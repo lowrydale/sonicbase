@@ -1,0 +1,108 @@
+package com.lowryengineering.database.query.impl;
+
+import com.lowryengineering.database.common.Record;
+import com.lowryengineering.database.jdbcdriver.ParameterHandler;
+import com.lowryengineering.database.query.DatabaseException;
+import com.lowryengineering.database.schema.TableSchema;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.util.Set;
+
+/**
+ * Responsible for
+ */
+public class ParenthesisImpl extends ExpressionImpl {
+  private ExpressionImpl expression;
+  private boolean isNot;
+
+  public ExpressionImpl getExpression() {
+    return expression;
+  }
+
+  public void setExpression(ExpressionImpl expression) {
+    this.expression = expression;
+  }
+
+  public boolean isNot() {
+    return isNot;
+  }
+
+  public void setNot(boolean not) {
+    isNot = not;
+  }
+
+  @Override
+  public void getColumns(Set<ColumnImpl> columns) {
+
+  }
+
+  @Override
+  public void serialize(DataOutputStream out) {
+    try {
+      super.serialize(out);
+      out.writeInt(expression.getType().getId());
+      expression.serialize(out);
+      out.writeBoolean(isNot);
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  @Override
+  public ExpressionImpl.Type getType() {
+    return ExpressionImpl.Type.parenthesis;
+  }
+
+  @Override
+  public void deserialize(DataInputStream in) {
+    try {
+      expression = ExpressionImpl.deserializeExpression(in);
+      isNot = in.readBoolean();
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  @Override
+  public Object evaluateSingleRecord(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms)  {
+    Object ret = expression.evaluateSingleRecord(tableSchemas, records, parms);
+    if (isNot) {
+      return !(Boolean) ret;
+    }
+    return ret;
+  }
+
+  @Override
+  public NextReturn next(int count) {
+    return null;
+  }
+
+
+  public NextReturn next() {
+    return null;
+  }
+
+  @Override
+  public boolean canUseIndex() {
+    return false;
+  }
+
+  @Override
+  public boolean canSortWithIndex() {
+    return false;
+  }
+
+  @Override
+  public void queryRewrite() {
+
+  }
+
+  @Override
+  public ColumnImpl getPrimaryColumn() {
+    return null;
+  }
+}

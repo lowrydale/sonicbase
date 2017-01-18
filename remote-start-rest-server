@@ -1,0 +1,6 @@
+ sudo mkdir -p /data/logs
+ sudo chown -R ubuntu:ubuntu /data
+
+ cd /home/ubuntu/database/bin
+
+ ./runclass com.lowryengineering.database.graph.GraphRestServer $1

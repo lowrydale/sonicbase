@@ -1,0 +1,4 @@
+nohup ./runclass com.lowryengineering.database.socket.BlockingServer --port 9010 --role master --shard 0 > /data/logs/db-0.log &
+nohup ./runclass com.lowryengineering.database.socket.BlockingServer --port 9110 --role master --shard 1 > /data/logs/db-1.log &
+#nohup ./runclass com.lowryengineering.database.socket.BlockingServer --port 9210 --role master --shard 2 > /data/logs/db-2.log &
+#nohup ./runclass com.lowryengineering.database.socket.BlockingServer --port 9310 --role master --shard 3 > /data/logs/db-3.log &

@@ -1,0 +1,4 @@
+cp -r src/main/resources/com/* out/production/pinyata-java/com
+cp -r src/main/resources/com/* out/test/pinyata-java/com
+
+

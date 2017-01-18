@@ -1,0 +1,42 @@
+{
+    "database": {
+        "dataDirectory": "/data/database",
+        "partitionCountForRecordIndex" : 10000,
+        "subPartitionsForIdIndex" : 10,
+        "initialIndexSize" : 10000000,
+        "indexEntrySize" : 60,
+      "replicationFactor": 2,
+        "shards" : [
+          {
+            "replicas": [
+              {
+                "privateAddress": "localhost",
+                "publicAddress": "localhost",
+                "port": 9010
+              },
+              {
+                "publicAddress": "localhost",
+                "privateAddress": "localhost",
+                "port": 9060
+              }
+            ]
+          },
+          {
+            "replicas": [
+              {
+                "publicAddress": "localhost",
+                "privateAddress": "localhost",
+                "port": 9110
+              },
+              {
+                "publicAddress": "localhost",
+                "privateAddress": "localhost",
+                "port": 9160
+              }
+            ]
+          }
+
+        ]
+    }
+
+}

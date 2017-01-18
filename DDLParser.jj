@@ -1,0 +1,835 @@
+options {
+      STATIC = false;
+      SUPPORT_CLASS_VISIBILITY_PUBLIC = true;
+      ERROR_REPORTING = false;
+      JAVA_UNICODE_ESCAPE = true;
+      UNICODE_INPUT = true;
+      NODE_USES_PARSER = false;
+      NODE_DEFAULT_VOID = true;
+      IGNORE_CASE = true;
+      VISITOR = true;
+      FORCE_LA_CHECK = true;
+      TRACK_TOKENS = true;
+}
+
+PARSER_BEGIN(DDLParser)
+package com.lowryengineering.database.jdbcdriver.ddlparser;
+
+public class DDLParser {
+    protected String removeQuotes(String quotedString) {
+        return quotedString.substring(1, quotedString.length() - 1);
+    }
+}
+
+PARSER_END(DDLParser)
+
+// white-space
+SKIP: {
+      " " | "\t" | "\n" | "\r" | "\f"
+}
+// comments
+SKIP: {
+    <COMMENT_LINE: "--" (~["\n","\r"])* ("\n"|"\r"|"\r\n") >
+}
+SKIP:{
+    <COMMENT_BLOCK: "/*" (~["*"])* "*" ("*" | (~["*","/"] (~["*"])* "*"))* "/">
+}
+
+// literals
+
+// separator and operator literals (prefix with O_)
+TOKEN: {
+      <O_ASSIGN: ":="> | <O_ASTERISK: "*"> | <O_ATSIGN: "@"> | <O_CLOSEPAREN: ")">
+    | <O_CONCAT: "||"> | <O_COLON: ":"> | <O_COMMA: ","> | <O_DOT: "."> | <O_DOUBLEDOT: "..">
+    | <O_DOLLAR: "$"> | <O_PERCENT: "%"> | <O_EQUAL: "="> | <O_GREATER: ">">
+    | <O_GREATEREQUAL: ">="> | <O_JOINPLUS: "(+)"> | <O_LESS: "<"> | <O_LESSEQUAL: "<=">
+    | <O_MINUS: "-"> | <O_NOTEQUAL2: "<>"> | <O_NOTEQUAL: "!="> | <O_OPENPAREN: "(">
+    | <O_PLUS: "+"> | <O_POUND: "#"> | <O_QUESTIONMARK: "?"> | <O_SEMICOLON: ";">
+    | <O_SLASH: "/"> | <O_TILDE: "~">
+}
+
+// numeric literals
+TOKEN : {
+      <S_NUMBER: <FLOAT> | <FLOAT> ( ["e","E"] ([ "-","+"])? <FLOAT> )? >
+    | <#FLOAT: <INTEGER> | <INTEGER> ( "." <INTEGER> )? | "." <INTEGER> >
+    | <#INTEGER: ( <DIGIT> )+ >
+    | <#DIGIT: ["0" - "9"] >
+}
+
+//reserved words and keywords literals
+
+/*
+PLSQL reserved words (prefix with R_ ) and keyword (prefix with K_) [NB: incomplete list]
+http://docs.oracle.com/cd/E11882_01/appdev.112/e25519/fundamentals.htm#CBJGBIGI
+You cannot use reserved words as ordinary user-defined identifiers.
+You can use keywords as ordinary user-defined identifiers, but it is not recommended.
+
+If a new K_ keyword is add to this list of tokens, it must also be added to the
+keywords() production
+*/
+TOKEN: {
+    //reserved words
+      <R_ALL: "ALL">
+    | <R_ALTER: "ALTER">
+    | <R_ANCHORED_ROWTYPE: "%ROWTYPE">
+    | <R_ANCHORED_TYPE: "%TYPE">
+    | <R_AND: "AND">
+    | <R_AS: "AS">
+    | <R_ASC: "ASC">
+    | <R_AT: "AT">
+    | <R_BEGIN: "BEGIN">
+    | <R_BETWEEN: "BETWEEN">
+    | <R_BY: "BY">
+    | <R_CASE: "CASE">
+    | <R_CHECK: "CHECK">
+    | <R_CLUSTERS: "CLUSTERS">
+    | <R_CLUSTER: "CLUSTER">
+    | <R_COLAUTH: "COLAUTH">
+    | <R_COLUMNS: "COLUMNS">
+    | <R_COMPRESS: "COMPRESS">
+    | <R_CONNECT: "CONNECT">
+    | <R_CRASH: "CRASH">
+    | <R_CREATE: "CREATE">
+    | <R_CURSOR: "CURSOR">
+    | <R_DECLARE: "DECLARE">
+    | <R_DEFAULT: "DEFAULT">
+    | <R_DESC: "DESC">
+    | <R_DISTINCT: "DISTINCT">
+    | <R_DROP: "DROP">
+    | <R_ELSE: "ELSE">
+    | <R_END: "END">
+    | <R_EXCEPTION: "EXCEPTION">
+    | <R_EXCLUSIVE: "EXCLUSIVE">
+    | <R_FETCH: "FETCH">
+    | <R_FOR: "FOR">
+    | <R_FROM: "FROM">
+    | <R_FUNCTION: "FUNCTION">
+    | <R_GOTO: "GOTO">
+    | <R_GRANT: "GRANT">
+    | <R_GROUP: "GROUP">
+    | <R_HAVING: "HAVING">
+    | <R_IDENTIFIED: "IDENTIFIED">
+    | <R_IF: "IF">
+    | <R_IN: "IN">
+    | <R_INDEX: "INDEX">
+    | <R_INDEXES: "INDEXES">
+    | <R_INSERT: "INSERT">
+    | <R_INTERSECT: "INTERSECT">
+    | <R_INTO: "INTO">
+    | <R_IS: "IS">
+    | <R_LIKE: "LIKE">
+    | <R_LOCK: "LOCK">
+    | <R_MINUS: "MINUS">
+    | <R_MODE: "MODE">
+    | <R_NOCOMPRESS: "NOCOMPRESS">
+    | <R_NO: "'NO'">
+    | <R_NOT: "NOT">
+    | <R_NOWAIT: "NOWAIT">
+    | <R_NULL: "NULL">
+    | <R_OF: "OF">
+    | <R_ON: "ON">
+    | <R_OPTION: "OPTION">
+    | <R_OR: "OR">
+    | <R_ORDER: "ORDER">
+    | <R_OVERLAPS: "OVERLAPS">
+    | <R_PROCEDURE: "PROCEDURE">
+    | <R_PUBLIC: "PUBLIC">
+    | <R_RESOURCE: "RESOURCE">
+    | <R_REVOKE: "REVOLE">
+    | <R_SELECT: "SELECT">
+    | <R_SHARE: "SHARE">
+    | <R_SIZE: "SIZE">
+    | <R_SQL: "SQL">
+    | <R_START: "START">
+    | <R_SUBTYPE: "SUBTYPE">
+    | <R_TABAUTH: "TABAUTH">
+    | <R_TABLE: "TABLE">
+    | <R_THEN: "THEN">
+    | <R_TO: "TO">
+    | <R_TYPE: "TYPE">
+    | <R_UNION: "UNION">
+    | <R_UNIQUE: "UNIQUE">
+    | <R_UPDATE: "UPDATE">
+    | <R_VALUES: "VALUES">
+    | <R_VIEW: "VIEW">
+    | <R_VIEWS: "VIEWS">
+    | <R_WHEN: "WHEN">
+    | <R_WHERE: "WHERE">
+    | <R_WITH: "WITH">
+    | <R_YES: "'YES'">
+    //keywords
+    | <K_ARRAY: "ARRAY">
+    | <K_AUTHID: "AUTHID">
+    | <K_AUTONOMOUS_TRANSACTION: "AUTONOMOUS_TRANSACTION">
+    | <K_BFILE: "BFILE">
+    | <K_BINARY_DOUBLE: "BINARY_DOUBLE">
+    | <K_BINARY_FLOAT: "BINARY_FLOAT">
+    | <K_BINARY_INTEGER: "BINARY_INTEGER">
+    | <K_BLOB: "BLOB">
+    | <K_BOOLEAN: "BOOLEAN">
+    | <K_BYTE: "BYTE">
+    | <K_CHAR: "CHAR">
+    | <K_CHARACTER: "CHARACTER">
+    | <K_CHARSET: "CHARSET">
+    | <K_CLOB: "CLOB">
+    | <K_COMMIT: "COMMIT">
+    | <K_CONSTANT: "CONSTANT">
+    | <K_CONSTRAINT: "CONSTRAINT">
+    | <K_CURRENT_USER: "CURRENT_USER">
+    | <K_DATE :"DATE">
+    | <K_DAY: "DAY">
+    | <K_DEC: "DEC">
+    | <K_DECIMAL: "DECIMAL">
+    | <K_DEFINER: "DEFINER">
+    | <K_DELETE: "DELETE">
+    | <K_DETERMINISTIC: "DETERMINISTIC">
+    | <K_DOUBLE: "DOUBLE">
+    | <K_ENABLE: "ENABLE">
+    | <K_EXCEPTION_INIT: "EXCEPTION_INIT">
+    | <K_FINAL: "FINAL">
+    | <K_FLOAT: "FLOAT">
+    | <K_FORCE: "FORCE">
+    | <K_GLOBAL: "GLOBAL">
+    | <K_INLINE: "INLINE">
+    | <K_INSTANTIABLE: "INSTANTIABLE">
+    | <K_INT: "INT">
+    | <K_INTEGER: "INTEGER">
+    | <K_INTERVAL: "INTERVAL">
+    | <K_KEY: "KEY">
+    | <K_LOCAL: "LOCAL">
+    | <K_LONG: "LONG">
+    | <K_MLSLABEL: "MLSLABEL">
+    | <K_MONTH: "MONTH">
+    | <K_NATIONAL: "NATIONAL">
+    | <K_NATURAL: "NATURAL">
+    | <K_NCHAR: "NCHAR">
+    | <K_NCLOB: "NCLOB">
+    | <K_NOCOPY: "NOCOPY">
+    | <K_NUMBER: "NUMBER">
+    | <K_NUMERIC: "NUMERIC">
+    | <K_NVARCHAR2: "NVARCHAR2">
+    | <K_NVARCHAR: "NVARCHAR">
+    | <K_OBJECT: "OBJECT">
+    | <K_OID: "OID">
+    | <K_ORGANIZATION: "ORGANIZATION">
+    | <K_OUT: "OUT">
+    | <K_OVERFLOW: "OVERFLOW">
+    | <K_PACKAGE: "PACKAGE">
+    | <K_PARALLEL_ENABLE: "PARALLEL_ENABLE">
+    | <K_PIPELINED: "PIPELINED">
+    | <K_PLS_INTEGER:"PLS_INTEGER">
+    | <K_POSITIVE: "POSITIVE">
+    | <K_PRAGMA: "PRAGMA">
+    | <K_PRECISION:"PRECISION">
+    | <K_PRESERVE: "PRESERVE">
+    | <K_PRIMARY: "PRIMARY">
+    | <K_RANGE: "RANGE">
+    | <K_RAW: "RAW">
+    | <K_REAL:"REAL">
+    | <K_RECORD: "RECORD">
+    | <K_REF: "REF">
+    | <K_REPLACE: "REPLACE">
+    | <K_RESTRICT_REFERENCES: "RESTRICT_REFERENCES">
+    | <K_RESULT_CACHE: "RESULT_CACHE">
+    | <K_RETURN: "RETURN">
+    | <K_RNDS: "RNDS">
+    | <K_RNPS: "RNPS">
+    | <K_ROWID:"ROWID">
+    | <K_ROWS: "ROWS">
+    | <K_SECOND: "SECOND">
+    | <K_SERIALLY_REUSABLE: "SERIALLY_REUSABLE">
+    | <K_SET: "SET">
+    | <K_SIGNTYPE: "SIGNTYPE">
+    | <K_SIMPLE_DOUBLE:"SIMPLE_DOUBLE">
+    | <K_SIMPLE_FLOAT:"SIMPLE_FLOAT">
+    | <K_SIMPLE_INTEGER:"SIMPLE_INTEGER">
+    | <K_SMALLINT:"SMALLINT">
+    | <K_STRING: "STRING">
+    | <K_SYS_REFCURSOR:"SYS_REFCURSOR">
+    | <K_TEMPORARY: "TEMPORARY">
+    | <K_TIME: "TIME">
+    | <K_TIMESTAMP: "TIMESTAMP">
+    | <K_TRUST: "TRUST">
+    | <K_UROWID:"UROWID">
+    | <K_VARCHAR2: "VARCHAR2">
+    | <K_VARCHAR: "VARCHAR">
+    | <K_VARRAY: "VARRAY">
+    | <K_VARYING: "VARYING">
+    | <K_WNDS: "WNDS">
+    | <K_WNPS: "WNPS">
+    | <K_YEAR: "YEAR">
+    | <K_ZONE: "ZONE">
+}
+
+// identifier literals
+TOKEN: {
+      <S_IDENTIFIER: (<LETTER>)+ (<DIGIT> | <LETTER> | <SPECIAL_CHARS>)* >
+    | <#LETTER: ["a"-"z", "A"-"Z"] >
+    | <#SPECIAL_CHARS: "$" | "_" | "#" | "@" >
+    | <S_BIND: ":" ( <S_NUMBER> | <S_IDENTIFIER> ("." <S_IDENTIFIER>)?) >
+    | <S_CHAR_LITERAL: "'" (~["'"])* "'" ("'" (~["'"])* "'")*>
+    | <S_QUOTED_IDENTIFIER: "\"" (~["\n","\r","\""])* "\"" >
+}
+
+String keywords():
+{Token t = null;}
+{
+    (
+        t=<K_TIMESTAMP>
+    )
+    {
+      return t.image;
+    }
+}
+
+String OracleObjectName():
+{Token t = null;
+ String s = null;}
+{
+    (
+      //  s=keywords()
+      //|
+        t=<S_QUOTED_IDENTIFIER> {s = removeQuotes(t.image);}
+      | t=<S_IDENTIFIER> {s = t.image;}
+    )
+    {
+      return s;
+    }
+}
+
+String OracleObjectNamePossiblyDotted():
+{String possiblyDottedName = "";
+ String afterDot = null;
+}
+{
+    possiblyDottedName=OracleObjectName() [ <O_DOT> afterDot=OracleObjectName() ]
+    {
+      if (afterDot != null) {
+          possiblyDottedName += "." + afterDot;
+      }
+      return possiblyDottedName;
+    }
+}
+
+String direction():
+{String dir = "";
+}
+{
+    (
+        <R_IN> {dir = "IN";} [ <K_OUT> {dir += " OUT";} ]
+      | <K_OUT> {dir = "OUT";}
+    )
+    {
+      return dir;
+    }
+}
+
+// stripped-down version of PLSQL grammar: only parses package/top-level DDL specifications
+
+// PLSQLPackage at 'top-level'
+void parsePLSQLPackage():
+{String dottedName = null;
+ String schema = null;
+ String packageName = null;
+}
+{
+    <R_CREATE> [ orReplaceClause() ] <K_PACKAGE>
+        dottedName=OracleObjectNamePossiblyDotted()
+        {
+          packageName = dottedName;
+          if (dottedName.contains(".")) {
+            int idx = dottedName.indexOf(".");
+            schema = dottedName.substring(0, idx);
+            packageName = dottedName.substring(idx+1, dottedName.length());
+          }
+        }
+        [ invokerRightsClause() ] asClause()
+         ( packageDeclaration() )*
+     <R_END> skipToSemiColon()
+     <EOF>
+}
+
+void orReplaceClause(): {}
+{
+    <R_OR> <K_REPLACE>
+}
+
+void invokerRightsClause(): {}
+{
+    <K_AUTHID> (<K_CURRENT_USER> | <K_DEFINER>)
+}
+
+void asClause(): {}
+{
+    ( <R_AS> | <R_IS> )
+}
+
+// procedure at 'top-level'
+void parseTopLevelProcedure():
+{String dottedName = null;
+ String schema = null;
+ String procedureName = null;}
+{
+	<R_CREATE> [ orReplaceClause() ] <R_PROCEDURE>
+        dottedName=OracleObjectNamePossiblyDotted()
+        {
+          procedureName = dottedName;
+          if (dottedName.contains(".")) {
+            int idx = dottedName.indexOf(".");
+            schema = dottedName.substring(0, idx);
+            procedureName = dottedName.substring(idx+1, dottedName.length());
+          }
+        }
+      [ <O_OPENPAREN> argumentList() <O_CLOSEPAREN> ] asClause() skipToEnd()
+}
+
+// function at 'top-level'
+void parseTopLevelFunction():
+{String dottedName = null;
+ String schema = null;
+ String functionName = null;
+}
+{
+    <R_CREATE> [ orReplaceClause() ] <R_FUNCTION>
+        dottedName=OracleObjectNamePossiblyDotted()
+        {
+          functionName = dottedName;
+          if (dottedName.contains(".")) {
+            int idx = dottedName.indexOf(".");
+            schema = dottedName.substring(0, idx);
+            functionName = dottedName.substring(idx+1, dottedName.length());
+          }
+        }
+      [ <O_OPENPAREN> argumentList() <O_CLOSEPAREN> ] functionReturnSpec() asClause() skipToEnd()
+}
+
+// table at 'top-level'
+void parseTable():
+{String dottedName = null;
+ String schema = null;
+ String tableName = null;
+}
+{
+    <R_CREATE> [ <K_GLOBAL> <K_TEMPORARY> ] <R_TABLE>
+        dottedName=OracleObjectNamePossiblyDotted()
+        {
+          tableName = dottedName;
+          if (dottedName.contains(".")) {
+            int idx = dottedName.indexOf(".");
+            schema = dottedName.substring(0, idx);
+            tableName = dottedName.substring(idx+1, dottedName.length());
+          }
+        }
+        <O_OPENPAREN> columnDeclarations() <O_CLOSEPAREN>
+
+         // todo - add support for ALTER ... clauses
+
+         [ <K_ORGANIZATION> ] [ <R_INDEX> ] [ <R_NOCOMPRESS> ] [ <K_OVERFLOW> ] [ onCommitClause() ]
+         <O_SEMICOLON>
+         <EOF>
+}
+
+boolean notNullClause(): {}
+{
+    <R_NOT> <R_NULL> [ <K_ENABLE> ]
+    {
+      return true;
+    }
+}
+
+void onCommitClause(): {}
+{
+    ( <R_ON> <K_COMMIT> ( <K_DELETE> | <K_PRESERVE> ) <K_ROWS> )
+}
+
+// type at 'top-level'
+void parseType():
+{String dottedName = null;
+}
+//CREATE [OR REPLACE] TYPE [ schema. ] type_name [ FORCE ] [ OID 'object_identifier' ] [ object_type | | { IS | AS } { varray_type_def | nested_table_type_def } ];
+{
+    <R_CREATE> [ orReplaceClause() ] <R_TYPE>
+      dottedName=OracleObjectNamePossiblyDotted()
+        [ <K_FORCE> ] [ <K_OID> <S_CHAR_LITERAL> ] [ invokerRightsClause() ] asClause()
+        (
+            <K_OBJECT> <O_OPENPAREN> columnDeclarations() <O_CLOSEPAREN>
+          | <K_VARRAY> <O_OPENPAREN> <S_NUMBER> <O_CLOSEPAREN> <R_OF> typeSpec()
+          | <R_TABLE> <R_OF> typeSpec()
+        )
+     [ [ <R_NOT> ] ( <K_FINAL> | <K_INSTANTIABLE> ) ] skipToEnd()
+}
+
+void columnDeclarations():
+{}
+{
+    columnDeclaration() [ <O_COMMA> columnDeclarations() ]
+}
+
+void columnDeclaration():
+{String s = null;
+}
+{
+    s=OracleObjectName() typeSpec() [ notNullConstraint() ]
+}
+
+void notNullConstraint():
+{
+}
+{
+    [ <K_CONSTRAINT> <S_QUOTED_IDENTIFIER> ] <R_NOT> <R_NULL>  [ <K_ENABLE> ]
+}
+
+void pkList():
+{}
+{
+    pk() ( <O_COMMA> pk() )*
+}
+
+
+void pk():
+{
+}
+{
+    OracleObjectName()
+}
+
+void packageDeclaration():
+{}
+{
+      variableDeclaration()
+    | typeOrSubTypeDeclaration()
+    | cursorDeclaration()
+    | procedureSpec()
+    | functionSpec()
+    | pragmaDeclaration()
+}
+
+void variableDeclaration():
+{String varName = null;}
+{
+    varName=OracleObjectName() [ <K_CONSTANT> ] typeSpec() [ <R_NOT> <R_NULL> ]
+        [variableDefaultAssignment() ]
+    <O_SEMICOLON>
+}
+
+void variableDefaultAssignment():
+{}
+{
+    ( <O_ASSIGN> | <R_DEFAULT> ) skipToSemiColon()
+}
+
+void datatype():
+{Token t = null;
+ Token precision = null;
+ Token scale = null;
+ Token withTimeZone = null;
+ Token withLocalTimeZone = null;
+}
+{
+      <K_BINARY_INTEGER>
+    | <K_BINARY_FLOAT>
+    | <K_BINARY_DOUBLE>
+    | <K_NATURAL>
+    | <K_POSITIVE>
+    | <K_SIGNTYPE>
+    | ( t=<K_NUMBER>
+        | t=<K_NUMERIC>
+        | t=<K_DECIMAL>
+        | t=<K_DEC>
+      ) [ <O_OPENPAREN> [ precision=<O_ASTERISK > | precision=<S_NUMBER> ] ( <O_COMMA> scale=<S_NUMBER> )* <O_CLOSEPAREN> ]
+    | <K_LONG> [ t=<K_RAW> ] [ <O_OPENPAREN> precision=<S_NUMBER> <O_CLOSEPAREN> ]
+    | <K_RAW> [ <O_OPENPAREN> precision=<S_NUMBER> <O_CLOSEPAREN> ]
+    | <K_BOOLEAN>
+    | <K_DATE>
+    | <K_INTERVAL>
+       (
+           <K_DAY> [ <O_OPENPAREN> precision=<S_NUMBER> <O_CLOSEPAREN> ] <R_TO> <K_SECOND> [ <O_OPENPAREN> scale=<S_NUMBER> <O_CLOSEPAREN> ]
+         |  <K_YEAR> [ <O_OPENPAREN> <S_NUMBER> <O_CLOSEPAREN> ] <R_TO> <K_MONTH>
+       )
+    | <K_TIME>
+    | <K_TIMESTAMP> [ <O_OPENPAREN> precision=<S_NUMBER> <O_CLOSEPAREN> ] [ <R_WITH> [ withLocalTimeZone=<K_LOCAL> ] withTimeZone=<K_TIME> <K_ZONE> ]
+    | <K_INTEGER>
+    | <K_INT>
+    | <K_SMALLINT>
+    | <K_FLOAT> [ <O_OPENPAREN> precision=<S_NUMBER> <O_CLOSEPAREN> ]
+    | <K_REAL>
+    | <K_MLSLABEL>
+    | <K_PLS_INTEGER>
+    | <K_SIMPLE_INTEGER>
+    | <K_SIMPLE_FLOAT>
+    | <K_SIMPLE_DOUBLE>
+    | <K_SYS_REFCURSOR>
+    | <K_BLOB >
+    | <K_CLOB>
+    | <K_NCLOB>
+    | <K_BFILE>
+    | <K_ROWID>
+    | <K_UROWID> [ <O_OPENPAREN> precision=<S_NUMBER> <O_CLOSEPAREN> ]
+    | <K_DOUBLE> <K_PRECISION>
+    | <K_CHAR> [ <K_VARYING> ] [ <O_OPENPAREN> precision=<S_NUMBER> [ <K_BYTE> | <K_CHAR> ] <O_CLOSEPAREN> ]
+    | <K_CHARACTER> [ <K_VARYING> ] <O_OPENPAREN> precision=<S_NUMBER> <O_CLOSEPAREN>
+    | <K_VARCHAR> <O_OPENPAREN> precision=<S_NUMBER> <O_CLOSEPAREN>
+    | <K_VARCHAR2> [ <O_OPENPAREN> precision=<S_NUMBER> [ <K_BYTE> | <K_CHAR> ] <O_CLOSEPAREN> ]
+    | <K_NCHAR> [ <K_VARYING> ] [ <O_OPENPAREN> precision=<S_NUMBER> <O_CLOSEPAREN> ]
+    | <K_NVARCHAR2> [ <O_OPENPAREN> precision=<S_NUMBER> <O_CLOSEPAREN> ]
+    | <K_NATIONAL> ( <K_CHARACTER> | <K_CHAR> ) [ <K_VARYING> ] <O_OPENPAREN> precision=<S_NUMBER> <O_CLOSEPAREN>
+}
+
+void typeSpec():
+{boolean isTYPEType = false;
+ boolean isROWTYPEType = false;
+ String spec = null;
+ String s = null;}
+{
+    (
+        datatype()
+      | columnSpec()
+        [
+               ( <O_OPENPAREN> <S_NUMBER> <O_CLOSEPAREN> )
+            |  <R_ANCHORED_TYPE>
+            |  <R_ANCHORED_ROWTYPE>
+        ]
+    )
+}
+
+String columnSpec():
+{String s1 = null;
+ String s2 = null;
+ String s3 = null;}
+{
+    s1=OracleObjectName() [ <O_DOT> s2=OracleObjectName() [ <O_DOT> s3=OracleObjectName() ] ]
+    {
+      StringBuilder sb = new StringBuilder(s1);
+      if (s2 != null) {
+          sb.append('.');
+          sb.append(s2);
+          if (s3 != null) {
+              sb.append('.');
+              sb.append(s3);
+          }
+      }
+      return sb.toString();
+    }
+}
+
+String tableSpec():
+{}
+{
+    OracleObjectName() [ <O_DOT> OracleObjectName() [ <O_ATSIGN> <S_IDENTIFIER> ] ]
+    {return token.image;}
+}
+
+String typeName():
+{}
+{
+    OracleObjectName() [ <O_DOT> OracleObjectName() ]
+    {return token.image;}
+}
+
+void typeOrSubTypeDeclaration():
+{String s = null;}
+{
+      typeDeclaration()
+    | subtypeDeclaration()
+}
+
+void typeDeclaration():
+{String s = null;}
+{
+    <R_TYPE> s=typeName() <R_IS> aTypeDeclaration() <O_SEMICOLON>
+}
+
+void aTypeDeclaration():
+{}
+{
+      recordDeclaration()
+    | plsqlTableDeclaration()
+    | varrayDeclaration()
+    | refCursorDeclaration()
+}
+
+void recordDeclaration():
+{
+}
+{
+    <K_RECORD> <O_OPENPAREN>
+        fieldDeclarations()
+    <O_CLOSEPAREN>
+}
+
+void fieldDeclarations():
+{}
+{
+    fieldDeclaration() [ <O_COMMA> fieldDeclarations() ]
+}
+
+void fieldDeclaration( ):
+{String s = null;
+}
+{
+    s=typeName() typeSpec() [ <R_NOT> <R_NULL> ] [ fieldDefaultAssignment() ]
+}
+
+void fieldDefaultAssignment():
+{}
+{
+    ( <O_ASSIGN> | <R_DEFAULT> ) skipToNextArg()
+}
+
+void subtypeDeclaration():
+{String subtypeName;
+Token notNull = null;
+Token rangeStart = null;
+Token rangeEnd = null;}
+{
+    <R_SUBTYPE> subtypeName=OracleObjectName() <R_IS> typeSpec()
+        [ <K_RANGE> rangeStart=<S_NUMBER> <O_DOUBLEDOT> rangeEnd=<S_NUMBER> ]
+        [ <R_NOT> notNull=<R_NULL> ] <O_SEMICOLON>
+}
+
+void plsqlTableDeclaration():
+{
+}
+{
+    <R_TABLE> <R_OF> typeSpec() [ <R_NOT> <R_NULL> ]
+        [ <R_INDEX> <R_BY> plsqlTableIndexByDeclaration() ]
+}
+
+void plsqlTableIndexByDeclaration():
+{}
+{
+    (
+        <K_PLS_INTEGER>
+      | <K_BINARY_INTEGER>
+      | <K_VARCHAR2> <O_OPENPAREN> <S_NUMBER> <O_CLOSEPAREN>
+      | <K_STRING> <O_OPENPAREN> <S_NUMBER> <O_CLOSEPAREN>
+    )
+}
+
+void varrayDeclaration():
+{}
+{
+    ( <K_VARRAY> | <K_VARYING> <K_ARRAY> ) <O_OPENPAREN> <S_NUMBER> <O_CLOSEPAREN>
+        <R_OF> datatype() [ <R_NOT> <R_NULL> ]
+}
+
+void refCursorDeclaration():
+{}
+{
+    <K_REF> <R_CURSOR>
+        [
+          <K_RETURN> <S_IDENTIFIER> [ <R_ANCHORED_TYPE> | <R_ANCHORED_ROWTYPE> ]
+        ]
+}
+
+void cursorReturnsColumnType():
+{}
+{
+    columnSpec() [ <R_ANCHORED_TYPE> ]
+}
+
+void cursorReturnsTableType():
+{}
+{
+    tableSpec() [ <R_ANCHORED_TYPE> ]
+}
+
+void cursorDeclaration():
+{}
+{
+    <R_CURSOR> OracleObjectName()
+    <O_SEMICOLON>
+}
+
+// Procedure Specification
+void procedureSpec():
+{String s = null;
+}
+{
+    <R_PROCEDURE> s=OracleObjectName()
+        [ <O_OPENPAREN> argumentList() <O_CLOSEPAREN> ]
+    <O_SEMICOLON>
+}
+
+void argumentList():
+{}
+{
+   argument() ( <O_COMMA> argument() )*
+}
+
+// Function Specification
+void functionSpec():
+{String s = null;
+}
+{
+    <R_FUNCTION> s=OracleObjectName()
+        [ <O_OPENPAREN> argumentList() <O_CLOSEPAREN> ] functionReturnSpec()
+        [ <K_DETERMINISTIC> | <K_PIPELINED> | <K_PARALLEL_ENABLE> | <K_RESULT_CACHE> ]
+    <O_SEMICOLON>
+}
+
+void functionReturnSpec():
+{}
+{
+    <K_RETURN> typeSpec()
+
+}
+
+void argument( ):
+{String s = null;
+}
+{
+    s=OracleObjectName() [ direction() ]
+        [ <K_NOCOPY> ] typeSpec() [ argumentDefaultAssignment() ]
+}
+
+boolean argumentDefaultAssignment(): {}
+{
+    ( <O_ASSIGN> | <R_DEFAULT> ) skipToNextArg()
+    {
+      return true;
+    }
+}
+
+void pragmaDeclaration():
+{}
+{
+    <K_PRAGMA> skipToSemiColon()
+}
+
+void skipToSemiColon():
+{}
+{
+    {
+        Token t = getNextToken();
+        while (t.kind != O_SEMICOLON) {
+	        t = getNextToken();
+        }
+        token_source.input_stream.backup(1);
+    }
+}
+
+void skipToNextArg():
+{}
+{
+    {
+        Token t = getNextToken();
+        while (t.kind != O_COMMA && t.kind != O_CLOSEPAREN) {
+            t = getNextToken();
+        }
+        token_source.input_stream.backup(1);
+    }
+}
+
+void skipToEnd():
+{}
+{
+    {
+      /** skip through all the tokens. */
+      Token t = getNextToken();
+      while (t.kind != EOF) {
+          t = getNextToken();
+      }
+  }
+
+}

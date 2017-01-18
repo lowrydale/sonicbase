@@ -1,0 +1,4 @@
+nohup ./runclass com.lowryengineering.database.graph.GraphRestServer 8080 > /data/logs/rest-0.log &
+nohup ./runclass com.lowryengineering.database.graph.GraphRestServer 8081 > /data/logs/rest-1.log &
+#nohup ./runclass com.lowryengineering.database.graph.GraphRestServer 8082 > /data/logs/rest-2.log &
+#nohup ./runclass com.lowryengineering.database.graph.GraphRestServer 8083 > /data/logs/rest-3.log &

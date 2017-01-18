@@ -1,0 +1,110 @@
+#!/bin/bash
+
+#cd $( dirname $0 )
+#if [ "$SEARCH_HOME" = "" ]
+#then
+  export SEARCH_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
+#fi
+
+export SEARCH_HOME=$(echo $SEARCH_HOME | sed 's/\/bin\/..//g')
+echo "SH=$SEARCH_HOME"
+
+if [ "$_XMX_" = "" ]
+then
+  export _XMX_=2000m
+fi
+export _CLASS_=$1
+export _CONFIG_=default_server
+export _CONFIG_=default_server
+export _JPROFILER_HOME_=/home/tools/jprofiler3
+export _NODE_SYS_PROPS_='-Dunified.configuration.bootstrap.properties='$BOOTSTRAP_PROPERTIES
+export _SYS_PROPS_=$_SYS_PROPS_' '$_NODE_SYS_PROPS_
+
+export _GC_=$_GC_LOG_FILENAME_
+
+if [ "$_GC_LOG_FILENAME_" == "" ]
+then
+  export _GC_="$SEARCH_HOME/logs/gc.log"
+fi
+
+java_opts="$java_opts -Dclass="$1
+java_opts="$java_opts -Dp1="$2
+java_opts="$java_opts -Dp2="$3
+java_opts="$java_opts -Dp3="$4
+java_opts="$java_opts -Dp4="$5
+java_opts="$java_opts -Dp5="$6
+java_opts="$java_opts -Dp6="$7
+java_opts="$java_opts -Dp7="$8
+java_opts="$java_opts -Dp8="$9
+java_opts="$java_opts -Dp9="$10
+java_opts="$java_opts -Dp10="$11
+java_opts="$java_opts -Dp11="$12
+java_opts="$java_opts -Dp12="$13
+java_opts="$java_opts -Dp13="$14
+#-XX:+UseParallelGC
+
+
+#java_opts="$java_opts -showversion -server  -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=68 -XX:+CMSConcurrentMTEnabled -XX:+UseParNewGC -XX:NewSize=256m -XX:MaxNewSize=460m -XX:+UseCompressedOops"
+
+java_opts="$java_opts -server  -XX:NewRatio=2 -XX:SurvivorRatio=10 -XX:+UseG1GC -XX:MaxGCPauseMillis=150 -XX:-ResizePLAB -XX:ParallelGCThreads=4 -XX:ConcGCThreads=2 -XX:-OmitStackTraceInFastThrow"
+java_opts="$java_opts -verbose:gc -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=3 -XX:GCLogFileSize=2m -Xloggc:$_GC_"
+
+if [ "$_LOG4J_FILENAME_" = "" ]
+then
+  export _LOG4J_FILENAME_="out.log"
+fi
+
+java_opts="$java_opts  -Dlogfilename=$_LOG4J_FILENAME_"
+
+echo $java_opts
+
+#java_opts="$java_opts -showversion -server  -XX:+UseG1GC -verbose:gc -Xloggc:$_GC_"
+java_opts="$java_opts  -XX:PermSize=256m -XX:MaxPermSize=356m -XX:+CMSClassUnloadingEnabled -XX:+PrintGCDetails  -XX:-UseLargePagesIndividualAllocation"
+java_opts="$java_opts -XX:+HeapDumpOnOutOfMemoryError  -Djava.net.preferIPv4Stack=true"
+java_opts="$java_opts -XX:+PrintGCDetails -XX:+PrintGCTimeStamps "
+java_opts="$java_opts -XX:-OmitStackTraceInFastThrow -XX:-UseLoopPredicate"
+java_opts="$java_opts -Xmx$_XMX_ -XX:MaxDirectMemorySize=2g "
+#-XX:ReservedCodeCacheSize=32m
+java_opts="$java_opts -Dfamilysearch.search.disable.foreign.node.registration -Dfamilysearch.search.disable.central.log "
+if [ "$LOG4J_FILE" = "cli-log4j.xml" ]; then
+java_opts="$java_opts -Dlog4j.configuration=cli-log4j.xml"
+else
+java_opts="$java_opts -Dlog4j.configuration=log4j.xml"
+fi
+
+export _JAVA_OPTS_=$java_opts
+
+if [ "$_JMX_PORT_" != "" ]; then
+  export _JAVA_OPTS_=$_JAVA_OPTS_' -Dcom.sun.management.jmxremote.port='$_JMX_PORT_
+fi
+echo "search_home=$SEARCH_HOME"
+_SEARCH_CLASSPATH_=$SEARCH_HOME/target/:$SEARCH_HOME/config/
+for f in $SEARCH_HOME/lib/*.jar; do
+  _SEARCH_CLASSPATH_=$_SEARCH_CLASSPATH_:$f
+done
+
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$SEARCH_HOME/lib/linux64
+
+if [ "$MODE" = "debug" ]; then
+
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH
+echo java $_JAVA_OPTS_ $_SYS_PROPS_ -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005 -cp $_SEARCH_CLASSPATH_ "$@" >&2
+java $_JAVA_OPTS_ $_SYS_PROPS_ -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005 -cp $_SEARCH_CLASSPATH_ "$@"
+
+elif [ "$MODE" = "yprof" ]; then
+
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/ubuntu/yjp-linux/bin/linux-x86-64
+echo java $_JAVA_OPTS_ $_SYS_PROPS_ -agentlib:yjpagent=port=9009 -cp $_SEARCH_CLASSPATH_ "$@" >&2
+java $_JAVA_OPTS_ $_SYS_PROPS_ -agentlib:yjpagent=port=9009,dir=$SEARCH_HOME -cp $_SEARCH_CLASSPATH_ "$@"
+
+else
+
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH
+echo java $_JAVA_OPTS_ $_SYS_PROPS_ -cp $_SEARCH_CLASSPATH_ "$@" >&2
+pushd $SEARCH_HOME
+echo $SEARCH_HOME
+java $_JAVA_OPTS_ $_SYS_PROPS_ -classpath $_SEARCH_CLASSPATH_ "$@"
+popd
+
+fi
+

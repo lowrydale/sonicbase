@@ -18,6 +18,9 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -508,7 +511,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
           getClient().getCommon().getTables(dbName).get(getTableName()),
           getClient().getCommon().getTables(dbName).get(getTableName()).getIndices().get(indexName),
           leftOp, null, getOrderByExpressions(), singleKey, getParms(), getTopLevelExpression(), null,
-          new Object[]{originalLeftValue}, null, getColumns(), leftColumn, getNextShard(),
+          singleKey, null, getColumns(), leftColumn, getNextShard(),
           getRecordCache(), usedIndex, false, getViewVersion(), getCounters(), getGroupByContext(), debug);
       if (context != null) {
         setNextShard(context.getNextShard());
@@ -583,7 +586,13 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
 
   private Object[] makeSingleKeyExpression(String indexName, String leftColumn, List<Object> leftValues, Operator leftOp, String rightColumn, List<Object> rightValues,
                                            Operator rightOp) {
+    if (indexName == null) {
+      return null;
+    }
     String[] indexFields = getClient().getCommon().getTables(dbName).get(getTableName()).getIndices().get(indexName).getFields();
+    if (indexFields.length < 2) {
+      return null;
+    }
 
     Object[] key = new Object[indexFields.length];
     if (leftOp == Operator.equal && rightOp == Operator.equal) {
@@ -634,11 +643,11 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
   }
 
   private NextReturn evaluateOneSidedIndex(
-      String[] tableNames, int count, ExpressionImpl leftExpression, ExpressionImpl rightExpression) {
+      final String[] tableNames, int count, ExpressionImpl leftExpression, ExpressionImpl rightExpression) {
     if (getNextShard() == -2) {
       return null;
     }
-    List<Object[]> retIds = new ArrayList<>();
+    final List<Object[]> retIds = new ArrayList<>();
 
     ExpressionImpl tmpExpression = null;
     if (!leftExpression.canUseIndex() && rightExpression.canUseIndex()) {
@@ -662,24 +671,27 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
       return null;
     }
     //todo: loop while less than 200
-    TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(tableNames[0]);
+    final TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(tableNames[0]);
     if (true || !rightExpression.canUseIndex()) {
+      ThreadPoolExecutor executor = getClient().getExecutor();
+      List<Object[][]> batch = new ArrayList<>();
+      List<Future> futures = new ArrayList<>();
       for (Object[][] id : leftIds.getKeys()) {
+        batch.add(id);
+        if (batch.size() >= 250) {
+          final List<Object[][]> currBatch = batch;
+          batch = new ArrayList<>();
 
-        Record record = getRecordCache().get(tableNames[0], id[0]);
-        if (record != null) {
-          boolean pass = (Boolean) ((ExpressionImpl) getTopLevelExpression()).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, getParms());
-          if (pass) {
-            retIds.add(id[0]);
-          }
-        }
-        else {
-          record = ExpressionImpl.doReadRecord(dbName, getClient(), getRecordCache(), id[0], getTableName(), getColumns(), getTopLevelExpression(), getParms(), getViewVersion(), debug);
-          if (record != null) {
-            retIds.add(id[0]);
-          }
+          futures.add(executor.submit(new Callable() {
+            @Override
+            public Object call() throws Exception {
+              processBatch(currBatch, tableNames[0], tableSchema, retIds);
+              return null;
+            }
+          }));
         }
       }
+      processBatch(batch, tableNames[0], tableSchema, retIds);
 
       Object[][][] ids = new Object[retIds.size()][][];
       int i = 0;
@@ -730,6 +742,26 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     }
   }
 
+
+  private void processBatch(List<Object[][]> currBatch, String tableName, TableSchema tableSchema, List<Object[]> retIds) {
+    for (Object[][] id : currBatch) {
+      Record record = getRecordCache().get(tableName, id[0]);
+      if (record != null) {
+        boolean pass = (Boolean) ((ExpressionImpl) getTopLevelExpression()).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, getParms());
+        if (pass) {
+          synchronized (retIds) {
+            retIds.add(id[0]);
+          }
+        }
+      }
+      else {
+        record = ExpressionImpl.doReadRecord(dbName, getClient(), getRecordCache(), id[0], getTableName(), getColumns(), getTopLevelExpression(), getParms(), getViewVersion(), debug);
+        if (record != null) {
+          retIds.add(id[0]);
+        }
+      }
+    }
+  }
 
   private NextReturn evaluateOrExpression(int count) {
     if (!leftExpression.canUseIndex() || !rightExpression.canUseIndex()) {

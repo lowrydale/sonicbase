@@ -68,38 +68,33 @@ public class SchemaManager {
         throw new DatabaseException("Invalid field for index: indexName=" + indexName + ", field=" + field);
       }
     }
-    for (int i = 0; i < fields.length; i++) {
-      String[] currFields = new String[i + 1];
-      for (int j = 0; j < currFields.length; j++) {
-        currFields[j] = fields[j];
+
+    indexName = "_" + fields.length + "_" + indexName;
+
+    createdIndices.add(indexName);
+
+    TableSchema.Partition[] partitions = new TableSchema.Partition[server.getShardCount()];
+    for (int j = 0; j < partitions.length; j++) {
+      partitions[j] = new TableSchema.Partition();
+      partitions[j].setShardOwning(j);
+      if (j == 0) {
+        partitions[j].setUnboundUpper(true);
       }
-
-      indexName = "_" + (i + 1) + "_" + indexName;
-
-      createdIndices.add(indexName);
-
-      TableSchema.Partition[] partitions = new TableSchema.Partition[server.getShardCount()];
-      for (int j = 0; j < partitions.length; j++) {
-        partitions[j] = new TableSchema.Partition();
-        partitions[j].setShardOwning(j);
-        if (j == 0) {
-          partitions[j].setUnboundUpper(true);
-        }
-      }
-
-      Map<Integer, IndexSchema> indicesById = tableSchema.getIndexesById();
-      int highIndexId = 0;
-      for (int id : indicesById.keySet()) {
-        highIndexId = Math.max(highIndexId, id);
-      }
-      highIndexId++;
-
-      tableSchema.addIndex(indexName, currFields, partitions, highIndexId);
-
-      server.getCommon().updateTable(dbName, server.getDataDir(), tableSchema);
-
-      doCreateIndex(dbName, tableSchema, indexName, currFields);
     }
+
+    Map<Integer, IndexSchema> indicesById = tableSchema.getIndexesById();
+    int highIndexId = 0;
+    for (int id : indicesById.keySet()) {
+      highIndexId = Math.max(highIndexId, id);
+    }
+    highIndexId++;
+
+    tableSchema.addIndex(indexName, fields, partitions, highIndexId);
+
+    server.getCommon().updateTable(dbName, server.getDataDir(), tableSchema);
+
+    doCreateIndex(dbName, tableSchema, indexName, fields);
+
     return createdIndices;
   }
 
@@ -127,6 +122,10 @@ public class SchemaManager {
       String dbName = parts[4];
       String masterSlave = parts[5];
       dbName = dbName.toLowerCase();
+
+      if (replayedCommand && null != server.getCommon().getSchema(dbName)) {
+        return null;
+      }
 
       if (null != server.getCommon().getSchema(dbName)) {
         throw new DatabaseException("Database already exists: name=" + dbName);
@@ -426,7 +425,9 @@ public class SchemaManager {
         String indexName = in.readUTF();
         IndexSchema indexSchema = tableSchema.getIndexes().get(indexName);
 
-        doCreateIndex(dbName, tableSchema, indexName, indexSchema.getFields());
+        if (!server.getIndices(dbName).getIndices().containsKey(indexName)) {
+          doCreateIndex(dbName, tableSchema, indexName, indexSchema.getFields());
+        }
       }
     }
     catch (IOException e) {
@@ -435,7 +436,7 @@ public class SchemaManager {
     return null;
   }
 
-  public byte[] createIndex(String command, byte[] body) {
+  public byte[] createIndex(String command, byte[] body, boolean replayedCommand) {
     try {
       if (server.getShard() == 0 && server.getReplica() == 0 && command.contains(":slave:")) {
         return null;
@@ -452,6 +453,19 @@ public class SchemaManager {
       String indexName = parts[7];
       String fieldsStr = parts[8];
       String[] fields = fieldsStr.split(",");
+
+      if (replayedCommand) {
+        logger.info("replayedCommand: crateIndex, table=" + table + ", index=" + indexName);
+        if (server.getCommon().getTables(dbName).get(table).getIndexes().containsKey(indexName.toLowerCase())) {
+          ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+          DataOutputStream out = new DataOutputStream(bytesOut);
+          DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+          server.getCommon().serializeSchema(out);
+          out.close();
+
+          return bytesOut.toByteArray();
+        }
+      }
 
       List<String> createdIndices = createIndex(dbName, table, indexName, fields);
 

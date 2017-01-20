@@ -27,7 +27,7 @@ public class SnapshotManager {
   private static final String DURATION_STR = ", duration(s)=";
   public static Logger logger = LoggerFactory.getLogger(SnapshotManager.class);
 
-  public static final int SNAPSHOT_BUCKET_COUNT = 32;
+  public static final int SNAPSHOT_BUCKET_COUNT = 128;
   public static final int SNAPSHOT_SERIALIZATION_VERSION = 19;
 
   private final DatabaseServer server;
@@ -143,18 +143,20 @@ public class SnapshotManager {
     final long indexBegin = System.currentTimeMillis();
     recoveredCount.set(0);
     final AtomicLong lastLogged = new AtomicLong(System.currentTimeMillis());
-    for (int i = 0; i < SNAPSHOT_BUCKET_COUNT; i++) {
-      File file = new File(snapshotDir, String.valueOf(i));
-      if (file.exists()) {
-        for (File tableFile : file.listFiles()) {
-          final String tableName = tableFile.getName();
+    File file = snapshotDir;
+    if (file.exists()) {
+      for (File tableFile : file.listFiles()) {
+        final String tableName = tableFile.getName();
+        if (!tableFile.isDirectory()) {
+          continue;
+        }
+        final AtomicBoolean firstThread = new AtomicBoolean();
+        for (File indexDir : tableFile.listFiles()) {
+          final String indexName = indexDir.getName();
           List<Future> futures = new ArrayList<>();
-          final AtomicBoolean firstThread = new AtomicBoolean();
-          File[] files = new File(snapshotDir, String.valueOf(i) + "/" + tableName).listFiles();
-          for (int j = 0; j < files.length; j++) {
-            final int offset = j;
-            final File indexFile = files[j];
-            final String indexName = indexFile.getName().split("\\.")[0];
+          final AtomicInteger offset = new AtomicInteger();
+          for (final File indexFile : indexDir.listFiles()) {
+            final int currOffset = offset.get();
             logger.info("Recovering: table=" + tableName + INDEX_STR + indexName);
             final TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
             final IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
@@ -197,7 +199,7 @@ public class SnapshotManager {
 
                                                 countForFile++;
                                                 recoveredCount.incrementAndGet();
-                                                if (offset == 0 && (System.currentTimeMillis() - lastLogged.get()) > 2000) {
+                                                if (currOffset == 0 && (System.currentTimeMillis() - lastLogged.get()) > 2000) {
                                                   lastLogged.set(System.currentTimeMillis());
                                                   logger.info("Recover progress - table=" + tableName + INDEX_STR + indexName + ": count=" + recoveredCount.get() + RATE_STR +
                                                       ((float) recoveredCount.get() / (float) ((System.currentTimeMillis() - indexBegin)) * 1000f) +
@@ -208,29 +210,26 @@ public class SnapshotManager {
                                             catch (EOFException e) {
                                               throw new Exception(e);
                                             }
-                                            finally {
-                                              logger.info("End of records file: name=" + indexFile.getAbsolutePath() + ", countForFile=" + countForFile);
-                                            }
                                             return true;
                                           }
                                         }
             ));
-
-            for (Future future : futures) {
-              try {
-                if (!(Boolean) future.get()) {
-                  throw new Exception("Error recovering from bucket");
-                }
-              }
-              catch (Exception t) {
-                throw new Exception("Error recovering from bucket", t);
+            offset.incrementAndGet();
+          }
+          for (Future future : futures) {
+            try {
+              if (!(Boolean) future.get()) {
+                throw new Exception("Error recovering from bucket");
               }
             }
-            logger.info("Recover progress - finished index. table=" + tableName + INDEX_STR + indexName + ": count=" + recoveredCount.get() + RATE_STR +
-                ((float) recoveredCount.get() / (float) ((System.currentTimeMillis() - indexBegin)) * 1000f) +
-                DURATION_STR + (System.currentTimeMillis() - indexBegin) / 1000f);
-
+            catch (Exception t) {
+              throw new Exception("Error recovering from bucket", t);
+            }
           }
+          logger.info("Recover progress - finished index. table=" + tableName + INDEX_STR + indexName + ": count=" + recoveredCount.get() + RATE_STR +
+              ((float) recoveredCount.get() / (float) ((System.currentTimeMillis() - indexBegin)) * 1000f) +
+              DURATION_STR + (System.currentTimeMillis() - indexBegin) / 1000f);
+
         }
       }
     }
@@ -304,7 +303,7 @@ public class SnapshotManager {
         final DataOutputStream[] outStreams = new DataOutputStream[SNAPSHOT_BUCKET_COUNT];
         try {
           for (int i = 0; i < outStreams.length; i++) {
-            File currFile = new File(file, i + "/" + tableEntry.getKey() + "/" + indexEntry.getKey() + ".bin");
+            File currFile = new File(file, tableEntry.getKey() + "/" + indexEntry.getKey() + "/" + i + ".bin");
             currFile.getParentFile().mkdirs();
             outStreams[i] = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(currFile)));
           }

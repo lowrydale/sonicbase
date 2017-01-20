@@ -270,7 +270,9 @@ public class LongRunningCommands {
   }
 
   public void serialize(DataOutputStream out) throws IOException {
-    commands.serialize(out);
+    synchronized (commands) {
+      commands.serialize(out);
+    }
   }
 
   private static void serializeType(DataOutputStream out, Command command) throws IOException {
@@ -283,7 +285,9 @@ public class LongRunningCommands {
   }
 
   public void deserialize(DataInputStream in) throws IOException {
-    commands.deserialize(in);
+    synchronized (commands) {
+      commands.deserialize(in);
+    }
   }
 
   private static Command createType(LongRunningCommands longRunningCommands, DataInputStream in) throws IOException {

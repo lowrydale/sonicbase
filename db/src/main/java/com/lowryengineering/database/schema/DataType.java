@@ -463,14 +463,8 @@ public class DataType {
         long l2 = (Long) o2;
         return l1 < l2 ? -1 : l1 > l2 ? 1 : 0;
       }
-      if (o1 == null && o2 == null) {
+      if (o1 == null || o2 == null) {
         return 0;
-      }
-      if (o1 == null) {
-        return -1;
-      }
-      if (o2 == null) {
-        return 1;
       }
       Long lhs = (Long) longConverter.convert(o1);
       Long rhs = (Long) longConverter.convert(o2);
@@ -487,14 +481,8 @@ public class DataType {
   private static Comparator intComparator = new Comparator() {
     @Override
     public int compare(Object o1, Object o2) {
-      if (o1 == null && o2 == null) {
+      if (o1 == null || o2 == null) {
         return 0;
-      }
-      if (o1 == null) {
-        return -1;
-      }
-      if (o2 == null) {
-        return 1;
       }
       Integer lhs = (Integer) intConverter.convert(o1);
       Integer rhs = (Integer) intConverter.convert(o2);

@@ -2,10 +2,9 @@ package com.lowryengineering.database.bench;
 
 import com.lowryengineering.research.socket.NettyServer;
 
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.*;
 
 /**
  * Responsible for
@@ -15,7 +14,7 @@ public class TestServers {
   public static void main(String[] args) throws Exception {
     //FileUtils.deleteDirectory(new File("/data/database"));
 
-    final NettyServer[] dbServers = new NettyServer[1];
+    final NettyServer[] dbServers = new NettyServer[4];
     for (int shard = 0; shard < dbServers.length; shard++) {
       dbServers[shard] = new NettyServer();
     }
@@ -28,7 +27,7 @@ public class TestServers {
       public Object call() throws Exception {
         try {
           dbServers[0].startServer(new String[]{"-port", String.valueOf(9010 + (50 * 0)), "-host", "localhost",
-              "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "4-servers-large", "-shard", String.valueOf(0)}, "db/src/main/resources/config/config-4-servers-large.json", true);
+              "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "4-bench", "-shard", String.valueOf(0)}, "db/src/main/resources/config/config-4-bench.json", true);
           //dbServers[0].getDatabaseServer().disableRepartitioner();
         }
         catch (Exception e) {
@@ -40,37 +39,38 @@ public class TestServers {
     while (!dbServers[0].isRunning()) {
       Thread.sleep(1000);
     }
+    Thread.sleep(10000);
 
-//    List<Future> futures = new ArrayList<>();
-//    for (int i = 0; i < dbServers.length; i++) {
-//      final int shard = i;
-//      futures.add(executor.submit(new Callable() {
-//        @Override
-//        public Object call() throws Exception {
-//          if (shard == 0) {
-//            return null;
-//          }
-//          try {
-//            dbServers[shard].startServer(new String[]{"-port", String.valueOf(9010 + (50 * shard)), "-host", "localhost",
-//                "-mport", String.valueOf(9010), "-mhost", "localhost",
-//                "-shard", String.valueOf(shard)}, "db/src/main/resources/config/config-4-servers-large.json");
-//            //dbServers[shard].getDatabaseServer().disableRepartitioner();
-//          }
-//          catch (Exception e) {
-//            e.printStackTrace();
-//          }
-//          //          String role = "primaryMaster";
-//          //          dbServers[shard] = new DatabaseServer();
-//          //          dbServers[shard].setConfig(config, Integer.valueOf(shard));
-//          //          dbServers[shard].setRole(role);
-//          //          dbServers[shard].disableLogProcessor();
-//          return null;
-//        }
-//      }));
-    //}
-    //    for (Future future : futures) {
-    //      future.get();
-    //    }
+    List<Future> futures = new ArrayList<>();
+    for (int i = 0; i < dbServers.length; i++) {
+      final int shard = i;
+      futures.add(executor.submit(new Callable() {
+        @Override
+        public Object call() throws Exception {
+          if (shard == 0) {
+            return null;
+          }
+          try {
+            dbServers[shard].startServer(new String[]{"-port", String.valueOf(9010 + (50 * shard)), "-host", "localhost",
+                "-mport", String.valueOf(9010), "-mhost", "localhost",
+                "-shard", String.valueOf(shard), "-cluster", "4-bench"}, "db/src/main/resources/config/config-4-bench.json", true);
+            //dbServers[shard].getDatabaseServer().disableRepartitioner();
+          }
+          catch (Exception e) {
+            e.printStackTrace();
+          }
+          //          String role = "primaryMaster";
+          //          dbServers[shard] = new DatabaseServer();
+          //          dbServers[shard].setConfig(config, Integer.valueOf(shard));
+          //          dbServers[shard].setRole(role);
+          //          dbServers[shard].disableLogProcessor();
+          return null;
+        }
+      }));
+    }
+        for (Future future : futures) {
+          future.get();
+        }
     for (NettyServer server : dbServers) {
       while (!server.isRunning()) {
         Thread.sleep(1000);

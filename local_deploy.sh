@@ -31,6 +31,8 @@ rsync -rvlLt terminal-size.py $HOME/database/bin
 rsync -rvlLt terminal-resize.py $HOME/database/bin
 rsync -rvlLt do-rsync.sh $HOME/database/bin
 rsync -rvlLt do-start.sh $HOME/database/bin
+rsync -rvlLt get-mem-total $HOME/database/bin
+rsync -rvlLt remote-get-mem-total $HOME/database/bin
 rsync -rvlLt db/src/main/resources/log4j.xml $HOME/database/config
 rsync -rvlLt db/src/main/resources/cli-log4j.xml $HOME/database/config
 chmod +x $HOME/database/bin/runclass
@@ -50,6 +52,8 @@ chmod +x $HOME/database/bin/terminal-resize.py
 chmod +x $HOME/database/bin/do-rsync.sh
 chmod +x $HOME/database/bin/do-start.sh
 chmod +x $HOME/database/bin/dump-threads
+chmod +x $HOME/database/bin/get-mem-total
+chmod +x $HOME/database/bin/remove-get-mem-total
 
 rsync -rvlLt src/main/resources/* $HOME/database/target
 

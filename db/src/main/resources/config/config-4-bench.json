@@ -1,6 +1,6 @@
 {
     "database": {
-        "dataDirectory": "/data/database",
+        "dataDirectory": "$HOME/db-data",
         "partitionCountForRecordIndex" : 10000,
         "subPartitionsForIdIndex" : 10,
         "initialIndexSize" : 10000000,

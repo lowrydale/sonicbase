@@ -652,6 +652,20 @@ public class TestDatabase {
     assertFalse(ret.next());
   }
 
+
+  @Test
+  public void test2FieldKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from memberships where personId=? and membershipName=?");
+    stmt.setLong(1, 0);
+    stmt.setString(2, "membership-0");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("personId"), 0);
+    assertEquals(ret.getString("membershipName"), "membership-0");
+    assertFalse(ret.next());
+  }
+
   @Test
   public void testMax() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from persons");
@@ -2043,5 +2057,7 @@ public class TestDatabase {
 
     return decrypted;
   }
+
+
 }
 

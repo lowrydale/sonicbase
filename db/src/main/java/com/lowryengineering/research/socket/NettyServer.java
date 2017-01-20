@@ -604,36 +604,40 @@ public class NettyServer {
     List<byte[]> doProcessRequests(List<Request> requests) {
       List<byte[]> finalRet = new ArrayList<>();
       try {
-        List<byte[]> ret = processRequests(requests);
-        for (byte[] bytes : ret) {
-          int size = 0;
-          if (bytes != null) {
-            size = bytes.length;
+        List<DatabaseServer.Response> ret = processRequests(requests);
+        for (DatabaseServer.Response response : ret) {
+          if (response.getException() != null) {
+            finalRet.add(returnException("exception: " + response.getException().getMessage(), response.getException()));
           }
-          byte[] intBuff = new byte[4];
-          Util.writeRawLittleEndian32(size, intBuff);
-          ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-          bytesOut.write(1);
-          bytesOut.write(intBuff);
-          if (bytes != null) {
-            bytesOut.write(bytes);
+          else {
+            byte[] bytes = response.getBytes();
+            int size = 0;
+            if (bytes != null) {
+              size = bytes.length;
+            }
+            byte[] intBuff = new byte[4];
+            Util.writeRawLittleEndian32(size, intBuff);
+            ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+            bytesOut.write(1);
+            bytesOut.write(intBuff);
+            if (bytes != null) {
+              bytesOut.write(bytes);
+            }
+            bytesOut.close();
+            finalRet.add(bytesOut.toByteArray());
           }
-          bytesOut.close();
-          finalRet.add(bytesOut.toByteArray());
         }
-        return finalRet;
       }
-      catch (Exception t) {
-      //  System.out.println("Error processing request: error=" + t.getMessage());
-      //  t.printStackTrace();
-        for (int i = 0; i < requests.size(); i++) {
-          finalRet.add(returnException("exception: " + t.getMessage(), t));
+      catch (Exception e) {
+        finalRet.clear();
+        for (Request request : requests) {
+          finalRet.add(returnException("exception: " + e.getMessage(), e));
         }
-        return finalRet;
       }
+      return finalRet;
     }
 
-    private List<byte[]> processRequests(List<Request> requests) throws IOException {
+    private List<DatabaseServer.Response> processRequests(List<Request> requests) throws IOException {
       return getDatabaseServer().handleCommands(requests, false, true);
     }
 

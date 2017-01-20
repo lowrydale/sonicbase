@@ -206,26 +206,30 @@ public class UpdateManager {
 
   public byte[] insertIndexEntryByKey(String command, byte[] body, boolean replayedCommand) {
     try {
+      if (server.getAboveMemoryThreshold().get()) {
+        throw new DatabaseException("Above max memory threshold. Further inserts are not allowed");
+      }
+
       String[] parts = command.split(":");
       String dbName = parts[4];
       int schemaVersion = Integer.valueOf(parts[3]);
       if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
-      String tableName = parts[5];
-      String indexName = parts[6];
-      boolean isExplicitTrans = Boolean.valueOf(parts[7]);
-      boolean isCommitting = Boolean.valueOf(parts[8]);
-      long transactionId = Long.valueOf(parts[9]);
-
-      TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
       ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
       DataInputStream in = new DataInputStream(bytesIn);
       long serializationVersion = DataUtil.readVLong(in);
-      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-      int len = (int) DataUtil.readVLong(in, resultLength);
+
+      String tableName = in.readUTF();
+      String indexName = in.readUTF();
+      boolean isExplicitTrans = in.readBoolean();
+      boolean isCommitting = in.readBoolean();
+      long transactionId = DataUtil.readVLong(in);
+
+      TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
+      int len = (int) DataUtil.readVLong(in);
       Object[] key = DatabaseCommon.deserializeKey(tableSchema, in);
-      len = (int) DataUtil.readVLong(in, resultLength);
+      len = (int) DataUtil.readVLong(in);
       byte[] primaryKeyBytes = new byte[len];
       in.readFully(primaryKeyBytes);
 
@@ -279,23 +283,28 @@ public class UpdateManager {
 
   public byte[] insertIndexEntryByKeyWithRecord(String command, byte[] body, boolean replayedCommand) {
     try {
+      if (server.getAboveMemoryThreshold().get()) {
+        throw new DatabaseException("Above max memory threshold. Further inserts are not allowed");
+      }
+
       String[] parts = command.split(":");
       String dbName = parts[4];
       int schemaVersion = Integer.valueOf(parts[3]);
       if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
-      String tableName = parts[5];
-      String indexName = parts[6];
-      long id = Long.valueOf(parts[7]);
-      boolean isExplicitTrans = Boolean.valueOf(parts[8]);
-      boolean isCommitting = Boolean.valueOf(parts[9]);
-      long transactionId = Long.valueOf(parts[10]);
-
-      TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
       ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
       DataInputStream in = new DataInputStream(bytesIn);
       long serializationVersion = DataUtil.readVLong(in);
+
+      String tableName = in.readUTF();
+      String indexName = in.readUTF();
+      long id = DataUtil.readVLong(in);
+      boolean isExplicitTrans = in.readBoolean();
+      boolean isCommitting = in.readBoolean();
+      long transactionId = DataUtil.readVLong(in);
+
+      TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
       int len = in.readInt();
       byte[] recordBytes = new byte[len];
       in.readFully(recordBytes);

@@ -63,6 +63,9 @@ public class DatabaseServer {
   public AtomicBoolean isRunning;
   private List<byte[]> buffers;
   private ThreadPoolExecutor executor;
+  private AtomicBoolean aboveMemoryThreshold = new AtomicBoolean();
+  private Exception exception;
+  private byte[] bytes;
 
   @SuppressWarnings("restriction")
   private static Unsafe getUnsafe() {
@@ -507,6 +510,8 @@ public class DatabaseServer {
     longRunningCommands = new LongRunningCommands(this);
     startLongRunningCommands();
 
+    startMemoryMonitor();
+
     logger.info("Started server");
 
 
@@ -517,9 +522,202 @@ public class DatabaseServer {
 
   }
 
+  public AtomicBoolean getAboveMemoryThreshold() {
+    return aboveMemoryThreshold;
+  }
+
+  private static final int pid;
+
+  static {
+    try {
+      java.lang.management.RuntimeMXBean runtime =
+          java.lang.management.ManagementFactory.getRuntimeMXBean();
+      java.lang.reflect.Field jvm = runtime.getClass().getDeclaredField("jvm");
+      jvm.setAccessible(true);
+      sun.management.VMManagement mgmt =
+          (sun.management.VMManagement) jvm.get(runtime);
+      java.lang.reflect.Method pid_method =
+          mgmt.getClass().getDeclaredMethod("getProcessId");
+      pid_method.setAccessible(true);
+
+      pid = (Integer) pid_method.invoke(mgmt);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  private void startMemoryMonitor() {
+    Thread thread = new Thread(new Runnable() {
+      @Override
+      public void run() {
+        while (true) {
+          try {
+            Thread.sleep(30000);
+
+            String max = config.getDict("database").getString("maxProcessMemory");
+            if (max == null) {
+              logger.info("Max process memory not set in config. Not enforcing max memory");
+              continue;
+            }
+            Double totalGig = null;
+            Double resGig = null;
+            if (isMac()) {
+              ProcessBuilder builder = new ProcessBuilder().command("sysctl", "hw.memsize");
+              Process p = builder.start();
+              BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+              String line = in.readLine();
+              p.waitFor();
+              String[] parts = line.split(" ");
+              String memStr = parts[1];
+              totalGig =  getMemValue(memStr);
+
+              builder = new ProcessBuilder().command("top", "-l", "1", "-pid", String.valueOf(pid));
+              p = builder.start();
+              in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+              String lastLine = null;
+              String secondToLastLine = null;
+              while (true) {
+                line = in.readLine();
+                if (line == null) {
+                  break;
+                }
+                secondToLastLine = lastLine;
+                lastLine = line;
+              }
+              p.waitFor();
+
+              String[] headerParts = secondToLastLine.split("\\s+");
+              parts = lastLine.split("\\s+");
+              for (int i = 0; i < headerParts.length; i++) {
+                if (headerParts[i].toLowerCase().trim().equals("mem")) {
+                  resGig = getMemValue(parts[i]);
+                }
+              }
+            }
+            else if (isUnix()) {
+              ProcessBuilder builder = new ProcessBuilder().command("grep", "MemTotal", "/proc/meminfo");
+              Process p = builder.start();
+              BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+              String line = in.readLine();
+              p.waitFor();
+              line = line.substring("MemTotal:".length()).trim();
+              totalGig =  getMemValue(line);
+
+              builder = new ProcessBuilder().command("top", "-b", "-n", "1", "-o", "RES", "-p", String.valueOf(pid));
+              p = builder.start();
+              in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+              String lastLine = null;
+              String secondToLastLine = null;
+              while (true) {
+                line = in.readLine();
+                if (line == null) {
+                  break;
+                }
+                secondToLastLine = lastLine;
+                lastLine = line;
+              }
+              p.waitFor();
+
+              String[] headerParts = secondToLastLine.split("\\s+");
+              String[] parts = lastLine.split("\\s+");
+              for (int i = 0; i < headerParts.length; i++) {
+                if (headerParts[i].toLowerCase().trim().equals("res")) {
+                  String memStr = parts[i];
+                  resGig = getMemValue(memStr);
+                }
+              }
+            }
+            if (totalGig == null || resGig == null) {
+              logger.error("Unable to obtain os memory info: totalGig=" + totalGig + ", residentGig=" + resGig);
+            }
+            else {
+              if (max.contains("%")) {
+                max = max.replaceAll("\\%", "").trim();
+                double maxPercent = Double.valueOf(max);
+                double actualPercent = resGig  / totalGig * 100d;
+                if (actualPercent > maxPercent) {
+                  logger.info(String.format("Above max memory threshold: totalGig=%.2f, residentGig=%.2f, percentMax=%.2f, percentActual=%.2f", totalGig, resGig, maxPercent, actualPercent));
+                  aboveMemoryThreshold.set(true);
+                }
+                else {
+                  logger.info(String.format("Not above max memory threshold: totalGig=%.2f, residentGig=%.2f, percentMax=%.2f, percentActual=%.2f", totalGig, resGig, maxPercent, actualPercent));
+                  aboveMemoryThreshold.set(false);
+                }
+              }
+              else {
+                double maxGig = getMemValue(max);
+                if (resGig > maxGig) {
+                  logger.info(String.format("Above max memory threshold: totalGig=%.2f, residentGig=%.2f, maxGig=%.2f", totalGig, resGig, maxGig));
+                  aboveMemoryThreshold.set(true);
+                }
+                else {
+                  logger.info(String.format("Not above max memory threshold: totalGig=%.2f, residentGig=%.2f, maxGig=%.2f", totalGig, resGig, maxGig));
+                  aboveMemoryThreshold.set(false);
+                }
+              }
+            }
+          }
+          catch (Exception e) {
+            logger.error("Error in memory check thread", e);
+          }
+        }
+
+      }
+    });
+    thread.start();
+  }
+
+  public static double getMemValue(String memStr) {
+    int qualifierPos = memStr.toLowerCase().indexOf("m");
+    if (qualifierPos == -1) {
+      qualifierPos = memStr.toLowerCase().indexOf("g");
+      if (qualifierPos == -1) {
+        qualifierPos = memStr.toLowerCase().indexOf("t");
+        if (qualifierPos == -1) {
+          qualifierPos = memStr.toLowerCase().indexOf("b");
+        }
+      }
+    }
+    double value = 0;
+    if (qualifierPos == -1) {
+      value = Double.valueOf(memStr.trim());
+      value = value / 1024d / 1024d / 1024d;
+    }
+    else {
+      char qualifier = memStr.toLowerCase().charAt(qualifierPos);
+      value = Double.valueOf(memStr.substring(0, qualifierPos).trim());
+      if (qualifier == 't') {
+        value = value * 1024d;
+      }
+      else if (qualifier == 'm') {
+        value = value / 1024d;
+      }
+      else if (qualifier == 'k') {
+        value = value / 1024d / 1024d;
+      }
+    }
+    return value;
+  }
+
+  private static String OS = System.getProperty("os.name").toLowerCase();
+
+  private static boolean isWindows() {
+    return OS.contains("win");
+  }
+
+  private static boolean isMac() {
+    return OS.contains("mac");
+  }
+
+  private static boolean isUnix() {
+    return OS.contains("nux");
+  }
+
   public boolean isRunning() {
     return isRunning.get();
   }
+
   public LongRunningCommands getLongRunningCommands() {
     return longRunningCommands;
   }
@@ -1050,9 +1248,9 @@ public class DatabaseServer {
   }
 
 
-  //todo: snapshot queue periodically
+//todo: snapshot queue periodically
 
-  //todo: implement restoreSnapshot()
+//todo: implement restoreSnapshot()
 
   public static class LogRequest {
     private byte[] buffer;
@@ -1088,6 +1286,7 @@ public class DatabaseServer {
   }
 
   private static Set<String> priorityCommands = new HashSet<>();
+
   static {
     priorityCommands.add("getSchema");
     priorityCommands.add("synchSchema");
@@ -1097,8 +1296,29 @@ public class DatabaseServer {
     priorityCommands.add("getDbNames");
   }
 
-  public List<byte[]> handleCommands(List<NettyServer.Request> requests, final boolean replayedCommand, boolean enableQueuing) throws IOException {
-    List<byte[]> retList = new ArrayList<>();
+  public static class Response {
+    private byte[] bytes;
+    private Exception exception;
+
+    public Response(Exception e) {
+      this.exception = e;
+    }
+
+    public Response(byte[] bytes) {
+      this.bytes = bytes;
+    }
+
+    public Exception getException() {
+      return exception;
+    }
+
+    public byte[] getBytes() {
+      return bytes;
+    }
+  }
+
+  public List<Response> handleCommands(List<NettyServer.Request> requests, final boolean replayedCommand, boolean enableQueuing) throws IOException {
+    List<Response> retList = new ArrayList<>();
     try {
       if (shutdown) {
         throw new DatabaseException("Shutdown in progress");
@@ -1107,9 +1327,9 @@ public class DatabaseServer {
 
       List<Future<byte[]>> futures = new ArrayList<>();
       for (final NettyServer.Request request : requests) {
-        futures.add(executor.submit(new Callable<byte[]>(){
+        futures.add(executor.submit(new Callable<byte[]>() {
           @Override
-          public byte[]call() throws Exception {
+          public byte[] call() throws Exception {
             String command = request.getCommand();
             byte[] body = request.getBody();
 
@@ -1153,7 +1373,12 @@ public class DatabaseServer {
       }
       for (Future<byte[]> future : futures) {
         commandCount.incrementAndGet();
-        retList.add(future.get());
+        try {
+          retList.add(new Response(future.get()));
+        }
+        catch (Exception e) {
+          retList.add(new Response(e));
+        }
       }
       if (logRequest != null) {
         logRequest.latch.await();
@@ -1280,6 +1505,12 @@ public class DatabaseServer {
         isInternal = config.getBoolean("clientIsPrivate");
       }
       DatabaseServer.ServersConfig newConfig = new DatabaseServer.ServersConfig(config.getArray("shards"), config.getInt("replicationFactor"), isInternal);
+
+      common.setServersConfig(newConfig);
+
+      common.saveSchema(getDataDir());
+
+      pushSchema();
 
       Shard[] oldShards = oldConfig.getShards();
       Shard[] newShards = newConfig.getShards();
@@ -1795,6 +2026,10 @@ public class DatabaseServer {
     }
   }
 
+  public byte[] listIndexFiles(String command, byte[] body, boolean replayedCommand) {
+    return null;
+  }
+
   public byte[] createTable(String command, byte[] body, boolean replayedCommand) {
     return schemaManager.createTable(command, body, replayedCommand);
   }
@@ -1918,7 +2153,7 @@ public class DatabaseServer {
     String dbName = parts[4];
     common.getSchemaWriteLock(dbName).lock();
     try {
-      return schemaManager.createIndex(command, body);
+      return schemaManager.createIndex(command, body, replayedCommand);
     }
     finally {
       common.getSchemaWriteLock(dbName).unlock();

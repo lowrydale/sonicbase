@@ -1267,11 +1267,16 @@ public class DatabaseClient {
 
   public void insertKey(String dbName, String tableName, KeyInfo keyInfo, String primaryKeyIndexName, Object[] primaryKey) {
     try {
-      String command = "DatabaseServer:insertIndexEntryByKey:1:" + common.getSchemaVersion() + ":" + dbName + ":" + tableName +
-          ":" + keyInfo.indexSchema.getKey() + ":" + isExplicitTrans() + ":" + isCommitting() + ":" + getTransactionId();
+      String command = "DatabaseServer:insertIndexEntryByKey:1:" + common.getSchemaVersion() + ":" + dbName;
+
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
       DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+      out.writeUTF(tableName);
+      out.writeUTF(keyInfo.indexSchema.getKey());
+      out.writeBoolean(isExplicitTrans());
+      out.writeBoolean(isCommitting());
+      DataUtil.writeVLong(out, getTransactionId());
       byte[] keyBytes = DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), keyInfo.indexSchema.getKey(), keyInfo.key);
       DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
       DataUtil.writeVLong(out, keyBytes.length, resultLength);
@@ -1296,12 +1301,17 @@ public class DatabaseClient {
 
   public void insertKeyWithRecord(String dbName, String tableName, KeyInfo keyInfo, Record record) {
     try {
-      String command = "DatabaseServer:insertIndexEntryByKeyWithRecord:1:" + common.getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + keyInfo.indexSchema.getKey() +
-          ":" + record.getId() + ":" + isExplicitTrans() + ":" + isCommitting() + ":" + getTransactionId();
+      String command = "DatabaseServer:insertIndexEntryByKeyWithRecord:1:" + common.getSchemaVersion() + ":" + dbName;
 
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
       DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+      out.writeUTF(tableName);
+      out.writeUTF(keyInfo.indexSchema.getKey());
+      DataUtil.writeVLong(out, record.getId());
+      out.writeBoolean(isExplicitTrans());
+      out.writeBoolean(isCommitting());
+      DataUtil.writeVLong(out, getTransactionId());
       byte[] recordBytes = record.serialize(common);
       out.writeInt(recordBytes.length);
       out.write(recordBytes);

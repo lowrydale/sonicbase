@@ -257,7 +257,7 @@ public class Cli {
 
   private static void startServer(JsonDict databaseDict, String externalAddress, String port, String installDir, int currShard, int currReplica) throws IOException {
     String deployUser = databaseDict.getString("user");
-    String maxHeap = databaseDict.getString("maxHeap");
+    String maxHeap = databaseDict.getString("maxJavaHeap");
     if (port == null) {
       port = "9010";
     }

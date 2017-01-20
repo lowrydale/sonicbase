@@ -1745,10 +1745,11 @@ public abstract class ExpressionImpl implements Expression {
     }
   }
 
-  static Object[] buildKey(String columnName, List<Object> values, String[] indexFields) {
+  static Object[] buildKey(List<Object> values, String[] indexFields) {
     Object[] key = new Object[indexFields.length];
-    key[0] = values.get(0);
-    //todo: support multiple columns
+    for (int i = 0; i < values.size(); i++) {
+      key[i] = values.get(i);
+    }
     return key;
   }
 

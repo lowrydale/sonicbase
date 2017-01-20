@@ -343,7 +343,7 @@ public class DatabaseCommon {
         for (int i = 0; i < columns.length; i++) {
           String column = columns[i];
           if (column != null) {
-            if (i >= key.length) {
+            if (i >= key.length || key[i] == null) {
               out.writeBoolean(false);
             }
             else {
@@ -729,6 +729,19 @@ public class DatabaseCommon {
 
   public void setServersConfig(DatabaseServer.ServersConfig serversConfig) {
     this.serversConfig = serversConfig;
+    Integer replicaCount = null;
+    DatabaseServer.Shard[] shards = serversConfig.getShards();
+    for (DatabaseServer.Shard shard : shards) {
+      DatabaseServer.Host[] replicas = shard.getReplicas();
+      if (replicaCount == null) {
+        replicaCount = replicas.length;
+      }
+      else {
+        if (replicaCount != replicas.length) {
+          throw new DatabaseException("Inconsistent replica count");
+        }
+      }
+    }
   }
 
   public DatabaseServer.ServersConfig getServersConfig() {

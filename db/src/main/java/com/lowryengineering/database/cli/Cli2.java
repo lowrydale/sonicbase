@@ -5,6 +5,7 @@ import com.lowryengineering.database.jdbcdriver.ConnectionProxy;
 import com.lowryengineering.database.query.DatabaseException;
 import com.lowryengineering.database.schema.DataType;
 import com.lowryengineering.database.schema.FieldSchema;
+import com.lowryengineering.database.server.DatabaseServer;
 import com.lowryengineering.database.util.JsonArray;
 import com.lowryengineering.database.util.JsonDict;
 import com.lowryengineering.database.util.StreamUtils;
@@ -22,6 +23,8 @@ import org.apache.commons.io.FileUtils;
 import java.io.*;
 import java.sql.*;
 import java.util.*;
+
+import static com.lowryengineering.database.server.DatabaseServer.getMemValue;
 
 public class Cli2 {
 
@@ -1043,7 +1046,7 @@ public class Cli2 {
   private static void startServer(JsonDict databaseDict, String externalAddress, String privateAddress, String port, String installDir,
                                   String cluster) throws IOException, InterruptedException {
     String deployUser = databaseDict.getString("user");
-    String maxHeap = databaseDict.getString("maxHeap");
+    String maxHeap = databaseDict.getString("maxJavaHeap");
     if (port == null) {
       port = "9010";
     }
@@ -1059,14 +1062,59 @@ public class Cli2 {
     }
     System.out.println("Home=" + searchHome);
     if (externalAddress.equals("127.0.0.1") || externalAddress.equals("localhost")) {
+      String maxStr = databaseDict.getString("maxJavaHeap");
+      if (maxStr != null && maxStr.contains("%")) {
+        ProcessBuilder builder = new ProcessBuilder().command("bin/get-mem-total");
+        Process p = builder.start();
+        BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+        String line = reader.readLine();
+        double totalGig = 0;
+        if (line.toLowerCase().startsWith("memtotal")) {
+          line = line.substring("MemTotal:".length()).trim();
+          totalGig = getMemValue(line);
+        }
+        else {
+          String[] parts = line.split(" ");
+          String memStr = parts[1];
+          totalGig = getMemValue(memStr);
+        }
+        p.waitFor();
+        maxStr = maxStr.substring(0, maxStr.indexOf("%"));
+        double maxPercent = Double.valueOf(maxStr);
+        double maxGig = totalGig * (maxPercent / 100);
+        maxHeap = (int)Math.floor(maxGig * 1024d) + "m";
+      }
       ProcessBuilder builder = new ProcessBuilder().command("bin/start-db-server.sh", privateAddress, port, maxHeap, searchHome, cluster);
-      System.out.println("Started server: address=" + externalAddress + ", port=" + port);
+      System.out.println("Started server: address=" + externalAddress + ", port=" + port + ", maxJavaHeap=" + maxHeap);
       Process p = builder.start();
       p.waitFor();
     }
     else {
+      String maxStr = databaseDict.getString("maxJavaHeap");
+      if (maxStr != null && maxStr.contains("%")) {
+        ProcessBuilder builder = new ProcessBuilder().command("bin/remote-get-mem-total", deployUser + "@" + externalAddress, installDir);
+        Process p = builder.start();
+        BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+        String line = reader.readLine();
+        double totalGig = 0;
+        if (line.toLowerCase().startsWith("memtotal")) {
+          line = line.substring("MemTotal:".length()).trim();
+          totalGig = getMemValue(line);
+        }
+        else {
+          String[] parts = line.split(" ");
+          String memStr = parts[1];
+          totalGig =  getMemValue(memStr);
+        }
+        p.waitFor();
+        maxStr = maxStr.substring(0, maxStr.indexOf("%"));
+        double maxPercent = Double.valueOf(maxStr);
+        double maxGig = totalGig * (maxPercent / 100);
+        maxHeap = (int)Math.floor(maxGig * 1024d) + "m";
+      }
+
       ProcessBuilder builder = new ProcessBuilder().command("bin/do-start.sh", deployUser + "@" + externalAddress, installDir, privateAddress, port, maxHeap, searchHome, cluster);
-      System.out.println("Started server: address=" + externalAddress + ", port=" + port);
+      System.out.println("Started server: address=" + externalAddress + ", port=" + port + ", maxJavaHeap=" + maxHeap);
       Process p = builder.start();
       p.waitFor();
     }

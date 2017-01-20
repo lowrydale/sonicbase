@@ -405,7 +405,7 @@ public class ReadManager {
 
       if (tableSchema.getIndexes().get(indexName).isPrimaryKey()) {
         if (rightOperator == null) {
-            entry = doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, parms, evaluateExpression, expression, columnOffsets, excludeKeys, leftKey, leftOperator, index, ascending, retRecords, viewVersion, false, counters, groupContext);
+          entry = doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, parms, evaluateExpression, expression, columnOffsets, excludeKeys, leftKey, leftOperator, index, ascending, retRecords, viewVersion, false, counters, groupContext);
         }
         else {
           entry = doIndexLookupTwoKeys(dbName, count, tableSchema, indexSchema, excludeKeys, leftKey, columnOffsets, rightKey, leftOperator, rightOperator, parms, evaluateExpression, expression, index, ascending, retRecords, false, counters, groupContext);

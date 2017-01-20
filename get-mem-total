@@ -1,0 +1,7 @@
+if [ ! -f /proc/meminfo ]
+then
+  sysctl hw.memsize
+else
+  grep MemTotal /proc/meminfo
+fi
+

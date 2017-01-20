@@ -154,11 +154,11 @@ public class LogManager {
             else {
               requests.add(request);
               break;
-//              if (requests.size() > 20) {
-//                break;
-//              }
+////              if (requests.size() > 20) {
+////                break;
+////              }
+//            }
             }
-          }
 //            logRequests.drainTo(requests, 200);
 //            if (requests.size() == 0) {
 //              Thread.sleep(0, 50000);
@@ -166,8 +166,8 @@ public class LogManager {
 //            else {
 //              break;
 //            }
-          //}
-          if (writer == null || System.currentTimeMillis() - 10 * 60 * 100 > currQueueTime) {
+          }
+          if (writer == null || System.currentTimeMillis() - 2 * 60 * 100 > currQueueTime) {
             if (writer != null) {
               writer.close();
             }
@@ -374,7 +374,7 @@ public class LogManager {
               if (minSource.requests != null) {
                 List<Future> futures = new ArrayList<>();
                 for (final NettyServer.Request request : minSource.requests) {
-                   futures.add(executor.submit(new Callable(){
+                  futures.add(executor.submit(new Callable() {
                     @Override
                     public Object call() throws Exception {
                       try {
@@ -522,7 +522,7 @@ public class LogManager {
               String dateStr = name.substring(pos + 1, pos2);
               Date fileDate = ISO8601.from8601String(dateStr).getTime();
               long fileTime = fileDate.getTime();
-              if (fileTime < lastSnapshot - (10 * 60 * 1000) && file.exists() && !file.delete()) {
+              if (fileTime < lastSnapshot - (30 * 1000) && file.exists() && !file.delete()) {
                 throw new DatabaseException("Error deleting file: file=" + file.getAbsolutePath());
               }
             }

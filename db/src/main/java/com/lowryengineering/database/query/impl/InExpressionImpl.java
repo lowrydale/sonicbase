@@ -167,11 +167,18 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
     IndexSchema indexSchema = null;
     List<ExpressionImpl> expressionList = getExpressionList();
     ColumnImpl cNode = (ColumnImpl) getLeftExpression();
-    for (IndexSchema schema : client.getCommon().getSchema(dbName).getTables().get(tableName).getIndexes().values()) {
-      if (schema.getFields()[0].equals(cNode.getColumnName())) {
-        indexSchema = schema;
+    String[] preferredIndexColumns = null;
+
+    for (Map.Entry<String, IndexSchema> currIndexSchema : getClient().getCommon().getTables(dbName).get(getTableName()).getIndices().entrySet()) {
+      String[] fields = currIndexSchema.getValue().getFields();
+      if (fields[0].equals(cNode.getColumnName())) {
+        if (preferredIndexColumns == null || preferredIndexColumns.length > fields.length) {
+          preferredIndexColumns = fields;
+          indexSchema = currIndexSchema.getValue();
+        }
       }
     }
+
     if (indexSchema == null) {
       throw new DatabaseException("Not Supported");
     }

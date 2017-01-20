@@ -19,6 +19,8 @@ import java.sql.ResultSet;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static org.testng.Assert.assertEquals;
+
 public class TestBenchmarkIdentityQuery {
 
   public static Logger logger = LoggerFactory.getLogger(TestBenchmarkIdentityQuery.class);
@@ -105,6 +107,22 @@ public class TestBenchmarkIdentityQuery {
 //                  ((ConnectionProxy)conn).getDatabaseClient().send(ThreadLocalRandom.current().nextInt(2), ThreadLocalRandom.current().nextInt(2), "DatabaseSever:echo:1", bytes, DatabaseClient.Replica.specified, 20000, new AtomicReference<String>());
                   ctx.stop();
 
+                  ctx = LOOKUP_STATS.time();
+                  stmt = conn.prepareStatement("select id1, id2  " +
+                      "from memberships where id1=? and id2=?");                                              //
+                  stmt.setLong(1, offset);
+                  stmt.setLong(2, 0);
+                  ret = stmt.executeQuery();
+
+                  if (!ret.next()) {
+                    System.out.println("max=" + offset);
+                    break;
+                  }
+                  assertEquals(ret.getLong("id1"), offset);
+                  assertEquals(ret.getLong("id2"), 0);
+
+//                  ((ConnectionProxy)conn).getDatabaseClient().send(ThreadLocalRandom.current().nextInt(2), ThreadLocalRandom.current().nextInt(2), "DatabaseSever:echo:1", bytes, DatabaseClient.Replica.specified, 20000, new AtomicReference<String>());
+                  ctx.stop();
                   totalSelectDuration.addAndGet(System.nanoTime() - beginSelect);
                   if (selectOffset.incrementAndGet() % 10000 == 0) {
                     StringBuilder builder = new StringBuilder();

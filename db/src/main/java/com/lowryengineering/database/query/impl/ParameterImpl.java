@@ -69,12 +69,12 @@ public class ParameterImpl extends ExpressionImpl {
     return ExpressionImpl.Type.parameter;
   }
 
-  public NextReturn next() {
+  public NextReturn next(SelectStatementImpl.Explain explain) {
     return null;
   }
 
   @Override
-  public NextReturn next(int count) {
+  public NextReturn next(int count, SelectStatementImpl.Explain explain) {
     return null;
   }
 

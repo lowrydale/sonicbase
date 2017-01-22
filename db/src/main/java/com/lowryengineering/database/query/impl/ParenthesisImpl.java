@@ -77,12 +77,12 @@ public class ParenthesisImpl extends ExpressionImpl {
   }
 
   @Override
-  public NextReturn next(int count) {
+  public NextReturn next(int count, SelectStatementImpl.Explain eplain) {
     return null;
   }
 
 
-  public NextReturn next() {
+  public NextReturn next(SelectStatementImpl.Explain explainBuilder) {
     return null;
   }
 

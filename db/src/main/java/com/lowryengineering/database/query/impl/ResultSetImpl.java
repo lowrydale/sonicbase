@@ -1442,7 +1442,7 @@ public class ResultSetImpl implements ResultSet {
         lastReadRecords = readRecords;
         readRecords = null;
 
-        ExpressionImpl.NextReturn ids = selectStatement.next(dbName);
+        ExpressionImpl.NextReturn ids = selectStatement.next(dbName, null);
         if (ids != null && ids.getIds() != null) {
           selectStatement.applyDistinct(dbName, selectContext.getTableNames(), ids, uniqueRecords);
         }

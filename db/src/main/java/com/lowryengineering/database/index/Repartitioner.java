@@ -752,9 +752,9 @@ public class Repartitioner extends Thread {
                 try {
                   List<Integer> selectedShards = findOrderedPartitionForRecord(true, false, fieldOffsets, common, tableSchema, indexName, null, BinaryExpression.Operator.equal, null, key, null);
                   int shard = selectedShards.get(0);
-                  if (selectedShards.size() != 1) {
-                    throw new IllegalStateException("Expected to select one partition to move entry to: found=" + selectedShards.size());
-                  }
+//                  if (selectedShards.size() != 1) {
+//                    throw new IllegalStateException("Expected to select one partition to move entry to: found=" + selectedShards.size());
+//                  }
                   if (shard != databaseServer.getShard()) {
                     byte[][] content = null;
   //                      if (addedAfter.get(entry.getKey()) != null) {
@@ -1080,28 +1080,57 @@ public class Repartitioner extends Thread {
         selectedPartitions.add(0);
         return;
       }
-      int compareValue = 0;
-      //for (int j = 0; j < fieldOffsets.length; j++) {
 
-      for (int k = 0; k < key.length; k++) {
-        int value = comparators[k].compare(key[k], partitions[0].getUpperKey()[k]);
-        if (value < 0) {
-          compareValue = -1;
-          break;
+      for (int i = 0; i < partitions.length - 1; i++) {
+        int compareValue = 0;
+        //for (int j = 0; j < fieldOffsets.length; j++) {
+
+        for (int k = 0; k < key.length; k++) {
+          if (key[k] == null || partitions[0].getUpperKey()[k] == null) {
+            continue;
+          }
+          int value = comparators[k].compare(key[k], partitions[i].getUpperKey()[k]);
+          if (value < 0) {
+            compareValue = -1;
+            break;
+          }
+          if (value > 0) {
+            compareValue = 1;
+            break;
+          }
         }
-        if (value > 0) {
-          compareValue = 1;
-          break;
+
+        if (i == 0 && compareValue == -1 || compareValue == 0) {
+          selectedPartitions.add(i);
+        }
+
+        int compareValue2 = 0;
+        if (partitions[i + 1].getUpperKey() == null) {
+          if (compareValue == 1 || compareValue == 0) {
+            selectedPartitions.add(i + 1);
+          }
+        }
+        else {
+          for (int k = 0; k < key.length; k++) {
+            if (key[k] == null || partitions[0].getUpperKey()[k] == null) {
+              continue;
+            }
+            int value = comparators[k].compare(key[k], partitions[i + 1].getUpperKey()[k]);
+            if (value < 0) {
+              compareValue2 = -1;
+              break;
+            }
+            if (value > 0) {
+              compareValue2 = 1;
+              break;
+            }
+          }
+          if ((compareValue == 1 || compareValue == 0) && compareValue2 == -1) {
+            selectedPartitions.add(i + 1);
+          }
         }
       }
-      if (compareValue == -1 || compareValue == 0) {
-        selectedPartitions.add(0);
-        return;
-      }
-      else {
-        selectedPartitions.add(1);
-        return;
-      }
+      return;
     }
 
     //todo: do a binary search

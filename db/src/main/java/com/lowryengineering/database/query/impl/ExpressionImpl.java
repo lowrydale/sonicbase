@@ -224,9 +224,9 @@ public abstract class ExpressionImpl implements Expression {
   abstract public Object evaluateSingleRecord(
       TableSchema[] tableSchemas, Record[] records, ParameterHandler parms);
 
-  abstract public NextReturn next();
+  abstract public NextReturn next(SelectStatementImpl.Explain explain);
 
-  public abstract NextReturn next(int count);
+  public abstract NextReturn next(int count, SelectStatementImpl.Explain explain);
 
   abstract public boolean canUseIndex();
 
@@ -579,7 +579,7 @@ public abstract class ExpressionImpl implements Expression {
       for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
         String[] fields = entry.getValue().getFields();
         boolean shouldIndex = false;
-        if (fields.length == columns.length) {
+        if (fields.length ==  columns.length) {
           boolean foundAll = true;
           for (int i = 0; i < fields.length; i++) {
             boolean found = false;
@@ -595,6 +595,26 @@ public abstract class ExpressionImpl implements Expression {
             }
           }
           if (foundAll) {
+            shouldIndex = true;
+          }
+        }
+        else {
+          int columnsFound = 0;
+          for (int i = 0; i < fields.length; i++) {
+            boolean found = false;
+            for (int j = 0; j < columns.length; j++) {
+              if (fields[i].equals(columns[j])) {
+                found = true;
+              }
+            }
+            if (!found) {
+              break;
+            }
+            else {
+              columnsFound++;
+            }
+          }
+          if (columnsFound >= 1) {
             shouldIndex = true;
           }
         }
@@ -622,14 +642,16 @@ public abstract class ExpressionImpl implements Expression {
         if (selectedShards.size() == 0) {
           throw new DatabaseException("No shards selected for query");
         }
-        if (selectedShards.size() > 1) {
-          if (!synced) {
-            client.syncSchema();
-            synced = true;
-          }
-          throw new DatabaseException("Invalid state. Multiple shards");
+//        if (selectedShards.size() > 1) {
+//          if (!synced) {
+//            client.syncSchema();
+//            synced = true;
+//          }
+//          throw new DatabaseException("Invalid state. Multiple shards");
+//        }
+        for (int selectedShard : selectedShards) {
+          partitionedValues.get(selectedShard).add(new IdEntry(keysToRead.get(i).getOffset(), keysToRead.get(i).getValue()));
         }
-        partitionedValues.get(selectedShards.get(0)).add(new IdEntry(keysToRead.get(i).getOffset(), keysToRead.get(i).getValue()));
       }
 
 

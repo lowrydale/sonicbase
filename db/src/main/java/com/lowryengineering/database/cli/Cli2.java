@@ -261,6 +261,10 @@ public class Cli2 {
         System.out.print("\033[2J\033[;H");
         describe(command);
       }
+      else if (command.trim().startsWith("explain")) {
+        System.out.print("\033[2J\033[;H");
+        explain(command);
+      }
       else if (command.startsWith("reconfigure cluster")) {
         reconfigureCluster();
       }
@@ -310,6 +314,44 @@ public class Cli2 {
     }
     lastCommand = command;
   }
+
+  private static void explain(String command) throws SQLException, ClassNotFoundException, IOException, InterruptedException {
+    String cluster = currCluster;
+    if (cluster == null) {
+      System.out.println("Error, not using a cluster");
+      return;
+    }
+
+    if (currDbName == null) {
+      System.out.println("Error, not using a database");
+      return;
+    }
+
+    initConnection();
+
+    System.out.println("Executing explain request");
+
+
+    DatabaseClient client = ((ConnectionProxy) conn).getDatabaseClient();
+    PreparedStatement stmt = conn.prepareStatement(command);
+    ret = stmt.executeQuery();
+
+    String str = getTerminalSize();
+    String[] parts = str.split(",");
+    String height = parts[1];
+
+    int currLine = 0;
+    System.out.println();
+    for (int i = 0; currLine < Integer.valueOf(height) - 2; i++) {
+      if (!ret.next()) {
+        break;
+      }
+      System.out.println(ret.getString(1));
+      currLine++;
+    }
+    lastCommand = command;
+  }
+
 
   private static void debugRecord(String command) {
     String cluster = currCluster;

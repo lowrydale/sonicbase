@@ -12,6 +12,7 @@ import com.lowryengineering.database.server.ReadManager;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -70,10 +71,14 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
   }
 
   @Override
-  public NextReturn next(int count) {
+  public NextReturn next(int count, SelectStatementImpl.Explain explain) {
     TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(getFromTable());
-    IndexSchema indexSchema = tableSchema.getIndices().get("_1__primarykey");
-
+    IndexSchema indexSchema = null;
+    for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndexes().entrySet()) {
+      if (entry.getValue().isPrimaryKey()) {
+        indexSchema = entry.getValue();
+      }
+    }
     AtomicReference<String> usedIndex = new AtomicReference<>();
     SelectContextImpl context = ExpressionImpl.lookupIds(dbName, getClient().getCommon(), getClient(), getReplica(), count, tableSchema, indexSchema,
         BinaryExpression.Operator.greater, null, getOrderByExpressions(), getNextKey(), getParms(), this, null, getNextKey(), null,
@@ -88,8 +93,8 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
 
 
   @Override
-  public NextReturn next() {
-    return next(ReadManager.SELECT_PAGE_SIZE);
+  public NextReturn next(SelectStatementImpl.Explain explain) {
+    return next(ReadManager.SELECT_PAGE_SIZE, explain);
   }
 
   @Override

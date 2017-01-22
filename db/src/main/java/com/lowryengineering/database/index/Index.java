@@ -107,7 +107,7 @@ public class Index {
         objectSkipIndex = new ConcurrentSkipListMap<>(new Comparator<Object[]>() {
                         @Override
                         public int compare(Object[] o1, Object[] o2) {
-                          for (int i = 0; i < o1.length; i++) {
+                          for (int i = 0; i < Math.min(o1.length, o2.length); i++) {
                             if (o1[i] == null || o2[i] == null) {
                               continue;
                             }
@@ -128,7 +128,7 @@ public class Index {
       objectSkipIndex = new ConcurrentSkipListMap<>(new Comparator<Object[]>() {
                 @Override
                 public int compare(Object[] o1, Object[] o2) {
-                  for (int i = 0; i < o1.length; i++) {
+                  for (int i = 0; i < Math.min(o1.length, o2.length); i++) {
                     if (o1[i] == null || o2[i] == null) {
                       continue;
                     }

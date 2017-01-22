@@ -29,6 +29,10 @@ public class ColumnImpl extends ExpressionImpl {
   public ColumnImpl() {
   }
 
+  public String toString() {
+    return columnName;
+  }
+
   public String getColumnName() {
     return columnName;
   }
@@ -128,12 +132,12 @@ public class ColumnImpl extends ExpressionImpl {
   }
 
   @Override
-  public NextReturn next() {
+  public NextReturn next(SelectStatementImpl.Explain explainBuilder) {
     return null;
   }
 
   @Override
-  public NextReturn next(int count) {
+  public NextReturn next(int count, SelectStatementImpl.Explain explain) {
     return null;
   }
 

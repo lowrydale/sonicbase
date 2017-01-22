@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.atomic.AtomicReference;
 
 public class DeleteStatementImpl extends StatementImpl implements DeleteStatement {
   private final DatabaseClient client;
@@ -52,7 +51,7 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
   }
 
   @Override
-  public Object execute(String dbName) throws DatabaseException {
+  public Object execute(String dbName, SelectStatementImpl.Explain explain) throws DatabaseException {
     while (true) {
       try {
         expression.setTableName(tableName);
@@ -74,7 +73,7 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
         Random rand = new Random(System.currentTimeMillis());
         int countDeleted = 0;
         while (true) {
-          ExpressionImpl.NextReturn ids = expression.next();
+          ExpressionImpl.NextReturn ids = expression.next(explain);
           if (ids == null) {
             return countDeleted;
           }

@@ -212,12 +212,12 @@ public class DatabaseClient {
     }
   }
 
-  public void commit(String dbName) throws DatabaseException {
+  public void commit(String dbName, SelectStatementImpl.Explain explain) throws DatabaseException {
     isCommitting.set(true);
     List<TransactionOperation> ops = transactionOps.get();
     for (TransactionOperation op : ops) {
       op.statement.setParms(op.parms);
-      op.statement.execute(dbName);
+      op.statement.execute(dbName, explain);
     }
 
     isExplicitTrans.set(false);
@@ -815,7 +815,10 @@ public class DatabaseClient {
       try {
         Statement statement;
         if (sql.toLowerCase().startsWith("describe")) {
-          return  doDescribe(dbName, sql);
+          return doDescribe(dbName, sql);
+        }
+        else if (sql.toLowerCase().startsWith("explain")) {
+          return doExplain(dbName, sql, parms);
         }
         else {
           StatementCacheEntry entry = statementCache.get(sql);
@@ -847,7 +850,7 @@ public class DatabaseClient {
             entry.whenUsed.set(System.currentTimeMillis());
           }
           if (statement instanceof Select) {
-            return doSelect(dbName, parms, (Select) statement, debug);
+            return doSelect(dbName, parms, (Select) statement, debug, null);
           }
           else if (statement instanceof Insert) {
             return doInsert(dbName, parms, (Insert) statement);
@@ -881,6 +884,25 @@ public class DatabaseClient {
       catch (Exception e) {
         throw new SQLException(e);
       }
+    }
+  }
+
+  private Object doExplain(String dbName, String sql, ParameterHandler parms) {
+
+    try {
+      sql = sql.trim().substring("explain".length()).trim();
+      String[] parts = sql.split(" ");
+      if (!parts[0].trim().toLowerCase().equals("select")) {
+        throw new DatabaseException("Verb not supported: verb=" + parts[0].trim());
+      }
+
+      CCJSqlParserManager parser = new CCJSqlParserManager();
+      Statement statement = parser.parse(new StringReader(sql));
+      SelectStatementImpl.Explain explain = new SelectStatementImpl.Explain();
+      return (ResultSet) doSelect(dbName, parms, (Select) statement, false, explain);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
     }
   }
 
@@ -1146,7 +1168,7 @@ public class DatabaseClient {
     deleteStatement.setWhereClause(innerExpression);
 
     deleteStatement.setParms(parms);
-    return deleteStatement.execute(dbName);
+    return deleteStatement.execute(dbName, null);
   }
 
   private int doCreateTable(String dbName, CreateTable stmt) {
@@ -1262,7 +1284,7 @@ public class DatabaseClient {
     }
 
     updateStatement.setParms(parms);
-    return updateStatement.execute(dbName);
+    return updateStatement.execute(dbName, null);
   }
 
   public void insertKey(String dbName, String tableName, KeyInfo keyInfo, String primaryKeyIndexName, Object[] primaryKey) {
@@ -1847,7 +1869,7 @@ public class DatabaseClient {
     return ret;
   }
 
-  private Object doSelect(String dbName, ParameterHandler parms, Select selectNode, boolean debug) {
+  private Object doSelect(String dbName, ParameterHandler parms, Select selectNode, boolean debug, SelectStatementImpl.Explain explain) {
 //    int currParmNum = 0;
 //    List<String> columnNames = new ArrayList<>();
 //    List<Object> values = new ArrayList<>();
@@ -1976,7 +1998,7 @@ public class DatabaseClient {
       }
     }
     selectStatement.setParms(parms);
-    return selectStatement.execute(dbName);
+    return selectStatement.execute(dbName, explain);
   }
 
 

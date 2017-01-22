@@ -24,7 +24,7 @@ public abstract class StatementImpl implements Statement {
     return parms;
   }
 
-  public abstract Object execute(String dbName) throws DatabaseException;
+  public abstract Object execute(String dbName, SelectStatementImpl.Explain explain) throws DatabaseException;
 
   @Override
   public BinaryExpression createBinaryExpression(String id, BinaryExpression.Operator op, long value) {

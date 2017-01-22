@@ -3,11 +3,13 @@ package com.lowryengineering.database.query.impl;
 import com.lowryengineering.database.common.Record;
 import com.lowryengineering.database.jdbcdriver.ParameterHandler;
 import com.lowryengineering.database.query.DatabaseException;
+import com.lowryengineering.database.schema.DataType;
 import com.lowryengineering.database.schema.TableSchema;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.sql.Types;
 import java.util.Set;
 
@@ -23,6 +25,25 @@ public class ConstantImpl extends ExpressionImpl {
   public ConstantImpl(Object value, int sqlType) {
     this.value = value;
     this.sqlType = sqlType;
+  }
+
+  public String toString() {
+    if (sqlType == DataType.Type.VARCHAR.getValue() ||
+        sqlType == DataType.Type.NVARCHAR.getValue() ||
+        sqlType == DataType.Type.LONGVARCHAR.getValue() ||
+        sqlType == DataType.Type.LONGNVARCHAR.getValue() ||
+        sqlType == DataType.Type.NCLOB.getValue() ||
+        sqlType == DataType.Type.CLOB.getValue()) {
+      try {
+        return new String((byte[])value, "utf-8");
+      }
+      catch (UnsupportedEncodingException e) {
+        throw new DatabaseException(e);
+      }
+    }
+    else {
+      return String.valueOf(value);
+    }
   }
 
   public Object getValue() {
@@ -133,12 +154,12 @@ public class ConstantImpl extends ExpressionImpl {
     return ExpressionImpl.Type.constant;
   }
 
-  public NextReturn next() {
+  public NextReturn next(SelectStatementImpl.Explain explain) {
     return null;
   }
 
   @Override
-  public NextReturn next(int count) {
+  public NextReturn next(int count, SelectStatementImpl.Explain explain) {
     return null;
   }
 

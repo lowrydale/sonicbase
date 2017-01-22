@@ -48,7 +48,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
   }
 
   @Override
-  public Object execute(String dbName) throws DatabaseException {
+  public Object execute(String dbName, SelectStatementImpl.Explain explain) throws DatabaseException {
 
     while (true) {
       try {
@@ -71,7 +71,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
         getWhereClause().reset();
         while (true) {
 
-          ExpressionImpl.NextReturn ret = getWhereClause().next();
+          ExpressionImpl.NextReturn ret = getWhereClause().next(explain);
           if (ret == null || ret.getIds() == null) {
             return countUpdated;
           }

@@ -558,7 +558,7 @@ public class ReadManager {
 
       DiskBasedResultSet diskResults = null;
       if (select.getServerSelectPageNumber() == 0) {
-        ResultSetImpl resultSet = (ResultSetImpl) select.execute(dbName);
+        ResultSetImpl resultSet = (ResultSetImpl) select.execute(dbName, null);
         diskResults = new DiskBasedResultSet(dbName, server, select.getTableNames(), resultSet, count, select);
       }
       else {
@@ -1083,46 +1083,53 @@ public class ReadManager {
       if (key == null) {
         return null;
       }
-      Long value = index.get(key);
-      if (value == null) {
-        return null;
-      }
-      if (excludeKeys != null) {
-        for (Object[] excludeKey : excludeKeys) {
-          if (server.getCommon().compareKey(indexSchema.getComparators(), excludeKey, key) == 0) {
-            return null;
-          }
+      entry = index.floorEntry(key);
+      while (entry != null) {
+        if (server.getCommon().compareKey(indexSchema.getComparators(), key, entry.getKey()) != 0) {
+          break;
         }
-      }
-      if (keys) {
-        byte[][] currKeys = server.fromUnsafeToKeys(value);
-        for (byte[] currKey : currKeys) {
-          ret.add(currKey);
+        Long value = entry.getValue();
+        if (value == null) {
+          break;
         }
-      }
-      else {
-        byte[][] records = server.fromUnsafeToRecords(value);
-        if (parms != null && expression != null && evaluateExpresion) {
-          for (byte[] bytes : records) {
-            Record record = new Record(tableSchema);
-            record.deserialize(dbName, server.getCommon(), bytes);
-            boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
-            if (pass) {
-              byte[][] currRecords = new byte[][]{bytes};
-              applySelectToResultRecords(dbName, columnOffsets, currRecords, null, tableSchema, counters, groupContext);
-              if (counters == null) {
-                bytes = currRecords[0];
-                ret.add(bytes);
-              }
+        if (excludeKeys != null) {
+          for (Object[] excludeKey : excludeKeys) {
+            if (server.getCommon().compareKey(indexSchema.getComparators(), excludeKey, key) == 0) {
+              return null;
             }
           }
         }
-        else {
-          applySelectToResultRecords(dbName, columnOffsets, records, null, tableSchema, counters, groupContext);
-          if (counters == null) {
-            ret.addAll(Arrays.asList(records));
+        if (keys) {
+          byte[][] currKeys = server.fromUnsafeToKeys(value);
+          for (byte[] currKey : currKeys) {
+            ret.add(currKey);
           }
         }
+        else {
+          byte[][] records = server.fromUnsafeToRecords(value);
+          if (parms != null && expression != null && evaluateExpresion) {
+            for (byte[] bytes : records) {
+              Record record = new Record(tableSchema);
+              record.deserialize(dbName, server.getCommon(), bytes);
+              boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
+              if (pass) {
+                byte[][] currRecords = new byte[][]{bytes};
+                applySelectToResultRecords(dbName, columnOffsets, currRecords, null, tableSchema, counters, groupContext);
+                if (counters == null) {
+                  bytes = currRecords[0];
+                  ret.add(bytes);
+                }
+              }
+            }
+          }
+          else {
+            applySelectToResultRecords(dbName, columnOffsets, records, null, tableSchema, counters, groupContext);
+            if (counters == null) {
+              ret.addAll(Arrays.asList(records));
+            }
+          }
+        }
+        entry = index.higherEntry(entry.getKey());
       }
       entry = null;
     }

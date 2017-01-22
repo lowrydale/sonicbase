@@ -181,7 +181,7 @@ public class TestBenchmark {
 
                 try {
                   if (false) {
-                    ResultSet results = (ResultSet) selectStatement.execute("test");
+                    ResultSet results = (ResultSet) selectStatement.execute("test", null);
                     if (results == null) {
                       logger.error("record not found: id=" + id);
                       selectErrorCount.incrementAndGet();
@@ -244,7 +244,7 @@ public class TestBenchmark {
               statement.addValue("relatives", "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
               statement.addValue("restricted", false);
               statement.addValue("gender", "m");
-              statement.execute("test");
+              statement.execute("test", null);
               long currBegin = System.nanoTime();
              // client.doInsert(parms, insert);
               totalDuration.addAndGet(System.nanoTime() - currBegin);

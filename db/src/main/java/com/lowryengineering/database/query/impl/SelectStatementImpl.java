@@ -365,8 +365,43 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     }
   }
 
+  public static class Explain {
+    private StringBuilder builder = new StringBuilder();
+    private int indent;
+
+    public StringBuilder getBuilder() {
+      return builder;
+    }
+
+    public void setBuilder(StringBuilder builder) {
+      this.builder = builder;
+    }
+
+    public int getIndent() {
+      return indent;
+    }
+
+    public void setIndent(int indent) {
+      this.indent = indent;
+    }
+
+    public void appendSpaces() {
+//      for (int i = 0; i < indent; i++) {
+//        builder.append("  ");
+//      }
+    }
+
+    public void indent() {
+      indent++;
+    }
+
+    public void outdent() {
+      indent--;
+    }
+  }
+
   @Override
-  public Object execute(String dbName) throws DatabaseException {
+  public Object execute(String dbName, Explain explain) throws DatabaseException {
     while (true) {
       try {
         expression.setViewVersion(client.getCommon().getSchemaVersion());
@@ -617,9 +652,13 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
           }
 
           Set<DistinctRecord> uniqueRecords = new HashSet<>();
-          ExpressionImpl.NextReturn ids = next(dbName);
+          ExpressionImpl.NextReturn ids = next(dbName, explain);
           if (!serverSelect) {
             applyDistinct(dbName, tableNames, ids, uniqueRecords);
+          }
+
+          if (explain != null) {
+            return new ResultSetImpl(explain.getBuilder().toString().split("\\n"));
           }
 
           ResultSet ret = new ResultSetImpl(dbName, client, this, getParms(), uniqueRecords,
@@ -790,7 +829,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     }
     if (joins.size() != 0) {
       while (true) {
-        ExpressionImpl.NextReturn ids = next(dbName);
+        ExpressionImpl.NextReturn ids = next(dbName, null);
         if (ids == null || ids.getIds() == null) {
           break;
         }
@@ -881,7 +920,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     return new ResultSetImpl(dbName, client, this, count);
   }
 
-  public ExpressionImpl.NextReturn next(String dbName) throws DatabaseException {
+  public ExpressionImpl.NextReturn next(String dbName, Explain explain) throws DatabaseException {
     while (true) {
       try {
         ExpressionImpl expression = getExpression();
@@ -895,7 +934,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
 
         expression.setRecordCache(recordCache);
         if (joins.size() > 0) {
-          return handleJoins(dbName);
+          return handleJoins(dbName, explain);
         }
         ExpressionImpl.NextReturn ret = null;
         if (!isOnServer && serverSelect) {
@@ -903,7 +942,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
         }
         else {
           expression.setDbName(dbName);
-          ret = expression.next();
+          ret = expression.next(ReadManager.SELECT_PAGE_SIZE, explain);
         }
         if (ret == null) {
           return null;
@@ -1036,7 +1075,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     ids.setIds(retIds);
   }
 
-  private ExpressionImpl.NextReturn handleJoins(String dbName) throws Exception {
+  private ExpressionImpl.NextReturn handleJoins(String dbName, Explain explain) throws Exception {
     final AtomicReference<List<Object[][]>> multiTableIds = new AtomicReference<>();
     String[] tableNames = new String[joins.size() + 1];
     tableNames[0] = fromTable;
@@ -1123,7 +1162,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
               if (joinType == JoinType.inner) {
                 if (multiTableIds.get() == null) {
                   long begin = System.nanoTime();
-                  ids = expression.next(ReadManager.SELECT_PAGE_SIZE / threadCount);
+                  ids = expression.next(ReadManager.SELECT_PAGE_SIZE / threadCount, explain);
                   expressionCount.incrementAndGet();
                   expressionDuration.set(System.nanoTime() - begin);
                 }
@@ -1139,7 +1178,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                   allExpression.setClient(client);
                   allExpression.setRecordCache(recordCache);
                   allExpression.setDbName(dbName);
-                  ids = allExpression.next(ReadManager.SELECT_PAGE_SIZE / threadCount);
+                  ids = allExpression.next(ReadManager.SELECT_PAGE_SIZE / threadCount, explain);
                   expression.setNextShard(allExpression.getNextShard());
                   expression.setNextKey(allExpression.getNextKey());
                 }
@@ -1155,7 +1194,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                   allExpression.setClient(client);
                   allExpression.setRecordCache(recordCache);
                   allExpression.setDbName(dbName);
-                  ids = allExpression.next(ReadManager.SELECT_PAGE_SIZE / threadCount);
+                  ids = allExpression.next(ReadManager.SELECT_PAGE_SIZE / threadCount, explain);
                   expression.setNextShard(allExpression.getNextShard());
                   expression.setNextKey(allExpression.getNextKey());
                 }
@@ -1377,7 +1416,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       final List<ExpressionImpl.IdEntry> keysToRead = new ArrayList<>();
       for (int i = 0; i < multiTableIds.get().size(); i++) {
         Object[][] id = multiTableIds.get().get(i);
-        if (id[leftTableIndex.get()] != null) {
+         if (id[leftTableIndex.get()] != null) {
           Record leftRecord = recordCache.get(leftTable.getName(), id[leftTableIndex.get()]);
           if (leftRecord != null) {
             keysToRead.add(new ExpressionImpl.IdEntry(i, new Object[]{leftRecord.getFields()[leftColumnIndex]}));

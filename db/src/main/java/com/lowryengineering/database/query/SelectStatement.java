@@ -1,5 +1,6 @@
 package com.lowryengineering.database.query;
 
+import com.lowryengineering.database.query.impl.SelectStatementImpl;
 import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
 
 /**
@@ -13,7 +14,7 @@ public interface SelectStatement extends Statement {
 
   void setWhereClause(Expression expression);
 
-  Object execute(String dbName) throws DatabaseException;
+  Object execute(String dbName, SelectStatementImpl.Explain explain) throws DatabaseException;
 
   void addOrderByExpression(String tableName, String columnName, boolean ascending);
 

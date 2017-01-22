@@ -36,6 +36,27 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
   public InExpressionImpl() {
   }
 
+  public String toString() {
+    String ret = "";
+    ret += leftExpression.toString();
+    if (isNot) {
+      ret += "not";
+    }
+    ret += " in (";
+    boolean first = true;
+    for (ExpressionImpl item : expressionList) {
+      if (first) {
+        first = false;
+      }
+      else {
+        ret += ", ";
+      }
+      ret += item.toString();
+    }
+    ret += ")";
+    return ret;
+  }
+
   public List<ExpressionImpl> getExpressionList() {
     return expressionList;
   }
@@ -149,7 +170,7 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
   }
 
   @Override
-  public NextReturn next(int count) {
+  public NextReturn next(int count, SelectStatementImpl.Explain explain) {
     if (getNextShard() == -2) {
       return new NextReturn(new String[]{getTableName()}, null);
     }
@@ -201,8 +222,8 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
   }
 
 
-  public NextReturn next() {
-    return next(ReadManager.SELECT_PAGE_SIZE);
+  public NextReturn next(SelectStatementImpl.Explain explain) {
+    return next(ReadManager.SELECT_PAGE_SIZE, explain);
   }
 
   @Override

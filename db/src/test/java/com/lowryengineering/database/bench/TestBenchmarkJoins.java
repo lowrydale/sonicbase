@@ -1,6 +1,7 @@
 package com.lowryengineering.database.bench;
 
 import com.lowryengineering.database.jdbcdriver.ConnectionProxy;
+import com.lowryengineering.database.util.JsonArray;
 import com.lowryengineering.database.util.JsonDict;
 import com.lowryengineering.database.util.StreamUtils;
 import com.lowryengineering.research.socket.NettyServer;
@@ -8,6 +9,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -23,8 +26,27 @@ public class TestBenchmarkJoins {
 
   public static void main(String[] args) throws Exception {
 
-    String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(TestBenchmarkJoins.class.getResourceAsStream("/config/config-4-servers.json")));
-    final JsonDict config = new JsonDict(configStr);
+    final long startId = Long.valueOf(args[0]);
+    final String cluster = args[1];
+    final String queryType = args[2];
+
+    File file = new File(System.getProperty("user.dir"), "config/config-" + cluster + ".json");
+    if (!file.exists()) {
+      file = new File(System.getProperty("user.dir"), "db/src/main/resources/config/config-" + cluster + ".json");
+      System.out.println("Loaded config resource dir");
+    }
+    else {
+      System.out.println("Loaded config default dir");
+    }
+     String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(new FileInputStream(file)));
+
+    JsonDict dict = new JsonDict(configStr);
+    JsonDict databaseDict = dict.getDict("database");
+    JsonArray array = databaseDict.getArray("shards");
+    JsonDict replica = array.getDict(0);
+    JsonArray replicasArray = replica.getArray("replicas");
+    String address = replicasArray.getDict(0).getString("publicAddress");
+    System.out.println("Using address: address=" + address);
 
     //   FileUtils.deleteDirectory(new File("/data/database"));
 
@@ -44,7 +66,7 @@ public class TestBenchmarkJoins {
 //    final java.sql.Connection conn = java.sql.DriverManager.getConnection("jdbc:mysql://localhost/test", "test", "test");
 //    final java.sql.Connection conn = java.sql.DriverManager.getConnection("jdbc:mysql://127.0.0.1:4306/test", "test", "test");
 
-    final java.sql.Connection conn = DriverManager.getConnection("jdbc:dbproxy:localhost:9010", "user", "password");
+    final java.sql.Connection conn = DriverManager.getConnection("jdbc:dbproxy:" + address + ":9010", "user", "password");
 
 
     //test insert
@@ -62,45 +84,51 @@ public class TestBenchmarkJoins {
         public void run() {
           try {
                   try {
-                    int countExpected = 0;
+                    PreparedStatement stmt1 = conn.prepareStatement("select count(*) from persons");
+
+                    ResultSet ret1 = stmt1.executeQuery();
+                    ret1.next();
+                    long count = ret1.getLong(1);
+
+                    long countExpected = 0;
                     long beginSelect = System.nanoTime();
                     //memberships.membershipname, resorts.resortname
                     ResultSet ret = null;
-                    if (false) {
+                    if (queryType.equals("3wayInner")) {
                       PreparedStatement stmt = conn.prepareStatement("select persons.id, socialsecuritynumber, memberships.id  " +
                           "from persons inner join Memberships on persons.id = Memberships.id inner join resorts on memberships.resortid = resorts.id" +
-                          " where persons.id<1000000");
+                          " where persons.id<" + count);
 
                       ret = stmt.executeQuery();
-                      countExpected = 500000;
+                      countExpected = count;
                     }
-                    else if (false) {
+                    else if (queryType.equals("2wayInner")) {
                       PreparedStatement stmt = conn.prepareStatement(
                            "select persons.id, persons.id2, persons.socialsecuritynumber, memberships.personId, memberships.personid2, memberships.membershipname from persons " +
                                " inner join Memberships on persons.id = Memberships.PersonId and memberships.personid2 = persons.id2  where persons.id > 0 order by persons.id desc");
                        ret = stmt.executeQuery();
-                      countExpected = 100000;
+                      countExpected = count;
                     }
-                    else if (false) {
+                    else if (queryType.equals("2wayLeftOuter")) {
                       PreparedStatement stmt = conn.prepareStatement(
                           "select persons.id, persons.socialsecuritynumber, memberships.membershipname, memberships.personid from memberships " +
-                              "left outer join Memberships on persons.id = Memberships.PersonId where memberships.personid<100000  order by memberships.personid desc");
+                              "left outer join Memberships on persons.id = Memberships.PersonId where memberships.personid<" + count + " order by memberships.personid desc");
                       ret = stmt.executeQuery();
-                      countExpected = 190000;
+                      countExpected = count;
                     }
-                    else if (false) {
+                    else if (queryType.equals("2wayInner2Field")) {
                       PreparedStatement stmt = conn.prepareStatement(
                            "select persons.id, persons.socialsecuritynumber, memberships.membershipname from persons " +
-                               " inner join Memberships on Memberships.PersonId = persons.id and memberships.personid < 100000 where persons.id > 0 order by persons.id desc");
+                               " inner join Memberships on Memberships.PersonId = persons.id and memberships.personid < " + count + " where persons.id > 0 order by persons.id desc");
                        ret = stmt.executeQuery();
-                      countExpected = 100000;
+                      countExpected = count;
                     }
-                    else {
+                    else if (queryType.equals("2wayRightOuter")) {
                       PreparedStatement stmt = conn.prepareStatement(
                           "select persons.id, persons.socialsecuritynumber, memberships.personId, memberships.membershipname from persons " +
-                              "right outer join Memberships on persons.id = Memberships.PersonId where persons.id<100000  order by persons.id desc");
+                              "right outer join Memberships on persons.id = Memberships.PersonId where persons.id<" + count + " order by persons.id desc");
                       ret = stmt.executeQuery();
-                      countExpected = 100000;
+                      countExpected = count;
                     }
                     totalSelectDuration.addAndGet(System.nanoTime() - beginSelect);
 

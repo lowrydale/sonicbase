@@ -497,14 +497,8 @@ public class DataType {
   private static Comparator doubleComparator = new Comparator() {
     @Override
     public int compare(Object o1, Object o2) {
-      if (o1 == null && o2 == null) {
+      if (o1 == null || o2 == null) {
         return 0;
-      }
-      if (o1 == null) {
-        return -1;
-      }
-      if (o2 == null) {
-        return 1;
       }
       Double lhs = (Double) doubleConverter.convert(o1);
       Double rhs = (Double) doubleConverter.convert(o2);
@@ -519,14 +513,8 @@ public class DataType {
   private static Comparator floatComparator = new Comparator() {
     @Override
     public int compare(Object o1, Object o2) {
-      if (o1 == null && o2 == null) {
+      if (o1 == null || o2 == null) {
         return 0;
-      }
-      if (o1 == null) {
-        return -1;
-      }
-      if (o2 == null) {
-        return 1;
       }
       Float lhs = (Float) floatConverter.convert(o1);
       Float rhs = (Float) floatConverter.convert(o2);
@@ -554,6 +542,9 @@ public class DataType {
     @Override
     public int compare(Object o1, Object o2) {
       //return ((String)o1).compareTo((String)o2);
+      if (o1 == null || o2 == null) {
+        return 0;
+      }
       if (o1 instanceof byte[] && o2 instanceof byte[]) {
         byte[] b1 = (byte[]) o1;
         byte[] b2 = (byte[]) o2;
@@ -595,14 +586,8 @@ public class DataType {
   private static Comparator byteComparator = new Comparator() {
     @Override
     public int compare(Object o1, Object o2) {
-      if (o1 == null && o2 == null) {
+      if (o1 == null || o2 == null) {
         return 0;
-      }
-      if (o1 == null) {
-        return -1;
-      }
-      if (o2 == null) {
-        return 1;
       }
       Byte lhs = (Byte) byteConverter.convert(o1);
       Byte rhs = (Byte) byteConverter.convert(o2);
@@ -617,14 +602,8 @@ public class DataType {
   private static Comparator shortComparator = new Comparator() {
     @Override
     public int compare(Object o1, Object o2) {
-      if (o1 == null && o2 == null) {
+      if (o1 == null || o2 == null) {
         return 0;
-      }
-      if (o1 == null) {
-        return -1;
-      }
-      if (o2 == null) {
-        return 1;
       }
       Short lhs = (Short) shortConverter.convert(o1);
       Short rhs = (Short) shortConverter.convert(o2);
@@ -639,14 +618,8 @@ public class DataType {
   private static Comparator bigDecimalComparator = new Comparator() {
     @Override
     public int compare(Object o1, Object o2) {
-      if (o1 == null && o2 == null) {
+      if (o1 == null || o2 == null) {
         return 0;
-      }
-      if (o1 == null) {
-        return -1;
-      }
-      if (o2 == null) {
-        return 1;
       }
       BigDecimal lhs = (BigDecimal) bigDecimalConverter.convert(o1);
       BigDecimal rhs = (BigDecimal) bigDecimalConverter.convert(o2);
@@ -661,14 +634,8 @@ public class DataType {
   private static Comparator dateComparator = new Comparator() {
     @Override
     public int compare(Object o1, Object o2) {
-      if (o1 == null && o2 == null) {
+      if (o1 == null || o2 == null) {
         return 0;
-      }
-      if (o1 == null) {
-        return -1;
-      }
-      if (o2 == null) {
-        return 1;
       }
       Date lhs = (Date) dateConverter.convert(o1);
       Date rhs = (Date) dateConverter.convert(o2);
@@ -683,14 +650,8 @@ public class DataType {
   private static Comparator timeComparator = new Comparator() {
     @Override
     public int compare(Object o1, Object o2) {
-      if (o1 == null && o2 == null) {
+      if (o1 == null || o2 == null) {
         return 0;
-      }
-      if (o1 == null) {
-        return -1;
-      }
-      if (o2 == null) {
-        return 1;
       }
       Time lhs = (Time) timeConverter.convert(o1);
       Time rhs = (Time) timeConverter.convert(o2);
@@ -705,14 +666,8 @@ public class DataType {
   private static Comparator timestampComparator = new Comparator() {
     @Override
     public int compare(Object o1, Object o2) {
-      if (o1 == null && o2 == null) {
+      if (o1 == null || o2 == null) {
         return 0;
-      }
-      if (o1 == null) {
-        return -1;
-      }
-      if (o2 == null) {
-        return 1;
       }
       Timestamp lhs = (Timestamp) timestampConverter.convert(o1);
       Timestamp rhs = (Timestamp) timestampConverter.convert(o2);
@@ -728,14 +683,8 @@ public class DataType {
 
     @Override
     public int compare(Object o1, Object o2) {
-      if (o1 == null && o2 == null) {
+      if (o1 == null || o2 == null) {
         return 0;
-      }
-      if (o1 == null) {
-        return -1;
-      }
-      if (o2 == null) {
-        return 1;
       }
       if (!(o1 instanceof byte[]) || !(o2 instanceof byte[])) {
         throw new DatabaseException("Datatype mismatch - expecting byte[]: found=" + o1.getClass().getName() + ", found=" + o2.getClass().getName());
@@ -761,6 +710,9 @@ public class DataType {
   private static Comparator blobComparator = new Comparator() {
     @Override
     public int compare(Object o1, Object o2) {
+      if (o1 == null || o2 == null) {
+        return 0;
+      }
       if (!(o1 instanceof byte[]) || !(o2 instanceof byte[])) {
         throw new DatabaseException("Datatype mismatch - expecting byte[]: found=" + o1.getClass().getName() + ", found=" + o2.getClass().getName());
       }

@@ -99,7 +99,7 @@ public class ConnectionProxy implements Connection {
 
   public void commit() throws SQLException {
     try {
-      databaseClient.commit(dbName);
+      databaseClient.commit(dbName, null);
     }
     catch (DatabaseException e) {
       throw new SQLException(e);

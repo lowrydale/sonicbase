@@ -5,4 +5,5 @@ package com.lowryengineering.database.query;
  */
 public interface Expression {
 
+
 }

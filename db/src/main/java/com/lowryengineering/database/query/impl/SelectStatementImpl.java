@@ -61,6 +61,8 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
   private Offset offset;
   private List<net.sf.jsqlparser.expression.Expression> groupByColumns;
   private GroupByContext groupByContext;
+  private Long pageSize;
+  private boolean forceSelectOnServer;
 
   public SelectStatementImpl(DatabaseClient client) {
     this.client = client;
@@ -270,6 +272,22 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     this.groupByColumns = groupByColumns;
   }
 
+  public void setPageSize(long pageSize) {
+    this.pageSize = pageSize;
+  }
+
+  public void forceSelectOnServer() {
+    this.forceSelectOnServer = true;
+  }
+
+  public boolean isForceSelectOnServer() {
+    return forceSelectOnServer;
+  }
+
+  public Long getPageSize() {
+    return pageSize;
+  }
+
   public static class Function {
     private String name;
     private ExpressionList parms;
@@ -413,6 +431,8 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
         expression.setOrderByExpressions(orderByExpressions);
         expression.setLimit(limit);
 
+        boolean haveCounters = false;
+        boolean needToEvaluate = false;
         List<Counter> countersList = new ArrayList<>();
         GroupByContext groupContext = this.groupByContext;
         if (groupContext == null && groupByColumns != null && groupByColumns.size() != 0) {
@@ -439,7 +459,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
           Set<String> columnsHandled = new HashSet<>();
           Map<String, Function> aliases = getFunctionAliases();
           for (Function function : aliases.values()) {
-            if (function.getName().equalsIgnoreCase("count") || function.getName().equalsIgnoreCase("min") || function.getName().equalsIgnoreCase("max") ||
+            if (function.getName().equalsIgnoreCase("pageSize") || function.getName().equalsIgnoreCase("min") || function.getName().equalsIgnoreCase("max") ||
                 function.getName().equalsIgnoreCase("avg") || function.getName().equalsIgnoreCase("sum")) {
 
               if (groupContext == null) {
@@ -490,7 +510,6 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
           }
         }
         else {
-
           Map<String, Function> aliases = getFunctionAliases();
           for (Function function : aliases.values()) {
             if (function.getName().equalsIgnoreCase("min") || function.getName().equalsIgnoreCase("max") ||
@@ -523,8 +542,26 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                   counter.setDestTypeToDouble();
                   break;
               }
+              boolean indexed = false;
+              for (IndexSchema indexSchema : client.getCommon().getTables(dbName).get(table).getIndices().values()) {
+                if (indexSchema.getFields()[0].equals(columnName)) {
+                  indexed = true;
+                  break;
+                }
+              }
+
+              haveCounters = true;
+              if (indexed && expression instanceof AllRecordsExpressionImpl) {
+                ExpressionImpl.evaluateCounter(client.getCommon(), client, dbName, counter);
+              }
+              else {
+                needToEvaluate = true;
+              }
             }
           }
+        }
+        if (!haveCounters) {
+          needToEvaluate = true;
         }
 
         if (countersList.size() > 0) {
@@ -652,9 +689,12 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
           }
 
           Set<DistinctRecord> uniqueRecords = new HashSet<>();
-          ExpressionImpl.NextReturn ids = next(dbName, explain);
-          if (!serverSelect) {
-            applyDistinct(dbName, tableNames, ids, uniqueRecords);
+          ExpressionImpl.NextReturn ids = null;
+          if (needToEvaluate) {
+            ids = next(dbName, explain);
+            if (!serverSelect) {
+              applyDistinct(dbName, tableNames, ids, uniqueRecords);
+            }
           }
 
           if (explain != null) {
@@ -731,8 +771,10 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
           for (int j = 0; j < tableNames.length; j++) {
             if (in.readBoolean()) {
               Record record = new Record(tableSchemas[j]);
-              DataUtil.readVLong(in, resultLength); //len
-              record.deserialize(dbName, client.getCommon(), in);
+              int len = (int)DataUtil.readVLong(in, resultLength); //len
+              byte[] bytes = new byte[len];
+              in.readFully(bytes);
+              record.deserialize(dbName, client.getCommon(), bytes);
               currRetRecords[k][j] = record;
 
               Object[] key = new Object[primaryKeyFields.length];
@@ -744,7 +786,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                 retKeys[k][j] = key;
               }
 
-              recordCache.put(tableNames[j], key, record);
+              recordCache.put(tableNames[j], key, new ExpressionImpl.CachedRecord(record, bytes));
             }
           }
 
@@ -787,7 +829,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       }
       List<Object[][]> actualIds = new ArrayList<>();
       for (int i = 0; i < ids.getIds().length; i++) {
-        Record record = recordCache.get(fromTable, ids.getIds()[i][tableIndex]);
+        Record record = recordCache.get(fromTable, ids.getIds()[i][tableIndex]).getRecord();
         if (!uniqueRecords.contains(new DistinctRecord(record, comparators, isArray, distinctFields, selectColumns))) {
           actualIds.add(ids.getIds()[i]);
           uniqueRecords.add(new DistinctRecord(record, comparators, isArray, distinctFields, selectColumns));
@@ -835,7 +877,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
         }
         if (this.countColumn != null) {
           for (Object[][] key : ids.getIds()) {
-            Record record = recordCache.get(this.countTable, key[tableIndex]);
+            Record record = recordCache.get(this.countTable, key[tableIndex]).getRecord();
             if (record.getFields()[columnIndex] != null) {
               count++;
             }
@@ -941,8 +983,13 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
           ret = serverSelect(dbName, serverSort, tableNames);
         }
         else {
+          expression.forceSelectOnServer(forceSelectOnServer);
           expression.setDbName(dbName);
-          ret = expression.next(ReadManager.SELECT_PAGE_SIZE, explain);
+          int count = ReadManager.SELECT_PAGE_SIZE;
+          if (this.pageSize != null) {
+            count = (int)(long)this.pageSize;
+          }
+          ret = expression.next(count, explain);
         }
         if (ret == null) {
           return null;
@@ -1161,6 +1208,10 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
               ExpressionImpl.NextReturn ids = null;
               if (joinType == JoinType.inner) {
                 if (multiTableIds.get() == null) {
+                  if (explain != null) {
+                    explain.appendSpaces();
+                    explain.getBuilder().append("inner join based on expression: table=" + fromTable + ", expression=" + expression.toString() + "\n");
+                  }
                   long begin = System.nanoTime();
                   ids = expression.next(ReadManager.SELECT_PAGE_SIZE / threadCount, explain);
                   expressionCount.incrementAndGet();
@@ -1169,6 +1220,15 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
               }
               else if (joinType == JoinType.leftOuter || joinType == JoinType.full) {
                 if (multiTableIds.get() == null) {
+                  if (explain != null) {
+                    explain.appendSpaces();
+                    if (joinType == JoinType.leftOuter) {
+                      explain.getBuilder().append("left outer join. Retrieving all records from table: table=" + fromTable + "\n");
+                    }
+                    else {
+                      explain.getBuilder().append("Full outer join. Retrieving all records from table: table=" + fromTable + "\n");
+                    }
+                  }
                   AllRecordsExpressionImpl allExpression = new AllRecordsExpressionImpl();
                   allExpression.setNextShard(expression.getNextShard());
                   allExpression.setNextKey(expression.getNextKey());
@@ -1185,6 +1245,10 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
               }
               else if (joinType == JoinType.rightOuter) {
                 if (multiTableIds.get() == null) {
+                  if (explain != null) {
+                    explain.appendSpaces();
+                    explain.getBuilder().append("Right outer join. Retrieving all records from table: table=" + fromTable + "\n");
+                  }
                   AllRecordsExpressionImpl allExpression = new AllRecordsExpressionImpl();
                   allExpression.setNextShard(expression.getNextShard());
                   allExpression.setNextKey(expression.getNextKey());
@@ -1237,7 +1301,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                 idsToProcess.set(multiTableIds.get());
               }
                joinRet.set(evaluateJoin(dbName, idsToProcess, joinType,
-                  leftColumn, rightColumn, leftTable, rightTable, rightTableIndex, leftTableIndex));
+                  leftColumn, rightColumn, leftTable, rightTable, rightTableIndex, leftTableIndex, explain));
 
 //              if (joinType == JoinType.rightOuter || joinType == JoinType.leftOuter) {
 //              if (joinType != JoinType.inner) {
@@ -1269,7 +1333,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                     Record[] records = new Record[tableNames.length];
                     for (int i = 0; i < records.length; i++) {
                       if (key[i] != null) {
-                        records[i] = recordCache.get(tableNames[i], key[i]);
+                        records[i] = recordCache.get(tableNames[i], key[i]).getRecord();
                       }
                     }
                     boolean passes = (boolean) expression.evaluateSingleRecord(tables, records, getParms());
@@ -1284,6 +1348,10 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                 }
               }
                 if (additionalJoinExpression != null) {
+                  if (explain != null) {
+                    explain.appendSpaces();
+                    explain.getBuilder().append("Evaluating join expression: expression=" + additionalJoinExpression.toString() + "\n");
+                  }
                   if (joinRet.get() != null) {
                     List<Object[][]> retKeys = new ArrayList<>();
                     TableSchema[] tables = new TableSchema[tableNames.length];
@@ -1294,7 +1362,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                       Record[] records = new Record[tableNames.length];
                       for (int i = 0; i < records.length; i++) {
                         if (key[i] != null) {
-                          records[i] = recordCache.get(tableNames[i], key[i]);
+                          records[i] = recordCache.get(tableNames[i], key[i]).getRecord();
                         }
                       }
                       boolean passes = (boolean) additionalJoinExpression.evaluateSingleRecord(tables, records, getParms());
@@ -1385,7 +1453,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       AtomicReference<ColumnImpl> leftColumn,
       AtomicReference<ColumnImpl> rightColumn,
       TableSchema leftTable, final TableSchema rightTable, AtomicInteger rightTableIndex,
-      AtomicInteger leftTableIndex) throws Exception {
+      AtomicInteger leftTableIndex, Explain explain) throws Exception {
 
      if (multiTableIds.get() != null) {
       HashMap<Integer, Object[][]> keys = null;
@@ -1417,14 +1485,19 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       for (int i = 0; i < multiTableIds.get().size(); i++) {
         Object[][] id = multiTableIds.get().get(i);
          if (id[leftTableIndex.get()] != null) {
-          Record leftRecord = recordCache.get(leftTable.getName(), id[leftTableIndex.get()]);
+          ExpressionImpl.CachedRecord cachedRecord = recordCache.get(leftTable.getName(), id[leftTableIndex.get()]);
+           Record leftRecord = cachedRecord == null ? null : cachedRecord.getRecord();
           if (leftRecord != null) {
             keysToRead.add(new ExpressionImpl.IdEntry(i, new Object[]{leftRecord.getFields()[leftColumnIndex]}));
           }
         }
       }
+       if (explain != null) {
+         explain.appendSpaces();
+         explain.getBuilder().append("Evaluate join expression. Read join records: joinTable=" + rightTable.getName() + ", expression=" + expression.toString() + "\n");
+       }
 
-      keys = ExpressionImpl.readRecords(dbName, client, tableSchema, keysToRead, new String[]{rightColumn.get().getColumnName()}, columns, recordCache, expression.getViewVersion());
+      keys = ExpressionImpl.readRecords(dbName, client, forceSelectOnServer, tableSchema, keysToRead, new String[]{rightColumn.get().getColumnName()}, columns, recordCache, expression.getViewVersion());
 
 
       //todo: need to make sure this index is sharded with the primary key so we know they're on the same server
@@ -1439,7 +1512,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
             }
           }
 
-          keys = ExpressionImpl.readRecords(dbName, client, tableSchema, keysToRead2, tableSchema.getPrimaryKey(), columns, recordCache, expression.getViewVersion());
+          keys = ExpressionImpl.readRecords(dbName, client, forceSelectOnServer, tableSchema, keysToRead2, tableSchema.getPrimaryKey(), columns, recordCache, expression.getViewVersion());
         }
       }
 

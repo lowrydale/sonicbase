@@ -675,7 +675,10 @@ public class DatabaseServer {
       if (qualifierPos == -1) {
         qualifierPos = memStr.toLowerCase().indexOf("t");
         if (qualifierPos == -1) {
-          qualifierPos = memStr.toLowerCase().indexOf("b");
+          qualifierPos = memStr.toLowerCase().indexOf("k");
+          if (qualifierPos == -1) {
+            qualifierPos = memStr.toLowerCase().indexOf("b");
+          }
         }
       }
     }
@@ -720,6 +723,13 @@ public class DatabaseServer {
 
   public LongRunningCommands getLongRunningCommands() {
     return longRunningCommands;
+  }
+
+  public byte[] areAllLongRunningCommandsComplete(String command, byte[] bodyzz, boolean replayedCommand) {
+    if (longRunningCommands.getCommandCount() == 0) {
+      return "true".getBytes();
+    }
+    return "false".getBytes();
   }
 
   private void startLongRunningCommands() {
@@ -1819,14 +1829,19 @@ public class DatabaseServer {
   }
 
   public byte[] indexLookup(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[4];
-    common.getSchemaReadLock(dbName).lock();
     try {
-      return readManager.indexLookup(command, body);
+      DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
+      String dbName = in.readUTF();
+      common.getSchemaReadLock(dbName).lock();
+      try {
+        return readManager.indexLookup(dbName, in);
+      }
+      finally {
+        common.getSchemaReadLock(dbName).unlock();
+      }
     }
-    finally {
-      common.getSchemaReadLock(dbName).unlock();
+    catch (Exception e) {
+      throw new DatabaseException(e);
     }
   }
 
@@ -1873,6 +1888,18 @@ public class DatabaseServer {
     common.getSchemaReadLock(dbName).lock();
     try {
       return readManager.indexLookupExpression(command, body);
+    }
+    finally {
+      common.getSchemaReadLock(dbName).unlock();
+    }
+  }
+
+  public byte[] evaluateCounter(String command, byte[] body, boolean replayedCommand) {
+    String[] parts = command.split(":");
+    String dbName = parts[4];
+    common.getSchemaReadLock(dbName).lock();
+    try {
+      return readManager.evaluateCounter(command, body);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();

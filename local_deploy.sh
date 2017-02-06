@@ -53,7 +53,7 @@ chmod +x $HOME/database/bin/do-rsync.sh
 chmod +x $HOME/database/bin/do-start.sh
 chmod +x $HOME/database/bin/dump-threads
 chmod +x $HOME/database/bin/get-mem-total
-chmod +x $HOME/database/bin/remove-get-mem-total
+chmod +x $HOME/database/bin/remote-get-mem-total
 
 rsync -rvlLt src/main/resources/* $HOME/database/target
 

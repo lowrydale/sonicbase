@@ -230,23 +230,25 @@ public class TestBenchmarkInsert {
                   }
                   ctx.stop();
 
-                  for (int j = 0; j < 2; j++) {
-                    try {
-                      stmt = conn.prepareStatement("insert into Memberships (id1, id2) VALUES (?, ?)");
-                      stmt.setLong(1, offset);
-                      stmt.setLong(2, j);
-                      ctx = INSERT_STATS.time();
-                      if (stmt.executeUpdate() != 1) {
-                        throw new DatabaseException("Failed to insert members");
+                  if(false) {
+                    for (int j = 0; j < 2; j++) {
+                      try {
+                        stmt = conn.prepareStatement("insert into Memberships (id1, id2) VALUES (?, ?)");
+                        stmt.setLong(1, offset);
+                        stmt.setLong(2, j);
+                        ctx = INSERT_STATS.time();
+                        if (stmt.executeUpdate() != 1) {
+                          throw new DatabaseException("Failed to insert members");
+                        }
+                        ctx.stop();
                       }
-                      ctx.stop();
-                    }
-                    catch (Exception e) {
-                      if (e.getMessage().contains("Unique constraint violated")) {
-                        logger.error("Unique constraint violation - membership");
-                      }
-                      else {
-                        logger.error("Error inserting membership: id=" + currOffset, e);
+                      catch (Exception e) {
+                        if (e.getMessage().contains("Unique constraint violated")) {
+                          logger.error("Unique constraint violation - membership");
+                        }
+                        else {
+                          logger.error("Error inserting membership: id=" + currOffset, e);
+                        }
                       }
                     }
                   }

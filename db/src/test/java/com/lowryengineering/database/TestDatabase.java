@@ -100,6 +100,8 @@ public class TestDatabase {
 
     client = ((ConnectionProxy) conn).getDatabaseClient();
 
+    client.setPageSize(3);
+
     PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
     stmt.executeUpdate();
 
@@ -177,7 +179,13 @@ public class TestDatabase {
 //    stmt = conn.prepareStatement("create index ssn on persons(socialSecurityNumber)");
 //    stmt.executeUpdate();
 
-    Thread.sleep(5000);
+    while (true) {
+      byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().send(null, 0, 0, "DatabaseServer:areAllLongRunningCommandsComplete:1:test", null, DatabaseClient.Replica.master);
+      if (new String(bytes).equals("true")) {
+        break;
+      }
+      Thread.sleep(1000);
+    }
 
     IndexSchema indexSchema = null;
     for (Map.Entry<String, IndexSchema> entry : client.getCommon().getTables("test").get("persons").getIndices().entrySet()) {
@@ -193,7 +201,7 @@ public class TestDatabase {
     ParameterHandler parms = new ParameterHandler();
     SelectContextImpl ret = ExpressionImpl.lookupIds(
           "test", client.getCommon(), client, 0,
-          1000, client.getCommon().getTables("test").get("persons"), indexSchema, BinaryExpression.Operator.equal,
+          1000, client.getCommon().getTables("test").get("persons"), indexSchema, false, BinaryExpression.Operator.equal,
           null,
           null,
           new Object[]{"933-28-0".getBytes()}, parms, null, null,
@@ -314,7 +322,7 @@ public class TestDatabase {
      ParameterHandler parms = new ParameterHandler();
      SelectContextImpl ret = ExpressionImpl.lookupIds(
            "test", client.getCommon(), client, 0,
-           1000, client.getCommon().getTables("test").get("persons"), indexSchema, BinaryExpression.Operator.equal,
+           1000, client.getCommon().getTables("test").get("persons"), indexSchema, false, BinaryExpression.Operator.equal,
            null,
            null,
            new Object[]{"933-28-0".getBytes()}, parms, null, null,
@@ -356,7 +364,7 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 1);
     assertEquals(ret.getLong("id2"), 2);
     ret.next();
-    assertEquals(ret.getLong("id"), 1);
+      assertEquals(ret.getLong("id"), 1);
     assertEquals(ret.getLong("id2"), 5);
     assertFalse(ret.next());
   }
@@ -432,6 +440,28 @@ public class TestDatabase {
   }
 
   @Test
+  public void testLess() throws Exception {
+
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where id<106 and id>100 order by id2 asc, id desc");
+    ResultSet ret = stmt.executeQuery();
+    assertTrue(ret.next());
+    assertEquals(ret.getInt("id2"), 0);
+    assertEquals(ret.getInt("id"), 104);
+    assertTrue(ret.next());
+    assertEquals(ret.getInt("id2"), 0);
+    assertEquals(ret.getInt("id"), 102);
+    assertTrue(ret.next());
+    assertEquals(ret.getInt("id2"), 1);
+    assertEquals(ret.getInt("id"), 105);
+    assertTrue(ret.next());
+    assertEquals(ret.getInt("id2"), 1);
+    assertEquals(ret.getInt("id"), 103);
+    assertTrue(ret.next());
+    assertEquals(ret.getInt("id2"), 1);
+    assertEquals(ret.getInt("id"), 101);
+  }
+
+  @Test
   public void testBasics() throws Exception {
 
     //test select returns multiple records with an index using operator '<'
@@ -439,8 +469,10 @@ public class TestDatabase {
     ResultSet ret = stmt.executeQuery();
 
     assertTrue(ret.isBeforeFirst());
-    ret.next();
-    ret.getInt("id2");
+    assertTrue(ret.next());
+//    System.out.println(ret.getLong("id"));
+//    System.out.println(ret.getLong("id2"));
+    ret.getLong("id2");
     assertTrue(ret.wasNull());
     ret.getInt(2);
     assertTrue(ret.wasNull());
@@ -545,6 +577,18 @@ public class TestDatabase {
   }
 
   @Test
+  public void testIdentity() throws SQLException {
+    //test select with not in expression
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where id = 5");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    assertFalse(ret.next());
+  }
+
+
+  @Test
   public void testNoKey() throws SQLException {
     //test select with not in expression
     PreparedStatement stmt = conn.prepareStatement("select * from nokey where id < 5 order by id asc");
@@ -554,22 +598,27 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 0);
     assertEquals(ret.getLong("id2"), 0);
     ret.next();
+    assertEquals(ret.getLong("id"), 0);
+    assertEquals(ret.getLong("id2"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    assertEquals(ret.getLong("id2"), 2);
+    ret.next();
     assertEquals(ret.getLong("id"), 1);
     assertEquals(ret.getLong("id2"), 2);
     ret.next();
     assertEquals(ret.getLong("id"), 2);
     assertEquals(ret.getLong("id2"), 4);
-    ret.next();
-    assertEquals(ret.getLong("id"), 3);
-    assertEquals(ret.getLong("id2"), 6);
-    ret.next();
-    assertEquals(ret.getLong("id"), 4);
-    assertEquals(ret.getLong("id2"), 8);
-    assertFalse(ret.next());
+  }
 
-    stmt = conn.prepareStatement("select * from nokey where id <= 2 and id2 = 4 order by id asc");
-    ret = stmt.executeQuery();
+  @Test
+  public void testNoKey2() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from nokey where id <= 2 and id2 = 4 order by id asc");
+    ResultSet ret = stmt.executeQuery();
 
+    ret.next();
+    assertEquals(ret.getLong("id"), 2);
+    assertEquals(ret.getLong("id2"), 4);
     ret.next();
     assertEquals(ret.getLong("id"), 2);
     assertEquals(ret.getLong("id2"), 4);
@@ -747,74 +796,85 @@ public class TestDatabase {
     assertFalse(ret.next());
   }
 
+
   @Test
-  public void testAllSort() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("select * from persons order by id2 asc, id desc");
+  public void tesSort2() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id, id2 from persons order by id2 asc, id asc");
     ResultSet ret = stmt.executeQuery();
 
     ret.next();
     assertEquals(ret.getLong("id2"), 0);
-    assertTrue(ret.wasNull());
-    assertEquals(ret.getLong("id"), 9);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 0);
-    assertEquals(ret.getLong("id"), 8);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 0);
-    assertEquals(ret.getLong("id"), 7);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 0);
-    assertEquals(ret.getLong("id"), 6);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 0);
-    assertEquals(ret.getLong("id"), 5);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 0);
-    assertEquals(ret.getLong("id"), 4);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 0);
-    assertEquals(ret.getLong("id"), 3);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 0);
-    assertEquals(ret.getLong("id"), 2);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 0);
-    assertEquals(ret.getLong("id"), 1);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 0);
-    assertEquals(ret.getLong("id"), 0);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 0);
-    assertEquals(ret.getLong("id"), 108);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 0);
-    assertEquals(ret.getLong("id"), 106);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 0);
-    assertEquals(ret.getLong("id"), 104);
+    assertEquals(ret.getLong("id"), 100);
     ret.next();
     assertEquals(ret.getLong("id2"), 0);
     assertEquals(ret.getLong("id"), 102);
     ret.next();
     assertEquals(ret.getLong("id2"), 0);
-    assertEquals(ret.getLong("id"), 100);
+    assertEquals(ret.getLong("id"), 104);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getLong("id"), 106);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getLong("id"), 108);
     ret.next();
     assertEquals(ret.getLong("id2"), 1);
-    assertEquals(ret.getLong("id"), 109);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 1);
-    assertEquals(ret.getLong("id"), 107);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 1);
-    assertEquals(ret.getLong("id"), 105);
+    assertEquals(ret.getLong("id"), 101);
     ret.next();
     assertEquals(ret.getLong("id2"), 1);
     assertEquals(ret.getLong("id"), 103);
     ret.next();
     assertEquals(ret.getLong("id2"), 1);
-    assertEquals(ret.getLong("id"), 101);
+    assertEquals(ret.getLong("id"), 105);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 1);
+    assertEquals(ret.getLong("id"), 107);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 1);
+    assertEquals(ret.getLong("id"), 109);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertTrue(ret.wasNull());
+    assertEquals(ret.getLong("id"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertTrue(ret.wasNull());
+    assertEquals(ret.getLong("id"), 1);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertTrue(ret.wasNull());
+    assertEquals(ret.getLong("id"), 2);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertTrue(ret.wasNull());
+    assertEquals(ret.getLong("id"), 3);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertTrue(ret.wasNull());
+    assertEquals(ret.getLong("id"), 4);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertTrue(ret.wasNull());
+    assertEquals(ret.getLong("id"), 5);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertTrue(ret.wasNull());
+    assertEquals(ret.getLong("id"), 6);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertTrue(ret.wasNull());
+    assertEquals(ret.getLong("id"), 7);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertTrue(ret.wasNull());
+    assertEquals(ret.getLong("id"), 8);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertTrue(ret.wasNull());
+    assertEquals(ret.getLong("id"), 9);
     assertFalse(ret.next());
   }
+
 
   @Test
   public void testAllSortAnd() throws SQLException {
@@ -1180,7 +1240,7 @@ public class TestDatabase {
     for (int i = 0; i < recordCount; i++) {
 
       //test jdbc select
-      stmt = conn.prepareStatement("select * from persons where socialSecurityNumber=?");
+      stmt = conn.prepareStatement("select * from persons where socialSecurityNumber=? order by id");
       stmt.setString(1, "933-28-" + i);
       ret = stmt.executeQuery();
       assertTrue(ret.next());
@@ -1369,7 +1429,7 @@ public class TestDatabase {
     ret.next();
     assertEquals(ret.getLong("id"), 3);
     ret.next();
-    assertEquals(ret.getLong("id"), 2);
+     assertEquals(ret.getLong("id"), 2);
     ret.next();
     assertEquals(ret.getLong("id"), 1);
     assertFalse(ret.next());
@@ -2059,6 +2119,238 @@ public class TestDatabase {
   }
 
 
+  @Test
+   public void testExplain() throws SQLException {
+     PreparedStatement stmt = conn.prepareStatement("explain select * from persons where id < 100");
+     ResultSet ret = stmt.executeQuery();
 
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+     stmt = conn.prepareStatement("explain select * from persons where id < 100 and id > 10");
+     ret = stmt.executeQuery();
+
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+     stmt = conn.prepareStatement("explain select * from persons where id < 100 or id > 10");
+     ret = stmt.executeQuery();
+
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+     stmt = conn.prepareStatement("explain select * from persons where id < 100 and id > 10 and id2 > 10");
+     ret = stmt.executeQuery();
+
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+     stmt = conn.prepareStatement("explain select * from persons where id < 100 and id > 10 and id2 > 10 and id2 < 1");
+     ret = stmt.executeQuery();
+
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+     stmt = conn.prepareStatement("explain select * from persons where id < 100 and id > 10 and id > 10 and id < 1");
+     ret = stmt.executeQuery();
+
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+     stmt = conn.prepareStatement("explain select * from persons where id2 < 100");
+     ret = stmt.executeQuery();
+
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+     stmt = conn.prepareStatement("explain select personId, membershipname from memberships where personid=1 and membershipname='name'");
+     ret = stmt.executeQuery();
+
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+
+     stmt = conn.prepareStatement("explain select max(id) as maxValue from persons");
+     ret = stmt.executeQuery();
+
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+     stmt = conn.prepareStatement("explain select max(id) as maxValue from persons where id2 < 1");
+     ret = stmt.executeQuery();
+
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+     stmt = conn.prepareStatement("explain select max(id) as maxValue from persons where id < 100");
+     ret = stmt.executeQuery();
+
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+     stmt = conn.prepareStatement("explain select sum(id) as sumValue from persons");
+     ret = stmt.executeQuery();
+
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+     stmt = conn.prepareStatement("explain select * from persons where id < 100 and id > 200 limit 3");
+     ret = stmt.executeQuery();
+
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+     stmt = conn.prepareStatement("explain select * from persons where id < 100 and id > 200 limit 3 offset 2");
+     ret = stmt.executeQuery();
+
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+     stmt = conn.prepareStatement("explain select * from persons order by id2 asc, id desc");
+     ret = stmt.executeQuery();
+
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+     stmt = conn.prepareStatement("explain select persons.id  from persons where persons.id>=100 AND id < 100AND ID2=0 OR id> 6 AND ID < 100");
+     ret = stmt.executeQuery();
+
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+     stmt = conn.prepareStatement("explain select * from persons where id>105 and id2=0 or id<105 and id2=1 order by id desc");
+     ret = stmt.executeQuery();
+
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+     stmt = conn.prepareStatement("explain select persons.id from persons where persons.id>2 AND id < 100 OR id> 6 AND ID < 200");
+     ret = stmt.executeQuery();
+
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+     stmt = conn.prepareStatement("explain select * from persons where id2=1 order by id desc");
+     ret = stmt.executeQuery();
+
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+     stmt = conn.prepareStatement("explain select * from persons where id in (0, 1, 2, 3, 4)");
+     ret = stmt.executeQuery();
+
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+     stmt = conn.prepareStatement("explain select * from persons where socialSecurityNumber='555'");
+     ret = stmt.executeQuery();
+
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+     stmt = conn.prepareStatement("explain select * from persons where id2=1 or id2=0 order by id2 asc, id desc");
+     ret = stmt.executeQuery();
+
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+     stmt = conn.prepareStatement("explain select * from persons where id=0 OR id=1 OR id=2 OR id=3 OR id=4");
+     ret = stmt.executeQuery();
+
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+
+     stmt = conn.prepareStatement("explain select persons.id, socialsecuritynumber, memberships.personid  " +
+         "from persons inner join Memberships on persons.id = Memberships.personId inner join resorts on memberships.resortid = resorts.resortid" +
+         " where persons.id<1000");
+     ret = stmt.executeQuery();
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+     stmt = conn.prepareStatement(
+         "explain select persons.id, persons.id2, persons.socialsecuritynumber, memberships.personId, memberships.personid, memberships.membershipname from persons " +
+             " inner join Memberships on persons.id = Memberships.PersonId and memberships.personid = persons.id2  where persons.id > 0 order by persons.id desc");
+     ret = stmt.executeQuery();
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+     stmt = conn.prepareStatement(
+         "explain select persons.id, persons.socialsecuritynumber, memberships.membershipname, memberships.personid from memberships " +
+             "left outer join persons on persons.id = Memberships.PersonId where memberships.personid<1000 order by memberships.personid desc");
+     ret = stmt.executeQuery();
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+     stmt = conn.prepareStatement(
+         "explain select persons.id, persons.socialsecuritynumber, memberships.membershipname from persons " +
+             " inner join Memberships on Memberships.PersonId = persons.id and memberships.personid < 1000 where persons.id > 0 order by persons.id desc");
+     ret = stmt.executeQuery();
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+
+     stmt = conn.prepareStatement(
+         "select persons.id, persons.socialsecuritynumber, memberships.personId, memberships.membershipname from persons " +
+             "right outer join Memberships on persons.id = Memberships.PersonId where persons.id<1000 order by persons.id desc");
+     ret = stmt.executeQuery();
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
+     System.out.println();
+   }
 }
 

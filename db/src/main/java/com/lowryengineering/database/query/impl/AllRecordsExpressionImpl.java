@@ -80,7 +80,7 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
       }
     }
     AtomicReference<String> usedIndex = new AtomicReference<>();
-    SelectContextImpl context = ExpressionImpl.lookupIds(dbName, getClient().getCommon(), getClient(), getReplica(), count, tableSchema, indexSchema,
+    SelectContextImpl context = ExpressionImpl.lookupIds(dbName, getClient().getCommon(), getClient(), getReplica(), count, tableSchema, indexSchema, isForceSelectOnServer(),
         BinaryExpression.Operator.greater, null, getOrderByExpressions(), getNextKey(), getParms(), this, null, getNextKey(), null,
         getColumns(), indexSchema.getFields()[0], getNextShard(), getRecordCache(), usedIndex, false, getViewVersion(), getCounters(), getGroupByContext(), debug);
     setNextShard(context.getNextShard());

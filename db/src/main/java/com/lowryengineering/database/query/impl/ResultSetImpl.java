@@ -46,8 +46,8 @@ public class ResultSetImpl implements ResultSet {
   private long count;
   private ExpressionImpl.RecordCache recordCache;
   private ParameterHandler parms;
-  private Record[][] readRecords;
-  private Record[][] lastReadRecords;
+  private ExpressionImpl.CachedRecord[][] readRecords;
+  private ExpressionImpl.CachedRecord[][] lastReadRecords;
   private SelectStatementImpl selectStatement;
   private String indexUsed;
   private SelectContextImpl selectContext;
@@ -57,13 +57,14 @@ public class ResultSetImpl implements ResultSet {
   private Record[] currRecord;
   private Counter[] counters;
   private Limit limit;
+  private long pageSize = ReadManager.SELECT_PAGE_SIZE;
 
   public ResultSetImpl(String[] describeStrs) {
     this.describeStrs = describeStrs;
   }
 
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP", justification="copying the returned data is too slow")
-  public Record[][] getReadRecords() {
+  public ExpressionImpl.CachedRecord[][] getReadRecordsAndSerializedRecords() {
     return readRecords;
   }
 
@@ -141,6 +142,14 @@ public class ResultSetImpl implements ResultSet {
     return null;
   }
 
+  public void setPageSize(int pageSize) {
+    this.pageSize = pageSize;
+  }
+
+  public void forceSelectOnServer() {
+    selectStatement.forceSelectOnServer();
+  }
+
   public static class MultiTableRecordList {
     private String[] tableNames;
     private long[][] ids;
@@ -201,6 +210,7 @@ public class ResultSetImpl implements ResultSet {
     this.offset = offset;
     this.groupByColumns = groupByColumns;
     this.groupByContext = groupContext;
+    this.pageSize = selectStatement.getPageSize();
 
     List<OrderByExpressionImpl> orderByExpressions = selectStatement.getOrderByExpressions();
     if (orderByExpressions.size() != 0) {
@@ -226,7 +236,7 @@ public class ResultSetImpl implements ResultSet {
   public static void sortResults(
       String dbName,
       DatabaseCommon common,
-      SelectStatementImpl selectStatement, Record[][] records,
+      SelectStatementImpl selectStatement, ExpressionImpl.CachedRecord[][] records,
       final String[] tableNames) {
     List<OrderByExpressionImpl> orderByExpressions = selectStatement.getOrderByExpressions();
     if (orderByExpressions.size() != 0) {
@@ -257,11 +267,15 @@ public class ResultSetImpl implements ResultSet {
         comparators[i] = fieldSchema.getType().getComparator();
       }
 
-      Arrays.sort(records, new Comparator<Record[]>() {
+      Arrays.sort(records, new Comparator<ExpressionImpl.CachedRecord[]>() {
         @Override
-        public int compare(Record[] o1, Record[] o2) {
+        public int compare(ExpressionImpl.CachedRecord[] o1, ExpressionImpl.CachedRecord[] o2) {
           for (int i = 0; i < fieldOffsets.length; i++) {
             if (o1[tableOffsets[i]] == null && o2[tableOffsets[i]] == null) {
+              continue;
+            }
+            if ((o1[tableOffsets[i]] == null || o1[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]] == null) &&
+                (o2[tableOffsets[i]] == null || o2[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]] == null)) {
               continue;
             }
             if (o1[tableOffsets[i]] == null) {
@@ -270,8 +284,13 @@ public class ResultSetImpl implements ResultSet {
             if (o2[tableOffsets[i]] == null) {
               return 1 * (ascendingFlags[i] ? 1 : -1);
             }
-
-            int value = comparators[i].compare(o1[tableOffsets[i]].getFields()[fieldOffsets[i]], o2[tableOffsets[i]].getFields()[fieldOffsets[i]]);
+            if (o1[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]] == null) {
+              return 1 * (ascendingFlags[i] ? 1 : -1);
+            }
+            if (o2[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]] == null) {
+              return -1 * (ascendingFlags[i] ? 1 : -1);
+            }
+            int value = comparators[i].compare(o1[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]], o2[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]]);
             if (value < 0) {
               return -1 * (ascendingFlags[i] ? 1 : -1);
             }
@@ -416,8 +435,15 @@ public class ResultSetImpl implements ResultSet {
         boolean hasNull = false;
         Object[] lastTmp = new Object[lastFields.length];
         for (int i = 0; i < lastFields.length; i++) {
+          if (lastFields[i] == null) {
+            return false;
+          }
           Object field = getField(actualColumns[i]);
           if (nonNull && 0 != comparators[i].compare(field, lastFields[i]) && field != null && lastFields[i] != null) {
+            currPos--;
+            break outer;
+          }
+          if (lastFields[i] != null && field == null) {
             currPos--;
             break outer;
           }
@@ -502,7 +528,7 @@ public class ResultSetImpl implements ResultSet {
 
   private Record doReadRecord(Object[] key, String tableName) throws Exception {
 
-    return ExpressionImpl.doReadRecord(dbName, databaseClient, parms, selectStatement.getWhereClause(), recordCache, key, tableName, columns, ((ExpressionImpl)selectStatement.getWhereClause()).getViewVersion(), false);
+    return ExpressionImpl.doReadRecord(dbName, databaseClient, selectStatement.isForceSelectOnServer(), parms, selectStatement.getWhereClause(), recordCache, key, tableName, columns, ((ExpressionImpl)selectStatement.getWhereClause()).getViewVersion(), false);
   }
 
 
@@ -559,12 +585,12 @@ public class ResultSetImpl implements ResultSet {
               if (lastReadRecords[lastReadRecords.length + currPos][i] == null) {
                 return null;
               }
-              return lastReadRecords[lastReadRecords.length + currPos][i].getFields()[offset];
+              return lastReadRecords[lastReadRecords.length + currPos][i].getRecord().getFields()[offset];
             }
             if (readRecords[currPos][i] == null) {
               return null;
             }
-            return readRecords[currPos][i].getFields()[offset];
+            return readRecords[currPos][i].getRecord().getFields()[offset];
           }
         }
       }
@@ -580,12 +606,12 @@ public class ResultSetImpl implements ResultSet {
           if (lastReadRecords[lastReadRecords.length + currPos][i] == null) {
             return null;
           }
-          return lastReadRecords[lastReadRecords.length + currPos][i].getFields()[offset];
+          return lastReadRecords[lastReadRecords.length + currPos][i].getRecord().getFields()[offset];
         }
         if (readRecords[currPos][i] == null) {
           return null;
         }
-        return readRecords[currPos][i].getFields()[offset];
+        return readRecords[currPos][i].getRecord().getFields()[offset];
       }
     }
     return null;
@@ -1442,13 +1468,14 @@ public class ResultSetImpl implements ResultSet {
         lastReadRecords = readRecords;
         readRecords = null;
 
+        selectStatement.setPageSize(pageSize);
         ExpressionImpl.NextReturn ids = selectStatement.next(dbName, null);
         if (ids != null && ids.getIds() != null) {
           selectStatement.applyDistinct(dbName, selectContext.getTableNames(), ids, uniqueRecords);
         }
 
         readRecords = readRecords(ids);
-        if (ids != null) {
+        if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
           selectContext.setCurrKeys(ids.getKeys());
         }
         else {
@@ -1593,8 +1620,10 @@ public class ResultSetImpl implements ResultSet {
           for (int j = 0; j < tableNames.length; j++) {
             if (in.readBoolean()) {
               Record record = new Record(tableSchemas[j]);
-              DataUtil.readVLong(in, resultLength);//len
-              record.deserialize(dbName, databaseClient.getCommon(), in);
+              int len = (int)DataUtil.readVLong(in, resultLength);//len
+              byte[] bytes = new byte[len];
+              in.readFully(bytes);
+              record.deserialize(dbName, databaseClient.getCommon(), bytes);
               currRetRecords[k][j] = record;
 
               Object[] key = new Object[primaryKeyFields.length];
@@ -1606,7 +1635,7 @@ public class ResultSetImpl implements ResultSet {
                 retKeys[k][j] = key;
               }
 
-              recordCache.put(tableNames[j], key, record);
+              recordCache.put(tableNames[j], key, new ExpressionImpl.CachedRecord(record, bytes));
             }
           }
 
@@ -1634,7 +1663,7 @@ public class ResultSetImpl implements ResultSet {
 
   }
 
-  private Record[][] readRecords(ExpressionImpl.NextReturn nextReturn) {
+  private ExpressionImpl.CachedRecord[][] readRecords(ExpressionImpl.NextReturn nextReturn) {
     if (nextReturn == null || nextReturn.getKeys() == null) {
       return null;
     }
@@ -1679,17 +1708,20 @@ public class ResultSetImpl implements ResultSet {
 //          //Record[][] records = ExpressionImpl.doReadRecords(databaseClient, actualIds, selectContext.getTableNames(), columns);
 //        }
         Object[][][] actualIds = nextReturn.getKeys();
-        Record[][] retRecords = new Record[actualIds.length][];
+        ExpressionImpl.CachedRecord[][] retRecords = new ExpressionImpl.CachedRecord[actualIds.length][];
         for (int i = 0; i < retRecords.length; i++) {
-          retRecords[i] = new Record[actualIds[i].length];
+          retRecords[i] = new ExpressionImpl.CachedRecord[actualIds[i].length];
           for (int j = 0; j < retRecords[i].length; j++) {
             if (actualIds[i][j] == null) {
               continue;
             }
-            retRecords[i][j] = recordCache.get(nextReturn.getTableNames()[j], actualIds[i][j]);
+
+            ExpressionImpl.CachedRecord cachedRecord = recordCache.get(nextReturn.getTableNames()[j], actualIds[i][j]);
+            retRecords[i][j] = cachedRecord;
             if (retRecords[i][j] == null) {
               //todo: batch these reads
-              retRecords[i][j] = doReadRecord(actualIds[i][j], nextReturn.getTableNames()[j]);
+              Record record = doReadRecord(actualIds[i][j], nextReturn.getTableNames()[j]);
+              retRecords[i][i] = new ExpressionImpl.CachedRecord(record, record.serialize(databaseClient.getCommon()));
             }
           }
         }

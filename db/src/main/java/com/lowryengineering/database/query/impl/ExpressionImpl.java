@@ -54,6 +54,7 @@ public abstract class ExpressionImpl implements Expression {
   private Limit limit;
   private GroupByContext groupByContext;
   protected String dbName;
+  private boolean forceSelectOnServer;
 
   public Counter[] getCounters() {
     return counters;
@@ -135,6 +136,89 @@ public abstract class ExpressionImpl implements Expression {
 
   public void setDbName(String dbName) {
     this.dbName = dbName;
+  }
+
+  public void forceSelectOnServer(boolean forceSelectOnServer) {
+    this.forceSelectOnServer = forceSelectOnServer;
+  }
+
+  public static void evaluateCounter(DatabaseCommon common, DatabaseClient client, String dbName, Counter counter) throws IOException {
+    byte[] bytes = counter.serialize();
+    String command = "DatabaseServer:evaluateCounter:1:" + common.getSchemaVersion() + ":" + dbName;
+
+    String batchKey = "DatabaseServer:evaluateCounter";
+
+    Counter lastCounter = null;
+    int shardCount = common.getServersConfig().getShardCount();
+    int replicaCount = common.getServersConfig().getShards()[0].getReplicas().length;
+    for (int i = 0; i < shardCount; i++) {
+      byte[] ret = client.send(batchKey, i, ThreadLocalRandom.current().nextInt(replicaCount), command, bytes, DatabaseClient.Replica.specified);
+      DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
+      Counter retCounter = new Counter();
+      retCounter.deserialize(in);
+      if (lastCounter != null) {
+        Long maxLong = retCounter.getMaxLong();
+        Long lastMaxLong = lastCounter.getMaxLong();
+        if (maxLong != null) {
+          if (lastMaxLong != null) {
+            retCounter.setMaxLong(Math.max(maxLong, lastMaxLong));
+          }
+        }
+        else {
+          retCounter.setMaxLong(lastMaxLong);
+        }
+        Double maxDouble = retCounter.getMaxDouble();
+        Double lastMaxDouble = lastCounter.getMaxDouble();
+        if (maxDouble != null) {
+          if (lastMaxDouble != null) {
+            retCounter.setMaxDouble(Math.max(maxDouble, lastMaxDouble));
+          }
+        }
+        else {
+          retCounter.setMaxDouble(lastMaxDouble);
+        }
+        Long minLong = retCounter.getMinLong();
+        Long lastMinLong = lastCounter.getMinLong();
+        if (minLong != null) {
+          if (lastMinLong != null) {
+            retCounter.setMaxLong(Math.max(minLong, lastMinLong));
+          }
+        }
+        else {
+          retCounter.setMinLong(lastMinLong);
+        }
+        Double minDouble = retCounter.getMinDouble();
+        Double lastMinDouble = lastCounter.getMinDouble();
+        if (minDouble != null) {
+          if (lastMinDouble != null) {
+            retCounter.setMinDouble(Math.max(minDouble, lastMinDouble));
+          }
+        }
+        else {
+          retCounter.setMinDouble(lastMinDouble);
+        }
+        Long count = retCounter.getCount();
+        Long lastCount = lastCounter.getCount();
+        if (count != null) {
+          if (lastCount != null) {
+            retCounter.setCount(count + lastCount);
+          }
+        }
+        else {
+          retCounter.setCount(lastCount);
+        }
+      }
+      lastCounter = retCounter;
+    }
+    counter.setMaxLong(lastCounter.getMaxLong());
+    counter.setMinLong(lastCounter.getMinLong());
+    counter.setMaxDouble(lastCounter.getMaxDouble());
+    counter.setMinDouble(lastCounter.getMinDouble());
+    counter.setCount(lastCounter.getCount());
+  }
+
+  public boolean isForceSelectOnServer() {
+    return forceSelectOnServer;
   }
 
   public static enum Type {
@@ -425,15 +509,41 @@ public abstract class ExpressionImpl implements Expression {
 //
 
 
-  public static class RecordCache {
-    private Map<String, ConcurrentHashMap<Key, Record>> recordsForTable = new ConcurrentHashMap<>();
+  public static class CachedRecord {
+    private Record record;
+    private byte[] serializedRecord;
 
-    public Map<String, ConcurrentHashMap<Key, Record>> getRecordsForTable() {
+    public CachedRecord(Record record, byte[] serializedRecord) {
+      this.record = record;
+      this.serializedRecord = serializedRecord;
+    }
+
+    public Record getRecord() {
+      return record;
+    }
+
+    public void setRecord(Record record) {
+      this.record = record;
+    }
+
+    public byte[] getSerializedRecord() {
+      return serializedRecord;
+    }
+
+    public void setSerializedRecord(byte[] serializedRecord) {
+      this.serializedRecord = serializedRecord;
+    }
+  }
+
+  public static class RecordCache {
+    private Map<String, ConcurrentHashMap<Key, CachedRecord>> recordsForTable = new ConcurrentHashMap<>();
+
+    public Map<String, ConcurrentHashMap<Key, CachedRecord>> getRecordsForTable() {
       return recordsForTable;
     }
 
     public void clear() {
-      for (ConcurrentHashMap<Key, Record> records : recordsForTable.values()) {
+      for (ConcurrentHashMap<Key, CachedRecord> records : recordsForTable.values()) {
         records.clear();
       }
     }
@@ -531,27 +641,27 @@ public abstract class ExpressionImpl implements Expression {
     }
 
     public boolean containsKey(String tableName, Object[] key) {
-      ConcurrentHashMap<Key, Record> records = recordsForTable.get(tableName);
+      ConcurrentHashMap<Key, CachedRecord> records = recordsForTable.get(tableName);
       if (records == null) {
         return false;
       }
       return records.containsKey(new Key(tableName, key));
     }
 
-    public Record get(String tableName, Object[] key) {
-      ConcurrentHashMap<Key, Record> records = recordsForTable.get(tableName);
+    public CachedRecord get(String tableName, Object[] key) {
+      ConcurrentHashMap<Key, CachedRecord> records = recordsForTable.get(tableName);
       if (records == null) {
         return null;
       }
       return records.get(new Key(tableName, key));
     }
 
-    public void put(String tableName, Object[] key, Record record) {
-      ConcurrentHashMap<Key, Record> records = null;
+    public void put(String tableName, Object[] key, CachedRecord record) {
+      ConcurrentHashMap<Key, CachedRecord> records = null;
       synchronized (this) {
         records = recordsForTable.get(tableName);
         if (records == null) {
-          recordsForTable.put(tableName, new ConcurrentHashMap<Key, Record>());
+          recordsForTable.put(tableName, new ConcurrentHashMap<Key, CachedRecord>());
           records = recordsForTable.get(tableName);
         }
       }
@@ -560,17 +670,17 @@ public abstract class ExpressionImpl implements Expression {
   }
 
   public static HashMap<Integer, Object[][]> readRecords(
-      String dbName, final DatabaseClient client, final TableSchema tableSchema,
+      String dbName, final DatabaseClient client, boolean forceSelectOnServer, final TableSchema tableSchema,
       List<IdEntry> keysToRead, String[] columns, List<ColumnImpl> selectColumns, RecordCache recordCache, int viewVersion) {
 
 
-    HashMap<Integer, Object[][]> ret = doReadRecords(dbName, client, tableSchema, keysToRead, columns, selectColumns, recordCache, viewVersion);
+    HashMap<Integer, Object[][]> ret = doReadRecords(dbName, client, forceSelectOnServer, tableSchema, keysToRead, columns, selectColumns, recordCache, viewVersion);
 
     return ret;
   }
 
   public static HashMap<Integer, Object[][]> doReadRecords(
-      final String dbName, final DatabaseClient client, final TableSchema tableSchema, List<IdEntry> keysToRead, String[] columns, final List<ColumnImpl> selectColumns,
+      final String dbName, final DatabaseClient client, final boolean forceSelectOnServer, final TableSchema tableSchema, List<IdEntry> keysToRead, String[] columns, final List<ColumnImpl> selectColumns,
       final RecordCache recordCache, final int viewVersion) {
     try {
       int[] fieldOffsets = null;
@@ -663,7 +773,7 @@ public abstract class ExpressionImpl implements Expression {
           public Object call() {
             AtomicReference<String> usedIndex = new AtomicReference<>();
             Object rightRet = ExpressionImpl.batchLookupIds(dbName,
-                client.getCommon(), client, ReadManager.SELECT_PAGE_SIZE, tableSchema,
+                client.getCommon(), client, forceSelectOnServer, ReadManager.SELECT_PAGE_SIZE, tableSchema,
                 BinaryExpression.Operator.equal, indexSchema.get(), selectColumns, entry.getValue(), entry.getKey(), usedIndex, recordCache, viewVersion);
             return rightRet;
           }
@@ -692,7 +802,7 @@ public abstract class ExpressionImpl implements Expression {
                 key[j] = record.getFields()[tableSchema.getFieldOffset(primaryKeyFields[j])];
               }
 
-              recordCache.put(tableSchema.getName(), key, record);
+              recordCache.put(tableSchema.getName(), key, new CachedRecord(record, recordBytes));
 
               keys[i] = key;
             }
@@ -712,7 +822,7 @@ public abstract class ExpressionImpl implements Expression {
   }
 
   public static Record doReadRecord(
-      String dbName, DatabaseClient client, RecordCache recordCache, Object[] key, String tableName, List<ColumnImpl> columns, Expression expression,
+      String dbName, DatabaseClient client, boolean forceSelectOnServer, RecordCache recordCache, Object[] key, String tableName, List<ColumnImpl> columns, Expression expression,
       ParameterHandler parms, int viewVersion, boolean debug) {
 //    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
 //    DataOutputStream out = new DataOutputStream(bytesOut);
@@ -725,9 +835,9 @@ public abstract class ExpressionImpl implements Expression {
 //    parms.serialize(out);
 //    out.close();
 
-    Record ret = recordCache.get(tableName, key);
+    CachedRecord ret = recordCache.get(tableName, key);
     if (ret != null) {
-      return ret;
+      return ret.getRecord();
     }
 
     TableSchema tableSchema = client.getCommon().getTables(dbName).get(tableName);
@@ -742,7 +852,7 @@ public abstract class ExpressionImpl implements Expression {
     int replicaCount = client.getCommon().getServersConfig().getShards()[0].getReplicas().length;
     int replica = ThreadLocalRandom.current().nextInt(0, replicaCount);
     AtomicReference<String> usedIndex = new AtomicReference<>();
-    SelectContextImpl context = ExpressionImpl.lookupIds(dbName, client.getCommon(), client, replica, 1, tableSchema, primaryKeyIndex,
+    SelectContextImpl context = ExpressionImpl.lookupIds(dbName, client.getCommon(), client, replica, 1, tableSchema, primaryKeyIndex, forceSelectOnServer,
         BinaryExpression.Operator.equal, null, null, key, parms, expression, null, key, null,
         columns, primaryKeyIndex.getFields()[0], nextShard, recordCache, usedIndex, true, viewVersion, expression == null ? null : ((ExpressionImpl)expression).getCounters(),
         expression == null ? null : ((ExpressionImpl)expression).groupByContext, debug);
@@ -751,7 +861,10 @@ public abstract class ExpressionImpl implements Expression {
     if (currKeys != null) {
       Object[] retKey = currKeys[0][0];
       if (retKey != null) {
-        return recordCache.get(tableName, retKey);
+        CachedRecord currRet = recordCache.get(tableName, retKey);
+        if (currRet != null) {
+          return currRet.getRecord();
+        }
       }
     }
     return null;
@@ -777,7 +890,7 @@ public abstract class ExpressionImpl implements Expression {
   }
 
   public static Record doReadRecord(
-      String dbName, DatabaseClient client, ParameterHandler parms, Expression expression, RecordCache recordCache, Object[] key,
+      String dbName, DatabaseClient client, boolean forceSelectOnServer, ParameterHandler parms, Expression expression, RecordCache recordCache, Object[] key,
       String tableName,
       List<ColumnImpl> columns, int viewVersion, boolean debug) {
 
@@ -794,13 +907,17 @@ public abstract class ExpressionImpl implements Expression {
     int replicaCount = client.getCommon().getServersConfig().getShards()[0].getReplicas().length;
     int replica = ThreadLocalRandom.current().nextInt(0, replicaCount);
     AtomicReference<String> usedIndex = new AtomicReference<>();
-    ExpressionImpl.lookupIds(dbName, client.getCommon(), client, replica, 1, tableSchema, primaryKeyIndex,
+    ExpressionImpl.lookupIds(dbName, client.getCommon(), client, replica, 1, tableSchema, primaryKeyIndex, forceSelectOnServer,
         BinaryExpression.Operator.equal, null, null, key, parms, expression, null, key, null,
         columns, primaryKeyIndex.getFields()[0], nextShard, recordCache, usedIndex, false, viewVersion,
         expression == null ? null : ((ExpressionImpl)expression).getCounters(),
         expression == null ? null : ((ExpressionImpl)expression).groupByContext, debug);
 
-    return recordCache.get(tableName, key);
+    CachedRecord ret = recordCache.get(tableName, key);
+    if (ret != null) {
+      return ret.getRecord();
+    }
+    return null;
 
 //    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
 //    DataOutputStream out = new DataOutputStream(bytesOut);
@@ -910,7 +1027,7 @@ public abstract class ExpressionImpl implements Expression {
   }
 
   private static BatchLookupReturn batchLookupIds(
-      final String dbName, final DatabaseCommon common, final DatabaseClient client, final int count, final TableSchema tableSchema,
+      final String dbName, final DatabaseCommon common, final DatabaseClient client, final boolean forceSelectOnServer, final int count, final TableSchema tableSchema,
       final BinaryExpression.Operator operator,
       final Map.Entry<String, IndexSchema> indexSchema, final List<ColumnImpl> columns, final List<IdEntry> srcValues, final int shard,
       AtomicReference<String> usedIndex, final RecordCache recordCache, final int viewVersion) {
@@ -1019,7 +1136,7 @@ public abstract class ExpressionImpl implements Expression {
                     byte[][] records = new byte[ids.length][];
                     for (int j = 0; j < ids.length; j++) {
                       Object[] key = ids[j];
-                      Record record = doReadRecord(dbName, client, recordCache, key, tableSchema.getName(), columns, null, null, viewVersion, false);
+                      Record record = doReadRecord(dbName, client, forceSelectOnServer, recordCache, key, tableSchema.getName(), columns, null, null, viewVersion, false);
                       records[j] = record.serialize(common);
                     }
                     aggregateRecords(retRecords, offset, records);
@@ -1101,7 +1218,7 @@ public abstract class ExpressionImpl implements Expression {
 
   public static SelectContextImpl lookupIds(
       String dbName, DatabaseCommon common, DatabaseClient client, int replica,
-      int count, TableSchema tableSchema, IndexSchema indexSchema, BinaryExpression.Operator leftOperator,
+      int count, TableSchema tableSchema, IndexSchema indexSchema, boolean forceSelectOnServer, BinaryExpression.Operator leftOperator,
       BinaryExpression.Operator rightOperator,
       List<OrderByExpressionImpl> orderByExpressions,
       Object[] leftValue, ParameterHandler parms, Expression expression, Object[] rightValue,
@@ -1156,18 +1273,40 @@ public abstract class ExpressionImpl implements Expression {
             }
           }
         }
+//
+//        if (originalLeftValue != null && leftValue != null) {
+//          if (0 != DatabaseCommon.compareKey(comparators, originalLeftValue, leftValue)) {
+//            if (leftOperator == BinaryExpression.Operator.lessEqual) {
+//              leftOperator = BinaryExpression.Operator.less;
+//            }
+//            else if (leftOperator == BinaryExpression.Operator.greaterEqual) {
+//              leftOperator = BinaryExpression.Operator.greater;
+//            }
+//          }
+//        }
 
-        if (originalLeftValue != null && leftValue != null) {
-          if (0 != DatabaseCommon.compareKey(comparators, originalLeftValue, leftValue)) {
-            if (leftOperator == BinaryExpression.Operator.lessEqual) {
-              leftOperator = BinaryExpression.Operator.less;
-            }
-            else if (leftOperator == BinaryExpression.Operator.greaterEqual) {
-              leftOperator = BinaryExpression.Operator.greater;
-            }
-          }
-        }
-
+//        if (originalRightValue != null && leftValue != null) {
+//          if (0 != DatabaseCommon.compareKey(comparators, originalRightValue, leftValue)) {
+//            if (rightOperator == BinaryExpression.Operator.less) {
+//              rightOperator = BinaryExpression.Operator.lessEqual;
+//            }
+//            else if (rightOperator == BinaryExpression.Operator.greater) {
+//              rightOperator = BinaryExpression.Operator.greaterEqual;
+//            }
+//          }
+//        }
+//
+//        if (originalRightValue != null && leftValue != null) {
+//          if (0 != DatabaseCommon.compareKey(comparators, originalRightValue, leftValue)) {
+//            if (rightOperator == BinaryExpression.Operator.lessEqual) {
+//              rightOperator = BinaryExpression.Operator.less;
+//            }
+//            else if (rightOperator == BinaryExpression.Operator.greaterEqual) {
+//              rightOperator = BinaryExpression.Operator.greater;
+//            }
+//          }
+//        }
+//
         if (nextShard == -2) {
           return new SelectContextImpl();
         }
@@ -1212,11 +1351,11 @@ public abstract class ExpressionImpl implements Expression {
 
         while (true) {
           //TableSchema.Partition[] partitions = indexSchema.getValue().getCurrPartitions();
-
-
           Random rand = new Random(System.currentTimeMillis());
           ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
           DataOutputStream out = new DataOutputStream(bytesOut);
+          out.writeUTF(dbName);
+          out.writeInt(common.getSchemaVersion());
           DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
           DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
 
@@ -1228,6 +1367,7 @@ public abstract class ExpressionImpl implements Expression {
 
           DataUtil.writeVLong(out, tableSchema.getTableId(), resultLength);
           DataUtil.writeVLong(out, indexSchema.getIndexId(), resultLength);
+          out.writeBoolean(forceSelectOnServer);
           if (!evalueExpression || parms == null) {
             out.writeBoolean(false);
           }
@@ -1264,13 +1404,34 @@ public abstract class ExpressionImpl implements Expression {
             out.writeBoolean(true);
             out.write(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), localLeftValue));
           }
+          if (originalLeftValue == null) {
+            out.writeBoolean(false);
+          }
+          else {
+            out.writeBoolean(true);
+            out.write(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), originalLeftValue));
+          }
           DataUtil.writeVLong(out, leftOperator.getId(), resultLength);
           //out.writeInt(leftOperator.getId());
 
           if (rightOperator != null) {
             out.writeBoolean(true);
-            out.writeBoolean(true);
-            out.write(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), rightValue));
+            if (rightValue == null) {
+              out.writeBoolean(false);
+            }
+            else {
+              out.writeBoolean(true);
+              out.write(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), rightValue));
+            }
+
+            if (originalRightValue == null) {
+              out.writeBoolean(false);
+            }
+            else {
+              out.writeBoolean(true);
+              out.write(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), originalRightValue));
+            }
+
             //out.writeInt(rightOperator.getId());
             DataUtil.writeVLong(out, rightOperator.getId(), resultLength);
           }
@@ -1443,7 +1604,7 @@ public abstract class ExpressionImpl implements Expression {
                 keysToRead.add(new ExpressionImpl.IdEntry(i, id[0]));
               }
             }
-            doReadRecords(dbName, client, tableSchema, keysToRead, indexColumns, columns, recordCache, viewVersion);
+            doReadRecords(dbName, client, forceSelectOnServer, tableSchema, keysToRead, indexColumns, columns, recordCache, viewVersion);
           }
         }
         else {
@@ -1470,12 +1631,12 @@ public abstract class ExpressionImpl implements Expression {
 
             nextKey = key;
 
-            recordCache.put(tableSchema.getName(), key, record);
+            recordCache.put(tableSchema.getName(), key, new CachedRecord(record, curr));
           }
         }
         if (previousSchemaVersion < common.getSchemaVersion()) {
-           throw new SchemaOutOfSyncException();
-         }
+          throw new SchemaOutOfSyncException();
+        }
 
         return new SelectContextImpl(tableSchema.getName(), indexSchema.getName(), leftOperator, nextShard, nextKey, retKeys, recordCache);
       }
@@ -1723,7 +1884,7 @@ public abstract class ExpressionImpl implements Expression {
               retKeys[i] = new Object[][]{key};
             }
 
-            recordCache.put(tableSchema.getName(), key, record);
+            recordCache.put(tableSchema.getName(), key, new CachedRecord(record, curr));
           }
 
         }

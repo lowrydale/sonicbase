@@ -211,7 +211,7 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
       Object[] key = new Object[]{value};
       AtomicReference<String> usedIndex = new AtomicReference<>();
       SelectContextImpl currRet = ExpressionImpl.lookupIds(dbName, client.getCommon(), client, getReplica(), count,
-          client.getCommon().getTables(dbName).get(tableName), indexSchema,
+          client.getCommon().getTables(dbName).get(tableName), indexSchema, isForceSelectOnServer(),
           BinaryExpression.Operator.equal, null,
           null, key, getParms(), this, null, key, null, getColumns(), cNode.getColumnName(), -1, getRecordCache(), usedIndex,
           false, getViewVersion(), getCounters(), getGroupByContext(), debug);

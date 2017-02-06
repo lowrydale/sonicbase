@@ -1205,7 +1205,11 @@ public class Cli2 {
     System.out.println("deploying: cluster=" + cluster);
 
     try {
-      String json = StreamUtils.inputStreamToString(Cli2.class.getResourceAsStream("/config-" + cluster + ".json"));
+      InputStream in = Cli2.class.getResourceAsStream("/config-" + cluster + ".json");
+      if (in == null) {
+        in = new FileInputStream("/Users/lowryda/database/config/config-" + cluster + ".json");
+      }
+      String json = StreamUtils.inputStreamToString(in);
       JsonDict config = new JsonDict(json);
       JsonDict databaseDict = config.getDict("database");
       String deployUser = databaseDict.getString("user");
@@ -1222,11 +1226,12 @@ public class Cli2 {
             if (externalAddress.equals("127.0.0.1") || externalAddress.equals("localhost")) {
               continue;
             }
+            System.out.println("deploying to server: publicAddress=" + externalAddress);
             //ProcessBuilder builder = new ProcessBuilder().command("rsync", "-rvlLt", "--delete", "-e", "'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no'", "*", deployUser + "@" + externalAddress + ":" + installDir);
             ProcessBuilder builder = new ProcessBuilder().command("bin/do-rsync.sh", deployUser + "@" + externalAddress + ":" + installDir);
             //builder.directory(workingDir);
             Process p = builder.start();
-            InputStream in = p.getInputStream();
+            in = p.getInputStream();
             while (true) {
               int b = in.read();
               if (b == -1) {
@@ -1247,11 +1252,12 @@ public class Cli2 {
             if (externalAddress.equals("127.0.0.1") || externalAddress.equals("localhost")) {
               continue;
             }
+            System.out.println("deploying to client: publicAddress=" + externalAddress);
             //ProcessBuilder builder = new ProcessBuilder().command("rsync", "-rvlLt", "--delete", "-e", "'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no'", "*", deployUser + "@" + externalAddress + ":" + installDir);
             ProcessBuilder builder = new ProcessBuilder().command("bin/do-rsync.sh", deployUser + "@" + externalAddress + ":" + installDir);
             //builder.directory(workingDir);
             Process p = builder.start();
-            InputStream in = p.getInputStream();
+            in = p.getInputStream();
             while (true) {
               int b = in.read();
               if (b == -1) {

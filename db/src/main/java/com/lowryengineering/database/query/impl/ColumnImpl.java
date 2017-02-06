@@ -30,6 +30,9 @@ public class ColumnImpl extends ExpressionImpl {
   }
 
   public String toString() {
+    if (tableName != null) {
+      return tableName + "." + columnName;
+    }
     return columnName;
   }
 

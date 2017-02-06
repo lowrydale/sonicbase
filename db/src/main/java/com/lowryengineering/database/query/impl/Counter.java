@@ -151,6 +151,14 @@ public class Counter {
     this.doubleCount = 0d;
   }
 
+  public boolean isDestTypeLong() {
+    return longCount != null;
+  }
+
+  public boolean isDestTypeDouble() {
+    return doubleCount != null;
+  }
+
   public byte[] serialize() throws IOException {
     ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
     DataOutputStream out = new DataOutputStream(bytesOut);
@@ -210,5 +218,25 @@ public class Counter {
 
   public long getCount() {
     return count;
+  }
+
+  public void setMaxLong(Long maxLong) {
+    this.maxLong = maxLong;
+  }
+
+  public void setMinLong(Long minLong) {
+    this.minLong = minLong;
+  }
+
+  public void setMaxDouble(Double maxDouble) {
+    this.maxDouble = maxDouble;
+  }
+
+  public void setMinDouble(double minDouble) {
+    this.minDouble = minDouble;
+  }
+
+  public void setCount(Long count) {
+    this.count = count;
   }
 }

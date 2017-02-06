@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Untitled Document</title>
+
+
+<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+</head>
+
+<body>
+
+<table width="411" border="1" cellpadding=2 cellspacing="0">
+  <tbody>
+   <tr class="example-header">
+      <td width="50">Field</td>
+      <td width="33">Datatype</td>
+    </tr>
+    <tr>
+      <td>id1</td>
+      <td>BIGINT</td>
+    </tr>
+    <tr>
+      <td>id2</td>
+      <td>BIGINT</td>
+    </tr>
+    <tr>
+      <td>SocialSecurityNumber</td>
+      <td>VARCHAR(20)</td>
+    </tr>
+    <tr>
+      <td>Relatives</td>
+      <td>VARCHAR(64000)</td>
+    </tr>
+    <tr>
+      <td>Restricted</td>
+      <td>BOOLEAN</td>
+    </tr>
+    <tr>
+      <td>Gender</td>
+      <td>VARCHAR(8)</td>
+    </tr>
+    <tr>
+    	<td>PRIMARY KEY</td>
+    	<td>id1</td>
+    </tr>
+
+  </tbody>
+</table>
+
+<br/>
+<br/>
+
+for (int offset = 0; offset < 100000000; offset++) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;PreparedStatement stmt = conn.prepareStatement("insert into persons (id1, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;stmt.setLong(1, offset);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;stmt.setLong(2, (offset + 100) % 2);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;stmt.setString(3, "933-28-" + offset);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;stmt.setBoolean(5, false);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;stmt.setString(6, "m");<br/>
+}
+<br/><br/>
+	
+</body>
+</html>

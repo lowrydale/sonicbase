@@ -11,6 +11,7 @@ import com.lowryengineering.database.query.*;
 import com.lowryengineering.database.query.impl.*;
 import com.lowryengineering.database.schema.*;
 import com.lowryengineering.database.server.DatabaseServer;
+import com.lowryengineering.database.server.ReadManager;
 import com.lowryengineering.database.server.SnapshotManager;
 import com.lowryengineering.database.socket.DatabaseSocketClient;
 import com.lowryengineering.database.util.DataUtil;
@@ -61,6 +62,8 @@ public class DatabaseClient {
   private ThreadPoolExecutor executor = new ThreadPoolExecutor(128, 128, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
   private static Logger logger = LoggerFactory.getLogger(DatabaseClient.class);
+
+  private int pageSize = ReadManager.SELECT_PAGE_SIZE;
 
   private Set<String> write_verbs = new HashSet<String>();
   private static String[] write_verbs_array = new String[]{
@@ -126,6 +129,14 @@ public class DatabaseClient {
     for (String verb : write_verbs_array) {
       writeVerbs.add(verb);
     }
+  }
+
+  public int getPageSize() {
+    return pageSize;
+  }
+
+  public void setPageSize(int pageSize) {
+    this.pageSize = pageSize;
   }
 
   public Schema getSchema(String dbName) {
@@ -279,7 +290,8 @@ public class DatabaseClient {
           for (int replica = 0; replica < getReplicaCount(); replica++) {
             String port = servers[shard][replica].hostPort;
             logger.info("calling server: port=" + port);
-            SelectContextImpl context = ExpressionImpl.lookupIds(dbName, common, this, replica, 1, tableSchema, indexSchema, BinaryExpression.Operator.equal, null, null, keyObj, parms,
+            boolean forceSelectOnServer = false;
+            SelectContextImpl context = ExpressionImpl.lookupIds(dbName, common, this, replica, 1, tableSchema, indexSchema, forceSelectOnServer, BinaryExpression.Operator.equal, null, null, keyObj, parms,
                 null, null, keyObj, null, columns, columnName, shard, recordCache, usedIndex, false, common.getSchemaVersion(), null, null, false);
             Object[][][] keys = context.getCurrKeys();
             if (keys != null && keys.length > 0 && keys[0].length > 0 && keys[0][0].length > 0) {
@@ -1829,35 +1841,42 @@ public class DatabaseClient {
 //          lastGotSchema = System.currentTimeMillis();
 //        }
 
-
-
-        List<Integer> selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false, fieldOffsets, common, tableSchema,
-            indexSchema.getKey(), null, BinaryExpression.Operator.equal, null, key, null);
-//        List<Integer> selectedShards = new ArrayList<>();
-//        selectedShards.add(0);
-//        selectedShards.add(1);
-        for (int partition : selectedShards) {
-          int shard = currPartitions[partition].getShardOwning();
-          ret.add(new KeyInfo(shard, key, indexSchema, true));
+        boolean keyIsNull = false;
+        for (Object obj : key) {
+          if (obj == null) {
+            keyIsNull = true;
+          }
         }
 
-        selectedShards = Repartitioner.findOrderedPartitionForRecord(false, true, fieldOffsets, common, tableSchema,
-            indexSchema.getKey(), null, BinaryExpression.Operator.equal, null, key, null);
-//        List<Integer> selectedShards = new ArrayList<>();
-//        selectedShards.add(0);
-//        selectedShards.add(1);
-        for (int partition : selectedShards) {
-          boolean found = false;
-          int shard = lastPartitions[partition].getShardOwning();
-          for (KeyInfo keyInfo : ret) {
-            if (keyInfo.shard == shard) {
-              keyInfo.currAndLastMatch = true;
-              found = true;
-              break;
-            }
+        if (!keyIsNull) {
+          List<Integer> selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false, fieldOffsets, common, tableSchema,
+              indexSchema.getKey(), null, BinaryExpression.Operator.equal, null, key, null);
+          //        List<Integer> selectedShards = new ArrayList<>();
+          //        selectedShards.add(0);
+          //        selectedShards.add(1);
+          for (int partition : selectedShards) {
+            int shard = currPartitions[partition].getShardOwning();
+            ret.add(new KeyInfo(shard, key, indexSchema, true));
           }
-          if (!found) {
-            ret.add(new KeyInfo(shard, key, indexSchema, false));
+
+          selectedShards = Repartitioner.findOrderedPartitionForRecord(false, true, fieldOffsets, common, tableSchema,
+              indexSchema.getKey(), null, BinaryExpression.Operator.equal, null, key, null);
+          //        List<Integer> selectedShards = new ArrayList<>();
+          //        selectedShards.add(0);
+          //        selectedShards.add(1);
+          for (int partition : selectedShards) {
+            boolean found = false;
+            int shard = lastPartitions[partition].getShardOwning();
+            for (KeyInfo keyInfo : ret) {
+              if (keyInfo.shard == shard) {
+                keyInfo.currAndLastMatch = true;
+                found = true;
+                break;
+              }
+            }
+            if (!found) {
+              ret.add(new KeyInfo(shard, key, indexSchema, false));
+            }
           }
         }
 //        for (int i = 0; i < 2; i++) {
@@ -1997,6 +2016,7 @@ public class DatabaseClient {
         }
       }
     }
+    selectStatement.setPageSize(pageSize);
     selectStatement.setParms(parms);
     return selectStatement.execute(dbName, explain);
   }

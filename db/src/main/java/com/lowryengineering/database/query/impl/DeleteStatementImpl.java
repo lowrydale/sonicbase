@@ -92,9 +92,11 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
           }
 
           for (Object[][] entry : ids.getKeys()) {
-            Record record = recordCache.get(tableName, entry[0]);
+            ExpressionImpl.CachedRecord cachedRecord = recordCache.get(tableName, entry[0]);;
+            Record record = cachedRecord == null ? null : cachedRecord.getRecord();
             if (record == null) {
-              record = expression.doReadRecord(dbName, client, recordCache, entry[0], tableName, null, null, null, client.getCommon().getSchemaVersion(), false);
+              boolean forceSelectOnServer = false;
+              record = expression.doReadRecord(dbName, client, forceSelectOnServer, recordCache, entry[0], tableName, null, null, null, client.getCommon().getSchemaVersion(), false);
             }
             if (record != null) {
               List<Integer> selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false, fieldOffsets, client.getCommon(), tableSchema,

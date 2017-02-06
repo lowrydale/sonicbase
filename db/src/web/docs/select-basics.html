@@ -1,0 +1,79 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Untitled Document</title>
+
+
+<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+</head>
+
+<body>
+<p>Syntax<table border="1" cellspacing="0" cellpadding="4">
+  <tbody>
+  
+    <tr class="syntax-main">
+           <td width="512" colspan=2 >
+            SELECT select_columns FROM table_name [WHERE expression]
+		</td>
+	  </tr>
+	  <tr><td><table cellpadding=4 cellspacing=0>
+	  <tr><td width="103" class="syntax-detail"align="">select_columns:</td><td width="430"> * for all columns or comma separated list of column names</td></tr>
+	  <tr ><td class="syntax-detail">table_name: </td><td class="syntax-detail">name of table to select records from</td></tr>
+		<tr ><td class="syntax-detail">expression:</td>
+		<td class="syntax-detail">column | constant | parameter | not expression | (expression) | <br>
+		  expression operator expression | in (expression [, expression...])</td></tr>
+  		<tr><td class="syntax-detail">operator:</td>
+  		<td class="syntax-detail"> or | and  | = | != | &lt; | &gt; | &lt;= | &gt;=</td></tr>
+	
+	  </table></td></tr>
+	  
+  </tbody>
+</table>
+
+<p>Example</p>
+<p>select * from persons where name='bob' and age&gt;=30</p>
+<table width="411" border="1" cellpadding=2 cellspacing="0">
+  <tbody>
+    <tr class="example-header">
+      <td colspan="3">persons table</td>
+    </tr>
+    <tr class="example-header">
+      <td width="50">name</td>
+      <td width="33">age</td>
+      <td width="314">occupation</td>
+    </tr>
+    <tr>
+      <td>bob</td>
+      <td>30</td>
+      <td>plumber</td>
+    </tr>
+    <tr>
+      <td>bob</td>
+      <td>24</td>
+      <td>electrician</td>
+    </tr>
+    <tr>
+      <td>mary</td>
+      <td>35</td>
+      <td>CEO</td>
+    </tr>
+  </tbody>
+</table>
+<p>results</p>
+<table width="411" border="1" cellpadding=2 cellspacing="0">
+  <tbody>
+    <tr class="example-header">
+      <td width="50">name</td>
+      <td width="33">age</td>
+      <td width="314">occupation</td>
+    </tr>
+    <tr>
+      <td>bob</td>
+      <td>30</td>
+      <td>plumber</td>
+    </tr>
+  </tbody>
+</table>
+</body>
+</html>

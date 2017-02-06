@@ -3,6 +3,7 @@ package com.lowryengineering.database;
 import com.lowryengineering.database.client.DatabaseClient;
 import com.lowryengineering.database.jdbcdriver.ConnectionProxy;
 import com.lowryengineering.database.server.DatabaseServer;
+import com.lowryengineering.database.util.JsonArray;
 import com.lowryengineering.database.util.JsonDict;
 import com.lowryengineering.database.util.StreamUtils;
 import org.codehaus.plexus.util.FileUtils;
@@ -35,6 +36,10 @@ public class TestTransactions {
   public void beforeClass() throws Exception {
     String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")));
     final JsonDict config = new JsonDict(configStr);
+
+    JsonArray array = config.getDict("database").putArray("licenseKeys");
+    array.add(DatabaseServer.FOUR_SERVER_LICENSE);
+
 
     FileUtils.deleteDirectory(new File("/data/database"));
 

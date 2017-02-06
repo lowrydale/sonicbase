@@ -1,7 +1,6 @@
 package com.lowryengineering.database.server;
 
 import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.Timer;
 import com.lowryengineering.database.common.DatabaseCommon;
 import com.lowryengineering.database.common.Record;
 import com.lowryengineering.database.common.SchemaOutOfSyncException;
@@ -11,6 +10,7 @@ import com.lowryengineering.database.query.BinaryExpression;
 import com.lowryengineering.database.query.DatabaseException;
 import com.lowryengineering.database.query.Expression;
 import com.lowryengineering.database.query.impl.*;
+import com.lowryengineering.database.schema.DataType;
 import com.lowryengineering.database.schema.FieldSchema;
 import com.lowryengineering.database.schema.IndexSchema;
 import com.lowryengineering.database.schema.TableSchema;
@@ -33,16 +33,15 @@ public class ReadManager {
   public ReadManager(DatabaseServer databaseServer) {
 
     this.server = databaseServer;
-    new java.util.Timer().scheduleAtFixedRate(new TimerTask(){
+    new java.util.Timer().scheduleAtFixedRate(new TimerTask() {
       @Override
       public void run() {
         logger.info("IndexLookup stats: count=" + INDEX_LOOKUP_STATS.getCount() + ", rate=" + INDEX_LOOKUP_STATS.getFiveMinuteRate() +
             ", durationAvg=" + INDEX_LOOKUP_STATS.getSnapshot().getMean() / 1000000d +
-            ", duration99.9=" + INDEX_LOOKUP_STATS.getSnapshot().get999thPercentile()  / 1000000d);
+            ", duration99.9=" + INDEX_LOOKUP_STATS.getSnapshot().get999thPercentile() / 1000000d);
       }
     }, 20 * 1000, 20 * 1000);
   }
-
 
 
   public static final int SELECT_PAGE_SIZE = 30000;
@@ -208,11 +207,13 @@ public class ReadManager {
 
         List<byte[]> retKeys = new ArrayList<>();
         List<byte[]> retRecords = new ArrayList<>();
+
+        boolean forceSelectOnServer = false;
         if (indexSchema.isPrimaryKey()) {
-          doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, null, false, null, columnOffsets, null, leftKey, leftOperator, index, ascending, retRecords, server.getCommon().getSchemaVersion(), false, counters, groupContext);
+          doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, null, false, null, columnOffsets, forceSelectOnServer, null, leftKey, leftKey, leftOperator, index, ascending, retRecords, server.getCommon().getSchemaVersion(), false, counters, groupContext);
         }
         else {
-          doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, null, false, null, columnOffsets, null, leftKey, leftOperator, index, ascending, retKeys, server.getCommon().getSchemaVersion(), true, counters, groupContext);
+          doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, null, false, null, columnOffsets, forceSelectOnServer, null, leftKey, leftKey, leftOperator, index, ascending, retKeys, server.getCommon().getSchemaVersion(), true, counters, groupContext);
 
 //          if (indexSchema.isPrimaryKeyGroup()) {
 //            if (((Long)leftKey[0]) == 5) {
@@ -255,12 +256,10 @@ public class ReadManager {
 
   public static final com.codahale.metrics.Timer INDEX_LOOKUP_STATS = METRICS.timer("indexLookup");
 
-  public byte[] indexLookup(String command, byte[] body) {
-    Timer.Context context = INDEX_LOOKUP_STATS.time();
+  public byte[] indexLookup(String dbName, DataInputStream in) {
+    //Timer.Context context = INDEX_LOOKUP_STATS.time();
     try {
-      String[] parts = command.split(":");
-      String dbName = parts[4];
-      int schemaVersion = Integer.valueOf(parts[3]);
+      int schemaVersion = in.readInt();
       if (schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
       }
@@ -271,7 +270,6 @@ public class ReadManager {
         }
       }
 
-      DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
       long serializationVersion = DataUtil.readVLong(in);
       DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
 
@@ -283,6 +281,7 @@ public class ReadManager {
 
       int tableId = (int) (long) DataUtil.readVLong(in, resultLength);
       int indexId = (int) (long) DataUtil.readVLong(in, resultLength);
+      boolean forceSelectOnServer = in.readBoolean();
       ParameterHandler parms = null;
       if (in.readBoolean()) {
         parms = new ParameterHandler();
@@ -295,18 +294,21 @@ public class ReadManager {
       }
       String tableName = null;
       String indexName = null;
+      TableSchema tableSchema = null;
+      IndexSchema indexSchema = null;
       try {
         //  logger.info("indexLookup: tableid=" + tableId + ", tableCount=" + common.getTablesById().size() + ", tableNull=" + (common.getTablesById().get(tableId) == null));
         Map<Integer, TableSchema> tablesById = server.getCommon().getTablesById(dbName);
         if (tablesById == null) {
           logger.error("Error");
         }
-        TableSchema table = tablesById.get(tableId);
-        if (table == null) {
+        tableSchema = tablesById.get(tableId);
+        if (tableSchema == null) {
           logger.error("Error");
         }
-          tableName = table.getName();
-        indexName = server.getCommon().getTables(dbName).get(tableName).getIndexesById().get(indexId).getName();
+        tableName = tableSchema.getName();
+        indexSchema = tableSchema.getIndexesById().get(indexId);
+        indexName = indexSchema.getName();
       }
       catch (Exception e) {
         logger.info("indexLookup: tableName=" + tableName + ", tableid=" + tableId + ", tableByNameCount=" + server.getCommon().getTables(dbName).size() + ", tableCount=" + server.getCommon().getTablesById(dbName).size() +
@@ -322,21 +324,28 @@ public class ReadManager {
         orderByExpression.deserialize(in);
         orderByExpressions.add(orderByExpression);
       }
-      TableSchema tableSchema = server.getCommon().getSchema(dbName).getTables().get(tableName);
-      IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
       Object[] leftKey = null;
       if (in.readBoolean()) {
         leftKey = DatabaseCommon.deserializeKey(tableSchema, in);
+      }
+      Object[] originalLeftKey = null;
+      if (in.readBoolean()) {
+        originalLeftKey = DatabaseCommon.deserializeKey(tableSchema, in);
       }
       //BinaryExpression.Operator leftOperator = BinaryExpression.Operator.getOperator(in.readInt());
       BinaryExpression.Operator leftOperator = BinaryExpression.Operator.getOperator((int) (long) DataUtil.readVLong(in, resultLength));
 
       BinaryExpression.Operator rightOperator = null;
+      Object[] originalRightKey = null;
       Object[] rightKey = null;
       if (in.readBoolean()) {
         if (in.readBoolean()) {
           rightKey = DatabaseCommon.deserializeKey(tableSchema, in);
         }
+        if (in.readBoolean()) {
+          originalRightKey = DatabaseCommon.deserializeKey(tableSchema, in);
+        }
+
         //      rightOperator = BinaryExpression.Operator.getOperator(in.readInt());
         rightOperator = BinaryExpression.Operator.getOperator((int) (long) DataUtil.readVLong(in, resultLength));
       }
@@ -403,21 +412,21 @@ public class ReadManager {
       }
 
 
-      if (tableSchema.getIndexes().get(indexName).isPrimaryKey()) {
+      if (indexSchema.isPrimaryKey()) {
         if (rightOperator == null) {
-          entry = doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, parms, evaluateExpression, expression, columnOffsets, excludeKeys, leftKey, leftOperator, index, ascending, retRecords, viewVersion, false, counters, groupContext);
+          entry = doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, parms, evaluateExpression, expression, columnOffsets, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, leftOperator, index, ascending, retRecords, viewVersion, false, counters, groupContext);
         }
         else {
-          entry = doIndexLookupTwoKeys(dbName, count, tableSchema, indexSchema, excludeKeys, leftKey, columnOffsets, rightKey, leftOperator, rightOperator, parms, evaluateExpression, expression, index, ascending, retRecords, false, counters, groupContext);
+          entry = doIndexLookupTwoKeys(dbName, count, tableSchema, indexSchema, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, columnOffsets, originalRightKey, rightKey, leftOperator, rightOperator, parms, evaluateExpression, expression, index, ascending, retRecords, false, counters, groupContext);
         }
         //todo: support rightOperator
       }
       else {
         if (rightOperator == null) {
-          entry = doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, parms, evaluateExpression, expression, columnOffsets, excludeKeys, leftKey, leftOperator, index, ascending, retKeys, viewVersion, true, counters, groupContext);
+          entry = doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, parms, evaluateExpression, expression, columnOffsets, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, leftOperator, index, ascending, retKeys, viewVersion, true, counters, groupContext);
         }
         else {
-          entry = doIndexLookupTwoKeys(dbName, count, tableSchema, indexSchema, excludeKeys, leftKey, columnOffsets, rightKey, leftOperator, rightOperator, parms, evaluateExpression, expression, index, ascending, retKeys, true, counters, groupContext);
+          entry = doIndexLookupTwoKeys(dbName, count, tableSchema, indexSchema, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, columnOffsets, originalRightKey, rightKey, leftOperator, rightOperator, parms, evaluateExpression, expression, index, ascending, retKeys, true, counters, groupContext);
         }
       }
 
@@ -477,15 +486,15 @@ public class ReadManager {
       throw new DatabaseException(e);
     }
     finally {
-      context.stop();
+      //context.stop();
     }
   }
 
   private Set<Integer> getSimpleColumnOffsets(DataInputStream in, DataUtil.ResultLength resultLength, String tableName, TableSchema tableSchema) throws IOException {
-    int count = (int)DataUtil.readVLong(in, resultLength);
+    int count = (int) DataUtil.readVLong(in, resultLength);
     Set<Integer> columnOffsets = new HashSet<>();
     for (int i = 0; i < count; i++) {
-      columnOffsets.add((int)DataUtil.readVLong(in, resultLength));
+      columnOffsets.add((int) DataUtil.readVLong(in, resultLength));
     }
     return columnOffsets;
   }
@@ -558,6 +567,7 @@ public class ReadManager {
 
       DiskBasedResultSet diskResults = null;
       if (select.getServerSelectPageNumber() == 0) {
+        select.setPageSize(500000);
         ResultSetImpl resultSet = (ResultSetImpl) select.execute(dbName, null);
         diskResults = new DiskBasedResultSet(dbName, server, select.getTableNames(), resultSet, count, select);
       }
@@ -601,158 +611,158 @@ public class ReadManager {
   }
 
   public byte[] indexLookupExpression(String command, byte[] body) {
-  try {
-    String[] parts = command.split(":");
-    String dbName = parts[4];
-    int schemaVersion = Integer.valueOf(parts[3]);
-    if (schemaVersion < server.getSchemaVersion()) {
-      throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
-    }
-    int count = Integer.valueOf(parts[5]);
-
-    DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
-    long serializationVersion = DataUtil.readVLong(in);
-    //    String tableName = in.readUTF();
-    //    String indexName = in.readUTF();
-    DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-    int tableId = (int) (long) DataUtil.readVLong(in, resultLength);
-    //    int indexId = (int) (long) DataUtil.readVLong(in, resultLength);
-    ParameterHandler parms = null;
-    if (in.readBoolean()) {
-      parms = new ParameterHandler();
-      parms.deserialize(in);
-    }
-    Expression expression = null;
-    if (in.readBoolean()) {
-      expression = ExpressionImpl.deserializeExpression(in);
-    }
-    String tableName = null;
-    String indexName = null;
     try {
-      //  logger.info("indexLookup: tableid=" + tableId + ", tableCount=" + common.getTablesById().size() + ", tableNull=" + (common.getTablesById().get(tableId) == null));
-      TableSchema tableSchema = server.getCommon().getTablesById(dbName).get(tableId);
-      tableName = tableSchema.getName();
-      for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
-        if (entry.getValue().isPrimaryKey()) {
-          indexName = entry.getKey();
+      String[] parts = command.split(":");
+      String dbName = parts[4];
+      int schemaVersion = Integer.valueOf(parts[3]);
+      if (schemaVersion < server.getSchemaVersion()) {
+        throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
+      }
+      int count = Integer.valueOf(parts[5]);
+
+      DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
+      long serializationVersion = DataUtil.readVLong(in);
+      //    String tableName = in.readUTF();
+      //    String indexName = in.readUTF();
+      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+      int tableId = (int) (long) DataUtil.readVLong(in, resultLength);
+      //    int indexId = (int) (long) DataUtil.readVLong(in, resultLength);
+      ParameterHandler parms = null;
+      if (in.readBoolean()) {
+        parms = new ParameterHandler();
+        parms.deserialize(in);
+      }
+      Expression expression = null;
+      if (in.readBoolean()) {
+        expression = ExpressionImpl.deserializeExpression(in);
+      }
+      String tableName = null;
+      String indexName = null;
+      try {
+        //  logger.info("indexLookup: tableid=" + tableId + ", tableCount=" + common.getTablesById().size() + ", tableNull=" + (common.getTablesById().get(tableId) == null));
+        TableSchema tableSchema = server.getCommon().getTablesById(dbName).get(tableId);
+        tableName = tableSchema.getName();
+        for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
+          if (entry.getValue().isPrimaryKey()) {
+            indexName = entry.getKey();
+          }
         }
       }
-    }
-    catch (Exception e) {
-      logger.info("indexLookup: tableName=" + tableName + ", tableid=" + tableId + ", tableByNameCount=" + server.getCommon().getTables(dbName).size() + ", tableCount=" + server.getCommon().getTablesById(dbName).size() +
-          ", tableNull=" + (server.getCommon().getTablesById(dbName).get(tableId) == null) + ", indexName=" + indexName + ", indexName=" + indexName +
-          ", indexNull=" /*+ (common.getTablesById().get(tableId).getIndexesById().get(indexId) == null) */);
-      throw e;
-    }
-    //int srcCount = in.readInt();
-    int srcCount = (int) DataUtil.readVLong(in, resultLength);
-    List<OrderByExpressionImpl> orderByExpressions = new ArrayList<>();
-    for (int i = 0; i < srcCount; i++) {
-      OrderByExpressionImpl orderByExpression = new OrderByExpressionImpl();
-      orderByExpression.deserialize(in);
-      orderByExpressions.add(orderByExpression);
-    }
-
-    TableSchema tableSchema = server.getCommon().getSchema(dbName).getTables().get(tableName);
-    IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
-
-    Object[] leftKey = null;
-    if (in.readBoolean()) {
-      leftKey = DatabaseCommon.deserializeKey(tableSchema, in);
-    }
-
-    Set<Integer> columnOffsets = getSimpleColumnOffsets(in, resultLength, tableName, tableSchema);
-
-    Counter[] counters = null;
-    int counterCount = in.readInt();
-    if (counterCount > 0) {
-      counters = new Counter[counterCount];
-      for (int i = 0; i < counterCount; i++) {
-        counters[i] = new Counter();
-        counters[i].deserialize(in);
+      catch (Exception e) {
+        logger.info("indexLookup: tableName=" + tableName + ", tableid=" + tableId + ", tableByNameCount=" + server.getCommon().getTables(dbName).size() + ", tableCount=" + server.getCommon().getTablesById(dbName).size() +
+            ", tableNull=" + (server.getCommon().getTablesById(dbName).get(tableId) == null) + ", indexName=" + indexName + ", indexName=" + indexName +
+            ", indexNull=" /*+ (common.getTablesById().get(tableId).getIndexesById().get(indexId) == null) */);
+        throw e;
       }
-    }
-
-    GroupByContext groupByContext = null;
-    if (in.readBoolean()) {
-      groupByContext = new GroupByContext();
-      groupByContext.deserialize(in, server.getCommon(), dbName);
-    }
-
-    Index index = server.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexName);
-    Map.Entry<Object[], Long> entry = null;
-
-    Boolean ascending = null;
-    if (orderByExpressions.size() != 0) {
-      OrderByExpressionImpl orderByExpression = orderByExpressions.get(0);
-      String columnName = orderByExpression.getColumnName();
-      boolean isAscending = orderByExpression.isAscending();
-      if (columnName.equals(indexSchema.getFields()[0])) {
-        ascending = isAscending;
+      //int srcCount = in.readInt();
+      int srcCount = (int) DataUtil.readVLong(in, resultLength);
+      List<OrderByExpressionImpl> orderByExpressions = new ArrayList<>();
+      for (int i = 0; i < srcCount; i++) {
+        OrderByExpressionImpl orderByExpression = new OrderByExpressionImpl();
+        orderByExpression.deserialize(in);
+        orderByExpressions.add(orderByExpression);
       }
-    }
 
-    List<byte[]> retKeys = new ArrayList<>();
-    List<byte[]> retRecords = new ArrayList<>();
+      TableSchema tableSchema = server.getCommon().getSchema(dbName).getTables().get(tableName);
+      IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
 
-    if (tableSchema.getIndexes().get(indexName).isPrimaryKey()) {
-      entry = doIndexLookupWithRecordsExpression(dbName, count, tableSchema, columnOffsets, parms, expression, index, leftKey,
-          ascending, retRecords, counters, groupByContext);
-    }
-    else {
-      //entry = doIndexLookupExpression(count, indexSchema, columnOffsets, index, leftKey, ascending, retKeys);
-    }
-    //}
-    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-    DataOutputStream out = new DataOutputStream(bytesOut);
-    DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-    if (entry != null) {
-      out.writeBoolean(true);
-      out.write(DatabaseCommon.serializeKey(tableSchema, indexName, entry.getKey()));
-    }
-    else {
-      out.writeBoolean(false);
-    }
-    DataUtil.writeVLong(out, retKeys.size(), resultLength);
-    for (byte[] key : retKeys) {
-      DataUtil.writeVLong(out, key.length, resultLength);
-      out.write(key);
-    }
-    DataUtil.writeVLong(out, retRecords.size(), resultLength);
-    for (byte[] record : retRecords) {
-      DataUtil.writeVLong(out, record.length, resultLength);
-      out.write(record);
-    }
-
-    if (counters == null) {
-      out.writeInt(0);
-    }
-    else {
-      out.writeInt(counters.length);
-      for (int i = 0; i < counters.length; i++) {
-        out.write(counters[i].serialize());
+      Object[] leftKey = null;
+      if (in.readBoolean()) {
+        leftKey = DatabaseCommon.deserializeKey(tableSchema, in);
       }
-    }
 
-    if (groupByContext == null) {
-      out.writeBoolean(false);
-    }
-    else {
-      out.writeBoolean(true);
-      out.write(groupByContext.serialize(server.getCommon()));
-    }
+      Set<Integer> columnOffsets = getSimpleColumnOffsets(in, resultLength, tableName, tableSchema);
 
-    out.close();
+      Counter[] counters = null;
+      int counterCount = in.readInt();
+      if (counterCount > 0) {
+        counters = new Counter[counterCount];
+        for (int i = 0; i < counterCount; i++) {
+          counters[i] = new Counter();
+          counters[i].deserialize(in);
+        }
+      }
 
-    if (schemaVersion < server.getSchemaVersion()) {
-      throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
+      GroupByContext groupByContext = null;
+      if (in.readBoolean()) {
+        groupByContext = new GroupByContext();
+        groupByContext.deserialize(in, server.getCommon(), dbName);
+      }
+
+      Index index = server.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexName);
+      Map.Entry<Object[], Long> entry = null;
+
+      Boolean ascending = null;
+      if (orderByExpressions.size() != 0) {
+        OrderByExpressionImpl orderByExpression = orderByExpressions.get(0);
+        String columnName = orderByExpression.getColumnName();
+        boolean isAscending = orderByExpression.isAscending();
+        if (columnName.equals(indexSchema.getFields()[0])) {
+          ascending = isAscending;
+        }
+      }
+
+      List<byte[]> retKeys = new ArrayList<>();
+      List<byte[]> retRecords = new ArrayList<>();
+
+      if (tableSchema.getIndexes().get(indexName).isPrimaryKey()) {
+        entry = doIndexLookupWithRecordsExpression(dbName, count, tableSchema, columnOffsets, parms, expression, index, leftKey,
+            ascending, retRecords, counters, groupByContext);
+      }
+      else {
+        //entry = doIndexLookupExpression(count, indexSchema, columnOffsets, index, leftKey, ascending, retKeys);
+      }
+      //}
+      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+      DataOutputStream out = new DataOutputStream(bytesOut);
+      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+      if (entry != null) {
+        out.writeBoolean(true);
+        out.write(DatabaseCommon.serializeKey(tableSchema, indexName, entry.getKey()));
+      }
+      else {
+        out.writeBoolean(false);
+      }
+      DataUtil.writeVLong(out, retKeys.size(), resultLength);
+      for (byte[] key : retKeys) {
+        DataUtil.writeVLong(out, key.length, resultLength);
+        out.write(key);
+      }
+      DataUtil.writeVLong(out, retRecords.size(), resultLength);
+      for (byte[] record : retRecords) {
+        DataUtil.writeVLong(out, record.length, resultLength);
+        out.write(record);
+      }
+
+      if (counters == null) {
+        out.writeInt(0);
+      }
+      else {
+        out.writeInt(counters.length);
+        for (int i = 0; i < counters.length; i++) {
+          out.write(counters[i].serialize());
+        }
+      }
+
+      if (groupByContext == null) {
+        out.writeBoolean(false);
+      }
+      else {
+        out.writeBoolean(true);
+        out.write(groupByContext.serialize(server.getCommon()));
+      }
+
+      out.close();
+
+      if (schemaVersion < server.getSchemaVersion()) {
+        throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
+      }
+
+      return bytesOut.toByteArray();
     }
-
-    return bytesOut.toByteArray();
-  }
-  catch (IOException e) {
-    throw new DatabaseException(e);
-  }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
   }
 
   private Map.Entry<Object[], Long> doIndexLookupWithRecordsExpression(
@@ -781,6 +791,7 @@ public class ReadManager {
       if (ret.size() >= count) {
         break;
       }
+      boolean forceSelectOnServer = false;
       byte[][] records = server.fromUnsafeToRecords(entry.getValue());
       if (parms != null && expression != null) {
         for (byte[] bytes : records) {
@@ -789,16 +800,19 @@ public class ReadManager {
           boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
           if (pass) {
             byte[][] currRecords = new byte[][]{bytes};
-            applySelectToResultRecords(dbName, columnOffsets, currRecords, entry.getKey(), tableSchema, counters, groupByContext);
-            bytes = currRecords[0];
-            ret.add(bytes);
+            applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, entry.getKey(), tableSchema, counters, groupByContext);
+            if (counters == null) {
+              bytes = currRecords[0];
+              ret.add(bytes);
+            }
           }
         }
       }
       else {
-        applySelectToResultRecords(dbName, columnOffsets, records, entry.getKey(), tableSchema, counters, groupByContext);
-
-        ret.addAll(Arrays.asList(records));
+        applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, entry.getKey(), tableSchema, counters, groupByContext);
+        if (counters == null) {
+          ret.addAll(Arrays.asList(records));
+        }
       }
       if (ascending == null || ascending) {
         entry = index.higherEntry((entry.getKey()));
@@ -816,9 +830,11 @@ public class ReadManager {
       int count,
       TableSchema tableSchema,
       IndexSchema indexSchema,
-      List<Object[]> excludeKeys,
+      boolean forceSelectOnServer, List<Object[]> excludeKeys,
+      Object[] originalLeftKey,
       Object[] leftKey,
       Set<Integer> columnOffsets,
+      Object[] originalRightKey,
       Object[] rightKey,
       BinaryExpression.Operator leftOperator,
       BinaryExpression.Operator rightOperator,
@@ -834,36 +850,52 @@ public class ReadManager {
 
     BinaryExpression.Operator greaterOp = leftOperator;
     Object[] greaterKey = leftKey;
+    Object[] greaterOriginalKey = originalLeftKey;
     BinaryExpression.Operator lessOp = rightOperator;
-    Object[] lessKey = rightKey;
+    Object[] lessKey = leftKey;//rightKey;
+    Object[] lessOriginalKey = originalRightKey;
     if (greaterOp == BinaryExpression.Operator.less ||
         greaterOp == BinaryExpression.Operator.lessEqual) {
       greaterOp = rightOperator;
       greaterKey = rightKey;
+      greaterOriginalKey = originalRightKey;
       lessOp = leftOperator;
       lessKey = leftKey;
+      lessOriginalKey = originalLeftKey;
     }
 
-    Map.Entry<Object[], Long> entry;
+    Map.Entry<Object[], Long> entry = null;
     if (ascending == null || ascending) {
-      if (greaterKey == null) {
-        entry = index.firstEntry();
+      if (greaterKey != null) {
+        entry = index.floorEntry(greaterKey);
       }
       else {
-        entry = index.floorEntry(greaterKey);
-        if (entry == null) {
+        if (greaterOriginalKey == null) {
           entry = index.firstEntry();
         }
+        else {
+          entry = index.floorEntry(greaterOriginalKey);
+        }
+      }
+      if (entry == null) {
+        entry = index.firstEntry();
       }
     }
     else {
-      if (ascending != null && !ascending && lessKey == null) {
-        entry = index.lastEntry();
-      }
-      else {
-        entry = index.floorEntry(lessKey);
+      if (ascending != null && !ascending) {
+        if (lessKey != null) {
+          entry = index.ceilingEntry(lessKey);
+        }
+        else {
+          if (lessOriginalKey == null) {
+            entry = index.lastEntry();
+          }
+          else {
+            entry = index.ceilingEntry(lessOriginalKey);
+          }
+        }
         if (entry == null) {
-          entry = index.firstEntry();
+          entry = index.lastEntry();
         }
       }
     }
@@ -871,22 +903,43 @@ public class ReadManager {
       Object[] key = lessKey;
       //      rightKey = greaterKey;
       //      if (ascending == null || ascending) {
-      key = greaterKey;
+      key = greaterOriginalKey;
       rightKey = lessKey;
       //}
+
       if ((ascending != null && !ascending)) {
-        if (lessOp.equals(BinaryExpression.Operator.less)) {
-          boolean foundMatch = key != null && 0 == server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), lessKey);
-          if (foundMatch) {
-            entry = index.lowerEntry((entry.getKey()));
+        if (lessKey != null) {
+          if (lessOp.equals(BinaryExpression.Operator.less) || lessOp.equals(BinaryExpression.Operator.lessEqual)) {
+            boolean foundMatch = 0 == server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), lessKey);
+            if (foundMatch) {
+              entry = index.lowerEntry((entry.getKey()));
+            }
+          }
+        }
+        else if (lessOriginalKey != null) {
+          if (lessOp.equals(BinaryExpression.Operator.less)) {
+            boolean foundMatch = 0 == server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), lessOriginalKey);
+            if (foundMatch) {
+              entry = index.lowerEntry((entry.getKey()));
+            }
           }
         }
       }
       else {
-        if (greaterOp.equals(BinaryExpression.Operator.greater)) {
-          boolean foundMatch = key != null && 0 == server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), greaterKey);
-          if (foundMatch) {
-            entry = index.higherEntry((entry.getKey()));
+        if (greaterKey != null){
+          if (greaterOp.equals(BinaryExpression.Operator.greater) || greaterOp.equals(BinaryExpression.Operator.greaterEqual)) {
+            boolean foundMatch = key != null && 0 == server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), greaterKey);
+            if (foundMatch) {
+              entry = index.higherEntry((entry.getKey()));
+            }
+          }
+        }
+        else if (greaterOriginalKey != null) {
+          if (greaterOp.equals(BinaryExpression.Operator.greater)) {
+            boolean foundMatch = 0 == server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), greaterOriginalKey);
+            if (foundMatch) {
+              entry = index.higherEntry((entry.getKey()));
+            }
           }
         }
       }
@@ -916,8 +969,8 @@ public class ReadManager {
 
           boolean rightIsDone = false;
           int compareRight = 1;
-          if (rightKey != null) {
-            compareRight = server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), rightKey);
+          if (lessOriginalKey != null) {
+            compareRight = server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), lessOriginalKey);
           }
           if (lessOp.equals(BinaryExpression.Operator.less) && compareRight >= 0) {
             rightIsDone = true;
@@ -945,9 +998,11 @@ public class ReadManager {
               boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
               if (pass) {
                 byte[][] currRecords = new byte[][]{bytes};
-                applySelectToResultRecords(dbName, columnOffsets, currRecords, entry.getKey(), tableSchema, counters, groupContext);
-                bytes = currRecords[0];
-                ret.add(bytes);
+                applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, entry.getKey(), tableSchema, counters, groupContext);
+                if (counters == null) {
+                  bytes = currRecords[0];
+                  ret.add(bytes);
+                }
               }
             }
           }
@@ -956,9 +1011,10 @@ public class ReadManager {
               logger.error("Records size: " + records.length);
             }
 
-            applySelectToResultRecords(dbName, columnOffsets, records, entry.getKey(), tableSchema, counters, groupContext);
-
-            ret.addAll(Arrays.asList(records));
+            applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, entry.getKey(), tableSchema, counters, groupContext);
+            if (counters == null) {
+              ret.addAll(Arrays.asList(records));
+            }
           }
         }
         //        if (operator.equals(QueryEvaluator.BinaryRelationalOperator.Operator.equal)) {
@@ -975,10 +1031,10 @@ public class ReadManager {
           if (entry.getKey() == null) {
             throw new DatabaseException("entry key is null");
           }
-          if (lessKey == null) {
-            throw new DatabaseException("less key is null");
+          if (lessOriginalKey == null) {
+            throw new DatabaseException("original less key is null");
           }
-          int compareValue = server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), lessKey);
+          int compareValue = server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), lessOriginalKey);
           if ((0 == compareValue || 1 == compareValue) && lessOp == BinaryExpression.Operator.less) {
             entry = null;
             break;
@@ -988,8 +1044,8 @@ public class ReadManager {
             break;
           }
           compareValue = 1;
-          if (greaterKey != null) {
-            compareValue = server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), greaterKey);
+          if (greaterOriginalKey != null) {
+            compareValue = server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), greaterOriginalKey);
           }
           if (0 == compareValue && greaterOp == BinaryExpression.Operator.greater) {
             entry = null;
@@ -1005,7 +1061,7 @@ public class ReadManager {
     return entry;
   }
 
-  private void applySelectToResultRecords(String dbName, Set<Integer> columnOffsets, byte[][] records, Object[] key,
+  private void applySelectToResultRecords(String dbName, Set<Integer> columnOffsets, boolean forceSelectOnServer, byte[][] records, Object[] key,
                                           TableSchema tableSchema, Counter[] counters, GroupByContext groupContext) {
     if (columnOffsets.size() == 0) {
       return;
@@ -1013,8 +1069,10 @@ public class ReadManager {
     for (int i = 0; i < records.length; i++) {
       byte[] recordBytes = records[i];
 
-      if (groupContext == null && counters == null && recordBytes.length < 1024) {
-        continue;
+      if (!forceSelectOnServer) {
+        if (groupContext == null && counters == null && recordBytes.length < 1024) {
+          continue;
+        }
       }
       Record record = new Record(dbName, server.getCommon(), recordBytes);
 
@@ -1045,17 +1103,16 @@ public class ReadManager {
         }
       }
 
-//      if (key != null && (long)record.getFields()[tableSchema.getFieldOffset("id")] != (long)key[0]) {
       count(counters, record);
 
-//        logger.error("########################################################################################### record mismatch");
-//      }
-      for (int j = 0; j < record.getFields().length; j++) {
-        if (!columnOffsets.contains(j)) {
-          record.getFields()[j] = null;
+      if (counters == null) {
+        for (int j = 0; j < record.getFields().length; j++) {
+          if (!columnOffsets.contains(j)) {
+            record.getFields()[j] = null;
+          }
         }
+        records[i] = record.serialize(server.getCommon());
       }
-      records[i] = record.serialize(server.getCommon());
     }
   }
 
@@ -1068,7 +1125,8 @@ public class ReadManager {
       boolean evaluateExpresion,
       Expression expression,
       Set<Integer> columnOffsets,
-      List<Object[]> excludeKeys,
+      boolean forceSelectOnServer, List<Object[]> excludeKeys,
+      Object[] originalKey,
       Object[] key,
       BinaryExpression.Operator operator,
       Index index,
@@ -1077,15 +1135,17 @@ public class ReadManager {
       boolean keys,
       Counter[] counters,
       GroupByContext groupContext) {
-    Map.Entry<Object[], Long> entry;
+    Map.Entry<Object[], Long> entry = null;
 
+    //count = 3;
     if (operator.equals(BinaryExpression.Operator.equal)) {
-      if (key == null) {
+      if (originalKey == null) {
         return null;
       }
-      entry = index.floorEntry(key);
+
+      entry = index.floorEntry(originalKey);
       while (entry != null) {
-        if (server.getCommon().compareKey(indexSchema.getComparators(), key, entry.getKey()) != 0) {
+        if (server.getCommon().compareKey(indexSchema.getComparators(), originalKey, entry.getKey()) != 0) {
           break;
         }
         Long value = entry.getValue();
@@ -1094,7 +1154,7 @@ public class ReadManager {
         }
         if (excludeKeys != null) {
           for (Object[] excludeKey : excludeKeys) {
-            if (server.getCommon().compareKey(indexSchema.getComparators(), excludeKey, key) == 0) {
+            if (server.getCommon().compareKey(indexSchema.getComparators(), excludeKey, originalKey) == 0) {
               return null;
             }
           }
@@ -1114,7 +1174,7 @@ public class ReadManager {
               boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
               if (pass) {
                 byte[][] currRecords = new byte[][]{bytes};
-                applySelectToResultRecords(dbName, columnOffsets, currRecords, null, tableSchema, counters, groupContext);
+                applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, null, tableSchema, counters, groupContext);
                 if (counters == null) {
                   bytes = currRecords[0];
                   ret.add(bytes);
@@ -1123,64 +1183,129 @@ public class ReadManager {
             }
           }
           else {
-            applySelectToResultRecords(dbName, columnOffsets, records, null, tableSchema, counters, groupContext);
+            applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, null, tableSchema, counters, groupContext);
             if (counters == null) {
               ret.addAll(Arrays.asList(records));
             }
           }
         }
+//        boolean hasNull = false;
+//        for (int i = 0; i < originalKey.length; i++) {
+//          if (originalKey[i] == null) {
+//            hasNull = true;
+//            break;
+//          }
+//        }
+//        if (!hasNull) {
+//          break;
+//        }
+
         entry = index.higherEntry(entry.getKey());
       }
       entry = null;
     }
-    else if ((ascending == null || ascending) /*&&
-        (operator.equals(BinaryExpression.Operator.less) ||
-            operator.equals(BinaryExpression.Operator.lessEqual))*/) {
+    else if ((ascending == null || ascending)) {
       if (key == null) {
-        entry = index.firstEntry();
-      }
-      else {
-        //entry = index.floorEntry(key);
-        if (operator.equals(BinaryExpression.Operator.greater) ||
-             operator.equals(BinaryExpression.Operator.greaterEqual)) {
-           entry = index.floorEntry(key);
+        if (originalKey == null) {
+          entry = index.firstEntry();
+        }
+        else if (operator.equals(BinaryExpression.Operator.greater) || operator.equals(BinaryExpression.Operator.greaterEqual)) {
+          entry = index.floorEntry(originalKey);
           if (entry == null) {
             entry = index.firstEntry();
           }
-         }
-         else {
-           entry = index.firstEntry();
-         }
+        }
+        else if (operator.equals(BinaryExpression.Operator.less) || operator.equals(BinaryExpression.Operator.lessEqual)) {
+          entry = index.firstEntry();
+        }
+      }
+      else {
+        //entry = index.floorEntry(key);
+        //        if (operator.equals(BinaryExpression.Operator.greater) ||
+        //             operator.equals(BinaryExpression.Operator.greaterEqual)) {
+        entry = index.floorEntry(key);
+        if (entry == null) {
+          entry = index.firstEntry();
+        }
+      }
+      if (entry != null) {
+        if (operator.equals(BinaryExpression.Operator.less) ||
+            operator.equals(BinaryExpression.Operator.lessEqual) ||
+            operator.equals(BinaryExpression.Operator.greater) ||
+            operator.equals(BinaryExpression.Operator.greaterEqual)) {
+          boolean foundMatch = key != null && 0 == server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), key);
+          if (foundMatch) {
+            //todo: match below
+            entry = index.higherEntry((entry.getKey()));
+          }
+          else if (operator.equals(BinaryExpression.Operator.less) ||
+                      operator.equals(BinaryExpression.Operator.greater)) {
+            foundMatch = originalKey != null && 0 == server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), originalKey);
+            if (foundMatch) {
+              //todo: match below
+              entry = index.higherEntry((entry.getKey()));
+            }
+          }
+        }
       }
     }
     else {
       //        if (key[0] == indexSchema.getCurrPartitions()[shard].getUpperKey()) {
       //
       //        }
-
-
-      if (ascending != null && !ascending &&
-          (key == null || operator.equals(BinaryExpression.Operator.greater) ||
-              operator.equals(BinaryExpression.Operator.greaterEqual))) {
-        entry = index.lastEntry();
-      }
-      else {
-        if (key == null) {
-          entry = index.firstEntry();
+      if (key == null) {
+        if (originalKey == null) {
+          entry = index.lastEntry();
         }
         else {
-          entry = index.ceilingEntry(key);
-          if (entry == null) {
-            entry = index.lastEntry();
+          if (ascending != null && !ascending && originalKey != null &&
+              (operator.equals(BinaryExpression.Operator.less) || operator.equals(BinaryExpression.Operator.lessEqual))) {
+            entry = index.ceilingEntry(originalKey);
+            if (entry == null) {
+              entry = index.lastEntry();
+            }
+          }
+          else if (ascending != null && !ascending && originalKey != null &&
+              (operator.equals(BinaryExpression.Operator.greater) || operator.equals(BinaryExpression.Operator.greaterEqual))) {
+            //entry = index.ceilingEntry(originalKey);
+            if (entry == null) {
+              entry = index.lastEntry();
+            }
           }
         }
+      }
+      else {
+        if (ascending != null && !ascending &&
+            (key == null || operator.equals(BinaryExpression.Operator.greater) ||
+                operator.equals(BinaryExpression.Operator.greaterEqual))) {
+          entry = index.lastEntry();
+        }
+        else {
+          if (key == null) {
+            entry = index.firstEntry();
+          }
+          else {
+            entry = index.ceilingEntry(key);
+            if (entry == null) {
+              entry = index.lastEntry();
+            }
+          }
 
+        }
       }
     }
     if (entry != null) {
       if ((ascending != null && !ascending)) {
-        if (operator.equals(BinaryExpression.Operator.less)) {
+        if (key != null && (operator.equals(BinaryExpression.Operator.less) ||
+            operator.equals(BinaryExpression.Operator.lessEqual))) {
           boolean foundMatch = key != null && 0 == server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), key);
+          if (foundMatch) {
+            //todo: match below
+            entry = index.lowerEntry((entry.getKey()));
+          }
+        }
+        else if (operator.equals(BinaryExpression.Operator.less)) {
+          boolean foundMatch = originalKey != null && 0 == server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), originalKey);
           if (foundMatch) {
             //todo: match below
             entry = index.lowerEntry((entry.getKey()));
@@ -1188,7 +1313,8 @@ public class ReadManager {
         }
       }
       else {
-        if (operator.equals(BinaryExpression.Operator.greater)) {
+        if (key != null && (operator.equals(BinaryExpression.Operator.greater) ||
+            operator.equals(BinaryExpression.Operator.greaterEqual))) {
           while (entry != null && key != null) {
             int compare = server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), key);
             if (compare <= 0) {
@@ -1225,8 +1351,8 @@ public class ReadManager {
         if (ret.size() >= count) {
           break;
         }
-        if (key != null) {
-          int compare = server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), key);
+        if (originalKey != null) {
+          int compare = server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), originalKey);
           if (compare == 0 &&
               (operator.equals(BinaryExpression.Operator.less) || operator.equals(BinaryExpression.Operator.greater))) {
             entry = null;
@@ -1261,7 +1387,7 @@ public class ReadManager {
         if (keys) {
           byte[][] currKeys = null;
           synchronized (index) {
-            Long unsafeAddress = index.get(entry.getKey());
+            Long unsafeAddress = entry.getValue();//index.get(entry.getKey());
             if (unsafeAddress != null) {
               currKeys = server.fromUnsafeToKeys(unsafeAddress);
             }
@@ -1275,7 +1401,7 @@ public class ReadManager {
         else {
           byte[][] records = null;
           synchronized (index) {
-            Long unsafeAddress = index.get(entry.getKey());
+            Long unsafeAddress = entry.getValue();//index.get(entry.getKey());
             if (unsafeAddress != null) {
               records = server.fromUnsafeToRecords(unsafeAddress);
             }
@@ -1289,11 +1415,9 @@ public class ReadManager {
                 if (dbViewNum <= viewVersion) {
                   remaining.add(bytes);
                 }
-                else
-                  if (//dbViewNum < server.getCommon().getSchema().getVersion()  ||
-                      (dbViewFlags & Record.DB_VIEW_FLAG_ADDING) == 0
-                      )
-                  {
+                else if (//dbViewNum < server.getCommon().getSchema().getVersion()  ||
+                    (dbViewFlags & Record.DB_VIEW_FLAG_ADDING) == 0
+                    ) {
                   remaining.add(bytes);
                 }
               }
@@ -1315,7 +1439,7 @@ public class ReadManager {
                   }
                   else if (dbViewNum == server.getSchemaVersion() ||
                       (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
-            //        remaining.add(bytes);
+                    //        remaining.add(bytes);
                   }
                   else if ((dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
                     synchronized (index) {
@@ -1343,7 +1467,7 @@ public class ReadManager {
                 boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
                 if (pass) {
                   byte[][] currRecords = new byte[][]{bytes};
-                  applySelectToResultRecords(dbName, columnOffsets, currRecords, null, tableSchema, counters, groupContext);
+                  applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, null, tableSchema, counters, groupContext);
                   if (counters == null) {
                     bytes = currRecords[0];
                     ret.add(bytes);
@@ -1355,7 +1479,7 @@ public class ReadManager {
               if (records.length > 2) {
                 logger.error("Records size: " + records.length);
               }
-              applySelectToResultRecords(dbName, columnOffsets, records, entry.getKey(), tableSchema, counters, groupContext);
+              applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, entry.getKey(), tableSchema, counters, groupContext);
               if (counters == null) {
                 ret.addAll(Arrays.asList(records));
               }
@@ -1373,12 +1497,12 @@ public class ReadManager {
 //          entry = index.lowerEntry((entry.getKey()));
 //        }
 //        else {
-          if (ascending != null && !ascending) {
-            entry = index.lowerEntry((entry.getKey()));
-          }
-          else {
-            entry = index.higherEntry((entry.getKey()));
-          }
+        if (ascending != null && !ascending) {
+          entry = index.lowerEntry((entry.getKey()));
+        }
+        else {
+          entry = index.higherEntry((entry.getKey()));
+        }
         //}
       }
     }
@@ -1393,4 +1517,60 @@ public class ReadManager {
     }
   }
 
+  public byte[] evaluateCounter(String command, byte[] body) {
+
+    String[] parts = command.split(":");
+    String dbName = parts[4];
+
+    DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
+    Counter counter = new Counter();
+    try {
+      counter.deserialize(in);
+
+      String tableName = counter.getTableName();
+      String columnName = counter.getColumnName();
+      String indexName = null;
+      TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
+      for (IndexSchema indexSchema : tableSchema.getIndexes().values()) {
+        if (indexSchema.getFields()[0].equals(columnName)) {
+          indexName = indexSchema.getName();
+        }
+      }
+      Index index = server.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
+      Map.Entry<Object[], Long> entry = index.lastEntry();
+      if (entry != null) {
+        Long unsafeAddress = entry.getValue();
+        if (unsafeAddress != null) {
+          byte[][] records = server.fromUnsafeToRecords(unsafeAddress);
+          Record record = new Record(dbName, server.getCommon(), records[0]);
+          Object value = record.getFields()[tableSchema.getFieldOffset(columnName)];
+          if (counter.isDestTypeLong()) {
+            counter.setMaxLong((Long)DataType.getLongConverter().convert(value));
+          }
+          else {
+            counter.setMaxDouble((Double)DataType.getDoubleConverter().convert(value));
+          }
+        }
+      }
+      entry = index.firstEntry();
+      if (entry != null) {
+        Long unsafeAddress = entry.getValue();
+        if (unsafeAddress != null) {
+          byte[][] records = server.fromUnsafeToRecords(unsafeAddress);
+          Record record = new Record(dbName, server.getCommon(), records[0]);
+          Object value = record.getFields()[tableSchema.getFieldOffset(columnName)];
+          if (counter.isDestTypeLong()) {
+            counter.setMinLong((Long)DataType.getLongConverter().convert(value));
+          }
+          else {
+            counter.setMinDouble((Double)DataType.getDoubleConverter().convert(value));
+          }
+        }
+      }
+      return counter.serialize();
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+  }
 }

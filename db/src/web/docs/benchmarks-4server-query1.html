@@ -1,0 +1,90 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Untitled Document</title>
+
+
+<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+</head>
+
+<body>
+	for (int i = 0; ; i++) {<br/>
+	&nbsp;&nbsp;&nbsp;&nbsp;PreparedStatement stmt = con.prepareStatement("select id from persons where persons.id=?")<br/>
+	&nbsp;&nbsp;&nbsp;&nbsp;stmt.setLong(1, i);<br/>
+	&nbsp;&nbsp;&nbsp;&nbsp;ResultSet rs = stmt.executeQuery();<br/>
+	&nbsp;&nbsp;&nbsp;&nbsp;rs.next();<br/>
+	}<br/><br/>
+	
+		<div class="mylink">
+	<a href="benchmarks-schema.html">Schema and Insert Code</a><br/><br/>
+	</div>
+	
+<table width="411" border="1" cellpadding=2 cellspacing="0">
+  <tbody>
+   <tr class="example-header">
+      <td width="50">Metric</td>
+      <td width="33">Value</td>
+    </tr>
+    <tr>
+      <td>Record size</td>
+      <td>120 bytes</td>
+    </tr>
+    <tr>
+      <td>Record count</td>
+      <td>280 million</td>
+    </tr>
+    <tr>
+      <td>Server total mem</td>
+      <td>60g</td>
+    </tr>
+    <tr>
+      <td>Server xmx</td>
+      <td>22g</td>
+    </tr>
+    <tr>
+      <td>Resident mem</td>
+      <td>57g</td>
+    </tr>
+    <tr>
+      <td>Client machine count</td>
+      <td>4</td>
+    </tr>
+        <tr>
+      <td>Cores per client machine</td>
+      <td>8</td>
+    </tr>
+    <tr>
+    	<td>Cores per server machine</td>
+    	<td>8</td>
+    </tr>
+
+    <tr>
+      <td>Call rate</td>
+      <td>320k/sec</td>
+    </tr>
+    <tr>
+      <td>Call latency</td>
+      <td>3.5 millis</td>
+    </tr>
+    <tr>
+      <td>Threads per client</td>
+      <td>256</td>
+    </tr>
+    <tr>
+      <td>Server cpu</td>
+      <td>40%</td>
+    </tr>
+    <tr>
+    	<td>Shard Count</td>
+    	<td>2</td>
+    </tr>
+    <tr>
+    	<td>Replica Count</td>
+    	<td>2</td>
+    </tr>
+  </tbody>
+</table>
+	
+</body>
+</html>

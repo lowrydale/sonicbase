@@ -1,0 +1,131 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+
+	</style>
+	<script src="tree.js"></script>
+
+<script>
+
+	// source=https://www.softcomplex.com/products/tigra_tree_menu/docs/
+
+	var trees = []
+var TREE_ITEMS = [
+	['Documentation', '/',
+		['SQL Syntax', null,
+			['Select', 0,
+				['Select Basics', 'docs/select-basics.html'],
+				['Select Order By', 'docs/select-order-by.html']
+			 ]
+		],
+		['Administration',    '/order.html',
+                ['Setup', 'docs/setup.html'],
+                ['Client', '/download.html']
+		],
+		['JDBC Client',  '/support.html'],
+		['Data Types',  '/support.html'],
+		['Benchmarks',  0,
+                ['Four Server', 0,
+                    ['Identity Query', 'docs/benchmarks-4server-query1.html'],
+                    ['Range Query', 'docs/benchmarks-4server-query2.html'],
+                ],
+                ['One Server', 0,
+                    ['Identity Query', 'docs/benchmarks-query1.html'],
+                    ['Range Query', 'docs/benchmarks-query2.html'],
+                    ['Two Column Query', 'docs/benchmarks-query-two-fields.html'],
+                    ['Insert', 'docs/benchmarks-insert1.html'],
+                    ['Sort', 'docs/benchmarks-query-or-sort.html'],
+                    ['Max With Index', 'docs/benchmarks-query-max.html'],
+                    ['Max With Table Scan', 'docs/benchmarks-query-max-table-scan.html'],
+                    ['Max With Where', 'docs/benchmarks-query-max-with-where.html'],
+                    ['Limit', 'docs/benchmarks-query-limit.html'],
+                    ['Unsorted Table Scan', 'docs/benchmarks-query-table-scan.html'],
+                    ['Or With Index', 'docs/benchmarks-query-or-index.html'],
+                    ['Equal No Index', 'docs/benchmarks-query-equal-no-index.html'],
+                ]
+		],
+	]
+];
+
+var TREE_TPL = {
+	'target'  : 'doc-frame',	// name of the frame links will be opened in
+							// other possible values are: _blank, _parent, _search, _self and _top
+
+	'icon_e'  : 'icons/empty.gif', // empty image
+	'icon_l'  : 'icons/line.gif',  // vertical line
+
+	'icon_32' : 'demo1/icons/base.gif',   // root leaf icon normal
+	'icon_36' : 'demo1/icons/base.gif',   // root leaf icon selected
+
+	'icon_48' : 'icons/base.gif',   // root icon normal
+	'icon_52' : 'icons/base.gif',   // root icon selected
+	'icon_56' : 'icons/base.gif',   // root icon opened
+	'icon_60' : 'icons/base.gif',   // root icon selected
+
+	'icon_16' : 'icons/folder.gif', // node icon normal
+	'icon_20' : 'icons/folderopen.gif', // node icon selected
+	'icon_24' : 'icons/folder.gif', // node icon opened
+	'icon_28' : 'icons/folderopen.gif', // node icon selected opened
+
+	'icon_0'  : 'icons/page.gif', // leaf icon normal
+	'icon_4'  : 'icons/page.gif', // leaf icon selected
+	'icon_8'  : 'icons/page.gif', // leaf icon opened
+	'icon_12' : 'icons/page.gif', // leaf icon selected
+
+	'icon_2'  : 'icons/joinbottom.gif', // junction for leaf
+	'icon_3'  : 'icons/join.gif',       // junction for last leaf
+	'icon_18' : 'icons/plusbottom.gif', // junction for closed node
+	'icon_19' : 'icons/plus.gif',       // junctioin for last closed node
+	'icon_26' : 'icons/minusbottom.gif',// junction for opened node
+	'icon_27' : 'icons/minus.gif'       // junctioin for last opended node
+};
+	</script>
+
+<link href="css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+<script>var __adobewebfontsappname__="dreamweaver"</script>
+<script src="http://use.edgefonts.net/source-sans-pro:n2:default.js" type="text/javascript"></script>
+<meta charset="UTF-8">
+<title>Documentation</title>
+
+</head>
+
+<body>
+ <div class="container">
+  <header> <a href="">
+    <h4 class="logo">SonicBase</h4>
+    </a>
+    <nav>
+      <ul>
+        <li><a href="sonic-base.html">HOME</a></li>
+        <li><a href="documentation.html">DOCUMENTATION</a></li>
+        <li><a href="#about">ABOUT</a></li>
+        <li> <a href="#contact">CONTACT</a></li>
+      </ul>
+    </nav>
+  </header>
+
+<table width="100%" border="0">
+  <tbody>
+    <tr valign=top>
+      <td width=25%>
+      <div class="doc-tree">
+	<script language="JavaScript">
+	<!--//
+		trees.push(new tree (TREE_ITEMS, TREE_TPL));
+	//-->
+	</script>
+     </div>
+     </td>
+      <td><iframe frameBorder="0" width=100% height=1024px src="doc-detail.html" name="doc-frame"></iframe></td>
+    </tr>
+  </tbody>
+</table>
+<br/>
+<br/>
+<br/>
+	</div>
+</body>
+</html>

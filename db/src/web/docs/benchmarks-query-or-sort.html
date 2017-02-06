@@ -1,0 +1,80 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Untitled Document</title>
+
+
+<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+</head>
+
+<body>
+
+PreparedStatement stmt = conn.prepareStatement("select id1,id2 from persons where id1 < 5000000 order by id2 asc, id1 desc");<br/>
+ResultSet ret = stmt.executeQuery();<br/>
+<br/><br/>
+
+		<div class="mylink">
+	<a href="benchmarks-schema.html">Schema and Insert Code</a><br/><br/>
+	</div>
+
+<table width="411" border="1" cellpadding=2 cellspacing="0">
+  <tbody>
+   <tr class="example-header">
+      <td width="50">Metric</td>
+      <td width="33">Value</td>
+    </tr>
+    <tr>
+      <td>Record size</td>
+      <td>120 bytes</td>
+    </tr>
+    <tr>
+      <td>Record count</td>
+      <td>150 million</td>
+    </tr>
+    <tr>
+      <td>Server total mem</td>
+      <td>60g</td>
+    </tr>
+    <tr>
+      <td>Server xmx</td>
+      <td>24g</td>
+    </tr>
+    <tr>
+      <td>Resident mem</td>
+      <td>44g</td>
+    </tr>
+    <tr>
+      <td>Client location</td>
+      <td>Collocated with server</td>
+    </tr>
+    <tr>
+    	<td>Cores per server machine</td>
+    	<td>8</td>
+    </tr>
+
+    <tr>
+      <td>latency to first result</td>
+      <td>40 seconds</td>
+    </tr>
+     <tr>
+      <td>Threads per client</td>
+      <td>1</td>
+    </tr>
+    <tr>
+      <td>Server cpu</td>
+      <td>60%</td>
+    </tr>
+    <tr>
+    	<td>Shard Count</td>
+    	<td>1</td>
+    </tr>
+    <tr>
+    	<td>Replica Count</td>
+    	<td>1</td>
+    </tr>
+  </tbody>
+</table>
+
+</body>
+</html>

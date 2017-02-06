@@ -244,64 +244,71 @@ public class TestDatabaseAdvanced {
 
   @Test
   public void testGroupBy() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("select id2 from persons group by id2");
+    PreparedStatement stmt = conn.prepareStatement("select id, id2 from persons group by id2 order by id");
     ResultSet ret = stmt.executeQuery();
 
     ret.next();
     assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getLong("id"), 108);
     ret.next();
     assertEquals(ret.getLong("id2"), 1);
+    assertEquals(ret.getLong("id"), 109);
     assertFalse(ret.next());
 
   }
 
   @Test
   public void testServerSort() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("select id2 from persons order by id2 ASC");
+    PreparedStatement stmt = conn.prepareStatement("select id, id2 from persons order by id2 ASC");
     ResultSet ret = stmt.executeQuery();
 
     ret.next();
     assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getLong("id"), 0);
     ret.next();
     assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getLong("id"), 2);
     ret.next();
     assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getLong("id"), 100);
     ret.next();
     assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getLong("id"), 102);
     ret.next();
     assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getLong("id"), 104);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getLong("id"), 106);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getLong("id"), 108);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 1);
+    assertEquals(ret.getLong("id"), 1);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 1);
+    assertEquals(ret.getLong("id"), 3);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 1);
+    assertEquals(ret.getLong("id"), 101);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 1);
+    assertEquals(ret.getLong("id"), 103);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 1);
+    assertEquals(ret.getLong("id"), 105);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 1);
+    assertEquals(ret.getLong("id"), 107);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 1);
+    assertEquals(ret.getLong("id"), 109);
     ret.next();
     assertEquals(ret.getLong("id2"), 0);
     assertTrue(ret.wasNull());
-    ret.next();
-    assertEquals(ret.getLong("id2"), 0);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 0);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 0);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 0);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 0);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 0);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 0);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 1);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 1);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 1);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 1);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 1);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 1);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 1);
-    assertFalse(ret.next());
+    assertEquals(ret.getLong("id"), 4);
+    //assertFalse(ret.next());
 
   }
 
@@ -372,6 +379,10 @@ public class TestDatabaseAdvanced {
     ret.next();
     assertEquals(ret.getLong("id2"), 0);
     assertEquals(ret.getInt("maxValue"), 108);
+//
+//    ret.next();
+//     assertEquals(ret.getLong("id2"), 0);
+//     assertEquals(ret.getInt("maxValue"), 108);
 
     ret.next();
     assertEquals(ret.getLong("id2"), 1);

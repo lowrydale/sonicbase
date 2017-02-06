@@ -113,7 +113,9 @@ public class LongRunningCommands {
   }
 
   public int getCommandCount() {
-    return commands.commands.size();
+    synchronized (commands.commands) {
+      return commands.commands.size();
+    }
   }
 
   public interface Command {
@@ -131,20 +133,24 @@ public class LongRunningCommands {
       this.longRunningCommands = longRunningCommands;
     }
     public void serialize(DataOutputStream out) throws IOException {
-      DataUtil.writeVLong(out, commands.size());
-      for (Command command : commands) {
-        serializeType(out, command);
-        command.serialize(out);
+      synchronized (commands) {
+        DataUtil.writeVLong(out, commands.size());
+        for (Command command : commands) {
+          serializeType(out, command);
+          command.serialize(out);
+        }
       }
     }
 
     public void deserialize(DataInputStream in) throws IOException {
-      commands.clear();
-      int count = (int)DataUtil.readVLong(in);
-      for (int i = 0; i < count; i++) {
-        Command command = createType(longRunningCommands, in);
-        command.deserialize(in);
-        commands.add(command);
+      synchronized (commands) {
+        commands.clear();
+        int count = (int) DataUtil.readVLong(in);
+        for (int i = 0; i < count; i++) {
+          Command command = createType(longRunningCommands, in);
+          command.deserialize(in);
+          commands.add(command);
+        }
       }
     }
 

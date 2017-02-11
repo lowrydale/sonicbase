@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Responsible for
@@ -109,7 +110,7 @@ public class ReadManager {
           byte[][] records = server.fromUnsafeToRecords(entry.getValue());
           for (byte[] bytes : records) {
             Record record = new Record(tableSchema);
-            record.deserialize(dbName, server.getCommon(), bytes);
+            record.deserialize(dbName, server.getCommon(), bytes, null, true);
             boolean pass = true;
             if (countColumn != null) {
               if (record.getFields()[countColumnOffset] == null) {
@@ -256,6 +257,20 @@ public class ReadManager {
 
   public static final com.codahale.metrics.Timer INDEX_LOOKUP_STATS = METRICS.timer("indexLookup");
 
+  class PreparedIndexLookup {
+
+    public int count;
+    public int tableId;
+    public int indexId;
+    public boolean forceSelectOnServer;
+    public boolean evaluateExpression;
+    public Expression expression;
+    public List<OrderByExpressionImpl> orderByExpressions;
+    public Set<Integer> columnOffsets;
+  }
+
+  private ConcurrentHashMap<Long, PreparedIndexLookup> preparedIndexLookups = new ConcurrentHashMap<>();
+
   public byte[] indexLookup(String dbName, DataInputStream in) {
     //Timer.Context context = INDEX_LOOKUP_STATS.time();
     try {
@@ -272,25 +287,62 @@ public class ReadManager {
 
       long serializationVersion = DataUtil.readVLong(in);
       DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+      long preparedId = DataUtil.readVLong(in);
+      boolean isPrepared = in.readBoolean();
 
-      int count = in.readInt();
+      PreparedIndexLookup prepared = null;
+      if (isPrepared) {
+        prepared = preparedIndexLookups.get(preparedId);
+      }
+      else {
+        prepared = new PreparedIndexLookup();
+        preparedIndexLookups.put(preparedId, prepared);
+      }
+      int count = 0;
+      if (isPrepared) {
+        count = prepared.count;
+      }
+      else {
+        prepared.count = count = in.readInt();
+      }
       boolean isExplicitTrans = in.readBoolean();
       boolean isCommitting = in.readBoolean();
       long transactionId = DataUtil.readVLong(in, resultLength);
       long viewVersion = DataUtil.readVLong(in, resultLength);
 
-      int tableId = (int) (long) DataUtil.readVLong(in, resultLength);
-      int indexId = (int) (long) DataUtil.readVLong(in, resultLength);
-      boolean forceSelectOnServer = in.readBoolean();
+      int tableId = 0;
+      int indexId = 0;
+      boolean forceSelectOnServer = false;
+      if (isPrepared) {
+        tableId = prepared.tableId;
+        indexId = prepared.indexId;
+        forceSelectOnServer = prepared.forceSelectOnServer;
+      }
+      else {
+        prepared.tableId = tableId = (int) (long) DataUtil.readVLong(in, resultLength);
+        prepared.indexId = indexId = (int) (long) DataUtil.readVLong(in, resultLength);
+        prepared.forceSelectOnServer = forceSelectOnServer = in.readBoolean();
+      }
       ParameterHandler parms = null;
       if (in.readBoolean()) {
         parms = new ParameterHandler();
         parms.deserialize(in);
       }
-      boolean evaluateExpression = in.readBoolean();
+      boolean evaluateExpression;
+      if (isPrepared) {
+        evaluateExpression = prepared.evaluateExpression;
+      }
+      else {
+        prepared.evaluateExpression = evaluateExpression = in.readBoolean();
+      }
       Expression expression = null;
-      if (in.readBoolean()) {
-        expression = ExpressionImpl.deserializeExpression(in);
+      if (isPrepared) {
+        expression = prepared.expression;
+      }
+      else {
+        if (in.readBoolean()) {
+          prepared.expression = expression = ExpressionImpl.deserializeExpression(in);
+        }
       }
       String tableName = null;
       String indexName = null;
@@ -316,13 +368,19 @@ public class ReadManager {
             ", indexNull=" /*+ (common.getTablesById().get(tableId).getIndexesById().get(indexId) == null) */);
         throw e;
       }
-      //int srcCount = in.readInt();
-      int srcCount = (int) DataUtil.readVLong(in, resultLength);
-      List<OrderByExpressionImpl> orderByExpressions = new ArrayList<>();
-      for (int i = 0; i < srcCount; i++) {
-        OrderByExpressionImpl orderByExpression = new OrderByExpressionImpl();
-        orderByExpression.deserialize(in);
-        orderByExpressions.add(orderByExpression);
+      List<OrderByExpressionImpl> orderByExpressions = null;
+      if (isPrepared) {
+        orderByExpressions = prepared.orderByExpressions;
+      }
+      else {
+        //int srcCount = in.readInt();
+        int srcCount = (int) DataUtil.readVLong(in, resultLength);
+        prepared.orderByExpressions = orderByExpressions = new ArrayList<>();
+        for (int i = 0; i < srcCount; i++) {
+          OrderByExpressionImpl orderByExpression = new OrderByExpressionImpl();
+          orderByExpression.deserialize(in);
+          orderByExpressions.add(orderByExpression);
+        }
       }
       Object[] leftKey = null;
       if (in.readBoolean()) {
@@ -350,7 +408,13 @@ public class ReadManager {
         rightOperator = BinaryExpression.Operator.getOperator((int) (long) DataUtil.readVLong(in, resultLength));
       }
 
-      Set<Integer> columnOffsets = getSimpleColumnOffsets(in, resultLength, tableName, tableSchema);
+      Set<Integer> columnOffsets = null;
+      if (isPrepared) {
+        columnOffsets = prepared.columnOffsets;
+      }
+      else {
+        prepared.columnOffsets = columnOffsets = getSimpleColumnOffsets(in, resultLength, tableName, tableSchema);
+      }
 
       Counter[] counters = null;
       int counterCount = in.readInt();
@@ -372,7 +436,7 @@ public class ReadManager {
       Map.Entry<Object[], Long> entry = null;
 
       Boolean ascending = null;
-      if (orderByExpressions.size() != 0) {
+      if (orderByExpressions != null && orderByExpressions.size() != 0) {
         OrderByExpressionImpl orderByExpression = orderByExpressions.get(0);
         String columnName = orderByExpression.getColumnName();
         boolean isAscending = orderByExpression.isAscending();
@@ -796,7 +860,7 @@ public class ReadManager {
       if (parms != null && expression != null) {
         for (byte[] bytes : records) {
           Record record = new Record(tableSchema);
-          record.deserialize(dbName, server.getCommon(), bytes);
+          record.deserialize(dbName, server.getCommon(), bytes, null, true);
           boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
           if (pass) {
             byte[][] currRecords = new byte[][]{bytes};
@@ -926,7 +990,7 @@ public class ReadManager {
         }
       }
       else {
-        if (greaterKey != null){
+        if (greaterKey != null) {
           if (greaterOp.equals(BinaryExpression.Operator.greater) || greaterOp.equals(BinaryExpression.Operator.greaterEqual)) {
             boolean foundMatch = key != null && 0 == server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), greaterKey);
             if (foundMatch) {
@@ -994,7 +1058,7 @@ public class ReadManager {
           if (parms != null && expression != null && evaluateExpression) {
             for (byte[] bytes : records) {
               Record record = new Record(tableSchema);
-              record.deserialize(dbName, server.getCommon(), bytes);
+              record.deserialize(dbName, server.getCommon(), bytes, null, true);
               boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
               if (pass) {
                 byte[][] currRecords = new byte[][]{bytes};
@@ -1170,7 +1234,7 @@ public class ReadManager {
           if (parms != null && expression != null && evaluateExpresion) {
             for (byte[] bytes : records) {
               Record record = new Record(tableSchema);
-              record.deserialize(dbName, server.getCommon(), bytes);
+              record.deserialize(dbName, server.getCommon(), bytes, null, true);
               boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
               if (pass) {
                 byte[][] currRecords = new byte[][]{bytes};
@@ -1239,7 +1303,7 @@ public class ReadManager {
             entry = index.higherEntry((entry.getKey()));
           }
           else if (operator.equals(BinaryExpression.Operator.less) ||
-                      operator.equals(BinaryExpression.Operator.greater)) {
+              operator.equals(BinaryExpression.Operator.greater)) {
             foundMatch = originalKey != null && 0 == server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), originalKey);
             if (foundMatch) {
               //todo: match below
@@ -1463,7 +1527,7 @@ public class ReadManager {
             if (parms != null && expression != null && evaluateExpresion) {
               for (byte[] bytes : records) {
                 Record record = new Record(tableSchema);
-                record.deserialize(dbName, server.getCommon(), bytes);
+                record.deserialize(dbName, server.getCommon(), bytes, null, true);
                 boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
                 if (pass) {
                   byte[][] currRecords = new byte[][]{bytes};
@@ -1545,10 +1609,10 @@ public class ReadManager {
           Record record = new Record(dbName, server.getCommon(), records[0]);
           Object value = record.getFields()[tableSchema.getFieldOffset(columnName)];
           if (counter.isDestTypeLong()) {
-            counter.setMaxLong((Long)DataType.getLongConverter().convert(value));
+            counter.setMaxLong((Long) DataType.getLongConverter().convert(value));
           }
           else {
-            counter.setMaxDouble((Double)DataType.getDoubleConverter().convert(value));
+            counter.setMaxDouble((Double) DataType.getDoubleConverter().convert(value));
           }
         }
       }
@@ -1560,10 +1624,10 @@ public class ReadManager {
           Record record = new Record(dbName, server.getCommon(), records[0]);
           Object value = record.getFields()[tableSchema.getFieldOffset(columnName)];
           if (counter.isDestTypeLong()) {
-            counter.setMinLong((Long)DataType.getLongConverter().convert(value));
+            counter.setMinLong((Long) DataType.getLongConverter().convert(value));
           }
           else {
-            counter.setMinDouble((Double)DataType.getDoubleConverter().convert(value));
+            counter.setMinDouble((Double) DataType.getDoubleConverter().convert(value));
           }
         }
       }

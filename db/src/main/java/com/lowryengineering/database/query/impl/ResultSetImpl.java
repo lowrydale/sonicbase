@@ -1623,7 +1623,7 @@ public class ResultSetImpl implements ResultSet {
               int len = (int)DataUtil.readVLong(in, resultLength);//len
               byte[] bytes = new byte[len];
               in.readFully(bytes);
-              record.deserialize(dbName, databaseClient.getCommon(), bytes);
+              record.deserialize(dbName, databaseClient.getCommon(), bytes, null, true);
               currRetRecords[k][j] = record;
 
               Object[] key = new Object[primaryKeyFields.length];

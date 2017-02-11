@@ -51,7 +51,7 @@ public class UpdateManager {
       int len = in.readInt();
       byte[] bytes = new byte[len];
       in.readFully(bytes);
-      record.deserialize(dbName, server.getCommon(), bytes);
+      record.deserialize(dbName, server.getCommon(), bytes, null);
       List<FieldSchema> fieldSchemas = tableSchema.getFields();
 
       for (Map.Entry<String, IndexSchema> indexSchema : tableSchema.getIndices().entrySet()) {

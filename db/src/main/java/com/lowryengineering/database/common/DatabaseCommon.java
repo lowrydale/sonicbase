@@ -16,6 +16,7 @@ import java.sql.Timestamp;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -471,28 +472,42 @@ public class DatabaseCommon {
   }
 
   public static void serializeFields(
-      Object[] fields, DataOutputStream out, TableSchema tableSchema, int schemaVersion) throws IOException {
+      Object[] fields, DataOutputStream outerOut, TableSchema tableSchema, int schemaVersion) throws IOException {
+
+    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+    DataOutputStream out = new DataOutputStream(bytesOut);
     DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
     DataUtil.writeVLong(out, schemaVersion);
     DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
     DataUtil.writeVLong(out, fields.length, resultLength);
     int offset = 0;
+    byte[] buffer = new byte[16];
     for (Object field : fields) {
-      if (field != null) {
-        out.writeByte(1);
+      if (field == null) {
+        DataUtil.writeVLong(out, 0);
+        offset++;
+      }
+      else {
         if (tableSchema.getFields().get(offset).getType() == DataType.Type.BIGINT) {
-          DataUtil.writeVLong(out, (Long) field, resultLength);
+          DataUtil.writeVLong(buffer, (Long) field, resultLength);
+          DataUtil.writeVLong(out, resultLength.getLength());
+          out.write(buffer, 0, resultLength.getLength());
           offset++;
         }
         else if (tableSchema.getFields().get(offset).getType() == DataType.Type.INTEGER) {
-          DataUtil.writeVLong(out, (Integer) field, resultLength);
+          DataUtil.writeVLong(buffer, (Integer) field, resultLength);
+          DataUtil.writeVLong(out, resultLength.getLength());
+          out.write(buffer, 0, resultLength.getLength());
           offset++;
         }
         else if (tableSchema.getFields().get(offset).getType() == DataType.Type.SMALLINT) {
-          DataUtil.writeVLong(out, (Short) field, resultLength);
+          DataUtil.writeVLong(buffer, (Short) field, resultLength);
+          DataUtil.writeVLong(out, resultLength.getLength());
+          out.write(buffer, 0, resultLength.getLength());
           offset++;
         }
         else if (tableSchema.getFields().get(offset).getType() == DataType.Type.TINYINT) {
+          DataUtil.writeVLong(out, 1);
           out.write((byte)field);
           offset++;
         }
@@ -509,14 +524,17 @@ public class DatabaseCommon {
           offset++;
         }
         else if (tableSchema.getFields().get(offset).getType() == DataType.Type.FLOAT) {
+          DataUtil.writeVLong(out, 8);
           out.writeDouble((Double)field);
           offset++;
         }
         else if (tableSchema.getFields().get(offset).getType() == DataType.Type.REAL) {
+          DataUtil.writeVLong(out, 4);
           out.writeFloat((Float)field);
           offset++;
         }
         else if (tableSchema.getFields().get(offset).getType() == DataType.Type.DOUBLE) {
+          DataUtil.writeVLong(out, 8);
           out.writeDouble((Double)field);
           offset++;
         }
@@ -532,11 +550,13 @@ public class DatabaseCommon {
           offset++;
         }
         else if (tableSchema.getFields().get(offset).getType() == DataType.Type.BOOLEAN) {
-          out.writeBoolean((Boolean) field);
+          DataUtil.writeVLong(out, 1);
+          out.write((Boolean) field ? 1 : 0);
           offset++;
         }
         else if (tableSchema.getFields().get(offset).getType() == DataType.Type.BIT) {
-          out.writeBoolean((Boolean) field);
+          DataUtil.writeVLong(out, 1);
+          out.write((Boolean) field ? 1 : 0);
           offset++;
         }
         else if (tableSchema.getFields().get(offset).getType() == DataType.Type.LONGVARBINARY ||
@@ -591,21 +611,24 @@ public class DatabaseCommon {
           tableSchema.getFields().get(offset).getType();
         }
       }
-      else {
-        out.writeByte(0);
-        offset++;
-      }
     }
+    out.close();
+    byte[] bytes = bytesOut.toByteArray();
+    DataUtil.writeVLong(outerOut, bytes.length);
+    outerOut.write(bytes);
   }
 
   public static Object[] deserializeFields(
-      String dbName, DatabaseCommon common, DataInputStream in, TableSchema tableSchema, int schemaVersion) throws IOException {
-    long serializationVersion = DataUtil.readVLong(in);
-    int serializedSchemaVersion = (int)DataUtil.readVLong(in);
+      String dbName, DatabaseCommon common, byte[] bytes, int byteOffset, TableSchema tableSchema, int schemaVersion, Set<Integer> columns) throws IOException {
+    DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+    long serializationVersion = DataUtil.readVLong(bytes, byteOffset, resultLength);
+    byteOffset += resultLength.getLength();
+    int serializedSchemaVersion = (int)DataUtil.readVLong(bytes, byteOffset, resultLength);
+    byteOffset += resultLength.getLength();
     List<FieldSchema> currFieldList = tableSchema.getFields();
     List<FieldSchema> serializedFieldList = tableSchema.getFieldsForVersion(schemaVersion, serializedSchemaVersion);
-    DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-    int fieldCount = (int)DataUtil.readVLong(in, resultLength);
+    int fieldCount = (int)DataUtil.readVLong(bytes, byteOffset, resultLength);
+    byteOffset += resultLength.getLength();
     Object[] fields = new Object[currFieldList.size()];
     int offset = 0;
     boolean isCurrentSchema = currFieldList == serializedFieldList;
@@ -617,39 +640,54 @@ public class DatabaseCommon {
       else {
         currOffset = field.getMapToOffset();
       }
-      if (in.readByte() == 1) {
+      int size = (int)DataUtil.readVLong(bytes, byteOffset, resultLength);
+      byteOffset += resultLength.getLength();
+      if (size > 0) {
+        if (columns != null) {
+          if (!columns.contains(currOffset)) {
+            byteOffset += size;
+            continue;
+          }
+        }
         if (field.getType() == DataType.Type.BIGINT) {
-          fields[currOffset] = DataUtil.readVLong(in, resultLength);
+          fields[currOffset] = DataUtil.readVLong(bytes, byteOffset, resultLength);
+          byteOffset += resultLength.getLength();
         }
         else if (field.getType() == DataType.Type.INTEGER) {
-          fields[currOffset] = (int)DataUtil.readVLong(in, resultLength);
+          fields[currOffset] = (int)DataUtil.readVLong(bytes, byteOffset, resultLength);
+          byteOffset += resultLength.getLength();
         }
         else if (field.getType() == DataType.Type.SMALLINT) {
-          fields[currOffset] = (short)DataUtil.readVLong(in, resultLength);
+          fields[currOffset] = (short)DataUtil.readVLong(bytes, byteOffset, resultLength);
+          byteOffset += resultLength.getLength();
         }
         else if (field.getType() == DataType.Type.TINYINT) {
-          fields[currOffset] = in.readByte();
+          fields[currOffset] = bytes[byteOffset];
+          byteOffset++;
         }
         else if (field.getType() == DataType.Type.NCHAR) {
-          int len = (int)DataUtil.readVLong(in, resultLength);
-          byte[] buffer = new byte[len];
-          in.readFully(buffer);
+          byte[] buffer = new byte[size];
+          System.arraycopy(bytes, byteOffset, buffer, 0, size);
+          byteOffset += size;
           fields[currOffset] = buffer;
         }
         else if (field.getType() == DataType.Type.CHAR) {
-          int len = (int)DataUtil.readVLong(in, resultLength);
-          byte[] buffer = new byte[len];
-          in.readFully(buffer);
+          byte[] buffer = new byte[size];
+          System.arraycopy(bytes, byteOffset, buffer, 0, size);
+          byteOffset += size;
           fields[currOffset] = buffer;
         }
         else if (field.getType() == DataType.Type.FLOAT) {
-          fields[currOffset] = in.readDouble();
+          fields[currOffset] = DataUtil.readDouble(bytes, byteOffset);
+          byteOffset += 8;
         }
         else if (field.getType() == DataType.Type.REAL) {
-          fields[currOffset] = in.readFloat();
+          fields[currOffset] = DataUtil.readFloat(bytes, byteOffset);
+          byteOffset += 4;
         }
         else if (field.getType() == DataType.Type.DOUBLE) {
-          fields[currOffset] = in.readDouble();
+          fields[currOffset] = DataUtil.readDouble(bytes, byteOffset);
+          byteOffset += 8;
         }
         else if (field.getType() == DataType.Type.VARCHAR ||
             field.getType() == DataType.Type.NVARCHAR ||
@@ -657,57 +695,59 @@ public class DatabaseCommon {
             field.getType() == DataType.Type.NCLOB ||
             field.getType() == DataType.Type.LONGNVARCHAR ||
             field.getType() == DataType.Type.LONGVARCHAR) {
-          int len = (int)DataUtil.readVLong(in, resultLength);
-          byte[] buffer = new byte[len];
-          in.readFully(buffer);
+          byte[] buffer = new byte[size];
+          System.arraycopy(bytes, byteOffset, buffer, 0, size);
+          byteOffset += size;
           fields[currOffset] = buffer;
         }
         else if (field.getType() == DataType.Type.BOOLEAN) {
-          fields[currOffset] = in.readBoolean();
+          fields[currOffset] = bytes[byteOffset] == 1;
+          byteOffset += 1;
         }
         else if (field.getType() == DataType.Type.BIT) {
-          fields[currOffset] = in.readBoolean();
+          fields[currOffset] = bytes[byteOffset] == 1;
+          byteOffset += 1;
         }
         else if (field.getType() == DataType.Type.VARBINARY ||
             field.getType() == DataType.Type.LONGVARBINARY ||
             field.getType() == DataType.Type.BLOB) {
-          int len = (int)DataUtil.readVLong(in, resultLength);
-          byte[] data = new byte[len];
-          in.readFully(data);
-          fields[currOffset] = data;
+          byte[] buffer = new byte[size];
+          System.arraycopy(bytes, byteOffset, buffer, 0, size);
+          byteOffset += size;
+          fields[currOffset] = buffer;
         }
         else if (field.getType() == DataType.Type.NUMERIC) {
-          int len = (int)DataUtil.readVLong(in, resultLength);
-          byte[] buffer = new byte[len];
-          in.readFully(buffer);
+          byte[] buffer = new byte[size];
+          System.arraycopy(bytes, byteOffset, buffer, 0, size);
+          byteOffset += size;
           String str = new String(buffer, "utf-8");
           fields[currOffset] = new BigDecimal(str);
         }
         else if (field.getType() == DataType.Type.DECIMAL) {
-          int len = (int)DataUtil.readVLong(in, resultLength);
-          byte[] buffer = new byte[len];
-          in.readFully(buffer);
+          byte[] buffer = new byte[size];
+          System.arraycopy(bytes, byteOffset, buffer, 0, size);
+          byteOffset += size;
           String str = new String(buffer, "utf-8");
           fields[currOffset] = new BigDecimal(str);
         }
         else if (field.getType() == DataType.Type.DATE) {
-          int len = (int)DataUtil.readVLong(in, resultLength);
-          byte[] buffer = new byte[len];
-          in.readFully(buffer);
+          byte[] buffer = new byte[size];
+          System.arraycopy(bytes, byteOffset, buffer, 0, size);
+          byteOffset += size;
           String str = new String(buffer, "utf-8");
           fields[currOffset] = Date.valueOf(str);
         }
         else if (field.getType() == DataType.Type.TIME) {
-           int len = (int)DataUtil.readVLong(in, resultLength);
-           byte[] buffer = new byte[len];
-           in.readFully(buffer);
+          byte[] buffer = new byte[size];
+          System.arraycopy(bytes, byteOffset, buffer, 0, size);
+          byteOffset += size;
            String str = new String(buffer, "utf-8");
            fields[currOffset] = Time.valueOf(str);
          }
         else if (field.getType() == DataType.Type.TIMESTAMP) {
-           int len = (int)DataUtil.readVLong(in, resultLength);
-           byte[] buffer = new byte[len];
-           in.readFully(buffer);
+          byte[] buffer = new byte[size];
+          System.arraycopy(bytes, byteOffset, buffer, 0, size);
+          byteOffset += size;
            String str = new String(buffer, "utf-8");
            fields[currOffset] = Timestamp.valueOf(str);
          }

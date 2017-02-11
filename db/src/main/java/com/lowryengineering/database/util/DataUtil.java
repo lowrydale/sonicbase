@@ -6,7 +6,11 @@ package com.lowryengineering.database.util;
  * Time: 8:27 AM
  */
 
-import java.io.*;
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
 
 public class DataUtil {
 
@@ -71,6 +75,20 @@ public class DataUtil {
     out.write((byte)localValue);
     if (resultLength != null) {
       resultLength.length = count;
+    }
+  }
+
+  public static void writeVLong(byte[] buffer, long value, ResultLength resultLength) throws IOException {
+    long localValue = value;
+    int offset = 0;
+    while ((localValue & ~0x7F) != 0) {
+      buffer[offset] = (byte)((localValue & 0x7f) | 0x80);
+      localValue >>>= 7;
+      offset++;
+    }
+    buffer[offset] = (byte)localValue;
+    if (resultLength != null) {
+      resultLength.length = offset + 1;
     }
   }
 
@@ -278,5 +296,22 @@ public class DataUtil {
 //
 //    // return (short)((buffer[offset] << 8) + (buffer[offset + 1] << 0));
 //  }
+
+  public static double readDouble(byte[] bytes, int byteOffset) {
+    return ByteBuffer.wrap(bytes, byteOffset, 8).getDouble();
+  }
+
+  public static void writeDouble(double value, byte[] bytes, int byteOffset) {
+    ByteBuffer.wrap(bytes, byteOffset, 8).putDouble(value);
+  }
+
+  public static float readFloat(byte[] bytes, int byteOffset) {
+    return ByteBuffer.wrap(bytes, byteOffset, 8).getFloat();
+  }
+
+  public static void writeFloat(float value, byte[] bytes, int byteOffset) {
+    ByteBuffer.wrap(bytes, byteOffset, 4).putFloat(value);
+  }
+
 
 }

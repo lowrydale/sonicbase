@@ -5,8 +5,11 @@ import com.lowryengineering.database.schema.FieldSchema;
 import com.lowryengineering.database.schema.TableSchema;
 import com.lowryengineering.database.util.DataUtil;
 
-import java.io.*;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 /**
  * User: lowryda
@@ -29,18 +32,38 @@ public class Record {
   }
 
   public Record(String dbName, DatabaseCommon common, byte[] bytes) {
-    deserialize(dbName, common, bytes);
+    deserialize(dbName, common, bytes, null);
   }
 
-  public void recoverFromSnapshot(String dbName, DatabaseCommon common, DataInputStream in, int serializationVersion) {
+  public Record(String dbName, DatabaseCommon common, byte[] bytes, Set<Integer> columns, boolean readHeader) {
+    deserialize(dbName, common, bytes, columns, readHeader);
+  }
+
+  public void recoverFromSnapshot(String dbName, DatabaseCommon common, byte[] bytes, int serializationVersion, Set<Integer> columns, boolean readHeader) {
     try {
       DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-      this.tableSchema = common.getTablesById(dbName).get((int) DataUtil.readVLong(in, resultLength));
-      id = DataUtil.readVLong(in, resultLength);
-      dbViewNumber = DataUtil.readVLong(in, resultLength);
-      dbViewFlags = DataUtil.readVLong(in, resultLength);
-      transId = DataUtil.readVLong(in, resultLength);
-      fields = DatabaseCommon.deserializeFields(dbName, common, in, tableSchema, common.getSchemaVersion());
+      int byteOffset = 0;
+      int headerLen = (int)DataUtil.readVLong(bytes, byteOffset, resultLength);
+      byteOffset += resultLength.getLength();
+      if (!readHeader) {
+        byteOffset += headerLen;
+      }
+      else {
+        id = DataUtil.readVLong(bytes, byteOffset, resultLength);
+        byteOffset += resultLength.getLength();
+        dbViewNumber = DataUtil.readVLong(bytes, byteOffset, resultLength);
+        byteOffset += resultLength.getLength();
+        dbViewFlags = DataUtil.readVLong(bytes, byteOffset, resultLength);
+        byteOffset += resultLength.getLength();
+        transId = DataUtil.readVLong(bytes, byteOffset, resultLength);
+        byteOffset += resultLength.getLength();
+      }
+      this.tableSchema = common.getTablesById(dbName).get((int) DataUtil.readVLong(bytes, byteOffset, resultLength));
+      byteOffset += resultLength.getLength();
+
+       int len = (int)DataUtil.readVLong(bytes, byteOffset, resultLength);
+      byteOffset += resultLength.getLength();
+      fields = DatabaseCommon.deserializeFields(dbName, common, bytes, byteOffset, tableSchema, common.getSchemaVersion(), columns);
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -113,11 +136,18 @@ public class Record {
 
   public void snapshot(DataOutputStream out, DatabaseCommon common) throws IOException {
     DataUtil.ResultLength resultLen = new DataUtil.ResultLength();
+    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+    DataOutputStream headerOut = new DataOutputStream(bytesOut);
+
+    DataUtil.writeVLong(headerOut, id, resultLen);
+    DataUtil.writeVLong(headerOut, dbViewNumber, resultLen);
+    DataUtil.writeVLong(headerOut, dbViewFlags, resultLen);
+    DataUtil.writeVLong(headerOut, transId, resultLen);
+    headerOut.close();
+    byte[] bytes = bytesOut.toByteArray();
+    DataUtil.writeVLong(out, bytes.length);
+    out.write(bytes);
     DataUtil.writeVLong(out, tableSchema.getTableId(), resultLen);
-    DataUtil.writeVLong(out, id, resultLen);
-    DataUtil.writeVLong(out, dbViewNumber, resultLen);
-    DataUtil.writeVLong(out, dbViewFlags, resultLen);
-    DataUtil.writeVLong(out, transId, resultLen);
     DatabaseCommon.serializeFields(fields, out, tableSchema, common.getSchemaVersion());
   }
 
@@ -163,13 +193,12 @@ public class Record {
     }
   }
 
-  public void deserialize(String dbName, DatabaseCommon common, byte[] bytes) {
-    DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
-    recoverFromSnapshot(dbName, common, in, 0);
+  public void deserialize(String dbName, DatabaseCommon common, byte[] bytes, Set<Integer> columns, boolean readHeader) {
+    recoverFromSnapshot(dbName, common, bytes, 0, columns, readHeader);
   }
 
-  public void deserialize(String dbName, DatabaseCommon common, DataInputStream in) throws IOException {
-    recoverFromSnapshot(dbName, common, in, 0);
+  public void deserialize(String dbName, DatabaseCommon common, byte[] bytes, Set<Integer> columns) {
+    recoverFromSnapshot(dbName, common, bytes, 0, columns, true);
   }
 
   public static long getTableId(byte[] record) {

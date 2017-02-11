@@ -1634,7 +1634,7 @@ public class DatabaseClient {
     return 1;
   }
 
-  private long allocateId(String dbName) {
+  public long allocateId(String dbName) {
     try {
       long id = -1;
       synchronized (idAllocatorLock) {

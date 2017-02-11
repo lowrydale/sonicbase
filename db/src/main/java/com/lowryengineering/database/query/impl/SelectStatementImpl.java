@@ -774,7 +774,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
               int len = (int)DataUtil.readVLong(in, resultLength); //len
               byte[] bytes = new byte[len];
               in.readFully(bytes);
-              record.deserialize(dbName, client.getCommon(), bytes);
+              record.deserialize(dbName, client.getCommon(), bytes, null, true);
               currRetRecords[k][j] = record;
 
               Object[] key = new Object[primaryKeyFields.length];

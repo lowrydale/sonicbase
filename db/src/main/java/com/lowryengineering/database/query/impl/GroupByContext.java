@@ -4,6 +4,7 @@ import com.lowryengineering.database.common.DatabaseCommon;
 import com.lowryengineering.database.schema.DataType;
 import com.lowryengineering.database.schema.FieldSchema;
 import com.lowryengineering.database.schema.TableSchema;
+import com.lowryengineering.database.util.DataUtil;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -141,7 +142,10 @@ public class GroupByContext {
         GroupCounter groupCounter = new GroupCounter();
         Object[] groupValues = new Object[fieldContexts.size()];
         for (int k = 0; k < groupValues.length; k++) {
-          groupValues[k] = DatabaseCommon.deserializeFields(dbName, common, in, fieldContexts.get(k).tableSchema, common.getSchemaVersion())[0];
+          int len = (int) DataUtil.readVLong(in);
+          byte[] buffer = new byte[len];
+          in.readFully(buffer);
+          groupValues[k] = DatabaseCommon.deserializeFields(dbName, common, buffer, 0, fieldContexts.get(k).tableSchema, common.getSchemaVersion(), null)[0];
         }
         Counter counter = new Counter();
         counter.deserialize(in);

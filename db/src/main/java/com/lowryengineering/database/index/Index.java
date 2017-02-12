@@ -194,8 +194,10 @@ public class Index {
 
   public void iterate(Visitor visitor) throws IOException {
     if (longIndex != null) {
-      for (Map.Entry<Long, Long> entry : longIndex.entrySet()) {
+      Map.Entry<Object[], Long> entry = firstEntry();
+      while (entry != null) {
         visitor.visit(new Object[]{entry.getKey()}, entry.getValue());
+        entry = higherEntry(entry.getKey());
       }
     }
     else if (longSkipIndex != null) {
@@ -293,24 +295,25 @@ public class Index {
   }
 
   public Long unsafePutIfAbsent(Object[] key, long id) {
-
+  synchronized (this) {
     if (longIndex != null) {
       return longIndex.putIfAbsent((long) key[0], id);
     }
     else if (stringIndex != null) {
-      return stringIndex.putIfAbsent((byte[])key[0] /*((String) key[0]).getBytes("utf-8")*/, id);
+      return stringIndex.putIfAbsent((byte[]) key[0] /*((String) key[0]).getBytes("utf-8")*/, id);
     }
-    else if (longSkipIndex != null) {
-      return longSkipIndex.putIfAbsent((long) key[0], id);
+    else if (objectIndex != null) {
+      return objectIndex.putIfAbsent(key, id);
     }
+  }
+  if (longSkipIndex != null) {
+    return longSkipIndex.putIfAbsent((long) key[0], id);
+  }
     else if (objectSkipIndex != null) {
       return objectSkipIndex.putIfAbsent(key, id);
     }
     else if (stringSkipIndex != null) {
       return stringSkipIndex.putIfAbsent((byte[])key[0], id);
-    }
-    else if (objectIndex != null) {
-      return objectIndex.putIfAbsent(key, id);
     }
     return null;
   }

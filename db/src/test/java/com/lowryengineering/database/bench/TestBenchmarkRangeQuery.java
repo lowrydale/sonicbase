@@ -2,7 +2,6 @@ package com.lowryengineering.database.bench;
 
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Snapshot;
-import com.codahale.metrics.Timer;
 import com.lowryengineering.database.client.DatabaseClient;
 import com.lowryengineering.database.jdbcdriver.ConnectionProxy;
 import com.lowryengineering.database.jdbcdriver.StatementProxy;
@@ -81,6 +80,7 @@ public class TestBenchmarkRangeQuery {
     final java.sql.Connection conn = DriverManager.getConnection("jdbc:dbproxy:" + address + ":9010/db", "user", "password");
 
     //test insert
+    final AtomicLong totalBegin = new AtomicLong(System.currentTimeMillis());
     final AtomicLong totalSelectDuration = new AtomicLong();
     final AtomicLong selectErrorCount = new AtomicLong();
     final AtomicLong selectBegin = new AtomicLong(System.currentTimeMillis());
@@ -88,7 +88,7 @@ public class TestBenchmarkRangeQuery {
     final AtomicLong selectCount = new AtomicLong();
     final AtomicLong readCount = new AtomicLong();
         try {
-          Thread[] threads = new Thread[8];
+          Thread[] threads = new Thread[4];
           for (int i = 0; i < threads.length; i++) {
             threads[i] = new Thread(new Runnable() {
               @Override
@@ -125,32 +125,38 @@ public class TestBenchmarkRangeQuery {
                     else if (true) {
                       //primary index 2 expressions order desc
                       //700k
+
+                      long begin = System.nanoTime();
                       stmt = conn.prepareStatement("select persons.id1, id2  " +
                           "from persons where id1 >= " + startId + " order by id1 asc");                                              //
                       long beginNano = System.nanoTime();
                       ret = stmt.executeQuery();
+                      totalSelectDuration.addAndGet(System.nanoTime() - begin);
 
                       int count = 0;
                       while (true) {
-                        Timer.Context context = LOOKUP_STATS.time();
+                        begin = System.nanoTime();
+                        //Timer.Context context = LOOKUP_STATS.time();
                         if (!ret.next()) {
                           break;
                         }
-                        context.stop();
+                        totalSelectDuration.addAndGet(System.nanoTime() - begin);
+                        //context.stop();
 
                         if (readCount.incrementAndGet() % 100000 == 0) {
                           StringBuilder builder = new StringBuilder();
                           builder.append("count=").append(readCount.get());
                           Snapshot snapshot = LOOKUP_STATS.getSnapshot();
-                          builder.append(String.format(", rate=%.2f", LOOKUP_STATS.getFiveMinuteRate()));
-                          builder.append(String.format(", avg=%.2f nanos", snapshot.getMean()));
+                          builder.append(String.format(", rate=%.2f", readCount.get() / (double)(System.currentTimeMillis() - totalBegin.get())*1000f));//LOOKUP_STATS.getFiveMinuteRate()));
+                          builder.append(String.format(", avg=%.2f nanos", totalSelectDuration.get() / (double)readCount.get()));//snapshot.getMean()));
                           builder.append(String.format(", 99th=%.2f nanos", snapshot.get99thPercentile()));
                           builder.append(String.format(", max=%d", snapshot.getMax()));
                           builder.append(", errorCount=" + selectErrorCount.get());
-                          if (selectCount.get() > 1000) {
+                          if (selectOffset.get() > 1000000) {
                             selectOffset.set(0);
                             selectCount.set(0);
                             selectBegin.set(System.currentTimeMillis());
+                            totalBegin.set(System.currentTimeMillis());
                             totalSelectDuration.set(0);
                           }
                           System.out.println(builder.toString());

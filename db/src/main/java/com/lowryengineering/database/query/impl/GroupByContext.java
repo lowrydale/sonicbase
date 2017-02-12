@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class GroupByContext {
   private List<FieldContext> fieldContexts;
@@ -145,7 +146,7 @@ public class GroupByContext {
           int len = (int) DataUtil.readVLong(in);
           byte[] buffer = new byte[len];
           in.readFully(buffer);
-          groupValues[k] = DatabaseCommon.deserializeFields(dbName, common, buffer, 0, fieldContexts.get(k).tableSchema, common.getSchemaVersion(), null)[0];
+          groupValues[k] = DatabaseCommon.deserializeFields(dbName, common, buffer, 0, fieldContexts.get(k).tableSchema, common.getSchemaVersion(), null, new AtomicInteger(), true)[0];
         }
         Counter counter = new Counter();
         counter.deserialize(in);
@@ -189,7 +190,7 @@ public class GroupByContext {
       out.writeInt(innerMap.getValue().values().size());
       for (GroupCounter counter : innerMap.getValue().values()) {
         for  (int i = 0; i < count; i++) {
-          DatabaseCommon.serializeFields(new Object[]{counter.groupValues[i]}, out, fieldContexts.get(i).tableSchema, common.getSchemaVersion());
+          DatabaseCommon.serializeFields(new Object[]{counter.groupValues[i]}, out, fieldContexts.get(i).tableSchema, common.getSchemaVersion(), true);
         }
         out.write(counter.counter.serialize());
       }

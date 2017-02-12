@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -472,14 +473,16 @@ public class DatabaseCommon {
   }
 
   public static void serializeFields(
-      Object[] fields, DataOutputStream outerOut, TableSchema tableSchema, int schemaVersion) throws IOException {
+      Object[] fields, DataOutputStream outerOut, TableSchema tableSchema, int schemaVersion, boolean serializeHeader) throws IOException {
 
     ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
     DataOutputStream out = new DataOutputStream(bytesOut);
-    DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-    DataUtil.writeVLong(out, schemaVersion);
     DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-    DataUtil.writeVLong(out, fields.length, resultLength);
+    if (serializeHeader) {
+      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+      DataUtil.writeVLong(out, schemaVersion);
+      DataUtil.writeVLong(out, fields.length, resultLength);
+    }
     int offset = 0;
     byte[] buffer = new byte[16];
     for (Object field : fields) {
@@ -619,15 +622,21 @@ public class DatabaseCommon {
   }
 
   public static Object[] deserializeFields(
-      String dbName, DatabaseCommon common, byte[] bytes, int byteOffset, TableSchema tableSchema, int schemaVersion, Set<Integer> columns) throws IOException {
+      String dbName, DatabaseCommon common, byte[] bytes, int byteOffset, TableSchema tableSchema, int schemaVersion, Set<Integer> columns, AtomicInteger serializedSchemaVersion, boolean deserializeHeader) throws IOException {
     DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-    long serializationVersion = DataUtil.readVLong(bytes, byteOffset, resultLength);
-    byteOffset += resultLength.getLength();
-    int serializedSchemaVersion = (int)DataUtil.readVLong(bytes, byteOffset, resultLength);
-    byteOffset += resultLength.getLength();
     List<FieldSchema> currFieldList = tableSchema.getFields();
-    List<FieldSchema> serializedFieldList = tableSchema.getFieldsForVersion(schemaVersion, serializedSchemaVersion);
-    int fieldCount = (int)DataUtil.readVLong(bytes, byteOffset, resultLength);
+    List<FieldSchema> serializedFieldList = null;
+    if (deserializeHeader) {
+      long serializationVersion = DataUtil.readVLong(bytes, byteOffset, resultLength);
+      byteOffset += resultLength.getLength();
+      serializedSchemaVersion.set((int) DataUtil.readVLong(bytes, byteOffset, resultLength));
+      byteOffset += resultLength.getLength();
+      serializedFieldList = tableSchema.getFieldsForVersion(schemaVersion, serializedSchemaVersion.get());
+      int fieldCount = (int) DataUtil.readVLong(bytes, byteOffset, resultLength);
+    }
+    else {
+      serializedFieldList = tableSchema.getFieldsForVersion(schemaVersion, serializedSchemaVersion.get());
+    }
     byteOffset += resultLength.getLength();
     Object[] fields = new Object[currFieldList.size()];
     int offset = 0;

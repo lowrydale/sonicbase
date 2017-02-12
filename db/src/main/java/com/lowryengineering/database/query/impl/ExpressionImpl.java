@@ -1239,7 +1239,7 @@ public abstract class ExpressionImpl implements Expression {
       int currShardOffset = 0;
       int previousSchemaVersion = common.getSchemaVersion();
       Object[][][] retKeys;
-      byte[][] recordRet = null;
+      Record[] recordRet = null;
       Object[] nextKey = null;
       int nextShard = shard;
       int localShard = shard;
@@ -1391,6 +1391,9 @@ public abstract class ExpressionImpl implements Expression {
         while (true) {
           boolean isPrepared = prepared.serversPrepared[localShard][replica];
           long preparedId = prepared.preparedId;
+          if (!isPrepared) {
+            System.out.println("Not prepared:" + preparedKeyStr);
+          }
 
           //TableSchema.Partition[] partitions = indexSchema.getValue().getCurrPartitions();
           Random rand = new Random(System.currentTimeMillis());
@@ -1608,14 +1611,27 @@ public abstract class ExpressionImpl implements Expression {
           }
 
           int recordCount = (int) DataUtil.readVLong(in, resultLength);
-          byte[][] currRetRecords = new byte[recordCount][];
-          for (int k = 0; k < recordCount; k++) {
+          Record[] currRetRecords = new Record[recordCount];
+          if (recordCount > 0) {
             int len = (int) DataUtil.readVLong(in, resultLength);
             byte[] recordBytes = new byte[len];
             in.readFully(recordBytes);
-            currRetRecords[k] = recordBytes;
-            if (debug) {
-              System.out.println("hit record: shard=" + calledShard + ", replica=" + replica);
+            Record record = new Record(dbName, common, recordBytes);
+            currRetRecords[0] = record;
+            AtomicInteger serializedSchemaVersion = new AtomicInteger(record.getSerializedSchemaVersion());
+
+            for (int k = 1; k < recordCount; k++) {
+              len = (int) DataUtil.readVLong(in, resultLength);
+              recordBytes = new byte[len];
+              in.readFully(recordBytes);
+              Object[] currFields = DatabaseCommon.deserializeFields(dbName, common, recordBytes, 0, tableSchema, common.getSchemaVersion(), null, serializedSchemaVersion, false);
+              Record currRecord = new Record(tableSchema);
+              currRecord.setFields(currFields);
+
+              currRetRecords[k] = currRecord;
+              if (debug) {
+                System.out.println("hit record: shard=" + calledShard + ", replica=" + replica);
+              }
             }
           }
 
@@ -1640,7 +1656,7 @@ public abstract class ExpressionImpl implements Expression {
             groupByContext.deserialize(in, client.getCommon(), dbName);
           }
 
-          if (originalShard != -1 || localShard == -1 || localShard == -2 || (retKeys != null && retKeys.length >= count) || (recordRet != null && recordRet.length >= count)) {
+          if (/*originalShard != -1 ||*/localShard == -1 || localShard == -2 || (retKeys != null && retKeys.length >= count) || (recordRet != null && recordRet.length >= count)) {
             break;
           }
         }
@@ -1674,9 +1690,8 @@ public abstract class ExpressionImpl implements Expression {
           }
           retKeys = new Object[recordRet.length][][];
           for (int i = 0; i < recordRet.length; i++) {
-            byte[] curr = recordRet[i];
+            Record record = recordRet[i];
 
-            Record record = new Record(dbName, client.getCommon(), curr, null, true);
             Object[] key = new Object[primaryKeyFields.length];
             for (int j = 0; j < primaryKeyFields.length; j++) {
               key[j] = record.getFields()[tableSchema.getFieldOffset(primaryKeyFields[j])];
@@ -1688,7 +1703,7 @@ public abstract class ExpressionImpl implements Expression {
 
             nextKey = key;
 
-            recordCache.put(tableSchema.getName(), key, new CachedRecord(record, curr));
+            recordCache.put(tableSchema.getName(), key, new CachedRecord(record, null));
           }
         }
         if (previousSchemaVersion < common.getSchemaVersion()) {
@@ -2044,6 +2059,23 @@ public abstract class ExpressionImpl implements Expression {
     }
 
     byte[][] retArray = new byte[records1.length + records2.length][];
+    System.arraycopy(records1, 0, retArray, 0, records1.length);
+    System.arraycopy(records2, 0, retArray, records1.length, records2.length);
+    return retArray;
+  }
+
+  static Record[] aggregateResults(Record[] records1, Record[] records2) {
+    if (records1 == null || records1.length == 0) {
+      if (records2 == null || records2.length == 0) {
+        return null;
+      }
+      return records2;
+    }
+    if (records2 == null || records2.length == 0) {
+      return records1;
+    }
+
+    Record[] retArray = new Record[records1.length + records2.length];
     System.arraycopy(records1, 0, retArray, 0, records1.length);
     System.arraycopy(records2, 0, retArray, records1.length, records2.length);
     return retArray;

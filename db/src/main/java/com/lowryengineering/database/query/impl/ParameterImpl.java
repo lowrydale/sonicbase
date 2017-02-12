@@ -38,6 +38,10 @@ public class ParameterImpl extends ExpressionImpl {
 
   }
 
+  public String toString() {
+    return "parm(" + String.valueOf(parmOffset) + ")";
+  }
+
   @Override
   public void serialize(DataOutputStream out) {
     try {

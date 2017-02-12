@@ -10,6 +10,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * User: lowryda
@@ -23,6 +24,7 @@ public class Record {
   private long dbViewNumber;
   private long transId;
   private long dbViewFlags;
+  private AtomicInteger serializedSchemaVersion = new AtomicInteger();
 
   public static long DB_VIEW_FLAG_DELETING = 0x1;
   public static long DB_VIEW_FLAG_ADDING = 0x2;
@@ -63,7 +65,7 @@ public class Record {
 
        int len = (int)DataUtil.readVLong(bytes, byteOffset, resultLength);
       byteOffset += resultLength.getLength();
-      fields = DatabaseCommon.deserializeFields(dbName, common, bytes, byteOffset, tableSchema, common.getSchemaVersion(), columns);
+      fields = DatabaseCommon.deserializeFields(dbName, common, bytes, byteOffset, tableSchema, common.getSchemaVersion(), columns, serializedSchemaVersion, true);
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -148,7 +150,7 @@ public class Record {
     DataUtil.writeVLong(out, bytes.length);
     out.write(bytes);
     DataUtil.writeVLong(out, tableSchema.getTableId(), resultLen);
-    DatabaseCommon.serializeFields(fields, out, tableSchema, common.getSchemaVersion());
+    DatabaseCommon.serializeFields(fields, out, tableSchema, common.getSchemaVersion(), true);
   }
 
   public void setId(long id) {
@@ -205,4 +207,7 @@ public class Record {
     return DataUtil.readVLong(record, 0, new DataUtil.ResultLength());
   }
 
+  public int getSerializedSchemaVersion() {
+    return serializedSchemaVersion.get();
+  }
 }

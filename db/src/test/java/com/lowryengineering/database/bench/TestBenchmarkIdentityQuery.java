@@ -100,15 +100,18 @@ public class TestBenchmarkIdentityQuery {
                         "from persons where persons.id1=?");
                     int innerOffset = 0;
                     while (true) {
-                      Timer.Context ctx = LOOKUP_STATS.time();
+                      long begin = System.nanoTime();
+                      //Timer.Context ctx = LOOKUP_STATS.time();
                       stmt.setLong(1, offset);
                       ResultSet rs = stmt.executeQuery();
                       boolean found = rs.next();
-                      ctx.stop();
+                      //ctx.stop();
                       if (!found) {
                         break;
                       }
-                      if (innerOffset++ % 10000 == 0) {
+                      totalSelectDuration.addAndGet(System.nanoTime() - begin);
+
+                      if (selectOffset.incrementAndGet() % 10000 == 0) {
                         logProgress(selectOffset, selectErrorCount, selectBegin, totalSelectDuration);
                       }
                     }
@@ -337,8 +340,9 @@ public class TestBenchmarkIdentityQuery {
     StringBuilder builder = new StringBuilder();
     builder.append("select: count=").append(selectOffset.get());
     Snapshot snapshot = LOOKUP_STATS.getSnapshot();
-    builder.append(String.format(", rate=%.4f", LOOKUP_STATS.getFiveMinuteRate()));
-    builder.append(String.format(", avg=%.4f", snapshot.getMean() / 1000000d));
+    builder.append(String.format(", rate=%.4f", selectOffset.get() / (double)(System.currentTimeMillis() - selectBegin.get())*1000f));//LOOKUP_STATS.getFiveMinuteRate()));
+    builder.append(String.format(", avg=%.2f nanos", totalSelectDuration.get() / (double)selectOffset.get()));//snapshot.getMean()));
+    //builder.append(String.format(", avg=%.4f", snapshot.getMean() / 1000000d));
     builder.append(String.format(", 99th=%.4f", snapshot.get99thPercentile() / 1000000d));
     builder.append(String.format(", max=%.4f", (double) snapshot.getMax() / 1000000d));
     builder.append(", errorCount=" + selectErrorCount.get());

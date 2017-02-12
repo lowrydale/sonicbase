@@ -544,7 +544,8 @@ public class DiskBasedResultSet {
           }
           else {
             out.writeBoolean(true);
-            byte[] bytes = record.getSerializedRecord();//record.serialize(server.getCommon());
+            Record rec = record.getRecord();//record.serialize(server.getCommon());
+            byte[] bytes = rec.serialize(server.getCommon());
             DataUtil.writeVLong(out, bytes.length, resultLength);
             out.write(bytes);
           }

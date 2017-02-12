@@ -180,6 +180,11 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     return null;
   }
 
+  public void getColumnsInExpression(List<ColumnImpl> columns) {
+    super.getColumnsInExpression(columns);
+    leftExpression.getColumnsInExpression(columns);
+    rightExpression.getColumnsInExpression(columns);
+  }
 
   public NextReturn next(SelectStatementImpl.Explain explain) {
     return next(ReadManager.SELECT_PAGE_SIZE, explain);

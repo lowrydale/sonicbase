@@ -459,7 +459,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
           Set<String> columnsHandled = new HashSet<>();
           Map<String, Function> aliases = getFunctionAliases();
           for (Function function : aliases.values()) {
-            if (function.getName().equalsIgnoreCase("pageSize") || function.getName().equalsIgnoreCase("min") || function.getName().equalsIgnoreCase("max") ||
+            if (function.getName().equalsIgnoreCase("count") || function.getName().equalsIgnoreCase("min") || function.getName().equalsIgnoreCase("max") ||
                 function.getName().equalsIgnoreCase("avg") || function.getName().equalsIgnoreCase("sum")) {
 
               if (groupContext == null) {
@@ -1128,6 +1128,10 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     tableNames[0] = fromTable;
     for (int i = 0; i < tableNames.length - 1; i++) {
       tableNames[i + 1] = joins.get(i).rightFrom;
+    }
+
+    for (Join join : joins) {
+      ((ExpressionImpl)join.expression).getColumnsInExpression(columns);
     }
 
     final ExpressionImpl.NextReturn ret = new ExpressionImpl.NextReturn();

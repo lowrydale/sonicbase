@@ -9,6 +9,7 @@ import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.List;
 import java.util.Set;
 
 public class ColumnImpl extends ExpressionImpl {
@@ -34,6 +35,23 @@ public class ColumnImpl extends ExpressionImpl {
       return tableName + "." + columnName;
     }
     return columnName;
+  }
+
+  public void getColumnsInExpression(List<ColumnImpl> columns) {
+    super.getColumnsInExpression(columns);
+    boolean found = false;
+    for (ColumnImpl currColumn : columns) {
+      if (((currColumn.getTableName() == null || getTableName() == null) || (currColumn.getTableName() == null || currColumn.getTableName().equals(getTableName()))) &&
+          currColumn.getColumnName().equals(getColumnName())) {
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      columns.add(this);
+    }
+
   }
 
   public String getColumnName() {

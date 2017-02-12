@@ -220,6 +220,9 @@ public abstract class ExpressionImpl implements Expression {
     return forceSelectOnServer;
   }
 
+  public void getColumnsInExpression(List<ColumnImpl> columns) {
+  }
+
   public static enum Type {
     column(0),
     constant(1),

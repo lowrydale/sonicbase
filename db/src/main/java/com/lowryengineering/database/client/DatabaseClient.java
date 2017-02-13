@@ -378,6 +378,10 @@ public class DatabaseClient {
 
     private DatabaseSocketClient socketClient = new DatabaseSocketClient();
 
+    public DatabaseSocketClient getSocketClient() {
+      return socketClient;
+    }
+
     public byte[] do_send(String batchKey, String command, byte[] body) {
       return socketClient.do_send(batchKey, command, body, hostPort);
     }
@@ -410,6 +414,14 @@ public class DatabaseClient {
 
     DatabaseServer.Shard[] shards = serversConfig.getShards();
 
+    List<Thread> threads = new ArrayList<>();
+    if (servers != null) {
+      for (Server[] server : servers) {
+        for (Server innerServer : server) {
+          threads.addAll(innerServer.getSocketClient().getBatchThreads());
+        }
+      }
+    }
     servers = new Server[shards.length][];
     for (int i = 0; i < servers.length; i++) {
       DatabaseServer.Shard shard = shards[i];
@@ -418,6 +430,9 @@ public class DatabaseClient {
         DatabaseServer.Host replicaHost = shard.getReplicas()[j];
         servers[i][j] = new Server(isPrivate ? replicaHost.getPrivateAddress() : replicaHost.getPublicAddress(), replicaHost.getPort());
       }
+    }
+    for (Thread thread : threads) {
+      thread.interrupt();
     }
   }
 

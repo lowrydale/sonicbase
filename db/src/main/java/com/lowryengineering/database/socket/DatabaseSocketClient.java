@@ -12,7 +12,10 @@ import net.jpountz.lz4.LZ4FastDecompressor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
@@ -42,6 +45,7 @@ public class DatabaseSocketClient {
   private static ConcurrentHashMap<String, ArrayBlockingQueue<Connection>> pools = new ConcurrentHashMap<>();
 
   private static AtomicInteger connectionCount = new AtomicInteger();
+  private List<Thread> batchThreads = new ArrayList<>();
 
   private static Connection borrow_connection(String host, int port) {
     for (int i = 0; i < 1; i++) {
@@ -100,6 +104,10 @@ public class DatabaseSocketClient {
   }
 
   private static EventLoopGroup clientGroup = new NioEventLoopGroup(); // NIO event loops are also OK
+
+  public List<Thread> getBatchThreads() {
+    return batchThreads;
+  }
 
   public static class NioClient {
     private ClientNioHandler clientHandler;
@@ -388,6 +396,9 @@ public class DatabaseSocketClient {
 //          sendBatch(host, port, requests);
 
         }
+        catch (InterruptedException e) {
+          break;
+        }
         catch (Exception t) {
           for (Request request : requests) {
             request.exception = t;
@@ -661,9 +672,11 @@ public class DatabaseSocketClient {
   private static void initBatchSender(String host, int port, DatabaseSocketClient socketClient) {
     socketClient.requestQueues.put(host + ":" + port, new ConcurrentLinkedQueue<Request>());
 
+
     for (int i = 0; i < BATCH_THREAD_COUNT; i++) {
       Thread thread = new Thread(new BatchSender(host, port, socketClient.requestQueues.get(host + ":" + port)), "BatchSender: host=" + host + ", port=" + port + ", offset=" + i);
       thread.start();
+      socketClient.batchThreads.add(thread);
     }
   }
 

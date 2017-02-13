@@ -156,6 +156,14 @@ public class TestJoins {
   }
 
   @Test
+  public void testMemberships() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from memberships");
+    ResultSet ret = stmt.executeQuery();
+    assertTrue(ret.next());
+    System.out.println(ret.getLong("personId"));
+  }
+
+  @Test
   public void testThreeWayJoin() throws SQLException {
     //fails
     PreparedStatement stmt = conn.prepareStatement("select id, socialsecuritynumber, memberships.personId, memberships.membershipname, resorts.resortname " +

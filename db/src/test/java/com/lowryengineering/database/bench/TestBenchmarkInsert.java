@@ -16,7 +16,10 @@ import java.io.FileInputStream;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+
+import static org.testng.Assert.assertEquals;
 
 public class TestBenchmarkInsert {
 
@@ -112,7 +115,6 @@ public class TestBenchmarkInsert {
 
 
     //test insert
-    final AtomicLong totalDuration = new AtomicLong();
     final AtomicLong countFinished = new AtomicLong();
 
 //    PreparedStatement stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");
@@ -167,8 +169,11 @@ public class TestBenchmarkInsert {
 //    });
 //    thread.start();
 
+    final int batchSize = 1000;
+    final AtomicInteger countInserted = new AtomicInteger();
     final AtomicLong insertErrorCount = new AtomicLong();
     final long begin = System.currentTimeMillis();
+    final AtomicLong totalDuration = new AtomicLong();
     if (true) {
       final AtomicLong currOffset = new AtomicLong(startId);
       for (int i = 0; i < 256; i++) {
@@ -178,7 +183,11 @@ public class TestBenchmarkInsert {
           @Override
           public void run() {
             while (true) {
-              long offset = currOffset.incrementAndGet();
+
+              long offset = 0;
+              synchronized (currOffset) {
+                offset = currOffset.getAndAdd(batchSize);
+              }
               try {
                 //              PreparedStatement stmt = conn.prepareStatement("insert into Resorts (id, resortName) VALUES (?, ?)");
                 //              stmt.setLong(1, currOffset);
@@ -215,32 +224,44 @@ public class TestBenchmarkInsert {
                 try {
                  // System.out.println("Inserting: id=" + offset);
 
-                  // create table Persons (id1 BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id1))
-                  // create table Memberships (id1 BIGINT, id2 BIGINT, PRIMARY KEY (id1, id2))
-                  PreparedStatement stmt = conn.prepareStatement("insert into persons (id1, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
-                  stmt.setLong(1, offset);
-                  stmt.setLong(2, (offset + 100) % 2);
-                  stmt.setString(3, "933-28-" + currOffset);
-                  stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
-                  stmt.setBoolean(5, false);
-                  stmt.setString(6, "m");
-                  Timer.Context ctx = INSERT_STATS.time();
-                  if (stmt.executeUpdate() != 1) {
-                    throw new DatabaseException("Failed to insert");
-                  }
-                  ctx.stop();
+                  for (int i = 0; i < batchSize; i++) {
+                    // create table Persons (id1 BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id1))
+                    // create table Memberships (personId BIGINT, personId2 BIGINT, membershipName VARCHAR(20), resortId BIGINT, PRIMARY KEY (personId, personId2))
+                    // create table Resorts (resortId BIGINT, resortName VARCHAR(20), PRIMARY KEY (resortId))
+                    PreparedStatement stmt = conn.prepareStatement("insert into persons (id1, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
+                    stmt.setLong(1, offset + i);
+                    stmt.setLong(2, (offset + i + 100) % 2);
+                    stmt.setString(3, "933-28-" + (offset + i + 1));
+                    stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+                    stmt.setBoolean(5, false);
+                    stmt.setString(6, "m");
+                    //Timer.Context ctx = INSERT_STATS.time();
+                    long currBegin = System.nanoTime();
+                    if (stmt.executeUpdate() != 1) {
+                      throw new DatabaseException("Failed to insert");
+                    }
+                    totalDuration.addAndGet(System.nanoTime() - currBegin);
+                    countInserted.incrementAndGet();
+                    logProgress(offset, threadOffset, countInserted, lastLogged, begin, totalDuration, insertErrorCount);
 
-                  if(false) {
+                    //ctx.stop();
+                  }
+
+                  for (int i = 0; i < batchSize; i++) {
                     for (int j = 0; j < 2; j++) {
+                      long id1 = offset + i;
+                      long id2 = j;
                       try {
-                        stmt = conn.prepareStatement("insert into Memberships (id1, id2) VALUES (?, ?)");
-                        stmt.setLong(1, offset);
-                        stmt.setLong(2, j);
-                        ctx = INSERT_STATS.time();
-                        if (stmt.executeUpdate() != 1) {
-                          throw new DatabaseException("Failed to insert members");
-                        }
-                        ctx.stop();
+                        PreparedStatement stmt = conn.prepareStatement("insert into Memberships (personId, personId2, membershipName, resortId) VALUES (?, ?, ?, ?)");
+                        stmt.setLong(1, id1);
+                        stmt.setLong(2, id2);
+                        stmt.setString(3, "membership-" + j);
+                        stmt.setLong(4, new long[]{1000, 2000}[j % 2]);
+                        long currBegin = System.nanoTime();
+                        assertEquals(stmt.executeUpdate(), 1);
+                        totalDuration.addAndGet(System.nanoTime() - currBegin);
+                        countInserted.incrementAndGet();
+                        //ctx.stop();
                       }
                       catch (Exception e) {
                         if (e.getMessage().contains("Unique constraint violated")) {
@@ -251,6 +272,19 @@ public class TestBenchmarkInsert {
                         }
                       }
                     }
+                    logProgress(offset, threadOffset, countInserted, lastLogged, begin, totalDuration, insertErrorCount);
+                  }
+
+                  if (offset == 0) {
+                    PreparedStatement stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");
+                    stmt.setLong(1, 1000);
+                    stmt.setString(2, "resort-1000");
+                    assertEquals(stmt.executeUpdate(), 1);
+
+                    stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");
+                    stmt.setLong(1, 2000);
+                    stmt.setString(2, "resort-2000");
+                    assertEquals(stmt.executeUpdate(), 1);
                   }
                   //                  stmt = conn.prepareStatement("select persons.id, id2  " +
                   //                      "from persons where id = " + currOffset + " order by id asc");                                              //
@@ -281,25 +315,11 @@ public class TestBenchmarkInsert {
                 else {
                   System.out.println("Error inserting");
                   e.printStackTrace();
-                  throw new RuntimeException(e);
                 }
               }
               finally {
                 countFinished.incrementAndGet();
-                if (threadOffset == 0) {
-                  if (System.currentTimeMillis() - lastLogged.get() > 2000) {
-                    lastLogged.set(System.currentTimeMillis());
-                    StringBuilder builder = new StringBuilder();
-                    builder.append("count=").append(offset);
-                    Snapshot snapshot = INSERT_STATS.getSnapshot();
-                    builder.append(String.format(", rate=%.2f", INSERT_STATS.getFiveMinuteRate()));
-                    builder.append(String.format(", avg=%.2f", snapshot.getMean() / 1000000d));
-                    builder.append(String.format(", 99th=%.2f", snapshot.get99thPercentile() / 1000000d));
-                    builder.append(String.format(", max=%.2f", (double)snapshot.getMax() / 1000000d));
-                    builder.append(", errorCount=" + insertErrorCount.get());
-                    System.out.println(builder.toString());
-                  }
-                }
+                logProgress(offset, threadOffset, countInserted, lastLogged, begin, totalDuration, insertErrorCount);
               }
             }
           }
@@ -320,6 +340,23 @@ public class TestBenchmarkInsert {
 
     selectExecutor.shutdownNow();
     executor.shutdownNow();
+  }
+
+  private static void logProgress(long offset, int threadOffset, AtomicInteger countInserted, AtomicLong lastLogged, long begin, AtomicLong totalDuration, AtomicLong insertErrorCount) {
+    if (threadOffset == 0) {
+      if (System.currentTimeMillis() - lastLogged.get() > 2000) {
+        lastLogged.set(System.currentTimeMillis());
+        StringBuilder builder = new StringBuilder();
+        builder.append("count=").append(countInserted.get());
+        Snapshot snapshot = INSERT_STATS.getSnapshot();
+        builder.append(String.format(", rate=%.2f", countInserted.get() / (double)(System.currentTimeMillis() - begin) * 1000f)); //INSERT_STATS.getFiveMinuteRate()));
+        builder.append(String.format(", avg=%.2f", totalDuration.get() / (countInserted.get()) / 1000000d));//snapshot.getMean() / 1000000d));
+        builder.append(String.format(", 99th=%.2f", snapshot.get99thPercentile() / 1000000d));
+        builder.append(String.format(", max=%.2f", (double)snapshot.getMax() / 1000000d));
+        builder.append(", errorCount=" + insertErrorCount.get());
+        System.out.println(builder.toString());
+      }
+    }
   }
 
   private static ConcurrentHashMap<Long, Integer> addedRecords = new ConcurrentHashMap<>();

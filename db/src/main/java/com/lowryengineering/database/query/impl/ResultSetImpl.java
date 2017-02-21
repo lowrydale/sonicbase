@@ -1609,7 +1609,9 @@ public class ResultSetImpl implements ResultSet {
 
         lastReadRecords = readRecords;
         readRecords = null;
-        recordCache.getRecordsForTable().clear();
+        synchronized (recordCache.getRecordsForTable()) {
+          recordCache.getRecordsForTable().clear();
+        }
 
         int recordCount = (int) DataUtil.readVLong(in, resultLength);
         Object[][][] retKeys = new Object[recordCount][][];

@@ -850,7 +850,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
             keysToRead.add(new ExpressionImpl.IdEntry(i, id[0]));
           }
         }
-        ExpressionImpl.doReadRecords(dbName, getClient(), isForceSelectOnServer(), tableSchema, keysToRead, columns, this.getColumns(), getRecordCache(), getViewVersion());
+        ExpressionImpl.doReadRecords(dbName, getClient(), count, isForceSelectOnServer(), tableSchema, keysToRead, columns, this.getColumns(), getRecordCache(), getViewVersion());
       }
 
 //      for (Object[][] id : rightIds.getKeys()) {

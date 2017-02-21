@@ -33,6 +33,10 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
 
   }
 
+  public String toString() {
+    return "<all>";
+  }
+
   @Override
   public void serialize(DataOutputStream out) {
     try {

@@ -3,10 +3,10 @@ export SEARCH_HOME=$4
 #export MODE=yprof
 mkdir $4/logs
 
-if [ $2 == "9010" ]
-then
-  export MODE=yprof
-fi
+#if [ $2 == "9010" ]
+#then
+#  export MODE=debug
+#fi
 
 if [ ${4:0:1} != "/" ]
 then

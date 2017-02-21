@@ -173,7 +173,7 @@ public class TestPartsOfJoin {
       keysToRead.add(new ExpressionImpl.IdEntry(i, entry[0]));
     }
     tableSchema = client.getCommon().getTables("test").get("memberships");
-    Map<Integer, Object[][]> readKeys = ExpressionImpl.readRecords("test", client, false, tableSchema, keysToRead, new String[]{"personid"}, null, recordCache, 1000);
+    Map<Integer, Object[][]> readKeys = ExpressionImpl.readRecords("test", client, 30000, false, tableSchema, keysToRead, new String[]{"personid"}, null, recordCache, 1000);
 
     List<ExpressionImpl.IdEntry> keysToRead2 = new ArrayList<>();
     for (int i = 0; i < readKeys.size(); i++) {

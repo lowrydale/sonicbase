@@ -379,6 +379,9 @@ public class DatabaseSocketClient {
 //                requests.add(request);
 //              }
 //            }
+          if (requests.size() == 0) {
+            continue;
+          }
           sendBatch(host, port, requests);
 
           batchTotalEntryCount.addAndGet(requests.size());

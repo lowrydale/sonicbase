@@ -1,5 +1,6 @@
 package com.lowryengineering.database.bench;
 
+import com.lowryengineering.database.client.DatabaseClient;
 import com.lowryengineering.database.jdbcdriver.ConnectionProxy;
 import com.lowryengineering.database.util.JsonArray;
 import com.lowryengineering.database.util.JsonDict;
@@ -38,7 +39,7 @@ public class TestBenchmarkJoins {
     else {
       System.out.println("Loaded config default dir");
     }
-     String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(new FileInputStream(file)));
+    String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(new FileInputStream(file)));
 
     JsonDict dict = new JsonDict(configStr);
     JsonDict databaseDict = dict.getDict("database");
@@ -66,8 +67,10 @@ public class TestBenchmarkJoins {
 //    final java.sql.Connection conn = java.sql.DriverManager.getConnection("jdbc:mysql://localhost/test", "test", "test");
 //    final java.sql.Connection conn = java.sql.DriverManager.getConnection("jdbc:mysql://127.0.0.1:4306/test", "test", "test");
 
-    final java.sql.Connection conn = DriverManager.getConnection("jdbc:dbproxy:" + address + ":9010", "user", "password");
+    final java.sql.Connection conn = DriverManager.getConnection("jdbc:dbproxy:" + address + ":9010/db", "user", "password");
 
+    DatabaseClient client = ((ConnectionProxy) conn).getDatabaseClient();
+    client.setPageSize(30000);
 
     //test insert
     int recordCount = 100000;
@@ -76,7 +79,7 @@ public class TestBenchmarkJoins {
     final AtomicLong selectErrorCount = new AtomicLong();
     final AtomicLong selectBegin = new AtomicLong(System.currentTimeMillis());
     final AtomicLong selectOffset = new AtomicLong();
-
+    final AtomicLong maxDuration = new AtomicLong();
 
     while (true) {
       executor.submit(new Runnable(){
@@ -84,113 +87,123 @@ public class TestBenchmarkJoins {
         public void run() {
           try {
                   try {
-                    PreparedStatement stmt1 = conn.prepareStatement("select count(*) from persons");
+//                    PreparedStatement stmt1 = conn.prepareStatement("select count(*) from persons");
+//
+//                    ResultSet ret1 = stmt1.executeQuery();
+//                    ret1.next();
+          long count = 60000000;//ret1.getLong(1);
 
-                    ResultSet ret1 = stmt1.executeQuery();
-                    ret1.next();
-                    long count = ret1.getLong(1);
+          long countExpected = 0;
+          long beginSelect = System.nanoTime();
+          //memberships.membershipname, resorts.resortname
+          ResultSet ret = null;
+                    PreparedStatement stmt = null;
+          if (queryType.equals("3wayInner")) {
+            stmt = conn.prepareStatement("select persons.id1, socialsecuritynumber, memberships.personId2  " +
+                "from persons inner join Memberships on persons.id1 = Memberships.personId1 inner join resorts on memberships.resortid = resorts.id" +
+                " where persons.id<" + count);
 
-                    long countExpected = 0;
-                    long beginSelect = System.nanoTime();
-                    //memberships.membershipname, resorts.resortname
-                    ResultSet ret = null;
-                    if (queryType.equals("3wayInner")) {
-                      PreparedStatement stmt = conn.prepareStatement("select persons.id, socialsecuritynumber, memberships.id  " +
-                          "from persons inner join Memberships on persons.id = Memberships.id inner join resorts on memberships.resortid = resorts.id" +
-                          " where persons.id<" + count);
+            ret = stmt.executeQuery();
+            countExpected = count;
+          }
+          else if (queryType.equals("2wayInner")) {
+            stmt = conn.prepareStatement(
+                "select persons.id1, persons.id2, persons.socialsecuritynumber, memberships.personId, memberships.personid2, memberships.membershipname from persons " +
+                    " inner join Memberships on persons.id1 = Memberships.PersonId where persons.id1 < 65000000 order by persons.id1 desc");
+            ret = stmt.executeQuery();
+            countExpected = count;
+          }
+          else if (queryType.equals("2wayLeftOuter")) {
+            stmt = conn.prepareStatement(
+                "select persons.id1, persons.socialsecuritynumber, memberships.membershipname, memberships.personid from memberships " +
+                    "left outer join Memberships on persons.id1 = Memberships.PersonId where memberships.personid<" + count + " order by memberships.personid desc");
+            ret = stmt.executeQuery();
+            countExpected = count;
+          }
+          else if (queryType.equals("2wayInner2Field")) {
+            stmt = conn.prepareStatement(
+                "select persons.id1, persons.socialsecuritynumber, memberships.membershipname from persons " +
+                    " inner join Memberships on Memberships.PersonId = persons.id1 and memberships.personid < " + count + " where persons.id1 > 0 order by persons.id1 desc");
+            ret = stmt.executeQuery();
+            countExpected = count;
+          }
+          else if (queryType.equals("2wayRightOuter")) {
+            stmt = conn.prepareStatement(
+                "select persons.id1, persons.socialsecuritynumber, memberships.personId, memberships.membershipname from persons " +
+                    "right outer join Memberships on persons.id1 = Memberships.PersonId where persons.id1<" + count + " order by persons.id1 desc");
+            ret = stmt.executeQuery();
+            countExpected = count;
+          }
+          totalSelectDuration.addAndGet(System.nanoTime() - beginSelect);
 
-                      ret = stmt.executeQuery();
-                      countExpected = count;
-                    }
-                    else if (queryType.equals("2wayInner")) {
-                      PreparedStatement stmt = conn.prepareStatement(
-                           "select persons.id, persons.id2, persons.socialsecuritynumber, memberships.personId, memberships.personid2, memberships.membershipname from persons " +
-                               " inner join Memberships on persons.id = Memberships.PersonId and memberships.personid2 = persons.id2  where persons.id > 0 order by persons.id desc");
-                       ret = stmt.executeQuery();
-                      countExpected = count;
-                    }
-                    else if (queryType.equals("2wayLeftOuter")) {
-                      PreparedStatement stmt = conn.prepareStatement(
-                          "select persons.id, persons.socialsecuritynumber, memberships.membershipname, memberships.personid from memberships " +
-                              "left outer join Memberships on persons.id = Memberships.PersonId where memberships.personid<" + count + " order by memberships.personid desc");
-                      ret = stmt.executeQuery();
-                      countExpected = count;
-                    }
-                    else if (queryType.equals("2wayInner2Field")) {
-                      PreparedStatement stmt = conn.prepareStatement(
-                           "select persons.id, persons.socialsecuritynumber, memberships.membershipname from persons " +
-                               " inner join Memberships on Memberships.PersonId = persons.id and memberships.personid < " + count + " where persons.id > 0 order by persons.id desc");
-                       ret = stmt.executeQuery();
-                      countExpected = count;
-                    }
-                    else if (queryType.equals("2wayRightOuter")) {
-                      PreparedStatement stmt = conn.prepareStatement(
-                          "select persons.id, persons.socialsecuritynumber, memberships.personId, memberships.membershipname from persons " +
-                              "right outer join Memberships on persons.id = Memberships.PersonId where persons.id<" + count + " order by persons.id desc");
-                      ret = stmt.executeQuery();
-                      countExpected = count;
-                    }
-                    totalSelectDuration.addAndGet(System.nanoTime() - beginSelect);
+          for (int i = 0; i < countExpected; i++) {
+            //beginSelect = System.nanoTime();
+            if (!ret.next()) {
+              ret.close();
+              stmt.close();
+              throw new Exception("Not found: at=" + i);
+            }
 
-                    for (int i = 0; i < countExpected; i++) {
-                      beginSelect = System.nanoTime();
-                      if (!ret.next()) {
-                        throw new Exception("Not found: at=" + i);
-                      }
-
-                      totalSelectDuration.addAndGet(System.nanoTime() - beginSelect);
-                      if (selectOffset.incrementAndGet() % 100000 == 0) {
-                        StringBuilder builder = new StringBuilder();
-                        builder.append("select: count=").append(selectOffset.get()).append(", rate=");
-                        builder.append(selectOffset.get() / (float) (System.currentTimeMillis() - selectBegin.get()) * 1000f).append("/sec");
-                        builder.append(", avgDuration=" + (float) (totalSelectDuration.get() / (float) selectOffset.get() / 1000000f) + " millis, ");
-                        builder.append("errorCount=" + selectErrorCount.get());
-                        if (selectOffset.get() > 4000000) {
-                          selectOffset.set(0);
-                          selectBegin.set(System.currentTimeMillis());
-                          totalSelectDuration.set(0);
-                        }
-                                    builder.append("0=" + ((ConnectionProxy)conn).getDatabaseClient().getPartitionSize("test", 0, 0, "persons", "_1__primarykey")).append(",");
-                                     builder.append("1=" + ((ConnectionProxy)conn).getDatabaseClient().getPartitionSize("test", 0, 1, "persons", "_1__primarykey")).append(",");
-                                     builder.append("0=" + ((ConnectionProxy)conn).getDatabaseClient().getPartitionSize("test", 1, 0, "persons", "_1__primarykey")).append(",");
-                                     builder.append("1=" + ((ConnectionProxy)conn).getDatabaseClient().getPartitionSize("test", 1, 1, "persons", "_1__primarykey")).append(",");
-
-                        logger.info(builder.toString());
-                      }
-                    }
-                  }
-                  catch (Exception e) {
-                    logger.error("error", e);
-                  }
-
+//            long duration = System.nanoTime() - beginSelect;
+//            synchronized (maxDuration) {
+//              maxDuration.set(Math.max(maxDuration.get(), duration));
+//            }
+//            totalSelectDuration.addAndGet(duration);
+            if (selectOffset.incrementAndGet() % 100000 == 0) {
+              StringBuilder builder = new StringBuilder();
+              builder.append("select: count=").append(selectOffset.get()).append(", rate=");
+              builder.append(selectOffset.get() / (float) (System.currentTimeMillis() - selectBegin.get()) * 1000f).append("/sec");
+              builder.append(", avgDuration=" + (float) (totalSelectDuration.get() / (float) selectOffset.get() / 1000000f) + " millis, ");
+              builder.append(", maxDuration=" + maxDuration.get() / 1000000f + " millis, ");
+              builder.append("errorCount=" + selectErrorCount.get());
+              if (selectOffset.get() > 40000000) {
+                selectOffset.set(0);
+                selectBegin.set(System.currentTimeMillis());
+                totalSelectDuration.set(0);
+                maxDuration.set(0);
               }
+//                                    builder.append("0=" + ((ConnectionProxy)conn).getDatabaseClient().getPartitionSize("test", 0, 0, "persons", "_1__primarykey")).append(",");
+//                                     builder.append("1=" + ((ConnectionProxy)conn).getDatabaseClient().getPartitionSize("test", 0, 1, "persons", "_1__primarykey")).append(",");
+//                                     builder.append("0=" + ((ConnectionProxy)conn).getDatabaseClient().getPartitionSize("test", 1, 0, "persons", "_1__primarykey")).append(",");
+//                                     builder.append("1=" + ((ConnectionProxy)conn).getDatabaseClient().getPartitionSize("test", 1, 1, "persons", "_1__primarykey")).append(",");
 
-              catch (
-                  Exception e
-                  )
+              System.out.println(builder.toString());
+            }
+          }
+        }
+        catch (Exception e) {
+          e.printStackTrace();
+        }
 
-              {
-                selectErrorCount.incrementAndGet();
-                logger.error("Error searching: ", e);
-                //               e.printStackTrace();
-              }
+      }
 
-              finally
+      catch (
+          Exception e
+          )
 
-              {
-                if (selectOffset.incrementAndGet() % 10000 == 0) {
-                  StringBuilder builder = new StringBuilder();
-                  builder.append("select: count=").append(selectOffset.get()).append(", rate=");
-                  builder.append(selectOffset.get() / (float) (System.currentTimeMillis() - selectBegin.get()) * 1000f).append("/sec");
-                  builder.append(", avgDuration=" + (totalSelectDuration.get() / selectOffset.get() / 1000000) + " millis, ");
-                  builder.append("errorCount=" + selectErrorCount.get());
-                  logger.info(builder.toString());
-                }
-              }
+      {
+        selectErrorCount.incrementAndGet();
+        e.printStackTrace();
+        //               e.printStackTrace();
+      }
+
+      finally
+
+      {
+        if (selectOffset.incrementAndGet() % 10000 == 0) {
+          StringBuilder builder = new StringBuilder();
+          builder.append("select: count=").append(selectOffset.get()).append(", rate=");
+          builder.append(selectOffset.get() / (float) (System.currentTimeMillis() - selectBegin.get()) * 1000f).append("/sec");
+          builder.append(", avgDuration=" + (totalSelectDuration.get() / selectOffset.get() / 1000000) + " millis, ");
+          builder.append("errorCount=" + selectErrorCount.get());
+          System.out.println(builder.toString());
+        }
+      }
 
         }
       });
     }
+
 
 
     //executor.shutdownNow();

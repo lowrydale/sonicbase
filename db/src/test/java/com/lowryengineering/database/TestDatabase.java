@@ -2121,6 +2121,7 @@ public class TestDatabase {
 
   @Test
    public void testExplain() throws SQLException {
+     //client.setPageSize(100);
      PreparedStatement stmt = conn.prepareStatement("explain select * from persons where id < 100");
      ResultSet ret = stmt.executeQuery();
 
@@ -2128,6 +2129,14 @@ public class TestDatabase {
        System.out.println(ret.getString(1));
      }
      System.out.println();
+
+    stmt = conn.prepareStatement(
+         "select persons.id, persons.socialsecuritynumber, memberships.personId, memberships.membershipname from persons " +
+             "right outer join Memberships on persons.id = Memberships.PersonId where persons.id<1000 order by persons.id desc");
+     ret = stmt.executeQuery();
+     while (ret.next()) {
+       System.out.println(ret.getString(1));
+     }
 
      stmt = conn.prepareStatement("explain select * from persons where id < 100 and id > 10");
      ret = stmt.executeQuery();

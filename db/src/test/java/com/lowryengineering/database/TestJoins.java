@@ -179,7 +179,8 @@ public class TestJoins {
       for (int j = 9; j >= 0; j--) {
         ret.next();
         assertEquals(ret.getLong("id"), i);
-        assertEquals(ret.getString("membershipname"), "membership-" + j);
+        String value = ret.getString("membershipname");
+        assertEquals(value, "membership-" + j);
         assertEquals(ret.getString("resortname"), j % 2 == 0 ? "resort-1000" : "resort-2000");
       }
     }

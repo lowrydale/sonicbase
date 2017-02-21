@@ -146,7 +146,9 @@ public class DiskBasedResultSet {
 //        }
         batch.add(row);
       }
-      resultSet.getRecordCache().getRecordsForTable().clear();
+      synchronized (resultSet.getRecordCache().getRecordsForTable()) {
+        resultSet.getRecordCache().getRecordsForTable().clear();
+      }
       if (batch.size() >= 500000) {
         ExpressionImpl.CachedRecord[][] batchRecords = new ExpressionImpl.CachedRecord[batch.size()][];
         for (int i = 0; i < batchRecords.length; i++) {

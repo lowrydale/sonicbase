@@ -9,29 +9,36 @@
 </head>
 
 <body>
-for (int offset = 0; ; offset++) {<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;PreparedStatement stmt = conn.prepareStatement("insert into persons (id1, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");<br/>
-                  &nbsp;&nbsp;&nbsp;&nbsp;stmt.setLong(1, offset);<br/>
-                  &nbsp;&nbsp;&nbsp;&nbsp;stmt.setLong(2, (offset + 100) % 2);<br/>
-                  &nbsp;&nbsp;&nbsp;&nbsp;stmt.setString(3, "933-28-" + offset);<br/>
-                  &nbsp;&nbsp;&nbsp;&nbsp;stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");<br/>
-                  &nbsp;&nbsp;&nbsp;&nbsp;stmt.setBoolean(5, false);<br/>
-                  &nbsp;&nbsp;&nbsp;&nbsp;stmt.setString(6, "m");<br/>
-	}
-	<br/><br/>
+	for (int i = 0; ; i++) {<br/>
+	&nbsp;&nbsp;&nbsp;&nbsp;PreparedStatement stmt = con.prepareStatement("select persons.id, socialsecuritynumber, memberships.personId2  " +
+	                          "from persons inner join Memberships on persons.id = Memberships.personId1 inner join resorts on memberships.resortid = resorts.id" +
+	                          " where persons.id<60000000")<br/>
+	&nbsp;&nbsp;&nbsp;&nbsp;ResultSet rs = stmt.executeQuery();<br/>
+	&nbsp;&nbsp;&nbsp;&nbsp;while (true) {
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (!ret.next()) {
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+    &nbsp;&nbsp;&nbsp;&nbsp;}
+	<br/>
+	}<br/><br/>
+
+		<div class="mylink">
+	<a href="benchmarks-schema.html">Schema and Insert Code</a><br/><br/>
+	</div>
+
 <table width="411" border="1" cellpadding=2 cellspacing="0">
   <tbody>
    <tr class="example-header">
       <td width="50">Metric</td>
       <td width="33">Value</td>
     </tr>
-    <tr>
+   <tr>
       <td>Record size</td>
       <td>120 bytes</td>
     </tr>
     <tr>
       <td>Record count</td>
-      <td></td>
+      <td>150 million</td>
     </tr>
     <tr>
       <td>Server total mem</td>
@@ -39,13 +46,12 @@ for (int offset = 0; ; offset++) {<br/>
     </tr>
     <tr>
       <td>Server xmx</td>
-      <td>22g</td>
+      <td>24g</td>
     </tr>
     <tr>
       <td>Resident mem</td>
-      <td>57g</td>
+      <td>44g</td>
     </tr>
-
     <tr>
       <td>Client location</td>
       <td>Collocated with server</td>
@@ -54,13 +60,14 @@ for (int offset = 0; ; offset++) {<br/>
     	<td>Cores per server machine</td>
     	<td>8</td>
     </tr>
+
     <tr>
       <td>Call rate</td>
-      <td>34k/sec</td>
+      <td>???</td>
     </tr>
-    <tr>
-    	<td>Call latency</td>
-    	<td>7.4 millis</td>
+   <tr>
+      <td>Call latency</td>
+      <td></td>
     </tr>
      <tr>
       <td>Threads per client</td>
@@ -68,7 +75,7 @@ for (int offset = 0; ; offset++) {<br/>
     </tr>
     <tr>
       <td>Server cpu</td>
-      <td>60%</td>
+      <td>50%</td>
     </tr>
     <tr>
     	<td>Shard Count</td>

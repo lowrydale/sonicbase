@@ -1,5 +1,6 @@
 package com.lowryengineering.database.query.impl;
 
+import com.codahale.metrics.Timer;
 import com.lowryengineering.database.client.DatabaseClient;
 import com.lowryengineering.database.common.Record;
 import com.lowryengineering.database.common.SchemaOutOfSyncException;
@@ -973,10 +974,14 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
           replica = ThreadLocalRandom.current().nextInt(0, replicaCount);
           expression.setReplica(replica);
         }
+        int count = ReadManager.SELECT_PAGE_SIZE;
+        if (this.pageSize != null) {
+          count = (int)(long)this.pageSize;
+        }
 
         expression.setRecordCache(recordCache);
         if (joins.size() > 0) {
-          return handleJoins(dbName, explain);
+          return handleJoins(count, dbName, explain);
         }
         ExpressionImpl.NextReturn ret = null;
         if (!isOnServer && serverSelect) {
@@ -985,10 +990,6 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
         else {
           expression.forceSelectOnServer(forceSelectOnServer);
           expression.setDbName(dbName);
-          int count = ReadManager.SELECT_PAGE_SIZE;
-          if (this.pageSize != null) {
-            count = (int)(long)this.pageSize;
-          }
           ret = expression.next(count, explain);
         }
         if (ret == null) {
@@ -1122,235 +1123,237 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     ids.setIds(retIds);
   }
 
-  private ExpressionImpl.NextReturn handleJoins(String dbName, Explain explain) throws Exception {
-    final AtomicReference<List<Object[][]>> multiTableIds = new AtomicReference<>();
-    String[] tableNames = new String[joins.size() + 1];
-    tableNames[0] = fromTable;
-    for (int i = 0; i < tableNames.length - 1; i++) {
-      tableNames[i + 1] = joins.get(i).rightFrom;
-    }
+  private ExpressionImpl.NextReturn handleJoins(int pageSize, String dbName, Explain explain) throws Exception {
+    Timer.Context ctx = DatabaseClient.JOIN_EVALUATE.time();
+    try {
+      final AtomicReference<List<Object[][]>> multiTableIds = new AtomicReference<>();
+      String[] tableNames = new String[joins.size() + 1];
+      tableNames[0] = fromTable;
+      for (int i = 0; i < tableNames.length - 1; i++) {
+        tableNames[i + 1] = joins.get(i).rightFrom;
+      }
 
-    for (Join join : joins) {
-      ((ExpressionImpl)join.expression).getColumnsInExpression(columns);
-    }
+      for (Join join : joins) {
+        ((ExpressionImpl) join.expression).getColumnsInExpression(columns);
+      }
 
-    final ExpressionImpl.NextReturn ret = new ExpressionImpl.NextReturn();
-    while (true) {
-      try {
-        for (int k = 0; k < joins.size(); k++) {
-          Join join = joins.get(k);
+      final ExpressionImpl.NextReturn ret = new ExpressionImpl.NextReturn();
+      while (true) {
+        try {
+          for (int k = 0; k < joins.size(); k++) {
+            Join join = joins.get(k);
 
-          String joinRightFrom = join.rightFrom;
-          Expression joinExpression = join.expression;
-          final JoinType joinType = join.type;
+            String joinRightFrom = join.rightFrom;
+            Expression joinExpression = join.expression;
+            final JoinType joinType = join.type;
 
-          if (!(joinExpression instanceof BinaryExpressionImpl)) {
-            throw new DatabaseException("Join expression type not supported");
-          }
-          BinaryExpressionImpl joinBinaryExpression = (BinaryExpressionImpl) joinExpression;
-          ExpressionImpl leftExpression = joinBinaryExpression.getLeftExpression();
-          ExpressionImpl rightExpression = joinBinaryExpression.getRightExpression();
-          ExpressionImpl additionalJoinExpression = null;
-          if (leftExpression instanceof BinaryExpressionImpl && rightExpression instanceof BinaryExpressionImpl) {
-            if (joinBinaryExpression.getOperator() != BinaryExpression.Operator.and) {
-              throw new DatabaseException("Only 'and' operators are supported in join expression");
+            if (!(joinExpression instanceof BinaryExpressionImpl)) {
+              throw new DatabaseException("Join expression type not supported");
             }
-            List<ExpressionImpl> otherJoinExpressions = new ArrayList<>();
-            AtomicReference<BinaryExpressionImpl> actualJoinExpression = new AtomicReference<>();
-            getActualJoinExpression(joinBinaryExpression, actualJoinExpression, otherJoinExpressions);
-            leftExpression = actualJoinExpression.get().getLeftExpression();
-            rightExpression = actualJoinExpression.get().getRightExpression();
+            BinaryExpressionImpl joinBinaryExpression = (BinaryExpressionImpl) joinExpression;
+            ExpressionImpl leftExpression = joinBinaryExpression.getLeftExpression();
+            ExpressionImpl rightExpression = joinBinaryExpression.getRightExpression();
+            ExpressionImpl additionalJoinExpression = null;
+            if (leftExpression instanceof BinaryExpressionImpl && rightExpression instanceof BinaryExpressionImpl) {
+              if (joinBinaryExpression.getOperator() != BinaryExpression.Operator.and) {
+                throw new DatabaseException("Only 'and' operators are supported in join expression");
+              }
+              List<ExpressionImpl> otherJoinExpressions = new ArrayList<>();
+              AtomicReference<BinaryExpressionImpl> actualJoinExpression = new AtomicReference<>();
+              getActualJoinExpression(joinBinaryExpression, actualJoinExpression, otherJoinExpressions);
+              leftExpression = actualJoinExpression.get().getLeftExpression();
+              rightExpression = actualJoinExpression.get().getRightExpression();
 
-            if (otherJoinExpressions.size() == 0) {
-              additionalJoinExpression = null;
-            }
-            else if (otherJoinExpressions.size() == 1) {
-              additionalJoinExpression = otherJoinExpressions.get(0);
-            }
-            else {
-              BinaryExpressionImpl andExpression = new BinaryExpressionImpl();
-              BinaryExpressionImpl firstAndExpression = andExpression;
-              andExpression.setOperator(BinaryExpression.Operator.and);
-              for (int i = 0; i < otherJoinExpressions.size(); i++) {
-                ExpressionImpl expression = otherJoinExpressions.get(i);
-                if (andExpression.getLeftExpression() == null) {
-                  andExpression.setLeftExpression(expression);
-                }
-                else {
-                  if (i < otherJoinExpressions.size() - 2) {
-                    BinaryExpressionImpl newAndExpression = new BinaryExpressionImpl();
-                    newAndExpression.setOperator(BinaryExpression.Operator.and);
-                    newAndExpression.setLeftExpression(expression);
-                    andExpression.setRightExpression(newAndExpression);
-                    andExpression = newAndExpression;
-                  }
-                  else {
-                    andExpression.setRightExpression(expression);
-                  }
-                }
+              if (otherJoinExpressions.size() == 0) {
+                additionalJoinExpression = null;
               }
-              additionalJoinExpression = firstAndExpression;
-            }
-          }
-          if (leftExpression instanceof ColumnImpl && rightExpression instanceof ColumnImpl) {
-            final AtomicReference<ColumnImpl> leftColumn = new AtomicReference<>((ColumnImpl) leftExpression);
-            final AtomicReference<ColumnImpl> rightColumn = new AtomicReference<>((ColumnImpl) rightExpression);
-
-            if (!leftColumn.get().getTableName().equals(tableNames[k])) {
-              ColumnImpl tmp = leftColumn.get();
-              leftColumn.set(rightColumn.get());
-              rightColumn.set(tmp);
-            }
-            int threadCount = 1;
-            if (multiTableIds.get() != null) {
-              threadCount = 1;
-            }
-            final AtomicReference<JoinReturn> joinRet = new AtomicReference<>();
-            for (int x = 0; x < threadCount; x++) {
-              final AtomicReference<String> leftFrom = new AtomicReference<>(k == 0 ? fromTable : tableNames[k]);
-              final AtomicReference<String> rightFrom = new AtomicReference<>(tableNames[k + 1]);
-              ExpressionImpl.NextReturn ids = null;
-              if (joinType == JoinType.inner) {
-                if (multiTableIds.get() == null) {
-                  if (explain != null) {
-                    explain.appendSpaces();
-                    explain.getBuilder().append("inner join based on expression: table=" + fromTable + ", expression=" + expression.toString() + "\n");
-                  }
-                  long begin = System.nanoTime();
-                  ids = expression.next(ReadManager.SELECT_PAGE_SIZE / threadCount, explain);
-                  expressionCount.incrementAndGet();
-                  expressionDuration.set(System.nanoTime() - begin);
-                }
-              }
-              else if (joinType == JoinType.leftOuter || joinType == JoinType.full) {
-                if (multiTableIds.get() == null) {
-                  if (explain != null) {
-                    explain.appendSpaces();
-                    if (joinType == JoinType.leftOuter) {
-                      explain.getBuilder().append("left outer join. Retrieving all records from table: table=" + fromTable + "\n");
-                    }
-                    else {
-                      explain.getBuilder().append("Full outer join. Retrieving all records from table: table=" + fromTable + "\n");
-                    }
-                  }
-                  AllRecordsExpressionImpl allExpression = new AllRecordsExpressionImpl();
-                  allExpression.setNextShard(expression.getNextShard());
-                  allExpression.setNextKey(expression.getNextKey());
-                  allExpression.setReplica(expression.getReplica());
-                  allExpression.setViewVersion(expression.getViewVersion());
-                  allExpression.setFromTable(fromTable);
-                  allExpression.setClient(client);
-                  allExpression.setRecordCache(recordCache);
-                  allExpression.setDbName(dbName);
-                  ids = allExpression.next(ReadManager.SELECT_PAGE_SIZE / threadCount, explain);
-                  expression.setNextShard(allExpression.getNextShard());
-                  expression.setNextKey(allExpression.getNextKey());
-                }
-              }
-              else if (joinType == JoinType.rightOuter) {
-                if (multiTableIds.get() == null) {
-                  if (explain != null) {
-                    explain.appendSpaces();
-                    explain.getBuilder().append("Right outer join. Retrieving all records from table: table=" + fromTable + "\n");
-                  }
-                  AllRecordsExpressionImpl allExpression = new AllRecordsExpressionImpl();
-                  allExpression.setNextShard(expression.getNextShard());
-                  allExpression.setNextKey(expression.getNextKey());
-                  allExpression.setReplica(expression.getReplica());
-                  allExpression.setViewVersion(expression.getViewVersion());
-                  allExpression.setFromTable(joinRightFrom);
-                  allExpression.setClient(client);
-                  allExpression.setRecordCache(recordCache);
-                  allExpression.setDbName(dbName);
-                  ids = allExpression.next(ReadManager.SELECT_PAGE_SIZE / threadCount, explain);
-                  expression.setNextShard(allExpression.getNextShard());
-                  expression.setNextKey(allExpression.getNextKey());
-                }
-                leftFrom.set(joinRightFrom);
-                rightFrom.set(fromTable);
-                ColumnImpl column = leftColumn.get();
-                leftColumn.set(rightColumn.get());
-                rightColumn.set(column);
-              }
-              final List<String> joinColumns = new ArrayList<>();
-              joinColumns.add(leftColumn.get().getColumnName());
-
-              final TableSchema leftTable = client.getCommon().getTables(dbName).get(leftFrom.get());
-              final TableSchema rightTable = client.getCommon().getTables(dbName).get(rightFrom.get());
-
-              final AtomicInteger rightTableIndex = new AtomicInteger();
-              for (int j = 0; j < tableNames.length; j++) {
-                if (tableNames[j].equals(rightTable.getName())) {
-                  rightTableIndex.set(j);
-                  break;
-                }
-              }
-              final AtomicInteger leftTableIndex = new AtomicInteger();
-              for (int j = 0; j < tableNames.length; j++) {
-                if (tableNames[j].equals(leftTable.getName())) {
-                  leftTableIndex.set(j);
-                  break;
-                }
-              }
-              final AtomicReference<List<Object[][]>> idsToProcess = new AtomicReference<>();
-              idsToProcess.set(new ArrayList<Object[][]>());
-              if (ids != null && ids.getKeys() != null) {
-                for (Object[][] id : ids.getKeys()) {
-                  Object[][] newId = new Object[tableNames.length][];
-                  newId[leftTableIndex.get()] = id[0];
-                  idsToProcess.get().add(newId);
-                }
+              else if (otherJoinExpressions.size() == 1) {
+                additionalJoinExpression = otherJoinExpressions.get(0);
               }
               else {
-                idsToProcess.set(multiTableIds.get());
-              }
-               joinRet.set(evaluateJoin(dbName, idsToProcess, joinType,
-                  leftColumn, rightColumn, leftTable, rightTable, rightTableIndex, leftTableIndex, explain));
-
-//              if (joinType == JoinType.rightOuter || joinType == JoinType.leftOuter) {
-//              if (joinType != JoinType.inner) {
-//                if (joinRet.get() != null) {
-//                  for (Object[][] key : joinRet.get().keys) {
-//                    if (key.length > rightTableIndex.get()) {
-//                      if (key[rightTableIndex.get()] == null) {
-//                        continue;
-//                      }
-//                      Record record = recordCache.get(rightTable.getName(), key[rightTableIndex.get()]);
-//                      if (record == null) {
-//                        continue;
-//                      }
-//                      boolean passes = (boolean) expression.evaluateSingleRecord(rightTable, record, getParms());
-//                      if (!passes) {
-//                        key[rightTableIndex.get()] = null;
-//                      }
-//                    }
-//                  }
-//                }
-//              }
-              if (joinType != JoinType.full) {
-                if (joinRet.get() != null) {
-                  TableSchema[] tables = new TableSchema[tableNames.length];
-                  for (int i = 0; i < tables.length; i++) {
-                    tables[i] = client.getCommon().getTables(dbName).get(tableNames[i]);
+                BinaryExpressionImpl andExpression = new BinaryExpressionImpl();
+                BinaryExpressionImpl firstAndExpression = andExpression;
+                andExpression.setOperator(BinaryExpression.Operator.and);
+                for (int i = 0; i < otherJoinExpressions.size(); i++) {
+                  ExpressionImpl expression = otherJoinExpressions.get(i);
+                  if (andExpression.getLeftExpression() == null) {
+                    andExpression.setLeftExpression(expression);
                   }
-                  for (Object[][] key : joinRet.get().keys) {
-                    Record[] records = new Record[tableNames.length];
-                    for (int i = 0; i < records.length; i++) {
-                      if (key[i] != null) {
-                        records[i] = recordCache.get(tableNames[i], key[i]).getRecord();
+                  else {
+                    if (i < otherJoinExpressions.size() - 2) {
+                      BinaryExpressionImpl newAndExpression = new BinaryExpressionImpl();
+                      newAndExpression.setOperator(BinaryExpression.Operator.and);
+                      newAndExpression.setLeftExpression(expression);
+                      andExpression.setRightExpression(newAndExpression);
+                      andExpression = newAndExpression;
+                    }
+                    else {
+                      andExpression.setRightExpression(expression);
+                    }
+                  }
+                }
+                additionalJoinExpression = firstAndExpression;
+              }
+            }
+            if (leftExpression instanceof ColumnImpl && rightExpression instanceof ColumnImpl) {
+              final AtomicReference<ColumnImpl> leftColumn = new AtomicReference<>((ColumnImpl) leftExpression);
+              final AtomicReference<ColumnImpl> rightColumn = new AtomicReference<>((ColumnImpl) rightExpression);
+
+              if (!leftColumn.get().getTableName().equals(tableNames[k])) {
+                ColumnImpl tmp = leftColumn.get();
+                leftColumn.set(rightColumn.get());
+                rightColumn.set(tmp);
+              }
+              int threadCount = 1;
+              if (multiTableIds.get() != null) {
+                threadCount = 1;
+              }
+              final AtomicReference<JoinReturn> joinRet = new AtomicReference<>();
+              for (int x = 0; x < threadCount; x++) {
+                final AtomicReference<String> leftFrom = new AtomicReference<>(k == 0 ? fromTable : tableNames[k]);
+                final AtomicReference<String> rightFrom = new AtomicReference<>(tableNames[k + 1]);
+                ExpressionImpl.NextReturn ids = null;
+                if (joinType == JoinType.inner) {
+                  if (multiTableIds.get() == null) {
+                    if (explain != null) {
+                      explain.appendSpaces();
+                      explain.getBuilder().append("inner join based on expression: table=" + fromTable + ", expression=" + expression.toString() + "\n");
+                    }
+                    long begin = System.nanoTime();
+                    ids = expression.next(pageSize / threadCount, explain);
+                    expressionCount.incrementAndGet();
+                    expressionDuration.set(System.nanoTime() - begin);
+                  }
+                }
+                else if (joinType == JoinType.leftOuter || joinType == JoinType.full) {
+                  if (multiTableIds.get() == null) {
+                    if (explain != null) {
+                      explain.appendSpaces();
+                      if (joinType == JoinType.leftOuter) {
+                        explain.getBuilder().append("left outer join. Retrieving all records from table: table=" + fromTable + "\n");
+                      }
+                      else {
+                        explain.getBuilder().append("Full outer join. Retrieving all records from table: table=" + fromTable + "\n");
                       }
                     }
-                    boolean passes = (boolean) expression.evaluateSingleRecord(tables, records, getParms());
-                    if (!passes) {
-                      for (int i = 0; i < tables.length; i++) {
-                        if (leftTableIndex.get() != i) {
-                          key[i] = null;
+                    AllRecordsExpressionImpl allExpression = new AllRecordsExpressionImpl();
+                    allExpression.setNextShard(expression.getNextShard());
+                    allExpression.setNextKey(expression.getNextKey());
+                    allExpression.setReplica(expression.getReplica());
+                    allExpression.setViewVersion(expression.getViewVersion());
+                    allExpression.setFromTable(fromTable);
+                    allExpression.setClient(client);
+                    allExpression.setRecordCache(recordCache);
+                    allExpression.setDbName(dbName);
+                    ids = allExpression.next(pageSize / threadCount, explain);
+                    expression.setNextShard(allExpression.getNextShard());
+                    expression.setNextKey(allExpression.getNextKey());
+                  }
+                }
+                else if (joinType == JoinType.rightOuter) {
+                  if (multiTableIds.get() == null) {
+                    if (explain != null) {
+                      explain.appendSpaces();
+                      explain.getBuilder().append("Right outer join. Retrieving all records from table: table=" + fromTable + "\n");
+                    }
+                    AllRecordsExpressionImpl allExpression = new AllRecordsExpressionImpl();
+                    allExpression.setNextShard(expression.getNextShard());
+                    allExpression.setNextKey(expression.getNextKey());
+                    allExpression.setReplica(expression.getReplica());
+                    allExpression.setViewVersion(expression.getViewVersion());
+                    allExpression.setFromTable(joinRightFrom);
+                    allExpression.setClient(client);
+                    allExpression.setRecordCache(recordCache);
+                    allExpression.setDbName(dbName);
+                    ids = allExpression.next(pageSize / threadCount, explain);
+                    expression.setNextShard(allExpression.getNextShard());
+                    expression.setNextKey(allExpression.getNextKey());
+                  }
+                  leftFrom.set(joinRightFrom);
+                  rightFrom.set(fromTable);
+                  ColumnImpl column = leftColumn.get();
+                  leftColumn.set(rightColumn.get());
+                  rightColumn.set(column);
+                }
+                final List<String> joinColumns = new ArrayList<>();
+                joinColumns.add(leftColumn.get().getColumnName());
+
+                final TableSchema leftTable = client.getCommon().getTables(dbName).get(leftFrom.get());
+                final TableSchema rightTable = client.getCommon().getTables(dbName).get(rightFrom.get());
+
+                final AtomicInteger rightTableIndex = new AtomicInteger();
+                for (int j = 0; j < tableNames.length; j++) {
+                  if (tableNames[j].equals(rightTable.getName())) {
+                    rightTableIndex.set(j);
+                    break;
+                  }
+                }
+                final AtomicInteger leftTableIndex = new AtomicInteger();
+                for (int j = 0; j < tableNames.length; j++) {
+                  if (tableNames[j].equals(leftTable.getName())) {
+                    leftTableIndex.set(j);
+                    break;
+                  }
+                }
+                final AtomicReference<List<Object[][]>> idsToProcess = new AtomicReference<>();
+                idsToProcess.set(new ArrayList<Object[][]>());
+                if (ids != null && ids.getKeys() != null) {
+                  for (Object[][] id : ids.getKeys()) {
+                    Object[][] newId = new Object[tableNames.length][];
+                    newId[leftTableIndex.get()] = id[0];
+                    idsToProcess.get().add(newId);
+                  }
+                }
+                else {
+                  idsToProcess.set(multiTableIds.get());
+                }
+                joinRet.set(evaluateJoin(pageSize, dbName, idsToProcess, joinType,
+                    leftColumn, rightColumn, leftTable, rightTable, rightTableIndex, leftTableIndex, explain));
+
+                //              if (joinType == JoinType.rightOuter || joinType == JoinType.leftOuter) {
+                //              if (joinType != JoinType.inner) {
+                //                if (joinRet.get() != null) {
+                //                  for (Object[][] key : joinRet.get().keys) {
+                //                    if (key.length > rightTableIndex.get()) {
+                //                      if (key[rightTableIndex.get()] == null) {
+                //                        continue;
+                //                      }
+                //                      Record record = recordCache.get(rightTable.getName(), key[rightTableIndex.get()]);
+                //                      if (record == null) {
+                //                        continue;
+                //                      }
+                //                      boolean passes = (boolean) expression.evaluateSingleRecord(rightTable, record, getParms());
+                //                      if (!passes) {
+                //                        key[rightTableIndex.get()] = null;
+                //                      }
+                //                    }
+                //                  }
+                //                }
+                //              }
+                if (joinType != JoinType.full) {
+                  if (joinRet.get() != null) {
+                    TableSchema[] tables = new TableSchema[tableNames.length];
+                    for (int i = 0; i < tables.length; i++) {
+                      tables[i] = client.getCommon().getTables(dbName).get(tableNames[i]);
+                    }
+                    for (Object[][] key : joinRet.get().keys) {
+                      Record[] records = new Record[tableNames.length];
+                      for (int i = 0; i < records.length; i++) {
+                        if (key[i] != null) {
+                          records[i] = recordCache.get(tableNames[i], key[i]).getRecord();
+                        }
+                      }
+                      boolean passes = (boolean) expression.evaluateSingleRecord(tables, records, getParms());
+                      if (!passes) {
+                        for (int i = 0; i < tables.length; i++) {
+                          if (leftTableIndex.get() != i) {
+                            key[i] = null;
+                          }
                         }
                       }
                     }
                   }
                 }
-              }
                 if (additionalJoinExpression != null) {
                   if (explain != null) {
                     explain.appendSpaces();
@@ -1378,44 +1381,48 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                   }
                 }
 
-            }
-  //          }
-            if (joinRet.get() != null) {
-              multiTableIds.set(joinRet.get().keys);
+              }
+              //          }
+              if (joinRet.get() != null) {
+                multiTableIds.set(joinRet.get().keys);
+              }
             }
           }
+          break;
         }
-        break;
+        catch (Exception e) {
+          if (-1 != ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class)) {
+            expression.setViewVersion(client.getCommon().getSchemaVersion());
+            logger.error("SchemaOutOfSyncException");
+            Thread.sleep(200);
+          }
+          else {
+            throw e;
+          }
+        }
       }
-      catch (Exception e) {
-        if (-1 != ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class)) {
-          expression.setViewVersion(client.getCommon().getSchemaVersion());
-          logger.error("SchemaOutOfSyncException");
-          Thread.sleep(200);
-        }
-        else {
-          throw e;
-        }
+      if (multiTableIds == null || multiTableIds.get() == null) {
+        return null;
       }
-    }
-    if (multiTableIds == null || multiTableIds.get() == null) {
-      return null;
-    }
-    Object[][][] tableIds = new Object[multiTableIds.get().size()][][];
-    for (int i = 0; i < tableIds.length; i++) {
-      tableIds[i] = multiTableIds.get().get(i);
-    }
+      Object[][][] tableIds = new Object[multiTableIds.get().size()][][];
+      for (int i = 0; i < tableIds.length; i++) {
+        tableIds[i] = multiTableIds.get().get(i);
+      }
 
-    ret.setTableNames(tableNames);
-    for (int i = 0; i < tableNames.length; i++) {
-      for (Map.Entry<String, IndexSchema> entry : client.getCommon().getTables(dbName).get(tableNames[i]).getIndices().entrySet()) {
-        if (entry.getValue().isPrimaryKey()) {
-          ret.setFields(tableNames[i], entry.getValue().getFields());
+      ret.setTableNames(tableNames);
+      for (int i = 0; i < tableNames.length; i++) {
+        for (Map.Entry<String, IndexSchema> entry : client.getCommon().getTables(dbName).get(tableNames[i]).getIndices().entrySet()) {
+          if (entry.getValue().isPrimaryKey()) {
+            ret.setFields(tableNames[i], entry.getValue().getFields());
+          }
         }
       }
+      ret.setIds(tableIds);
+      return ret;
     }
-    ret.setIds(tableIds);
-    return ret;
+    finally {
+      ctx.stop();
+    }
     //return new ResultSetImpl(client, this, getParms(), new SelectContextImpl(tableIds, false, tableNames, this), null, null);
   }
 
@@ -1451,6 +1458,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
   }
 
   private JoinReturn evaluateJoin(
+      int pageSize,
       String dbName,
       AtomicReference<List<Object[][]>> multiTableIds,
       JoinType joinType,
@@ -1501,7 +1509,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
          explain.getBuilder().append("Evaluate join expression. Read join records: joinTable=" + rightTable.getName() + ", expression=" + expression.toString() + "\n");
        }
 
-      keys = ExpressionImpl.readRecords(dbName, client, forceSelectOnServer, tableSchema, keysToRead, new String[]{rightColumn.get().getColumnName()}, columns, recordCache, expression.getViewVersion());
+      keys = ExpressionImpl.readRecords(dbName, client, pageSize, forceSelectOnServer, tableSchema, keysToRead, new String[]{rightColumn.get().getColumnName()}, columns, recordCache, expression.getViewVersion());
 
 
       //todo: need to make sure this index is sharded with the primary key so we know they're on the same server
@@ -1516,7 +1524,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
             }
           }
 
-          keys = ExpressionImpl.readRecords(dbName, client, forceSelectOnServer, tableSchema, keysToRead2, tableSchema.getPrimaryKey(), columns, recordCache, expression.getViewVersion());
+          keys = ExpressionImpl.readRecords(dbName, client, pageSize, forceSelectOnServer, tableSchema, keysToRead2, tableSchema.getPrimaryKey(), columns, recordCache, expression.getViewVersion());
         }
       }
 

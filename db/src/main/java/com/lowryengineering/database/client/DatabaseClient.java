@@ -1,5 +1,6 @@
 package com.lowryengineering.database.client;
 
+import com.codahale.metrics.MetricRegistry;
 import com.lowryengineering.database.common.DatabaseCommon;
 import com.lowryengineering.database.common.Record;
 import com.lowryengineering.database.common.SchemaOutOfSyncException;
@@ -401,11 +402,32 @@ public class DatabaseClient {
 
     configureServers();
 
+    new java.util.Timer().scheduleAtFixedRate(new TimerTask() {
+      @Override
+      public void run() {
+        System.out.println("IndexLookup stats: count=" + INDEX_LOOKUP_STATS.getCount() + ", rate=" + INDEX_LOOKUP_STATS.getFiveMinuteRate() +
+            ", durationAvg=" + INDEX_LOOKUP_STATS.getSnapshot().getMean() / 1000000d +
+            ", duration99.9=" + INDEX_LOOKUP_STATS.getSnapshot().get999thPercentile() / 1000000d);
+        System.out.println("BatchIndexLookup stats: count=" + BATCH_INDEX_LOOKUP_STATS.getCount() + ", rate=" + BATCH_INDEX_LOOKUP_STATS.getFiveMinuteRate() +
+            ", durationAvg=" + BATCH_INDEX_LOOKUP_STATS.getSnapshot().getMean() / 1000000d +
+            ", duration99.9=" + BATCH_INDEX_LOOKUP_STATS.getSnapshot().get999thPercentile() / 1000000d);
+        System.out.println("BatchIndexLookup stats: count=" + JOIN_EVALUATE.getCount() + ", rate=" + JOIN_EVALUATE.getFiveMinuteRate() +
+            ", durationAvg=" + JOIN_EVALUATE.getSnapshot().getMean() / 1000000d +
+            ", duration99.9=" + JOIN_EVALUATE.getSnapshot().get999thPercentile() / 1000000d);
+      }
+    }, 20 * 1000, 20 * 1000);
+
     for (String verb : write_verbs_array) {
       write_verbs.add(verb);
     }
 
   }
+
+  private static final MetricRegistry METRICS = new MetricRegistry();
+
+  public static final com.codahale.metrics.Timer INDEX_LOOKUP_STATS = METRICS.timer("indexLookup");
+  public static final com.codahale.metrics.Timer BATCH_INDEX_LOOKUP_STATS = METRICS.timer("batchIndexLookup");
+  public static final com.codahale.metrics.Timer JOIN_EVALUATE = METRICS.timer("joinEvaluate");
 
   public void configureServers() {
     DatabaseServer.ServersConfig serversConfig = common.getServersConfig();

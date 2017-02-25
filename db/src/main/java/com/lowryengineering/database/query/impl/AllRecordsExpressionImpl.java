@@ -12,6 +12,7 @@ import com.lowryengineering.database.server.ReadManager;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
@@ -83,9 +84,19 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
         indexSchema = entry.getValue();
       }
     }
+    boolean ascending = true;
+    List<OrderByExpressionImpl> orderByExpressions = getOrderByExpressions();
+    if (orderByExpressions != null && orderByExpressions.size() != 0) {
+      OrderByExpressionImpl expression = orderByExpressions.get(0);
+      String columnName = expression.getColumnName();
+      //if (columnName.equals(tableSchema.getIndices().get(indexSchema.getName()).getFields()[0])) {
+        ascending = expression.isAscending();
+      //}
+    }
+    BinaryExpression.Operator op = ascending ? BinaryExpression.Operator.greater : BinaryExpression.Operator.less;
     AtomicReference<String> usedIndex = new AtomicReference<>();
     SelectContextImpl context = ExpressionImpl.lookupIds(dbName, getClient().getCommon(), getClient(), getReplica(), count, tableSchema, indexSchema, isForceSelectOnServer(),
-        BinaryExpression.Operator.greater, null, getOrderByExpressions(), getNextKey(), getParms(), this, null, getNextKey(), null,
+        op, null, getOrderByExpressions(), getNextKey(), getParms(), this, null, getNextKey(), null,
         getColumns(), indexSchema.getFields()[0], getNextShard(), getRecordCache(), usedIndex, false, getViewVersion(), getCounters(), getGroupByContext(), debug);
     setNextShard(context.getNextShard());
     setNextKey(context.getNextKey());

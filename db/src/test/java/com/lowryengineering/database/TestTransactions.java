@@ -246,7 +246,9 @@ public class TestTransactions {
            stmt.setLong(3, 100);
            try {
              int count = stmt.executeUpdate();
-             updated.set(true);
+             if (count == 1) {
+               updated.set(true);
+             }
            }
            catch (Exception e) {
              //expected
@@ -260,7 +262,7 @@ public class TestTransactions {
      });
      thread.start();
 
-     latch.await(1000, TimeUnit.MILLISECONDS);
+     latch.await(1000, TimeUnit.SECONDS);
      thread.interrupt();
      assertFalse(updated.get());
 

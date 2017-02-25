@@ -564,44 +564,14 @@ public abstract class ExpressionImpl implements Expression {
           if (key[i] == null) {
             continue;
           }
-          if (key[i] instanceof Long) {
-            hashCode += ((Long)key[i]).hashCode();
-          }
-          else if (key[i] instanceof Integer) {
-            hashCode += (Integer)key[i];
-          }
-          else if (key[i] instanceof Short) {
-            hashCode += (Short)key[i];
-          }
-          else if (key[i] instanceof Byte) {
-            hashCode += (Byte)key[i];
-          }
-          else if (key[i] instanceof Float) {
-            hashCode += ((Float)key[i]).hashCode();
-          }
-          else if (key[i] instanceof Double) {
-            hashCode += ((Double)key[i]).hashCode();
-          }
-          else if (key[i] instanceof Boolean) {
-            hashCode += ((Boolean)key[i]).hashCode();
-          }
-          else if (key[i] instanceof BigDecimal) {
-            hashCode += ((BigDecimal)key[i]).hashCode();
-          }
-          else if (key[i] instanceof java.sql.Date) {
-            hashCode += ((java.sql.Date)key[i]).hashCode();
-          }
-          else if (key[i] instanceof Time) {
-            hashCode += ((Time)key[i]).hashCode();
-          }
-          else if (key[i] instanceof Timestamp) {
-            hashCode += ((Timestamp)key[i]).hashCode();
-          }
-          else if (key[i] instanceof byte[]) {
+          if (key[i] instanceof byte[]) {
             hashCode += Arrays.hashCode((byte[])key[i]);
           }
           else if (key[i] instanceof Blob) {
             hashCode += Arrays.hashCode(((Blob) key[i]).getData());
+          }
+          else {
+            hashCode += key[i].hashCode();
           }
         }
       }
@@ -623,16 +593,18 @@ public abstract class ExpressionImpl implements Expression {
             }
             return false;
           }
-          if (key[i] instanceof byte[]) {
+          else if (key[i] instanceof byte[]) {
             if (Arrays.equals((byte[])key[i], (byte[])((Key)o).key[i])) {
               continue;
             }
             return false;
           }
-//          int value = comparators[i].compare(key[i], ((Key)o).key[i]);
-//          if (value != 0) {
-//            return false;
-//          }
+          else {
+            if (key[i].equals(((Key)o).key[i])) {
+              continue;
+            }
+            return false;
+          }
         }
         return true;
       }

@@ -196,9 +196,9 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
       ExpressionImpl leftExpression = getLeftExpression();
       if (leftExpression instanceof ColumnImpl) {
         columnName = ((ColumnImpl) leftExpression).getColumnName();
-        Object leftValue = null;
+        Object[] leftValue = null;
         if (getNextKey() != null) {
-          leftValue = getNextKey()[0];
+          leftValue = getNextKey();
         }
         else {
           Object currLeftValue = ExpressionImpl.getValueFromExpression(getParms(), rightExpression);
@@ -219,10 +219,10 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
         }
         Object[] leftKey = null;
         if (leftValue != null) {
-          List<Object> leftValues = new ArrayList<>();
+          List<Object[]> leftValues = new ArrayList<>();
           leftValues.add(leftValue);
 
-          leftKey = ExpressionImpl.buildKey(leftValues, preferredIndexColumns);
+          leftKey = leftValue;//ExpressionImpl.buildKey(leftValues, preferredIndexColumns);
         }
 
         if (explain != null) {

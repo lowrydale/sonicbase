@@ -990,7 +990,8 @@ public class Repartitioner extends Thread {
     if (orderByExpressions != null && orderByExpressions.size() != 0) {
       OrderByExpressionImpl expression = orderByExpressions.get(0);
       String columnName = expression.getColumnName();
-      if (columnName.equals(tableSchema.getIndices().get(indexName).getFields()[0])) {
+      if (expression.getTableName() == null || !expression.getTableName().equals(tableSchema.getName()) ||
+          columnName.equals(tableSchema.getIndices().get(indexName).getFields()[0])) {
         ascending = expression.isAscending();
       }
     }
@@ -1068,8 +1069,15 @@ public class Repartitioner extends Thread {
       boolean ascending, List<Integer> selectedPartitions) {
 
     if (key == null) {
-      for (int i = 0; i < partitions.length; i++) {
-        selectedPartitions.add(i);
+      if (ascending) {
+        for (int i = 0; i < partitions.length; i++) {
+          selectedPartitions.add(i);
+        }
+      }
+      else {
+        for (int i = partitions.length - 1; i >= 0; i--) {
+          selectedPartitions.add(i);
+        }
       }
       return;
     }

@@ -364,7 +364,7 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 1);
     assertEquals(ret.getLong("id2"), 2);
     ret.next();
-      assertEquals(ret.getLong("id"), 1);
+    assertEquals(ret.getLong("id"), 1);
     assertEquals(ret.getLong("id2"), 5);
     assertFalse(ret.next());
   }

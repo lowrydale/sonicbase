@@ -728,6 +728,9 @@ public class Index {
         }
         int offset = 0;
         ObjectBidirectionalIterator<Map.Entry<Object[], Long>> iterator = entries.iterator(entries.last());
+        //Map.Entry<Object[], Long> entry = entries.last();
+        //Object[] lastKey = entry.getKey();
+        //ret[offset++] = new MyEntry<>(lastKey, entry.getValue());
         while (iterator.hasPrevious()) {
           Map.Entry<Object[], Long> entry = iterator.previous();
           Object[] lastKey = entry.getKey();

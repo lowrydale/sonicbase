@@ -76,6 +76,7 @@ public class TestJoins {
 
     DatabaseClient client = ((ConnectionProxy)conn).getDatabaseClient();
 
+    client.setPageSize(3);
 
     PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
     stmt.executeUpdate();
@@ -222,21 +223,14 @@ public class TestJoins {
             "right outer join Memberships on persons.id = Memberships.PersonId where persons.id<2  order by persons.id desc");
     ResultSet ret = stmt.executeQuery();
 
-    for (int i = 1; i >= 0; i--) {
-      for (int j = 0; j < 10; j++) {
+    for (int i = 9; i >= 0; i--) {
+      for (int j = 9; j >= 0; j--) {
         ret.next();
-        assertEquals(ret.getLong("id"), i);
+        assertEquals(ret.getLong("personid"), i);
         assertEquals(ret.getString("membershipname"), "membership-" + j);
-      }
-    }
-
-    for (int i = 2; i < 10; i++) {
-      for (int j = 0; j < 10; j++) {
-        ret.next();
-        ret.getLong("id");
-        assertTrue(ret.wasNull());
-        assertEquals(ret.getString("personid"), String.valueOf(i));
-        assertEquals(ret.getString("membershipname"), "membership-" + j);
+        if (i < 2) {
+          assertEquals(ret.getLong("id"), i);
+        }
       }
     }
     assertFalse(ret.next());
@@ -257,32 +251,24 @@ public class TestJoins {
 
     //todo: I don't think these results are right
 
-    for (int i = 1; i >= 0; i--) {
-      for (int j = 0; j < 10; j++) {
-        ret.next();
-        assertEquals(ret.getLong("id"), i);
-        assertEquals(ret.getLong("personid"), i);
-        assertEquals(ret.getString("membershipname"), "membership-" + j);
-      }
-    }
-    for (int i = 2; i < 10; i++) {
-      for (int j = 0; j < 10; j++) {
-        ret.next();
-        assertEquals(ret.getLong("id"), i);
-        assertEquals(ret.getLong("personid"), 0);
-        assertTrue(ret.wasNull());
-        assertEquals(ret.getString("membershipname"), null);
-        assertTrue(ret.wasNull());
-      }
-    }
-    for (int i = 100; i < 110; i++) {
+    for (int i = 109; i >= 100; i--) {
       ret.next();
-      for (int j = 0; j < 10; j++) {
+      assertEquals(ret.getLong("id"), i);
+      assertEquals(ret.getLong("personid"), 0);
+      assertTrue(ret.wasNull());
+    }
+    for (int i = 9; i >= 0; i--) {
+      if (i < 2) {
+        for (int j = 0; j < 10; j++) {
+          ret.next();
+          assertEquals(ret.getLong("id"), i);
+          assertEquals(ret.getLong("personid"), i);
+          assertEquals(ret.getString("membershipname"), "membership-" + j);
+        }
+      }
+      else {
+        ret.next();
         assertEquals(ret.getLong("id"), i);
-        assertEquals(ret.getLong("personid"), 0);
-        assertTrue(ret.wasNull());
-        assertEquals(ret.getString("membershipname"), null);
-        assertTrue(ret.wasNull());
       }
     }
     assertFalse(ret.next());

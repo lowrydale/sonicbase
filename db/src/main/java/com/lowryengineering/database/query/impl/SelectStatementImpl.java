@@ -1140,12 +1140,15 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       final ExpressionImpl.NextReturn ret = new ExpressionImpl.NextReturn();
       while (true) {
         try {
+          boolean hadSelectRet = false;
           for (int k = 0; k < joins.size(); k++) {
             Join join = joins.get(k);
 
             String joinRightFrom = join.rightFrom;
             Expression joinExpression = join.expression;
             final JoinType joinType = join.type;
+
+            Object[] lastKey = expression.getNextKey();
 
             if (!(joinExpression instanceof BinaryExpressionImpl)) {
               throw new DatabaseException("Join expression type not supported");
@@ -1221,6 +1224,9 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                     }
                     long begin = System.nanoTime();
                     ids = expression.next(pageSize / threadCount, explain);
+                    if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
+                      hadSelectRet = true;
+                    }
                     expressionCount.incrementAndGet();
                     expressionDuration.set(System.nanoTime() - begin);
                   }
@@ -1245,7 +1251,11 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                     allExpression.setClient(client);
                     allExpression.setRecordCache(recordCache);
                     allExpression.setDbName(dbName);
+                    allExpression.setOrderByExpressions(expression.getOrderByExpressions());
                     ids = allExpression.next(pageSize / threadCount, explain);
+                    if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
+                      hadSelectRet = true;
+                    }
                     expression.setNextShard(allExpression.getNextShard());
                     expression.setNextKey(allExpression.getNextKey());
                   }
@@ -1265,7 +1275,11 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                     allExpression.setClient(client);
                     allExpression.setRecordCache(recordCache);
                     allExpression.setDbName(dbName);
+                    allExpression.setOrderByExpressions(expression.getOrderByExpressions());
                     ids = allExpression.next(pageSize / threadCount, explain);
+                    if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
+                      hadSelectRet = true;
+                    }
                     expression.setNextShard(allExpression.getNextShard());
                     expression.setNextKey(allExpression.getNextKey());
                   }
@@ -1332,9 +1346,16 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                 //              }
                 if (joinType != JoinType.full) {
                   if (joinRet.get() != null) {
+                    AtomicReference<JoinReturn> finalJoinRet = new AtomicReference<>();
+                    finalJoinRet.set(new JoinReturn());
                     TableSchema[] tables = new TableSchema[tableNames.length];
                     for (int i = 0; i < tables.length; i++) {
                       tables[i] = client.getCommon().getTables(dbName).get(tableNames[i]);
+                    }
+                    Object[][] previousKey = null;
+                    if (lastKey != null) {
+                      previousKey = new Object[tables.length][];
+                      previousKey[leftTableIndex.get()] = lastKey;
                     }
                     for (Object[][] key : joinRet.get().keys) {
                       Record[] records = new Record[tableNames.length];
@@ -1345,13 +1366,39 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                       }
                       boolean passes = (boolean) expression.evaluateSingleRecord(tables, records, getParms());
                       if (!passes) {
+                        boolean equals = true;
                         for (int i = 0; i < tables.length; i++) {
                           if (leftTableIndex.get() != i) {
                             key[i] = null;
                           }
+                          else {
+                            for (int j = 0; j < key[i].length; j++) {
+                              if (previousKey != null) {
+                                Object lhsValue = key[i][j];
+                                Object rhsValue = previousKey[i][j];
+                                Comparator comparator = DataType.Type.getComparatorForValue(lhsValue);
+                                if (lhsValue == null || rhsValue == null) {
+                                  equals = false;
+                                }
+                                else {
+                                  if (comparator.compare(lhsValue, rhsValue) != 0) {
+                                    equals = false;
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                        if (previousKey == null || !equals || key.length == 1) {
+                          finalJoinRet.get().keys.add(key);
                         }
                       }
+                      else {
+                        finalJoinRet.get().keys.add(key);
+                      }
+                      previousKey = key;
                     }
+                    joinRet.set(finalJoinRet.get());
                   }
                 }
                 if (additionalJoinExpression != null) {
@@ -1387,6 +1434,10 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                 multiTableIds.set(joinRet.get().keys);
               }
             }
+          }
+          if (hadSelectRet && multiTableIds.get().size() == 0) {
+            multiTableIds.set(null);
+            continue;
           }
           break;
         }
@@ -1454,7 +1505,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
   }
 
   class JoinReturn {
-    private List<Object[][]> keys;
+    private List<Object[][]> keys = new ArrayList<>();
   }
 
   private JoinReturn evaluateJoin(

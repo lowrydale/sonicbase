@@ -4,7 +4,7 @@ export home=$HOME
 hosts=("54.148.240.165" "54.187.178.248")
 
 
-bash local_deploy.sh
+bash local_deploy
 
 
 #  for i in range(0, len(hosts)):

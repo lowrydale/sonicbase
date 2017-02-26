@@ -406,6 +406,7 @@ public class DatabaseSocketClient {
 
         }
         catch (InterruptedException e) {
+          System.out.println("Interrupted");
           break;
         }
         catch (Exception t) {
@@ -421,194 +422,194 @@ public class DatabaseSocketClient {
 
   private static void sendBatch(String host, int port, List<Request> requests) {
     try {
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      byte[] intBuff = new byte[4];
-      int requestCount = requests.size();
-      Util.writeRawLittleEndian32(requestCount, intBuff);
-      bytesOut.write(intBuff);
-      for (Request currRequest : requests) {
-        serializeSingleRequest(bytesOut, currRequest.command, currRequest.body);
-      }
-      bytesOut.close();
-      byte[] body = bytesOut.toByteArray();
-      int originalBodyLen = body.length;
-      if (COMPRESS) {
-        if (LZO_COMPRESSION) {
-          LZ4Factory factory = LZ4Factory.fastestInstance();
+      while (true) {
 
-          LZ4Compressor compressor = factory.fastCompressor();
-          int maxCompressedLength = compressor.maxCompressedLength(body.length);
-          byte[] compressed = new byte[maxCompressedLength];
-          int compressedLength = compressor.compress(body, 0, body.length, compressed, 0, maxCompressedLength);
-          body = new byte[compressedLength];
-          System.arraycopy(compressed, 0, body, 0, compressedLength);
+        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+        byte[] intBuff = new byte[4];
+        int requestCount = requests.size();
+        Util.writeRawLittleEndian32(requestCount, intBuff);
+        bytesOut.write(intBuff);
+        for (Request currRequest : requests) {
+          serializeSingleRequest(bytesOut, currRequest.command, currRequest.body);
         }
-        else {
-          ByteArrayOutputStream bodyBytesOut = new ByteArrayOutputStream();
-          GZIPOutputStream bodyOut = new GZIPOutputStream(bodyBytesOut);
-          bodyOut.write(body);
-          bodyOut.close();
-          body = bodyBytesOut.toByteArray();
-        }
-        Util.writeRawLittleEndian32(body.length + 12, intBuff);
-      }
-      else {
-        Util.writeRawLittleEndian32(body.length + 8, intBuff);
-      }
-
-
-      boolean shouldReturn = true;
-      Connection sock = borrow_connection(host, port);
-      try {
-        //System.out.println("borrow: " + (end - begin) / 1000000f);
-
-        //OutputStream out = new BufferedOutputStream(sock.sock.getOutputStream());
-        ByteBuffer buf = ByteBuffer.wrap(intBuff);
-        sock.sock.write(buf);
-        //buf.release();
+        bytesOut.close();
+        byte[] body = bytesOut.toByteArray();
+        int originalBodyLen = body.length;
         if (COMPRESS) {
-          byte[] originalLenBuff = new byte[4];
-          Util.writeRawLittleEndian32(originalBodyLen, originalLenBuff);
-          buf = ByteBuffer.wrap(originalLenBuff);
-          sock.sock.write(buf);
-          //buf.release();
-        }
-        CRC32 checksum = new CRC32();
-        checksum.update(body, 0, body.length);
-        long checksumValue = checksum.getValue();
-        //checksumValue = Arrays.hashCode(body);
-        byte[] longBuff = new byte[8];
-
-        Util.writeRawLittleEndian64(checksumValue, longBuff);
-        buf = ByteBuffer.wrap(longBuff);
-        //buf.release();
-        sock.sock.write(buf);
-
-        //sock.latch = new CountDownLatch(1);
-        //buf = Unpooled.wrappedBuffer(body);
-        //sock.sock.body = null;
-        //ChannelFuture future = sock.sock.write(ByteBuffer.wrap(body));
-        sock.sock.write(ByteBuffer.wrap(body));
-        //      //buf.release();
-        //      future.addListener(new GenericFutureListener<ChannelFuture>() {
-        //        @Override
-        //        public void operationComplete(ChannelFuture future) throws Exception {
-        //          if (!future.isSuccess()) {
-        //            System.err.print("write failed: ");
-        //            future.cause().printStackTrace(System.err);
-        //          }
-        //        }
-        //      });
-        //sock.channel.flush();
-        //InputStream in = new BufferedInputStream(sock.sock.getInputStream());
-        int totalRead = 0;
-
-        int bodyLen = 0;
-        //while (true) {
-        int nBytes = 0;
-        //sock.clientHandler.await();
-        //
-        //     while (true) {
-        buf = ByteBuffer.allocate(intBuff.length - totalRead);
-        while ((nBytes = nBytes = sock.sock.read(buf)) > 0) {
-          buf.flip();
-          System.arraycopy(buf.array(), 0, intBuff, totalRead, nBytes);
-          buf.clear();
-
-          totalRead += nBytes;
-          if (totalRead == intBuff.length) {
-            bodyLen = Util.readRawLittleEndian32(intBuff);
-            break;
-          }
-        }
-        //              int lenRead = sock.sock.read(intBuff, totalRead, intBuff.length - totalRead);
-        //              if (lenRead == -1) {
-        //                throw new Exception("EOF");
-        //}
-        //        totalRead += nBytes;
-        //        if (totalRead == intBuff.length) {
-        //          bodyLen = Util.readRawLittleEndian32(intBuff);
-        //          break;
-        //        }
-
-        totalRead = 0;
-        byte[] responseBody = new byte[bodyLen];
-        //while (true) {
-        nBytes = 0;
-        buf = ByteBuffer.allocate(responseBody.length - totalRead);
-        while ((nBytes = nBytes = sock.sock.read(buf)) > 0) {
-          buf.flip();
-          System.arraycopy(buf.array(), 0, responseBody, totalRead, nBytes);
-          buf.clear();
-
-          totalRead += nBytes;
-          if (totalRead == responseBody.length) {
-            break;
-          }
-        }
-        //
-        //                    int lenRead = in.read(responseBody, totalRead, responseBody.length - totalRead);
-        //                    if (lenRead == -1) {
-        //                      throw new Exception("EOF");
-        //                    }
-        //
-
-        int offset = 0;
-        if (COMPRESS) {
-          originalBodyLen = Util.readRawLittleEndian32(responseBody, 0);
-          offset += 4;
-        }
-        long responseChecksum = Util.readRawLittleEndian64(responseBody, offset);
-        offset += 8;
-        body = new byte[responseBody.length - offset];
-        System.arraycopy(responseBody, offset, body, 0, body.length);
-
-        checksum = new CRC32();
-        checksum.update(body, 0, body.length);
-        checksumValue = checksum.getValue();
-        if (checksumValue != responseChecksum) {
-          throw new DatabaseException("Checksum mismatch");
-        }
-
-        if (DatabaseSocketClient.COMPRESS) {
-          if (DatabaseSocketClient.LZO_COMPRESSION) {
+          if (LZO_COMPRESSION) {
             LZ4Factory factory = LZ4Factory.fastestInstance();
 
-            LZ4FastDecompressor decompressor = factory.fastDecompressor();
-            byte[] restored = new byte[originalBodyLen];
-            decompressor.decompress(body, 0, restored, 0, originalBodyLen);
-            body = restored;
+            LZ4Compressor compressor = factory.fastCompressor();
+            int maxCompressedLength = compressor.maxCompressedLength(body.length);
+            byte[] compressed = new byte[maxCompressedLength];
+            int compressedLength = compressor.compress(body, 0, body.length, compressed, 0, maxCompressedLength);
+            body = new byte[compressedLength];
+            System.arraycopy(compressed, 0, body, 0, compressedLength);
           }
           else {
-            GZIPInputStream bodyIn = new GZIPInputStream(new ByteArrayInputStream(body));
-            body = new byte[originalBodyLen];
-            bodyIn.read(body);
+            ByteArrayOutputStream bodyBytesOut = new ByteArrayOutputStream();
+            GZIPOutputStream bodyOut = new GZIPOutputStream(bodyBytesOut);
+            bodyOut.write(body);
+            bodyOut.close();
+            body = bodyBytesOut.toByteArray();
           }
+          Util.writeRawLittleEndian32(body.length + 12, intBuff);
+        }
+        else {
+          Util.writeRawLittleEndian32(body.length + 8, intBuff);
         }
 
-        ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
-        bytesIn.read(intBuff); //response count
+        boolean shouldReturn = true;
+        Connection sock = borrow_connection(host, port);
+        try {
+          //System.out.println("borrow: " + (end - begin) / 1000000f);
 
-        for (Request currRequest : requests) {
-          try {
-            processResponse(bytesIn, currRequest);
+          //OutputStream out = new BufferedOutputStream(sock.sock.getOutputStream());
+          ByteBuffer buf = ByteBuffer.wrap(intBuff);
+          sock.sock.write(buf);
+          //buf.release();
+          if (COMPRESS) {
+            byte[] originalLenBuff = new byte[4];
+            Util.writeRawLittleEndian32(originalBodyLen, originalLenBuff);
+            buf = ByteBuffer.wrap(originalLenBuff);
+            sock.sock.write(buf);
+            //buf.release();
           }
-          catch (Exception t) {
-            System.out.println("Error processing response: command=" + currRequest.command);
-            throw new DatabaseException(t);
+          CRC32 checksum = new CRC32();
+          checksum.update(body, 0, body.length);
+          long checksumValue = checksum.getValue();
+          //checksumValue = Arrays.hashCode(body);
+          byte[] longBuff = new byte[8];
+
+          Util.writeRawLittleEndian64(checksumValue, longBuff);
+          buf = ByteBuffer.wrap(longBuff);
+          //buf.release();
+          sock.sock.write(buf);
+
+          //sock.latch = new CountDownLatch(1);
+          //buf = Unpooled.wrappedBuffer(body);
+          //sock.sock.body = null;
+          //ChannelFuture future = sock.sock.write(ByteBuffer.wrap(body));
+          sock.sock.write(ByteBuffer.wrap(body));
+          //      //buf.release();
+          //      future.addListener(new GenericFutureListener<ChannelFuture>() {
+          //        @Override
+          //        public void operationComplete(ChannelFuture future) throws Exception {
+          //          if (!future.isSuccess()) {
+          //            System.err.print("write failed: ");
+          //            future.cause().printStackTrace(System.err);
+          //          }
+          //        }
+          //      });
+          //sock.channel.flush();
+          //InputStream in = new BufferedInputStream(sock.sock.getInputStream());
+          int totalRead = 0;
+
+          int bodyLen = 0;
+          //while (true) {
+          int nBytes = 0;
+          //sock.clientHandler.await();
+          //
+          //     while (true) {
+          buf = ByteBuffer.allocate(intBuff.length - totalRead);
+          while ((nBytes = nBytes = sock.sock.read(buf)) > 0) {
+            buf.flip();
+            System.arraycopy(buf.array(), 0, intBuff, totalRead, nBytes);
+            buf.clear();
+
+            totalRead += nBytes;
+            if (totalRead == intBuff.length) {
+              bodyLen = Util.readRawLittleEndian32(intBuff);
+              break;
+            }
           }
+          //              int lenRead = sock.sock.read(intBuff, totalRead, intBuff.length - totalRead);
+          //              if (lenRead == -1) {
+          //                throw new Exception("EOF");
+          //}
+          //        totalRead += nBytes;
+          //        if (totalRead == intBuff.length) {
+          //          bodyLen = Util.readRawLittleEndian32(intBuff);
+          //          break;
+          //        }
+
+          totalRead = 0;
+          byte[] responseBody = new byte[bodyLen];
+          //while (true) {
+          nBytes = 0;
+          buf = ByteBuffer.allocate(responseBody.length - totalRead);
+          while ((nBytes = nBytes = sock.sock.read(buf)) > 0) {
+            buf.flip();
+            System.arraycopy(buf.array(), 0, responseBody, totalRead, nBytes);
+            buf.clear();
+
+            totalRead += nBytes;
+            if (totalRead == responseBody.length) {
+              break;
+            }
+          }
+          //
+          //                    int lenRead = in.read(responseBody, totalRead, responseBody.length - totalRead);
+          //                    if (lenRead == -1) {
+          //                      throw new Exception("EOF");
+          //                    }
+          //
+
+          int offset = 0;
+          if (COMPRESS) {
+            originalBodyLen = Util.readRawLittleEndian32(responseBody, 0);
+            offset += 4;
+          }
+          long responseChecksum = Util.readRawLittleEndian64(responseBody, offset);
+          offset += 8;
+          body = new byte[responseBody.length - offset];
+          System.arraycopy(responseBody, offset, body, 0, body.length);
+
+          checksum = new CRC32();
+          checksum.update(body, 0, body.length);
+          checksumValue = checksum.getValue();
+          if (checksumValue != responseChecksum) {
+            throw new DatabaseException("Checksum mismatch");
+          }
+
+          if (DatabaseSocketClient.COMPRESS) {
+            if (DatabaseSocketClient.LZO_COMPRESSION) {
+              LZ4Factory factory = LZ4Factory.fastestInstance();
+
+              LZ4FastDecompressor decompressor = factory.fastDecompressor();
+              byte[] restored = new byte[originalBodyLen];
+              decompressor.decompress(body, 0, restored, 0, originalBodyLen);
+              body = restored;
+            } else {
+              GZIPInputStream bodyIn = new GZIPInputStream(new ByteArrayInputStream(body));
+              body = new byte[originalBodyLen];
+              bodyIn.read(body);
+            }
+          }
+
+          ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
+          bytesIn.read(intBuff); //response count
+
+          for (Request currRequest : requests) {
+            try {
+              processResponse(bytesIn, currRequest);
+            } catch (Exception t) {
+              System.out.println("Error processing response: command=" + currRequest.command);
+              throw new DatabaseException(t);
+            }
+          }
+          break;
         }
-
-      }
-      catch (IOException e) {
-        sock.sock.close();//clientHandler.channel.close();
-        connectionCount.decrementAndGet();
-        shouldReturn = false;
-        throw e;
-      }
-      finally {
-        if (shouldReturn) {
-          return_connection(sock, host, port);
+        catch (Exception e) {
+          sock.sock.close();//clientHandler.channel.close();
+          connectionCount.decrementAndGet();
+          shouldReturn = false;
+          logger.error("Error sending message", e);
+        }
+        finally {
+          if (shouldReturn) {
+            return_connection(sock, host, port);
+          }
         }
       }
     }

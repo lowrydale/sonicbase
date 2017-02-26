@@ -52,9 +52,10 @@ public class ConnectionProxy implements Connection {
         db = db.toLowerCase();
       }
       synchronized (clientMutex) {
-        if (databaseClient == null) {
-          databaseClient = new DatabaseClient(host, port, true);
+        if (databaseClient != null) {
+          databaseClient.shutdown();
         }
+        databaseClient = new DatabaseClient(host, port, true);
       }
       if (db != null) {
         databaseClient.initDb(db);

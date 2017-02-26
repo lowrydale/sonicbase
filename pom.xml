@@ -18,7 +18,7 @@
             <archive>
               <manifest>
                 <addClasspath>true</addClasspath>
-                <mainClass>com.lowryengineering.database.cli.Cli2</mainClass>
+                <mainClass>com.lowryengineering.database.cli.Cli</mainClass>
               </manifest>
             </archive>
           </configuration>

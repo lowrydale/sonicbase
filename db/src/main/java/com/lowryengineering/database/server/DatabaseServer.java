@@ -2186,4 +2186,12 @@ public class DatabaseServer {
       common.getSchemaWriteLock(dbName).unlock();
     }
   }
+
+  public byte[] expirePreparedStatement(String command, byte[] body, boolean replayedCommand) {
+    String[] parts = command.split(":");
+    long preparedId = Long.valueOf(parts[5]);
+    readManager.expirePreparedStatement(preparedId);
+    return null;
+  }
+
 }

@@ -224,6 +224,7 @@ public abstract class ExpressionImpl implements Expression {
   public void getColumnsInExpression(List<ColumnImpl> columns) {
   }
 
+
   public static enum Type {
     column(0),
     constant(1),
@@ -1223,7 +1224,47 @@ public abstract class ExpressionImpl implements Expression {
 
   static class PreparedIndexLookup {
     private long preparedId;
+    private long lastTimeUsed;
     private boolean[][] serversPrepared;
+  }
+
+  private static Thread preparedReaper;
+
+  public static void stopPreparedReaper() {
+    if (preparedReaper != null) {
+      preparedReaper.interrupt();
+    }
+  }
+
+
+  public static void startPreparedReaper(final DatabaseClient client) {
+    preparedReaper = new Thread(new Runnable(){
+      @Override
+      public void run() {
+        while (true) {
+          try {
+            for (Map.Entry<String, PreparedIndexLookup> prepared : preparedIndexLookups.entrySet()) {
+              if (prepared.getValue().lastTimeUsed != 0 &&
+                      prepared.getValue().lastTimeUsed < System.currentTimeMillis() - 15 * 60 * 1000) {
+                preparedIndexLookups.remove(prepared.getKey());
+
+                String command = "DatabaseServer:expirePreparedStatement:1:" + client.getCommon().getSchemaVersion() + ":null:" + prepared.getValue().preparedId;
+
+                client.sendToAllShards(null, 0, command, null, DatabaseClient.Replica.all);
+              }
+            }
+            Thread.sleep(10 * 1000);
+          }
+          catch (InterruptedException e) {
+            break;
+          }
+          catch (Exception e) {
+            logger.error("Error in prepared reaper thread", e);
+          }
+        }
+      }
+    });
+    preparedReaper.start();
   }
 
   private static ConcurrentHashMap<String, PreparedIndexLookup> preparedIndexLookups = new ConcurrentHashMap<>();
@@ -1402,6 +1443,7 @@ public abstract class ExpressionImpl implements Expression {
             }
             preparedIndexLookups.put(preparedKeyStr, prepared);
           }
+          prepared.lastTimeUsed = System.currentTimeMillis();
         }
 
         while (true) {

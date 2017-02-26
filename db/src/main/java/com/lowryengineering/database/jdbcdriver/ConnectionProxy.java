@@ -126,6 +126,7 @@ public class ConnectionProxy implements Connection {
       throw new SQLException("Attempting to close a connection that is already closed");
     }
     closed = true;
+    databaseClient.shutdown();
   }
 
   public boolean isClosed() throws SQLException {

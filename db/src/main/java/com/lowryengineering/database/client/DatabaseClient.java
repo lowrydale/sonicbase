@@ -184,6 +184,7 @@ public class DatabaseClient {
   private ThreadLocal<Boolean> isCommitting = new ThreadLocal<>();
   private ThreadLocal<Long> transactionId = new ThreadLocal<>();
   private ThreadLocal<List<TransactionOperation>> transactionOps = new ThreadLocal<>();
+  Timer statsTimer;
 
   public boolean isExplicitTrans() {
     Boolean explicit = isExplicitTrans.get();
@@ -316,6 +317,19 @@ public class DatabaseClient {
     return "[not found]";
   }
 
+  public void shutdown() {
+    if (statsTimer != null) {
+      statsTimer.cancel();
+    }
+    ExpressionImpl.stopPreparedReaper();
+    executor.shutdownNow();
+    for (Server[] shard : servers) {
+      for (Server replica : shard) {
+        replica.getSocketClient().shutdown();
+      }
+    }
+  }
+
   public static class ReconfigureResults {
     private boolean handedOffToMaster;
     private int shardCount;
@@ -400,9 +414,12 @@ public class DatabaseClient {
 
     syncConfig();
 
+    ExpressionImpl.startPreparedReaper(this);
+
     configureServers();
 
-    new java.util.Timer().scheduleAtFixedRate(new TimerTask() {
+    statsTimer = new java.util.Timer();
+    statsTimer.scheduleAtFixedRate(new TimerTask() {
       @Override
       public void run() {
         System.out.println("IndexLookup stats: count=" + INDEX_LOOKUP_STATS.getCount() + ", rate=" + INDEX_LOOKUP_STATS.getFiveMinuteRate() +

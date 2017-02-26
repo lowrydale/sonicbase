@@ -109,6 +109,12 @@ public class DatabaseSocketClient {
     return batchThreads;
   }
 
+  public void shutdown() {
+    for (Thread thread : batchThreads) {
+      thread.interrupt();
+    }
+  }
+
   public static class NioClient {
     private ClientNioHandler clientHandler;
     //private io.netty.channel.Channel channel;

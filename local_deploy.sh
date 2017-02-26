@@ -1,17 +1,19 @@
 
-mkdir -p $HOME/database/target
+#mkdir -p $HOME/database/target
 mkdir -p $HOME/database/bin
 mkdir -p $HOME/database/config
-mkdir -p $HOME/database/web
+#mkdir -p $HOME/database/web
 mkdir -p $HOME/database/src
 rm -rf $HOME/database/logs
 mkdir -p $HOME/database/logs
-mkdir -p $HOME/database/lib/linux64
+#mkdir -p $HOME/database/lib/linux64
 
+./build-jar.sh
 mkdir -p $HOME/database/lib
-rsync -vlLt repo/* $HOME/database/lib
-mvn dependency:copy-dependencies -DoutputDirectory=$HOME/database/lib
-rsync -rvlLt repo/linux64/* $HOME/database/lib/linux64
+rsync -vlLt db/target/sonicbase-1.0-SNAPSHOT.jar $HOME/database/lib
+#rsync -vlLt repo/* $HOME/database/lib
+#mvn dependency:copy-dependencies -DoutputDirectory=$HOME/database/lib
+#rsync -rvlLt repo/linux64/* $HOME/database/lib/linux64
 
 rsync -rvlLt db/target/classes/config/config-* $HOME/database/config
 rsync -rvlLt $HOME/database-config/* $HOME/database/config
@@ -55,14 +57,14 @@ chmod +x $HOME/database/bin/dump-threads
 chmod +x $HOME/database/bin/get-mem-total
 chmod +x $HOME/database/bin/remote-get-mem-total
 
-rsync -rvlLt src/main/resources/* $HOME/database/target
+#rsync -rvlLt src/main/resources/* $HOME/database/target
 
-rsync -rvlLt db/target/test-classes/* $HOME/database/target
-rsync -rvlLt db/target/classes/main/java/* $HOME/database/target
-rsync -rvlLt db/target/classes/* $HOME/database/target
-rsync -rvlLt db/src/main/resources/web/* $HOME/database/web
+#rsync -rvlLt db/target/test-classes/* $HOME/database/target
+#rsync -rvlLt db/target/classes/main/java/* $HOME/database/target
+#rsync -rvlLt db/target/classes/* $HOME/database/target
+#rsync -rvlLt db/src/main/resources/web/* $HOME/database/web
 
-rm $HOME/database/target/*log4j*
+#rm $HOME/database/target/*log4j*
 
 #rsync -rvlLt db/src/main/* $HOME/database/src
 

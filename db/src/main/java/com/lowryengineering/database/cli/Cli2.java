@@ -28,7 +28,6 @@ import static com.lowryengineering.database.server.DatabaseServer.getMemValue;
 
 public class Cli2 {
 
-  static Thread thread = null;
   static String command = "";
   static File workingDir;
   private static String currCluster;
@@ -42,60 +41,63 @@ public class Cli2 {
 
   public static void main(final String[] args) throws IOException, InterruptedException {
     workingDir = new File(System.getProperty("user.dir"));
-
-    reader = new ConsoleReader();
-    if (args.length > 0) {
-      StringBuilder builder = new StringBuilder();
-      for (int i = 0; i < args.length; i++) {
-        builder.append(args[i] + " ");
+    try {
+      reader = new ConsoleReader();
+      if (args.length > 0) {
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < args.length; i++) {
+          builder.append(args[i] + " ");
+        }
+        runCommand(builder.toString());
+        System.exit(0);
       }
-      runCommand(builder.toString());
-      System.exit(0);
-    }
 
-    System.out.print("\033[2J\033[;H");
+      System.out.print("\033[2J\033[;H");
 
-    moveToBottom();
+      moveToBottom();
 
-    while (true) {
       while (true) {
+        while (true) {
 
 
-//       int c = (char) reader.readCharacter(new char[]{65,'\n','a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z',' '});//System.in.read();
+          //       int c = (char) reader.readCharacter(new char[]{65,'\n','a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z',' '});//System.in.read();
 
-//        if (c == 91) {
-//          previousCommand();
-//          break;
-//        }
-//        else {
-        //String str = reader.readLine();
-//        int c = System.in.read();
-//        if (c == 65) {
-// //         previousCommand();
-//          continue;
-//        }
-        //System.out.print((char)c);
-        String str = reader.readLine();//String.valueOf((char)c);
-        //System.out.print(str);//String.valueOf((char)c));
-        //String s = String.valueOf(c);//stdin.read());
-        command += str;
-        break;
-//          if (command.endsWith("\n")) {
-//            break;
-//          }
-        // }
+          //        if (c == 91) {
+          //          previousCommand();
+          //          break;
+          //        }
+          //        else {
+          //String str = reader.readLine();
+          //        int c = System.in.read();
+          //        if (c == 65) {
+          // //         previousCommand();
+          //          continue;
+          //        }
+          //System.out.print((char)c);
+          String str = reader.readLine();//String.valueOf((char)c);
+          //System.out.print(str);//String.valueOf((char)c));
+          //String s = String.valueOf(c);//stdin.read());
+          command += str;
+          break;
+          //          if (command.endsWith("\n")) {
+          //            break;
+          //          }
+          // }
 
+        }
+        //clear screen
+        moveToBottom();
+        if (command != null && command.length() > 0) {
+          runCommand(command);
+          command = "";
+        }
+        //clear screen
+        moveToBottom();
       }
-      //clear screen
-      moveToBottom();
-      if (command != null && command.length() > 0) {
-        runCommand(command);
-        command = "";
-      }
-      //clear screen
-      moveToBottom();
     }
-
+    catch (ExitCliException e) {
+      return;
+    }
   }
 
   private static List<String> commandHistory = new ArrayList<>();
@@ -186,6 +188,9 @@ public class Cli2 {
       else if (command.startsWith("purge cluster")) {
         purgeCluster();
       }
+      else if (command.startsWith("quit") || command.startsWith("exit")) {
+        exit();
+      }
       else if (command.startsWith("echo")) {
         moveToBottom();
         System.out.print(command);
@@ -272,10 +277,24 @@ public class Cli2 {
         System.out.println("Error, unknown command");
       }
     }
+    catch (ExitCliException e) {
+      throw e;
+    }
     catch (Exception e) {
       e.printStackTrace();
       System.out.println("Error executing command: msg=" + e.getMessage());
     }
+  }
+
+  private static void exit() throws SQLException {
+    if (conn != null) {
+      conn.close();
+    }
+    throw new ExitCliException();
+  }
+
+  static class ExitCliException extends RuntimeException {
+
   }
 
   private static void describe(String command) throws SQLException, ClassNotFoundException, IOException, InterruptedException {

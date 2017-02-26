@@ -1,6 +1,7 @@
 package com.lowryengineering.database.server;
 
 import com.codahale.metrics.MetricRegistry;
+import com.lowryengineering.database.client.DatabaseClient;
 import com.lowryengineering.database.common.DatabaseCommon;
 import com.lowryengineering.database.common.Record;
 import com.lowryengineering.database.common.SchemaOutOfSyncException;
@@ -30,6 +31,7 @@ public class ReadManager {
   private static Logger logger = LoggerFactory.getLogger(ReadManager.class);
 
   private final DatabaseServer server;
+  private Thread preparedReaper;
 
   public ReadManager(DatabaseServer databaseServer) {
 
@@ -45,6 +47,8 @@ public class ReadManager {
             ", duration99.9=" + BATCH_INDEX_LOOKUP_STATS.getSnapshot().get999thPercentile() / 1000000d);
       }
     }, 20 * 1000, 20 * 1000);
+
+    startPreparedReaper();
   }
 
 
@@ -270,8 +274,35 @@ public class ReadManager {
   public static final com.codahale.metrics.Timer INDEX_LOOKUP_STATS = METRICS.timer("indexLookup");
   public static final com.codahale.metrics.Timer BATCH_INDEX_LOOKUP_STATS = METRICS.timer("batchIndexLookup");
 
+  public void expirePreparedStatement(long preparedId) {
+    preparedIndexLookups.remove(preparedId);
+  }
+
+  public void startPreparedReaper() {
+    preparedReaper = new Thread(new Runnable(){
+      @Override
+      public void run() {
+        while (true) {
+          try {
+            for (Map.Entry<Long, PreparedIndexLookup> prepared : preparedIndexLookups.entrySet()) {
+              if (prepared.getValue().lastTimeUsed != 0 &&
+                      prepared.getValue().lastTimeUsed < System.currentTimeMillis() - 30 * 60 * 1000) {
+                preparedIndexLookups.remove(prepared.getKey());
+              }
+            }
+            Thread.sleep(10 * 1000);
+          }
+          catch (Exception e) {
+            logger.error("Error in prepared reaper thread", e);
+          }
+        }
+      }
+    });
+    preparedReaper.start();
+  }
   class PreparedIndexLookup {
 
+    public long lastTimeUsed;
     public int count;
     public int tableId;
     public int indexId;
@@ -311,6 +342,7 @@ public class ReadManager {
         prepared = new PreparedIndexLookup();
         preparedIndexLookups.put(preparedId, prepared);
       }
+      prepared.lastTimeUsed = System.currentTimeMillis();
       int count = 0;
       if (isPrepared) {
         count = prepared.count;

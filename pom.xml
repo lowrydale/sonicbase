@@ -18,7 +18,7 @@
             <archive>
               <manifest>
                 <addClasspath>true</addClasspath>
-                <mainClass>com.lowryengineering.database.cli.Cli</mainClass>
+                <mainClass>com.sonicbase.cli.Cli</mainClass>
               </manifest>
             </archive>
           </configuration>

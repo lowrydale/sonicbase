@@ -6,7 +6,7 @@
 # JRE version: Java(TM) SE Runtime Environment (8.0_51-b16) (build 1.8.0_51-b16)
 # Java VM: Java HotSpot(TM) 64-Bit Server VM (25.51-b03 mixed mode bsd-amd64 compressed oops)
 # Problematic frame:
-# J 1078% C2 com.lowryengineering.database.server.DatabaseServer.fromUnsafeToRecords(J)[[B (236 bytes) @ 0x0000000116470df0 [0x0000000116470ca0+0x150]
+# J 1078% C2 com.sonicbase.server.DatabaseServer.fromUnsafeToRecords(J)[[B (236 bytes) @ 0x0000000116470df0 [0x0000000116470ca0+0x150]
 #
 # Failed to write core dump. Core dumps have been disabled. To enable core dumping, try "ulimit -c unlimited" before starting Java again
 #
@@ -93,7 +93,7 @@ R15=0x00007fc63a002000 is a thread
 
 Stack: [0x000070000f963000,0x000070000fa63000],  sp=0x000070000fa5f9d0,  free space=1010k
 Native frames: (J=compiled Java code, j=interpreted, Vv=VM code, C=native code)
-J 1078% C2 com.lowryengineering.database.server.DatabaseServer.fromUnsafeToRecords(J)[[B (236 bytes) @ 0x0000000116470df0 [0x0000000116470ca0+0x150]
+J 1078% C2 com.sonicbase.server.DatabaseServer.fromUnsafeToRecords(J)[[B (236 bytes) @ 0x0000000116470df0 [0x0000000116470ca0+0x150]
 
 
 ---------------  P R O C E S S  ---------------
@@ -403,14 +403,14 @@ CodeCache: size=245760Kb used=3893Kb max_used=3904Kb free=241866Kb
 
 Compilation events (10 events):
 Event: 1.644 Thread 0x00007fc639010000 nmethod 1072 0x0000000116462bd0 code [0x0000000116462d40, 0x0000000116462f68]
-Event: 1.644 Thread 0x00007fc639010000 1074       1       com.lowryengineering.database.client.DatabaseClient$Server::access$400 (5 bytes)
+Event: 1.644 Thread 0x00007fc639010000 1074       1       com.sonicbase.client.DatabaseClient$Server::access$400 (5 bytes)
 Event: 1.645 Thread 0x00007fc639010000 nmethod 1074 0x0000000116463050 code [0x00000001164631a0, 0x0000000116463290]
 Event: 1.682 Thread 0x00007fc63883b800 nmethod 1025 0x0000000116468e10 code [0x0000000116469100, 0x000000011646bf60]
-Event: 2.096 Thread 0x00007fc639010000 1076 % !   3       com.lowryengineering.database.server.DatabaseServer::fromUnsafeToRecords @ 103 (236 bytes)
+Event: 2.096 Thread 0x00007fc639010000 1076 % !   3       com.sonicbase.server.DatabaseServer::fromUnsafeToRecords @ 103 (236 bytes)
 Event: 2.097 Thread 0x00007fc639010000 nmethod 1076% 0x0000000116465d90 code [0x0000000116466040, 0x0000000116467878]
-Event: 2.097 Thread 0x00007fc639010000 1077   !   3       com.lowryengineering.database.server.DatabaseServer::fromUnsafeToRecords (236 bytes)
+Event: 2.097 Thread 0x00007fc639010000 1077   !   3       com.sonicbase.server.DatabaseServer::fromUnsafeToRecords (236 bytes)
 Event: 2.098 Thread 0x00007fc639010000 nmethod 1077 0x0000000116463310 code [0x00000001164635c0, 0x0000000116464d38]
-Event: 2.098 Thread 0x00007fc63900e800 1078 % !   4       com.lowryengineering.database.server.DatabaseServer::fromUnsafeToRecords @ 103 (236 bytes)
+Event: 2.098 Thread 0x00007fc63900e800 1078 % !   4       com.sonicbase.server.DatabaseServer::fromUnsafeToRecords @ 103 (236 bytes)
 Event: 2.102 Thread 0x00007fc63900e800 nmethod 1078% 0x0000000116470b50 code [0x0000000116470ca0, 0x0000000116470f78]
 
 GC Heap History (2 events):

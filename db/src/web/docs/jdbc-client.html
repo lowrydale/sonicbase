@@ -1,0 +1,22 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Untitled Document</title>
+
+
+<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+</head>
+
+<h3>Connecting</h3>
+Include the following line before creating a connection:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;Class.forName("com.sonicbase.jdbcdriver.Driver");
+<br/>
+<br/>
+Connect to the database with the following code:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;Connection conn = DriverManager.getConnection("jdbc:sonicbase:<address>:9010/<database name>");
+
+
+<body>
+</body>
+</html>

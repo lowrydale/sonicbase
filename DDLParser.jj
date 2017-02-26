@@ -13,7 +13,7 @@ options {
 }
 
 PARSER_BEGIN(DDLParser)
-package com.lowryengineering.database.jdbcdriver.ddlparser;
+package com.sonicbase.jdbcdriver.ddlparser;
 
 public class DDLParser {
     protected String removeQuotes(String quotedString) {

@@ -3,4 +3,4 @@
 
  cd /home/ubuntu/database/bin
 
- ./runclass com.lowryengineering.database.graph.GraphRestServer $1
+ ./runclass com.sonicbase.database.graph.GraphRestServer $1

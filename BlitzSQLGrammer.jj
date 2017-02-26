@@ -1,5 +1,5 @@
 PARSER_BEGIN(BlitzSQLParser)
-package com.lowryengineering.database.jdbcdriver.parser;
+package com.sonicbase.jdbcdriver.parser;
 import java.util.List;
 import java.util.LinkedList;
 import net.java.blitz.db.sql.expression.*;

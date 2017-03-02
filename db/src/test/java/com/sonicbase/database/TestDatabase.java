@@ -1646,6 +1646,30 @@ public class TestDatabase {
     stmt.executeUpdate();
   }
 
+
+  @Test
+  public void testBatchInsert() throws SQLException, InterruptedException {
+
+    for (int i = 0; i < 10; i++) {
+      PreparedStatement stmt = conn.prepareStatement("insert into persons (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
+      stmt.setLong(1, 200000 + i);
+      stmt.setLong(2, (100) % 2);
+      stmt.setString(3, "ssn");
+      stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+      stmt.setBoolean(5, false);
+      stmt.setString(6, "m");
+      int count = stmt.executeUpdate();
+      assertEquals(count, 1);
+    }
+
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where id>=200000");
+    ResultSet resultSet = stmt.executeQuery();
+    for (int i = 0; i < 10; i++){
+      assertTrue(resultSet.next());
+    }
+    assertFalse(resultSet.next());
+  }
+
   @Test
   public void testDelete() throws SQLException {
 

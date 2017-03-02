@@ -1720,6 +1720,29 @@ public class DatabaseServer {
     }
   }
 
+  public byte[] batchInsertIndexEntryByKey(String command, byte[] body, boolean replayedCommand) {
+    String[] parts = command.split(":");
+    String dbName = parts[4];
+    common.getSchemaReadLock(dbName).lock();
+    try {
+      return updateManager.batchInsertIndexEntryByKey(command, body, replayedCommand);
+    }
+    finally {
+      common.getSchemaReadLock(dbName).unlock();
+    }
+  }
+
+  public byte[] batchInsertIndexEntryByKeyWithRecord(String command, byte[] body, boolean replayedCommand) {
+    String[] parts = command.split(":");
+    String dbName = parts[4];
+    common.getSchemaReadLock(dbName).lock();
+    try {
+      return updateManager.batchInsertIndexEntryByKeyWithRecord(command, body, replayedCommand);
+    }
+    finally {
+      common.getSchemaReadLock(dbName).unlock();
+    }
+  }
   public byte[] abortTransaction(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
     String dbName = parts[4];

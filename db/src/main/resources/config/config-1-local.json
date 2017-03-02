@@ -2,10 +2,6 @@
     "database": {
         "dataDirectory": "$HOME/db-data",
         "installDirectory": "$HOME/database",
-        "partitionCountForRecordIndex" : 10000,
-        "subPartitionsForIdIndex" : 10,
-        "initialIndexSize" : 10000000,
-        "indexEntrySize" : 60,
         "maxJavaHeap": "50%",
         "maxProcessMemory": "90%",
       "replicationFactor": 1,
@@ -21,5 +17,4 @@
           }
         ]
     }
-
 }

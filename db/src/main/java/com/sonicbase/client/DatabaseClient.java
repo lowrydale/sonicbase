@@ -132,6 +132,12 @@ public class DatabaseClient {
     }
   }
 
+  public static ThreadLocal<String> batchDbName = new ThreadLocal<>();
+  public static ThreadLocal<List<DataOutputStream>> batchWithRecordOutputStreams = new ThreadLocal<>();
+  public static ThreadLocal<List<DataOutputStream>> batchWithoutRecordOutputStreams = new ThreadLocal<>();
+  public static ThreadLocal<List<ByteArrayOutputStream>> batchWithRecordByteOutputStreams = new ThreadLocal<>();
+  public static ThreadLocal<List<ByteArrayOutputStream>> batchWithoutRecordByteOutputStreams = new ThreadLocal<>();
+
   public int getPageSize() {
     return pageSize;
   }
@@ -328,6 +334,91 @@ public class DatabaseClient {
         replica.getSocketClient().shutdown();
       }
     }
+  }
+
+  public int[] executeBatch() {
+    final AtomicInteger totalCount = new AtomicInteger();
+    try {
+      if (batchWithRecordOutputStreams.get() == null) {
+        throw new DatabaseException("No batch initiated");
+      }
+
+      {
+        final String command = "DatabaseServer:batchInsertIndexEntryByKeyWithRecord:1:" + common.getSchemaVersion() + ":" + batchDbName.get();
+        final List<ByteArrayOutputStream> bytesOut = batchWithRecordByteOutputStreams.get();
+        final List<DataOutputStream> out = batchWithRecordOutputStreams.get();
+        for (DataOutputStream currOut : out) {
+          currOut.close();
+        }
+
+        List<Future> futures = new ArrayList<>();
+        for (int i = 0; i < bytesOut.size(); i++) {
+          final int offset = i;
+          futures.add(executor.submit(new Callable() {
+            @Override
+            public Object call() throws Exception {
+              ByteArrayOutputStream currBytes = bytesOut.get(offset);
+              byte[] bytes = currBytes.toByteArray();
+              if (bytes == null || bytes.length == 0) {
+                return null;
+              }
+              byte[] ret = send(null, offset, 0, command, bytes, DatabaseClient.Replica.all);
+              if (ret == null) {
+                throw new FailedToInsertException("No response for key insert");
+              }
+              DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
+              long serializationVersion = DataUtil.readVLong(in);
+              int retVal = in.readInt();
+              totalCount.addAndGet(retVal);
+              //if (retVal != 1) {
+              //  throw new FailedToInsertException("Incorrect response from server: value=" + retVal);
+              //}
+              return null;
+            }
+          }));
+        }
+        for (Future future : futures) {
+          future.get();
+        }
+      }
+      {
+        final String command = "DatabaseServer:batchInsertIndexEntryByKey:1:" + common.getSchemaVersion() + ":" + batchDbName.get();
+        final List<ByteArrayOutputStream> bytesOut = batchWithoutRecordByteOutputStreams.get();
+        final List<DataOutputStream> out = batchWithoutRecordOutputStreams.get();
+        for (DataOutputStream currOut : out) {
+          currOut.close();
+        }
+
+        List<Future> futures = new ArrayList<>();
+        for (int i = 0; i < bytesOut.size(); i++) {
+          final int offset = i;
+          futures.add(executor.submit(new Callable() {
+            @Override
+            public Object call() throws Exception {
+              ByteArrayOutputStream currBytes = bytesOut.get(offset);
+              byte[] bytes = currBytes.toByteArray();
+              if (bytes == null || bytes.length == 0) {
+                return null;
+              }
+              send(null, offset, rand.nextLong(), command, bytes, DatabaseClient.Replica.all);
+
+              return null;
+            }
+          }));
+        }
+        for (Future future : futures) {
+          future.get();
+        }
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+    int[] ret = new int[totalCount.get()];
+    for (int i = 0; i < ret.length; i++) {
+      ret[i] = 1;
+    }
+    return ret;
   }
 
   public static class ReconfigureResults {
@@ -1348,7 +1439,6 @@ public class DatabaseClient {
       }
       ops.add(new TransactionOperation(updateStatement, parms));
     }
-
     updateStatement.setParms(parms);
     return updateStatement.execute(dbName, null);
   }
@@ -1359,19 +1449,7 @@ public class DatabaseClient {
 
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-      out.writeUTF(tableName);
-      out.writeUTF(keyInfo.indexSchema.getKey());
-      out.writeBoolean(isExplicitTrans());
-      out.writeBoolean(isCommitting());
-      DataUtil.writeVLong(out, getTransactionId());
-      byte[] keyBytes = DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), keyInfo.indexSchema.getKey(), keyInfo.key);
-      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-      DataUtil.writeVLong(out, keyBytes.length, resultLength);
-      out.write(keyBytes);
-      byte[] primaryKeyBytes = DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), primaryKeyIndexName, primaryKey);
-      DataUtil.writeVLong(out, primaryKeyBytes.length, resultLength);
-      out.write(primaryKeyBytes);
+      serializeInsertKey(dbName, tableName, keyInfo, primaryKeyIndexName, primaryKey, out);
       out.close();
 
       send("DatabaseServer:insertIndexEntryByKey", keyInfo.shard, rand.nextLong(), command, bytesOut.toByteArray(), DatabaseClient.Replica.all);
@@ -1379,6 +1457,22 @@ public class DatabaseClient {
     catch (IOException e) {
       throw new DatabaseException(e);
     }
+  }
+
+  private void serializeInsertKey(String dbName, String tableName, KeyInfo keyInfo, String primaryKeyIndexName, Object[] primaryKey, DataOutputStream out) throws IOException {
+    DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+    out.writeUTF(tableName);
+    out.writeUTF(keyInfo.indexSchema.getKey());
+    out.writeBoolean(isExplicitTrans());
+    out.writeBoolean(isCommitting());
+    DataUtil.writeVLong(out, getTransactionId());
+    byte[] keyBytes = DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), keyInfo.indexSchema.getKey(), keyInfo.key);
+    DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+    DataUtil.writeVLong(out, keyBytes.length, resultLength);
+    out.write(keyBytes);
+    byte[] primaryKeyBytes = DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), primaryKeyIndexName, primaryKey);
+    DataUtil.writeVLong(out, primaryKeyBytes.length, resultLength);
+    out.write(primaryKeyBytes);
   }
 
   class FailedToInsertException extends RuntimeException {
@@ -1393,17 +1487,7 @@ public class DatabaseClient {
 
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-      out.writeUTF(tableName);
-      out.writeUTF(keyInfo.indexSchema.getKey());
-      DataUtil.writeVLong(out, record.getId());
-      out.writeBoolean(isExplicitTrans());
-      out.writeBoolean(isCommitting());
-      DataUtil.writeVLong(out, getTransactionId());
-      byte[] recordBytes = record.serialize(common);
-      out.writeInt(recordBytes.length);
-      out.write(recordBytes);
-      out.write(DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), keyInfo.indexSchema.getKey(), keyInfo.key));
+      serializeInsertKeyWithRecord(out, dbName, tableName, keyInfo, record);
       out.close();
 
       int replicaCount = getReplicaCount();
@@ -1435,6 +1519,20 @@ public class DatabaseClient {
     catch (IOException e) {
       throw new DatabaseException(e);
     }
+  }
+
+  private void serializeInsertKeyWithRecord(DataOutputStream out, String dbName, String tableName, KeyInfo keyInfo, Record record) throws IOException {
+    DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+    out.writeUTF(tableName);
+    out.writeUTF(keyInfo.indexSchema.getKey());
+    DataUtil.writeVLong(out, record.getId());
+    out.writeBoolean(isExplicitTrans());
+    out.writeBoolean(isCommitting());
+    DataUtil.writeVLong(out, getTransactionId());
+    byte[] recordBytes = record.serialize(common);
+    out.writeInt(recordBytes.length);
+    out.write(recordBytes);
+    out.write(DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), keyInfo.indexSchema.getKey(), keyInfo.key));
   }
 
   public void deleteKey(String dbName, String tableName, KeyInfo keyInfo, String primaryKeyIndexName, Object[] primaryKey) {
@@ -1564,6 +1662,8 @@ public class DatabaseClient {
   public int doInsert(String dbName, InsertStatementImpl insertStatement, ParameterHandler parms) throws IOException, SQLException {
     int previousSchemaVersion = common.getSchemaVersion();
 
+    batchDbName.set(dbName);
+
     List<String> columnNames;
     List<Object> values;
 
@@ -1644,7 +1744,12 @@ public class DatabaseClient {
                 record.setDbViewNumber(common.getSchemaVersion() - 1);
               }
             }
-            insertKeyWithRecord(dbName, insertStatement.getTableName(), keyInfo, record);
+            if (batchWithRecordOutputStreams.get() != null) {
+              serializeInsertKeyWithRecord(batchWithRecordOutputStreams.get().get(keyInfo.shard), dbName, insertStatement.getTableName(), keyInfo, record);
+            }
+            else {
+              insertKeyWithRecord(dbName, insertStatement.getTableName(), keyInfo, record);
+            }
 
             primaryKeyCount++;
 //            if (previousSchemaVersion != common.getSchemaVersion()) {
@@ -1653,7 +1758,13 @@ public class DatabaseClient {
             completed.add(keyInfo);
           }
           else {
-            insertKey(dbName, insertStatement.getTableName(), keyInfo, primaryKey.indexSchema.getKey(), primaryKey.key);
+            if (batchWithoutRecordOutputStreams.get() != null) {
+              serializeInsertKey(dbName, insertStatement.getTableName(), keyInfo, primaryKey.indexSchema.getKey(),
+                      primaryKey.key, batchWithoutRecordOutputStreams.get().get(keyInfo.shard));
+            }
+            else {
+              insertKey(dbName, insertStatement.getTableName(), keyInfo, primaryKey.indexSchema.getKey(), primaryKey.key);
+            }
             completed.add(keyInfo);
           }
           if (previousSchemaVersion != common.getSchemaVersion()) {

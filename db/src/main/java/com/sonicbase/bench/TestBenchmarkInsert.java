@@ -34,6 +34,7 @@ public class TestBenchmarkInsert {
 
     final long startId = Long.valueOf(args[0]);
     final String cluster = args[1];
+    final boolean batch = args[2].equals("batch");
 
     File file = new File(System.getProperty("user.dir"), "config/config-" + cluster + ".json");
     if (!file.exists()) {
@@ -169,7 +170,7 @@ public class TestBenchmarkInsert {
 //    });
 //    thread.start();
 
-    final int batchSize = 1000;
+    final int batchSize = 10000;
     final AtomicInteger countInserted = new AtomicInteger();
     final AtomicLong insertErrorCount = new AtomicLong();
     final long begin = System.currentTimeMillis();
@@ -224,55 +225,110 @@ public class TestBenchmarkInsert {
                 try {
                  // System.out.println("Inserting: id=" + offset);
 
-                  for (int i = 0; i < batchSize; i++) {
-                    // create table Persons (id1 BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id1))
-                    // create table Memberships (personId BIGINT, personId2 BIGINT, membershipName VARCHAR(20), resortId BIGINT, PRIMARY KEY (personId, personId2))
-                    // create table Resorts (resortId BIGINT, resortName VARCHAR(20), PRIMARY KEY (resortId))
+                  if (batch) {
                     PreparedStatement stmt = conn.prepareStatement("insert into persons (id1, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
-                    stmt.setLong(1, offset + i);
-                    stmt.setLong(2, (offset + i + 100) % 2);
-                    stmt.setString(3, "933-28-" + (offset + i + 1));
-                    stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
-                    stmt.setBoolean(5, false);
-                    stmt.setString(6, "m");
-                    //Timer.Context ctx = INSERT_STATS.time();
-                    long currBegin = System.nanoTime();
-                    if (stmt.executeUpdate() != 1) {
-                      throw new DatabaseException("Failed to insert");
-                    }
-                    totalDuration.addAndGet(System.nanoTime() - currBegin);
-                    countInserted.incrementAndGet();
-                    logProgress(offset, threadOffset, countInserted, lastLogged, begin, totalDuration, insertErrorCount);
+                    for (int i = 0; i < batchSize; i++) {
+                      // create table Persons (id1 BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id1))
+                      // create table Memberships (personId BIGINT, personId2 BIGINT, membershipName VARCHAR(20), resortId BIGINT, PRIMARY KEY (personId, personId2))
+                      // create table Resorts (resortId BIGINT, resortName VARCHAR(20), PRIMARY KEY (resortId))
+                      stmt.setLong(1, offset + i);
+                      stmt.setLong(2, (offset + i + 100) % 2);
+                      stmt.setString(3, "933-28-" + (offset + i + 1));
+                      stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+                      stmt.setBoolean(5, false);
+                      stmt.setString(6, "m");
+                      //Timer.Context ctx = INSERT_STATS.time();
+                      long currBegin = System.nanoTime();
+                      stmt.addBatch();
+                      totalDuration.addAndGet(System.nanoTime() - currBegin);
+                      countInserted.incrementAndGet();
+                      logProgress(offset, threadOffset, countInserted, lastLogged, begin, totalDuration, insertErrorCount);
 
-                    //ctx.stop();
+                      //ctx.stop();
+                    }
+                    stmt.executeBatch();
+
+
+                    stmt = conn.prepareStatement("insert into Memberships (personId, personId2, membershipName, resortId) VALUES (?, ?, ?, ?)");
+                    for (int i = 0; i < batchSize; i++) {
+                      for (int j = 0; j < 2; j++) {
+                        long id1 = offset + i;
+                        long id2 = j;
+                        try {
+                          stmt.setLong(1, id1);
+                          stmt.setLong(2, id2);
+                          stmt.setString(3, "membership-" + j);
+                          stmt.setLong(4, new long[]{1000, 2000}[j % 2]);
+                          long currBegin = System.nanoTime();
+                          stmt.addBatch();
+                          totalDuration.addAndGet(System.nanoTime() - currBegin);
+                          countInserted.incrementAndGet();
+                          //ctx.stop();
+                        } catch (Exception e) {
+                          if (e.getMessage().contains("Unique constraint violated")) {
+                            logger.error("Unique constraint violation - membership");
+                          } else {
+                            logger.error("Error inserting membership: id=" + currOffset, e);
+                          }
+                        }
+                      }
+                      logProgress(offset, threadOffset, countInserted, lastLogged, begin, totalDuration, insertErrorCount);
+
+                    }
+                    stmt.executeBatch();
+
                   }
+                  else {
+                    for (int i = 0; i < batchSize; i++) {
+                      // create table Persons (id1 BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id1))
+                      // create table Memberships (personId BIGINT, personId2 BIGINT, membershipName VARCHAR(20), resortId BIGINT, PRIMARY KEY (personId, personId2))
+                      // create table Resorts (resortId BIGINT, resortName VARCHAR(20), PRIMARY KEY (resortId))
+                      PreparedStatement stmt = conn.prepareStatement("insert into persons (id1, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
+                      stmt.setLong(1, offset + i);
+                      stmt.setLong(2, (offset + i + 100) % 2);
+                      stmt.setString(3, "933-28-" + (offset + i + 1));
+                      stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+                      stmt.setBoolean(5, false);
+                      stmt.setString(6, "m");
+                      //Timer.Context ctx = INSERT_STATS.time();
+                      long currBegin = System.nanoTime();
+                      if (stmt.executeUpdate() != 1) {
+                        throw new DatabaseException("Failed to insert");
+                      }
+                      totalDuration.addAndGet(System.nanoTime() - currBegin);
+                      countInserted.incrementAndGet();
+                      logProgress(offset, threadOffset, countInserted, lastLogged, begin, totalDuration, insertErrorCount);
 
-                  for (int i = 0; i < batchSize; i++) {
-                    for (int j = 0; j < 2; j++) {
-                      long id1 = offset + i;
-                      long id2 = j;
-                      try {
-                        PreparedStatement stmt = conn.prepareStatement("insert into Memberships (personId, personId2, membershipName, resortId) VALUES (?, ?, ?, ?)");
-                        stmt.setLong(1, id1);
-                        stmt.setLong(2, id2);
-                        stmt.setString(3, "membership-" + j);
-                        stmt.setLong(4, new long[]{1000, 2000}[j % 2]);
-                        long currBegin = System.nanoTime();
-                        assertEquals(stmt.executeUpdate(), 1);
-                        totalDuration.addAndGet(System.nanoTime() - currBegin);
-                        countInserted.incrementAndGet();
-                        //ctx.stop();
-                      }
-                      catch (Exception e) {
-                        if (e.getMessage().contains("Unique constraint violated")) {
-                          logger.error("Unique constraint violation - membership");
-                        }
-                        else {
-                          logger.error("Error inserting membership: id=" + currOffset, e);
-                        }
-                      }
+                      //ctx.stop();
                     }
-                    logProgress(offset, threadOffset, countInserted, lastLogged, begin, totalDuration, insertErrorCount);
+
+                    /*
+                    for (int i = 0; i < batchSize; i++) {
+                      for (int j = 0; j < 2; j++) {
+                        long id1 = offset + i;
+                        long id2 = j;
+                        try {
+                          PreparedStatement stmt = conn.prepareStatement("insert into Memberships (personId, personId2, membershipName, resortId) VALUES (?, ?, ?, ?)");
+                          stmt.setLong(1, id1);
+                          stmt.setLong(2, id2);
+                          stmt.setString(3, "membership-" + j);
+                          stmt.setLong(4, new long[]{1000, 2000}[j % 2]);
+                          long currBegin = System.nanoTime();
+                          //assertEquals(stmt.executeUpdate(), 1);
+                          totalDuration.addAndGet(System.nanoTime() - currBegin);
+                          countInserted.incrementAndGet();
+                          //ctx.stop();
+                        } catch (Exception e) {
+                          if (e.getMessage().contains("Unique constraint violated")) {
+                            logger.error("Unique constraint violation - membership");
+                          } else {
+                            logger.error("Error inserting membership: id=" + currOffset, e);
+                          }
+                        }
+                      }
+                      logProgress(offset, threadOffset, countInserted, lastLogged, begin, totalDuration, insertErrorCount);
+                    }
+                    */
                   }
 
                   if (offset == 0) {

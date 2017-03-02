@@ -136,7 +136,7 @@ public class TestDataTypes {
       stmt.setDate(16, date);
       Time time = new Time(i, i, i);
       stmt.setTime(17, time);
-      Timestamp timestamp = new Timestamp(i, i, i, i, i, i, i);
+      Timestamp timestamp = new Timestamp(1990, 12, 13, 1, 2, i, 0);
       stmt.setTimestamp(18, timestamp);
       stmt.setByte(19, (byte) i);
       stmt.setBoolean(20, i % 2 == 0);
@@ -254,7 +254,7 @@ public class TestDataTypes {
     assertEquals(time, lhsTime);
 
     Timestamp timestamp = ret.getTimestamp("timestamp");
-    Timestamp lhsTimestamp = new Timestamp(4, 4, 4, 4, 4, 4, 4);
+    Timestamp lhsTimestamp = new Timestamp(1990, 12, 13, 1, 2, 4, 0);
     assertEquals(timestamp, lhsTimestamp);
 
     assertEquals(ret.getString("nchar"), "933-28-4");
@@ -334,7 +334,7 @@ public class TestDataTypes {
     assertEquals(time, lhsTime);
 
     timestamp = ret.getTimestamp(14);
-    lhsTimestamp = new Timestamp(4, 4, 4, 4, 4, 4, 4);
+    lhsTimestamp = new Timestamp(1990, 12, 13, 1, 2, 4, 0);
     assertEquals(timestamp, lhsTimestamp);
 
     assertEquals(ret.getLong(15), 4);
@@ -570,33 +570,66 @@ public class TestDataTypes {
 
   @Test
   public void testTimestamp() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("create table timestamp (id TIMESTAMP, id2 INTEGER, name VARCHAR(20), PRIMARY KEY (id))");
+    PreparedStatement stmt = conn.prepareStatement("create table timestamp (id TIMESTAMP, idb TIMESTAMP, id2 INTEGER, name VARCHAR(20), PRIMARY KEY (id))");
     stmt.executeUpdate();
 
     for (int i = 0; i < recordCount; i++) {
-      stmt = conn.prepareStatement("insert into timestamp (id, id2, name) VALUES (?, ?, ?)");
-      stmt.setTimestamp(1, new Timestamp(i + 1));
-      stmt.setInt(2, i);
-      stmt.setString(3, "name-" + i);
+      stmt = conn.prepareStatement("insert into timestamp (id, idb, id2, name) VALUES (?, ?, ?, ?)");
+      stmt.setTimestamp(1, new Timestamp(1990 - 1900, 11, 13, 1, 2, i, 0));
+      if (i != 4) {
+        stmt.setTimestamp(2, new Timestamp(1990 - 1900, 11, 13, 1, 2, i + 100, 0));
+      }
+      else {
+        stmt.setTimestamp(2, new Timestamp(1990 - 1900, 11, 13, 1, 2, i, 0));
+      }
+      stmt.setInt(3, i);
+      stmt.setString(4, "name-" + i);
       assertEquals(stmt.executeUpdate(), 1);
     }
 
     stmt = conn.prepareStatement("select id, id2, name from timestamp where id<? order by id desc");
-    stmt.setTimestamp(1, new Timestamp(6));
+    stmt.setTimestamp(1, new Timestamp(1990 - 1900, 11, 13, 1, 2, 6, 0));
     ResultSet ret = stmt.executeQuery();
 
     ret.next();
-    assertEquals(ret.getTimestamp("id").getTime(), 5);
+    assertEquals(ret.getTimestamp("id"), new Timestamp(1990 - 1900, 11, 13, 1, 2, 5, 0));
+    assertEquals(ret.getInt("id2"), 5);
+    assertEquals(ret.getString("name"), "name-5");
+    ret.next();
+    assertEquals(ret.getTimestamp("id"), new Timestamp(1990 - 1900, 11, 13, 1, 2, 4, 0));
+    ret.next();
+    assertEquals(ret.getTimestamp("id"), new Timestamp(1990 - 1900, 11, 13, 1, 2, 3, 0));
+    ret.next();
+    assertEquals(ret.getTimestamp("id"), new Timestamp(1990 - 1900, 11, 13, 1, 2, 2, 0));
+    ret.next();
+    assertEquals(ret.getTimestamp("id"), new Timestamp(1990 - 1900, 11, 13, 1, 2, 1, 0));
+
+    stmt = conn.prepareStatement("select id, id2, name from timestamp where id<? order by id desc");
+    stmt.setString(1, "1990-12-13 01:02:06.0");
+    ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getTimestamp("id"), new Timestamp(1990 - 1900, 11, 13, 1, 2, 5, 0));
+    assertEquals(ret.getInt("id2"), 5);
+    assertEquals(ret.getString("name"), "name-5");
+    ret.next();
+    assertEquals(ret.getTimestamp("id"), new Timestamp(1990 - 1900, 11, 13, 1, 2, 4, 0));
+    ret.next();
+    assertEquals(ret.getTimestamp("id"), new Timestamp(1990 - 1900, 11, 13, 1, 2, 3, 0));
+    ret.next();
+    assertEquals(ret.getTimestamp("id"), new Timestamp(1990 - 1900, 11, 13, 1, 2, 2, 0));
+    ret.next();
+    assertEquals(ret.getTimestamp("id"), new Timestamp(1990 - 1900, 11, 13, 1, 2, 1, 0));
+
+
+    stmt = conn.prepareStatement("select id, id2, name from timestamp where id=idb order by id desc");
+    ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getTimestamp("id"), new Timestamp(1990 - 1900, 11, 13, 1, 2, 4, 0));
     assertEquals(ret.getInt("id2"), 4);
     assertEquals(ret.getString("name"), "name-4");
-    ret.next();
-    assertEquals(ret.getTimestamp("id").getTime(), 4);
-    ret.next();
-    assertEquals(ret.getTimestamp("id").getTime(), 3);
-    ret.next();
-    assertEquals(ret.getTimestamp("id").getTime(), 2);
-    ret.next();
-    assertEquals(ret.getTimestamp("id").getTime(), 1);
+    assertFalse(ret.next());
   }
 
 

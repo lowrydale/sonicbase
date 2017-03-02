@@ -5,12 +5,16 @@ import com.sonicbase.query.impl.ResultSetImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.InputStream;
 import java.io.Reader;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.sql.*;
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.List;
 
 /**
  * Created by IntelliJ IDEA.
@@ -38,6 +42,11 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
     this.databaseClient = databaseClient;
     this.sql = sql;
     this.dbName = connectionProxy.getDbName();
+
+    DatabaseClient.batchWithRecordOutputStreams.set(null);
+    DatabaseClient.batchWithoutRecordOutputStreams.set(null);
+    DatabaseClient.batchWithRecordByteOutputStreams.set(null);
+    DatabaseClient.batchWithoutRecordByteOutputStreams.set(null);
   }
 
   public void close() throws SQLException {
@@ -145,13 +154,33 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
   }
 
   public void addBatch() throws SQLException {
+    if (DatabaseClient.batchWithRecordOutputStreams.get() == null) {
+      DatabaseClient.batchWithRecordOutputStreams.set(new ArrayList<DataOutputStream>());
+      DatabaseClient.batchWithoutRecordOutputStreams.set(new ArrayList<DataOutputStream>());
+      DatabaseClient.batchWithRecordByteOutputStreams.set(new ArrayList<ByteArrayOutputStream>());
+      DatabaseClient.batchWithoutRecordByteOutputStreams.set(new ArrayList<ByteArrayOutputStream>());
+      for (int i = 0; i < databaseClient.getShardCount(); i++) {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        DatabaseClient.batchWithRecordByteOutputStreams.get().add(bytes);
+        DatabaseClient.batchWithRecordOutputStreams.get().add(new DataOutputStream(bytes));
+
+        bytes = new ByteArrayOutputStream();
+        DatabaseClient.batchWithoutRecordByteOutputStreams.get().add(bytes);
+        DatabaseClient.batchWithoutRecordOutputStreams.get().add(new DataOutputStream(bytes));
+      }
+    }
+    databaseClient.executeQuery(dbName, QueryType.execute0, sql, parms);
   }
 
   public void clearBatch() throws SQLException {
+    DatabaseClient.batchWithRecordOutputStreams.set(null);
+    DatabaseClient.batchWithRecordByteOutputStreams.set(null);
+    DatabaseClient.batchWithoutRecordOutputStreams.set(null);
+    DatabaseClient.batchWithoutRecordOutputStreams.set(null);
   }
 
   public int[] executeBatch() throws SQLException {
-    return null;
+    return databaseClient.executeBatch();
   }
 
   public Connection getConnection() throws SQLException {

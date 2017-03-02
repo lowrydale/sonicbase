@@ -1041,14 +1041,16 @@ public abstract class ExpressionImpl implements Expression {
 
               boolean writingLongs = false;
               if (srcValues.size() > 0 && srcValues.get(0).getValue().length == 1) {
-                out.writeBoolean(true);
                 Object value = srcValues.get(0).getValue()[0];
                 if (value instanceof Long) {
+                  out.writeBoolean(true);
                   out.writeInt(DataType.Type.BIGINT.getValue());
                   writingLongs = true;
                 }
                 else {
-                  throw new DatabaseException("not supported");
+                  out.writeBoolean(false);
+                  writingLongs = false;
+                  //throw new DatabaseException("not supported");
                 }
               }
               else {

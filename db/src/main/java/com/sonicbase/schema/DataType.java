@@ -285,22 +285,30 @@ public class DataType {
       if (value instanceof BigDecimal) {
         return value;
       }
+      else if (value instanceof byte[]) {
+        try {
+          ret = BigDecimal.ONE.valueOf(Double.valueOf(new String((byte[]) value, "utf-8")));
+        }
+        catch (UnsupportedEncodingException e) {
+          throw new DatabaseException(e);
+        }
+      }
       else if (value instanceof Float) {
         ret = new BigDecimal((float) (Float) value);
       }
       else if (value instanceof Double) {
         ret = new BigDecimal((double) (Double) value);
       }
-      if (value instanceof Integer) {
+      else if (value instanceof Integer) {
         ret = new BigDecimal((int) (Integer) value);
       }
-      if (value instanceof Long) {
+      else if (value instanceof Long) {
         ret = new BigDecimal((long) (Long) value);
       }
-      if (value instanceof Short) {
+      else if (value instanceof Short) {
         ret = new BigDecimal((short) (Short) value);
       }
-      if (value instanceof Byte) {
+      else if (value instanceof Byte) {
         ret = new BigDecimal((short) (byte) (Byte) value);
       }
       else {
@@ -411,6 +419,9 @@ public class DataType {
         catch (UnsupportedEncodingException e) {
           throw new DatabaseException(e);
         }
+      }
+      else if (value instanceof Long) {
+        ret = new Timestamp((Long)value);
       }
       else if (value instanceof Date) {
         ret = new Timestamp(((Date) value).getTime());
@@ -671,7 +682,8 @@ public class DataType {
       }
       Timestamp lhs = (Timestamp) timestampConverter.convert(o1);
       Timestamp rhs = (Timestamp) timestampConverter.convert(o2);
-      return lhs.compareTo(rhs);
+      int ret = lhs.compareTo(rhs);
+      return ret;
     }
   };
 

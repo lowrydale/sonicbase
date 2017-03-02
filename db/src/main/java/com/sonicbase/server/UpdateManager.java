@@ -204,7 +204,44 @@ public class UpdateManager {
     }
   }
 
+  public byte[] batchInsertIndexEntryByKey(String command, byte[] body, boolean replayedCommand) {
+    ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
+    DataInputStream in = new DataInputStream(bytesIn);
+    int count = 0;
+    try {
+      while (true) {
+        doInsertIndexEntryByKey(command, in, replayedCommand);
+        count++;
+      }
+    }
+    catch (EOFException e) {
+      //expected
+    }
+    try {
+      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+      DataOutputStream out = new DataOutputStream(bytesOut);
+      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+      out.writeInt(count);
+      out.close();
+      return bytesOut.toByteArray();
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+  }
+
   public byte[] insertIndexEntryByKey(String command, byte[] body, boolean replayedCommand) {
+    ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
+    DataInputStream in = new DataInputStream(bytesIn);
+    try {
+      return doInsertIndexEntryByKey(command, in, replayedCommand);
+    }
+    catch (EOFException e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public byte[] doInsertIndexEntryByKey(String command, DataInputStream in, boolean replayedCommand) throws EOFException {
     try {
       if (server.getAboveMemoryThreshold().get()) {
         throw new DatabaseException("Above max memory threshold. Further inserts are not allowed");
@@ -216,8 +253,6 @@ public class UpdateManager {
       if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
-      ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
-      DataInputStream in = new DataInputStream(bytesIn);
       long serializationVersion = DataUtil.readVLong(in);
 
       String tableName = in.readUTF();
@@ -276,12 +311,52 @@ public class UpdateManager {
 
       return null;
     }
+    catch (EOFException e) {
+      throw e;
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public byte[] batchInsertIndexEntryByKeyWithRecord(String command, byte[] body, boolean replayedCommand) {
+    ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
+    DataInputStream in = new DataInputStream(bytesIn);
+    int count = 0;
+    try {
+      while (true) {
+        doInsertIndexEntryByKeyWithRecord(command, in, replayedCommand);
+        count++;
+      }
+    }
+    catch (EOFException e) {
+      //expected
+    }
+    try {
+      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+      DataOutputStream out = new DataOutputStream(bytesOut);
+      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+      out.writeInt(count);
+      out.close();
+      return bytesOut.toByteArray();
+    }
     catch (IOException e) {
       throw new DatabaseException(e);
     }
   }
 
   public byte[] insertIndexEntryByKeyWithRecord(String command, byte[] body, boolean replayedCommand) {
+    ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
+    DataInputStream in = new DataInputStream(bytesIn);
+    try {
+      return doInsertIndexEntryByKeyWithRecord(command, in, replayedCommand);
+    }
+    catch (EOFException e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public byte[] doInsertIndexEntryByKeyWithRecord(String command, DataInputStream in, boolean replayedCommand) throws EOFException {
     try {
       if (server.getAboveMemoryThreshold().get()) {
         throw new DatabaseException("Above max memory threshold. Further inserts are not allowed");
@@ -293,8 +368,6 @@ public class UpdateManager {
       if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
-      ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
-      DataInputStream in = new DataInputStream(bytesIn);
       long serializationVersion = DataUtil.readVLong(in);
 
       String tableName = in.readUTF();
@@ -382,6 +455,9 @@ public class UpdateManager {
       out.writeInt(1);
       out.close();
       return bytesOut.toByteArray();
+    }
+    catch (EOFException e) {
+      throw e;
     }
     catch (IOException e) {
       throw new DatabaseException(e);

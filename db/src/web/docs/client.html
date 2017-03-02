@@ -9,7 +9,37 @@
 </head>
 
 <h3>Startup</h3>
-Run the script "cli" found in the database install directory.
+Start the client by typing "./cli" from the bin subdirectory of the install directory.<br/>
+<br/>
+<h3>Use a Cluster</h3>
+Type "use cluster &lt;cluster name&gt;". The cluster name must match a config file in the config directory.
+The name of the config file must follow "config-&lt;cluster name&gt;.json".
+<br/>
+<h3>Deploy Cluster</h3>
+To deploy the image to the servers in the cluster, type "deploy cluster". Note that you must setup passwordless
+ssh between all the servers.
+<br/>
+<h3>Start Cluster</h3>
+To start a cluster type "start cluster".
+<br/>
+<h3>Purge Cluster</h3>
+To purge a cluster type "purge cluster". This will purge and stop the cluster.
+<br/>
+<h3>Create a Database</h3>
+Type "create database &lt;database name&gt;".
+<br/>
+<h3>Use a Database</h3>
+To use a database type "use database &lt;database name&gt;".
+<br/>
+<h3>SQL Commands Available</h3>
+The following sql commands may be entered in the client.<br/>
+select<br/>
+delete<br/>
+insert<br/>
+create table<br/>
+create index<br/>
+update<br/>
+describe<br/>
 
 <body>
 </body>

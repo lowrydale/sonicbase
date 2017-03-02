@@ -12,6 +12,7 @@ import org.testng.annotations.Test;
 
 import java.io.BufferedInputStream;
 import java.io.File;
+import java.math.BigDecimal;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,7 +29,7 @@ public class TestJoins {
   private Connection conn;
   private int recordCount = 10;
   List<Long> ids = new ArrayList<>();
-
+  DatabaseClient client;
 
   @BeforeClass
   public void beforeClass() throws Exception {
@@ -74,7 +75,7 @@ public class TestJoins {
 
     conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/test", "user", "password");
 
-    DatabaseClient client = ((ConnectionProxy)conn).getDatabaseClient();
+    client = ((ConnectionProxy)conn).getDatabaseClient();
 
     client.setPageSize(3);
 
@@ -286,6 +287,283 @@ public class TestJoins {
       for (int j = 0; j < 10; j++) {
         ret.next();
         assertEquals(ret.getLong("id"), i);
+        assertEquals(ret.getString("membershipname"), "membership-" + j);
+      }
+    }
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testInnerJoinString() throws SQLException, InterruptedException {
+
+    PreparedStatement stmt = conn.prepareStatement("create table PersonsString (id VARCHAR, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
+    stmt.executeUpdate();
+
+    stmt = conn.prepareStatement("create table MembershipsString (personId VARCHAR, personId2 BIGINT, membershipName VARCHAR(20), resortId BIGINT, PRIMARY KEY (personId, membershipName))");
+    stmt.executeUpdate();
+
+    for (int i = 0; i < recordCount; i++) {
+      for (int j = 0; j < recordCount; j++) {
+        stmt = conn.prepareStatement("insert into MembershipsString (personId, personId2, membershipName, resortId) VALUES (?, ?, ?, ?)");
+        stmt.setString(1, String.valueOf(i));
+        stmt.setLong(2, (i + 100) % 3);
+        stmt.setString(3, "membership-" + j);
+        stmt.setLong(4, new long[]{1000, 2000}[j % 2]);
+        assertEquals(stmt.executeUpdate(), 1);
+      }
+    }
+
+    for (int i = 0; i < recordCount; i++) {
+      stmt = conn.prepareStatement("insert into personsString (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
+      stmt.setString(1, String.valueOf(i));
+      stmt.setLong(2, (i + 100) % 2);
+      stmt.setString(3, "933-28-" + i);
+      stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+      stmt.setBoolean(5, false);
+      stmt.setString(6, "m");
+      assertEquals(stmt.executeUpdate(), 1);
+      ids.add((long) i);
+    }
+
+    for (int i = 0; i < recordCount; i++) {
+      stmt = conn.prepareStatement("insert into personsString (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
+      stmt.setString(1, String.valueOf(i + 100));
+      stmt.setLong(2, (i + 100) % 2);
+      stmt.setString(3, "933-28-" + (i % 4));
+      stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+      stmt.setBoolean(5, false);
+      stmt.setString(6, "m");
+      int count = stmt.executeUpdate();
+      assertEquals(count, 1);
+      ids.add((long) (i + 100));
+    }
+
+    client.beginRebalance("test", "personsString", "_1__primarykey");
+
+    while (true) {
+      if (client.isRepartitioningComplete("test")) {
+        break;
+      }
+      Thread.sleep(1000);
+    }
+
+    stmt = conn.prepareStatement(
+            "select personsString.id, personsString.socialsecuritynumber, membershipsString.membershipname from personsString " +
+                    " inner join MembershipsString on personsString.id = MembershipsString.PersonId where personsString.id<'5'  order by personsString.id desc");
+    ResultSet ret = stmt.executeQuery();
+
+    for (int i = 4; i >= 0; i--) {
+      for (int j = 0; j < 10; j++) {
+        ret.next();
+        assertEquals(ret.getString("id"), String.valueOf(i));
+        assertEquals(ret.getString("membershipname"), "membership-" + j);
+      }
+    }
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testInnerJoinDouble() throws SQLException, InterruptedException {
+
+    PreparedStatement stmt = conn.prepareStatement("create table PersonsDouble (id DOUBLE, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
+    stmt.executeUpdate();
+
+    stmt = conn.prepareStatement("create table MembershipsDouble (personId DOUBLE, personId2 BIGINT, membershipName VARCHAR(20), resortId BIGINT, PRIMARY KEY (personId, membershipName))");
+    stmt.executeUpdate();
+
+    for (int i = 0; i < recordCount; i++) {
+      for (int j = 0; j < recordCount; j++) {
+        stmt = conn.prepareStatement("insert into MembershipsDouble (personId, personId2, membershipName, resortId) VALUES (?, ?, ?, ?)");
+        stmt.setDouble(1, Double.valueOf(i));
+        stmt.setLong(2, (i + 100) % 3);
+        stmt.setString(3, "membership-" + j);
+        stmt.setLong(4, new long[]{1000, 2000}[j % 2]);
+        assertEquals(stmt.executeUpdate(), 1);
+      }
+    }
+
+    for (int i = 0; i < recordCount; i++) {
+      stmt = conn.prepareStatement("insert into personsDouble (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
+      stmt.setDouble(1, Double.valueOf(i));
+      stmt.setLong(2, (i + 100) % 2);
+      stmt.setString(3, "933-28-" + i);
+      stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+      stmt.setBoolean(5, false);
+      stmt.setString(6, "m");
+      assertEquals(stmt.executeUpdate(), 1);
+      ids.add((long) i);
+    }
+
+    for (int i = 0; i < recordCount; i++) {
+      stmt = conn.prepareStatement("insert into personsDouble (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
+      stmt.setDouble(1, Double.valueOf(i + 100));
+      stmt.setLong(2, (i + 100) % 2);
+      stmt.setString(3, "933-28-" + (i % 4));
+      stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+      stmt.setBoolean(5, false);
+      stmt.setString(6, "m");
+      int count = stmt.executeUpdate();
+      assertEquals(count, 1);
+      ids.add((long) (i + 100));
+    }
+
+    client.beginRebalance("test", "personsDouble", "_1__primarykey");
+
+    while (true) {
+      if (client.isRepartitioningComplete("test")) {
+        break;
+      }
+      Thread.sleep(1000);
+    }
+
+    stmt = conn.prepareStatement(
+            "select personsDouble.id, personsDouble.socialsecuritynumber, membershipsDouble.membershipname from personsDouble " +
+                    " inner join MembershipsDouble on personsDouble.id = MembershipsDouble.PersonId where personsDouble.id<'5'  order by personsDouble.id desc");
+    ResultSet ret = stmt.executeQuery();
+
+    for (int i = 4; i >= 0; i--) {
+      for (int j = 0; j < 10; j++) {
+        ret.next();
+        assertEquals(ret.getDouble("id"), Double.valueOf(i));
+        assertEquals(ret.getString("membershipname"), "membership-" + j);
+      }
+    }
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testInnerJoinNumeric() throws SQLException, InterruptedException {
+
+    PreparedStatement stmt = conn.prepareStatement("create table PersonsNumeric (id NUMERIC, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
+    stmt.executeUpdate();
+
+    stmt = conn.prepareStatement("create table MembershipsNumeric (personId NUMERIC, personId2 BIGINT, membershipName VARCHAR(20), resortId BIGINT, PRIMARY KEY (personId, membershipName))");
+    stmt.executeUpdate();
+
+    for (int i = 0; i < recordCount; i++) {
+      for (int j = 0; j < recordCount; j++) {
+        stmt = conn.prepareStatement("insert into MembershipsNumeric (personId, personId2, membershipName, resortId) VALUES (?, ?, ?, ?)");
+        stmt.setBigDecimal(1, BigDecimal.valueOf(i));
+        stmt.setLong(2, (i + 100) % 3);
+        stmt.setString(3, "membership-" + j);
+        stmt.setLong(4, new long[]{1000, 2000}[j % 2]);
+        assertEquals(stmt.executeUpdate(), 1);
+      }
+    }
+
+    for (int i = 0; i < recordCount; i++) {
+      stmt = conn.prepareStatement("insert into personsNumeric (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
+      stmt.setBigDecimal(1, BigDecimal.valueOf(i));
+      stmt.setLong(2, (i + 100) % 2);
+      stmt.setString(3, "933-28-" + i);
+      stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+      stmt.setBoolean(5, false);
+      stmt.setString(6, "m");
+      assertEquals(stmt.executeUpdate(), 1);
+      ids.add((long) i);
+    }
+
+    for (int i = 0; i < recordCount; i++) {
+      stmt = conn.prepareStatement("insert into personsNumeric (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
+      stmt.setBigDecimal(1, BigDecimal.valueOf(i + 100));
+      stmt.setLong(2, (i + 100) % 2);
+      stmt.setString(3, "933-28-" + (i % 4));
+      stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+      stmt.setBoolean(5, false);
+      stmt.setString(6, "m");
+      int count = stmt.executeUpdate();
+      assertEquals(count, 1);
+      ids.add((long) (i + 100));
+    }
+
+    client.beginRebalance("test", "personsNumeric", "_1__primarykey");
+
+    while (true) {
+      if (client.isRepartitioningComplete("test")) {
+        break;
+      }
+      Thread.sleep(1000);
+    }
+
+    stmt = conn.prepareStatement(
+            "select personsNumeric.id, personsNumeric.socialsecuritynumber, membershipsNumeric.membershipname from personsNumeric " +
+                    " inner join MembershipsNumeric on personsNumeric.id = MembershipsNumeric.PersonId where personsNumeric.id<'5'  order by personsNumeric.id desc");
+    ResultSet ret = stmt.executeQuery();
+
+    for (int i = 4; i >= 0; i--) {
+      for (int j = 0; j < 10; j++) {
+        ret.next();
+        assertEquals(ret.getBigDecimal("id"), BigDecimal.valueOf(i));
+        assertEquals(ret.getString("membershipname"), "membership-" + j);
+      }
+    }
+    assertFalse(ret.next());
+  }
+
+
+  @Test
+  public void testInnerJoinTimestamp() throws SQLException, InterruptedException {
+
+    PreparedStatement stmt = conn.prepareStatement("create table PersonsTimestamp (id TIMESTAMP, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
+    stmt.executeUpdate();
+
+    stmt = conn.prepareStatement("create table MembershipsTimestamp (personId TIMESTAMP, personId2 BIGINT, membershipName VARCHAR(20), resortId BIGINT, PRIMARY KEY (personId, membershipName))");
+    stmt.executeUpdate();
+
+    for (int i = 0; i < recordCount; i++) {
+      for (int j = 0; j < recordCount; j++) {
+        stmt = conn.prepareStatement("insert into MembershipsTimestamp (personId, personId2, membershipName, resortId) VALUES (?, ?, ?, ?)");
+        stmt.setTimestamp(1, new Timestamp(i));
+        stmt.setLong(2, (i + 100) % 3);
+        stmt.setString(3, "membership-" + j);
+        stmt.setLong(4, new long[]{1000, 2000}[j % 2]);
+        assertEquals(stmt.executeUpdate(), 1);
+      }
+    }
+
+    for (int i = 0; i < recordCount; i++) {
+      stmt = conn.prepareStatement("insert into personsTimestamp (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
+      stmt.setTimestamp(1, new Timestamp(i));
+      stmt.setLong(2, (i + 100) % 2);
+      stmt.setString(3, "933-28-" + i);
+      stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+      stmt.setBoolean(5, false);
+      stmt.setString(6, "m");
+      assertEquals(stmt.executeUpdate(), 1);
+      ids.add((long) i);
+    }
+
+    for (int i = 0; i < recordCount; i++) {
+      stmt = conn.prepareStatement("insert into personsTimestamp (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
+      stmt.setTimestamp(1, new Timestamp(i + 100));
+      stmt.setLong(2, (i + 100) % 2);
+      stmt.setString(3, "933-28-" + (i % 4));
+      stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+      stmt.setBoolean(5, false);
+      stmt.setString(6, "m");
+      int count = stmt.executeUpdate();
+      assertEquals(count, 1);
+      ids.add((long) (i + 100));
+    }
+
+    client.beginRebalance("test", "personsTimestamp", "_1__primarykey");
+
+    while (true) {
+      if (client.isRepartitioningComplete("test")) {
+        break;
+      }
+      Thread.sleep(1000);
+    }
+
+    stmt = conn.prepareStatement(
+            "select personsTimestamp.id, personsTimestamp.socialsecuritynumber, membershipsTimestamp.membershipname from personsTimestamp " +
+                    " inner join MembershipsTimestamp on personsTimestamp.id = MembershipsTimestamp.PersonId where personsTimestamp.id<5  order by personsTimestamp.id desc");
+    ResultSet ret = stmt.executeQuery();
+
+    for (int i = 4; i >= 0; i--) {
+      for (int j = 0; j < 10; j++) {
+        ret.next();
+        assertEquals(ret.getTimestamp("id"), new Timestamp(i));
         assertEquals(ret.getString("membershipname"), "membership-" + j);
       }
     }

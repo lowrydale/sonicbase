@@ -18,15 +18,33 @@ var TREE_ITEMS = [
 		['SQL Syntax', null,
 			['Select', 0,
 				['Select Basics', 'docs/select-basics.html'],
-				['Select Order By', 'docs/select-order-by.html']
-			 ]
+				['Select Order By', 'docs/select-order-by.html'],
+				['Select Functions', 'docs/select-functions.html'],
+				['Select Count', 'docs/select-count.html'],
+				['Select Group By', 'docs/select-group-by.html'],
+				['Select Limit', 'docs/select-limit.html'],
+				['Joins', 0,
+				    ['Inner', 'docs/joins-inner'],
+				    ['Left Outer', 'docs/joins-left-outer.html'],
+				    ['Right Outer', 'docs/joins-right-outer.html'],
+				    ['Full', 'docs/joins-full.html']
+				]
+			 ],
+			 ['Insert', 'docs/insert.html'],
+			 ['Delete', 'docs/delete.html'],
+			 ['Update', 'docs/update.html'],
+			 ['Create Table', 'docs/create-table.html'],
+			 ['Create Index', 'docs/create-index.html'],
+			 ['Describe', 'docs/describe.html']
 		],
-		['Administration',    '/order.html',
+		['Administration', 0,
                 ['Setup', 'docs/setup.html'],
-                ['Client', '/download.html']
+                ['Config', 'docs/config.html'],
+                ['Client', 'docs/client.html']
 		],
 		['JDBC Client',  'docs/jdbc-client.html'],
-		['Data Types',  'docs/client.html'],
+		['Data Types',  'docs/datatypes.html'],
+		['Transactions',  'docs/transactions.html'],
 		['Benchmarks',  0,
                 ['Four Server', 0,
                     ['Identity Query', 'docs/benchmarks-4server-query1.html'],
@@ -101,14 +119,14 @@ var TREE_TPL = {
   <header> <a href="">
     <h4 class="logo">SonicBase</h4>
     </a>
-    <nav>
-      <ul>
-        <li><a href="sonic-base.html">HOME</a></li>
-        <li><a href="documentation.html">DOCUMENTATION</a></li>
-        <li><a href="#about">ABOUT</a></li>
-        <li> <a href="#contact">CONTACT</a></li>
-      </ul>
-    </nav>
+      <nav>
+          <ul>
+              <li><a href="sonic-base.html">HOME</a></li>
+              <li><a href="#forum">FORUM</a></li>
+              <li><a href="#downloads.html">DOWNLOADS</a></li>
+              <li> <a href="#contact">CONTACT</a></li>
+          </ul>
+      </nav>
   </header>
 
 <table width="100%" border="0">

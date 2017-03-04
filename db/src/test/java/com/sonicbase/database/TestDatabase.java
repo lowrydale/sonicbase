@@ -1650,24 +1650,32 @@ public class TestDatabase {
   @Test
   public void testBatchInsert() throws SQLException, InterruptedException {
 
+    conn.setAutoCommit(false);
+    PreparedStatement stmt = conn.prepareStatement("insert into persons (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
     for (int i = 0; i < 10; i++) {
-      PreparedStatement stmt = conn.prepareStatement("insert into persons (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
       stmt.setLong(1, 200000 + i);
       stmt.setLong(2, (100) % 2);
       stmt.setString(3, "ssn");
       stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
       stmt.setBoolean(5, false);
       stmt.setString(6, "m");
-      int count = stmt.executeUpdate();
-      assertEquals(count, 1);
+      stmt.addBatch();
     }
+    stmt.executeBatch();
+    conn.commit();
 
-    PreparedStatement stmt = conn.prepareStatement("select * from persons where id>=200000");
+    stmt = conn.prepareStatement("select * from persons where id>=200000");
     ResultSet resultSet = stmt.executeQuery();
     for (int i = 0; i < 10; i++){
       assertTrue(resultSet.next());
     }
     assertFalse(resultSet.next());
+
+    for (int i = 0; i < 10; i++) {
+      stmt = conn.prepareStatement("delete from persons where id=?");
+      stmt.setLong(1, 200000 + i);
+      stmt.executeUpdate();
+    }
   }
 
   @Test

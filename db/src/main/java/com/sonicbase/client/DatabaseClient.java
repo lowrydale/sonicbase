@@ -109,6 +109,7 @@ public class DatabaseClient {
       "allocateRecordIds",
       "abortTransaction",
       "serverSelectDelete",
+      "commit"
 
   };
 
@@ -132,11 +133,7 @@ public class DatabaseClient {
     }
   }
 
-  public static ThreadLocal<String> batchDbName = new ThreadLocal<>();
-  public static ThreadLocal<List<DataOutputStream>> batchWithRecordOutputStreams = new ThreadLocal<>();
-  public static ThreadLocal<List<DataOutputStream>> batchWithoutRecordOutputStreams = new ThreadLocal<>();
-  public static ThreadLocal<List<ByteArrayOutputStream>> batchWithRecordByteOutputStreams = new ThreadLocal<>();
-  public static ThreadLocal<List<ByteArrayOutputStream>> batchWithoutRecordByteOutputStreams = new ThreadLocal<>();
+  public static ThreadLocal<List<InsertRequest>> batch = new ThreadLocal<>();
 
   public int getPageSize() {
     return pageSize;
@@ -233,19 +230,31 @@ public class DatabaseClient {
 
   public void commit(String dbName, SelectStatementImpl.Explain explain) throws DatabaseException {
     isCommitting.set(true);
+    /*
     List<TransactionOperation> ops = transactionOps.get();
     for (TransactionOperation op : ops) {
       op.statement.setParms(op.parms);
       op.statement.execute(dbName, explain);
     }
+    */
+
+    String command = "DatabaseServer:commit:1:" + common.getSchemaVersion() + ":" + dbName + ":" + transactionId.get();
+    sendToAllShards(null, 0, command, null, DatabaseClient.Replica.all);
 
     isExplicitTrans.set(false);
     transactionOps.set(null);
     isCommitting.set(false);
     transactionId.set(null);
+
+
+
   }
 
-  public void rollback() {
+  public void rollback(String dbName) {
+
+    String command = "DatabaseServer:rollback:1:" + common.getSchemaVersion() + ":" + dbName + ":" + transactionId.get();
+    sendToAllShards(null, 0, command, null, DatabaseClient.Replica.all);
+
     isExplicitTrans.set(false);
     transactionOps.set(null);
     isCommitting.set(false);
@@ -336,20 +345,58 @@ public class DatabaseClient {
     }
   }
 
-  public int[] executeBatch() {
-    final AtomicInteger totalCount = new AtomicInteger();
-    try {
-      if (batchWithRecordOutputStreams.get() == null) {
-        throw new DatabaseException("No batch initiated");
-      }
+  public int[] executeBatch() throws UnsupportedEncodingException, SQLException {
 
-      {
-        final String command = "DatabaseServer:batchInsertIndexEntryByKeyWithRecord:1:" + common.getSchemaVersion() + ":" + batchDbName.get();
-        final List<ByteArrayOutputStream> bytesOut = batchWithRecordByteOutputStreams.get();
-        final List<DataOutputStream> out = batchWithRecordOutputStreams.get();
-        for (DataOutputStream currOut : out) {
-          currOut.close();
+    final List<PreparedInsert> withRecordPrepared = new ArrayList<>();
+    final List<PreparedInsert> prepared = new ArrayList<>();
+    for (InsertRequest request : batch.get()) {
+      List<PreparedInsert> inserts = prepareInsert(request);
+      for (PreparedInsert insert : inserts) {
+        if (insert.keyInfo.indexSchema.getValue().isPrimaryKey()) {
+          withRecordPrepared.add(insert);
         }
+        else {
+          prepared.add(insert);
+        }
+      }
+    }
+    while (true) {
+      final AtomicInteger totalCount = new AtomicInteger();
+      try {
+        if (batch.get() == null) {
+          throw new DatabaseException("No batch initiated");
+        }
+
+        String dbName = batch.get().get(0).dbName;
+        final String command = "DatabaseServer:batchInsertIndexEntryByKeyWithRecord:1:" + common.getSchemaVersion() + ":" + dbName;
+
+        final List<List<PreparedInsert>> withRecordProcessed = new ArrayList<>();
+        final List<List<PreparedInsert>> processed = new ArrayList<>();
+        final List<ByteArrayOutputStream> withRecordBytesOut = new ArrayList<>();
+        final List<DataOutputStream> withRecordOut = new ArrayList<>();
+        final List<ByteArrayOutputStream> bytesOut = new ArrayList<>();
+        final List<DataOutputStream> out = new ArrayList<>();
+        for (int i = 0; i < getShardCount(); i++) {
+          ByteArrayOutputStream bOut = new ByteArrayOutputStream();
+          withRecordBytesOut.add(bOut);
+          withRecordOut.add(new DataOutputStream(bOut));
+          bOut = new ByteArrayOutputStream();
+          bytesOut.add(bOut);
+          out.add(new DataOutputStream(bOut));
+          withRecordProcessed.add(new ArrayList<PreparedInsert>());
+          processed.add(new ArrayList<PreparedInsert>());
+        }
+        for (PreparedInsert insert : withRecordPrepared) {
+          serializeInsertKeyWithRecord(withRecordOut.get(insert.keyInfo.shard), insert.dbName, insert.tableName,
+                insert.keyInfo, insert.record);
+          withRecordProcessed.get(insert.keyInfo.shard).add(insert);
+        }
+        for (PreparedInsert insert : prepared) {
+          serializeInsertKey(out.get(insert.keyInfo.shard), insert.dbName, insert.tableName, insert.keyInfo,
+              insert.primaryKeyIndexName, insert.primaryKey);
+          processed.get(insert.keyInfo.shard).add(insert);
+        }
+
 
         List<Future> futures = new ArrayList<>();
         for (int i = 0; i < bytesOut.size(); i++) {
@@ -357,7 +404,7 @@ public class DatabaseClient {
           futures.add(executor.submit(new Callable() {
             @Override
             public Object call() throws Exception {
-              ByteArrayOutputStream currBytes = bytesOut.get(offset);
+              ByteArrayOutputStream currBytes = withRecordBytesOut.get(offset);
               byte[] bytes = currBytes.toByteArray();
               if (bytes == null || bytes.length == 0) {
                 return null;
@@ -365,6 +412,9 @@ public class DatabaseClient {
               byte[] ret = send(null, offset, 0, command, bytes, DatabaseClient.Replica.all);
               if (ret == null) {
                 throw new FailedToInsertException("No response for key insert");
+              }
+              for (PreparedInsert insert : withRecordProcessed.get(offset)) {
+                withRecordPrepared.remove(insert);
               }
               DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
               long serializationVersion = DataUtil.readVLong(in);
@@ -380,16 +430,9 @@ public class DatabaseClient {
         for (Future future : futures) {
           future.get();
         }
-      }
-      {
-        final String command = "DatabaseServer:batchInsertIndexEntryByKey:1:" + common.getSchemaVersion() + ":" + batchDbName.get();
-        final List<ByteArrayOutputStream> bytesOut = batchWithoutRecordByteOutputStreams.get();
-        final List<DataOutputStream> out = batchWithoutRecordOutputStreams.get();
-        for (DataOutputStream currOut : out) {
-          currOut.close();
-        }
+        final String command2 = "DatabaseServer:batchInsertIndexEntryByKey:1:" + common.getSchemaVersion() + ":" + dbName;
 
-        List<Future> futures = new ArrayList<>();
+        futures = new ArrayList<>();
         for (int i = 0; i < bytesOut.size(); i++) {
           final int offset = i;
           futures.add(executor.submit(new Callable() {
@@ -400,7 +443,11 @@ public class DatabaseClient {
               if (bytes == null || bytes.length == 0) {
                 return null;
               }
-              send(null, offset, rand.nextLong(), command, bytes, DatabaseClient.Replica.all);
+              send(null, offset, rand.nextLong(), command2, bytes, DatabaseClient.Replica.all);
+
+              for (PreparedInsert insert : processed.get(offset)) {
+                prepared.remove(insert);
+              }
 
               return null;
             }
@@ -409,16 +456,41 @@ public class DatabaseClient {
         for (Future future : futures) {
           future.get();
         }
+
+        int[] ret = new int[totalCount.get()];
+        for (int i = 0; i < ret.length; i++) {
+          ret[i] = 1;
+        }
+        return ret;
+      }
+
+      catch (Exception e) {
+        if (e.getCause() instanceof SchemaOutOfSyncException) {
+          for (PreparedInsert insert: withRecordPrepared) {
+            List<KeyInfo> keys = getKeys(common.getTables(insert.dbName).get(insert.tableSchema.getName()), insert.columnNames, insert.values, insert.id);
+            for (KeyInfo key : keys) {
+              if (key.indexSchema.getKey().equals(insert.indexName)) {
+                insert.keyInfo.shard = key.shard;
+                break;
+              }
+            }
+          }
+
+          for (PreparedInsert insert: prepared) {
+            List<KeyInfo> keys = getKeys(common.getTables(insert.dbName).get(insert.tableSchema.getName()), insert.columnNames, insert.values, insert.id);
+            for (KeyInfo key : keys) {
+              if (key.indexSchema.getKey().equals(insert.indexName)) {
+                insert.keyInfo.shard = key.shard;
+                break;
+              }
+            }
+          }
+
+          continue;
+        }
+        throw new DatabaseException(e);
       }
     }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-    int[] ret = new int[totalCount.get()];
-    for (int i = 0; i < ret.length; i++) {
-      ret[i] = 1;
-    }
-    return ret;
   }
 
   public static class ReconfigureResults {
@@ -641,7 +713,7 @@ public class DatabaseClient {
   }
 
   public byte[] send(String batchKey,
-      int shard, long auth_user, String command, byte[] body, Replica replica) {
+                     int shard, long auth_user, String command, byte[] body, Replica replica) {
 //    DatabaseServer server = DatabaseServer.getServers().get(shard).get(0);
 //    while (true) {
 //      try {
@@ -691,7 +763,7 @@ public class DatabaseClient {
       }
 
       //if (previousVersion < common.getSchemaVersion()) {
-        throw new SchemaOutOfSyncException();
+      throw new SchemaOutOfSyncException();
       //}
 
 //      String newCommand = "";
@@ -1449,7 +1521,7 @@ public class DatabaseClient {
 
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
-      serializeInsertKey(dbName, tableName, keyInfo, primaryKeyIndexName, primaryKey, out);
+      serializeInsertKey(out, dbName, tableName, keyInfo, primaryKeyIndexName, primaryKey);
       out.close();
 
       send("DatabaseServer:insertIndexEntryByKey", keyInfo.shard, rand.nextLong(), command, bytesOut.toByteArray(), DatabaseClient.Replica.all);
@@ -1459,7 +1531,8 @@ public class DatabaseClient {
     }
   }
 
-  private void serializeInsertKey(String dbName, String tableName, KeyInfo keyInfo, String primaryKeyIndexName, Object[] primaryKey, DataOutputStream out) throws IOException {
+  private void serializeInsertKey(DataOutputStream out, String dbName, String tableName, KeyInfo keyInfo,
+                                  String primaryKeyIndexName, Object[] primaryKey) throws IOException {
     DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
     out.writeUTF(tableName);
     out.writeUTF(keyInfo.indexSchema.getKey());
@@ -1493,25 +1566,25 @@ public class DatabaseClient {
       int replicaCount = getReplicaCount();
       Exception lastException = null;
       //for (int i = 0; i < replicaCount; i++) {
-        try {
-          byte[] ret = send("DatabaseServer:insertIndexEntryByKeyWithRecord", keyInfo.shard, 0, command, bytesOut.toByteArray(), DatabaseClient.Replica.all);
-          if (ret == null) {
-            throw new FailedToInsertException("No response for key insert");
-          }
-          DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
-          long serializationVersion = DataUtil.readVLong(in);
-          int retVal = in.readInt();
-          if (retVal != 1) {
-            throw new FailedToInsertException("Incorrect response from server: value=" + retVal);
-          }
+      try {
+        byte[] ret = send("DatabaseServer:insertIndexEntryByKeyWithRecord", keyInfo.shard, 0, command, bytesOut.toByteArray(), DatabaseClient.Replica.all);
+        if (ret == null) {
+          throw new FailedToInsertException("No response for key insert");
         }
-        catch (Exception e) {
-          lastException = e;
+        DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
+        long serializationVersion = DataUtil.readVLong(in);
+        int retVal = in.readInt();
+        if (retVal != 1) {
+          throw new FailedToInsertException("Incorrect response from server: value=" + retVal);
         }
+      }
+      catch (Exception e) {
+        lastException = e;
+      }
       //}
       if (lastException != null) {
         if (lastException instanceof SchemaOutOfSyncException) {
-          throw (SchemaOutOfSyncException)lastException;
+          throw (SchemaOutOfSyncException) lastException;
         }
         throw new DatabaseException(lastException);
       }
@@ -1521,7 +1594,8 @@ public class DatabaseClient {
     }
   }
 
-  private void serializeInsertKeyWithRecord(DataOutputStream out, String dbName, String tableName, KeyInfo keyInfo, Record record) throws IOException {
+  private void serializeInsertKeyWithRecord(DataOutputStream out, String dbName, String tableName,
+                                            KeyInfo keyInfo, Record record) throws IOException {
     DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
     out.writeUTF(tableName);
     out.writeUTF(keyInfo.indexSchema.getKey());
@@ -1651,7 +1725,7 @@ public class DatabaseClient {
   public byte[] checkAddedRecords(String command, byte[] body) {
     logger.info("begin checkAddedRecords");
     for (int i = 0; i < 1000000; i++) {
-      if (addedRecords.get((long)i) == null) {
+      if (addedRecords.get((long) i) == null) {
         logger.error("missing record: id=" + i + ", count=0");
       }
     }
@@ -1659,17 +1733,37 @@ public class DatabaseClient {
     return null;
   }
 
-  public int doInsert(String dbName, InsertStatementImpl insertStatement, ParameterHandler parms) throws IOException, SQLException {
-    int previousSchemaVersion = common.getSchemaVersion();
+  public class InsertRequest {
+    private String dbName;
+    private InsertStatementImpl insertStatement;
+    private ParameterHandler parms;
+  }
 
-    batchDbName.set(dbName);
+  class PreparedInsert {
+    String dbName;
+    String tableName;
+    KeyInfo keyInfo;
+    Record record;
+    Object[] primaryKey;
+    String primaryKeyIndexName;
+    public TableSchema tableSchema;
+    public List<String> columnNames;
+    public List<Object> values;
+    public long id;
+    public String indexName;
+  }
+
+  public List<PreparedInsert> prepareInsert(InsertRequest request) throws UnsupportedEncodingException, SQLException {
+    List<PreparedInsert> ret = new ArrayList<>();
+
+    String dbName = request.dbName;
 
     List<String> columnNames;
     List<Object> values;
 
     long id = allocateId(dbName);
 
-    String tableName = insertStatement.getTableName();
+    String tableName = request.insertStatement.getTableName();
 
     TableSchema tableSchema = common.getTables(dbName).get(tableName);
     if (tableSchema == null) {
@@ -1683,7 +1777,7 @@ public class DatabaseClient {
     else {
       transId = transactionId.get();
     }
-    Record record = prepareRecordForInsert(insertStatement, tableSchema, id);
+    Record record = prepareRecordForInsert(request.insertStatement, tableSchema, id);
     record.setTransId(transId);
     record.setId(id);
 
@@ -1699,82 +1793,102 @@ public class DatabaseClient {
     int primaryKeyCount = 0;
     List<KeyInfo> completed = new ArrayList<>();
     KeyInfo primaryKey = new KeyInfo();
-    while (true) {
-      try {
-        tableSchema = common.getTables(dbName).get(tableName);
+    try {
+      tableSchema = common.getTables(dbName).get(tableName);
 
-        List<KeyInfo> keys = getKeys(tableSchema, columnNames, values, id);
-        if (keys.size() == 0) {
-          throw new DatabaseException("key not generated for record to insert");
+      List<KeyInfo> keys = getKeys(tableSchema, columnNames, values, id);
+      if (keys.size() == 0) {
+        throw new DatabaseException("key not generated for record to insert");
+      }
+      for (final KeyInfo keyInfo : keys) {
+        if (keyInfo.indexSchema.getValue().isPrimaryKey()) {
+          primaryKey.key = keyInfo.key;
+          primaryKey.indexSchema = keyInfo.indexSchema;
+          break;
         }
-        for (final KeyInfo keyInfo : keys) {
-          if (keyInfo.indexSchema.getValue().isPrimaryKey()) {
-            primaryKey.key = keyInfo.key;
-            primaryKey.indexSchema = keyInfo.indexSchema;
-            break;
-          }
-        }
+      }
 
 //        if (keys.size() == 2 && tableName.equals("persons")) {
 //          System.out.println("hey");
 //        }
-        outer:
-        for (final KeyInfo keyInfo : keys) {
-          previousSchemaVersion = common.getSchemaVersion();
-          for (KeyInfo completedKey : completed) {
-            Comparator[] comparators = keyInfo.indexSchema.getValue().getComparators();
+      outer:
+      for (final KeyInfo keyInfo : keys) {
+        for (KeyInfo completedKey : completed) {
+          Comparator[] comparators = keyInfo.indexSchema.getValue().getComparators();
 
-            if (completedKey.indexSchema.getKey().equals(keyInfo.indexSchema.getKey()) &&
-                DatabaseCommon.compareKey(comparators, completedKey.key, keyInfo.key) == 0
-                &&
-                completedKey.shard == keyInfo.shard
-                ) {
-              continue outer;
-            }
+          if (completedKey.indexSchema.getKey().equals(keyInfo.indexSchema.getKey()) &&
+              DatabaseCommon.compareKey(comparators, completedKey.key, keyInfo.key) == 0
+              &&
+              completedKey.shard == keyInfo.shard
+              ) {
+            continue outer;
           }
-
-          if (keyInfo.indexSchema.getValue().isPrimaryKey()) {
-            if (!keyInfo.currAndLastMatch) {
-              if (keyInfo.isCurrPartition()) {
-                record.setDbViewNumber(common.getSchemaVersion());
-                record.setDbViewFlags(Record.DB_VIEW_FLAG_ADDING);
-              }
-              else {
-                record.setDbViewFlags(Record.DB_VIEW_FLAG_DELETING);
-                record.setDbViewNumber(common.getSchemaVersion() - 1);
-              }
-            }
-            if (batchWithRecordOutputStreams.get() != null) {
-              serializeInsertKeyWithRecord(batchWithRecordOutputStreams.get().get(keyInfo.shard), dbName, insertStatement.getTableName(), keyInfo, record);
-            }
-            else {
-              insertKeyWithRecord(dbName, insertStatement.getTableName(), keyInfo, record);
-            }
-
-            primaryKeyCount++;
-//            if (previousSchemaVersion != common.getSchemaVersion()) {
-//              throw new SchemaOutOfSyncException();
-//            }
-            completed.add(keyInfo);
-          }
-          else {
-            if (batchWithoutRecordOutputStreams.get() != null) {
-              serializeInsertKey(dbName, insertStatement.getTableName(), keyInfo, primaryKey.indexSchema.getKey(),
-                      primaryKey.key, batchWithoutRecordOutputStreams.get().get(keyInfo.shard));
-            }
-            else {
-              insertKey(dbName, insertStatement.getTableName(), keyInfo, primaryKey.indexSchema.getKey(), primaryKey.key);
-            }
-            completed.add(keyInfo);
-          }
-          if (previousSchemaVersion != common.getSchemaVersion()) {
-            throw new SchemaOutOfSyncException();
-          }
-
         }
-//        if (primaryKeyCount != 1) {
-//          logger.info("Multiple primary keys: count=" + primaryKeyCount);
-//        }
+
+        if (keyInfo.indexSchema.getValue().isPrimaryKey()) {
+          if (!keyInfo.currAndLastMatch) {
+            if (keyInfo.isCurrPartition()) {
+              record.setDbViewNumber(common.getSchemaVersion());
+              record.setDbViewFlags(Record.DB_VIEW_FLAG_ADDING);
+            }
+            else {
+              record.setDbViewFlags(Record.DB_VIEW_FLAG_DELETING);
+              record.setDbViewNumber(common.getSchemaVersion() - 1);
+            }
+          }
+        }
+        PreparedInsert insert = new PreparedInsert();
+        insert.dbName = dbName;
+        insert.keyInfo = keyInfo;
+        insert.record = record;
+        insert.tableName = tableName;
+        insert.primaryKeyIndexName = primaryKey.indexSchema.getKey();
+        insert.primaryKey = primaryKey.key;
+        insert.tableSchema = tableSchema;
+        insert.columnNames = columnNames;
+        insert.values = values;
+        insert.id = id;
+        insert.indexName = keyInfo.indexSchema.getKey();
+        ret.add(insert);
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+    return ret;
+  }
+
+  public int doInsert(String dbName, InsertStatementImpl insertStatement, ParameterHandler parms) throws IOException, SQLException {
+    long previousSchemaVersion = common.getSchemaVersion();
+    InsertRequest request = new InsertRequest();
+    request.dbName = dbName;
+    request.insertStatement = insertStatement;
+    request.parms = parms;
+    int insertCountCompleted = 0;
+    while (true) {
+      try {
+        if (batch.get() != null) {
+          batch.get().add(request);
+        }
+        else {
+          List<PreparedInsert> inserts = prepareInsert(request);
+          for (int i = 0; i < inserts.size(); i++) {
+            if (i < insertCountCompleted) {
+              continue;
+            }
+            PreparedInsert insert = inserts.get(i);
+            if (insert.keyInfo.indexSchema.getValue().isPrimaryKey()) {
+              insertKeyWithRecord(dbName, insertStatement.getTableName(), insert.keyInfo, insert.record);
+            }
+            else {
+              insertKey(dbName, insertStatement.getTableName(), insert.keyInfo, insert.primaryKeyIndexName, insert.primaryKey);
+            }
+            insertCountCompleted++;
+            if (previousSchemaVersion != common.getSchemaVersion()) {
+              throw new SchemaOutOfSyncException();
+            }
+          }
+        }
         break;
       }
       catch (SchemaOutOfSyncException e) {
@@ -1785,17 +1899,6 @@ public class DatabaseClient {
         continue;
       }
     }
-
-    if (primaryKeyCount == 0) {
-      throw new DatabaseException("failed to insert");
-    }
-    //    for (Future future : futures) {
-    //      future.get();
-    //    }
-//    if (previousSchemaVersion != common.getSchemaVersion()) {
-//      throw new SchemaOutOfSyncException();
-//    }
-
     return 1;
   }
 
@@ -1847,14 +1950,14 @@ public class DatabaseClient {
           value = fieldSchema.getType().getConverter().convert(value);
 
           if (fieldSchema.getWidth() != 0) {
-            switch(fieldSchema.getType()) {
+            switch (fieldSchema.getType()) {
               case VARCHAR:
               case NVARCHAR:
               case LONGVARCHAR:
               case LONGNVARCHAR:
               case CLOB:
               case NCLOB:
-                String str = new String((byte[])value, "utf-8");
+                String str = new String((byte[]) value, "utf-8");
                 if (str.length() > fieldSchema.getWidth()) {
                   throw new SQLException("value too long: field=" + fieldSchema.getName() + ", width=" + fieldSchema.getWidth());
                 }
@@ -1862,7 +1965,7 @@ public class DatabaseClient {
               case VARBINARY:
               case LONGVARBINARY:
               case BLOB:
-                if (((byte[])value).length > fieldSchema.getWidth()) {
+                if (((byte[]) value).length > fieldSchema.getWidth()) {
                   throw new SQLException("value too long: field=" + fieldSchema.getName() + ", width=" + fieldSchema.getWidth());
                 }
                 break;
@@ -2168,7 +2271,7 @@ public class DatabaseClient {
       List<Expression> groupColumns = pselect.getGroupByColumnReferences();
       if (groupColumns != null && groupColumns.size() != 0) {
         for (int i = 0; i < groupColumns.size(); i++) {
-          Column column = (Column)groupColumns.get(i);
+          Column column = (Column) groupColumns.get(i);
           selectStatement.addOrderBy(column.getTable().getName(), column.getColumnName(), true);
         }
         selectStatement.setGroupByColumns(groupColumns);
@@ -2378,7 +2481,7 @@ public class DatabaseClient {
     }
     else if (whereExpression instanceof JdbcNamedParameter) {
       ParameterImpl parameter = new ParameterImpl();
-      parameter.setParmName(((JdbcNamedParameter)whereExpression).getName());
+      parameter.setParmName(((JdbcNamedParameter) whereExpression).getName());
       return parameter;
     }
     else if (whereExpression instanceof JdbcParameter) {
@@ -2483,30 +2586,30 @@ public class DatabaseClient {
 
   public void syncSchema() {
 //    try {
-      long previousVersion = common.getSchemaVersion();
-      //Thread.sleep(4);
-      //synchronized (common.getSchema(dbName).getSchemaLock()) {
+    long previousVersion = common.getSchemaVersion();
+    //Thread.sleep(4);
+    //synchronized (common.getSchema(dbName).getSchemaLock()) {
 //        if (previousVersion < common.getSchemaVersion()) {
 //          return;
 //        }
-        //logger.error("Schema out of sync: currVer=" + common.getSchemaVersion());
+    //logger.error("Schema out of sync: currVer=" + common.getSchemaVersion());
 
-        String command = "DatabaseServer:getSchema:1:" + common.getSchemaVersion() + ":__none__";
-        try {
+    String command = "DatabaseServer:getSchema:1:" + common.getSchemaVersion() + ":__none__";
+    try {
 
-          byte[] ret = send(null, 0, 0, command, null, Replica.master);
-          if (ret != null) {
-            DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
-            long serializationVersion = DataUtil.readVLong(in);
-            common.deserializeSchema(common, in);
+      byte[] ret = send(null, 0, 0, command, null, Replica.master);
+      if (ret != null) {
+        DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
+        long serializationVersion = DataUtil.readVLong(in);
+        common.deserializeSchema(common, in);
 
-            logger.info("Schema received from server: currVer=" + common.getSchemaVersion());
-          }
-        }
-        catch (Exception t) {
-          throw new DatabaseException(t);
-        }
-      //}
+        logger.info("Schema received from server: currVer=" + common.getSchemaVersion());
+      }
+    }
+    catch (Exception t) {
+      throw new DatabaseException(t);
+    }
+    //}
 //    }
 //    catch (InterruptedException e) {
 //      throw new DatabaseException(e);

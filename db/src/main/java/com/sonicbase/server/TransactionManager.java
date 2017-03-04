@@ -17,6 +17,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class TransactionManager {
 
+  public enum OperationType {
+    batchInsertWithRecord,
+    insertWithRecord,
+    batchInsert,
+    insert,
+    update,
+    delete
+  }
+
   private final DatabaseServer server;
   private ConcurrentHashMap<Long, Transaction> transactions = new ConcurrentHashMap<>();
   private ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Object[], RecordLock>>> locks = new ConcurrentHashMap<>();
@@ -38,27 +47,81 @@ public class TransactionManager {
     return transactions.get(transactionId);
   }
 
-  private static class RecordLock {
-     private Transaction transaction;
-     private String tableName;
-     private String indexName;
-     private Object[] primaryKey;
-     private int lockCount;
-   }
+  public static class RecordLock {
+    private Transaction transaction;
+    private String tableName;
+    private String indexName;
+    private Object[] primaryKey;
+    private int lockCount;
 
-   static class Transaction {
-     private long id;
-     private List<RecordLock> locks = new ArrayList<>();
-     private ConcurrentHashMap<String, List<Record>> records = new ConcurrentHashMap<>();
+    public String getTableName() {
+      return tableName;
+    }
 
-     public Transaction(long transactionId) {
-       this.id = transactionId;
-     }
+    public String getIndexName() {
+      return indexName;
+    }
 
-     public ConcurrentHashMap<String, List<Record>> getRecords() {
-       return records;
-     }
-   }
+    public Object[] getPrimaryKey() {
+      return primaryKey;
+    }
+  }
+
+  static class Operation {
+    private OperationType type;
+    private byte[] body;
+    private String command;
+    private boolean replayed;
+
+    public Operation(OperationType type, String command, byte[] body, boolean replayedCommand) {
+      this.type = type;
+      this.body = body;
+      this.command = command;
+      this.replayed = replayedCommand;
+    }
+
+    public OperationType getType() {
+      return type;
+    }
+
+    public String getCommand() {
+      return command;
+    }
+
+    public byte[] getBody() {
+      return body;
+    }
+
+    public boolean getReplayed() {
+      return replayed;
+    }
+  }
+
+  static class Transaction {
+    private long id;
+    private List<RecordLock> locks = new ArrayList<>();
+    private ConcurrentHashMap<String, List<Record>> records = new ConcurrentHashMap<>();
+    private List<Operation> operations = new ArrayList<>();
+    public Transaction(long transactionId) {
+      this.id = transactionId;
+    }
+
+    public ConcurrentHashMap<String, List<Record>> getRecords() {
+      return records;
+    }
+
+    public void addOperation(OperationType type, String command, byte[] body, boolean replayedCommand) {
+      operations.add(new Operation(type, command, body, replayedCommand));
+    }
+
+    public List<Operation> getOperations() {
+      return operations;
+    }
+
+    public List<RecordLock> getLocks() {
+      return locks;
+    }
+  }
 
   byte[] abortTransaction(String command, byte[] body) {
     String[] parts = command.split(":");
@@ -117,11 +180,11 @@ public class TransactionManager {
     }
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
+  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP2", justification = "copying the passed in data is too slow")
   @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public void preHandleTransaction(String dbName, String tableName, String indexName, boolean isExplicitTrans, boolean isCommitting, long transactionId, Object[] primaryKey,
-                                    AtomicBoolean shouldExecute,
-                                    AtomicBoolean shouldDeleteLock) {
+                                   AtomicBoolean shouldExecute,
+                                   AtomicBoolean shouldDeleteLock) {
     synchronized (locks) {
       if (!locks.containsKey(dbName)) {
         locks.put(dbName, new ConcurrentHashMap<String, ConcurrentSkipListMap<Object[], RecordLock>>());
@@ -173,7 +236,7 @@ public class TransactionManager {
           lock.primaryKey = primaryKey;
           trans.locks.add(lock);
           tableLocks.put(primaryKey, lock);
-          shouldExecute.set(true);
+          shouldExecute.set(false);
         }
         else {
           shouldExecute.set(true);

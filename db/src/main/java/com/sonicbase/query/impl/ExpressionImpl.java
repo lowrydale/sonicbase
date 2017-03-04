@@ -1477,7 +1477,7 @@ public abstract class ExpressionImpl implements Expression {
             DataUtil.writeVLong(out, indexSchema.getIndexId(), resultLength);
             out.writeBoolean(forceSelectOnServer);
           }
-          if (!evaluateExpression || parms == null) {
+          if (/*!evaluateExpression ||*/ parms == null) {
             out.writeBoolean(false);
           }
           else {
@@ -1486,7 +1486,7 @@ public abstract class ExpressionImpl implements Expression {
           }
           if (!isPrepared) {
             out.writeBoolean(evaluateExpression);
-            if (!evaluateExpression || expression == null) {
+            if (/*!evaluateExpression ||*/ expression == null) {
               out.writeBoolean(false);
             }
             else {

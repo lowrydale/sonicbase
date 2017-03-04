@@ -128,6 +128,7 @@ public class TestTransactions {
      int count = stmt.executeUpdate();
      assertEquals(count, 1);
 
+
      stmt = conn.prepareStatement("update persons set id = ?, socialSecurityNumber=? where id=?");
      stmt.setLong(1, 1000);
      stmt.setString(2, "ssn");
@@ -144,7 +145,62 @@ public class TestTransactions {
      assertEquals(resultSet.getString("socialsecuritynumber"), "ssn");
    }
 
-   @Test
+  @Test
+  public void testRollback() throws SQLException, InterruptedException {
+
+    PreparedStatement stmt = conn.prepareStatement("truncate table persons");
+    stmt.execute();
+
+    conn.setAutoCommit(false);
+
+    stmt = conn.prepareStatement("insert into persons (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
+    stmt.setLong(1, 100);
+    stmt.setLong(2, (100) % 2);
+    stmt.setString(3, "933-28-" + (4));
+    stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+    stmt.setBoolean(5, false);
+    stmt.setString(6, "m");
+    int count = stmt.executeUpdate();
+    assertEquals(count, 1);
+
+
+    stmt = conn.prepareStatement("update persons set id = ?, socialSecurityNumber=? where id=?");
+    stmt.setLong(1, 1000);
+    stmt.setString(2, "ssn");
+    stmt.setLong(3, 100);
+    count = stmt.executeUpdate();
+    //assertEquals(count, 1);
+
+    conn.rollback();
+
+    stmt = conn.prepareStatement("insert into persons (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
+    stmt.setLong(1, 100);
+    stmt.setLong(2, (100) % 2);
+    stmt.setString(3, "933-28-" + (4));
+    stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+    stmt.setBoolean(5, false);
+    stmt.setString(6, "m");
+    count = stmt.executeUpdate();
+    assertEquals(count, 1);
+
+    stmt = conn.prepareStatement("insert into persons (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
+    stmt.setLong(1, 1000);
+    stmt.setLong(2, (100) % 2);
+    stmt.setString(3, "933-28-" + (4));
+    stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+    stmt.setBoolean(5, false);
+    stmt.setString(6, "m");
+    count = stmt.executeUpdate();
+    assertEquals(count, 1);
+
+    stmt = conn.prepareStatement("select * from persons where id=1000");
+    ResultSet resultSet = stmt.executeQuery();
+    assertTrue(resultSet.next());
+    assertEquals(resultSet.getLong("id"), 1000);
+    assertEquals(resultSet.getString("socialsecuritynumber"), "933-28-" + (4));
+  }
+
+  @Test
    public void testConcurrent() throws SQLException, InterruptedException {
 
      PreparedStatement stmt = conn.prepareStatement("truncate table persons");

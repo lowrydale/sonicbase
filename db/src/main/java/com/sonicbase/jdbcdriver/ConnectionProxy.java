@@ -108,7 +108,7 @@ public class ConnectionProxy implements Connection {
   }
 
   public void rollback() throws SQLException {
-    databaseClient.rollback();
+    databaseClient.rollback(dbName);
   }
 
   public String nativeSQL(String sql) throws SQLException {

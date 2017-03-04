@@ -1,14 +1,12 @@
 package com.sonicbase.jdbcdriver;
 
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.ResultSetImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
-import java.io.InputStream;
-import java.io.Reader;
+import java.io.*;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.sql.*;
@@ -43,10 +41,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
     this.sql = sql;
     this.dbName = connectionProxy.getDbName();
 
-    DatabaseClient.batchWithRecordOutputStreams.set(null);
-    DatabaseClient.batchWithoutRecordOutputStreams.set(null);
-    DatabaseClient.batchWithRecordByteOutputStreams.set(null);
-    DatabaseClient.batchWithoutRecordByteOutputStreams.set(null);
+    DatabaseClient.batch.set(null);
   }
 
   public void close() throws SQLException {
@@ -154,33 +149,23 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
   }
 
   public void addBatch() throws SQLException {
-    if (DatabaseClient.batchWithRecordOutputStreams.get() == null) {
-      DatabaseClient.batchWithRecordOutputStreams.set(new ArrayList<DataOutputStream>());
-      DatabaseClient.batchWithoutRecordOutputStreams.set(new ArrayList<DataOutputStream>());
-      DatabaseClient.batchWithRecordByteOutputStreams.set(new ArrayList<ByteArrayOutputStream>());
-      DatabaseClient.batchWithoutRecordByteOutputStreams.set(new ArrayList<ByteArrayOutputStream>());
-      for (int i = 0; i < databaseClient.getShardCount(); i++) {
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        DatabaseClient.batchWithRecordByteOutputStreams.get().add(bytes);
-        DatabaseClient.batchWithRecordOutputStreams.get().add(new DataOutputStream(bytes));
-
-        bytes = new ByteArrayOutputStream();
-        DatabaseClient.batchWithoutRecordByteOutputStreams.get().add(bytes);
-        DatabaseClient.batchWithoutRecordOutputStreams.get().add(new DataOutputStream(bytes));
-      }
+    if (DatabaseClient.batch.get() == null) {
+      DatabaseClient.batch.set(new ArrayList<DatabaseClient.InsertRequest>());
     }
     databaseClient.executeQuery(dbName, QueryType.execute0, sql, parms);
   }
 
   public void clearBatch() throws SQLException {
-    DatabaseClient.batchWithRecordOutputStreams.set(null);
-    DatabaseClient.batchWithRecordByteOutputStreams.set(null);
-    DatabaseClient.batchWithoutRecordOutputStreams.set(null);
-    DatabaseClient.batchWithoutRecordOutputStreams.set(null);
+    DatabaseClient.batch.set(null);
   }
 
   public int[] executeBatch() throws SQLException {
-    return databaseClient.executeBatch();
+    try {
+      return databaseClient.executeBatch();
+    }
+    catch (UnsupportedEncodingException e) {
+      throw new DatabaseException(e);
+    }
   }
 
   public Connection getConnection() throws SQLException {

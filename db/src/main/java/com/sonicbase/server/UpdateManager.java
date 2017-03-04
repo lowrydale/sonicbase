@@ -17,7 +17,13 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+
+import static com.sonicbase.server.TransactionManager.*;
+import static com.sonicbase.server.TransactionManager.OperationType.*;
 
 /**
  * Responsible for
@@ -164,6 +170,18 @@ public class UpdateManager {
   }
 
   public byte[] deleteIndexEntryByKey(String command, byte[] body, boolean replayedCommand) {
+    AtomicBoolean isExplicitTrans = new AtomicBoolean();
+    AtomicLong transactionId = new AtomicLong();
+    byte[] ret = doDeleteIndexEntryByKey(command, body, replayedCommand, isExplicitTrans, transactionId, false);
+    if (isExplicitTrans.get()) {
+      Transaction trans = server.getTransactionManager().getTransaction(transactionId.get());
+      trans.addOperation(delete, command, body, replayedCommand);
+    }
+    return ret;
+  }
+
+  public byte[] doDeleteIndexEntryByKey(String command, byte[] body, boolean replayedCommand,
+                                        AtomicBoolean isExplicitTransRet, AtomicLong transactionIdRet, boolean isCommitting) {
     try {
       String[] parts = command.split(":");
       String dbName = parts[4];
@@ -175,8 +193,12 @@ public class UpdateManager {
       String indexName = parts[6];
       String primaryKeyIndexName = parts[7];
       boolean isExplicitTrans = Boolean.valueOf(parts[8]);
-      boolean isCommitting = Boolean.valueOf(parts[9]);
+      //boolean isCommitting = Boolean.valueOf(parts[9]);
       long transactionId = Long.valueOf(parts[10]);
+      if (isExplicitTrans && isExplicitTransRet != null) {
+        isExplicitTransRet.set(true);
+        transactionIdRet.set(transactionId);
+      }
 
       TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
       ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
@@ -207,15 +229,21 @@ public class UpdateManager {
   public byte[] batchInsertIndexEntryByKey(String command, byte[] body, boolean replayedCommand) {
     ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
     DataInputStream in = new DataInputStream(bytesIn);
+    AtomicBoolean isExplicitTrans = new AtomicBoolean();
+    AtomicLong transactionId = new AtomicLong();
     int count = 0;
     try {
       while (true) {
-        doInsertIndexEntryByKey(command, in, replayedCommand);
+        doInsertIndexEntryByKey(command, in, replayedCommand, isExplicitTrans, transactionId, false);
         count++;
       }
     }
     catch (EOFException e) {
       //expected
+      if (isExplicitTrans.get()) {
+        Transaction trans = server.getTransactionManager().getTransaction(transactionId.get());
+        trans.addOperation(batchInsert, command, body, replayedCommand);
+      }
     }
     try {
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
@@ -233,15 +261,24 @@ public class UpdateManager {
   public byte[] insertIndexEntryByKey(String command, byte[] body, boolean replayedCommand) {
     ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
     DataInputStream in = new DataInputStream(bytesIn);
+    AtomicBoolean isExplicitTrans = new AtomicBoolean();
+    AtomicLong transactionId = new AtomicLong();
     try {
-      return doInsertIndexEntryByKey(command, in, replayedCommand);
+      byte[] ret = doInsertIndexEntryByKey(command, in, replayedCommand, isExplicitTrans, transactionId, false);
+      if (isExplicitTrans.get()) {
+        Transaction trans = server.getTransactionManager().getTransaction(transactionId.get());
+        trans.addOperation(insert, command, body, replayedCommand);
+      }
+      return ret;
     }
     catch (EOFException e) {
       throw new DatabaseException(e);
     }
   }
 
-  public byte[] doInsertIndexEntryByKey(String command, DataInputStream in, boolean replayedCommand) throws EOFException {
+  public byte[] doInsertIndexEntryByKey(String command, DataInputStream in, boolean replayedCommand,
+                                        AtomicBoolean isExplicitTransRet, AtomicLong transactionIdRet,
+                                        boolean isCommitting) throws EOFException {
     try {
       if (server.getAboveMemoryThreshold().get()) {
         throw new DatabaseException("Above max memory threshold. Further inserts are not allowed");
@@ -258,8 +295,12 @@ public class UpdateManager {
       String tableName = in.readUTF();
       String indexName = in.readUTF();
       boolean isExplicitTrans = in.readBoolean();
-      boolean isCommitting = in.readBoolean();
+      /*boolean isCommitting =*/ in.readBoolean();
       long transactionId = DataUtil.readVLong(in);
+      if (isExplicitTrans && isExplicitTransRet != null) {
+        isExplicitTransRet.set(true);
+        transactionIdRet.set(transactionId);
+      }
 
       TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
       int len = (int) DataUtil.readVLong(in);
@@ -281,6 +322,7 @@ public class UpdateManager {
       if (shouldExecute.get()) {
         doInsertKey(key, primaryKeyBytes, index);
       }
+
       //    else {
       //      if (transactionId != 0) {
       //        Transaction trans = transactions.get(transactionId);
@@ -323,14 +365,20 @@ public class UpdateManager {
     ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
     DataInputStream in = new DataInputStream(bytesIn);
     int count = 0;
+    AtomicLong transactionId = new AtomicLong();
+    AtomicBoolean isExplicitTrans = new AtomicBoolean();
     try {
       while (true) {
-        doInsertIndexEntryByKeyWithRecord(command, in, replayedCommand);
+        doInsertIndexEntryByKeyWithRecord(command, in, replayedCommand, transactionId, isExplicitTrans, false);
         count++;
       }
     }
     catch (EOFException e) {
       //expected
+      if (isExplicitTrans.get()) {
+        Transaction trans = server.getTransactionManager().getTransaction(transactionId.get());
+        trans.addOperation(batchInsertWithRecord, command, body, replayedCommand);
+      }
     }
     try {
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
@@ -349,14 +397,23 @@ public class UpdateManager {
     ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
     DataInputStream in = new DataInputStream(bytesIn);
     try {
-      return doInsertIndexEntryByKeyWithRecord(command, in, replayedCommand);
+      AtomicBoolean isExplicitTrans = new AtomicBoolean();
+      AtomicLong transactionId = new AtomicLong();
+      byte[] ret = doInsertIndexEntryByKeyWithRecord(command, in, replayedCommand, transactionId, isExplicitTrans, false);
+      if (isExplicitTrans.get()) {
+        Transaction trans = server.getTransactionManager().getTransaction(transactionId.get());
+        trans.addOperation(insertWithRecord, command, body, replayedCommand);
+      }
+      return ret;
     }
     catch (EOFException e) {
       throw new DatabaseException(e);
     }
   }
 
-  public byte[] doInsertIndexEntryByKeyWithRecord(String command, DataInputStream in, boolean replayedCommand) throws EOFException {
+  public byte[] doInsertIndexEntryByKeyWithRecord(String command, DataInputStream in,
+                                                  boolean replayedCommand, AtomicLong transactionIdRet,
+                                                  AtomicBoolean isExpliciteTransRet, boolean isCommitting) throws EOFException {
     try {
       if (server.getAboveMemoryThreshold().get()) {
         throw new DatabaseException("Above max memory threshold. Further inserts are not allowed");
@@ -374,8 +431,12 @@ public class UpdateManager {
       String indexName = in.readUTF();
       long id = DataUtil.readVLong(in);
       boolean isExplicitTrans = in.readBoolean();
-      boolean isCommitting = in.readBoolean();
+      /*boolean isCommitting =*/ in.readBoolean();
       long transactionId = DataUtil.readVLong(in);
+      if (isExplicitTrans && isExpliciteTransRet != null) {
+        isExpliciteTransRet.set(true);
+        transactionIdRet.set(transactionId);
+      }
 
       TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
       int len = in.readInt();
@@ -411,7 +472,20 @@ public class UpdateManager {
         }
       }
       else {
-        throw new DatabaseException("in trans");
+        if (transactionId != 0) {
+          if (transactionId != 0) {
+            Transaction trans = server.getTransactionManager().getTransaction(transactionId);
+            List<Record> records = trans.getRecords().get(tableName);
+            if (records == null) {
+              records = new ArrayList<>();
+              trans.getRecords().put(tableName, records);
+            }
+            Record record = new Record(dbName, server.getCommon(), recordBytes);
+            records.add(record);
+          }
+        }
+
+        //throw new DatabaseException("in trans");
 //        if (transactionId != 0) {
 //          TransactionManager.Transaction trans = server.getTransactionManager().getTransaction(transactionId);
 //          List<Record> records = trans.getRecords().get(tableName);
@@ -464,7 +538,91 @@ public class UpdateManager {
     }
   }
 
+  public byte[] rollback(String command, byte[] body, boolean replayedCommand) {
+    String[] parts = command.split(":");
+    String dbName = parts[4];
+    int schemaVersion = Integer.valueOf(parts[3]);
+    if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
+      throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
+    }
+    long transactionId = Long.valueOf(parts[5]);
+
+    Transaction trans = server.getTransactionManager().getTransaction(transactionId);
+    ConcurrentHashMap<String, ConcurrentSkipListMap<Object[], RecordLock>> tableLocks = server.getTransactionManager().getLocks(dbName);
+    if (trans != null) {
+      List<RecordLock> locks = trans.getLocks();
+      for (RecordLock lock : locks) {
+        String tableName = lock.getTableName();
+        tableLocks.get(tableName).remove(lock.getPrimaryKey());
+      }
+      server.getTransactionManager().getTransactions().remove(transactionId);
+    }
+    return null;
+  }
+
+  public byte[] commit(String command, byte[] body, boolean replayedCommand) {
+    String[] parts = command.split(":");
+    String dbName = parts[4];
+    int schemaVersion = Integer.valueOf(parts[3]);
+    if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
+      throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
+    }
+    long transactionId = Long.valueOf(parts[5]);
+
+    Transaction trans = server.getTransactionManager().getTransaction(transactionId);
+    if (trans != null) {
+      List<TransactionManager.Operation> ops = trans.getOperations();
+      for (Operation op : ops) {
+        DataInputStream in = new DataInputStream(new ByteArrayInputStream(op.getBody()));
+        try {
+          switch (op.getType()) {
+            case insert:
+              doInsertIndexEntryByKey(op.getCommand(), in, op.getReplayed(), null, null, true);
+              break;
+            case batchInsert:
+              while (true) {
+                doInsertIndexEntryByKey(command, in, replayedCommand, null, null, true);
+              }
+              //break;
+            case insertWithRecord:
+              doInsertIndexEntryByKeyWithRecord(op.getCommand(), in, op.getReplayed(), null, null, true);
+              break;
+            case batchInsertWithRecord:
+              while (true) {
+                doInsertIndexEntryByKeyWithRecord(op.getCommand(), in, op.getReplayed(), null, null, true);
+              }
+              //break;
+            case update:
+              doUpdateRecord(op.getCommand(), op.getBody(), op.getReplayed(), null, null, true);
+              break;
+            case delete:
+              doDeleteIndexEntryByKey(op.getCommand(), op.getBody(), op.getReplayed(), null, null, true);
+              break;
+          }
+        }
+        catch (EOFException e) {
+          //expected
+        }
+      }
+      server.getTransactionManager().getTransactions().remove(transactionId);
+    }
+    return null;
+  }
+
   public byte[] updateRecord(String command, byte[] body, boolean replayedCommand) {
+
+    AtomicBoolean isExplicitTrans = new AtomicBoolean();
+    AtomicLong transactionId = new AtomicLong();
+    byte[] ret = doUpdateRecord(command, body, replayedCommand, isExplicitTrans, transactionId, false);
+    if (isExplicitTrans.get()) {
+      Transaction trans = server.getTransactionManager().getTransaction(transactionId.get());
+      trans.addOperation(update, command, body, replayedCommand);
+    }
+    return ret;
+  }
+
+  public byte[] doUpdateRecord(String command, byte[] body, boolean replayedCommand,
+                               AtomicBoolean isExplicitTransRet, AtomicLong transactionIdRet, boolean isCommitting) {
     try {
       String[] parts = command.split(":");
       String dbName = parts[4];
@@ -475,8 +633,13 @@ public class UpdateManager {
       String tableName = parts[5];
       String indexName = parts[6];
       boolean isExplicitTrans = Boolean.valueOf(parts[7]);
-      boolean isCommitting = Boolean.valueOf(parts[8]);
+      //boolean isCommitting = Boolean.valueOf(parts[8]);
       long transactionId = Long.valueOf(parts[9]);
+
+      if (isExplicitTrans && isExplicitTransRet != null) {
+        isExplicitTransRet.set(true);
+        transactionIdRet.set(transactionId);
+      }
 
       TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
       DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
@@ -505,7 +668,7 @@ public class UpdateManager {
       else {
         if (transactionId != 0) {
           if (transactionId != 0) {
-            TransactionManager.Transaction trans = server.getTransactionManager().getTransaction(transactionId);
+            Transaction trans = server.getTransactionManager().getTransaction(transactionId);
             List<Record> records = trans.getRecords().get(tableName);
             if (records == null) {
               records = new ArrayList<>();

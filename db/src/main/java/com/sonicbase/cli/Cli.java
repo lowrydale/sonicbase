@@ -230,7 +230,7 @@ public class Cli {
       else if (command.startsWith("debug record")) {
         debugRecord(command);
       }
-      else if (command.startsWith("insert")) {
+      else if (command.startsWith("insertWithRecord")) {
         System.out.print("\033[2J\033[;H");
         insert(command);
       }

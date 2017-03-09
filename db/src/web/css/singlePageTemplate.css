@@ -19,13 +19,23 @@ mainPageH2 {
     top: 150px;
     width: 100%;
 }
+mainPageH3 {
+
+	color: #fff;
+	font-weight: bold;
+    position: absolute;
+    font-size: 24px;
+    left: 500px;
+    top: 250px;
+    width: 100%;
+}
 mainPageH4 {
 	color: #fff;
 	font-weight: bold;
     position: absolute;
     font-size: 14px;
-    left: 500px;
-    top: 200px;
+    left: 530px;
+    top: 190px;
     width: 100%;
 }
 
@@ -77,11 +87,31 @@ header {
 	   margin-bottom=-5px;
 
 }
+table.border-table, tr.border-table, td.border-table {
+    border: 1px;
+    padding: 0px;
+    border-spacing: 0px;
+}
+
+table.syntax-table, tr.syntax-table, td.syntax-table {
+    background-color: #FAFCE6;
+    border: 0px solid black;
+    border-spacing: 0px;
+    padding: 4px;
+        border-collapse: collapse;
+}
 .example-header{
 	background: #26a5bf;
 }
 .syntax-main{
+	font-family: arial;
 	background: #26a5bf;
+	color: #FFFFFF;
+}
+td.syntax-main{
+	font-family: arial;
+	background: #26a5bf;
+	color: #FFFFFF;
 }
 td.syntax-detail{
 	vertical-align:top

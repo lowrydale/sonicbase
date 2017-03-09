@@ -114,7 +114,7 @@ public class TestDatabase {
     stmt = conn.prepareStatement("create table nokey (id BIGINT, id2 BIGINT)");
     stmt.executeUpdate();
 
-    //test insert
+    //test insertWithRecord
 
     stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");
     stmt.setLong(1, 1000);

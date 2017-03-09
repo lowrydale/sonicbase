@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Untitled Document</title>
+<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+</head>
+
+<body>
+Describes a table<br/>
+
+<p>Syntax<table bgcolor="FFFFFF" border="1" cellspacing="0" cellpadding="4">
+  <tbody>
+  
+    <tr class="syntax-main">
+           <td width="512" colspan=2 >
+            DESCRIBE TABLE table_name
+		</td>
+	  </tr>
+	  <tr><td><table border=1 cellpadding="0" cellspacing="0">
+		  <tr><td width="103">table_name:</td><td width="430">name of the table to describe</td></tr>
+	  </table></td></tr>
+  </tbody>
+</table>
+<br/>
+<br/>
+Example:<br/>
+<br/>
+PreparedStatement stmt = conn.prepareStatement("describe table persons")<br/>
+ResultSet rs = stmt.executeQuery();<br/>
+while (rs.next()) {<br/>
+&nbsp;&nbsp;System.out.println(rs.getString(1))<br/>
+}
+<br/>
+
+</body>
+</html>

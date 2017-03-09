@@ -109,7 +109,8 @@ public class DatabaseClient {
       "allocateRecordIds",
       "abortTransaction",
       "serverSelectDelete",
-      "commit"
+      "commit",
+      "rollback"
 
   };
 
@@ -230,7 +231,7 @@ public class DatabaseClient {
 
   public void commit(String dbName, SelectStatementImpl.Explain explain) throws DatabaseException {
     isCommitting.set(true);
-    /*
+     /*
     List<TransactionOperation> ops = transactionOps.get();
     for (TransactionOperation op : ops) {
       op.statement.setParms(op.parms);

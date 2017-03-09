@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Untitled Document</title>
+<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+</head>
+
+<body>
+<h3>Download The Software</h3>
+Go to the downloads section of the SonicBase website and download the latest version.
+<h3>Unzip Package</h3>
+Type "gunzip sonic-base-&lt;version&gt;.tgz" in the parent directory where you want the software to go.
+<h3>Start Client</h3>
+Go to the sonicbase/bin directory and type "./cli". This will start the SonicBase client.
+<h3>Use Cluster</h3>
+In the client, type:<br/>
+&nbsp;&nbsp;use cluster 1-local<br/><br/>
+This will allow you to use the 1-local cluster. You can create other clusters by modifying the config in
+the sonicbase/config directory.
+<h3>Start Cluster</h3>
+In the client, type:<br/>
+&nbsp;&nbsp;start cluster<br/><br/>
+This will start the cluster locally.
+<h3>Create Database</h3>
+In the client, type:<br/>
+&nbsp;&nbsp;create database db<br/>
+This will create the database named "db".
+<h3>Create Table</h3>
+In the client, type:<br/>
+&nbsp;&nbsp;create table persons (name VARCHAR, age INT, ssn VARCHAR, PRIMARY KEY (ssn))<br/>
+<h3>Insert Record</h3>
+In the client, type:<br/>
+&nbsp;&nbsp;insert into persons (name, age, ssn) VALUES ('bob', 22, '555-66-7777')<br/>
+<h3>Select Record</h3>
+In the client, type:<br/>
+&nbsp;&nbsp;select * from persons<br/>
+<br/>
+You should see the inserted record displayed in the client.
+<h3>Access From JDBC Client</h3>
+Create and run the following class:<br/>
+<br/>
+package foo;<br/>
+class Test {<br/>
+&nbsp;&nbsp;public static void main(String[] args) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;Class.forName("com.sonicbase.jdbcdriver.Driver");<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;Connection conn = DriverManager.getConnection("jdbc:sonicbase:localhost;:9010/db");<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;PreparedStatement stmt = conn.prepareStatement("select * from persons");<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;ResultSet rs = stmt.executeQuery();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;rs.next();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(rs.getString("name") + " " + rs.getInt("age") + " " + rs.getString("ssn"));<br/>
+&nbsp;&nbsp;}<br/>
+}<br/>
+<h3>Stop Cluster</h3>
+In the client, type:
+&nbsp;&nbsp;stop cluster
+</body>
+</html>

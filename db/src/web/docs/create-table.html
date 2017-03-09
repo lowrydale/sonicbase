@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Untitled Document</title>
+<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+</head>
+
+<body>
+Creates a table to store records in.<br/>
+<p>Syntax<table border="1" cellspacing="0" cellpadding="4">
+  <tbody>
+  
+    <tr class="syntax-main">
+           <td width="512" colspan=2 >
+			   CREATE TABLE table_name (column type [,column type...] [PRIMARY KEY (key_column [,key_column...])
+		</td>
+	  </tr>
+	  <tr><td><table border=1 cellpadding="0" cellspacing="0">
+		  <tr><td width="103">table_name:</td><td width="430">name of the table to create</td></tr>
+		  <tr ><td class="syntax-detail">column:</td>
+			  <td class="syntax-detail">name of the column to create</td></tr>
+		  <tr><td class="syntax-detail">type:</td>
+			  <td class="mylink syntax-detail">data type for the column to create. See
+				  <a href="datatypes.html">Data Types</a>
+
+			  </td></tr>
+		  <tr><td>key_column: </td><td>name of the column to include in the primary key</td></tr>
+	  </table></td></tr>
+  </tbody>
+</table>
+<br/>
+<br/>
+Example:<br/>
+<br/>
+create table persons (name VARCHAR, age INT, ssn VARCHAR, PRIMARY_KEY(ssn))<br/>
+
+<br/>
+
+</body>
+</html>

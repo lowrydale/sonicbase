@@ -170,14 +170,14 @@ public class TestBenchmarkInsert {
 //    });
 //    thread.start();
 
-    final int batchSize = 10000;
+    final int batchSize = 1000;
     final AtomicInteger countInserted = new AtomicInteger();
     final AtomicLong insertErrorCount = new AtomicLong();
     final long begin = System.currentTimeMillis();
     final AtomicLong totalDuration = new AtomicLong();
     if (true) {
       final AtomicLong currOffset = new AtomicLong(startId);
-      for (int i = 0; i < 256; i++) {
+      for (int i = 0; i < (batch ? 32 : 256); i++) {
         final int threadOffset = i;
         final AtomicLong lastLogged = new AtomicLong(System.currentTimeMillis());
         Thread insertThread = new Thread(new Runnable() {
@@ -226,6 +226,7 @@ public class TestBenchmarkInsert {
                  // System.out.println("Inserting: id=" + offset);
 
                   if (batch) {
+                    //conn.setAutoCommit(false);
                     PreparedStatement stmt = conn.prepareStatement("insert into persons (id1, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
                     for (int i = 0; i < batchSize; i++) {
                       // create table Persons (id1 BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id1))
@@ -247,8 +248,9 @@ public class TestBenchmarkInsert {
                       //ctx.stop();
                     }
                     stmt.executeBatch();
+                    //conn.commit();
 
-
+                    //conn.setAutoCommit(false);
                     stmt = conn.prepareStatement("insert into Memberships (personId, personId2, membershipName, resortId) VALUES (?, ?, ?, ?)");
                     for (int i = 0; i < batchSize; i++) {
                       for (int j = 0; j < 2; j++) {
@@ -276,7 +278,7 @@ public class TestBenchmarkInsert {
 
                     }
                     stmt.executeBatch();
-
+                    //conn.commit();
                   }
                   else {
                     for (int i = 0; i < batchSize; i++) {

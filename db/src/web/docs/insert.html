@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Untitled Document</title>
+<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+</head>
+
+<body>
+Inserts a record into a table<br/>
+
+<p>Syntax<table class="border-table" border="1"><tr><td> <table class="syntax-table" cellpadding="4">
+  <tbody>
+  
+    <tr class="syntax-main">
+           <td width="512" colspan=2 >
+            INSERT INTO table_name (column [,column...]) VALUES (expression [,expression...])");
+		</td>
+	  </tr>
+	  <tr><td><table border=0 cellpadding="0" cellspacing="0">
+		  <tr><td align="right">table_name:&nbsp;&nbsp;</td><td >name of the table to insert the record into</td></tr>
+	  <tr><td align="right">column:&nbsp;&nbsp;</td><td >column to insert</td></tr>
+	  <tr><td align="right">expression:&nbsp;&nbsp;</td><td>value to insert. May be parameter or constant</td></tr>
+		  <tr><td align="right">parameter:&nbsp;&nbsp;</td><td>the literal "?"</td></tr>
+		  <tr><td align="right">constant:&nbsp;&nbsp;</td><td>String, double, long, etc..</td></tr>
+
+	  </table></td></tr>
+  </tbody>
+</table>
+</td></tr></table>
+<br/>
+<br/>
+Example:<br/>
+<br/>
+PreparedStatement stmt = conn.prepareStatement("insert into persons (name, age, occupation) values ('bob', ?, ?)")<br/>
+stmt.setInt(1, 30);<br/>
+stmt.setString(2, "artist");<br/>
+stmt.executeUpdate();<br/>
+
+<br/>
+
+</body>
+</html>

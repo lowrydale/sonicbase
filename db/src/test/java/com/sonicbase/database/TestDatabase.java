@@ -5,6 +5,7 @@ import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.BinaryExpression;
+import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.ColumnImpl;
 import com.sonicbase.query.impl.ExpressionImpl;
 import com.sonicbase.query.impl.SelectContextImpl;
@@ -336,6 +337,33 @@ public class TestDatabase {
   }
 
   @Test
+  public void testUniqueIndex() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("create table indexes (id BIGINT, id2 BIGINT)");
+    stmt.executeUpdate();
+
+    stmt = conn.prepareStatement("create unique index uniqueIndex on indexes(id, id2)");
+    stmt.executeUpdate();
+
+    stmt = conn.prepareStatement("create unique index uniqueIndex on indexes(id)");
+    stmt.executeUpdate();
+
+    stmt = conn.prepareStatement("insert into indexes (id, id2) VALUES (?, ?)");
+    stmt.setLong(1, 1);
+    stmt.setLong(2, 1);
+    assertEquals(stmt.executeUpdate(), 1);
+
+    stmt = conn.prepareStatement("insert into indexes (id, id2) VALUES (?, ?)");
+    stmt.setLong(1, 1);
+    stmt.setLong(2, 2);
+    try {
+      assertEquals(stmt.executeUpdate(), 0);
+    }
+    catch (SQLException e) {
+      //expected
+    }
+  }
+
+    @Test
   public void testDualKey() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("create table dualKey (id BIGINT, id2 BIGINT, PRIMARY KEY (id, id2))");
     stmt.executeUpdate();

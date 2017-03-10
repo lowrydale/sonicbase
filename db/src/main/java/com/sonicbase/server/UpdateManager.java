@@ -295,7 +295,8 @@ public class UpdateManager {
       String tableName = in.readUTF();
       String indexName = in.readUTF();
       boolean isExplicitTrans = in.readBoolean();
-      /*boolean isCommitting =*/ in.readBoolean();
+      /*boolean isCommitting =*/
+      in.readBoolean();
       long transactionId = DataUtil.readVLong(in);
       if (isExplicitTrans && isExplicitTransRet != null) {
         isExplicitTransRet.set(true);
@@ -308,6 +309,7 @@ public class UpdateManager {
       len = (int) DataUtil.readVLong(in);
       byte[] primaryKeyBytes = new byte[len];
       in.readFully(primaryKeyBytes);
+      IndexSchema indexSchema = tableSchema.getIndexes().get(indexName);
 
 
       Index index = server.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexName);
@@ -320,7 +322,7 @@ public class UpdateManager {
       server.getTransactionManager().preHandleTransaction(dbName, tableName, indexName, isExplicitTrans, isCommitting, transactionId, primaryKey, shouldExecute, shouldDeleteLock);
 
       if (shouldExecute.get()) {
-        doInsertKey(key, primaryKeyBytes, index);
+        doInsertKey(key, primaryKeyBytes, index, indexSchema);
       }
 
       //    else {
@@ -431,7 +433,8 @@ public class UpdateManager {
       String indexName = in.readUTF();
       long id = DataUtil.readVLong(in);
       boolean isExplicitTrans = in.readBoolean();
-      /*boolean isCommitting =*/ in.readBoolean();
+      /*boolean isCommitting =*/
+      in.readBoolean();
       long transactionId = DataUtil.readVLong(in);
       if (isExplicitTrans && isExpliciteTransRet != null) {
         isExpliciteTransRet.set(true);
@@ -695,11 +698,11 @@ public class UpdateManager {
     doActualInsertKeyWithRecord(recordBytes, key, index, tableName, indexName, false);
   }
 
-  private void doInsertKey(Object[] key, byte[] primaryKeyBytes, Index index) {
+  private void doInsertKey(Object[] key, byte[] primaryKeyBytes, Index index, IndexSchema indexSchema) {
     //    ArrayBlockingQueue<Entry> existing = insertQueue.computeIfAbsent(index, k -> new ArrayBlockingQueue<>(1000));
     //    insertThreads.computeIfAbsent(index, k -> createThread(index));
 
-    doActualInsertKey(key, primaryKeyBytes, index);
+    doActualInsertKey(key, primaryKeyBytes, index, indexSchema);
 
     //    Entry currEntry = new Entry(id, key);
     //    existing.put(currEntry);
@@ -723,7 +726,7 @@ public class UpdateManager {
       for (Repartitioner.MoveRequest moveRequest : moveRequests) {
         byte[][] content = moveRequest.getContent();
         for (int i = 0; i < content.length; i++) {
-          doActualInsertKey(moveRequest.getKey(), content[i], index);
+          doActualInsertKey(moveRequest.getKey(), content[i], index, indexSchema);
         }
       }
     }
@@ -736,7 +739,7 @@ public class UpdateManager {
   /**
    * Caller must synchronized index
    */
-  private void doActualInsertKey(Object[] key, byte[] primaryKeyBytes, Index index) {
+  private void doActualInsertKey(Object[] key, byte[] primaryKeyBytes, Index index, IndexSchema indexSchema) {
     int fieldCount = index.getComparators().length;
     if (fieldCount != key.length) {
       Object[] newKey = new Object[fieldCount];
@@ -759,6 +762,10 @@ public class UpdateManager {
             break;
           }
         }
+
+        if (indexSchema.isUnique()) {
+          throw new DatabaseException("Unique constraint violated");
+        }
         if (!replaced) {
           byte[][] newRecords = new byte[records.length + 1][];
           System.arraycopy(records, 0, newRecords, 0, records.length);
@@ -771,9 +778,10 @@ public class UpdateManager {
     }
   }
 
-  /**
-   * Caller must synchronized index
-   */
+    /**
+     * Caller must synchronized index
+     */
+
   private void doActualInsertKeyWithRecord(
       byte[] recordBytes, Object[] key, Index index, String tableName, String indexName, boolean ignoreDuplicates) {
 //    int fieldCount = index.getComparators().length;

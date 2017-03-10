@@ -55,7 +55,7 @@ public class SchemaManager {
 
   private ConcurrentHashMap<String, AutoIncrementValue> autoIncrementValues = new ConcurrentHashMap<String, AutoIncrementValue>();
 
-  private List<String> createIndex(String dbName, String table, String indexName, String[] fields) {
+  private List<String> createIndex(String dbName, String table, String indexName, boolean isUnique, String[] fields) {
     List<String> createdIndices = new ArrayList<>();
 
     TableSchema tableSchema = server.getCommon().getTables(dbName).get(table.toLowerCase());
@@ -89,7 +89,7 @@ public class SchemaManager {
     }
     highIndexId++;
 
-    tableSchema.addIndex(indexName, fields, partitions, highIndexId);
+    tableSchema.addIndex(indexName, isUnique, fields, partitions, highIndexId);
 
     server.getCommon().updateTable(dbName, server.getDataDir(), tableSchema);
 
@@ -297,7 +297,7 @@ public class SchemaManager {
         server.getCommon().addTable(dbName, server.getDataDir(), schema);
 
         String[] primaryKeyFields = primaryKey.toArray(new String[primaryKey.size()]);
-        createIndex(dbName, tableName.toLowerCase(), "_primarykey", primaryKeyFields);
+        createIndex(dbName, tableName.toLowerCase(), "_primarykey", true, primaryKeyFields);
       }
       finally {
         server.getCommon().getSchemaWriteLock(dbName).unlock();
@@ -451,7 +451,8 @@ public class SchemaManager {
       String masterSlave = parts[5];
       String table = parts[6];
       String indexName = parts[7];
-      String fieldsStr = parts[8];
+      boolean isUnique = Boolean.valueOf(parts[8]);
+      String fieldsStr = parts[9];
       String[] fields = fieldsStr.split(",");
 
       if (replayedCommand) {
@@ -467,7 +468,7 @@ public class SchemaManager {
         }
       }
 
-      List<String> createdIndices = createIndex(dbName, table, indexName, fields);
+      List<String> createdIndices = createIndex(dbName, table, indexName, isUnique, fields);
 
       if (masterSlave.equals("master")) {
 

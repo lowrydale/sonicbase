@@ -12,6 +12,7 @@ public class CreateIndexStatementImpl implements CreateIndexStatement {
   private String name;
   private String tableName;
   private List<String> columns;
+  private boolean isUnique;
 
   public CreateIndexStatementImpl(DatabaseClient client) {
     this.client = client;
@@ -56,5 +57,13 @@ public class CreateIndexStatementImpl implements CreateIndexStatement {
       throw new DatabaseException(e);
     }
     return 1;
+  }
+
+  public void setIsUnique(boolean isUnique) {
+    this.isUnique = isUnique;
+  }
+
+  public boolean isUnique() {
+    return isUnique;
   }
 }

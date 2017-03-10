@@ -1009,7 +1009,7 @@ public class DatabaseClient {
   private AtomicLong nextRecordId = new AtomicLong();
 
   public void doCreateIndex(String dbName, CreateIndexStatementImpl statement) throws IOException {
-    String command = "DatabaseServer:createIndex:1:" + common.getSchemaVersion() + ":" + dbName + ":master:" + statement.getTableName() + ":" + statement.getName();
+    String command = "DatabaseServer:createIndex:1:" + common.getSchemaVersion() + ":" + dbName + ":master:" + statement.getTableName() + ":" + statement.getName() + ":" + statement.isUnique();
     StringBuilder builder = new StringBuilder();
     boolean first = true;
     for (String field : statement.getColumns()) {
@@ -1379,6 +1379,9 @@ public class DatabaseClient {
     }
 
     CreateIndexStatementImpl statement = new CreateIndexStatementImpl(this);
+    if (index.getType() != null) {
+      statement.setIsUnique(index.getType().equalsIgnoreCase("unique"));
+    }
     statement.setName(indexName);
     statement.setTableName(tableName);
     statement.setColumns(columnNames);

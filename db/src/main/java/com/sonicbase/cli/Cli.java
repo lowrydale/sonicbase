@@ -272,6 +272,9 @@ public class Cli {
       else if (command.startsWith("reconfigure cluster")) {
         reconfigureCluster();
       }
+      else if (command.startsWith("stop cluster")) {
+        stopCluster();
+      }
       else {
         System.out.println("Error, unknown command");
       }

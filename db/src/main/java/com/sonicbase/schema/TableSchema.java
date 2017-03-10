@@ -202,7 +202,7 @@ public class TableSchema {
     return fieldOffsets.get(id);
   }
 
-  public void addIndex(String indexName, String[] fields, Partition[] partitions, int indexId) {
+  public void addIndex(String indexName, boolean isUnique, String[] fields, Partition[] partitions, int indexId) {
     Comparator[] comparators = getComparators(fields);
 
     boolean isPrimaryKey = false;
@@ -242,7 +242,7 @@ public class TableSchema {
       }
     }
 
-    IndexSchema indexSchema = new IndexSchema(indexName, indexId, fields, comparators, partitions, isPrimaryKey, isPrimaryKeyGroup);
+    IndexSchema indexSchema = new IndexSchema(indexName, indexId, isUnique, fields, comparators, partitions, isPrimaryKey, isPrimaryKeyGroup);
     indexes.put(indexName, indexSchema);
     indexesById.put(indexId, indexSchema);
   }
@@ -270,6 +270,7 @@ public class TableSchema {
     for (Map.Entry<String, IndexSchema> entry : indexes.entrySet()) {
       out.writeUTF(entry.getKey());
       out.writeInt(entry.getValue().getIndexId());
+      out.writeBoolean(entry.getValue().isUnique());
       out.writeInt(entry.getValue().getFields().length);
       for (int i = 0; i < entry.getValue().getFields().length; i++) {
         out.writeUTF(entry.getValue().getFields()[i]);
@@ -347,6 +348,7 @@ public class TableSchema {
     for (int i = 0; i < indexCount; i++) {
       String name = in.readUTF();
       int indexId = in.readInt();
+      boolean isUnique = in.readBoolean();
       int columnCount = in.readInt();
       String[] columns = new String[columnCount];
       for (int j = 0; j < columnCount; j++) {
@@ -356,6 +358,7 @@ public class TableSchema {
       boolean isPrimaryKeyGroup = in.readBoolean();
       IndexSchema indexSchema = new IndexSchema();
       indexSchema.setName(name);
+      indexSchema.setIsUnique(isUnique);
       indexSchema.setFields(columns);
       Comparator[] comparators = getComparators(columns);
       indexSchema.setComparators(comparators);

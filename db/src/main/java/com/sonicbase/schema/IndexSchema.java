@@ -8,6 +8,7 @@ import java.util.List;
  */
 public class IndexSchema {
 
+  private boolean isUnique;
   private boolean isPrimaryKeyGroup;
   private boolean isPrimaryKey;
   private String name;
@@ -19,10 +20,11 @@ public class IndexSchema {
 
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
   @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
-  public IndexSchema(String name, int indexId, String[] fields, Comparator[] comparators,
+  public IndexSchema(String name, int indexId, boolean isUnique, String[] fields, Comparator[] comparators,
                      TableSchema.Partition[] partitions, boolean isPrimaryKey, boolean isPrimaryKeyGroup) {
     this.name = name;
     this.indexId = indexId;
+    this.isUnique = isUnique;
     this.fields = fields;
     for (int i = 0; i < fields.length; i++) {
       this.fields[i] = fields[i].toLowerCase();
@@ -34,6 +36,7 @@ public class IndexSchema {
   }
 
   public IndexSchema() {
+
   }
 
   public boolean isPrimaryKeyGroup() {
@@ -122,5 +125,13 @@ public class IndexSchema {
 
   public void setIsPrimaryKeyGroup(boolean isPrimaryKeyGroup) {
     this.isPrimaryKeyGroup = isPrimaryKeyGroup;
+  }
+
+  public boolean isUnique() {
+    return isUnique;
+  }
+
+  public void setIsUnique(boolean isUnique) {
+    this.isUnique = isUnique;
   }
 }

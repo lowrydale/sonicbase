@@ -3,6 +3,7 @@
         "dataDirectory": "$HOME/db-data",
         "installDirectory": "$HOME/database",
         "maxJavaHeap": "50%",
+        "user": "lowryda",
         "maxProcessMemory": "90%",
       "replicationFactor": 1,
         "shards" : [
@@ -15,6 +16,18 @@
               }
             ]
           }
-        ]
+        ],
+      "clients": [
+        {
+          "privateAddress": "localhost",
+          "publicAddress": "localhost",
+          "port": 8080
+        },
+        {
+          "privateAddress": "localhost",
+          "publicAddress": "localhost",
+          "port": 8090
+        }
+      ]
     }
 }

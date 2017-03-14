@@ -361,6 +361,11 @@ public class TestDatabase {
     catch (SQLException e) {
       //expected
     }
+
+    stmt = conn.prepareStatement("update indexes set id2=? where id=?");
+    stmt.setLong(1, 2);
+    stmt.setLong(2, 1);
+    stmt.executeUpdate();
   }
 
     @Test

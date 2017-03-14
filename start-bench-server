@@ -1,0 +1,23 @@
+export _XMX_=4g
+export SEARCH_HOME=$4
+#export MODE=yprof
+mkdir $4/logs
+
+#if [ $2 == "9010" ]
+#then
+#  export MODE=debug
+#fi
+
+if [ ${4:0:1} != "/" ]
+then
+  export SEARCH_HOME=$HOME/$SEARCH_HOME
+fi
+
+cd $SEARCH_HOME
+echo "start-search_home=$SEARCH_HOME"
+
+export _LOG4J_FILENAME_=$SEARCH_HOME/logs/bench-$2.log
+export _GC_LOG_FILENAME_=$SEARCH_HOME/logs/gc-bench-$2.log
+export LOG4J_FILE="log4j.xml"
+echo "starting BenchmarkServer: search_home=" + $SEARCH_HOME
+nohup $SEARCH_HOME/bin/runclass com.sonicbase.bench.BenchServer $2 > $SEARCH_HOME/logs/bench-$2.sysout.log 2>&1 &

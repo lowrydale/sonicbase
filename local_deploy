@@ -25,6 +25,7 @@ rsync -rvlLt is-server-running $HOME/database/bin
 rsync -rvlLt start-local-rest $HOME/database/bin
 rsync -rvlLt start $HOME/database/bin
 rsync -rvlLt start-db-server $HOME/database/bin
+rsync -rvlLt start-bench-server $HOME/database/bin
 rsync -rvlLt remote-start-db-server $HOME/database/bin
 rsync -rvlLt remote-start-rest-server $HOME/database/bin
 rsync -rvlLt kill-server $HOME/database/bin
@@ -33,6 +34,7 @@ rsync -rvlLt terminal-size.py $HOME/database/bin
 rsync -rvlLt terminal-resize.py $HOME/database/bin
 rsync -rvlLt do-rsync $HOME/database/bin
 rsync -rvlLt do-start $HOME/database/bin
+rsync -rvlLt do-start-bench $HOME/database/bin
 rsync -rvlLt get-mem-total $HOME/database/bin
 rsync -rvlLt remote-get-mem-total $HOME/database/bin
 rsync -rvlLt db/src/main/resources/log4j.xml $HOME/database/config
@@ -46,6 +48,7 @@ chmod +x $HOME/database/bin/start-local-rest
 chmod +x $HOME/database/bin/start
 chmod +x $HOME/database/bin/start-id-servers
 chmod +x $HOME/database/bin/start-db-server
+chmod +x $HOME/database/bin/start-bench-server
 chmod +x $HOME/database/bin/remote-start-db-server
 chmod +x $HOME/database/bin/remote-start-rest-server
 chmod +x $HOME/database/bin/kill-server
@@ -53,6 +56,7 @@ chmod +x $HOME/database/bin/terminal-size.py
 chmod +x $HOME/database/bin/terminal-resize.py
 chmod +x $HOME/database/bin/do-rsync
 chmod +x $HOME/database/bin/do-start
+chmod +x $HOME/database/bin/do-start-bench
 chmod +x $HOME/database/bin/dump-threads
 chmod +x $HOME/database/bin/get-mem-total
 chmod +x $HOME/database/bin/remote-get-mem-total

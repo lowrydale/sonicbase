@@ -1,5 +1,9 @@
 package com.sonicbase.cli;
 
+import com.mashape.unirest.http.HttpResponse;
+import com.mashape.unirest.http.Unirest;
+import com.mashape.unirest.http.exceptions.UnirestException;
+import com.mashape.unirest.request.GetRequest;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.query.DatabaseException;
@@ -37,6 +41,7 @@ public class Cli {
   private static String lastCommand;
   private static String currDbName;
   private static ConsoleReader reader;
+  private static long benchStartTime;
 
   public static void main(final String[] args) throws IOException, InterruptedException {
     workingDir = new File(System.getProperty("user.dir"));
@@ -96,6 +101,28 @@ public class Cli {
     }
     catch (ExitCliException e) {
       return;
+    }
+  }
+
+  private static List<String> benchUris = new ArrayList<>();
+
+  private static void initBench(String cluster) throws IOException {
+    InputStream in = Cli.class.getResourceAsStream("/config-" + cluster + ".json");
+    if (in == null) {
+      in = new FileInputStream("/Users/lowryda/database/config/config-" + cluster + ".json");
+    }
+    String json = StreamUtils.inputStreamToString(in);
+    JsonDict config = new JsonDict(json);
+    JsonDict databaseDict = config.getDict("database");
+
+    JsonArray clients = databaseDict.getArray("clients");
+    if (clients != null) {
+      for (int i = 0; i < clients.size(); i++) {
+        JsonDict replica = clients.getDict(i);
+        String externalAddress = replica.getString("publicAddress");
+        String port = replica.getString("port");
+        benchUris.add("http://" + externalAddress + ":" + port);
+      }
     }
   }
 
@@ -275,6 +302,27 @@ public class Cli {
       else if (command.startsWith("stop cluster")) {
         stopCluster();
       }
+      else if (command.startsWith("bench start cluster")) {
+        benchStartCluster();
+      }
+      else if (command.startsWith("bench stop cluster")) {
+        benchStopCluster();
+      }
+      else if (command.startsWith("bench healthcheck")) {
+        benchHealthcheck();
+      }
+      else if (command.startsWith("bench start")) {
+        benchStartTest(command);
+      }
+      else if (command.startsWith("bench stop")) {
+        benchStopTest(command);
+      }
+      else if (command.startsWith("bench stats")) {
+        benchstats(command);
+      }
+      else if (command.startsWith("bench resetStats")) {
+        benchResetStats(command);
+      }
       else {
         System.out.println("Error, unknown command");
       }
@@ -286,6 +334,242 @@ public class Cli {
       e.printStackTrace();
       System.out.println("Error executing command: msg=" + e.getMessage());
     }
+  }
+
+  private static void benchStopCluster() throws IOException, InterruptedException {
+    String cluster = currCluster;
+    if (cluster == null) {
+      System.out.println("Error, not using a cluster");
+      return;
+    }
+
+    String json = StreamUtils.inputStreamToString(Cli.class.getResourceAsStream("/config-" + cluster + ".json"));
+    JsonDict config = new JsonDict(json);
+    JsonDict databaseDict = config.getDict("database");
+    String installDir = databaseDict.getString("installDirectory");
+    installDir = resolvePath(installDir);
+    JsonArray clients = databaseDict.getArray("clients");
+    for (int i = 0; i < clients.size(); i++) {
+      JsonDict replica = clients.getDict(i);
+      stopBenchServer(databaseDict, replica.getString("publicAddress"), replica.getString("privateAddress"), replica.getString("port"), installDir);
+    }
+    System.out.println("Stopped benchmark cluster");
+  }
+
+  private static void benchStartCluster() throws IOException, InterruptedException {
+    String cluster = currCluster;
+    if (cluster == null) {
+      System.out.println("Error, not using a cluster");
+      return;
+    }
+
+    String json = StreamUtils.inputStreamToString(Cli.class.getResourceAsStream("/config-" + cluster + ".json"));
+    JsonDict config = new JsonDict(json);
+    JsonDict databaseDict = config.getDict("database");
+    String installDir = databaseDict.getString("installDirectory");
+    installDir = resolvePath(installDir);
+    JsonArray clients = databaseDict.getArray("clients");
+    for (int i = 0; i < clients.size(); i++) {
+      JsonDict replica = clients.getDict(i);
+      stopBenchServer(databaseDict, replica.getString("publicAddress"), replica.getString("privateAddress"), replica.getString("port"), installDir);
+    }
+    Thread.sleep(2000);
+    for (int i = 0; i < clients.size(); i++) {
+      JsonDict replica = clients.getDict(i);
+      startBenchServer(databaseDict, replica.getString("publicAddress"), replica.getString("privateAddress"), replica.getString("port"), installDir, cluster);
+    }
+
+    System.out.println("Finished starting servers");
+
+  }
+
+  private static void benchResetStats(String command) {
+    String[] parts = command.split(" ");
+    String test = parts[2];
+
+    List<Response> responses = sendBenchRequest("/bench/resetStats/" + test);
+    StringBuilder failedNodes = new StringBuilder();
+    boolean haveFailed = false;
+    for (int i = 0; i < responses.size(); i++) {
+      Response response = responses.get(i);
+      if (response.status != 200 || !response.response.equals("ok")) {
+        failedNodes.append(",").append(i);
+        haveFailed = true;
+      }
+    }
+    if (!haveFailed) {
+      System.out.println("All success: count=" + responses.size());
+    }
+    else {
+      System.out.println("Some failed: failed=" + failedNodes.toString());
+    }
+  }
+
+  private static void benchHealthcheck() {
+    List<Response> responses = sendBenchRequest("/bench/healthcheck");
+    StringBuilder failedNodes = new StringBuilder();
+    boolean haveFailed = false;
+    for (int i = 0; i < responses.size(); i++) {
+      Response response = responses.get(i);
+      if (response.status != 200 || !response.response.contains("ok")) {
+        failedNodes.append(",").append(i);
+        haveFailed = true;
+      }
+    }
+    if (!haveFailed) {
+      System.out.println("All success: count=" + responses.size());
+    }
+    else {
+      System.out.println("Some failed: failed=" + failedNodes.toString());
+    }
+  }
+
+  private static void benchstats(String command) {
+    String[] parts = command.split(" ");
+    String test = parts[2];
+
+    List<Response> responses = sendBenchRequest("/bench/stats/" + test);
+
+    long totalCount = 0;
+    long totalErrorCount = 0;
+    long totalDuration = 0;
+    double minRate = Double.MAX_VALUE;
+    int minOffset = 0;
+    double maxRate = Double.MIN_VALUE;
+    int maxOffset = 0;
+    int countReporting = 0;
+    for (int i = 0; i < responses.size(); i++) {
+      Response response = responses.get(i);
+      if (response.status == 200) {
+        countReporting++;
+        JsonDict dict = new JsonDict(response.response);
+        totalCount += dict.getLong("count");
+        totalErrorCount += dict.getLong("errorCount");
+        totalDuration += dict.getLong("totalDuration");
+        double rate = dict.getLong("count") / (System.currentTimeMillis() - benchStartTime) * 1000d;
+        if (rate < minRate) {
+          minRate = rate;
+          minOffset = i;
+        }
+        if (rate > maxRate) {
+          maxRate = rate;
+          maxOffset = i;
+        }
+      }
+    }
+    System.out.println("Stats: countReporting=" + countReporting + ", count=" + totalCount + ", errorCount=" + totalErrorCount +
+      ", rate=" + (double)totalCount / (double)(System.currentTimeMillis() - benchStartTime) * 1000d +
+        ", errorRate=" + (double)totalErrorCount / (double)(System.currentTimeMillis() - benchStartTime) * 1000d +
+        ", avgDuration=" + totalDuration / (double)totalCount +
+        ", minRate=" + minRate + ", minOffset=" + minOffset +
+        ", maxRate=" + maxRate + ", maxOffset=" + maxOffset);
+  }
+
+  private static void benchStopTest(String command) {
+    String[] parts = command.split(" ");
+    String test = parts[2];
+
+    boolean anyFailed = false;
+    StringBuilder failed = new StringBuilder();
+    List<Response> responses = sendBenchRequest("/bench/stop/" + test);
+    for (int i = 0; i < responses.size(); i++) {
+      Response response = responses.get(i);
+      if (response.status != 200) {
+        failed.append(",").append(i);
+        anyFailed = true;
+      }
+    }
+    if (!anyFailed) {
+      System.out.println("Stop successed");
+    }
+    else {
+      System.out.println("Stop failed: failed=" + failed.toString());
+    }
+  }
+
+  private static void benchStartTest(String command) {
+    String[] parts = command.split(" ");
+    String test = parts[2];
+    String queryType = null;
+    if (parts.length > 3) {
+      queryType = parts[3];
+    }
+
+    StringBuilder failed = new StringBuilder();
+    boolean anyFailed = false;
+    benchStartTime = System.currentTimeMillis();
+    List<Response> responses = null;
+    if (test.equals("insert")) {
+      responses = sendBenchRequest("/bench/start/" + test + "?cluster=" + currCluster +
+          "&count=1000000");
+    }
+    else if (test.equals("identity")) {
+      responses = sendBenchRequest("/bench/start/" + test + "?cluster=" + currCluster +
+          "&count=1000000&queryType=" + queryType);
+    }
+    else if (test.equals("joins")) {
+      responses = sendBenchRequest("/bench/start/" + test + "?cluster=" + currCluster +
+          "&count=1000000&queryType=" + queryType);
+    }
+    else if (test.equals("range")) {
+      responses = sendBenchRequest("/bench/start/" + test + "?cluster=" + currCluster +
+          "&count=1000000");
+    }
+    for (int i = 0; i < responses.size(); i++) {
+      Response response = responses.get(i);
+      if (response.status != 200) {
+        failed.append(",").append(i);
+        anyFailed = true;
+      }
+    }
+    if (!anyFailed) {
+      System.out.println("Start test successed");
+    }
+    else {
+      System.out.println("Start test failed: failed=" + failed.toString());
+    }
+  }
+
+  static class Response {
+    private int status;
+    private String response;
+  }
+
+  private static List<Response> sendBenchRequest(String url) {
+    List<Response> responses = new ArrayList<>();
+    for (int i = 0; i < benchUris.size(); i++) {
+      String benchUri = benchUris.get(i);
+
+      String fullUri = benchUri + url;
+      if (fullUri.contains("?")) {
+        fullUri += "&shard=" + i;
+      }
+      else {
+        fullUri += "?shard=" + i;
+      }
+      System.out.println(fullUri);
+      final GetRequest request = Unirest.get(fullUri);
+
+      HttpResponse<String> response = null;
+      try {
+        response = request.asString();
+        Response responseObj = new Response();
+        responseObj.status = response.getStatus();
+        responseObj.response = response.getBody();
+        responses.add(responseObj);
+
+        if (response.getStatus() != 200) {
+          throw new DatabaseException("Error sending bench request: status=" + response.getStatus());
+        }
+      }
+      catch (UnirestException e) {
+        Response responseObj = new Response();
+        responseObj.status = 500;
+        responses.add(responseObj);
+        e.printStackTrace();
+      }
+    }
+    return responses;
   }
 
   private static void exit() throws SQLException {
@@ -958,6 +1242,9 @@ public class Cli {
 
     currCluster = cluster;
 
+    initBench(cluster);
+
+
     closeConnection();
     currDbName = null;
 
@@ -1183,6 +1470,38 @@ public class Cli {
     }
   }
 
+  private static void startBenchServer(JsonDict databaseDict, String externalAddress, String privateAddress, String port, String installDir,
+                                  String cluster) throws IOException, InterruptedException {
+    String deployUser = databaseDict.getString("user");
+    String maxHeap = databaseDict.getString("maxJavaHeap");
+    if (port == null) {
+      port = "9010";
+    }
+    String searchHome = installDir;
+//    if (!searchHome.startsWith("/")) {
+//      searchHome = "$HOME/" + searchHome;
+//    }
+    if (externalAddress.equals("127.0.0.1") || externalAddress.equals("localhost")) {
+      if (!searchHome.startsWith("/")) {
+        File file = new File(System.getProperty("user.home"), searchHome);
+        searchHome = file.getAbsolutePath();
+      }
+      ProcessBuilder builder = new ProcessBuilder().command("bin/do-start-bench", "", installDir, privateAddress, port, maxHeap, searchHome, cluster);
+      System.out.println("Started server: address=" + externalAddress + ", port=" + port + ", maxJavaHeap=" + maxHeap);
+      Process p = builder.start();
+      p.waitFor();
+      System.out.println(StreamUtils.inputStreamToString(p.getErrorStream()));
+      System.out.println(StreamUtils.inputStreamToString(p.getInputStream()));
+      return;
+    }
+    System.out.println("Home=" + searchHome);
+
+    ProcessBuilder builder = new ProcessBuilder().command("bin/do-start-bench", deployUser + "@" + externalAddress, installDir, privateAddress, port, maxHeap, searchHome, cluster);
+    System.out.println("Started server: address=" + externalAddress + ", port=" + port + ", maxJavaHeap=" + maxHeap);
+    Process p = builder.start();
+    p.waitFor();
+  }
+
   private static void stopServer(JsonDict databaseDict, String externalAddress, String privateAddress, String port, String installDir) throws IOException, InterruptedException {
     String deployUser = databaseDict.getString("user");
     if (externalAddress.equals("127.0.0.1") || externalAddress.equals("localhost")) {
@@ -1195,6 +1514,40 @@ public class Cli {
       ProcessBuilder builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
           "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", deployUser + "@" +
               externalAddress, installDir + "/bin/kill-server", "NettyServer", "-host", privateAddress, "-port", port);
+      //builder.directory(workingDir);
+      Process p = builder.start();
+      p.waitFor();
+    }
+//    while (true) {
+//      builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
+//          "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", deployUser + "@" +
+//              externalAddress, installDir + "/bin/is-server-running", privateAddress, port);
+//      //builder.directory(workingDir);
+//      p = builder.start();
+//      InputStream in = p.getInputStream();
+//      String str = StreamUtils.inputStreamToString(in);
+//      if (str.length() == 0) {
+//        break;
+//      }
+//      p.waitFor();
+//
+//      Thread.sleep(1000);
+//      System.out.println("Waiting for server to stop...");
+//    }
+  }
+
+  private static void stopBenchServer(JsonDict databaseDict, String externalAddress, String privateAddress, String port, String installDir) throws IOException, InterruptedException {
+    String deployUser = databaseDict.getString("user");
+    if (externalAddress.equals("127.0.0.1") || externalAddress.equals("localhost")) {
+      ProcessBuilder builder = new ProcessBuilder().command("bin/kill-server", "BenchServer", port, port, port, port);
+      //builder.directory(workingDir);
+      Process p = builder.start();
+      p.waitFor();
+    }
+    else {
+      ProcessBuilder builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
+          "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", deployUser + "@" +
+              externalAddress, installDir + "/bin/kill-server", "BenchServer", port, port, port, port);
       //builder.directory(workingDir);
       Process p = builder.start();
       p.waitFor();

@@ -5,7 +5,7 @@ import com.sonicbase.index.Index;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.DataUtil;
-import org.codehaus.plexus.util.FileUtils;
+import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

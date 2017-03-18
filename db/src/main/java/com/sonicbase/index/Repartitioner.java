@@ -73,9 +73,9 @@ public class Repartitioner extends Thread {
       }
     }
 
-    beginRepartitioningThread = new Thread(new Runnable() {
-      @Override
-      public void run() {
+//    beginRepartitioningThread = new Thread(new Runnable() {
+//      @Override
+//      public void run() {
         try {
           String tableName = null;
           StringBuilder toRebalanceStr = new StringBuilder();
@@ -179,7 +179,7 @@ public class Repartitioner extends Thread {
             }
           }
 
-          common.getSchemaWriteLock(dbName).lock();
+          //common.getSchemaWriteLock(dbName).lock();
           try {
             for (String index : toRebalance) {
               String[] parts = index.split(" ");
@@ -199,7 +199,7 @@ public class Repartitioner extends Thread {
             common.saveSchema(databaseServer.getDataDir());
           }
           finally {
-            common.getSchemaWriteLock(dbName).unlock();
+            //common.getSchemaWriteLock(dbName).unlock();
           }
           databaseServer.pushSchema();
 
@@ -317,18 +317,18 @@ public class Repartitioner extends Thread {
           beginRepartitioningThread = null;
           isComplete.set(true);
         }
-      }
-    }, "Begin Repartition Thread");
-    beginRepartitioningThread.start();
-
-    while (!isComplete.get()) {
-      try {
-        Thread.sleep(1000);
-      }
-      catch (InterruptedException e) {
-        throw new DatabaseException(e);
-      }
-    }
+//      }
+//    }, "Begin Repartition Thread");
+//    beginRepartitioningThread.start();
+//
+//    while (!isComplete.get()) {
+//      try {
+//        Thread.sleep(1000);
+//      }
+//      catch (InterruptedException e) {
+//        throw new DatabaseException(e);
+//      }
+//    }
 
     return null;
   }
@@ -773,32 +773,40 @@ public class Repartitioner extends Thread {
                       }
                     }
                     if (indexSchema.isPrimaryKey()) {
-                      byte[][] newContent = new byte[content.length][];
-                      for (int i = 0; i < content.length; i++) {
-                        Record record = new Record(dbName, common, content[i]);
-                        record.setDbViewNumber(common.getSchemaVersion());
-                        record.setDbViewFlags(Record.DB_VIEW_FLAG_DELETING);
-                        newContent[i] = record.serialize(common);
-                      }
-                      synchronized (index) {
-                        databaseServer.freeUnsafeIds(value);
-
-                        value = databaseServer.toUnsafeFromRecords(newContent);
-                        index.put(key, value);
+                      Record record = new Record(dbName, common, content[0]);
+                      if (record.getDbViewFlags() == Record.DB_VIEW_FLAG_DELETING) {
+                        content = null;
                       }
                     }
+                    if (content != null) {
+                      if (indexSchema.isPrimaryKey()) {
+                        byte[][] newContent = new byte[content.length][];
+                        for (int i = 0; i < content.length; i++) {
+                          Record record = new Record(dbName, common, content[i]);
+                          record.setDbViewNumber(common.getSchemaVersion());
+                          record.setDbViewFlags(Record.DB_VIEW_FLAG_DELETING);
+                          newContent[i] = record.serialize(common);
+                        }
+                        synchronized (index) {
+                          databaseServer.freeUnsafeIds(value);
 
-                    List<MoveRequest> list = moveRequests.get(shard);
-                    list.add(new MoveRequest(key, content));
-                    if (list.size() > 1000) {
-                      moveIndexEntriesToShard(dbName, tableName, indexName, indexSchema.isPrimaryKey(), shard, list);
-                      for (MoveRequest request : list) {
-                        //index.remove(request.getKey());
-                        synchronized (keysToDelete) {
-                          keysToDelete.add(request.getKey());
+                          value = databaseServer.toUnsafeFromRecords(newContent);
+                          index.put(key, value);
                         }
                       }
-                      list.clear();
+
+                      List<MoveRequest> list = moveRequests.get(shard);
+                      list.add(new MoveRequest(key, content));
+                      if (list.size() > 1000) {
+                        moveIndexEntriesToShard(dbName, tableName, indexName, indexSchema.isPrimaryKey(), shard, list);
+                        for (MoveRequest request : list) {
+                          //index.remove(request.getKey());
+                          synchronized (keysToDelete) {
+                            keysToDelete.add(request.getKey());
+                          }
+                        }
+                        list.clear();
+                      }
                     }
                   }
                 }
@@ -915,21 +923,28 @@ public class Repartitioner extends Thread {
       DataUtil.writeVLong(out, moveRequests.size(), resultLength);
       for (MoveRequest moveRequest : moveRequests) {
         byte[] bytes = DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), indexName, moveRequest.key);
-        out.write(bytes);
         byte[][] content = moveRequest.getContent();
-        if (primaryKey) {
+        try {
+          if (primaryKey) {
+            for (int i = 0; i < content.length; i++) {
+              byte[] recordBytes = content[i];
+              Record record = new Record(dbName, common, recordBytes);
+              record.setDbViewNumber(common.getSchemaVersion());
+              record.setDbViewFlags(Record.DB_VIEW_FLAG_ADDING);
+              content[i] = record.serialize(common);
+            }
+          }
+          out.write(bytes);
+          DataUtil.writeVLong(out, content.length, resultLength);
           for (int i = 0; i < content.length; i++) {
-            byte[] recordBytes = content[i];
-            Record record = new Record(dbName, common, recordBytes);
-            record.setDbViewNumber(common.getSchemaVersion());
-            record.setDbViewFlags(Record.DB_VIEW_FLAG_ADDING);
-            content[i] = record.serialize(common);
+            DataUtil.writeVLong(out, content[i].length, resultLength);
+            out.write(content[i]);
           }
         }
-        DataUtil.writeVLong(out, content.length, resultLength);
-        for (int i = 0; i < content.length; i++) {
-          DataUtil.writeVLong(out, content[i].length, resultLength);
-          out.write(content[i]);
+        catch (Exception e) {
+          logger.error("Error moving record", e);
+          out.write(bytes);
+          DataUtil.writeVLong(out, 0, resultLength);
         }
       }
       out.close();
@@ -1409,17 +1424,19 @@ public class Repartitioner extends Thread {
           String command = "DatabaseServer:beginRebalance:1:1:" + dbName + ":" + false;
           beginRebalance(command, (byte[])null);
         }
-        Thread.sleep(100 * 1000);
+        Thread.sleep(30 * 1000);
       }
       catch (InterruptedException e) {
+        logger.info("Repartitioner interrupted");
         return;
       }
       catch (Exception t) {
         logger.error("Error in master thread", t);
         try {
-          Thread.sleep(100 * 1000);
+          Thread.sleep(10 * 1000);
         }
         catch (InterruptedException e) {
+          logger.info("Repartitioner interrupted");
           return;
         }
       }

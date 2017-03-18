@@ -9,6 +9,9 @@ import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
+import com.sonicbase.schema.IndexSchema;
+import com.sonicbase.schema.TableSchema;
+import com.sonicbase.util.DataUtil;
 import com.sonicbase.util.JsonArray;
 import com.sonicbase.util.JsonDict;
 import com.sonicbase.util.StreamUtils;
@@ -26,6 +29,7 @@ import org.apache.commons.io.FileUtils;
 import java.io.*;
 import java.sql.*;
 import java.util.*;
+import java.util.concurrent.*;
 
 import static com.sonicbase.server.DatabaseServer.getMemValue;
 
@@ -42,6 +46,7 @@ public class Cli {
   private static String currDbName;
   private static ConsoleReader reader;
   private static long benchStartTime;
+  private static ThreadPoolExecutor benchExecutor;
 
   public static void main(final String[] args) throws IOException, InterruptedException {
     workingDir = new File(System.getProperty("user.dir"));
@@ -117,6 +122,11 @@ public class Cli {
 
     JsonArray clients = databaseDict.getArray("clients");
     if (clients != null) {
+      System.out.println("Configuring " + clients.size() + " bench clients");
+      if (benchExecutor != null) {
+        benchExecutor.shutdownNow();
+      }
+      benchExecutor = new ThreadPoolExecutor(clients.size(), clients.size(), 10000L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
       for (int i = 0; i < clients.size(); i++) {
         JsonDict replica = clients.getDict(i);
         String externalAddress = replica.getString("publicAddress");
@@ -323,6 +333,9 @@ public class Cli {
       else if (command.startsWith("bench resetStats")) {
         benchResetStats(command);
       }
+      else if (command.startsWith("partitioning")) {
+        getPartitionSizes();
+      }
       else {
         System.out.println("Error, unknown command");
       }
@@ -357,7 +370,7 @@ public class Cli {
   }
 
   private static void benchStartCluster() throws IOException, InterruptedException {
-    String cluster = currCluster;
+    final String cluster = currCluster;
     if (cluster == null) {
       System.out.println("Error, not using a cluster");
       return;
@@ -365,20 +378,34 @@ public class Cli {
 
     String json = StreamUtils.inputStreamToString(Cli.class.getResourceAsStream("/config-" + cluster + ".json"));
     JsonDict config = new JsonDict(json);
-    JsonDict databaseDict = config.getDict("database");
-    String installDir = databaseDict.getString("installDirectory");
-    installDir = resolvePath(installDir);
+    final JsonDict databaseDict = config.getDict("database");
+    String dir = databaseDict.getString("installDirectory");
+    final String installDir = resolvePath(dir);
     JsonArray clients = databaseDict.getArray("clients");
     for (int i = 0; i < clients.size(); i++) {
       JsonDict replica = clients.getDict(i);
       stopBenchServer(databaseDict, replica.getString("publicAddress"), replica.getString("privateAddress"), replica.getString("port"), installDir);
     }
     Thread.sleep(2000);
+    List<Future> futures = new ArrayList<>();
     for (int i = 0; i < clients.size(); i++) {
-      JsonDict replica = clients.getDict(i);
-      startBenchServer(databaseDict, replica.getString("publicAddress"), replica.getString("privateAddress"), replica.getString("port"), installDir, cluster);
+      final JsonDict replica = clients.getDict(i);
+      futures.add(benchExecutor.submit(new Callable(){
+        @Override
+        public Object call() throws Exception {
+          startBenchServer(databaseDict, replica.getString("publicAddress"), replica.getString("privateAddress"), replica.getString("port"), installDir, cluster);
+          return null;
+        }
+      }));
     }
-
+    for (Future future : futures) {
+      try {
+        future.get();
+      }
+      catch (Exception e) {
+        throw new DatabaseException(e);
+      }
+    }
     System.out.println("Finished starting servers");
 
   }
@@ -422,6 +449,46 @@ public class Cli {
     else {
       System.out.println("Some failed: failed=" + failedNodes.toString());
     }
+  }
+
+  private static void getPartitionSizes() throws IOException, SQLException, ClassNotFoundException {
+    initConnection();
+    DatabaseClient client = ((ConnectionProxy) conn).getDatabaseClient();
+    for (Map.Entry<String, TableSchema> table : client.getCommon().getTables(currDbName).entrySet()) {
+      for (Map.Entry<String, IndexSchema> indexSchema : table.getValue().getIndexes().entrySet()) {
+        int shard = 0;
+        for (TableSchema.Partition partition : indexSchema.getValue().getCurrPartitions()) {
+          //if (table.getKey().equals("persons")) {
+          StringBuilder builder = new StringBuilder("[");
+          if (partition.getUpperKey() == null) {
+            builder.append("null");
+          }
+          else {
+            for (Object obj : partition.getUpperKey()) {
+              builder.append(",").append(obj);
+            }
+          }
+          builder.append("]");
+          System.out.println("Table=" + table.getKey() + ", Index=" + indexSchema.getKey() + ", shard=" + shard + ", key=" +
+                builder.toString());
+          //}
+          shard++;
+        }
+
+        String command = "DatabaseServer:getPartitionSize:1:" + client.getCommon().getSchemaVersion() + ":" +
+            currDbName + ":" + table.getKey() + ":" + indexSchema.getKey();
+        Random rand = new Random(System.currentTimeMillis());
+        for (int i = 0; i < client.getShardCount(); i++) {
+          shard = i;
+          byte[] ret = client.send(null, shard, rand.nextLong(), command, null, DatabaseClient.Replica.master);
+          DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
+          long serializationVersion = DataUtil.readVLong(in);
+          long count = in.readLong();
+          System.out.println("Table=" + table.getKey() + ", Index=" + indexSchema.getKey() + ", Shard=" + shard + ", count=" + count);
+        }
+      }
+    }
+
   }
 
   private static void benchstats(String command) {
@@ -501,7 +568,7 @@ public class Cli {
     List<Response> responses = null;
     if (test.equals("insert")) {
       responses = sendBenchRequest("/bench/start/" + test + "?cluster=" + currCluster +
-          "&count=1000000");
+          "&count=1000000000");
     }
     else if (test.equals("identity")) {
       responses = sendBenchRequest("/bench/start/" + test + "?cluster=" + currCluster +
@@ -535,38 +602,61 @@ public class Cli {
     private String response;
   }
 
-  private static List<Response> sendBenchRequest(String url) {
+  private static List<Response> sendBenchRequest(final String url) {
     List<Response> responses = new ArrayList<>();
+    List<Future<Response>> futures = new ArrayList<>();
+    System.out.println("bench server count=" + benchUris.size());
     for (int i = 0; i < benchUris.size(); i++) {
-      String benchUri = benchUris.get(i);
+      final int offset = i;
+      futures.add(benchExecutor.submit(new Callable<Response>(){
+        @Override
+        public Response call() throws Exception {
+          try {
+            String benchUri = benchUris.get(offset);
 
-      String fullUri = benchUri + url;
-      if (fullUri.contains("?")) {
-        fullUri += "&shard=" + i;
-      }
-      else {
-        fullUri += "?shard=" + i;
-      }
-      System.out.println(fullUri);
-      final GetRequest request = Unirest.get(fullUri);
+            String fullUri = benchUri + url;
+            if (fullUri.contains("?")) {
+              fullUri += "&shard=" + offset + "&shardCount=" + benchUris.size();
+            }
+            else {
+              fullUri += "?shard=" + offset + "&shardCount=" + benchUris.size();
+            }
+            System.out.println(fullUri);
+            final GetRequest request = Unirest.get(fullUri);
 
-      HttpResponse<String> response = null;
-      try {
-        response = request.asString();
-        Response responseObj = new Response();
-        responseObj.status = response.getStatus();
-        responseObj.response = response.getBody();
-        responses.add(responseObj);
+            HttpResponse<String> response = null;
+            try {
+              response = request.asString();
+              if (response.getStatus() != 200) {
+                throw new DatabaseException("Error sending bench request: status=" + response.getStatus());
+              }
 
-        if (response.getStatus() != 200) {
-          throw new DatabaseException("Error sending bench request: status=" + response.getStatus());
+              Response responseObj = new Response();
+              responseObj.status = response.getStatus();
+              responseObj.response = response.getBody();
+              return responseObj;
+
+            }
+            catch (UnirestException e) {
+              e.printStackTrace();
+              Response responseObj = new Response();
+              responseObj.status = 500;
+              return responseObj;
+            }
+          }
+          catch (Exception e) {
+            throw new DatabaseException(e);
+          }
         }
+      }));
+
+    }
+    for (Future<Response> future : futures) {
+      try {
+        responses.add(future.get());
       }
-      catch (UnirestException e) {
-        Response responseObj = new Response();
-        responseObj.status = 500;
-        responses.add(responseObj);
-        e.printStackTrace();
+      catch (Exception e) {
+        throw new DatabaseException(e);
       }
     }
     return responses;
@@ -575,6 +665,9 @@ public class Cli {
   private static void exit() throws SQLException {
     if (conn != null) {
       conn.close();
+    }
+    if (benchExecutor != null) {
+      benchExecutor.shutdownNow();
     }
     throw new ExitCliException();
   }
@@ -738,7 +831,7 @@ public class Cli {
     System.out.println("Stopped cluster");
   }
 
-  private static void reconfigureCluster() throws SQLException, ClassNotFoundException, IOException, InterruptedException {
+  private static void reconfigureCluster() throws SQLException, ClassNotFoundException, IOException, InterruptedException, ExecutionException {
     String cluster = currCluster;
     if (cluster == null) {
       System.out.println("Error, not using a cluster");
@@ -1316,7 +1409,7 @@ public class Cli {
     System.out.println("Finished purging: cluster=" + cluster);
   }
 
-  private static void readdressServers() throws IOException, InterruptedException, SQLException, ClassNotFoundException {
+  private static void readdressServers() throws IOException, InterruptedException, SQLException, ClassNotFoundException, ExecutionException {
     deploy();
     startCluster();
   }
@@ -1496,6 +1589,9 @@ public class Cli {
     }
     System.out.println("Home=" + searchHome);
 
+    System.out.println("1=" + deployUser + "@" + externalAddress + ", 2=" + installDir +
+        ", 3=" + privateAddress + ", 4=" + port + ", 5=" + maxHeap + ", 6=" + searchHome +
+        ", 7=" + cluster);
     ProcessBuilder builder = new ProcessBuilder().command("bin/do-start-bench", deployUser + "@" + externalAddress, installDir, privateAddress, port, maxHeap, searchHome, cluster);
     System.out.println("Started server: address=" + externalAddress + ", port=" + port + ", maxJavaHeap=" + maxHeap);
     Process p = builder.start();
@@ -1570,7 +1666,7 @@ public class Cli {
 //    }
   }
 
-  private static void deploy() throws IOException {
+  private static void deploy() throws IOException, ExecutionException {
     String cluster = currCluster;
     if (cluster == null) {
       System.out.println("Error, not using a cluster");
@@ -1586,62 +1682,83 @@ public class Cli {
       String json = StreamUtils.inputStreamToString(in);
       JsonDict config = new JsonDict(json);
       JsonDict databaseDict = config.getDict("database");
-      String deployUser = databaseDict.getString("user");
-      String installDir = databaseDict.getString("installDirectory");
-      installDir = resolvePath(installDir);
+      final String deployUser = databaseDict.getString("user");
+      final String installDir = resolvePath(databaseDict.getString("installDirectory"));
       Set<String> installedAddresses = new HashSet<>();
       JsonArray shards = databaseDict.getArray("shards");
-      for (int i = 0; i < shards.size(); i++) {
-        JsonArray replicas = shards.getDict(i).getArray("replicas");
-        for (int j = 0; j < replicas.size(); j++) {
-          JsonDict replica = replicas.getDict(j);
-          String externalAddress = replica.getString("publicAddress");
-          if (installedAddresses.add(externalAddress)) {
-            if (externalAddress.equals("127.0.0.1") || externalAddress.equals("localhost")) {
-              continue;
-            }
-            System.out.println("deploying to server: publicAddress=" + externalAddress);
-            //ProcessBuilder builder = new ProcessBuilder().command("rsync", "-rvlLt", "--delete", "-e", "'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no'", "*", deployUser + "@" + externalAddress + ":" + installDir);
-            ProcessBuilder builder = new ProcessBuilder().command("bin/do-rsync", deployUser + "@" + externalAddress + ":" + installDir);
-            //builder.directory(workingDir);
-            Process p = builder.start();
-            in = p.getInputStream();
-            while (true) {
-              int b = in.read();
-              if (b == -1) {
-                break;
+      List<Future> futures = new ArrayList<>();
+      ThreadPoolExecutor executor = new ThreadPoolExecutor(4, 4, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+      try {
+        for (int i = 0; i < shards.size(); i++) {
+          JsonArray replicas = shards.getDict(i).getArray("replicas");
+          for (int j = 0; j < replicas.size(); j++) {
+            JsonDict replica = replicas.getDict(j);
+            final String externalAddress = replica.getString("publicAddress");
+            if (installedAddresses.add(externalAddress)) {
+              if (externalAddress.equals("127.0.0.1") || externalAddress.equals("localhost")) {
+                continue;
               }
-              System.out.write(b);
+              futures.add(executor.submit(new Callable(){
+                @Override
+                public Object call() throws Exception {
+                  System.out.println("deploying to server: publicAddress=" + externalAddress);
+                  //ProcessBuilder builder = new ProcessBuilder().command("rsync", "-rvlLt", "--delete", "-e", "'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no'", "*", deployUser + "@" + externalAddress + ":" + installDir);
+                  ProcessBuilder builder = new ProcessBuilder().command("bin/do-rsync", deployUser + "@" + externalAddress + ":" + installDir);
+                  //builder.directory(workingDir);
+                  Process p = builder.start();
+                  InputStream in = p.getInputStream();
+                  while (true) {
+                    int b = in.read();
+                    if (b == -1) {
+                      break;
+                    }
+                    System.out.write(b);
+                  }
+                  p.waitFor();
+                  return null;
+                }
+              }));
             }
-            p.waitFor();
           }
+        }
+        JsonArray clients = databaseDict.getArray("clients");
+        if (clients != null) {
+          for (int i = 0; i < clients.size(); i++) {
+            JsonDict replica = clients.getDict(i);
+            final String externalAddress = replica.getString("publicAddress");
+            if (installedAddresses.add(externalAddress)) {
+              if (externalAddress.equals("127.0.0.1") || externalAddress.equals("localhost")) {
+                continue;
+              }
+              futures.add(executor.submit(new Callable(){
+                @Override
+                public Object call() throws Exception {
+                  System.out.println("deploying to client: publicAddress=" + externalAddress);
+                  //ProcessBuilder builder = new ProcessBuilder().command("rsync", "-rvlLt", "--delete", "-e", "'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no'", "*", deployUser + "@" + externalAddress + ":" + installDir);
+                  ProcessBuilder builder = new ProcessBuilder().command("bin/do-rsync", deployUser + "@" + externalAddress + ":" + installDir);
+                  //builder.directory(workingDir);
+                  Process p = builder.start();
+                  InputStream in = p.getInputStream();
+                  while (true) {
+                    int b = in.read();
+                    if (b == -1) {
+                      break;
+                    }
+                    System.out.write(b);
+                  }
+                  p.waitFor();
+                  return null;
+                }
+              }));
+            }
+          }
+        }
+        for (Future future : futures) {
+          future.get();
         }
       }
-      JsonArray clients = databaseDict.getArray("clients");
-      if (clients != null) {
-        for (int i = 0; i < clients.size(); i++) {
-          JsonDict replica = clients.getDict(i);
-          String externalAddress = replica.getString("publicAddress");
-          if (installedAddresses.add(externalAddress)) {
-            if (externalAddress.equals("127.0.0.1") || externalAddress.equals("localhost")) {
-              continue;
-            }
-            System.out.println("deploying to client: publicAddress=" + externalAddress);
-            //ProcessBuilder builder = new ProcessBuilder().command("rsync", "-rvlLt", "--delete", "-e", "'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no'", "*", deployUser + "@" + externalAddress + ":" + installDir);
-            ProcessBuilder builder = new ProcessBuilder().command("bin/do-rsync", deployUser + "@" + externalAddress + ":" + installDir);
-            //builder.directory(workingDir);
-            Process p = builder.start();
-            in = p.getInputStream();
-            while (true) {
-              int b = in.read();
-              if (b == -1) {
-                break;
-              }
-              System.out.write(b);
-            }
-            p.waitFor();
-          }
-        }
+      finally {
+        executor.shutdownNow();
       }
     }
     catch (InterruptedException e) {

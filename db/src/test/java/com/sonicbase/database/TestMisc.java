@@ -98,6 +98,59 @@ public class TestMisc {
 
   }
 
+  public static double getMemValue(String memStr) {
+    int qualifierPos = memStr.toLowerCase().indexOf("m");
+    if (qualifierPos == -1) {
+      qualifierPos = memStr.toLowerCase().indexOf("g");
+      if (qualifierPos == -1) {
+        qualifierPos = memStr.toLowerCase().indexOf("t");
+        if (qualifierPos == -1) {
+          qualifierPos = memStr.toLowerCase().indexOf("k");
+          if (qualifierPos == -1) {
+            qualifierPos = memStr.toLowerCase().indexOf("b");
+          }
+        }
+      }
+    }
+    double value = 0;
+    if (qualifierPos == -1) {
+      value = Double.valueOf(memStr.trim());
+      value = value / 1024d / 1024d / 1024d;
+    }
+    else {
+      char qualifier = memStr.toLowerCase().charAt(qualifierPos);
+      value = Double.valueOf(memStr.substring(0, qualifierPos).trim());
+      if (qualifier == 't') {
+        value = value * 1024d;
+      }
+      else if (qualifier == 'm') {
+        value = value / 1024d;
+      }
+      else if (qualifier == 'k') {
+        value = value / 1024d / 1024d;
+      }
+    }
+    return value;
+  }
+
+
+  @Test
+  public void testMem() {
+    String secondToLastLine = "  PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND";
+    String lastLine = "20631 ubuntu    20   0 38.144g 4.746g  22044 S 256.2  7.9   2:07.40 java";
+    secondToLastLine = secondToLastLine.trim();
+    lastLine = lastLine.trim();
+    String[] headerParts = secondToLastLine.split("\\s+");
+    String[] parts = lastLine.split("\\s+");
+    for (int i = 0; i < headerParts.length; i++) {
+      if (headerParts[i].toLowerCase().trim().equals("res")) {
+        String memStr = parts[i];
+        System.out.println("res=" + getMemValue(memStr));
+      }
+    }
+
+  }
+
   @Test
   public void testWhite() {
     String str = "s   a b  c ";

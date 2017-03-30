@@ -1,29 +1,35 @@
 package com.sonicbase.index;
 
+import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.TableSchema;
-import it.unimi.dsi.fastutil.longs.Long2LongAVLTreeMap;
-import it.unimi.dsi.fastutil.longs.Long2LongSortedMap;
-import it.unimi.dsi.fastutil.objects.Object2LongAVLTreeMap;
-import it.unimi.dsi.fastutil.objects.Object2LongSortedMap;
-import it.unimi.dsi.fastutil.objects.ObjectBidirectionalIterator;
-import it.unimi.dsi.fastutil.objects.ObjectSortedSet;
+import it.unimi.dsi.fastutil.longs.Long2ObjectAVLTreeMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectSortedMap;
+import it.unimi.dsi.fastutil.objects.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Responsible for
  */
 public class Index {
+  private static Logger logger = LoggerFactory.getLogger(Index.class);
+
   private boolean ordered = false;
 
   private final Comparator[] comparators;
+  private Object[] mutexes = new Object[10000];
 
-  private boolean fastUtil = true;
+  private boolean fastUtil = false;
 
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP", justification = "copying the returned data is too slow")
   public Comparator[] getComparators() {
@@ -34,24 +40,16 @@ public class Index {
     return ordered;
   }
 
-  private Long2LongAVLTreeMap longIndex;
-  private Object2LongAVLTreeMap<byte[]> stringIndex;
-  private Object2LongAVLTreeMap<Object[]> objectIndex;
+  private Long2ObjectAVLTreeMap<Object> longIndex;
+  private Object2ObjectAVLTreeMap<byte[], Object> stringIndex;
+  private Object2ObjectAVLTreeMap<Object[], Object> objectIndex;
 
-  private ConcurrentSkipListMap<Long, Long> longSkipIndex;
-  private ConcurrentSkipListMap<byte[], Long> stringSkipIndex;
-  private ConcurrentSkipListMap<Object[], Long> objectSkipIndex;
+  private ConcurrentSkipListMap<Long, Object> longSkipIndex;
+  private ConcurrentSkipListMap<byte[], Object> stringSkipIndex;
+  private ConcurrentSkipListMap<Object[], Object> objectSkipIndex;
 
-  private int keyLen;
+  private AtomicLong size = new AtomicLong();
 
-
-  public void setLongIndex(Long2LongAVLTreeMap longIndex) {
-    this.longIndex = longIndex;
-  }
-
-  public void setStringIndex(Object2LongAVLTreeMap stringIndex) {
-    this.stringIndex = stringIndex;
-  }
 
   private static Comparator utf8Comparator = new Comparator() {
     @Override
@@ -84,17 +82,42 @@ public class Index {
       return 0;
     }
   };
+  Comparator<Object[]> comparator = null;
 
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP2", justification = "copying the passed in data is too slow")
   @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public Index(TableSchema tableSchema, String indexName, final Comparator[] comparators) {
     this.comparators = comparators;
+
+    comparator = new Comparator<Object[]>() {
+      @Override
+      public int compare(Object[] o1, Object[] o2) {
+        for (int i = 0; i < Math.min(o1.length, o2.length); i++) {
+          if (o1[i] == null || o2[i] == null) {
+            continue;
+          }
+          int value = comparators[i].compare(o1[i], o2[i]);
+          if (value < 0) {
+            return -1;
+          }
+          if (value > 0) {
+            return 1;
+          }
+        }
+        return 0;
+      }
+    };
+
+    for (int i = 0; i < mutexes.length; i++) {
+      mutexes[i] = new Object();
+    }
+
     String[] fields = tableSchema.getIndices().get(indexName).getFields();
     if (fields.length == 1) {
       FieldSchema fieldSchema = tableSchema.getFields().get(tableSchema.getFieldOffset(fields[0]));
       if (fieldSchema.getType() == DataType.Type.BIGINT) {
         if (fastUtil) {
-          longIndex = new Long2LongAVLTreeMap();
+          longIndex = new Long2ObjectAVLTreeMap<>();
         }
         else {
           longSkipIndex = new ConcurrentSkipListMap<>(new Comparator<Long>() {
@@ -109,7 +132,7 @@ public class Index {
       }
       else if (fieldSchema.getType() == DataType.Type.VARCHAR) {
         if (fastUtil) {
-          stringIndex = new Object2LongAVLTreeMap<>(utf8Comparator);
+          stringIndex = new Object2ObjectAVLTreeMap<>(utf8Comparator);
         }
         else {
           stringSkipIndex = new ConcurrentSkipListMap<>(utf8Comparator);
@@ -117,7 +140,7 @@ public class Index {
       }
       else {
         if (fastUtil) {
-          objectIndex = new Object2LongAVLTreeMap<>(new Comparator<Object[]>() {
+          objectIndex = new Object2ObjectAVLTreeMap<>(new Comparator<Object[]>() {
             @Override
             public int compare(Object[] o1, Object[] o2) {
               for (int i = 0; i < Math.min(o1.length, o2.length); i++) {
@@ -160,7 +183,7 @@ public class Index {
     }
     else {
       if (fastUtil) {
-        objectIndex = new Object2LongAVLTreeMap<>(new Comparator<Object[]>() {
+        objectIndex = new Object2ObjectAVLTreeMap<>(new Comparator<Object[]>() {
           @Override
           public int compare(Object[] o1, Object[] o2) {
             for (int i = 0; i < Math.min(o1.length, o2.length); i++) {
@@ -202,15 +225,32 @@ public class Index {
     }
   }
 
+  public Object getMutex(Object[] key) {
+    int hash = 0;
+    for (int i = 0; i < key.length; i++) {
+      if (key[i] instanceof byte[]) {
+        hash += Arrays.hashCode((byte[])key[i]);
+      }
+      else {
+        hash += key[i].hashCode();
+      }
+    }
+    return hash;
+  }
+
   public void clear() {
-    synchronized (this) {
-      if (longIndex != null) {
+    if (longIndex != null) {
+      synchronized (this) {
         longIndex.clear();
       }
-      else if (stringIndex != null) {
+    }
+    else if (stringIndex != null) {
+      synchronized (this) {
         stringIndex.clear();
       }
-      else if (objectIndex != null) {
+    }
+    else if (objectIndex != null) {
+      synchronized (this) {
         objectIndex.clear();
       }
     }
@@ -223,59 +263,66 @@ public class Index {
     if (objectSkipIndex != null) {
       objectSkipIndex.clear();
     }
+    size.set(0);
   }
 
-  public interface Visitor {
-    void visit(Object[] key, long value) throws IOException;
-  }
-
-  public void iterate(Visitor visitor) throws IOException {
+  public boolean iterate(Index.Visitor visitor) throws IOException {
     if (longIndex != null) {
-      Map.Entry<Object[], Long> entry = firstEntry();
+      Map.Entry<Object[], Object> entry = firstEntry();
       while (entry != null) {
         visitor.visit(entry.getKey(), entry.getValue());
         entry = higherEntry(entry.getKey());
       }
     }
-    else if (longSkipIndex != null) {
-      for (Map.Entry<Long, Long> entry : longSkipIndex.entrySet()) {
-        visitor.visit(new Object[]{entry.getKey()}, entry.getValue());
-      }
-    }
-    else if (objectSkipIndex != null) {
-      for (Map.Entry<Object[], Long> entry : objectSkipIndex.entrySet()) {
-        visitor.visit(entry.getKey(), entry.getValue());
-      }
-    }
     else if (stringIndex != null) {
-      Map.Entry<Object[], Long> entry = firstEntry();
+      Map.Entry<Object[], Object> entry = firstEntry();
       while (entry != null) {
         visitor.visit(entry.getKey(), entry.getValue());
         entry = higherEntry(entry.getKey());
       }
     }
     else if (objectIndex != null) {
-      Map.Entry<Object[], Long> entry = firstEntry();
+      Map.Entry<Object[], Object> entry = firstEntry();
       while (entry != null) {
         visitor.visit(entry.getKey(), entry.getValue());
         entry = higherEntry(entry.getKey());
       }
     }
+    else if (longSkipIndex != null) {
+      for (Map.Entry<Long, Object> entry : longSkipIndex.entrySet()) {
+        visitor.visit(new Object[]{entry.getKey()}, entry.getValue());
+      }
+    }
+    else if (stringSkipIndex != null) {
+      for (Map.Entry<byte[], Object> entry : stringSkipIndex.entrySet()) {
+        visitor.visit(new Object[]{entry.getKey()}, entry.getValue());
+      }
+    }
+    else if (objectSkipIndex != null) {
+      for (Map.Entry<Object[], Object> entry : objectSkipIndex.entrySet()) {
+        visitor.visit(entry.getKey(), entry.getValue());
+      }
+    }
+    return true;
   }
 
-  public Long get(Object[] key) {
-    synchronized (this) {
-      keyLen = key.length;
-      if (longIndex != null) {
+  public Object get(Object[] key) {
+    if (longIndex != null) {
+      synchronized (this) {
         return longIndex.get(key[0]);
       }
-      else if (stringIndex != null) {
+    }
+    else if (stringIndex != null) {
+      synchronized (this) {
         return stringIndex.get((byte[]) key[0]/*((String)key[0]).getBytes("utf-8")*/);
       }
-      else if (objectIndex != null) {
+    }
+    else if (objectIndex != null) {
+      synchronized (this) {
         return objectIndex.get(key);
       }
     }
+
     if (longSkipIndex != null) {
       return longSkipIndex.get((long) key[0]);
     }
@@ -288,79 +335,105 @@ public class Index {
     return null;
   }
 
-  public Long put(Object[] key, long id) {
-    synchronized (this) {
-      keyLen = key.length;
-      if (longIndex != null) {
-        return longIndex.put((long) key[0], id);
+  public Object put(Object[] key, Object id) {
+    Object ret = null;
+    if (longIndex != null) {
+      synchronized (this) {
+        ret = longIndex.put((long) key[0], id);
       }
-      else if (stringIndex != null) {
-        return stringIndex.put((byte[]) key[0]/*((String)key[0]).getBytes("utf-8")*/, id);
+    }
+    else if (stringIndex != null) {
+      synchronized (this) {
+        ret = stringIndex.put((byte[]) key[0]/*((String)key[0]).getBytes("utf-8")*/, id);
       }
-      else if (objectIndex != null) {
-        return objectIndex.put(key, id);
+    }
+    else if (objectIndex != null) {
+      synchronized (this) {
+        ret = objectIndex.put(key, id);
       }
     }
     if (longSkipIndex != null) {
-      return longSkipIndex.put((Long) key[0], id);
+      ret = longSkipIndex.put((Long) key[0], id);
     }
     else if (stringSkipIndex != null) {
-      return stringSkipIndex.put((byte[]) key[0], id);
+      ret = stringSkipIndex.put((byte[]) key[0], id);
     }
     else if (objectSkipIndex != null) {
-      return objectSkipIndex.put(key, id);
+      ret = objectSkipIndex.put(key, id);
     }
-    return null;
+    if (ret == null) {
+      size.incrementAndGet();
+    }
+    return ret;
   }
 
-  public Long remove(Object[] key) {
-    synchronized (this) {
-      keyLen = key.length;
-      if (longIndex != null) {
-        return longIndex.remove((long) key[0]);
-      }
-      else if (stringIndex != null) {
-        return stringIndex.remove((byte[]) key[0] /*((String)key[0]).getBytes("utf-8")*/);
-      }
-      else if (objectIndex != null) {
-        return objectIndex.remove(key);
+  public Object remove(Object[] key) {
+    Object ret = null;
+    if (longIndex != null) {
+      synchronized (this) {
+        ret = longIndex.remove((long) key[0]);
       }
     }
+    else if (stringIndex != null) {
+      synchronized (this) {
+        ret = stringIndex.remove((byte[]) key[0] /*((String)key[0]).getBytes("utf-8")*/);
+      }
+    }
+    else if (objectIndex != null) {
+      synchronized (this) {
+        ret = objectIndex.remove(key);
+      }
+    }
+
     if (longSkipIndex != null) {
-      return longSkipIndex.remove((Long) key[0]);
+      ret = longSkipIndex.remove((Long) key[0]);
     }
     else if (stringSkipIndex != null) {
-      return stringSkipIndex.remove((byte[]) key[0]);
+      ret = stringSkipIndex.remove((byte[]) key[0]);
     }
     else if (objectSkipIndex != null) {
-      return objectSkipIndex.remove(key);
+      ret = objectSkipIndex.remove(key);
     }
-    return null;
+    if (ret != null) {
+      size.decrementAndGet();
+    }
+    return ret;
   }
 
-  public Long unsafePutIfAbsent(Object[] key, long id) {
-    synchronized (this) {
-      keyLen = key.length;
-      if (longIndex != null) {
-        return longIndex.putIfAbsent((long) key[0], id);
+  public Object unsafePutIfAbsent(Object[] key, Object id) {
+    Object ret = null;
+    if (longIndex != null) {
+      synchronized (this) {
+        ret = longIndex.putIfAbsent((long) key[0], id);
       }
-      else if (stringIndex != null) {
-        return stringIndex.putIfAbsent((byte[]) key[0] /*((String) key[0]).getBytes("utf-8")*/, id);
+    }
+    else if (stringIndex != null) {
+      synchronized (this) {
+        ret = stringIndex.putIfAbsent((byte[]) key[0] /*((String) key[0]).getBytes("utf-8")*/, id);
       }
-      else if (objectIndex != null) {
-        return objectIndex.putIfAbsent(key, id);
+    }
+    else if (objectIndex != null) {
+      synchronized (this) {
+        ret = objectIndex.putIfAbsent(key, id);
       }
     }
     if (longSkipIndex != null) {
-      return longSkipIndex.putIfAbsent((long) key[0], id);
+      ret = longSkipIndex.putIfAbsent((long) key[0], id);
     }
     else if (objectSkipIndex != null) {
-      return objectSkipIndex.putIfAbsent(key, id);
+      ret = objectSkipIndex.putIfAbsent(key, id);
     }
     else if (stringSkipIndex != null) {
-      return stringSkipIndex.putIfAbsent((byte[]) key[0], id);
+      ret = stringSkipIndex.putIfAbsent((byte[]) key[0], id);
     }
-    return null;
+    if (ret == null) {
+      size.incrementAndGet();
+    }
+    return ret;
+  }
+
+  public interface Visitor {
+    boolean visit(Object[] key, Object value) throws IOException;
   }
 
   public static class MyEntry<T, V> implements Map.Entry<T, V> {
@@ -389,117 +462,121 @@ public class Index {
     }
   }
 
-  public Map.Entry<Object[], Long> ceilingEntry(Object[] key) {
-    synchronized (this) {
-      keyLen = key.length;
-      if (longIndex != null) {
+  public Map.Entry<Object[], Object> ceilingEntry(Object[] key) {
+    if (longIndex != null) {
+      synchronized (this) {
         if (longIndex.isEmpty()) {
           return null;
         }
-        Long2LongSortedMap tail = longIndex.tailMap((Long) key[0]);
+        Long2ObjectSortedMap tail = longIndex.tailMap((Long) key[0]);
         if (tail.isEmpty()) {
           return null;
         }
         long firstKey = tail.firstLongKey();
         Object value = longIndex.get(firstKey);
-        return new MyEntry<>(new Object[]{firstKey}, (long) value);
+        return new MyEntry<>(new Object[]{firstKey}, value);
       }
-      else if (stringIndex != null) {
+    }
+    else if (stringIndex != null) {
+      synchronized (this) {
         if (stringIndex.isEmpty()) {
           return null;
         }
-        Object2LongSortedMap tail = stringIndex.tailMap((byte[]) key[0]/*((String)key[0]).getBytes("utf-8")*/);
+        Object2ObjectSortedMap tail = stringIndex.tailMap((byte[]) key[0]/*((String)key[0]).getBytes("utf-8")*/);
         if (tail.isEmpty()) {
           return null;
         }
         byte[] firstKey = (byte[]) tail.firstKey();
         Object value = stringIndex.get(firstKey);
-        return new MyEntry<>(new Object[]{firstKey/*new String(firstKey, "utf-8")*/}, (long) value);
+        return new MyEntry<>(new Object[]{firstKey/*new String(firstKey, "utf-8")*/}, value);
       }
-      else if (objectIndex != null) {
+    }
+    else if (objectIndex != null) {
+      synchronized (this) {
         if (objectIndex.isEmpty()) {
           return null;
         }
-        Object2LongSortedMap<Object[]> tail = objectIndex.tailMap(key);
+        Object2ObjectSortedMap<Object[], Object> tail = objectIndex.tailMap(key);
         if (tail.isEmpty()) {
           return null;
         }
         Object[] firstKey = tail.firstKey();
-        Long value = objectIndex.get(firstKey);
+        Object value = objectIndex.get(firstKey);
         return new MyEntry<>(firstKey, value);
 
-//        if (objectIndex.isEmpty()) {
-//          return null;
-//        }
-//        boolean haveKey = false;
-//        Object[] lastKey = key;
-//        while (true) {
-//          Object2LongSortedMap<Object[]> head = objectIndex.tailMap(lastKey);
-//          if (head.isEmpty()) {
-//            break;
-//          }
-//          Object[] curr = head.firstKey();
-//          if (objectIndex.comparator().compare(curr, key) != 0) {
-//            break;
-//          }
-//          lastKey = curr;
-//          haveKey = true;
-//        }
-//
-//        if (!haveKey) {
-//          Map.Entry<Object[], Long> entry = lowerEntry(lastKey);
-//          if (entry != null) {
-//            lastKey = entry.getKey();
-//            while (true) {
-//              Object2LongSortedMap<Object[]> head = objectIndex.tailMap(lastKey);
-//              if (head.isEmpty()) {
-//                break;
-//              }
-//              Object[] curr = head.firstKey();
-//              if (objectIndex.comparator().compare(curr, key) == 0) {
-//                lastKey = curr;
-//              }
-//              else {
-//                break;
-//              }
-//            }
-//          }
-//        }
-//        Long value = objectIndex.get(lastKey);
-//        return new MyEntry<>(lastKey, value);
+        //        if (objectIndex.isEmpty()) {
+        //          return null;
+        //        }
+        //        boolean haveKey = false;
+        //        Object[] lastKey = key;
+        //        while (true) {
+        //          Object2LongSortedMap<Object[]> head = objectIndex.tailMap(lastKey);
+        //          if (head.isEmpty()) {
+        //            break;
+        //          }
+        //          Object[] curr = head.firstKey();
+        //          if (objectIndex.comparator().compare(curr, key) != 0) {
+        //            break;
+        //          }
+        //          lastKey = curr;
+        //          haveKey = true;
+        //        }
+        //
+        //        if (!haveKey) {
+        //          Map.Entry<Object[], Long> entry = lowerEntry(lastKey);
+        //          if (entry != null) {
+        //            lastKey = entry.getKey();
+        //            while (true) {
+        //              Object2LongSortedMap<Object[]> head = objectIndex.tailMap(lastKey);
+        //              if (head.isEmpty()) {
+        //                break;
+        //              }
+        //              Object[] curr = head.firstKey();
+        //              if (objectIndex.comparator().compare(curr, key) == 0) {
+        //                lastKey = curr;
+        //              }
+        //              else {
+        //                break;
+        //              }
+        //            }
+        //          }
+        //        }
+        //        Long value = objectIndex.get(lastKey);
+        //        return new MyEntry<>(lastKey, value);
       }
     }
+
     if (longSkipIndex != null) {
-      Map.Entry<Long, Long> entry = longSkipIndex.ceilingEntry((Long) key[0]);
+      Map.Entry<Long, Object> entry = longSkipIndex.ceilingEntry((Long) key[0]);
       if (entry == null) {
         return null;
       }
-      return new MyEntry<>(new Object[]{entry.getKey()}, (long) entry.getValue());
+      return new MyEntry<>(new Object[]{entry.getKey()}, entry.getValue());
     }
     else if (stringSkipIndex != null) {
-      Map.Entry<byte[], Long> entry = stringSkipIndex.ceilingEntry((byte[]) key[0]);
+      Map.Entry<byte[], Object> entry = stringSkipIndex.ceilingEntry((byte[]) key[0]);
       if (entry == null) {
         return null;
       }
-      return new MyEntry<>(new Object[]{entry.getKey()}, (long) entry.getValue());
+      return new MyEntry<>(new Object[]{entry.getKey()}, entry.getValue());
     }
     else if (objectSkipIndex != null) {
-      Map.Entry<Object[], Long> entry = objectSkipIndex.ceilingEntry(key);
+      Map.Entry<Object[], Object> entry = objectSkipIndex.ceilingEntry(key);
       if (entry == null) {
         return null;
       }
-      return new MyEntry<>(entry.getKey(), (long) entry.getValue());
+      return new MyEntry<>(entry.getKey(), entry.getValue());
     }
     return null;
   }
 
-  public List<Map.Entry<Object[], Long>> equalsEntries(Object[] key) {
+  public List<Map.Entry<Object[], Object>> equalsEntries(Object[] key) {
 
-    List<Map.Entry<Object[], Long>> ret = new ArrayList<>();
+    List<Map.Entry<Object[], Object>> ret = new ArrayList<>();
 
-    synchronized (this) {
-      if (longIndex != null) {
-        Map.Entry<Object[], Long> entry = floorEntry(key);
+    if (longIndex != null) {
+      synchronized (this) {
+        Map.Entry<Object[], Object> entry = floorEntry(key);
         if (entry == null) {
           return null;
         }
@@ -509,15 +586,17 @@ public class Index {
           if (entry == null) {
             break;
           }
-          if ((long) entry.getKey()[0] !=  (long) key[0]) {
+          if ((long) entry.getKey()[0] != (long) key[0]) {
             return ret;
           }
           ret.add(entry);
         }
         return ret;
       }
-      else if (stringIndex != null) {
-        Map.Entry<Object[], Long> entry = floorEntry(key);
+    }
+    else if (stringIndex != null) {
+      synchronized (this) {
+        Map.Entry<Object[], Object> entry = floorEntry(key);
         if (entry == null) {
           return null;
         }
@@ -534,42 +613,127 @@ public class Index {
         }
         return ret;
       }
-      else if (objectIndex != null) {
+    }
+    else if (objectIndex != null) {
+      synchronized (this) {
         if (objectIndex.isEmpty()) {
           return null;
         }
         boolean haveKey = false;
         Object[] lastKey = key;
         if (!haveKey) {
-          Map.Entry<Object[], Long> entry = objectIndex.tailMap(lastKey).entrySet().first();//higherEntry(lastKey);
-          if (entry != null) {
-            lastKey = entry.getKey();
-            while (true) {
-              Object2LongSortedMap<Object[]> head = objectIndex.headMap(lastKey);
-              if (head.isEmpty()) {
-                break;
+          Iterator<Map.Entry<Object[], Object>> iterator = objectIndex.tailMap(lastKey).entrySet().iterator();
+          if (iterator.hasNext()) {
+            Map.Entry<Object[], Object> entry = iterator.next();//higherEntry(lastKey);
+            if (entry != null) {
+              lastKey = entry.getKey();
+              while (true) {
+                Object2ObjectSortedMap<Object[], Object> head = objectIndex.headMap(lastKey);
+                if (head.isEmpty()) {
+                  break;
+                }
+                Object[] curr = head.lastKey();
+                if (objectIndex.comparator().compare(curr, key) == 0) {
+                  lastKey = curr;
+                } else {
+                  break;
+                }
               }
-              Object[] curr = head.lastKey();
-              if (objectIndex.comparator().compare(curr, key) == 0) {
-                lastKey = curr;
-              }
-              else {
-                break;
-              }
-            }
 
-            Object2LongSortedMap<Object[]> head = objectIndex.tailMap(lastKey);
-            ObjectSortedSet<Map.Entry<Object[], Long>> entries = head.entrySet();
-            for (Map.Entry<Object[], Long> currEntry : entries) {
-              if (0 != objectIndex.comparator().compare(currEntry.getKey(), key)) {
-                break;
+              Object2ObjectSortedMap<Object[], Object> head = objectIndex.tailMap(lastKey);
+              ObjectSortedSet<Map.Entry<Object[], Object>> entries = head.entrySet();
+              for (Map.Entry<Object[], Object> currEntry : entries) {
+                if (0 != objectIndex.comparator().compare(currEntry.getKey(), key)) {
+                  break;
+                }
+                lastKey = currEntry.getKey();
+                Object value = objectIndex.get(lastKey);
+                ret.add(new MyEntry<>(lastKey, value));
               }
-              lastKey = currEntry.getKey();
-              Long value = objectIndex.get(lastKey);
-              ret.add(new MyEntry<>(lastKey, value));
             }
           }
+          return ret;
+        }
+      }
+    }
+    else if (longSkipIndex != null) {
+      synchronized (this) {
+        Map.Entry<Object[], Object> entry = floorEntry(key);
+        if (entry == null) {
+          return null;
+        }
+        ret.add(entry);
+        while (true) {
+          entry = higherEntry(entry.getKey());
+          if (entry == null) {
+            break;
+          }
+          if ((long) entry.getKey()[0] != (long) key[0]) {
+            return ret;
+          }
+          ret.add(entry);
+        }
+        return ret;
+      }
+    }
+    else if (stringSkipIndex != null) {
+      synchronized (this) {
+        Map.Entry<Object[], Object> entry = floorEntry(key);
+        if (entry == null) {
+          return null;
+        }
+        ret.add(entry);
+        while (true) {
+          entry = higherEntry(entry.getKey());
+          if (entry == null) {
+            break;
+          }
+          if (stringSkipIndex.comparator().compare((byte[]) entry.getKey()[0], (byte[]) key[0]) != 0) {
+            return ret;
+          }
+          ret.add(entry);
+        }
+        return ret;
+      }
+    }
+    else if (objectSkipIndex != null) {
+      synchronized (this) {
+        if (objectSkipIndex.isEmpty()) {
+          return null;
+        }
+        boolean haveKey = false;
+        Object[] lastKey = key;
+        if (!haveKey) {
+          Iterator<Map.Entry<Object[], Object>> iterator = objectSkipIndex.tailMap(lastKey).entrySet().iterator();
+          if (iterator.hasNext()) {
+            Map.Entry<Object[], Object> entry = iterator.next();
+            if (entry != null) {
+              lastKey = entry.getKey();
+              while (true) {
+                ConcurrentNavigableMap<Object[], Object> head = objectSkipIndex.headMap(lastKey);
+                if (head.isEmpty()) {
+                  break;
+                }
+                Object[] curr = head.lastKey();
+                if (objectSkipIndex.comparator().compare(curr, key) == 0) {
+                  lastKey = curr;
+                } else {
+                  break;
+                }
+              }
 
+              ConcurrentNavigableMap<Object[], Object> head = objectSkipIndex.tailMap(lastKey);
+              Set<Map.Entry<Object[], Object>> entries = head.entrySet();
+              for (Map.Entry<Object[], Object> currEntry : entries) {
+                if (0 != objectSkipIndex.comparator().compare(currEntry.getKey(), key)) {
+                  break;
+                }
+                lastKey = currEntry.getKey();
+                Object value = objectSkipIndex.get(lastKey);
+                ret.add(new MyEntry<>(lastKey, value));
+              }
+            }
+          }
           return ret;
         }
       }
@@ -578,67 +742,69 @@ public class Index {
   }
 
 
-  public Map.Entry<Object[], Long> floorEntry(Object[] key) {
-    synchronized (this) {
-      keyLen = key.length;
-      if (longIndex != null) {
+  public Map.Entry<Object[], Object> floorEntry(Object[] key) {
+    if (longIndex != null) {
+      synchronized (this) {
         if (longIndex.isEmpty()) {
           return null;
         }
         Object value = longIndex.get((Long) key[0]);
         if (value != null) {
-          return new MyEntry<>(key, (long) value);
+          return new MyEntry<>(key, value);
         }
-        Long2LongSortedMap head = longIndex.headMap((Long) key[0]);
+        Long2ObjectSortedMap head = longIndex.headMap((Long) key[0]);
         if (head.isEmpty()) {
           return null;
         }
         long lastKey = head.lastLongKey();
         value = longIndex.get(lastKey);
-        return new MyEntry<>(new Object[]{lastKey}, (long) value);
+        return new MyEntry<>(new Object[]{lastKey},  value);
       }
-      else if (stringIndex != null) {
+    }
+    else if (stringIndex != null) {
+      synchronized (this) {
         if (stringIndex.isEmpty()) {
           return null;
         }
         Object value = stringIndex.get((byte[]) key[0]/*((String)key[0]).getBytes("utf-8")*/);
         if (value != null) {
-          return new MyEntry<>(key, (long) value);
+          return new MyEntry<>(key, value);
         }
-        Object2LongSortedMap head = stringIndex.headMap((byte[]) key[0]/*((String)key[0]).getBytes("utf-8")*/);
+        Object2ObjectSortedMap head = stringIndex.headMap((byte[]) key[0]/*((String)key[0]).getBytes("utf-8")*/);
         if (head.isEmpty()) {
           return null;
         }
         byte[] lastKey = (byte[]) head.lastKey();
         value = stringIndex.get(lastKey);
-        return new MyEntry<>(new Object[]{(byte[]) lastKey/*new String(lastKey, "utf-8")*/}, (long) value);
-
+        return new MyEntry<>(new Object[]{(byte[]) lastKey/*new String(lastKey, "utf-8")*/}, value);
       }
-      else if (objectIndex != null) {
+    }
+    else if (objectIndex != null) {
+      synchronized (this) {
         if (objectIndex.isEmpty()) {
           return null;
         }
         boolean haveKey = false;
         Object[] lastKey = key;
-//        while (true) {
-//          Object2LongSortedMap<Object[]> head = objectIndex.headMap(lastKey);
-//          if (head.isEmpty()) {
-//            break;
-//          }
-//          Object[] curr = head.lastKey();
-//          if (objectIndex.comparator().compare(curr, key) != 0) {
-//            break;
-//          }
-//          lastKey = curr;
-//          haveKey = true;
-//        }
+        //        while (true) {
+        //          Object2LongSortedMap<Object[]> head = objectIndex.headMap(lastKey);
+        //          if (head.isEmpty()) {
+        //            break;
+        //          }
+        //          Object[] curr = head.lastKey();
+        //          if (objectIndex.comparator().compare(curr, key) != 0) {
+        //            break;
+        //          }
+        //          lastKey = curr;
+        //          haveKey = true;
+        //        }
 
         if (!haveKey) {
-          Map.Entry<Object[], Long> entry = objectIndex.tailMap(lastKey).entrySet().first();//higherEntry(lastKey);
+          Map.Entry<Object[], Object> entry = objectIndex.tailMap(lastKey).entrySet().first();//higherEntry(lastKey);
           if (entry != null) {
             lastKey = entry.getKey();
             while (true) {
-              Object2LongSortedMap<Object[]> head = objectIndex.headMap(lastKey);
+              Object2ObjectSortedMap<Object[], Object> head = objectIndex.headMap(lastKey);
               if (head.isEmpty()) {
                 break;
               }
@@ -652,47 +818,47 @@ public class Index {
             }
           }
         }
-        Long value = objectIndex.get(lastKey);
+        Object value = objectIndex.get(lastKey);
         return new MyEntry<>(lastKey, value);
       }
     }
+
     if (longSkipIndex != null) {
-      Map.Entry<Long, Long> entry = longSkipIndex.floorEntry((Long) key[0]);
+      Map.Entry<Long, Object> entry = longSkipIndex.floorEntry((Long) key[0]);
       if (entry == null) {
         return null;
       }
-      return new MyEntry<>(new Object[]{entry.getKey()}, (long) entry.getValue());
+      return new MyEntry<>(new Object[]{entry.getKey()}, entry.getValue());
     }
     else if (stringSkipIndex != null) {
-      Map.Entry<byte[], Long> entry = stringSkipIndex.floorEntry((byte[]) key[0]);
+      Map.Entry<byte[], Object> entry = stringSkipIndex.floorEntry((byte[]) key[0]);
       if (entry == null) {
         return null;
       }
-      return new MyEntry<>(new Object[]{entry.getKey()}, (long) entry.getValue());
+      return new MyEntry<>(new Object[]{entry.getKey()}, entry.getValue());
     }
     else if (objectSkipIndex != null) {
-      Map.Entry<Object[], Long> entry = objectSkipIndex.floorEntry(key);
+      Map.Entry<Object[], Object> entry = objectSkipIndex.floorEntry(key);
       if (entry == null) {
         return null;
       }
-      return new MyEntry<>(entry.getKey(), (long) entry.getValue());
+      return new MyEntry<>(entry.getKey(), entry.getValue());
     }
     return null;
   }
 
-  public Map.Entry<Object[], Long>[] lowerEntries(Object[] key, Map.Entry<Object[], Long>[] ret) {
-    synchronized (this) {
-      keyLen = key.length;
-      if (longIndex != null) {
-        Long2LongSortedMap head = longIndex.headMap((Long) key[0]);
-        ObjectSortedSet<Map.Entry<Long, Long>> entries = head.entrySet();
+  public Map.Entry<Object[], Object>[] lowerEntries(Object[] key, Map.Entry<Object[], Object>[] ret) {
+    if (longIndex != null) {
+      synchronized (this) {
+        Long2ObjectSortedMap head = longIndex.headMap((Long) key[0]);
+        ObjectSortedSet<Map.Entry<Long, Object>> entries = head.entrySet();
         if (head.isEmpty()) {
           return null;
         }
         int offset = 0;
-        ObjectBidirectionalIterator<Map.Entry<Long, Long>> iterator = entries.iterator(entries.last());
+        ObjectBidirectionalIterator<Map.Entry<Long, Object>> iterator = entries.iterator(entries.last());
         while (iterator.hasPrevious()) {
-          Map.Entry<Long, Long> entry = iterator.previous();
+          Map.Entry<Long, Object> entry = iterator.previous();
           Long lastKey = entry.getKey();
           ret[offset++] = new MyEntry<>(new Object[]{lastKey}, entry.getValue());
           if (offset >= ret.length) {
@@ -701,16 +867,18 @@ public class Index {
         }
         return ret;
       }
-      else if (stringIndex != null) {
-        Object2LongSortedMap head = stringIndex.headMap((byte[]) key[0]);
-        ObjectSortedSet<Map.Entry<byte[], Long>> entries = head.entrySet();
+    }
+    else if (stringIndex != null) {
+      synchronized (this) {
+        Object2ObjectSortedMap head = stringIndex.headMap((byte[]) key[0]);
+        ObjectSortedSet<Map.Entry<byte[], Object>> entries = head.entrySet();
         if (head.isEmpty()) {
           return null;
         }
         int offset = 0;
-        ObjectBidirectionalIterator<Map.Entry<byte[], Long>> iterator = entries.iterator(entries.last());
+        ObjectBidirectionalIterator<Map.Entry<byte[], Object>> iterator = entries.iterator(entries.last());
         while (iterator.hasPrevious()) {
-          Map.Entry<byte[], Long> entry = iterator.previous();
+          Map.Entry<byte[], Object> entry = iterator.previous();
           byte[] lastKey = entry.getKey();
           ret[offset++] = new MyEntry<>(new Object[]{lastKey}, entry.getValue());
           if (offset >= ret.length) {
@@ -719,19 +887,21 @@ public class Index {
         }
         return ret;
       }
-      else if (objectIndex != null) {
-        Object2LongSortedMap head = objectIndex.headMap(key);
-        ObjectSortedSet<Map.Entry<Object[], Long>> entries = head.entrySet();
+    }
+    else if (objectIndex != null) {
+      synchronized (this) {
+        Object2ObjectSortedMap head = objectIndex.headMap(key);
+        ObjectSortedSet<Map.Entry<Object[], Object>> entries = head.entrySet();
         if (head.isEmpty()) {
           return null;
         }
         int offset = 0;
-        ObjectBidirectionalIterator<Map.Entry<Object[], Long>> iterator = entries.iterator(entries.last());
+        ObjectBidirectionalIterator<Map.Entry<Object[], Object>> iterator = entries.iterator(entries.last());
         //Map.Entry<Object[], Long> entry = entries.last();
         //Object[] lastKey = entry.getKey();
         //ret[offset++] = new MyEntry<>(lastKey, entry.getValue());
         while (iterator.hasPrevious()) {
-          Map.Entry<Object[], Long> entry = iterator.previous();
+          Map.Entry<Object[], Object> entry = iterator.previous();
           Object[] lastKey = entry.getKey();
           ret[offset++] = new MyEntry<>(lastKey, entry.getValue());
           if (offset >= ret.length) {
@@ -741,35 +911,36 @@ public class Index {
         return ret;
       }
     }
+
     if (longSkipIndex != null) {
       for (int i = 0; i < ret.length; i++) {
-        Map.Entry<Long, Long> entry = longSkipIndex.lowerEntry((Long) key[0]);
+        Map.Entry<Long, Object> entry = longSkipIndex.lowerEntry((Long) key[0]);
         if (entry == null) {
           return ret;
         }
-        ret[i] = new MyEntry<>(new Object[]{entry.getKey()}, (long) entry.getValue());
+        ret[i] = new MyEntry<>(new Object[]{entry.getKey()}, entry.getValue());
         key = new Object[]{entry.getKey()};
       }
       return ret;
     }
     else if (stringSkipIndex != null) {
       for (int i = 0; i < ret.length; i++) {
-        Map.Entry<byte[], Long> entry = stringSkipIndex.lowerEntry((byte[]) key[0]);
+        Map.Entry<byte[], Object> entry = stringSkipIndex.lowerEntry((byte[]) key[0]);
         if (entry == null) {
           return ret;
         }
-        ret[i] = new MyEntry<>(new Object[]{entry.getKey()}, (long) entry.getValue());
+        ret[i] = new MyEntry<>(new Object[]{entry.getKey()}, entry.getValue());
         key = new Object[]{entry.getKey()};
       }
       return ret;
     }
     else if (objectSkipIndex != null) {
       for (int i = 0; i < ret.length; i++) {
-        Map.Entry<Object[], Long> entry = objectSkipIndex.lowerEntry(key);
+        Map.Entry<Object[], Object> entry = objectSkipIndex.lowerEntry(key);
         if (entry == null) {
           return ret;
         }
-        ret[i] = new MyEntry<>(entry.getKey(), (long) entry.getValue());
+        ret[i] = new MyEntry<>(entry.getKey(), entry.getValue());
         key = entry.getKey();
       }
       return ret;
@@ -777,68 +948,71 @@ public class Index {
     return null;
   }
 
-  public Map.Entry<Object[], Long> lowerEntry(Object[] key) {
-    synchronized (this) {
-      keyLen = key.length;
-      if (longIndex != null) {
-        Long2LongSortedMap head = longIndex.headMap((Long) key[0]);
+  public Map.Entry<Object[], Object> lowerEntry(Object[] key) {
+    if (longIndex != null) {
+      synchronized (this) {
+        Long2ObjectSortedMap head = longIndex.headMap((Long) key[0]);
         if (head.isEmpty()) {
           return null;
         }
         long lastKey = head.lastLongKey();
         Object value = longIndex.get(lastKey);
-        return new MyEntry<>(new Object[]{lastKey}, (long) value);
+        return new MyEntry<>(new Object[]{lastKey}, value);
       }
-      else if (stringIndex != null) {
-        Object2LongSortedMap head = stringIndex.headMap((byte[]) key[0]/*((String)key[0]).getBytes("utf-8")*/);
+    }
+    else if (stringIndex != null) {
+      synchronized (this) {
+        Object2ObjectSortedMap head = stringIndex.headMap((byte[]) key[0]/*((String)key[0]).getBytes("utf-8")*/);
         if (head.isEmpty()) {
           return null;
         }
         byte[] lastKey = (byte[]) head.lastKey();
         Object value = stringIndex.get(lastKey);
-        return new MyEntry<>(new Object[]{(byte[]) lastKey/*new String(lastKey, "utf-8")*/}, (long) value);
+        return new MyEntry<>(new Object[]{(byte[]) lastKey/*new String(lastKey, "utf-8")*/}, value);
       }
-      else if (objectIndex != null) {
-        Object2LongSortedMap<Object[]> head = objectIndex.headMap(key);
+    }
+    else if (objectIndex != null) {
+      synchronized (this) {
+        Object2ObjectSortedMap<Object[], Object> head = objectIndex.headMap(key);
         if (head.isEmpty()) {
           return null;
         }
         Object[] lastKey = head.lastKey();
-        Long value = objectIndex.get(lastKey);
+        Object value = objectIndex.get(lastKey);
         return new MyEntry<>(lastKey, value);
       }
     }
+
     if (longSkipIndex != null) {
-      Map.Entry<Long, Long> entry = longSkipIndex.lowerEntry((Long) key[0]);
+      Map.Entry<Long, Object> entry = longSkipIndex.lowerEntry((Long) key[0]);
       if (entry == null) {
         return null;
       }
-      return new MyEntry<>(new Object[]{entry.getKey()}, (long) entry.getValue());
+      return new MyEntry<>(new Object[]{entry.getKey()}, entry.getValue());
     }
     else if (stringSkipIndex != null) {
-      Map.Entry<byte[], Long> entry = stringSkipIndex.lowerEntry((byte[]) key[0]);
+      Map.Entry<byte[], Object> entry = stringSkipIndex.lowerEntry((byte[]) key[0]);
       if (entry == null) {
         return null;
       }
-      return new MyEntry<>(new Object[]{entry.getKey()}, (long) entry.getValue());
+      return new MyEntry<>(new Object[]{entry.getKey()}, entry.getValue());
     }
     else if (objectSkipIndex != null) {
-      Map.Entry<Object[], Long> entry = objectSkipIndex.lowerEntry(key);
+      Map.Entry<Object[], Object> entry = objectSkipIndex.lowerEntry(key);
       if (entry == null) {
         return null;
       }
-      return new MyEntry<>(entry.getKey(), (long) entry.getValue());
+      return new MyEntry<>(entry.getKey(), entry.getValue());
     }
     return null;
   }
 
-  public Map.Entry<Object[], Long>[] higherEntries(Object[] key, Map.Entry<Object[], Long>[] ret) {
+  public Map.Entry<Object[], Object>[] higherEntries(Object[] key, Map.Entry<Object[], Object>[] ret) {
     try {
-      synchronized (this) {
-        keyLen = key.length;
-        if (longIndex != null) {
-          Long2LongSortedMap head = longIndex.tailMap((Long) key[0]);
-          ObjectSortedSet<Map.Entry<Long, Long>> entries = head.entrySet();
+      if (longIndex != null) {
+        synchronized (this) {
+          Long2ObjectSortedMap head = longIndex.tailMap((Long) key[0]);
+          ObjectSortedSet<Map.Entry<Long, Object>> entries = head.entrySet();
           if (head.isEmpty()) {
             return null;
           }
@@ -848,7 +1022,7 @@ public class Index {
             //if (lastKey.equals(key[0])) {
             lastKey = null;
             Long currKey = null;
-            for (Map.Entry<Long, Long> entry : entries) {
+            for (Map.Entry<Long, Object> entry : entries) {
               if (currKey == null) {
                 currKey = entry.getKey();
               }
@@ -867,9 +1041,11 @@ public class Index {
             return null;
           }
         }
-        else if (stringIndex != null) {
-          Object2LongSortedMap head = stringIndex.tailMap((byte[]) key[0]);
-          ObjectSortedSet<Map.Entry<byte[], Long>> entries = head.entrySet();
+      }
+      else if (stringIndex != null) {
+        synchronized (this) {
+          Object2ObjectSortedMap head = stringIndex.tailMap((byte[]) key[0]);
+          ObjectSortedSet<Map.Entry<byte[], Object>> entries = head.entrySet();
           if (head.isEmpty()) {
             return null;
           }
@@ -879,7 +1055,7 @@ public class Index {
             //if (lastKey.equals(key[0])) {
             lastKey = null;
             byte[] currKey = null;
-            for (Map.Entry<byte[], Long> entry : entries) {
+            for (Map.Entry<byte[], Object> entry : entries) {
               if (currKey == null) {
                 currKey = (byte[]) entry.getKey();
               }
@@ -898,9 +1074,11 @@ public class Index {
             return null;
           }
         }
-        else if (objectIndex != null) {
-          Object2LongSortedMap head = objectIndex.tailMap(key);
-          ObjectSortedSet<Map.Entry<Object[], Long>> entries = head.entrySet();
+      }
+      else if (objectIndex != null) {
+        synchronized (this) {
+          Object2ObjectSortedMap head = objectIndex.tailMap(key);
+          ObjectSortedSet<Map.Entry<Object[], Object>> entries = head.entrySet();
           if (head.isEmpty()) {
             return null;
           }
@@ -910,7 +1088,7 @@ public class Index {
             //if (lastKey.equals(key[0])) {
             lastKey = null;
             Object[] currKey = null;
-            for (Map.Entry<Object[], Long> entry : entries) {
+            for (Map.Entry<Object[], Object> entry : entries) {
               if (currKey == null) {
                 currKey = (Object[]) entry.getKey();
               }
@@ -930,35 +1108,36 @@ public class Index {
           }
         }
       }
+
       if (longSkipIndex != null) {
         for (int i = 0; i < ret.length; i++) {
-          Map.Entry<Long, Long> entry = longSkipIndex.higherEntry((Long) key[0]);
+          Map.Entry<Long, Object> entry = longSkipIndex.higherEntry((Long) key[0]);
           if (entry == null) {
             return ret;
           }
-          ret[i] = new MyEntry<>(new Object[]{entry.getKey()}, (long) entry.getValue());
+          ret[i] = new MyEntry<>(new Object[]{entry.getKey()}, entry.getValue());
           key = new Object[]{entry.getKey()};
         }
         return ret;
       }
       else if (stringSkipIndex != null) {
         for (int i = 0; i < ret.length; i++) {
-          Map.Entry<byte[], Long> entry = stringSkipIndex.higherEntry((byte[]) key[0]);
+          Map.Entry<byte[], Object> entry = stringSkipIndex.higherEntry((byte[]) key[0]);
           if (entry == null) {
             return ret;
           }
-          ret[i] = new MyEntry<>(new Object[]{entry.getKey()}, (long) entry.getValue());
+          ret[i] = new MyEntry<>(new Object[]{entry.getKey()}, entry.getValue());
           key = new Object[]{entry.getKey()};
         }
         return ret;
       }
       else if (objectSkipIndex != null) {
         for (int i = 0; i < ret.length; i++) {
-          Map.Entry<Object[], Long> entry = objectSkipIndex.higherEntry(key);
+          Map.Entry<Object[], Object> entry = objectSkipIndex.higherEntry(key);
           if (entry == null) {
             return ret;
           }
-          ret[i] = new MyEntry<>(entry.getKey(), (long) entry.getValue());
+          ret[i] = new MyEntry<>(entry.getKey(), entry.getValue());
           key = entry.getKey();
         }
         return ret;
@@ -970,13 +1149,12 @@ public class Index {
     }
   }
 
-  public Map.Entry<Object[], Long> higherEntry(Object[] key) {
+  public Map.Entry<Object[], Object> higherEntry(Object[] key) {
     try {
-      synchronized (this) {
-        keyLen = key.length;
-        if (longIndex != null) {
-          Long2LongSortedMap head = longIndex.tailMap((Long) key[0]);
-          ObjectSortedSet<Map.Entry<Long, Long>> entries = head.entrySet();
+      if (longIndex != null) {
+        synchronized (this) {
+          Long2ObjectSortedMap head = longIndex.tailMap((Long) key[0]);
+          ObjectSortedSet<Map.Entry<Long, Object>> entries = head.entrySet();
           if (head.isEmpty()) {
             return null;
           }
@@ -986,7 +1164,7 @@ public class Index {
             if (lastKey.equals(key[0])) {
               lastKey = null;
               Long currKey = null;
-              for (Map.Entry<Long, Long> entry : entries) {
+              for (Map.Entry<Long, Object> entry : entries) {
                 if (currKey == null) {
                   currKey = entry.getKey();
                 }
@@ -1004,16 +1182,18 @@ public class Index {
             if (value == null) {
               value = longIndex.get(lastKey);
             }
-            return new MyEntry<>(new Object[]{lastKey}, (Long) value);
+            return new MyEntry<>(new Object[]{lastKey}, value);
           }
           catch (NoSuchElementException e) {
             return null;
           }
         }
-        else if (stringIndex != null) {
+      }
+      else if (stringIndex != null) {
+        synchronized (this) {
           byte[] inputKey = (byte[]) key[0];//((String) key[0]).getBytes("utf-8");
-          Object2LongSortedMap head = stringIndex.tailMap(inputKey);
-          ObjectSortedSet<Map.Entry<byte[], Long>> entries = head.entrySet();
+          Object2ObjectSortedMap head = stringIndex.tailMap(inputKey);
+          ObjectSortedSet<Map.Entry<byte[], Object>> entries = head.entrySet();
           if (head.isEmpty()) {
             return null;
           }
@@ -1022,7 +1202,7 @@ public class Index {
             if (Arrays.equals(lastKey, inputKey)) {
               lastKey = null;
               byte[] currKey = null;
-              for (Map.Entry<byte[], Long> entry : entries) {
+              for (Map.Entry<byte[], Object> entry : entries) {
                 if (currKey == null) {
                   currKey = entry.getKey();
                 }
@@ -1036,16 +1216,17 @@ public class Index {
               return null;
             }
             Object value = stringIndex.get(lastKey);
-            return new MyEntry<>(new Object[]{(byte[]) lastKey/*new String(lastKey, "utf-8")*/}, (long) value);
+            return new MyEntry<>(new Object[]{(byte[]) lastKey/*new String(lastKey, "utf-8")*/}, value);
           }
           catch (NoSuchElementException e) {
             return null;
           }
-
         }
-        else if (objectIndex != null) {
-          Object2LongSortedMap<Object[]> head = objectIndex.tailMap(key);
-          ObjectSortedSet<Map.Entry<Object[], Long>> entries = head.entrySet();
+      }
+      else if (objectIndex != null) {
+        synchronized (this) {
+          Object2ObjectSortedMap<Object[], Object> head = objectIndex.tailMap(key);
+          ObjectSortedSet<Map.Entry<Object[], Object>> entries = head.entrySet();
           if (head.isEmpty()) {
             return null;
           }
@@ -1054,7 +1235,7 @@ public class Index {
             if (0 == objectIndex.comparator().compare(lastKey, key)) {
               lastKey = null;
               Object[] currKey = null;
-              for (Map.Entry<Object[], Long> entry : entries) {
+              for (Map.Entry<Object[], Object> entry : entries) {
                 if (currKey == null) {
                   currKey = entry.getKey();
                 }
@@ -1067,7 +1248,7 @@ public class Index {
             if (lastKey == null) {
               return null;
             }
-            Long value = objectIndex.get(lastKey);
+            Object value = objectIndex.get(lastKey);
             return new MyEntry<>(lastKey, value);
           }
           catch (NoSuchElementException e) {
@@ -1075,26 +1256,27 @@ public class Index {
           }
         }
       }
+
       if (longSkipIndex != null) {
-        Map.Entry<Long, Long> entry = longSkipIndex.higherEntry((Long) key[0]);
+        Map.Entry<Long, Object> entry = longSkipIndex.higherEntry((Long) key[0]);
         if (entry == null) {
           return null;
         }
-        return new MyEntry<>(new Object[]{entry.getKey()}, (long) entry.getValue());
+        return new MyEntry<>(new Object[]{entry.getKey()}, entry.getValue());
       }
       else if (stringSkipIndex != null) {
-        Map.Entry<byte[], Long> entry = stringSkipIndex.higherEntry((byte[]) key[0]);
+        Map.Entry<byte[], Object> entry = stringSkipIndex.higherEntry((byte[]) key[0]);
         if (entry == null) {
           return null;
         }
-        return new MyEntry<>(new Object[]{entry.getKey()}, (long) entry.getValue());
+        return new MyEntry<>(new Object[]{entry.getKey()}, entry.getValue());
       }
       else if (objectSkipIndex != null) {
-        Map.Entry<Object[], Long> entry = objectSkipIndex.higherEntry(key);
+        Map.Entry<Object[], Object> entry = objectSkipIndex.higherEntry(key);
         if (entry == null) {
           return null;
         }
-        return new MyEntry<>(entry.getKey(), (long) entry.getValue());
+        return new MyEntry<>(entry.getKey(), entry.getValue());
       }
       return null;
     }
@@ -1103,18 +1285,23 @@ public class Index {
     }
   }
 
-  public Iterable<? extends Long> values() {
-    synchronized (this) {
-      if (longIndex != null) {
+  public Iterable<? extends Object> values() {
+    if (longIndex != null) {
+      synchronized (this) {
         return longIndex.values();
       }
-      else if (stringIndex != null) {
+    }
+    else if (stringIndex != null) {
+      synchronized (this) {
         return stringIndex.values();
       }
-      else if (objectIndex != null) {
+    }
+    else if (objectIndex != null) {
+      synchronized (this) {
         return objectIndex.values();
       }
     }
+
     if (longSkipIndex != null) {
       return longSkipIndex.values();
     }
@@ -1127,132 +1314,452 @@ public class Index {
     return null;
   }
 
-  public long size() {
-    synchronized (this) {
-      if (longIndex != null) {
-        return longIndex.size();
+  public long getSize(final Object[] minKey, final Object[] maxKey) {
+    final AtomicLong currOffset = new AtomicLong();
+
+    final Object[] actualMin;
+    if (minKey == null) {
+      Map.Entry<Object[], Object> entry = firstEntry();
+      if (entry == null) {
+        return 0;
       }
-      else if (stringIndex != null) {
-        return stringIndex.size();
+      actualMin = entry.getKey();
+    }
+    else {
+      actualMin = minKey;
+    }
+
+    visitTailMap(actualMin, new Index.Visitor() {
+      @Override
+      public boolean visit(Object[] key, Object value) throws IOException {
+        if (maxKey != null && comparator.compare(key, maxKey) > 0) {
+          return false;
+        }
+        currOffset.incrementAndGet();
+        return true;
       }
-      else if (objectIndex != null) {
-        return objectIndex.size();
-      }
-    }
-    if (longSkipIndex != null) {
-      return longSkipIndex.size();
-    }
-    else if (stringSkipIndex != null) {
-      return stringSkipIndex.size();
-    }
-    else if (objectSkipIndex != null) {
-      return objectSkipIndex.size();
-    }
-    return 0;
+    });
+    return currOffset.get();
   }
 
-  public Map.Entry<Object[], Long> lastEntry() {
-    synchronized (this) {
-      keyLen = comparators.length;
+  public long size() {
+    return size.get();
+  }
+
+  public Object[] getKeyAtOffset(final long offset, final Object[] minKey, final Object[] maxKey) {
+    long begin = System.currentTimeMillis();
+    final AtomicLong countSkipped = new AtomicLong();
+    final AtomicLong currOffset = new AtomicLong();
+    final AtomicReference<Object[]> foundKey = new AtomicReference<>();
+    if (firstEntry() != null) {
+      Object[] floorKey = null;
+      if (minKey != null) {
+        Map.Entry<Object[], Object> entry = floorEntry(minKey);
+        if (entry == null) {
+          floorKey = firstEntry().getKey();
+        }
+        else {
+          floorKey = entry.getKey();
+        }
+      }
+      else {
+        floorKey = firstEntry().getKey();
+      }
+      visitTailMap(floorKey, new Index.Visitor() {
+        @Override
+        public boolean visit(Object[] key, Object value) throws IOException {
+          if (maxKey != null && comparator.compare(key, maxKey) > 0) {
+            foundKey.set(key);
+            return false;
+          }
+          currOffset.incrementAndGet();
+          if (currOffset.get() >= offset) {
+            foundKey.set(key);
+            return false;
+          }
+          return true;
+        }
+      });
+    }
+    logger.info("getKeyAtOffset - scanForKey: " +
+            ", offsetInPartition=" + currOffset.get() + ", duration=" + (System.currentTimeMillis() - begin) +
+            ", startKey=" + DatabaseCommon.keyToString(firstEntry().getKey()) +
+            ", endKey=" + DatabaseCommon.keyToString(lastEntry().getKey()) +
+            ", foundKey=" + DatabaseCommon.keyToString(foundKey.get()) +
+            ", countSkipped=" + countSkipped.get());
+
+    if (foundKey.get() == null) {
+      return lastEntry().getKey();
+    }
+    return foundKey.get();
+  }
+
+  public boolean visitTailMap(Object[] key, Index.Visitor visitor) {
+    try {
       if (longIndex != null) {
+        boolean shouldSkip = false;
+        while (true) {
+          int count = 0;
+          List<Repartitioner.MapEntry> list = new ArrayList<>();
+          synchronized (this) {
+            Long2ObjectSortedMap<Object> map = longIndex.tailMap((long) key[0]);
+            if (map.isEmpty()) {
+              return false;
+            }
+            for (Map.Entry<Long, Object> entry : map.entrySet()) {
+              if (shouldSkip) {
+                shouldSkip = false;
+                continue;
+              }
+              key = new Object[]{entry.getKey()};
+              list.add(new Repartitioner.MapEntry(key, entry.getValue()));
+              if (count++ > 100) {
+                break;
+              }
+            }
+            shouldSkip = true;
+          }
+
+          if (list.isEmpty()) {
+            return false;
+          }
+          for (Repartitioner.MapEntry entry : list) {
+            if (!visitor.visit(entry.key, entry.value)) {
+              return false;
+            }
+          }
+        }
+      }
+      else if (stringIndex != null) {
+        boolean shouldSkip = false;
+        while (true) {
+          int count = 0;
+          List<Repartitioner.MapEntry> list = new ArrayList<>();
+          synchronized (this) {
+            Object2ObjectSortedMap<byte[], Object> map = stringIndex.tailMap((byte[]) key[0]);
+            if (map.isEmpty()) {
+              return false;
+            }
+            for (Map.Entry<byte[], Object> entry : map.entrySet()) {
+              if (shouldSkip) {
+                shouldSkip = false;
+                continue;
+              }
+              key = new Object[]{entry.getKey()};
+              list.add(new Repartitioner.MapEntry(key, entry.getValue()));
+              if (count++ > 100) {
+                break;
+              }
+            }
+            shouldSkip = true;
+          }
+
+          if (list.isEmpty()) {
+            return false;
+          }
+          for (Repartitioner.MapEntry entry : list) {
+            if (!visitor.visit(entry.key, entry.value)) {
+              return false;
+            }
+          }
+        }
+      }
+      else if (objectIndex != null) {
+        boolean shouldSkip = false;
+        while (true) {
+          int count = 0;
+          List<Repartitioner.MapEntry> list = new ArrayList<>();
+          synchronized (this) {
+            Object2ObjectSortedMap<Object[], Object> map = objectIndex.tailMap(key);
+            if (map.isEmpty()) {
+              return false;
+            }
+            for (Map.Entry<Object[], Object> entry : map.entrySet()) {
+              if (shouldSkip) {
+                shouldSkip = false;
+                continue;
+              }
+              key = entry.getKey();
+              list.add(new Repartitioner.MapEntry(key, entry.getValue()));
+              if (count++ > 100) {
+                break;
+              }
+            }
+            shouldSkip = true;
+          }
+
+          if (list.isEmpty()) {
+            return false;
+          }
+          for (Repartitioner.MapEntry entry : list) {
+            if (!visitor.visit(entry.key, entry.value)) {
+              return false;
+            }
+          }
+        }
+      }
+      else if (longSkipIndex != null) {
+        ConcurrentNavigableMap<Long, Object> map = longSkipIndex.tailMap((long) key[0]);
+        for (Map.Entry<Long, Object> entry : map.entrySet()) {
+          if (!visitor.visit(new Object[]{entry.getKey()}, entry.getValue())) {
+            return false;
+          }
+        }
+      }
+      else if (stringSkipIndex != null) {
+        ConcurrentNavigableMap<byte[], Object> map = stringSkipIndex.tailMap((byte[]) key[0]);
+        for (Map.Entry<byte[], Object> entry : map.entrySet()) {
+          if (!visitor.visit(new Object[]{entry.getKey()}, entry.getValue())) {
+            return false;
+          }
+        }
+      }
+      else if (objectSkipIndex != null) {
+        ConcurrentNavigableMap<Object[], Object> map = objectSkipIndex.tailMap(key);
+        for (Map.Entry<Object[], Object> entry : map.entrySet()) {
+          if (!visitor.visit(entry.getKey(), entry.getValue())) {
+            return false;
+          }
+        }
+      }
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+    return true;
+  }
+
+  public boolean visitHeadMap(Object[] key, Index.Visitor visitor) {
+    try {
+      if (longIndex != null) {
+        while (true) {
+          int count = 0;
+          synchronized (this) {
+            Long2ObjectSortedMap<Object> map = longIndex.headMap((long) key[0]);
+            if (map.isEmpty()) {
+              return true;
+            }
+            for (Map.Entry<Long, Object> entry : map.entrySet()) {
+              key[0] = entry.getKey();
+              if (!visitor.visit(key, entry.getValue())) {
+                return false;
+              }
+              if (count++ > 1000) {
+                break;
+              }
+            }
+          }
+        }
+/*
+        while (true) {
+          int count = 0;
+          List<Repartitioner.MapEntry> list = new ArrayList<>();
+          synchronized (this) {
+            Long2ObjectSortedMap<Object> map = longIndex.headMap((long) key[0]);
+            if (map.isEmpty()) {
+              return true;
+            }
+            for (Map.Entry<Long, Object> entry : map.entrySet()) {
+              key = new Object[]{entry.getKey()};
+              list.add(new Repartitioner.MapEntry(key, entry.getValue()));
+              if (count++ > 100) {
+                break;
+              }
+            }
+          }
+
+          if (list.isEmpty()) {
+            return true;
+          }
+          for (Repartitioner.MapEntry entry : list) {
+            if (!visitor.visit(entry.key, entry.value)) {
+              return false;
+            }
+          }
+        }
+  */
+      }
+      else if (stringIndex != null) {
+        while (true) {
+          int count = 0;
+          synchronized (this) {
+            Object2ObjectSortedMap<byte[], Object> map = stringIndex.headMap((byte[]) key[0]);
+            if (map.isEmpty()) {
+              return true;
+            }
+            for (Map.Entry<byte[], Object> entry : map.entrySet()) {
+              key[0] = entry.getKey();
+              if (!visitor.visit(key, entry.getValue())) {
+                return false;
+              }
+              if (count++ > 1000) {
+                break;
+              }
+            }
+          }
+        }
+      }
+      else if (objectIndex != null) {
+        while (true) {
+          int count = 0;
+          synchronized (this) {
+            Object2ObjectSortedMap<Object[], Object> map = objectIndex.headMap(key);
+            if (map.isEmpty()) {
+              return true;
+            }
+            for (Map.Entry<Object[], Object> entry : map.entrySet()) {
+              key[0] = entry.getKey();
+              if (!visitor.visit(key, entry.getValue())) {
+                return false;
+              }
+              if (count++ > 1000) {
+                break;
+              }
+            }
+          }
+        }
+      }
+      else if (longSkipIndex != null) {
+        ConcurrentNavigableMap<Long, Object> map = longSkipIndex.headMap((long) key[0]).descendingMap();
+        for (Map.Entry<Long, Object> entry : map.entrySet()) {
+          if (!visitor.visit(new Object[]{entry.getKey()}, entry.getValue())) {
+            return false;
+          }
+        }
+      }
+      else if (stringSkipIndex != null) {
+        ConcurrentNavigableMap<byte[], Object> map = stringSkipIndex.headMap((byte[]) key[0]).descendingMap();
+        for (Map.Entry<byte[], Object> entry : map.entrySet()) {
+          if (!visitor.visit(new Object[]{entry.getKey()}, entry.getValue())) {
+            return false;
+          }
+        }
+      }
+      else if (objectSkipIndex != null) {
+        ConcurrentNavigableMap<Object[], Object> map = objectSkipIndex.headMap(key).descendingMap();
+        for (Map.Entry<Object[], Object> entry : map.entrySet()) {
+          if (!visitor.visit(entry.getKey(), entry.getValue())) {
+            return false;
+          }
+        }
+      }
+      return true;
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public Map.Entry<Object[], Object> lastEntry() {
+    if (longIndex != null) {
+      synchronized (this) {
         if (longIndex.isEmpty()) {
           return null;
         }
         long lastKey = longIndex.lastLongKey();
-        Long value = longIndex.get(lastKey);
+        Object value = longIndex.get(lastKey);
         return new MyEntry<>(new Object[]{lastKey}, value);
       }
-      else if (stringIndex != null) {
+    }
+    else if (stringIndex != null) {
+      synchronized (this) {
         if (stringIndex.isEmpty()) {
           return null;
         }
         byte[] lastKey = stringIndex.lastKey();
         Object value = stringIndex.get(lastKey);
-        return new MyEntry<>(new Object[]{(byte[]) lastKey/*new String(lastKey, "utf-8")*/}, (long) value);
+        return new MyEntry<>(new Object[]{(byte[]) lastKey/*new String(lastKey, "utf-8")*/}, value);
       }
-      else if (objectIndex != null) {
+    }
+    else if (objectIndex != null) {
+      synchronized (this) {
         if (objectIndex.isEmpty()) {
           return null;
         }
         Object[] lastKey = objectIndex.lastKey();
-        Long value = objectIndex.get(lastKey);
+        Object value = objectIndex.get(lastKey);
         return new MyEntry<>(lastKey, value);
       }
     }
+
     if (longSkipIndex != null) {
-      Map.Entry<Long, Long> entry = longSkipIndex.lastEntry();
+      Map.Entry<Long, Object> entry = longSkipIndex.lastEntry();
       if (entry == null) {
         return null;
       }
       return new MyEntry<>(new Object[]{entry.getKey()}, entry.getValue());
     }
     else if (stringSkipIndex != null) {
-      Map.Entry<byte[], Long> entry = stringSkipIndex.lastEntry();
+      Map.Entry<byte[], Object> entry = stringSkipIndex.lastEntry();
       if (entry == null) {
         return null;
       }
-      return new MyEntry<>(new Object[]{entry.getKey()}, (long) entry.getValue());
+      return new MyEntry<>(new Object[]{entry.getKey()}, entry.getValue());
     }
     else if (objectSkipIndex != null) {
-      Map.Entry<Object[], Long> entry = objectSkipIndex.lastEntry();
+      Map.Entry<Object[], Object> entry = objectSkipIndex.lastEntry();
       if (entry == null) {
         return null;
       }
-      return new MyEntry<>(entry.getKey(), (long) entry.getValue());
+      return new MyEntry<>(entry.getKey(), entry.getValue());
     }
 
     return null;
   }
 
 
-  public Map.Entry<Object[], Long> firstEntry() {
-    synchronized (this) {
-      keyLen = comparators.length;
-      if (longIndex != null) {
+  public Map.Entry<Object[], Object> firstEntry() {
+    if (longIndex != null) {
+      synchronized (this) {
         if (longIndex.isEmpty()) {
           return null;
         }
         long firstKey = longIndex.firstLongKey();
         Object value = longIndex.get(firstKey);
-        return new MyEntry<>(new Object[]{firstKey}, (long) value);
+        return new MyEntry<>(new Object[]{firstKey}, value);
       }
-      else if (stringIndex != null) {
+    }
+    else if (stringIndex != null) {
+      synchronized (this) {
         if (stringIndex.isEmpty()) {
           return null;
         }
         byte[] firstKey = (byte[]) stringIndex.firstKey();
         Object value = stringIndex.get(firstKey);
-        return new MyEntry<>(new Object[]{(byte[]) firstKey/*new String(firstKey, "utf-8")*/}, (long) value);
+        return new MyEntry<>(new Object[]{(byte[]) firstKey/*new String(firstKey, "utf-8")*/}, value);
       }
-      else if (objectIndex != null) {
+    }
+    else if (objectIndex != null) {
+      synchronized (this) {
         if (objectIndex.isEmpty()) {
           return null;
         }
         Object[] firstKey = objectIndex.firstKey();
-        Long value = objectIndex.get(firstKey);
+        Object value = objectIndex.get(firstKey);
         return new MyEntry<>(firstKey, value);
       }
     }
+
     if (longSkipIndex != null) {
-      Map.Entry<Long, Long> entry = longSkipIndex.firstEntry();
+      Map.Entry<Long, Object> entry = longSkipIndex.firstEntry();
       if (entry == null) {
         return null;
       }
-      return new MyEntry<>(new Object[]{entry.getKey()}, (long) entry.getValue());
+      return new MyEntry<>(new Object[]{entry.getKey()}, entry.getValue());
     }
     else if (stringSkipIndex != null) {
-      Map.Entry<byte[], Long> entry = stringSkipIndex.firstEntry();
+      Map.Entry<byte[], Object> entry = stringSkipIndex.firstEntry();
       if (entry == null) {
         return null;
       }
-      return new MyEntry<>(new Object[]{entry.getKey()}, (long) entry.getValue());
+      return new MyEntry<>(new Object[]{entry.getKey()}, entry.getValue());
     }
     else if (objectSkipIndex != null) {
-      Map.Entry<Object[], Long> entry = objectSkipIndex.firstEntry();
+      Map.Entry<Object[], Object> entry = objectSkipIndex.firstEntry();
       if (entry == null) {
         return null;
       }
-      return new MyEntry<>(entry.getKey(), (long) entry.getValue());
+      return new MyEntry<>(entry.getKey(), entry.getValue());
     }
     return null;
   }

@@ -108,7 +108,7 @@ public class ReadManager {
         count = index.size();
       }
       else {
-        Map.Entry<Object[], Long> entry = index.firstEntry();
+        Map.Entry<Object[], Object> entry = index.firstEntry();
         while (true) {
           if (entry == null) {
             break;
@@ -477,7 +477,7 @@ public class ReadManager {
       }
 
       Index index = server.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexName);
-      Map.Entry<Object[], Long> entry = null;
+      Map.Entry<Object[], Object> entry = null;
 
       Boolean ascending = null;
       if (orderByExpressions != null && orderByExpressions.size() != 0) {
@@ -804,7 +804,7 @@ public class ReadManager {
       }
 
       Index index = server.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexName);
-      Map.Entry<Object[], Long> entry = null;
+      Map.Entry<Object[], Object> entry = null;
 
       Boolean ascending = null;
       if (orderByExpressions.size() != 0) {
@@ -880,12 +880,12 @@ public class ReadManager {
     }
   }
 
-  private Map.Entry<Object[], Long> doIndexLookupWithRecordsExpression(
+  private Map.Entry<Object[], Object> doIndexLookupWithRecordsExpression(
       String dbName, int count, TableSchema tableSchema, Set<Integer> columnOffsets, ParameterHandler parms,
       Expression expression,
       Index index, Object[] leftKey, Boolean ascending, List<Record> ret, Counter[] counters, GroupByContext groupByContext) {
 
-    Map.Entry<Object[], Long> entry;
+    Map.Entry<Object[], Object> entry;
     if (ascending == null || ascending) {
       if (leftKey == null) {
         entry = index.firstEntry();
@@ -939,7 +939,7 @@ public class ReadManager {
   }
 
 
-  private Map.Entry<Object[], Long> doIndexLookupTwoKeys(
+  private Map.Entry<Object[], Object> doIndexLookupTwoKeys(
       String dbName,
       int count,
       TableSchema tableSchema,
@@ -979,7 +979,7 @@ public class ReadManager {
       lessOriginalKey = originalLeftKey;
     }
 
-    Map.Entry<Object[], Long> entry = null;
+    Map.Entry<Object[], Object> entry = null;
     if (ascending == null || ascending) {
       if (greaterKey != null) {
         entry = index.floorEntry(greaterKey);
@@ -1220,7 +1220,7 @@ public class ReadManager {
     return ret;
   }
 
-  private Map.Entry<Object[], Long> doIndexLookupOneKey(
+  private Map.Entry<Object[], Object> doIndexLookupOneKey(
       String dbName,
       int count,
       TableSchema tableSchema,
@@ -1241,7 +1241,7 @@ public class ReadManager {
       boolean keys,
       Counter[] counters,
       GroupByContext groupContext) {
-    Map.Entry<Object[], Long> entry = null;
+    Map.Entry<Object[], Object> entry = null;
 
     //count = 3;
     if (operator.equals(BinaryExpression.Operator.equal)) {
@@ -1249,14 +1249,14 @@ public class ReadManager {
         return null;
       }
 
-      List<Map.Entry<Object[], Long>> entries = index.equalsEntries(originalKey);
+      List<Map.Entry<Object[], Object>> entries = index.equalsEntries(originalKey);
       if (entries != null) {
-        for (Map.Entry<Object[], Long> currEntry : entries) {
+        for (Map.Entry<Object[], Object> currEntry : entries) {
           entry = currEntry;
           if (server.getCommon().compareKey(indexSchema.getComparators(), originalKey, entry.getKey()) != 0) {
             break;
           }
-          Long value = entry.getValue();
+          Object value = entry.getValue();
           if (value == null) {
             break;
           }
@@ -1325,7 +1325,8 @@ public class ReadManager {
         }
       }
       if (entry != null) {
-        if (operator.equals(BinaryExpression.Operator.less) ||
+
+         if (operator.equals(BinaryExpression.Operator.less) ||
             operator.equals(BinaryExpression.Operator.lessEqual) ||
             operator.equals(BinaryExpression.Operator.greater) ||
             operator.equals(BinaryExpression.Operator.greaterEqual)) {
@@ -1343,6 +1344,7 @@ public class ReadManager {
             }
           }
         }
+
       }
     }
     else {
@@ -1450,7 +1452,7 @@ public class ReadManager {
           break;
         }
 
-        for (Map.Entry<Object[], Long> currEntry : entries) {
+        for (Map.Entry<Object[], Object> currEntry : entries) {
           entry = currEntry;
           if (currEntry == null) {
             break outer;
@@ -1491,7 +1493,7 @@ public class ReadManager {
           if (keys) {
             byte[][] currKeys = null;
             synchronized (index) {
-              Long unsafeAddress = currEntry.getValue();//index.get(entry.getKey());
+              Object unsafeAddress = currEntry.getValue();//index.get(entry.getKey());
               if (unsafeAddress != null) {
                 currKeys = server.fromUnsafeToKeys(unsafeAddress);
               }
@@ -1505,7 +1507,7 @@ public class ReadManager {
           else {
             byte[][] records = null;
             synchronized (index) {
-              Long unsafeAddress = currEntry.getValue();//index.get(entry.getKey());
+              Object unsafeAddress = currEntry.getValue();//index.get(entry.getKey());
               if (unsafeAddress != null) {
                 records = server.fromUnsafeToRecords(unsafeAddress);
               }
@@ -1546,8 +1548,8 @@ public class ReadManager {
                       //        remaining.add(bytes);
                     }
                     else if ((dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
-                      synchronized (index) {
-                        Long unsafeAddress = index.remove(currEntry.getKey());
+                      synchronized (index.getMutex(currEntry.getKey())) {
+                        Object unsafeAddress = index.remove(currEntry.getKey());
                         if (unsafeAddress != null) {
                           server.freeUnsafeIds(unsafeAddress);
                         }
@@ -1653,9 +1655,9 @@ public class ReadManager {
         }
       }
       Index index = server.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
-      Map.Entry<Object[], Long> entry = index.lastEntry();
+      Map.Entry<Object[], Object> entry = index.lastEntry();
       if (entry != null) {
-        Long unsafeAddress = entry.getValue();
+        Object unsafeAddress = entry.getValue();
         if (unsafeAddress != null) {
           byte[][] records = server.fromUnsafeToRecords(unsafeAddress);
           Record record = new Record(dbName, server.getCommon(), records[0]);
@@ -1670,7 +1672,7 @@ public class ReadManager {
       }
       entry = index.firstEntry();
       if (entry != null) {
-        Long unsafeAddress = entry.getValue();
+        Object unsafeAddress = entry.getValue();
         if (unsafeAddress != null) {
           byte[][] records = server.fromUnsafeToRecords(unsafeAddress);
           Record record = new Record(dbName, server.getCommon(), records[0]);

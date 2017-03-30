@@ -857,4 +857,23 @@ public class DatabaseCommon {
     schema.get(dbName).getTables().remove(tableName);
     saveSchema(dataDir);
   }
+
+  public static String keyToString(Object[] key) {
+    try {
+      StringBuilder keyStr = new StringBuilder("[");
+      for (Object curr : key) {
+        if (curr instanceof byte[]) {
+          keyStr.append(",").append(new String((byte[]) curr, "utf-8"));
+        }
+        else {
+          keyStr.append(",").append(curr);
+        }
+      }
+      keyStr.append("]");
+      return keyStr.toString();
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
 }

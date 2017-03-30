@@ -148,8 +148,8 @@ public class TestJoins {
       Thread.sleep(1000);
     }
 
-    assertEquals(client.getPartitionSize("test", 0, "persons", "_1__primarykey"), 11);
-    assertEquals(client.getPartitionSize("test", 1, "persons", "_1__primarykey"), 9);
+    assertEquals(client.getPartitionSize("test", 0, "persons", "_1__primarykey"), 9);
+    assertEquals(client.getPartitionSize("test", 1, "persons", "_1__primarykey"), 11);
 
 //    assertEquals(client.getPartitionSize(2, "persons", "_1__primarykey"), 9);
 //    assertEquals(client.getPartitionSize(3, "persons", "_1__primarykey"), 8);

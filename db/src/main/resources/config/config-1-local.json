@@ -2,25 +2,36 @@
     "database": {
         "dataDirectory": "$HOME/db-data",
         "installDirectory": "$HOME/database",
-        "maxJavaHeap": "52%",
+        "copmressRecords": false,
+        "useUnsafe": true,
+        "maxJavaHeap": "63%",
         "user": "ubuntu",
         "maxProcessMemory": "90%",
-      "replicationFactor": 1,
+        "replicationFactor": 1,
         "shards" : [
           {
             "replicas": [
               {
-                "publicAddress": "54.175.243.104",
-                "privateAddress": "172.31.51.76",
+                "publicAddress": "localhost",
+                "privateAddress": "localhost",
                 "port": 9010
               }
-              ]
+            ]
+          },
+          {
+            "replicas": [
+              {
+                "publicAddress": "localhost",
+                "privateAddress": "localhost",
+                "port": 9020
+              }
+            ]
           }
         ],
       "clients": [
         {
-          "publicAddress": "54.227.87.246",
-          "privateAddress": "172.31.54.212",
+          "publicAddress": "localhost",
+          "privateAddress": "localhost",
           "port": 8080
         }
       ]

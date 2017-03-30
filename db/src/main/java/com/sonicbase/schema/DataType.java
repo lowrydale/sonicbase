@@ -552,7 +552,13 @@ public class DataType {
 
     @Override
     public int compare(Object o1, Object o2) {
-      //return ((String)o1).compareTo((String)o2);
+      try {
+        return (new String((byte[])o1, "utf-8")).compareTo(new String((byte[])o2, "utf-8"));
+      }
+      catch (Exception e) {
+        throw new DatabaseException(e);
+      }
+      /*
       if (o1 == null || o2 == null) {
         return 0;
       }
@@ -585,6 +591,7 @@ public class DataType {
         return 0;
       }
       throw new DatabaseException("Unsupported datatype");
+      */
     }
   }
 

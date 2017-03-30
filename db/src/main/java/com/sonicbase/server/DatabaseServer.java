@@ -16,6 +16,9 @@ import com.sonicbase.util.JsonArray;
 import com.sonicbase.util.JsonDict;
 import com.sonicbase.util.StreamUtils;
 import com.sonicbase.research.socket.NettyServer;
+import net.jpountz.lz4.LZ4Compressor;
+import net.jpountz.lz4.LZ4Factory;
+import net.jpountz.lz4.LZ4FastDecompressor;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
@@ -66,6 +69,8 @@ public class DatabaseServer {
   private AtomicBoolean aboveMemoryThreshold = new AtomicBoolean();
   private Exception exception;
   private byte[] bytes;
+  private boolean compressRecords = false;
+  private boolean useUnsafe;
 
   @SuppressWarnings("restriction")
   private static Unsafe getUnsafe() {
@@ -431,6 +436,16 @@ public class DatabaseServer {
     executor = new ThreadPoolExecutor(256, 256, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
     if (!skipLicense) {
       validateLicense(config);
+    }
+
+    if (databaseDict.hasKey("compressRecords")) {
+      compressRecords = databaseDict.getBoolean("compressRecords");
+    }
+    if (databaseDict.hasKey("useUnsafe")) {
+      useUnsafe = databaseDict.getBoolean("useUnsafe");
+    }
+    else {
+      useUnsafe = true;
     }
 
     this.updateManager = new UpdateManager(this);
@@ -1079,42 +1094,18 @@ public class DatabaseServer {
   }
 
 
-  public long toUnsafeFromIds(long[] ids) throws IOException {
-    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-    DataOutputStream out = new DataOutputStream(bytesOut);
-    DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-    out.writeInt(0);
-    out.writeInt(ids.length);
-    for (long id : ids) {
-      DataUtil.writeVLong(out, id, resultLength);
+  public Object toUnsafeFromIds(long[] ids) throws IOException {
+    if (!useUnsafe) {
+      return ids;
     }
-    out.close();
-    byte[] bytes = bytesOut.toByteArray();
-    bytesOut = new ByteArrayOutputStream();
-    out = new DataOutputStream(bytesOut);
-    out.writeInt(bytes.length);
-    out.close();
-    byte[] lenBuffer = bytesOut.toByteArray();
-
-    System.arraycopy(lenBuffer, 0, bytes, 0, lenBuffer.length);
-
-    long address = unsafe.allocateMemory(bytes.length);
-    for (int i = 0; i < bytes.length; i++) {
-      unsafe.putByte(address + i, bytes[i]);
-    }
-    return -1 * address;
-  }
-
-  public long toUnsafeFromRecords(byte[][] records) {
-    try {
+    else {
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
       DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
       out.writeInt(0);
-      out.writeInt(records.length);
-      for (byte[] record : records) {
-        DataUtil.writeVLong(out, record.length, resultLength);
-        out.write(record);
+      out.writeInt(ids.length);
+      for (long id : ids) {
+        DataUtil.writeVLong(out, id, resultLength);
       }
       out.close();
       byte[] bytes = bytesOut.toByteArray();
@@ -1126,53 +1117,131 @@ public class DatabaseServer {
 
       System.arraycopy(lenBuffer, 0, bytes, 0, lenBuffer.length);
 
-      if (bytes.length > 1000000000) {
-        throw new DatabaseException("Invalid allocation: size=" + bytes.length);
-      }
       long address = unsafe.allocateMemory(bytes.length);
       for (int i = 0; i < bytes.length; i++) {
         unsafe.putByte(address + i, bytes[i]);
       }
       return -1 * address;
-    }
-    catch (IOException e) {
-      throw new DatabaseException(e);
     }
   }
 
-  public long toUnsafeFromKeys(byte[][] records) {
-    try {
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-      out.writeInt(0);
-      out.writeInt(records.length);
-      for (byte[] record : records) {
-        DataUtil.writeVLong(out, record.length, resultLength);
-        out.write(record);
-      }
-      out.close();
-      byte[] bytes = bytesOut.toByteArray();
-      bytesOut = new ByteArrayOutputStream();
-      out = new DataOutputStream(bytesOut);
-      out.writeInt(bytes.length);
-      out.close();
-      byte[] lenBuffer = bytesOut.toByteArray();
-
-      System.arraycopy(lenBuffer, 0, bytes, 0, lenBuffer.length);
-
-      if (bytes.length > 1000000000) {
-        throw new DatabaseException("Invalid allocation: size=" + bytes.length);
-      }
-
-      long address = unsafe.allocateMemory(bytes.length);
-      for (int i = 0; i < bytes.length; i++) {
-        unsafe.putByte(address + i, bytes[i]);
-      }
-      return -1 * address;
+  public Object toUnsafeFromRecords(byte[][] records) {
+    if (!useUnsafe) {
+      return records;
     }
-    catch (IOException e) {
-      throw new DatabaseException(e);
+    else {
+      try {
+        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(bytesOut);
+        DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+        //out.writeInt(0);
+        out.writeInt(records.length);
+        for (byte[] record : records) {
+          DataUtil.writeVLong(out, record.length, resultLength);
+          out.write(record);
+        }
+        out.close();
+        byte[] bytes = bytesOut.toByteArray();
+
+        int origLen = -1;
+        if (compressRecords) {
+          origLen = bytes.length;
+
+          LZ4Factory factory = LZ4Factory.fastestInstance();
+
+          LZ4Compressor compressor = factory.fastCompressor();
+          int maxCompressedLength = compressor.maxCompressedLength(bytes.length);
+          byte[] compressed = new byte[maxCompressedLength];
+          int compressedLength = compressor.compress(bytes, 0, bytes.length, compressed, 0, maxCompressedLength);
+          bytes = new byte[compressedLength];
+          System.arraycopy(compressed, 0, bytes, 0, compressedLength);
+        }
+
+        bytesOut = new ByteArrayOutputStream();
+        out = new DataOutputStream(bytesOut);
+        out.writeInt(bytes.length);
+        out.writeInt(origLen);
+        out.close();
+        byte[] lenBuffer = bytesOut.toByteArray();
+
+        //System.arraycopy(lenBuffer, 0, bytes, 0, lenBuffer.length);
+
+        if (bytes.length > 1000000000) {
+          throw new DatabaseException("Invalid allocation: size=" + bytes.length);
+        }
+        long address = unsafe.allocateMemory(bytes.length + 8);
+        for (int i = 0; i < lenBuffer.length; i++) {
+          unsafe.putByte(address + i, lenBuffer[i]);
+        }
+        for (int i = lenBuffer.length; i < lenBuffer.length + bytes.length; i++) {
+          unsafe.putByte(address + i, bytes[i - lenBuffer.length]);
+        }
+        return -1 * address;
+      }
+      catch (IOException e) {
+        throw new DatabaseException(e);
+      }
+    }
+  }
+
+  public Object toUnsafeFromKeys(byte[][] records) {
+    if (!useUnsafe) {
+      return records;
+    }
+    else {
+      try {
+        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(bytesOut);
+        DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+        //out.writeInt(0);
+        out.writeInt(records.length);
+        for (byte[] record : records) {
+          DataUtil.writeVLong(out, record.length, resultLength);
+          out.write(record);
+        }
+        out.close();
+        byte[] bytes = bytesOut.toByteArray();
+        int origLen = -1;
+
+        if (compressRecords) {
+          origLen = bytes.length;
+
+          LZ4Factory factory = LZ4Factory.fastestInstance();
+
+          LZ4Compressor compressor = factory.fastCompressor();
+          int maxCompressedLength = compressor.maxCompressedLength(bytes.length);
+          byte[] compressed = new byte[maxCompressedLength];
+          int compressedLength = compressor.compress(bytes, 0, bytes.length, compressed, 0, maxCompressedLength);
+          bytes = new byte[compressedLength];
+          System.arraycopy(compressed, 0, bytes, 0, compressedLength);
+        }
+
+        bytesOut = new ByteArrayOutputStream();
+        out = new DataOutputStream(bytesOut);
+        out.writeInt(bytes.length);
+        out.writeInt(origLen);
+        out.close();
+        byte[] lenBuffer = bytesOut.toByteArray();
+
+        //System.arraycopy(lenBuffer, 0, bytes, 0, lenBuffer.length);
+
+
+        if (bytes.length > 1000000000) {
+          throw new DatabaseException("Invalid allocation: size=" + bytes.length);
+        }
+
+        long address = unsafe.allocateMemory(bytes.length + 8);
+        for (int i = 0; i < lenBuffer.length; i++) {
+          unsafe.putByte(address + i, lenBuffer[i]);
+        }
+        for (int i = lenBuffer.length; i < lenBuffer.length + bytes.length; i++) {
+          unsafe.putByte(address + i, bytes[i - lenBuffer.length]);
+        }
+        return -1 * address;
+      }
+      catch (IOException e) {
+        throw new DatabaseException(e);
+      }
     }
   }
 
@@ -1200,72 +1269,124 @@ public class DatabaseServer {
     return ret;
   }
 
-  public byte[][] fromUnsafeToRecords(long address) {
+  public byte[][] fromUnsafeToRecords(Object obj) {
     try {
-      address *= -1;
-      byte[] lenBuffer = new byte[4];
-      lenBuffer[0] = unsafe.getByte(address + 0);
-      lenBuffer[1] = unsafe.getByte(address + 1);
-      lenBuffer[2] = unsafe.getByte(address + 2);
-      lenBuffer[3] = unsafe.getByte(address + 3);
-      ByteArrayInputStream bytesIn = new ByteArrayInputStream(lenBuffer);
-      DataInputStream in = new DataInputStream(bytesIn);
-      int count = in.readInt();
-      byte[] bytes = new byte[count];
-      for (int i = 0; i < count; i++) {
-        bytes[i] = unsafe.getByte(address + i);
+      if (obj instanceof Long) {
+        long address = (long) obj;
+
+        address *= -1;
+        byte[] lenBuffer = new byte[8];
+        lenBuffer[0] = unsafe.getByte(address + 0);
+        lenBuffer[1] = unsafe.getByte(address + 1);
+        lenBuffer[2] = unsafe.getByte(address + 2);
+        lenBuffer[3] = unsafe.getByte(address + 3);
+        lenBuffer[4] = unsafe.getByte(address + 4);
+        lenBuffer[5] = unsafe.getByte(address + 5);
+        lenBuffer[6] = unsafe.getByte(address + 6);
+        lenBuffer[7] = unsafe.getByte(address + 7);
+        ByteArrayInputStream bytesIn = new ByteArrayInputStream(lenBuffer);
+        DataInputStream in = new DataInputStream(bytesIn);
+        int count = in.readInt();
+        int origLen = in.readInt();
+        byte[] bytes = new byte[count];
+        for (int i = 0; i < count; i++) {
+          bytes[i] = unsafe.getByte(address + i + 8);
+        }
+
+        if (origLen != -1) {
+          LZ4Factory factory = LZ4Factory.fastestInstance();
+
+          LZ4FastDecompressor decompressor = factory.fastDecompressor();
+          byte[] restored = new byte[origLen];
+          decompressor.decompress(bytes, 0, restored, 0, origLen);
+          bytes = restored;
+        }
+
+        in = new DataInputStream(new ByteArrayInputStream(bytes));
+        DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+        //in.readInt(); //byte count
+        //in.readInt(); //orig len
+        byte[][] ret = new byte[in.readInt()][];
+        for (int i = 0; i < ret.length; i++) {
+          int len = (int) DataUtil.readVLong(in, resultLength);
+          byte[] record = new byte[len];
+          in.readFully(record);
+          ret[i] = record;
+        }
+        return ret;
       }
-      in = new DataInputStream(new ByteArrayInputStream(bytes));
-      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-      in.readInt(); //byte count
-      byte[][] ret = new byte[in.readInt()][];
-      for (int i = 0; i < ret.length; i++) {
-        int len = (int) DataUtil.readVLong(in, resultLength);
-        byte[] record = new byte[len];
-        in.readFully(record);
-        ret[i] = record;
+      else {
+        return (byte[][])obj;
       }
-      return ret;
     }
     catch (IOException e) {
       throw new DatabaseException(e);
     }
   }
 
-  public byte[][] fromUnsafeToKeys(long address) {
+  public byte[][] fromUnsafeToKeys(Object obj) {
     try {
-      address *= -1;
-      byte[] lenBuffer = new byte[4];
-      lenBuffer[0] = unsafe.getByte(address + 0);
-      lenBuffer[1] = unsafe.getByte(address + 1);
-      lenBuffer[2] = unsafe.getByte(address + 2);
-      lenBuffer[3] = unsafe.getByte(address + 3);
-      ByteArrayInputStream bytesIn = new ByteArrayInputStream(lenBuffer);
-      DataInputStream in = new DataInputStream(bytesIn);
-      int count = in.readInt();
-      byte[] bytes = new byte[count];
-      for (int i = 0; i < count; i++) {
-        bytes[i] = unsafe.getByte(address + i);
+      if (obj instanceof Long) {
+        long address = (long) obj;
+
+        address *= -1;
+        byte[] lenBuffer = new byte[8];
+        lenBuffer[0] = unsafe.getByte(address + 0);
+        lenBuffer[1] = unsafe.getByte(address + 1);
+        lenBuffer[2] = unsafe.getByte(address + 2);
+        lenBuffer[3] = unsafe.getByte(address + 3);
+        lenBuffer[4] = unsafe.getByte(address + 4);
+        lenBuffer[5] = unsafe.getByte(address + 5);
+        lenBuffer[6] = unsafe.getByte(address + 6);
+        lenBuffer[7] = unsafe.getByte(address + 7);
+        ByteArrayInputStream bytesIn = new ByteArrayInputStream(lenBuffer);
+        DataInputStream in = new DataInputStream(bytesIn);
+        int count = in.readInt();
+        int origLen = in.readInt();
+        byte[] bytes = new byte[count];
+        for (int i = 0; i < count; i++) {
+          bytes[i] = unsafe.getByte(address + i + 8);
+        }
+
+        if (origLen != -1) {
+          LZ4Factory factory = LZ4Factory.fastestInstance();
+
+          LZ4FastDecompressor decompressor = factory.fastDecompressor();
+          byte[] restored = new byte[origLen];
+          decompressor.decompress(bytes, 0, restored, 0, origLen);
+          bytes = restored;
+        }
+
+        in = new DataInputStream(new ByteArrayInputStream(bytes));
+        DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+        //in.readInt(); //byte count
+        //in.readInt(); //orig len
+        byte[][] ret = new byte[in.readInt()][];
+        for (int i = 0; i < ret.length; i++) {
+          int len = (int) DataUtil.readVLong(in, resultLength);
+          byte[] record = new byte[len];
+          in.readFully(record);
+          ret[i] = record;
+        }
+        return ret;
       }
-      in = new DataInputStream(new ByteArrayInputStream(bytes));
-      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-      in.readInt(); //byte count
-      byte[][] ret = new byte[in.readInt()][];
-      for (int i = 0; i < ret.length; i++) {
-        int len = (int) DataUtil.readVLong(in, resultLength);
-        byte[] record = new byte[len];
-        in.readFully(record);
-        ret[i] = record;
+      else {
+        return (byte[][])obj;
       }
-      return ret;
     }
     catch (IOException e) {
       throw new DatabaseException(e);
     }
   }
 
-  public void freeUnsafeIds(long address) {
-    unsafe.freeMemory(-1 * address);
+  public void freeUnsafeIds(Object obj) {
+    if (obj instanceof Long) {
+      long address = (long) obj;
+      if (address == 0) {
+        return;
+      }
+      unsafe.freeMemory(-1 * address);
+    }
   }
 
 

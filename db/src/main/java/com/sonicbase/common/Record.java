@@ -41,6 +41,21 @@ public class Record {
     deserialize(dbName, common, bytes, columns, readHeader);
   }
 
+  public static long readFlags(byte[] bytes) {
+    DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+    int byteOffset = 0;
+    int headerLen = (int)DataUtil.readVLong(bytes, byteOffset, resultLength);
+    byteOffset += resultLength.getLength();
+
+    DataUtil.readVLong(bytes, byteOffset, resultLength);
+    byteOffset += resultLength.getLength();
+    DataUtil.readVLong(bytes, byteOffset, resultLength);
+    byteOffset += resultLength.getLength();
+    long dbViewFlags = DataUtil.readVLong(bytes, byteOffset, resultLength);
+
+    return dbViewFlags;
+  }
+
   public void recoverFromSnapshot(String dbName, DatabaseCommon common, byte[] bytes, int serializationVersion, Set<Integer> columns, boolean readHeader) {
     try {
       DataUtil.ResultLength resultLength = new DataUtil.ResultLength();

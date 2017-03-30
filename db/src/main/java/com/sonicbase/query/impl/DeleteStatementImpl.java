@@ -108,6 +108,7 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
               ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
               DataOutputStream out = new DataOutputStream(bytesOut);
 
+              DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
               out.write(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), entry[0]));
 
               out.close();

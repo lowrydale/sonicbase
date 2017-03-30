@@ -94,8 +94,8 @@ java $_JAVA_OPTS_ $_SYS_PROPS_ -agentlib:jdwp=transport=dt_socket,server=y,suspe
 elif [ "$MODE" = "yprof" ]; then
 
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/ubuntu/yjp-linux/bin/linux-x86-64
-echo java $_JAVA_OPTS_ $_SYS_PROPS_ -agentlib:yjpagent=port=9009 -cp $_SEARCH_CLASSPATH_ "$@" >&2
-java $_JAVA_OPTS_ $_SYS_PROPS_ -agentlib:yjpagent=port=9009,dir=$SEARCH_HOME -cp $_SEARCH_CLASSPATH_ "$@"
+echo java $_JAVA_OPTS_ $_SYS_PROPS_ -agentlib:yjpagent=port=9009,probe_disable=* -cp $_SEARCH_CLASSPATH_ "$@" >&2
+java $_JAVA_OPTS_ $_SYS_PROPS_ -agentlib:yjpagent=port=9009,dir=$SEARCH_HOME,probe_disable=* -cp $_SEARCH_CLASSPATH_ "$@"
 
 else
 

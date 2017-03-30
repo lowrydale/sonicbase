@@ -20,11 +20,11 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.*;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Responsible for
@@ -76,247 +76,265 @@ public class Repartitioner extends Thread {
 //    beginRepartitioningThread = new Thread(new Runnable() {
 //      @Override
 //      public void run() {
-        try {
-          String tableName = null;
-          StringBuilder toRebalanceStr = new StringBuilder();
-          for (String index : toRebalance) {
-            toRebalanceStr.append(index).append(", ");
+    try {
+      String tableName = null;
+      StringBuilder toRebalanceStr = new StringBuilder();
+      for (String index : toRebalance) {
+        toRebalanceStr.append(index).append(", ");
+      }
+      logger.info("Rebalancing index group: group=" + toRebalanceStr);
+
+
+      Map<String, long[]> partitionSizes = new HashMap<>();
+      for (String index : toRebalance) {
+        String[] parts = index.split(" ");
+        tableName = parts[0];
+        final String indexName = parts[1];
+        long[] currPartitionSizes = new long[databaseServer.getShardCount()];
+        for (int i = 0; i < databaseServer.getShardCount(); i++) {
+          currPartitionSizes[i] = getPartitionSize(dbName, i, tableName, indexName);
+        }
+        partitionSizes.put(index, currPartitionSizes);
+      }
+
+      Map<String, List<TableSchema.Partition>> copiedPartitionsToApply = new HashMap<>();
+      Map<String, List<TableSchema.Partition>> newPartitionsToApply = new HashMap<>();
+
+      for (String index : toRebalance) {
+        List<TableSchema.Partition> newPartitions = new ArrayList<>();
+
+        String[] parts = index.split(" ");
+        tableName = parts[0];
+        final String indexName = parts[1];
+        TableSchema tableSchema = common.getTables(dbName).get(tableName);
+        long[] currPartitionSizes = partitionSizes.get(index);
+
+        long totalCount = 0;
+        for (long size : currPartitionSizes) {
+          totalCount += size;
+        }
+        long newPartitionSize = totalCount / databaseServer.getShardCount();
+
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < databaseServer.getShardCount(); i++) {
+          builder.append(",").append(currPartitionSizes[i]);
+        }
+        logger.info("calculating partitions: currSizes=" + builder.toString());
+        calculatePartitions(dbName, databaseServer.getShardCount(), newPartitions, indexName,
+            tableSchema.getName(), currPartitionSizes, newPartitionSize, new GetKeyAtOffset() {
+              @Override
+              public Object[] getKeyAtOffset(String dbName, int shard, String tableName, String indexName, long currPartitionSize, long currOffset) throws IOException {
+                return Repartitioner.this.getKeyAtOffset(dbName, shard, tableName, indexName, currPartitionSize, currOffset);
+              }
+            });
+
+/*
+        for (int currShardOffset = 0; currShardOffset < databaseServer.getShardCount() - 1; ) {
+
+
+
+          currPartitionsOffset += currPartitionSizes[sourceShardOffset++];
+          while (currPartitionsOffset < offset && sourceShardOffset < databaseServer.getShardCount()) {
+            currPartitionsOffset += currPartitionSizes[sourceShardOffset++];
           }
-          logger.info("Rebalancing index group: group=" + toRebalanceStr);
-
-
-          Map<String, long[]> partitionSizes = new HashMap<>();
-          for (String index : toRebalance) {
-            String[] parts = index.split(" ");
-            tableName = parts[0];
-            final String indexName = parts[1];
-            long[] currPartitionSizes = new long[databaseServer.getShardCount()];
-            for (int i = 0; i < databaseServer.getShardCount(); i++) {
-              currPartitionSizes[i] = getPartitionSize(dbName, i, tableName, indexName);
-            }
-            partitionSizes.put(index, currPartitionSizes);
+          int prevPartitionsSize = 0;
+          for (int i = 0; i < sourceShardOffset - 1; i++) {
+            prevPartitionsSize += currPartitionSizes[i];
           }
-
-          Map<String, List<TableSchema.Partition>> copiedPartitionsToApply = new HashMap<>();
-          Map<String, List<TableSchema.Partition>> newPartitionsToApply = new HashMap<>();
-
-          for (String index : toRebalance) {
-            List<TableSchema.Partition> newPartitions = new ArrayList<>();
-
-            String[] parts = index.split(" ");
-            tableName = parts[0];
-            final String indexName = parts[1];
-            TableSchema tableSchema = common.getTables(dbName).get(tableName);
-            long[] currPartitionSizes = partitionSizes.get(index);
-
-            long totalCount = 0;
-            for (long size : currPartitionSizes) {
-              totalCount += size;
-            }
-            long newPartitionSize = totalCount / databaseServer.getShardCount();
-            long offset = newPartitionSize;
-            int sourceShardOffset = 0;
-            long currPartitionsOffset = -1;
-            for (int currShardOffset = 0; currShardOffset < databaseServer.getShardCount() - 1; ) {
-              currPartitionsOffset += currPartitionSizes[sourceShardOffset++];
-              while (currPartitionsOffset < offset && sourceShardOffset < databaseServer.getShardCount()) {
-                currPartitionsOffset += currPartitionSizes[sourceShardOffset++];
-              }
-              int prevPartitionsSize = 0;
-              for (int i = 0; i < sourceShardOffset - 1; i++) {
-                prevPartitionsSize += currPartitionSizes[i];
-              }
-              long currOffset = offset - prevPartitionsSize;
-              do {
-                Object[] key = getKeyAtOffset(dbName, sourceShardOffset - 1, tableSchema.getName(), indexName, currOffset);
-                TableSchema.Partition partition = new TableSchema.Partition();
-                newPartitions.add(partition);
-                partition.setUpperKey(key);
-                partition.setShardOwning(currShardOffset++);
-                currOffset += newPartitionSize;
-                offset += newPartitionSize;
-              }
-              while (currOffset < currPartitionSizes[sourceShardOffset - 1] && currShardOffset < databaseServer.getShardCount() - 1);
-            }
-            TableSchema.Partition lastPartition = new TableSchema.Partition();
-            newPartitions.add(lastPartition);
-            lastPartition.setUnboundUpper(true);
-            lastPartition.setShardOwning(databaseServer.getShardCount() - 1);
-
-
-            //      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-            //      DataOutputStream out = new DataOutputStream(bytesOut);
-            //      out.writeInt(newPartitions.size());
-            //      for (TableSchema.Partition partition : newPartitions) {
-            //        partition.serialize(tableSchema, indexName, out);
-            //      }
-            //      out.close();
-            //      final byte[] bytes = bytesOut.toByteArray();
-
-            //todo: send new schema to clients so they start sending to new shards
-
-            if (!tableSchema.getIndices().get(indexName).isPrimaryKey() && newPartitions.size() != 0) {
-              List<TableSchema.Partition> copiedPartitions = new ArrayList<>();
-              int columnCount = tableSchema.getIndices().get(indexName).getFields().length;
-              for (TableSchema.Partition partition : newPartitions) {
-                TableSchema.Partition copiedPartition = new TableSchema.Partition();
-                copiedPartition.setShardOwning(partition.getShardOwning());
-                copiedPartition.setUnboundUpper(partition.isUnboundUpper());
-                Object[] upperKey = partition.getUpperKey();
-                if (upperKey != null) {
-                  Object[] copiedUpperKey = new Object[columnCount];
-                  for (int i = 0; i < columnCount; i++) {
-                    copiedUpperKey[i] = upperKey[i];
-                  }
-                  copiedPartition.setUpperKey(copiedUpperKey);
-                }
-                copiedPartitions.add(copiedPartition);
-              }
-              copiedPartitionsToApply.put(index, copiedPartitions);
-            }
-            else {
-              newPartitionsToApply.put(index, newPartitions);
-            }
+          long currOffset = offset - prevPartitionsSize;
+          do {
+            Object[] key = getKeyAtOffset(dbName, sourceShardOffset - 1, tableSchema.getName(), indexName, currOffset);
+            TableSchema.Partition partition = new TableSchema.Partition();
+            newPartitions.add(partition);
+            partition.setUpperKey(key);
+            partition.setShardOwning(currShardOffset++);
+            currOffset += newPartitionSize;
+            offset += newPartitionSize;
           }
+          while (currOffset < currPartitionSizes[sourceShardOffset - 1] && currShardOffset < databaseServer.getShardCount() - 1);
 
-          //common.getSchemaWriteLock(dbName).lock();
-          try {
-            for (String index : toRebalance) {
-              String[] parts = index.split(" ");
-              tableName = parts[0];
-              final String indexName = parts[1];
-              TableSchema tableSchema = common.getTables(dbName).get(tableName);
-              if (copiedPartitionsToApply.containsKey(index)) {
-                tableSchema.getIndices().get(indexName).reshardPartitions(copiedPartitionsToApply.get(index));
-                logPartitionsToApply(dbName, tableName, indexName, copiedPartitionsToApply.get(index));
+        }
+        */
+        TableSchema.Partition lastPartition = new TableSchema.Partition();
+        newPartitions.add(lastPartition);
+        lastPartition.setUnboundUpper(true);
+        lastPartition.setShardOwning(databaseServer.getShardCount() - 1);
+
+
+        //      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+        //      DataOutputStream out = new DataOutputStream(bytesOut);
+        //      out.writeInt(newPartitions.size());
+        //      for (TableSchema.Partition partition : newPartitions) {
+        //        partition.serialize(tableSchema, indexName, out);
+        //      }
+        //      out.close();
+        //      final byte[] bytes = bytesOut.toByteArray();
+
+        //todo: send new schema to clients so they start sending to new shards
+
+        if (!tableSchema.getIndices().get(indexName).isPrimaryKey() && newPartitions.size() != 0) {
+          List<TableSchema.Partition> copiedPartitions = new ArrayList<>();
+          int columnCount = tableSchema.getIndices().get(indexName).getFields().length;
+          for (TableSchema.Partition partition : newPartitions) {
+            TableSchema.Partition copiedPartition = new TableSchema.Partition();
+            copiedPartition.setShardOwning(partition.getShardOwning());
+            copiedPartition.setUnboundUpper(partition.isUnboundUpper());
+            Object[] upperKey = partition.getUpperKey();
+            if (upperKey != null) {
+              Object[] copiedUpperKey = new Object[columnCount];
+              for (int i = 0; i < columnCount; i++) {
+                copiedUpperKey[i] = upperKey[i];
               }
-              if (newPartitionsToApply.containsKey(index)) {
-                tableSchema.getIndices().get(indexName).reshardPartitions(newPartitionsToApply.get(index));
-                logPartitionsToApply(dbName, tableName, indexName, newPartitionsToApply.get(index));
-              }
+              copiedPartition.setUpperKey(copiedUpperKey);
             }
-
-            common.saveSchema(databaseServer.getDataDir());
+            copiedPartitions.add(copiedPartition);
           }
-          finally {
-            //common.getSchemaWriteLock(dbName).unlock();
-          }
-          databaseServer.pushSchema();
+          copiedPartitionsToApply.put(index, copiedPartitions);
+        }
+        else {
+          newPartitionsToApply.put(index, newPartitions);
+        }
+      }
 
-          Thread.sleep(1000);
+      //common.getSchemaWriteLock(dbName).lock();
+      try {
+        for (String index : toRebalance) {
+          String[] parts = index.split(" ");
+          tableName = parts[0];
+          final String indexName = parts[1];
+          TableSchema tableSchema = common.getTables(dbName).get(tableName);
+          if (copiedPartitionsToApply.containsKey(index)) {
+            tableSchema.getIndices().get(indexName).reshardPartitions(copiedPartitionsToApply.get(index));
+            logPartitionsToApply(dbName, tableName, indexName, copiedPartitionsToApply.get(index));
+          }
+          if (newPartitionsToApply.containsKey(index)) {
+            tableSchema.getIndices().get(indexName).reshardPartitions(newPartitionsToApply.get(index));
+            logPartitionsToApply(dbName, tableName, indexName, newPartitionsToApply.get(index));
+          }
+        }
+
+        common.saveSchema(databaseServer.getDataDir());
+      }
+      finally {
+        //common.getSchemaWriteLock(dbName).unlock();
+      }
+      databaseServer.pushSchema();
+
+      Thread.sleep(1000);
 //          common.saveSchema(databaseServer.getDataDir());
 //          databaseServer.pushSchema();
 
-          for (String index : toRebalance) {
-            String[] parts = index.split(" ");
-            tableName = parts[0];
-            final String finalTableName = tableName;
-            final String indexName = parts[1];
+      for (String index : toRebalance) {
+        String[] parts = index.split(" ");
+        tableName = parts[0];
+        final String finalTableName = tableName;
+        final String indexName = parts[1];
 
-            resetRepartitioningComplete();
+        resetRepartitioningComplete();
 
-            logger.info("rebalance ordered index - begin: table=" + tableName + INDEX_STR + indexName);
-            List<Future> futures = new ArrayList<>();
-            for (int i = 0; i < databaseServer.getShardCount(); i++) {
-              final int shard = i;
+        logger.info("rebalance ordered index - begin: table=" + tableName + INDEX_STR + indexName);
+        List<Future> futures = new ArrayList<>();
+        for (int i = 0; i < databaseServer.getShardCount(); i++) {
+          final int shard = i;
 
-              futures.add(databaseServer.getDatabaseClient().getExecutor().submit(new Callable() {
-                @Override
-                public Object call() {
-                  String command = "DatabaseServer:rebalanceOrderedIndex:1:" + common.getSchemaVersion() + ":" + dbName + ":" + finalTableName + ":" + indexName;
-                  Random rand = new Random(System.currentTimeMillis());
-                  try {
-                    databaseServer.getDatabaseClient().send(null, shard, rand.nextLong(), command, null, DatabaseClient.Replica.all);
-                  }
-                  catch (Exception e) {
-                    logger.error("Error sending rebalanceOrderedIndex to shard: shard=" + shard, e);
-                  }
-                  return null;
-                }
-              }));
-
+          futures.add(databaseServer.getDatabaseClient().getExecutor().submit(new Callable() {
+            @Override
+            public Object call() {
+              String command = "DatabaseServer:rebalanceOrderedIndex:1:" + common.getSchemaVersion() + ":" + dbName + ":" + finalTableName + ":" + indexName;
+              Random rand = new Random(System.currentTimeMillis());
+              try {
+                databaseServer.getDatabaseClient().send(null, shard, rand.nextLong(), command, null, DatabaseClient.Replica.all);
+              }
+              catch (Exception e) {
+                logger.error("Error sending rebalanceOrderedIndex to shard: shard=" + shard, e);
+              }
+              return null;
             }
+          }));
 
-            for (Future future : futures) {
-              future.get();
-            }
+        }
 
-            while (true) {
+        for (Future future : futures) {
+          future.get();
+        }
+
+        while (true) {
 //              if (lastPartitions != tableSchema.getIndices().get(indexName).getLastPartitions() ||
 //      f            null == tableSchema.getIndices().get(indexName).getLastPartitions()) {
 //                logger.error("##########################");
 //              }
-              if (isRepartitioningComplete()) {
+          if (isRepartitioningComplete()) {
 //                tableSchema.getIndices().get(indexName).deleteLastPartitions();
 //                common.saveSchema(databaseServer.getDataDir());
 //                databaseServer.pushSchema();
-                isRepartitioningIndex.set(false);
-                break;
-              }
-              Thread.sleep(2);
-              //}
-            }
-
-            logger.info("delete moved entries - begin");
-            for (int i = 0; i < databaseServer.getShardCount(); i++) {
-              final int shard = i;
-
-              futures.add(databaseServer.getDatabaseClient().getExecutor().submit(new Callable() {
-                @Override
-                public Object call() {
-                  String command = "DatabaseServer:deleteMovedIndexEntries:1:" + common.getSchemaVersion() + ":" + dbName + ":" + finalTableName + ":" + indexName;
-                  Random rand = new Random(System.currentTimeMillis());
-                  try {
-                    databaseServer.getDatabaseClient().send(null, shard, rand.nextLong(), command, null, DatabaseClient.Replica.all);
-                  }
-                  catch (Exception e) {
-                    logger.error("Error sending rebalanceOrderedIndex to shard: shard=" + shard, e);
-                  }
-                  return null;
-                }
-              }));
-
-            }
-
-            for (Future future : futures) {
-              future.get();
-            }
-
-            while (true) {
-              if (isDeletingComplete()) {
-                break;
-              }
-              Thread.sleep(2);
-            }
-            resetDeletingComplete();
-            logger.info("delete moved entries - end");
-
-
-            logger.info("rebalance ordered index - end: table=" + tableName + INDEX_STR + indexName);
+            isRepartitioningIndex.set(false);
+            break;
           }
+          Thread.sleep(2);
+          //}
+        }
 
-          for (String index : toRebalance) {
-            String[] parts = index.split(" ");
-            tableName = parts[0];
-            final String indexName = parts[1];
-            common.getTables(dbName).get(tableName).getIndices().get(indexName).deleteLastPartitions();
+        logger.info("delete moved entries - begin");
+        for (int i = 0; i < databaseServer.getShardCount(); i++) {
+          final int shard = i;
+
+          futures.add(databaseServer.getDatabaseClient().getExecutor().submit(new Callable() {
+            @Override
+            public Object call() {
+              String command = "DatabaseServer:deleteMovedIndexEntries:1:" + common.getSchemaVersion() + ":" + dbName + ":" + finalTableName + ":" + indexName;
+              Random rand = new Random(System.currentTimeMillis());
+              try {
+                databaseServer.getDatabaseClient().send(null, shard, rand.nextLong(), command, null, DatabaseClient.Replica.all);
+              }
+              catch (Exception e) {
+                logger.error("Error sending rebalanceOrderedIndex to shard: shard=" + shard, e);
+              }
+              return null;
+            }
+          }));
+
+        }
+
+        for (Future future : futures) {
+          future.get();
+        }
+
+        while (true) {
+          if (isDeletingComplete()) {
+            break;
           }
+          Thread.sleep(2);
+        }
+        resetDeletingComplete();
+        logger.info("delete moved entries - end");
 
-          common.saveSchema(databaseServer.getDataDir());
-          common.loadSchema(databaseServer.getDataDir());
-          logger.info("Post-save schemaVersion=" + common.getSchemaVersion() + ", shard=" + common.getShard() +
-              ", replica=" + common.getReplica());
-          databaseServer.pushSchema();
 
-          isRepartitioningIndex.set(false);
-        }
-        catch (Exception e) {
-          logger.error("Error repartitioning", e);
-        }
-        finally {
-          beginRepartitioningThread = null;
-          isComplete.set(true);
-        }
+        logger.info("rebalance ordered index - end: table=" + tableName + INDEX_STR + indexName);
+      }
+
+      for (String index : toRebalance) {
+        String[] parts = index.split(" ");
+        tableName = parts[0];
+        final String indexName = parts[1];
+        common.getTables(dbName).get(tableName).getIndices().get(indexName).deleteLastPartitions();
+      }
+
+      common.saveSchema(databaseServer.getDataDir());
+      common.loadSchema(databaseServer.getDataDir());
+      logger.info("Post-save schemaVersion=" + common.getSchemaVersion() + ", shard=" + common.getShard() +
+          ", replica=" + common.getReplica());
+      databaseServer.pushSchema();
+
+      isRepartitioningIndex.set(false);
+    }
+    catch (Exception e) {
+      e.printStackTrace();
+      logger.error("Error repartitioning", e);
+    }
+    finally {
+      beginRepartitioningThread = null;
+      isComplete.set(true);
+    }
 //      }
 //    }, "Begin Repartition Thread");
 //    beginRepartitioningThread.start();
@@ -331,6 +349,196 @@ public class Repartitioner extends Thread {
 //    }
 
     return null;
+  }
+
+  private List<Object[]> getKeysAtPercents(String dbName, int shard, String tableName, String indexName, int length) {
+    return null;
+  }
+
+  public interface GetKeyAtOffset {
+    Object[] getKeyAtOffset(String dbName, int shard, String tableName, String indexName,
+                            long currPartitionSize, long currOffset) throws IOException;
+  }
+
+  public static void calculatePartitions(final String dbName, int shardCount, final List<TableSchema.Partition> newPartitions,
+                                         final String indexName, final String tableName, final long[] currPartitionSizes,
+                                         long newPartitionSize, final GetKeyAtOffset getKey) throws IOException {
+    final List<Integer> nList = new ArrayList<>();
+    final List<Long> offsetList = new ArrayList<>();
+    long prev = 0;
+    long[] newPartitionSizes = new long[shardCount];
+    for (int i = 0; i < newPartitionSizes.length; i++) {
+      newPartitionSizes[i] = prev + newPartitionSize;
+      prev = newPartitionSizes[i];
+    }
+    prev = 0;
+    long[] currPartitionSumSizes = new long[shardCount];
+    for (int i = 0; i < currPartitionSumSizes.length; i++) {
+      currPartitionSumSizes[i] = currPartitionSizes[i] + prev;
+      prev = currPartitionSumSizes[i];
+    }
+    int x = 0;
+    int n = 0;
+    int assignedShard = 0;
+    outer:
+    while (true) {
+//      if (newPartitionSizes[x] > currPartitionSumSizes[n]) {
+//        while (newPartitionSizes[x] > currPartitionSumSizes[n]) {
+//          n++;
+//        }
+//        long currOffset = newPartitionSizes[x] - currPartitionSumSizes[n] - 1;
+//        Object[] key = getKey.getKeyAtOffset(dbName, n, tableName, indexName, currOffset);
+//        TableSchema.Partition partition = new TableSchema.Partition();
+//        newPartitions.add(partition);
+//        partition.setUpperKey(key);
+//        partition.setShardOwning(assignedShard++);
+//        n++;
+//        if (n >= currPartitionSumSizes.length - 1) {
+//          break;
+//        }
+//        if (assignedShard >= shardCount) {
+//          break;
+//        }
+//      }
+//      else
+      if (x > shardCount - 1 || n > shardCount - 1) {
+        break;
+      }
+      while (n <= shardCount - 1 && x <= shardCount - 1 && newPartitionSizes[x] < currPartitionSumSizes[n]) {
+        {
+          long currOffset = 0;
+          int currN = n;
+          if (n > 0) {
+            currOffset = newPartitionSizes[x] - currPartitionSumSizes[n - 1] - 1;
+            if (currOffset == -1) {
+              currOffset = 0;
+//              x++;
+//              continue outer;
+            }
+            //currN--;
+          }
+          else {
+            currOffset = newPartitionSizes[x] - 1;
+            if (currOffset == -1) {
+              currOffset = 0;
+//              x++;
+//              continue outer;
+            }
+          }
+//          Object[] key = getKey.getKeyAtOffset(dbName, currN, tableName, indexName, currPartitionSizes[n], currOffset);
+          nList.add(currN);
+          offsetList.add(currOffset);
+          TableSchema.Partition partition = new TableSchema.Partition();
+          newPartitions.add(partition);
+//          partition.setUpperKey(key);
+          partition.setShardOwning(assignedShard++);
+          if (x < shardCount - 1 && newPartitionSizes[x + 1] > currPartitionSumSizes[n]) {
+            n++;
+          }
+//        x++;
+//        if (x >= currPartitionSumSizes.length - 1) {
+//          break;
+//        }
+          x++;
+
+          if (assignedShard >= shardCount - 1) {
+            break outer;
+          }
+
+        }
+      }
+
+      while (n <= shardCount - 1 && x <= shardCount - 1 && newPartitionSizes[x] >= currPartitionSumSizes[n]) {
+        long currOffset = 0;
+        int currN = n;
+        if (n > 0) {
+          currOffset = newPartitionSizes[x] - currPartitionSumSizes[n] - 1;
+          if (currOffset >= currPartitionSumSizes[n] - currPartitionSumSizes[n - 1]) {
+            n++;
+            continue outer;
+          }
+          if (currOffset < 0) {
+            // if (currPartitionSumSizes[n] - currPartitionSumSizes[n-1] == 0) {
+            n++;
+            continue outer;
+            // }
+            // currOffset = 0;
+          }
+//          if (currOffset < 0) {// -1) {
+//            x++;
+//            continue outer;
+//          }
+          //currN--;
+        }
+        else {
+          currOffset = newPartitionSizes[x] - currPartitionSumSizes[0] - 1;
+          if (currOffset >= currPartitionSumSizes[n]) {
+            n++;
+            continue outer;
+          }
+          if (currOffset < 0) {
+            //if (currPartitionSumSizes[n] == 0) {
+            n++;
+            continue outer;
+            //}
+            //currOffset = 0;
+          }
+//          if (currOffset < 0) {// -1) {
+//            x++;
+//            continue outer;
+//          }
+        }
+
+//        Object[] key = getKey.getKeyAtOffset(dbName, n, tableName, indexName, currPartitionSizes[n], currOffset);
+        nList.add(n + 1);
+        offsetList.add(currOffset);
+        TableSchema.Partition partition = new TableSchema.Partition();
+        newPartitions.add(partition);
+//        partition.setUpperKey(key);
+        partition.setShardOwning(assignedShard++);
+//        x++;
+//        if (x >= currPartitionSumSizes.length - 1) {
+//          break;
+//        }
+        if (assignedShard >= shardCount - 1) {
+          break outer;
+        }
+        x++;
+        //if (newPartitionSizes[x] >= currPartitionSumSizes[n]) {
+        n++;
+        continue outer;
+        //}
+        //n++;
+      }
+    }
+
+    ThreadPoolExecutor executor = new ThreadPoolExecutor(newPartitions.size(), newPartitions.size(), 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+    try {
+      List<Future> futures = new ArrayList<>();
+      for (int i = 0; i < newPartitions.size(); i++) {
+        final int currPartitionOffset = i;
+        futures.add(executor.submit(new Callable() {
+          @Override
+          public Object call() throws Exception {
+            Object[] key = getKey.getKeyAtOffset(dbName, nList.get(currPartitionOffset), tableName, indexName, currPartitionSizes[nList.get(currPartitionOffset)], offsetList.get(currPartitionOffset));
+            TableSchema.Partition partition = newPartitions.get(currPartitionOffset);
+            partition.setUpperKey(key);
+            return null;
+          }
+        }));
+      }
+      for (Future future : futures) {
+        try {
+          future.get();
+        }
+        catch (Exception e) {
+          throw new DatabaseException(e);
+        }
+      }
+    }
+    finally {
+      executor.shutdownNow();
+    }
   }
 
   private void logPartitionsToApply(String dbName, String tableName, String indexName, List<TableSchema.Partition> partitions) {
@@ -474,8 +682,11 @@ public class Repartitioner extends Thread {
     return null;
   }
 
-  private Object[] getKeyAtOffset(String dbName, int shard, String tableName, String indexName, long offset) throws IOException {
-    String command = "DatabaseServer:getKeyAtOffset:1:" + common.getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + indexName + ":" + offset;
+  private Object[] getKeyAtOffset(String dbName, int shard, String tableName, String indexName, long currPartitionSize, long offset) throws IOException {
+    logger.info("getKeyAtOffset: dbName=" + dbName + ", shard=" + shard + ", table=" + tableName +
+        ", index=" + indexName + ", currPartitionSize=" + currPartitionSize + ", offset=" + offset);
+    long begin = System.currentTimeMillis();
+    String command = "DatabaseServer:getKeyAtOffset:1:" + common.getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + indexName + ":" + currPartitionSize + ":" + offset;
     Random rand = new Random(System.currentTimeMillis());
     byte[] ret = databaseServer.getDatabaseClient().send(null, shard, rand.nextLong(), command, null, DatabaseClient.Replica.master);
 
@@ -485,7 +696,13 @@ public class Repartitioner extends Thread {
 
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
     long serializationVersion = DataUtil.readVLong(in);
-    return DatabaseCommon.deserializeKey(common.getTables(dbName).get(tableName), in);
+    Object[] key = DatabaseCommon.deserializeKey(common.getTables(dbName).get(tableName), in);
+
+    String keyStr = DatabaseCommon.keyToString(key);
+    logger.info("getKeyAtOffset finished: dbName=" + dbName + ", shard=" + shard + ", table=" + tableName +
+        ", index=" + indexName + ", currPartitionSize=" + currPartitionSize + ", offset=" + offset +
+        ", duration=" + (System.currentTimeMillis() - begin) + ", key=" + keyStr);
+    return key;
   }
 
   public byte[] getKeyAtOffset(String command, byte[] body) {
@@ -493,72 +710,86 @@ public class Repartitioner extends Thread {
     String dbName = parts[4];
     String tableName = parts[5];
     String indexName = parts[6];
-    long desiredOffset = Long.valueOf(parts[7]);
+    long currPartitionSize = Long.valueOf(parts[7]);
+    long desiredOffset = Long.valueOf(parts[8]);
+    double desiredPercentPre = (double) desiredOffset / (double) currPartitionSize;
+    if (currPartitionSize > 10000) {
+      desiredPercentPre = Math.min(desiredPercentPre, 0.90d);
+      desiredPercentPre = Math.max(desiredPercentPre, 0.10d);
+    }
+    final double desiredPercent = desiredPercentPre;
+    final IndexSchema indexSchema = common.getTables(dbName).get(tableName).getIndices().get(indexName);
+    final Index index = databaseServer.getIndices(dbName).getIndices().get(tableName).get(indexName);
+    final long currSize = index.size();
+    final AtomicLong offset = new AtomicLong(0);//currSize);
+    final AtomicReference<Object[]> foundKey = new AtomicReference<>();
 
-    long offset = 0;
-    Object[] foundKey = null;
-    IndexSchema indexSchema = common.getTables(dbName).get(tableName).getIndices().get(indexName);
-    Index index = databaseServer.getIndices(dbName).getIndices().get(tableName).get(indexName);
-    Map.Entry<Object[], Long> entry = index.firstEntry();
-    if (entry != null) {
-      do {
-        int count = 0;
-        if (entry.getValue() >= 0) {
-          count = 1;
-        }
-        else {
-          synchronized (index) {
-            if (indexSchema.isPrimaryKey()) {
-              Long value = index.get(entry.getKey());
-              if (value == null) {
-                entry = index.higherEntry(entry.getKey());
-                if (entry == null) {
-                  break;
-                }
-                continue;
-              }
-              byte[][] records = databaseServer.fromUnsafeToRecords(value);
-              count = records.length;
-            }
-            else {
-              Long value = index.get(entry.getKey());
-              if (value == null) {
-                entry = index.higherEntry(entry.getKey());
-                if (entry == null) {
-                  break;
-                }
-                continue;
-              }
-              byte[][] ids = databaseServer.fromUnsafeToKeys(value);
-              count = ids.length;
-            }
-          }
-        }
-        offset += count;
-        if (offset > desiredOffset) {
-          foundKey = entry.getKey();
-          break;
-        }
-        entry = index.higherEntry(entry.getKey());
-        if (entry == null) {
-          break;
-        }
-      }
-      while (true);
-      if (foundKey != null) {
-        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-        DataOutputStream out = new DataOutputStream(bytesOut);
-        try {
-          DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-          out.write(DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), indexName, foundKey));
-          out.close();
-          return bytesOut.toByteArray();
-        }
-        catch (Exception e) {
-          throw new DatabaseException(e);
-        }
+    TableSchema.Partition[] partitions = indexSchema.getCurrPartitions();
+    Object[] minKey = null;
+    Object[] maxKey = null;
+    if (databaseServer.getShard() == 0) {
+      if (index.firstEntry() != null) {
+        minKey = index.firstEntry().getKey();
       }
     }
+    else {
+      minKey = partitions[databaseServer.getShard() - 1].getUpperKey();
+    }
+    maxKey = partitions[databaseServer.getShard()].getUpperKey();
+
+    foundKey.set(index.getKeyAtOffset(desiredOffset, minKey, maxKey));
+
+    //
+//    Map.Entry<Object[], Long> entry = index.firstEntry();
+//    if (entry != null) {
+//      index.visitTailMap(entry.getKey(), new Index.Visitor() {
+//        @Override
+//        public boolean visit(Object[] key, long value) throws IOException {
+//          int count = 0;
+//          if (value >= 0 || indexSchema.isPrimaryKey()) {
+//            count = 1;
+//          }
+//          else {
+//            if (indexSchema.isPrimaryKey()) {
+//              synchronized (index.getMutex(key)) {
+//                byte[][] records = databaseServer.fromUnsafeToRecords(value);
+//                count = records.length;
+//              }
+//            }
+//            else {
+//              synchronized (index.getMutex(key)) {
+//                byte[][] ids = databaseServer.fromUnsafeToKeys(value);
+//                count = ids.length;
+//              }
+//            }
+//          }
+//          offset.addAndGet(count);
+//          if ((double) offset.get() / (double) currSize >= desiredPercent) {
+//            foundKey.set(key);
+//            return false;
+//          }
+//          return true;
+//        }
+//      });
+
+    if (foundKey.get() == null) {
+      foundKey.set(index.firstEntry().getKey());
+    }
+
+    if (foundKey.get() != null) {
+      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+      DataOutputStream out = new DataOutputStream(bytesOut);
+      try {
+        DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+        out.write(DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), indexName, foundKey.get()));
+        out.close();
+        return bytesOut.toByteArray();
+      }
+      catch (Exception e) {
+        throw new DatabaseException(e);
+      }
+    }
+    //}
     return null;
   }
 
@@ -587,7 +818,23 @@ public class Repartitioner extends Thread {
 
       //todo: really need to read all the records to get an accurate count
       Index index = databaseServer.getIndices(dbName).getIndices().get(tableName).get(indexName);
-      long size = index.size();
+      IndexSchema indexSchema = common.getTables(dbName).get(tableName).getIndexes().get(indexName);
+
+      TableSchema.Partition[] partitions = indexSchema.getCurrPartitions();
+      Object[] minKey = null;
+      Object[] maxKey = null;
+      if (databaseServer.getShard() == 0) {
+        if (index.firstEntry() != null) {
+          minKey = index.firstEntry().getKey();
+        }
+      }
+      else {
+        minKey = partitions[databaseServer.getShard() - 1].getUpperKey();
+      }
+      maxKey = partitions[databaseServer.getShard()].getUpperKey();
+
+      long size = index.getSize(minKey, maxKey);
+
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
       DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
@@ -699,6 +946,16 @@ public class Repartitioner extends Thread {
     return null;
   }
 
+  static class MapEntry {
+    Object[] key;
+    Object value;
+
+    public MapEntry(Object[] key, Object value) {
+      this.key = key;
+      this.value = value;
+    }
+  }
+
   public byte[] doRebalanceOrderedIndex(final String command, final byte[] body) {
     try {
       final String[] parts = command.split(":");
@@ -712,129 +969,130 @@ public class Repartitioner extends Thread {
 
       addedAfter = new Index(tableSchema, indexName, index.getComparators());
 
-      for (int k = 0; k < 3; k++) {
-        common.getSchemaReadLock(dbName).lock();
-        try {
-          currTableRepartitioning = tableName;
-          currIndexRepartitioning = indexName;
+      //for (int k = 0; k < 3; k++) {
+      long begin = System.currentTimeMillis();
 
-          tableToDeleteEntriesFrom = tableName;
+      common.getSchemaReadLock(dbName).lock();
+      try {
+        currTableRepartitioning = tableName;
+        currIndexRepartitioning = indexName;
 
-          ConcurrentHashMap<String, List<Object[]>> indicesToDelete = getIndicesToDeleteFrom(tableName, indexName);
-          final List<Object[]> keysToDelete = indicesToDelete.get(indexName);
+        tableToDeleteEntriesFrom = tableName;
 
+        String[] indexFields = indexSchema.getFields();
+        final int[] fieldOffsets = new int[indexFields.length];
+        for (int i = 0; i < indexFields.length; i++) {
+          fieldOffsets[i] = tableSchema.getFieldOffset(indexFields[i]);
+        }
+        Map.Entry<Object[], Object> entry = index.firstEntry();
+        if (entry != null) {
+          final AtomicLong countVisited = new AtomicLong();
+          final ThreadPoolExecutor executor = new ThreadPoolExecutor(64, 64, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+          final AtomicInteger countSubmitted = new AtomicInteger();
+          final AtomicInteger countFinished = new AtomicInteger();
+          try {
+            TableSchema.Partition currPartition = indexSchema.getCurrPartitions()[databaseServer.getShard()];
+            if (currPartition.getUpperKey() != null) {
+              final AtomicReference<ArrayList<MapEntry>> currEntries = new AtomicReference<>(new ArrayList<MapEntry>());
+              index.visitTailMap(currPartition.getUpperKey(), new Index.Visitor() {
+                @Override
+                public boolean visit(Object[] key, Object value) throws IOException {
+                  countVisited.incrementAndGet();
+                  if (countVisited.get() == 1) {
+                    return true;
+                  }
+                  currEntries.get().add(new MapEntry(key, value));
+                  if (currEntries.get().size() >= 10000) {
+                    final List<MapEntry> toProcess = currEntries.get();
+                    currEntries.set(new ArrayList<MapEntry>());
+                    countSubmitted.incrementAndGet();
+                    executor.submit(new Runnable() {
+                      @Override
+                      public void run() {
+                        try {
+                          doProcessEntries(tableName, indexName, toProcess, index, indexSchema, dbName, fieldOffsets, tableSchema, parts);
+                        }
+                        catch (Exception e) {
+                          logger.error("Error moving entries", e);
+                        }
+                        finally {
+                          countFinished.incrementAndGet();
+                        }
+                      }
+                    });
+                  }
+                  return true;
+                }
+              });
 
-          //          DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
-          //          int partitionCount = in.readInt();
-          //          TableSchema.Partition[] partitions = new TableSchema.Partition[partitionCount];
-          //          for (int i = 0; i < partitions.length; i++) {
-          //            partitions[i] = new TableSchema.Partition();
-          //            partitions[i].deserialize(tableSchema, in);
-          //          }
-          //
-          //          //todo: when should we change the schema?
-          //          indexSchema.setPartitions(partitions);
-          String[] indexFields = indexSchema.getFields();
-          final int[] fieldOffsets = new int[indexFields.length];
-          for (int i = 0; i < indexFields.length; i++) {
-            fieldOffsets[i] = tableSchema.getFieldOffset(indexFields[i]);
-          }
-          Map.Entry<Object[], Long> entry = index.firstEntry();
-          if (entry != null) {
-            final Map<Integer, List<MoveRequest>> moveRequests = new HashMap<>();
-            for (int i = 0; i < databaseServer.getShardCount(); i++) {
-              moveRequests.put(i, new ArrayList<MoveRequest>());
+              if (countSubmitted.get() > 0) {
+                while (countSubmitted.get() > countFinished.get()) {
+                  Thread.sleep(1000);
+                }
+              }
+
+              if (currEntries.get() != null && currEntries.get().size() != 0) {
+                doProcessEntries(tableName, indexName, currEntries.get(), index, indexSchema, dbName, fieldOffsets, tableSchema, parts);
+              }
             }
-
-            index.iterate(new Index.Visitor(){
-              @Override
-              public void visit(Object[] key, long value) throws IOException {
-                try {
-                  List<Integer> selectedShards = findOrderedPartitionForRecord(true, false, fieldOffsets, common, tableSchema, indexName, null, BinaryExpression.Operator.equal, null, key, null);
-                  int shard = selectedShards.get(0);
-//                  if (selectedShards.size() != 1) {
-//                    throw new IllegalStateException("Expected to select one partition to move entry to: found=" + selectedShards.size());
-//                  }
-                  if (shard != databaseServer.getShard()) {
-                    byte[][] content = null;
-  //                      if (addedAfter.get(entry.getKey()) != null) {
-  //                        entry = index.higherEntry(entry.getKey());
-  //                        if (entry == null) {
-  //                          break;
-  //                        }
-  //                        continue;
-  //                      }
-                    synchronized (index) {
-                      if (indexSchema.isPrimaryKey()) {
-                        content = databaseServer.fromUnsafeToRecords(value);
-                      }
-                      else {
-                        content = databaseServer.fromUnsafeToKeys(value);
-                      }
-                    }
-                    if (indexSchema.isPrimaryKey()) {
-                      Record record = new Record(dbName, common, content[0]);
-                      if (record.getDbViewFlags() == Record.DB_VIEW_FLAG_DELETING) {
-                        content = null;
-                      }
-                    }
-                    if (content != null) {
-                      if (indexSchema.isPrimaryKey()) {
-                        byte[][] newContent = new byte[content.length][];
-                        for (int i = 0; i < content.length; i++) {
-                          Record record = new Record(dbName, common, content[i]);
-                          record.setDbViewNumber(common.getSchemaVersion());
-                          record.setDbViewFlags(Record.DB_VIEW_FLAG_DELETING);
-                          newContent[i] = record.serialize(common);
-                        }
-                        synchronized (index) {
-                          databaseServer.freeUnsafeIds(value);
-
-                          value = databaseServer.toUnsafeFromRecords(newContent);
-                          index.put(key, value);
-                        }
-                      }
-
-                      List<MoveRequest> list = moveRequests.get(shard);
-                      list.add(new MoveRequest(key, content));
-                      if (list.size() > 1000) {
-                        moveIndexEntriesToShard(dbName, tableName, indexName, indexSchema.isPrimaryKey(), shard, list);
-                        for (MoveRequest request : list) {
-                          //index.remove(request.getKey());
-                          synchronized (keysToDelete) {
-                            keysToDelete.add(request.getKey());
+            if (databaseServer.getShard() != 0) {
+              TableSchema.Partition lowerPartition = indexSchema.getCurrPartitions()[databaseServer.getShard() - 1];
+              if (lowerPartition.getUpperKey() != null) {
+                final AtomicReference<ArrayList<MapEntry>> currEntries = new AtomicReference<>(new ArrayList<MapEntry>());
+                index.visitHeadMap(lowerPartition.getUpperKey(), new Index.Visitor() {
+                  @Override
+                  public boolean visit(Object[] key, Object value) throws IOException {
+                    countVisited.incrementAndGet();
+                    MapEntry newEntry = new MapEntry(key, value);
+                    ArrayList<MapEntry> curr = currEntries.get();
+                    curr.add(newEntry);
+                    if (currEntries.get().size() >= 10000) {
+                      final List<MapEntry> toProcess = currEntries.get();
+                      currEntries.set(new ArrayList<MapEntry>());
+                      countSubmitted.incrementAndGet();
+                      executor.submit(new Runnable() {
+                        @Override
+                        public void run() {
+                          try {
+                            doProcessEntries(tableName, indexName, toProcess, index, indexSchema, dbName, fieldOffsets, tableSchema, parts);
+                          }
+                          catch (Exception e) {
+                            logger.error("Error moving entries", e);
+                          }
+                          finally {
+                            countFinished.incrementAndGet();
                           }
                         }
-                        list.clear();
-                      }
+                      });
                     }
+                    return true;
+                  }
+                });
+
+                if (countSubmitted.get() > 0) {
+                  while (countSubmitted.get() > countFinished.get()) {
+                    Thread.sleep(1000);
                   }
                 }
-                catch (Exception t) {
-                  throw new DatabaseException("Error moving record: table=" + parts[4] + INDEX_STR + parts[5], t);
+
+                if (currEntries.get() != null && currEntries.get().size() != 0) {
+                  doProcessEntries(tableName, indexName, currEntries.get(), index, indexSchema, dbName, fieldOffsets, tableSchema, parts);
                 }
-              }
-            });
-            for (int i = 0; i < databaseServer.getShardCount(); i++) {
-              List<MoveRequest> list = moveRequests.get(i);
-              if (list.size() != 0) {
-                moveIndexEntriesToShard(dbName, tableName, indexName, indexSchema.isPrimaryKey(), i, list);
-                for (MoveRequest request : list) {
-                  //index.remove(request.getKey());
-                  synchronized (keysToDelete) {
-                    keysToDelete.add(request.getKey());
-                  }
-                }
-                list.clear();
               }
             }
           }
+          finally {
+            executor.shutdownNow();
+            logger.info("doRebalanceOrderedIndex finished: countVisited=" + countVisited.get() +
+                ", duration=" + (System.currentTimeMillis() - begin));
+          }
         }
-        finally {
-          common.getSchemaReadLock(dbName).unlock();
-        }
-        // Thread.sleep(5000);
       }
+      finally {
+        common.getSchemaReadLock(dbName).unlock();
+      }
+      // Thread.sleep(5000);
+      //}
       String notifyCommand = "DatabaseServer:notifyRepartitioningComplete:1:" + common.getSchemaVersion() + ":" + dbName + ":" + databaseServer.getShard() + ":" + databaseServer.getReplica();
       Random rand = new Random(System.currentTimeMillis());
       databaseServer.getDatabaseClient().send(null, 0, rand.nextLong(), notifyCommand, null, DatabaseClient.Replica.master);
@@ -846,6 +1104,107 @@ public class Repartitioner extends Thread {
       addedAfter = null;
     }
     return null;
+  }
+
+  private void doProcessEntries(String tableName, String indexName, List<MapEntry> toProcess, Index index, IndexSchema indexSchema, String dbName, int[] fieldOffsets, TableSchema tableSchema, String[] parts) {
+    ConcurrentHashMap<String, List<Object[]>> indicesToDelete = getIndicesToDeleteFrom(tableName, indexName);
+    final List<Object[]> keysToDelete = indicesToDelete.get(indexName);
+
+    final Map<Integer, List<MoveRequest>> moveRequests = new HashMap<>();
+    for (int i = 0; i < databaseServer.getShardCount(); i++) {
+      moveRequests.put(i, new ArrayList<MoveRequest>());
+    }
+
+    for (MapEntry entry : toProcess) {
+      try {
+        byte[][] content = null;
+        int shard = 0;
+        synchronized (index.getMutex(entry.key)) {
+          entry.value = index.get(entry.key);
+          if (entry.value != null) {
+            if (indexSchema.isPrimaryKey()) {
+              content = databaseServer.fromUnsafeToRecords(entry.value);
+            }
+            else {
+              content = databaseServer.fromUnsafeToKeys(entry.value);
+            }
+          }
+          if (content != null) {
+            if (indexSchema.isPrimaryKey()) {
+              Record record = new Record(dbName, common, content[0]);
+              if (record.getDbViewFlags() == Record.DB_VIEW_FLAG_DELETING) {
+                continue;
+              }
+            }
+            List<Integer> selectedShards = findOrderedPartitionForRecord(true,
+                false, fieldOffsets, common, tableSchema, indexName,
+                null, BinaryExpression.Operator.equal, null,
+                entry.key, null);
+            shard = selectedShards.get(0);
+            //                  if (selectedShards.size() != 1) {
+            //                    throw new IllegalStateException("Expected to select one partition to move entry to: found=" + selectedShards.size());
+            //                  }
+            if (shard != databaseServer.getShard()) {
+              //                      if (addedAfter.get(entry.getKey()) != null) {
+              //                        entry = index.higherEntry(entry.getKey());
+              //                        if (entry == null) {
+              //                          break;
+              //                        }
+              //                        continue;
+              //                      }
+              //synchronized (index) {
+              //}
+              if (content != null) {
+                if (indexSchema.isPrimaryKey()) {
+                  byte[][] newContent = new byte[content.length][];
+                  for (int i = 0; i < content.length; i++) {
+                    Record record = new Record(dbName, common, content[i]);
+                    record.setDbViewNumber(common.getSchemaVersion());
+                    record.setDbViewFlags(Record.DB_VIEW_FLAG_DELETING);
+                    newContent[i] = record.serialize(common);
+                  }
+
+                  databaseServer.freeUnsafeIds(entry.value);
+                  Object newValue = databaseServer.toUnsafeFromRecords(newContent);
+                  index.put(entry.key, newValue);
+                }
+              }
+            }
+          }
+
+          if (content != null) {
+            List<MoveRequest> list = moveRequests.get(shard);
+            list.add(new MoveRequest(entry.key, content));
+            if (list.size() > 1000) {
+              moveIndexEntriesToShard(dbName, tableName, indexName, indexSchema.isPrimaryKey(), shard, list);
+              for (MoveRequest request : list) {
+                //index.remove(request.getKey());
+                synchronized (keysToDelete) {
+                  keysToDelete.add(request.getKey());
+                }
+              }
+              list.clear();
+            }
+          }
+        }
+      }
+      catch (Exception t) {
+        logger.error("Error moving record: table=" + parts[4] + INDEX_STR + parts[5], t);
+      }
+    }
+
+    for (int i = 0; i < databaseServer.getShardCount(); i++) {
+      List<MoveRequest> list = moveRequests.get(i);
+      if (list.size() != 0) {
+        moveIndexEntriesToShard(dbName, tableName, indexName, indexSchema.isPrimaryKey(), i, list);
+        for (MoveRequest request : list) {
+          synchronized (keysToDelete) {
+            keysToDelete.add(request.getKey());
+          }
+        }
+        list.clear();
+      }
+    }
   }
 
   private ConcurrentHashMap<String, List<Object[]>> getIndicesToDeleteFrom(String tableName, String indexName) {
@@ -867,39 +1226,41 @@ public class Repartitioner extends Thread {
 
   public byte[] doDeleteMovedIndexEntries(final String command, final byte[] body) {
     try {
-      currTableRepartitioning = null;
-      currIndexRepartitioning = null;
-
       String[] parts = command.split(":");
       String dbName = parts[4];
       String tableName = parts[5];
       String indexName = parts[6];
-      Index index = indices.get(dbName).getIndices().get(tableName).get(indexName);
-      if (entriesToDelete.get(tableName) == null) {
-        return null;
-      }
-      List<Object[]> keys = entriesToDelete.get(tableName).get(indexName);
-      logger.info("Deleting moved index entries: table=" + tableToDeleteEntriesFrom + INDEX_STR + indexName + ", count=" + keys.size());
-      if (keys == null) {
-        return null;
-      }
-      synchronized (keys) {
-        for (Object[] key : keys) {
-          synchronized (index) {
-            Long existingValue = index.remove(key);
-            if (existingValue != null) {
-              databaseServer.freeUnsafeIds(existingValue);
+      try {
+        currTableRepartitioning = null;
+        currIndexRepartitioning = null;
+
+        Index index = indices.get(dbName).getIndices().get(tableName).get(indexName);
+        if (entriesToDelete.get(tableName) != null) {
+          List<Object[]> keys = entriesToDelete.get(tableName).get(indexName);
+          logger.info("Deleting moved index entries: table=" + tableToDeleteEntriesFrom + INDEX_STR + indexName + ", count=" + keys.size());
+          if (keys.size() != 0) {
+            synchronized (keys) {
+              for (Object[] key : keys) {
+                synchronized (index.getMutex(key)) {
+                  Object existingValue = index.remove(key);
+                  if (existingValue != null) {
+                    databaseServer.freeUnsafeIds(existingValue);
+                  }
+                }
+              }
+              keys.clear();
             }
+
+            entriesToDelete.clear();
+            tableToDeleteEntriesFrom = null;
+
+            logger.info("Deleting moved index entries from index - end: table=" + tableName + ", shard=" + databaseServer.getShard() + ", replica=" + databaseServer.getReplica());
           }
         }
-        keys.clear();
       }
-
-      entriesToDelete.clear();
-      tableToDeleteEntriesFrom = null;
-
-      logger.info("Deleting moved index entries from index - end: table=" + tableName + ", shard=" + databaseServer.getShard() + ", replica=" + databaseServer.getReplica());
-
+      catch (Exception e) {
+        logger.error("Error deleting moved index entries", e);
+      }
       String notifyCommand = "DatabaseServer:notifyDeletingComplete:1:" + common.getSchemaVersion() + ":" + dbName + ":" + databaseServer.getShard() + ":" + databaseServer.getReplica();
       Random rand = new Random(System.currentTimeMillis());
       databaseServer.getDatabaseClient().send(null, 0, rand.nextLong(), notifyCommand, null, DatabaseClient.Replica.master);
@@ -1422,13 +1783,9 @@ public class Repartitioner extends Thread {
       try {
         for (String dbName : databaseServer.getDbNames(databaseServer.getDataDir())) {
           String command = "DatabaseServer:beginRebalance:1:1:" + dbName + ":" + false;
-          beginRebalance(command, (byte[])null);
+          beginRebalance(command, (byte[]) null);
         }
-        Thread.sleep(30 * 1000);
-      }
-      catch (InterruptedException e) {
-        logger.info("Repartitioner interrupted");
-        return;
+        Thread.sleep(2000);
       }
       catch (Exception t) {
         logger.error("Error in master thread", t);

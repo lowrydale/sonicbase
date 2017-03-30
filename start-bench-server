@@ -5,7 +5,7 @@ mkdir $4/logs
 
 #if [ $2 == "9010" ]
 #then
-#  export MODE=debug
+#  export MODE=yprof
 #fi
 
 if [ ${4:0:1} != "/" ]

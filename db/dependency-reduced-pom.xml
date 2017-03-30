@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <parent>
-    <artifactId>database</artifactId>
+    <artifactId>sonicbase-root</artifactId>
     <groupId>com.lowryengineering</groupId>
     <version>1.0-SNAPSHOT</version>
   </parent>
@@ -40,13 +40,6 @@
       </plugins>
     </pluginManagement>
   </build>
-  <repositories>
-    <repository>
-      <id>jline</id>
-      <name>JLine Project Repository</name>
-      <url>http://jline.sourceforge.net/m2repo</url>
-    </repository>
-  </repositories>
   <dependencies>
     <dependency>
       <groupId>org.apache.maven.plugin-tools</groupId>

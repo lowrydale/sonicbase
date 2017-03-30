@@ -2,6 +2,7 @@ package com.sonicbase.server;
 
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.index.Index;
+import com.sonicbase.index.Index;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.DataUtil;
@@ -187,7 +188,7 @@ public class SnapshotManager {
                                                   inStream.readFully(records[i]);
                                                 }
 
-                                                long address;
+                                                Object address;
                                                 if (isPrimaryKey) {
                                                   address = server.toUnsafeFromRecords(records);
                                                 }
@@ -311,22 +312,26 @@ public class SnapshotManager {
           final boolean isPrimaryKey = indexEntry.getValue().isPrimaryKey();
           index.iterate(new Index.Visitor() {
             @Override
-            public void visit(Object[] key, long value) throws IOException {
+            public boolean visit(Object[] key, Object value) throws IOException {
               int bucket = (int) (countSaved.incrementAndGet() % SNAPSHOT_BUCKET_COUNT);
 
+              byte[][] records = null;
+              synchronized (index.getMutex(key)) {
+                Object currValue = index.get(key);
+                if (currValue == null) {
+                  return false;
+                }
+                if (isPrimaryKey) {
+                  records = server.fromUnsafeToRecords(currValue);
+                }
+                else {
+                  records = server.fromUnsafeToKeys(currValue);
+                }
+              }
               outStreams[bucket].writeBoolean(true);
               byte[] keyBytes = DatabaseCommon.serializeKey(tableEntry.getValue(), indexEntry.getKey(), key);
               outStreams[bucket].write(keyBytes);
 
-              byte[][] records = null;
-              synchronized (index) {
-                if (isPrimaryKey) {
-                  records = server.fromUnsafeToRecords(value);
-                }
-                else {
-                  records = server.fromUnsafeToKeys(value);
-                }
-              }
               DataUtil.writeVLong(outStreams[bucket], records.length, resultLength);
               for (byte[] record : records) {
                 DataUtil.writeVLong(outStreams[bucket], record.length, resultLength);
@@ -341,6 +346,7 @@ public class SnapshotManager {
                       ", table=" + tableEntry.getKey() + INDEX_STR + indexEntry.getKey());
                 }
               }
+              return true;
             }
           });
           logger.info("Snapshot progress - finished index: count=" + savedCount + RATE_STR +

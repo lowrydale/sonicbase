@@ -33,7 +33,7 @@ public class TestLongRunningCommands {
     DatabaseServer.getServers().clear();
 
     DatabaseServer server = new DatabaseServer();
-    server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true));
+    server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true), null);
     server.disableLogProcessor();
     server.disableRepartitioner();
 
@@ -79,7 +79,7 @@ public class TestLongRunningCommands {
     int count = DatabaseServer.blockCount.get();
 
     server = new DatabaseServer();
-    server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true));
+    server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true), null);
     server.disableLogProcessor();
     server.disableRepartitioner();
 

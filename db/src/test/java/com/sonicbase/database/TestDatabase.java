@@ -72,7 +72,7 @@ public class TestDatabase {
 //          String role = "primaryMaster";
 
       dbServers[shard] = new DatabaseServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true));
+      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null);
       dbServers[shard].setRole(role);
       dbServers[shard].disableLogProcessor();
 //          return null;
@@ -1772,7 +1772,7 @@ public class TestDatabase {
         public Object call() throws Exception {
           String role = "primaryMaster";
           dbServers[shard] = new DatabaseServer();
-          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true));
+          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null);
           dbServers[shard].setRole(role);
           dbServers[shard].disableLogProcessor();
           return null;
@@ -1867,7 +1867,7 @@ public class TestDatabase {
         public Object call() throws Exception {
           String role = "primaryMaster";
           dbServers[shard] = new DatabaseServer();
-          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true));
+          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null);
           dbServers[shard].setRole(role);
           dbServers[shard].disableLogProcessor();
           return null;
@@ -1956,7 +1956,7 @@ public class TestDatabase {
         public Object call() throws Exception {
           String role = "primaryMaster";
           dbServers[shard] = new DatabaseServer();
-          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true));
+          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null);
           dbServers[shard].setRole(role);
           dbServers[shard].disableLogProcessor();
           return null;

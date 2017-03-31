@@ -54,7 +54,7 @@ public class TestDatabaseAdvanced {
       final int shard = i;
 
       dbServers[shard] = new DatabaseServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true));
+      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null);
       dbServers[shard].setRole(role);
       dbServers[shard].disableLogProcessor();
     }

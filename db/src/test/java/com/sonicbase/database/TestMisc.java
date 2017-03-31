@@ -53,7 +53,7 @@ public class TestMisc {
 //          String role = "primaryMaster";
 
       dbServers[shard] = new DatabaseServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true));
+      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null);
       dbServers[shard].setRole(role);
       dbServers[shard].disableLogProcessor();
 //          return null;

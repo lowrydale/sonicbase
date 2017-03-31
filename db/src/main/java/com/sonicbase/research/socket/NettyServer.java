@@ -806,6 +806,8 @@ public class NettyServer {
       options.addOption(OptionBuilder.withArgName("mport").hasArg().create("mport"));
       options.addOption(OptionBuilder.withArgName("replica").hasArg().create("replica"));
       options.addOption(OptionBuilder.withArgName("cluster").hasArg().create("cluster"));
+      options.addOption(OptionBuilder.withArgName("gclog").hasArg().create("gclog"));
+      options.addOption(OptionBuilder.withArgName("xmx").hasArg().create("xmx"));
 
       CommandLineParser parser = new DefaultParser();
       // parse the command line arguments
@@ -818,6 +820,8 @@ public class NettyServer {
       String masterHost = line.getOptionValue("mhost");
       this.cluster = line.getOptionValue("cluster");
       this.port = Integer.valueOf(portStr);
+      String gclog = line.getOptionValue("gclog");
+      String xmx = line.getOptionValue("xmx");
 
       String configStr = null;
       InputStream in = NettyServer.class.getResourceAsStream("/config/config-" + cluster + ".json");
@@ -842,7 +846,7 @@ public class NettyServer {
         final DatabaseServer databaseServer = new DatabaseServer();
         logger.info("databaseServer=" + databaseServer);
         final AtomicBoolean isRunning = new AtomicBoolean(false);
-        databaseServer.setConfig(config, cluster, host, port, isRunning, skipLicense);
+        databaseServer.setConfig(config, cluster, host, port, isRunning, skipLicense, gclog, xmx);
         databaseServer.setRole(role);
 
         setDatabaseServer(databaseServer);

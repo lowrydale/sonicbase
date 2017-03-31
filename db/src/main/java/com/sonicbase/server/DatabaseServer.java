@@ -20,6 +20,7 @@ import net.jpountz.lz4.LZ4Compressor;
 import net.jpountz.lz4.LZ4Factory;
 import net.jpountz.lz4.LZ4FastDecompressor;
 import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.io.input.ReversedLinesFileReader;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +34,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.nio.charset.Charset;
 import java.security.InvalidKeyException;
 import java.security.Key;
 import java.text.DateFormat;
@@ -71,6 +73,8 @@ public class DatabaseServer {
   private byte[] bytes;
   private boolean compressRecords = false;
   private boolean useUnsafe;
+  private String gclog;
+  private String xmx;
 
   @SuppressWarnings("restriction")
   private static Unsafe getUnsafe() {
@@ -402,29 +406,26 @@ public class DatabaseServer {
   }
 
   public void setConfig(
-      final JsonDict config, String cluster, String host, int port, AtomicBoolean isRunning) {
-    setConfig(config, cluster, host, port, false, isRunning, false);
-  }
-
-  public void setConfig(
-      final JsonDict config, String cluster, String host, int port, AtomicBoolean isRunning, boolean skipLicense) {
-    setConfig(config, cluster, host, port, false, isRunning, skipLicense);
+      final JsonDict config, String cluster, String host, int port, AtomicBoolean isRunning, boolean skipLicense, String gclog, String xmx) {
+    setConfig(config, cluster, host, port, false, isRunning, false, gclog, xmx);
   }
 
   public void setConfig(
       final JsonDict config, String cluster, String host, int port,
-      boolean unitTest, AtomicBoolean isRunning) {
-    setConfig(config, cluster, host, port, unitTest, isRunning, false);
+      boolean unitTest, AtomicBoolean isRunning, String gclog) {
+    setConfig(config, cluster, host, port, unitTest, isRunning, false, gclog, null);
   }
 
   public void setConfig(
       final JsonDict config, String cluster, String host, int port,
-      boolean unitTest, AtomicBoolean isRunning, boolean skipLicense) {
+      boolean unitTest, AtomicBoolean isRunning, boolean skipLicense, String gclog, String xmx) {
     this.isRunning = isRunning;
     this.config = config;
     this.cluster = cluster;
     this.host = host;
     this.port = port;
+    this.gclog = gclog;
+    this.xmx = xmx;
 
     logger.info("config=" + config.toString());
     JsonDict databaseDict = config.getDict("database");
@@ -682,6 +683,7 @@ public class DatabaseServer {
                 }
               }
             }
+            checkJavaHeap(totalGig);
           }
           catch (Exception e) {
             logger.error("Error in memory check thread", e);
@@ -691,6 +693,87 @@ public class DatabaseServer {
       }
     });
     thread.start();
+  }
+
+  private void checkJavaHeap(Double totalGig) throws IOException {
+    File file = new File(gclog);
+    try (ReversedLinesFileReader fr = new ReversedLinesFileReader(file, Charset.forName("utf-8"))) {
+      String ch;
+      do {
+        ch = fr.readLine();
+        if (ch.indexOf("[Eden") != -1) {
+          int pos = ch.indexOf("Heap:");
+          if (pos != -1) {
+            int pos2 = ch.indexOf("->", pos);
+            if (pos2 != -1) {
+              int pos3 = ch.indexOf("(", pos2);
+              if (pos3 != -1) {
+                String value = ch.substring(pos2 + 2, pos3);
+                value = value.trim().toLowerCase();
+                double actualGig = 0;
+                if (value.contains("g")) {
+                  actualGig = Double.valueOf(value.substring(0, value.length() - 1));
+                }
+                else if (value.contains("m")) {
+                  actualGig = Double.valueOf(value.substring(0, value.length() - 1)) / 1000d;
+                }
+                else if (value.contains("t")) {
+                  actualGig = Double.valueOf(value.substring(0, value.length() - 1)) * 1000d;
+
+                  String max = config.getDict("database").getString("maxJavaHeapTrigger");
+                  if (max == null) {
+                    logger.info("Max java heap trigger not set in config. Not enforcing max");
+                    return;
+                  }
+
+                  double xmxValue = 0;
+                  if (value.contains("g")) {
+                    xmxValue = Double.valueOf(xmx.substring(0, xmx.length() - 1));
+                  }
+                  else if (value.contains("m")) {
+                    xmxValue = Double.valueOf(xmx.substring(0, xmx.length() - 1)) / 1000d;
+                  }
+                  else if (value.contains("t")) {
+                    xmxValue = Double.valueOf(xmx.substring(0, xmx.length() - 1)) * 1000d;
+                  }
+
+                  if (max.contains("%")) {
+                    max = max.replaceAll("\\%", "").trim();
+                    double maxPercent = Double.valueOf(max);
+                    double actualPercent = actualGig  / xmxValue * 100d;
+                    if (actualPercent > maxPercent) {
+                      logger.info(String.format("Above max java heap memory threshold: pid=" + pid + ", xmx=%.2f, percentOfXmx=%.2f ",
+                          xmx, actualPercent) + ", line=" + ch);
+                      aboveMemoryThreshold.set(true);
+                    }
+                    else {
+                      logger.info(String.format("Not above max java heap memory threshold: pid=" + pid + ", xmx=%.2f, percentOfXmx=%.2f ",
+                          xmx, actualPercent) + ", line=" + ch);
+                      aboveMemoryThreshold.set(false);
+                    }
+                  }
+                  else {
+                    double maxGig = getMemValue(max);
+                    if (actualGig > maxGig) {
+                      logger.info(String.format("Above max java heap memory threshold: xmx=%.2f, usedHeap=%.2f ",
+                          xmx, actualGig) + "line=" + ch);
+                      aboveMemoryThreshold.set(true);
+                    }
+                    else {
+                      logger.info(String.format("Not above max java heap memory threshold: xmx=%.2f, usedHeap=%.2f ",
+                          xmx, actualGig) + "line=" + ch);
+                      aboveMemoryThreshold.set(false);
+                    }
+                  }
+
+                }
+              }
+            }
+            return;
+          }
+        }
+      } while (ch != null);
+    }
   }
 
   public static double getMemValue(String memStr) {

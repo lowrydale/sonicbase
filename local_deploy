@@ -33,6 +33,8 @@ rsync -rvlLt dump-threads $HOME/database/bin
 rsync -rvlLt terminal-size.py $HOME/database/bin
 rsync -rvlLt terminal-resize.py $HOME/database/bin
 rsync -rvlLt do-rsync $HOME/database/bin
+rsync -rvlLt do-deploy $HOME/database/bin
+rsync -rvlLt deploy $HOME/database/bin
 rsync -rvlLt do-start $HOME/database/bin
 rsync -rvlLt do-start-bench $HOME/database/bin
 rsync -rvlLt get-mem-total $HOME/database/bin
@@ -54,6 +56,8 @@ chmod +x $HOME/database/bin/remote-start-rest-server
 chmod +x $HOME/database/bin/kill-server
 chmod +x $HOME/database/bin/terminal-size.py
 chmod +x $HOME/database/bin/terminal-resize.py
+chmod +x $HOME/database/bin/deploy
+chmod +x $HOME/database/bin/do-deploy
 chmod +x $HOME/database/bin/do-rsync
 chmod +x $HOME/database/bin/do-start
 chmod +x $HOME/database/bin/do-start-bench

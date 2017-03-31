@@ -7,5 +7,5 @@ fi
 
 cd $SEARCH_HOME
 
-$SEARCH_HOME/bin/runclass com.sonicbase.cli.Deploy $1 $2 $3
+$SEARCH_HOME/bin/runclass com.sonicbase.cli.Deploy $1 $2
 

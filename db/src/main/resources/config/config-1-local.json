@@ -4,9 +4,10 @@
         "installDirectory": "$HOME/database",
         "copmressRecords": false,
         "useUnsafe": true,
-        "maxJavaHeap": "63%",
+        "maxJavaHeap": "10%",
+        "maxJavaHeapTrigger": "20%",
         "user": "ubuntu",
-        "maxProcessMemory": "90%",
+        "maxProcessMemoryTrigger": "90%",
         "replicationFactor": 1,
         "shards" : [
           {

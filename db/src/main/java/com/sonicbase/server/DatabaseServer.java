@@ -571,118 +571,8 @@ public class DatabaseServer {
           try {
             Thread.sleep(30000);
 
-            String max = config.getDict("database").getString("maxProcessMemory");
-            if (max == null) {
-              logger.info("Max process memory not set in config. Not enforcing max memory");
-              continue;
-            }
-            Double totalGig = null;
-            Double resGig = null;
-            String secondToLastLine = null;
-            String lastLine = null;
-            try {
-              if (isMac()) {
-                ProcessBuilder builder = new ProcessBuilder().command("sysctl", "hw.memsize");
-                Process p = builder.start();
-                BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-                String line = in.readLine();
-                p.waitFor();
-                String[] parts = line.split(" ");
-                String memStr = parts[1];
-                totalGig = getMemValue(memStr);
+            Double totalGig = checkResidentMemory();
 
-                builder = new ProcessBuilder().command("top", "-l", "1", "-pid", String.valueOf(pid));
-                p = builder.start();
-                in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-                while (true) {
-                  line = in.readLine();
-                  if (line == null) {
-                    break;
-                  }
-                  secondToLastLine = lastLine;
-                  lastLine = line;
-                }
-                p.waitFor();
-
-                secondToLastLine = secondToLastLine.trim();
-                lastLine = lastLine.trim();
-                String[] headerParts = secondToLastLine.split("\\s+");
-                parts = lastLine.split("\\s+");
-                for (int i = 0; i < headerParts.length; i++) {
-                  if (headerParts[i].toLowerCase().trim().equals("mem")) {
-                    resGig = getMemValue(parts[i]);
-                  }
-                }
-              }
-              else if (isUnix()) {
-                ProcessBuilder builder = new ProcessBuilder().command("grep", "MemTotal", "/proc/meminfo");
-                Process p = builder.start();
-                BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-                String line = in.readLine();
-                p.waitFor();
-                line = line.substring("MemTotal:".length()).trim();
-                totalGig = getMemValue(line);
-
-                builder = new ProcessBuilder().command("top", "-b", "-n", "1", "-o", "RES", "-p", String.valueOf(pid));
-                p = builder.start();
-                in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-                while (true) {
-                  line = in.readLine();
-                  if (line == null) {
-                    break;
-                  }
-                  secondToLastLine = lastLine;
-                  lastLine = line;
-                }
-                p.waitFor();
-
-                secondToLastLine = secondToLastLine.trim();
-                lastLine = lastLine.trim();
-                String[] headerParts = secondToLastLine.split("\\s+");
-                String[] parts = lastLine.split("\\s+");
-                for (int i = 0; i < headerParts.length; i++) {
-                  if (headerParts[i].toLowerCase().trim().equals("res")) {
-                    String memStr = parts[i];
-                    resGig = getMemValue(memStr);
-                  }
-                }
-              }
-            }
-            catch (Exception e) {
-              logger.error("Error checking memory: line2=" + secondToLastLine + ", line1=" + lastLine);
-            }
-            if (totalGig == null || resGig == null) {
-              logger.error("Unable to obtain os memory info: pid=" + pid + ", totalGig=" + totalGig + ", residentGig=" + resGig +
-                ", line2=" + secondToLastLine + ", line1=" + lastLine);
-            }
-            else {
-              if (max.contains("%")) {
-                max = max.replaceAll("\\%", "").trim();
-                double maxPercent = Double.valueOf(max);
-                double actualPercent = resGig  / totalGig * 100d;
-                if (actualPercent > maxPercent) {
-                  logger.info(String.format("Above max memory threshold: pid=" + pid + ", totalGig=%.2f, residentGig=%.2f, percentMax=%.2f, percentActual=%.2f ",
-                      totalGig, resGig, maxPercent, actualPercent) + ", line2=" + secondToLastLine + ", line1=" + lastLine);
-                  aboveMemoryThreshold.set(true);
-                }
-                else {
-                  logger.info(String.format("Not above max memory threshold: pid=" + pid + ", totalGig=%.2f, residentGig=%.2f, percentMax=%.2f, percentActual=%.2f ",
-                      totalGig, resGig, maxPercent, actualPercent) + ", line2=" + secondToLastLine  + ", line1=" + lastLine);
-                  aboveMemoryThreshold.set(false);
-                }
-              }
-              else {
-                double maxGig = getMemValue(max);
-                if (resGig > maxGig) {
-                  logger.info(String.format("Above max memory threshold: totalGig=%.2f, residentGig=%.2f, maxGig=%.2f ", totalGig, resGig, maxGig) + "line2=" + secondToLastLine + ", line1=" + lastLine);
-                  aboveMemoryThreshold.set(true);
-                }
-                else {
-                  logger.info(String.format("Not above max memory threshold: totalGig=%.2f, residentGig=%.2f, maxGig=%.2f, ", totalGig, resGig, maxGig) + "line2=" + secondToLastLine + ", line1=" + lastLine);
-                  aboveMemoryThreshold.set(false);
-                }
-              }
-            }
             checkJavaHeap(totalGig);
           }
           catch (Exception e) {
@@ -695,35 +585,158 @@ public class DatabaseServer {
     thread.start();
   }
 
-  private void checkJavaHeap(Double totalGig) throws IOException {
-    File file = new File(gclog);
-    try (ReversedLinesFileReader fr = new ReversedLinesFileReader(file, Charset.forName("utf-8"))) {
-      String ch;
-      do {
-        ch = fr.readLine();
-        if (ch.indexOf("[Eden") != -1) {
-          int pos = ch.indexOf("Heap:");
-          if (pos != -1) {
-            int pos2 = ch.indexOf("->", pos);
-            if (pos2 != -1) {
-              int pos3 = ch.indexOf("(", pos2);
-              if (pos3 != -1) {
-                String value = ch.substring(pos2 + 2, pos3);
-                value = value.trim().toLowerCase();
-                double actualGig = 0;
-                if (value.contains("g")) {
-                  actualGig = Double.valueOf(value.substring(0, value.length() - 1));
-                }
-                else if (value.contains("m")) {
-                  actualGig = Double.valueOf(value.substring(0, value.length() - 1)) / 1000d;
-                }
-                else if (value.contains("t")) {
-                  actualGig = Double.valueOf(value.substring(0, value.length() - 1)) * 1000d;
+  private Double checkResidentMemory() {
+    Double totalGig = null;
+    String max = config.getDict("database").getString("maxProcessMemoryTrigger");
+    if (max == null) {
+      logger.info("Max process memory not set in config. Not enforcing max memory");
+    }
 
-                  String max = config.getDict("database").getString("maxJavaHeapTrigger");
-                  if (max == null) {
-                    logger.info("Max java heap trigger not set in config. Not enforcing max");
-                    return;
+    Double resGig = null;
+    String secondToLastLine = null;
+    String lastLine = null;
+    try {
+      if (isMac()) {
+        ProcessBuilder builder = new ProcessBuilder().command("sysctl", "hw.memsize");
+        Process p = builder.start();
+        BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+        String line = in.readLine();
+        p.waitFor();
+        String[] parts = line.split(" ");
+        String memStr = parts[1];
+        totalGig = getMemValue(memStr);
+
+        builder = new ProcessBuilder().command("top", "-l", "1", "-pid", String.valueOf(pid));
+        p = builder.start();
+        in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+        while (true) {
+          line = in.readLine();
+          if (line == null) {
+            break;
+          }
+          secondToLastLine = lastLine;
+          lastLine = line;
+        }
+        p.waitFor();
+
+        secondToLastLine = secondToLastLine.trim();
+        lastLine = lastLine.trim();
+        String[] headerParts = secondToLastLine.split("\\s+");
+        parts = lastLine.split("\\s+");
+        for (int i = 0; i < headerParts.length; i++) {
+          if (headerParts[i].toLowerCase().trim().equals("mem")) {
+            resGig = getMemValue(parts[i]);
+          }
+        }
+      }
+      else if (isUnix()) {
+        ProcessBuilder builder = new ProcessBuilder().command("grep", "MemTotal", "/proc/meminfo");
+        Process p = builder.start();
+        BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+        String line = in.readLine();
+        p.waitFor();
+        line = line.substring("MemTotal:".length()).trim();
+        totalGig = getMemValue(line);
+
+        builder = new ProcessBuilder().command("top", "-b", "-n", "1", "-o", "RES", "-p", String.valueOf(pid));
+        p = builder.start();
+        in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+        while (true) {
+          line = in.readLine();
+          if (line == null) {
+            break;
+          }
+          secondToLastLine = lastLine;
+          lastLine = line;
+        }
+        p.waitFor();
+
+        secondToLastLine = secondToLastLine.trim();
+        lastLine = lastLine.trim();
+        String[] headerParts = secondToLastLine.split("\\s+");
+        String[] parts = lastLine.split("\\s+");
+        for (int i = 0; i < headerParts.length; i++) {
+          if (headerParts[i].toLowerCase().trim().equals("res")) {
+            String memStr = parts[i];
+            resGig = getMemValue(memStr);
+          }
+        }
+      }
+      if (max != null) {
+        if (totalGig == null || resGig == null) {
+          logger.error("Unable to obtain os memory info: pid=" + pid + ", totalGig=" + totalGig + ", residentGig=" + resGig +
+              ", line2=" + secondToLastLine + ", line1=" + lastLine);
+        }
+        else {
+          if (max.contains("%")) {
+            max = max.replaceAll("\\%", "").trim();
+            double maxPercent = Double.valueOf(max);
+            double actualPercent = resGig / totalGig * 100d;
+            if (actualPercent > maxPercent) {
+              logger.info(String.format("Above max memory threshold: pid=" + pid + ", totalGig=%.2f, residentGig=%.2f, percentMax=%.2f, percentActual=%.2f ",
+                  totalGig, resGig, maxPercent, actualPercent) + ", line2=" + secondToLastLine + ", line1=" + lastLine);
+              aboveMemoryThreshold.set(true);
+            }
+            else {
+              logger.info(String.format("Not above max memory threshold: pid=" + pid + ", totalGig=%.2f, residentGig=%.2f, percentMax=%.2f, percentActual=%.2f ",
+                  totalGig, resGig, maxPercent, actualPercent) + ", line2=" + secondToLastLine + ", line1=" + lastLine);
+              aboveMemoryThreshold.set(false);
+            }
+          }
+          else {
+            double maxGig = getMemValue(max);
+            if (resGig > maxGig) {
+              logger.info(String.format("Above max memory threshold: totalGig=%.2f, residentGig=%.2f, maxGig=%.2f ", totalGig, resGig, maxGig) + "line2=" + secondToLastLine + ", line1=" + lastLine);
+              aboveMemoryThreshold.set(true);
+            }
+            else {
+              logger.info(String.format("Not above max memory threshold: totalGig=%.2f, residentGig=%.2f, maxGig=%.2f, ", totalGig, resGig, maxGig) + "line2=" + secondToLastLine + ", line1=" + lastLine);
+              aboveMemoryThreshold.set(false);
+            }
+          }
+        }
+      }
+    }
+    catch (Exception e) {
+      logger.error("Error checking memory: line2=" + secondToLastLine + ", line1=" + lastLine);
+    }
+
+    return totalGig;
+  }
+
+  private void checkJavaHeap(Double totalGig) throws IOException {
+    String line = null;
+    try {
+      String max = config.getDict("database").getString("maxJavaHeapTrigger");
+      if (max == null) {
+        logger.info("Max java heap trigger not set in config. Not enforcing max");
+        return;
+      }
+
+      File file = new File(gclog + ".0.current");
+      try (ReversedLinesFileReader fr = new ReversedLinesFileReader(file, Charset.forName("utf-8"))) {
+        String ch;
+        do {
+          ch = fr.readLine();
+          if (ch.indexOf("[Eden") != -1) {
+            int pos = ch.indexOf("Heap:");
+            if (pos != -1) {
+              int pos2 = ch.indexOf("->", pos);
+              if (pos2 != -1) {
+                int pos3 = ch.indexOf("(", pos2);
+                if (pos3 != -1) {
+                  line = ch;
+                  String value = ch.substring(pos2 + 2, pos3);
+                  value = value.trim().toLowerCase();
+                  double actualGig = 0;
+                  if (value.contains("g")) {
+                    actualGig = Double.valueOf(value.substring(0, value.length() - 1));
+                  }
+                  else if (value.contains("m")) {
+                    actualGig = Double.valueOf(value.substring(0, value.length() - 1)) / 1000d;
+                  }
+                  else if (value.contains("t")) {
+                    actualGig = Double.valueOf(value.substring(0, value.length() - 1)) * 1000d;
                   }
 
                   double xmxValue = 0;
@@ -740,14 +753,14 @@ public class DatabaseServer {
                   if (max.contains("%")) {
                     max = max.replaceAll("\\%", "").trim();
                     double maxPercent = Double.valueOf(max);
-                    double actualPercent = actualGig  / xmxValue * 100d;
+                    double actualPercent = actualGig / xmxValue * 100d;
                     if (actualPercent > maxPercent) {
-                      logger.info(String.format("Above max java heap memory threshold: pid=" + pid + ", xmx=%.2f, percentOfXmx=%.2f ",
+                      logger.info(String.format("Above max java heap memory threshold: pid=" + pid + ", xmx=%s, percentOfXmx=%.2f ",
                           xmx, actualPercent) + ", line=" + ch);
                       aboveMemoryThreshold.set(true);
                     }
                     else {
-                      logger.info(String.format("Not above max java heap memory threshold: pid=" + pid + ", xmx=%.2f, percentOfXmx=%.2f ",
+                      logger.info(String.format("Not above max java heap memory threshold: pid=" + pid + ", xmx=%s, percentOfXmx=%.2f ",
                           xmx, actualPercent) + ", line=" + ch);
                       aboveMemoryThreshold.set(false);
                     }
@@ -755,24 +768,27 @@ public class DatabaseServer {
                   else {
                     double maxGig = getMemValue(max);
                     if (actualGig > maxGig) {
-                      logger.info(String.format("Above max java heap memory threshold: xmx=%.2f, usedHeap=%.2f ",
+                      logger.info(String.format("Above max java heap memory threshold: xmx=%s, usedHeap=%.2f ",
                           xmx, actualGig) + "line=" + ch);
                       aboveMemoryThreshold.set(true);
                     }
                     else {
-                      logger.info(String.format("Not above max java heap memory threshold: xmx=%.2f, usedHeap=%.2f ",
+                      logger.info(String.format("Not above max java heap memory threshold: xmx=%s, usedHeap=%.2f ",
                           xmx, actualGig) + "line=" + ch);
                       aboveMemoryThreshold.set(false);
                     }
                   }
-
                 }
               }
+              return;
             }
-            return;
           }
         }
-      } while (ch != null);
+        while (ch != null);
+      }
+    }
+    catch (Exception e) {
+      logger.error("Error checking java memory: line=" + line, e);
     }
   }
 
@@ -1399,7 +1415,7 @@ public class DatabaseServer {
         return ret;
       }
       else {
-        return (byte[][])obj;
+        return (byte[][]) obj;
       }
     }
     catch (IOException e) {
@@ -1454,7 +1470,7 @@ public class DatabaseServer {
         return ret;
       }
       else {
-        return (byte[][])obj;
+        return (byte[][]) obj;
       }
     }
     catch (IOException e) {
@@ -1982,6 +1998,7 @@ public class DatabaseServer {
       common.getSchemaReadLock(dbName).unlock();
     }
   }
+
   public byte[] abortTransaction(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
     String dbName = parts[4];

@@ -113,6 +113,9 @@ public class ReadManager {
           if (entry == null) {
             break;
           }
+          if (entry.getValue() instanceof Long) {
+            entry.setValue(index.get(entry.getKey()));
+          }
           byte[][] records = server.fromUnsafeToRecords(entry.getValue());
           for (byte[] bytes : records) {
             Record record = new Record(tableSchema);
@@ -1267,32 +1270,36 @@ public class ReadManager {
               }
             }
           }
-          if (keys) {
-            byte[][] currKeys = server.fromUnsafeToKeys(value);
-            for (byte[] currKey : currKeys) {
-              retKeys.add(currKey);
+          synchronized (index.getMutex(entry.getKey())) {
+            if (value instanceof Long) {
+              value = index.get(entry.getKey());
             }
-          }
-          else {
-            byte[][] records = server.fromUnsafeToRecords(value);
-            if (parms != null && expression != null && evaluateExpresion) {
-              for (byte[] bytes : records) {
-                Record record = new Record(tableSchema);
-                record.deserialize(dbName, server.getCommon(), bytes, null, true);
-                boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
-                if (pass) {
-                  byte[][] currRecords = new byte[][]{bytes};
-                  Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, null, tableSchema, counters, groupContext);
-                  if (counters == null) {
-                    retRecords.add(ret[0]);
-                  }
-                }
+            if (keys) {
+              byte[][] currKeys = server.fromUnsafeToKeys(value);
+              for (byte[] currKey : currKeys) {
+                retKeys.add(currKey);
               }
             }
             else {
-              Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, null, tableSchema, counters, groupContext);
-              if (counters == null) {
-                retRecords.addAll(Arrays.asList(ret));
+              byte[][] records = server.fromUnsafeToRecords(value);
+              if (parms != null && expression != null && evaluateExpresion) {
+                for (byte[] bytes : records) {
+                  Record record = new Record(tableSchema);
+                  record.deserialize(dbName, server.getCommon(), bytes, null, true);
+                  boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
+                  if (pass) {
+                    byte[][] currRecords = new byte[][]{bytes};
+                    Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, null, tableSchema, counters, groupContext);
+                    if (counters == null) {
+                      retRecords.add(ret[0]);
+                    }
+                  }
+                }
+              } else {
+                Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, null, tableSchema, counters, groupContext);
+                if (counters == null) {
+                  retRecords.addAll(Arrays.asList(ret));
+                }
               }
             }
           }

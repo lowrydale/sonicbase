@@ -1120,7 +1120,9 @@ public class Repartitioner extends Thread {
         byte[][] content = null;
         int shard = 0;
         synchronized (index.getMutex(entry.key)) {
-          entry.value = index.get(entry.key);
+          if (entry.value instanceof Long) {
+            entry.value = index.get(entry.key);
+          }
           if (entry.value != null) {
             if (indexSchema.isPrimaryKey()) {
               content = databaseServer.fromUnsafeToRecords(entry.value);

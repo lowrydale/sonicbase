@@ -12,6 +12,7 @@ import com.sonicbase.query.*;
 import com.sonicbase.query.impl.*;
 import com.sonicbase.schema.*;
 import com.sonicbase.server.DatabaseServer;
+import com.sonicbase.server.PreparedIndexLookupNotFoundException;
 import com.sonicbase.server.ReadManager;
 import com.sonicbase.server.SnapshotManager;
 import com.sonicbase.socket.DatabaseSocketClient;

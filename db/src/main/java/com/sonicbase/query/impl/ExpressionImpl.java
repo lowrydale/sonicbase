@@ -14,10 +14,12 @@ import com.sonicbase.query.Expression;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.server.PreparedIndexLookupNotFoundException;
 import com.sonicbase.server.SnapshotManager;
 import com.sonicbase.util.DataUtil;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.sf.jsqlparser.statement.select.Limit;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1280,494 +1282,527 @@ public abstract class ExpressionImpl implements Expression {
       AtomicReference<String> usedIndex, boolean evaluateExpression, int viewVersion, Counter[] counters, GroupByContext groupByContext, boolean debug) {
 
     Timer.Context ctx = DatabaseClient.INDEX_LOOKUP_STATS.time();
-    try {
-      int originalShard = shard;
-      List<Integer> selectedShards = null;
-      int currShardOffset = 0;
-      int previousSchemaVersion = common.getSchemaVersion();
-      Object[][][] retKeys;
-      Record[] recordRet = null;
-      Object[] nextKey = null;
-      int nextShard = shard;
-      int localShard = shard;
-      Object[] localLeftValue = leftValue;
+    StringBuilder preparedKey = new StringBuilder();
+    while (true) {
+      try {
+        int originalShard = shard;
+        List<Integer> selectedShards = null;
+        int currShardOffset = 0;
+        int previousSchemaVersion = common.getSchemaVersion();
+        Object[][][] retKeys;
+        Record[] recordRet = null;
+        Object[] nextKey = null;
+        int nextShard = shard;
+        int localShard = shard;
+        Object[] localLeftValue = leftValue;
 
-      List<Object> leftValues = new ArrayList<>();
-      leftValues.add(localLeftValue);
+        List<Object> leftValues = new ArrayList<>();
+        leftValues.add(localLeftValue);
 
-      List<Object> rightValues = new ArrayList<>();
-      rightValues.add(rightValue);
+        List<Object> rightValues = new ArrayList<>();
+        rightValues.add(rightValue);
 
-      String[] fields = indexSchema.getFields();
-      boolean shouldIndex = true;
-      if (fields.length == 1 && !fields[0].equals(columnName)) {
-        shouldIndex = false;
-      }
-
-      //int replica = ThreadLocalRandom.current().nextInt(0,2);
-      if (shouldIndex) {
-
-        retKeys = null;
-
-        String[] indexFields = indexSchema.getFields();
-        int[] fieldOffsets = new int[indexFields.length];
-        for (int k = 0; k < indexFields.length; k++) {
-          fieldOffsets[k] = tableSchema.getFieldOffset(indexFields[k]);
-        }
-        Comparator[] comparators = indexSchema.getComparators();
-
-        if (originalLeftValue != null && leftValue != null) {
-          if (0 != DatabaseCommon.compareKey(comparators, originalLeftValue, leftValue)) {
-            if (leftOperator == BinaryExpression.Operator.less) {
-              leftOperator = BinaryExpression.Operator.lessEqual;
-            }
-            else if (leftOperator == BinaryExpression.Operator.greater) {
-              leftOperator = BinaryExpression.Operator.greaterEqual;
-            }
-          }
-        }
-//
-//        if (originalLeftValue != null && leftValue != null) {
-//          if (0 != DatabaseCommon.compareKey(comparators, originalLeftValue, leftValue)) {
-//            if (leftOperator == BinaryExpression.Operator.lessEqual) {
-//              leftOperator = BinaryExpression.Operator.less;
-//            }
-//            else if (leftOperator == BinaryExpression.Operator.greaterEqual) {
-//              leftOperator = BinaryExpression.Operator.greater;
-//            }
-//          }
-//        }
-
-        if (originalRightValue != null && leftValue != null) {
-          if (0 != DatabaseCommon.compareKey(comparators, originalRightValue, leftValue)) {
-            if (rightOperator == BinaryExpression.Operator.less) {
-              rightOperator = BinaryExpression.Operator.lessEqual;
-            }
-            else if (rightOperator == BinaryExpression.Operator.greater) {
-              rightOperator = BinaryExpression.Operator.greaterEqual;
-            }
-          }
-        }
-//
-//        if (originalRightValue != null && leftValue != null) {
-//          if (0 != DatabaseCommon.compareKey(comparators, originalRightValue, leftValue)) {
-//            if (rightOperator == BinaryExpression.Operator.lessEqual) {
-//              rightOperator = BinaryExpression.Operator.less;
-//            }
-//            else if (rightOperator == BinaryExpression.Operator.greaterEqual) {
-//              rightOperator = BinaryExpression.Operator.greater;
-//            }
-//          }
-//        }
-//
-        if (nextShard == -2) {
-          return new SelectContextImpl();
+        String[] fields = indexSchema.getFields();
+        boolean shouldIndex = true;
+        if (fields.length == 1 && !fields[0].equals(columnName)) {
+          shouldIndex = false;
         }
 
-        if (debug) {
-          selectedShards = new ArrayList<>();
-          for (int i = 0; i < client.getShardCount(); i++) {
-            selectedShards.add(i);
-          }
-          localLeftValue = originalLeftValue;
-        }
-        else {
+        //int replica = ThreadLocalRandom.current().nextInt(0,2);
+        if (shouldIndex) {
 
-          selectedShards = Repartitioner.findOrderedPartitionForRecord(false, true, fieldOffsets, common, tableSchema,
-              indexSchema.getName(), orderByExpressions, leftOperator, rightOperator, originalLeftValue, originalRightValue);
-          if (selectedShards.size() == 0) {
-            selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false, fieldOffsets, common, tableSchema,
-                indexSchema.getName(), orderByExpressions, leftOperator, rightOperator, originalLeftValue, originalRightValue);
-//              for (Integer curr : currSelectedShards) {
-//                boolean found = false;
-//                for (Integer last : selectedShards) {
-//                  if (last.equals(curr)) {
-//                    found = true;
-//                  }
-//                }
-//                if (!found) {
-//                  selectedShards.add(curr);
-//                }
-//              }
-          }
-//              if (selectedShards.size() == 0) {
-//                throw new DatabaseException("No shards selected for query");
-//              }
-//            ''}
-        }
+          retKeys = null;
 
-        if (localShard == -1) {
-          localShard = nextShard = selectedShards.get(currShardOffset);
-        }
-        boolean found = false;
-        for (int i = 0; i < selectedShards.size(); i++) {
-          if (localShard == selectedShards.get(i)) {
-            found = true;
+          String[] indexFields = indexSchema.getFields();
+          int[] fieldOffsets = new int[indexFields.length];
+          for (int k = 0; k < indexFields.length; k++) {
+            fieldOffsets[k] = tableSchema.getFieldOffset(indexFields[k]);
           }
-        }
-        if (!found) {
-          localShard = nextShard = selectedShards.get(currShardOffset);
-        }
-        usedIndex.set(indexSchema.getName());
+          Comparator[] comparators = indexSchema.getComparators();
 
-        StringBuilder preparedKey = new StringBuilder();
-        preparedKey.append(dbName).append(":").append(count);
-        preparedKey.append(":").append(tableSchema.getName()).append(":").append(indexSchema.getName());
-        preparedKey.append(":").append(forceSelectOnServer);
-        if (orderByExpressions != null) {
-         //todo: this is printing an object
-          for (OrderByExpressionImpl orderByExp : orderByExpressions) {
-            preparedKey.append(":").append(orderByExp.toString());
-          }
-        }
-        preparedKey.append(":").append(expression);
-        if (columns != null) {
-          for (ColumnImpl column : columns) {
-            preparedKey.append(":").append(column.toString());
-          }
-        }
-        preparedKey.append(":").append(columnName);
-        preparedKey.append(":").append(evaluateExpression);
-
-        String preparedKeyStr = preparedKey.toString();
-        PreparedIndexLookup prepared = null;
-        synchronized (preparedIndexLookups) {
-          prepared = preparedIndexLookups.get(preparedKeyStr);
-          if (prepared == null) {
-            prepared = new PreparedIndexLookup();
-            prepared.preparedId = client.allocateId(dbName);
-            prepared.serversPrepared = new boolean[client.getShardCount()][];
-            for (int i = 0; i < prepared.serversPrepared.length; i++) {
-              prepared.serversPrepared[i] = new boolean[client.getReplicaCount()];
-            }
-            preparedIndexLookups.put(preparedKeyStr, prepared);
-          }
-          prepared.lastTimeUsed = System.currentTimeMillis();
-        }
-
-        while (true) {
-          boolean isPrepared = prepared.serversPrepared[localShard][replica];
-          long preparedId = prepared.preparedId;
-          if (!isPrepared) {
-            System.out.println("Not prepared:" + preparedKeyStr);
-          }
-
-          //TableSchema.Partition[] partitions = indexSchema.getValue().getCurrPartitions();
-          Random rand = new Random(System.currentTimeMillis());
-          ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-          DataOutputStream out = new DataOutputStream(bytesOut);
-          out.writeUTF(dbName);
-          out.writeInt(common.getSchemaVersion());
-          DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-          DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-
-          DataUtil.writeVLong(out, preparedId);
-          out.writeBoolean(isPrepared);
-
-          if (!isPrepared) {
-            out.writeInt(count);
-          }
-          out.writeBoolean(client.isExplicitTrans());
-          out.writeBoolean(client.isCommitting());
-          DataUtil.writeVLong(out, client.getTransactionId(), resultLength);
-          DataUtil.writeVLong(out, viewVersion, resultLength);
-
-          if (!isPrepared) {
-            DataUtil.writeVLong(out, tableSchema.getTableId(), resultLength);
-            DataUtil.writeVLong(out, indexSchema.getIndexId(), resultLength);
-            out.writeBoolean(forceSelectOnServer);
-          }
-          if (/*!evaluateExpression ||*/ parms == null) {
-            out.writeBoolean(false);
-          }
-          else {
-            out.writeBoolean(true);
-            parms.serialize(out);
-          }
-          if (!isPrepared) {
-            out.writeBoolean(evaluateExpression);
-            if (/*!evaluateExpression ||*/ expression == null) {
-              out.writeBoolean(false);
-            }
-            else {
-              out.writeBoolean(true);
-              ExpressionImpl.serializeExpression((ExpressionImpl) expression, out);
-            }
-            //          out.writeUTF(tableSchema.getName());
-            //          out.writeUTF(indexSchema.getKey());
-            if (orderByExpressions == null) {
-              DataUtil.writeVLong(out, 0, resultLength);
-              //out.writeInt(0);
-            }
-            else {
-              //out.writeInt(orderByExpressions.size());
-              DataUtil.writeVLong(out, orderByExpressions.size(), resultLength);
-              for (int j = 0; j < orderByExpressions.size(); j++) {
-                OrderByExpressionImpl orderByExpression = orderByExpressions.get(j);
-                orderByExpression.serialize(out);
+          if (originalLeftValue != null && leftValue != null) {
+            if (0 != DatabaseCommon.compareKey(comparators, originalLeftValue, leftValue)) {
+              if (leftOperator == BinaryExpression.Operator.less) {
+                leftOperator = BinaryExpression.Operator.lessEqual;
+              }
+              else if (leftOperator == BinaryExpression.Operator.greater) {
+                leftOperator = BinaryExpression.Operator.greaterEqual;
               }
             }
           }
+          //
+          //        if (originalLeftValue != null && leftValue != null) {
+          //          if (0 != DatabaseCommon.compareKey(comparators, originalLeftValue, leftValue)) {
+          //            if (leftOperator == BinaryExpression.Operator.lessEqual) {
+          //              leftOperator = BinaryExpression.Operator.less;
+          //            }
+          //            else if (leftOperator == BinaryExpression.Operator.greaterEqual) {
+          //              leftOperator = BinaryExpression.Operator.greater;
+          //            }
+          //          }
+          //        }
 
-          if (localLeftValue == null) {
-            out.writeBoolean(false);
+          if (originalRightValue != null && leftValue != null) {
+            if (0 != DatabaseCommon.compareKey(comparators, originalRightValue, leftValue)) {
+              if (rightOperator == BinaryExpression.Operator.less) {
+                rightOperator = BinaryExpression.Operator.lessEqual;
+              }
+              else if (rightOperator == BinaryExpression.Operator.greater) {
+                rightOperator = BinaryExpression.Operator.greaterEqual;
+              }
+            }
+          }
+          //
+          //        if (originalRightValue != null && leftValue != null) {
+          //          if (0 != DatabaseCommon.compareKey(comparators, originalRightValue, leftValue)) {
+          //            if (rightOperator == BinaryExpression.Operator.lessEqual) {
+          //              rightOperator = BinaryExpression.Operator.less;
+          //            }
+          //            else if (rightOperator == BinaryExpression.Operator.greaterEqual) {
+          //              rightOperator = BinaryExpression.Operator.greater;
+          //            }
+          //          }
+          //        }
+          //
+          if (nextShard == -2) {
+            return new SelectContextImpl();
+          }
+
+          if (debug) {
+            selectedShards = new ArrayList<>();
+            for (int i = 0; i < client.getShardCount(); i++) {
+              selectedShards.add(i);
+            }
+            localLeftValue = originalLeftValue;
           }
           else {
-            out.writeBoolean(true);
-            out.write(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), localLeftValue));
+
+            selectedShards = Repartitioner.findOrderedPartitionForRecord(false, true, fieldOffsets, common, tableSchema,
+                indexSchema.getName(), orderByExpressions, leftOperator, rightOperator, originalLeftValue, originalRightValue);
+            if (selectedShards.size() == 0) {
+              selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false, fieldOffsets, common, tableSchema,
+                  indexSchema.getName(), orderByExpressions, leftOperator, rightOperator, originalLeftValue, originalRightValue);
+              //              for (Integer curr : currSelectedShards) {
+              //                boolean found = false;
+              //                for (Integer last : selectedShards) {
+              //                  if (last.equals(curr)) {
+              //                    found = true;
+              //                  }
+              //                }
+              //                if (!found) {
+              //                  selectedShards.add(curr);
+              //                }
+              //              }
+            }
+            //              if (selectedShards.size() == 0) {
+            //                throw new DatabaseException("No shards selected for query");
+            //              }
+            //            ''}
           }
-          if (originalLeftValue == null) {
-            out.writeBoolean(false);
+
+          if (localShard == -1) {
+            localShard = nextShard = selectedShards.get(currShardOffset);
           }
-          else {
-            out.writeBoolean(true);
-            out.write(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), originalLeftValue));
+          boolean found = false;
+          for (int i = 0; i < selectedShards.size(); i++) {
+            if (localShard == selectedShards.get(i)) {
+              found = true;
+            }
           }
-          DataUtil.writeVLong(out, leftOperator.getId(), resultLength);
+          if (!found) {
+            localShard = nextShard = selectedShards.get(currShardOffset);
+          }
+          usedIndex.set(indexSchema.getName());
+
+          preparedKey.append(dbName).append(":").append(count);
+          preparedKey.append(":").append(tableSchema.getName()).append(":").append(indexSchema.getName());
+          preparedKey.append(":").append(forceSelectOnServer);
+          if (orderByExpressions != null) {
+            //todo: this is printing an object
+            for (OrderByExpressionImpl orderByExp : orderByExpressions) {
+              preparedKey.append(":").append(orderByExp.toString());
+            }
+          }
+          preparedKey.append(":").append(expression);
+          if (columns != null) {
+            for (ColumnImpl column : columns) {
+              preparedKey.append(":").append(column.toString());
+            }
+          }
+          preparedKey.append(":").append(columnName);
+          preparedKey.append(":").append(evaluateExpression);
+
+          String preparedKeyStr = preparedKey.toString();
+          PreparedIndexLookup prepared = null;
+          synchronized (preparedIndexLookups) {
+            prepared = preparedIndexLookups.get(preparedKeyStr);
+            if (prepared == null) {
+              prepared = new PreparedIndexLookup();
+              prepared.preparedId = client.allocateId(dbName);
+              prepared.serversPrepared = new boolean[client.getShardCount()][];
+              for (int i = 0; i < prepared.serversPrepared.length; i++) {
+                prepared.serversPrepared[i] = new boolean[client.getReplicaCount()];
+              }
+              preparedIndexLookups.put(preparedKeyStr, prepared);
+            }
+            prepared.lastTimeUsed = System.currentTimeMillis();
+          }
+
+          while (true) {
+            boolean isPrepared = prepared.serversPrepared[localShard][replica];
+            long preparedId = prepared.preparedId;
+            if (!isPrepared) {
+              System.out.println("Not prepared:" + preparedKeyStr);
+            }
+
+            //TableSchema.Partition[] partitions = indexSchema.getValue().getCurrPartitions();
+            Random rand = new Random(System.currentTimeMillis());
+            ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+            DataOutputStream out = new DataOutputStream(bytesOut);
+            out.writeUTF(dbName);
+            out.writeInt(common.getSchemaVersion());
+            DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+            DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+
+            DataUtil.writeVLong(out, preparedId);
+            out.writeBoolean(isPrepared);
+
+            if (!isPrepared) {
+              out.writeInt(count);
+            }
+            out.writeBoolean(client.isExplicitTrans());
+            out.writeBoolean(client.isCommitting());
+            DataUtil.writeVLong(out, client.getTransactionId(), resultLength);
+            DataUtil.writeVLong(out, viewVersion, resultLength);
+
+            if (!isPrepared) {
+              DataUtil.writeVLong(out, tableSchema.getTableId(), resultLength);
+              DataUtil.writeVLong(out, indexSchema.getIndexId(), resultLength);
+              out.writeBoolean(forceSelectOnServer);
+            }
+            if (/*!evaluateExpression ||*/ parms == null) {
+              out.writeBoolean(false);
+            }
+            else {
+              out.writeBoolean(true);
+              parms.serialize(out);
+            }
+            if (!isPrepared) {
+              out.writeBoolean(evaluateExpression);
+              if (/*!evaluateExpression ||*/ expression == null) {
+                out.writeBoolean(false);
+              }
+              else {
+                out.writeBoolean(true);
+                ExpressionImpl.serializeExpression((ExpressionImpl) expression, out);
+              }
+              //          out.writeUTF(tableSchema.getName());
+              //          out.writeUTF(indexSchema.getKey());
+              if (orderByExpressions == null) {
+                DataUtil.writeVLong(out, 0, resultLength);
+                //out.writeInt(0);
+              }
+              else {
+                //out.writeInt(orderByExpressions.size());
+                DataUtil.writeVLong(out, orderByExpressions.size(), resultLength);
+                for (int j = 0; j < orderByExpressions.size(); j++) {
+                  OrderByExpressionImpl orderByExpression = orderByExpressions.get(j);
+                  orderByExpression.serialize(out);
+                }
+              }
+            }
+
+            if (localLeftValue == null) {
+              out.writeBoolean(false);
+            }
+            else {
+              out.writeBoolean(true);
+              out.write(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), localLeftValue));
+            }
+            if (originalLeftValue == null) {
+              out.writeBoolean(false);
+            }
+            else {
+              out.writeBoolean(true);
+              out.write(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), originalLeftValue));
+            }
+            DataUtil.writeVLong(out, leftOperator.getId(), resultLength);
             //out.writeInt(leftOperator.getId());
 
-          if (rightOperator != null) {
-            out.writeBoolean(true);
-            if (rightValue == null) {
+            if (rightOperator != null) {
+              out.writeBoolean(true);
+              if (rightValue == null) {
+                out.writeBoolean(false);
+              }
+              else {
+                out.writeBoolean(true);
+                out.write(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), rightValue));
+              }
+
+              if (originalRightValue == null) {
+                out.writeBoolean(false);
+              }
+              else {
+                out.writeBoolean(true);
+                out.write(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), originalRightValue));
+              }
+
+              //out.writeInt(rightOperator.getId());
+              DataUtil.writeVLong(out, rightOperator.getId(), resultLength);
+            }
+            else {
+              out.writeBoolean(false);
+            }
+
+            if (!isPrepared) {
+              writeColumns(tableSchema, columns, out, resultLength);
+            }
+
+            if (counters == null) {
+              out.writeInt(0);
+            }
+            else {
+              out.writeInt(counters.length);
+              for (int i = 0; i < counters.length; i++) {
+                out.write(counters[i].serialize());
+              }
+            }
+
+            if (groupByContext == null) {
               out.writeBoolean(false);
             }
             else {
               out.writeBoolean(true);
-              out.write(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), rightValue));
+              out.write(groupByContext.serialize(client.getCommon()));
             }
 
-            if (originalRightValue == null) {
-              out.writeBoolean(false);
+            out.close();
+
+            List<Integer> replicas = singletonList(replica);
+            if (debug) {
+              replicas = new ArrayList<>();
+              replicas.add(0);
+              replicas.add(1);
+            }
+
+            String command = "DatabaseServer:indexLookup:1:" + common.getSchemaVersion() + ":" + dbName + ":" + rand.nextLong();
+            byte[] bytes = bytesOut.toByteArray();
+
+            String batchKey = null;
+            if (leftOperator == BinaryExpression.Operator.equal && rightOperator == null) {
+              batchKey = "DatabaseServer:indexLookup:" + tableSchema.getName() + ":" + indexSchema.getName();
+            }
+
+            //Timer.Context ctx = INDEX_LOOKUP_SEND_STATS.time();
+            byte[] lookupRet = client.send(batchKey, localShard, replica, command, bytes, DatabaseClient.Replica.specified);
+            //ctx.stop();
+
+            prepared.serversPrepared[localShard][replica] = true;
+
+            int calledShard = localShard;
+            if (previousSchemaVersion < common.getSchemaVersion()) {
+              throw new SchemaOutOfSyncException();
+            }
+            ByteArrayInputStream bytes2 = new ByteArrayInputStream(lookupRet);
+            DataInputStream in = new DataInputStream(bytes2);
+            long serializationVersion = DataUtil.readVLong(in);
+            //nextKey = null;
+            if (in.readBoolean()) {
+              Object[] retKey = DatabaseCommon.deserializeKey(tableSchema, in);
+              nextKey = retKey;
             }
             else {
-              out.writeBoolean(true);
-              out.write(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), originalRightValue));
+              nextKey = null;
+            }
+            //          else {
+            //            localLeftValue = null;
+            //          }
+            for (int i = 0; i < selectedShards.size(); i++) {
+              if (localShard == selectedShards.get(i)) {
+                if (nextKey == null && i >= selectedShards.size() - 1) {
+                  localShard = nextShard = -2;
+                  //System.out.println("nextKey == null && > shards");
+                  break;
+                }
+                else {
+                  if (nextKey == null) {
+                    localShard = nextShard = selectedShards.get(i + 1);
+                    //System.out.println("nextKey == null, nextShard=" + localShard);
+                  }
+                  break;
+                }
+              }
+            }
+            int retCount = (int) DataUtil.readVLong(in, resultLength);
+            //              if (retCount != 0 || nextKey != null) {
+            //                localLeftValue = nextKey;
+            //              }
+            //              else {
+            //                nextKey = localLeftValue;
+            //              }
+            if (debug && localLeftValue == null) {
+              localLeftValue = originalLeftValue;
             }
 
-            //out.writeInt(rightOperator.getId());
-            DataUtil.writeVLong(out, rightOperator.getId(), resultLength);
-          }
-          else {
-            out.writeBoolean(false);
-          }
+            Object[][][] currRetKeys = null;
+            if (retCount != 0) {
+              currRetKeys = new Object[retCount][][];
+              for (int k = 0; k < retCount; k++) {
+                int len = (int) DataUtil.readVLong(in, resultLength);
+                byte[] keyBytes = new byte[len];
+                in.readFully(keyBytes);
+                DataInputStream keyIn = new DataInputStream(new ByteArrayInputStream(keyBytes));
+                Object[] key = DatabaseCommon.deserializeKey(common.getTables(dbName).get(tableSchema.getName()), keyIn);
+                currRetKeys[k] = new Object[][]{key};
+                if (debug) {
+                  System.out.println("hit key: shard=" + calledShard + ", replica=" + replica);
+                }
+              }
+            }
 
-          if (!isPrepared) {
-            writeColumns(tableSchema, columns, out, resultLength);
-          }
+            int recordCount = (int) DataUtil.readVLong(in, resultLength);
+            Record[] currRetRecords = new Record[recordCount];
+            if (recordCount > 0) {
+              int len = (int) DataUtil.readVLong(in, resultLength);
+              byte[] recordBytes = new byte[len];
+              in.readFully(recordBytes);
+              Record record = new Record(dbName, common, recordBytes);
+              currRetRecords[0] = record;
+              AtomicInteger serializedSchemaVersion = new AtomicInteger(record.getSerializedSchemaVersion());
 
-          if (counters == null) {
-            out.writeInt(0);
-          }
-          else {
-            out.writeInt(counters.length);
-            for (int i = 0; i < counters.length; i++) {
-              out.write(counters[i].serialize());
+              for (int k = 1; k < recordCount; k++) {
+                len = (int) DataUtil.readVLong(in, resultLength);
+                recordBytes = new byte[len];
+                in.readFully(recordBytes);
+                Object[] currFields = DatabaseCommon.deserializeFields(dbName, common, recordBytes, 0, tableSchema, common.getSchemaVersion(), null, serializedSchemaVersion, false);
+                Record currRecord = new Record(tableSchema);
+                currRecord.setFields(currFields);
+
+                currRetRecords[k] = currRecord;
+                if (debug) {
+                  System.out.println("hit record: shard=" + calledShard + ", replica=" + replica);
+                }
+              }
+            }
+
+            recordRet = aggregateResults(recordRet, currRetRecords);
+
+
+            retKeys = aggregateResults(retKeys, currRetKeys);
+
+
+            Counter[] retCounters = null;
+            int counterCount = in.readInt();
+            if (counterCount > 0) {
+              retCounters = new Counter[counterCount];
+              for (int i = 0; i < counterCount; i++) {
+                retCounters[i] = new Counter();
+                retCounters[i].deserialize(in);
+              }
+              System.arraycopy(retCounters, 0, counters, 0, Math.min(counters.length, retCounters.length));
+            }
+
+            if (in.readBoolean()) {
+              groupByContext.deserialize(in, client.getCommon(), dbName);
+            }
+
+            if (/*originalShard != -1 ||*/localShard == -1 || localShard == -2 || (retKeys != null && retKeys.length >= count) || (recordRet != null && recordRet.length >= count)) {
+              break;
             }
           }
+          if (recordRet == null) {
+            String[] indexColumns = null;
+            for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
+              if (entry.getValue().isPrimaryKey()) {
+                indexColumns = entry.getValue().getFields();
+                break;
+              }
+            }
+            if (retKeys != null) {
+              List<IdEntry> keysToRead = new ArrayList<>();
+              for (int i = 0; i < retKeys.length; i++) {
+                Object[][] id = retKeys[i];
 
-          if (groupByContext == null) {
-            out.writeBoolean(false);
+                if (!recordCache.containsKey(tableSchema.getName(), id[0])) {
+                  keysToRead.add(new ExpressionImpl.IdEntry(i, id[0]));
+                }
+              }
+              doReadRecords(dbName, client, count, forceSelectOnServer, tableSchema, keysToRead, indexColumns, columns, recordCache, viewVersion);
+            }
           }
           else {
-            out.writeBoolean(true);
-            out.write(groupByContext.serialize(client.getCommon()));
+            String[] primaryKeyFields = null;
+            for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
+              if (entry.getValue().isPrimaryKey()) {
+                primaryKeyFields = entry.getValue().getFields();
+                break;
+              }
+            }
+            retKeys = new Object[recordRet.length][][];
+            for (int i = 0; i < recordRet.length; i++) {
+              Record record = recordRet[i];
+
+              Object[] key = new Object[primaryKeyFields.length];
+              for (int j = 0; j < primaryKeyFields.length; j++) {
+                key[j] = record.getFields()[tableSchema.getFieldOffset(primaryKeyFields[j])];
+              }
+
+              if (retKeys[i] == null) {
+                retKeys[i] = new Object[][]{key};
+              }
+
+              nextKey = key;
+
+              recordCache.put(tableSchema.getName(), key, new CachedRecord(record, null));
+            }
           }
-
-          out.close();
-
-          List<Integer> replicas = singletonList(replica);
-          if (debug) {
-            replicas = new ArrayList<>();
-            replicas.add(0);
-            replicas.add(1);
-          }
-
-          String command = "DatabaseServer:indexLookup:1:" + common.getSchemaVersion() + ":" + dbName + ":" + rand.nextLong();
-          byte[] bytes = bytesOut.toByteArray();
-
-          String batchKey = null;
-          if (leftOperator == BinaryExpression.Operator.equal && rightOperator == null) {
-            batchKey = "DatabaseServer:indexLookup:" + tableSchema.getName() + ":" + indexSchema.getName();
-          }
-
-          //Timer.Context ctx = INDEX_LOOKUP_SEND_STATS.time();
-          byte[] lookupRet = client.send(batchKey, localShard, replica, command, bytes, DatabaseClient.Replica.specified);
-          //ctx.stop();
-
-          prepared.serversPrepared[localShard][replica] = true;
-
-          int calledShard = localShard;
           if (previousSchemaVersion < common.getSchemaVersion()) {
             throw new SchemaOutOfSyncException();
           }
-          ByteArrayInputStream bytes2 = new ByteArrayInputStream(lookupRet);
-          DataInputStream in = new DataInputStream(bytes2);
-          long serializationVersion = DataUtil.readVLong(in);
-          //nextKey = null;
-          if (in.readBoolean()) {
-            Object[] retKey = DatabaseCommon.deserializeKey(tableSchema, in);
-            nextKey = retKey;
-          }
-          else {
-            nextKey = null;
-          }
-//          else {
-//            localLeftValue = null;
-//          }
-          for (int i = 0; i < selectedShards.size(); i++) {
-            if (localShard == selectedShards.get(i)) {
-              if (nextKey == null && i >= selectedShards.size() - 1) {
-                localShard = nextShard = -2;
-                //System.out.println("nextKey == null && > shards");
-                break;
-              }
-              else {
-                if (nextKey == null) {
-                  localShard = nextShard = selectedShards.get(i + 1);
-                  //System.out.println("nextKey == null, nextShard=" + localShard);
-                }
-                break;
-              }
-            }
-          }
-          int retCount = (int) DataUtil.readVLong(in, resultLength);
-//              if (retCount != 0 || nextKey != null) {
-//                localLeftValue = nextKey;
-//              }
-//              else {
-//                nextKey = localLeftValue;
-//              }
-          if (debug && localLeftValue == null) {
-            localLeftValue = originalLeftValue;
-          }
 
-          Object[][][] currRetKeys = null;
-          if (retCount != 0) {
-            currRetKeys = new Object[retCount][][];
-            for (int k = 0; k < retCount; k++) {
-              int len = (int) DataUtil.readVLong(in, resultLength);
-              byte[] keyBytes = new byte[len];
-              in.readFully(keyBytes);
-              DataInputStream keyIn = new DataInputStream(new ByteArrayInputStream(keyBytes));
-              Object[] key = DatabaseCommon.deserializeKey(common.getTables(dbName).get(tableSchema.getName()), keyIn);
-              currRetKeys[k] = new Object[][]{key};
-              if (debug) {
-                System.out.println("hit key: shard=" + calledShard + ", replica=" + replica);
-              }
-            }
-          }
-
-          int recordCount = (int) DataUtil.readVLong(in, resultLength);
-          Record[] currRetRecords = new Record[recordCount];
-          if (recordCount > 0) {
-            int len = (int) DataUtil.readVLong(in, resultLength);
-            byte[] recordBytes = new byte[len];
-            in.readFully(recordBytes);
-            Record record = new Record(dbName, common, recordBytes);
-            currRetRecords[0] = record;
-            AtomicInteger serializedSchemaVersion = new AtomicInteger(record.getSerializedSchemaVersion());
-
-            for (int k = 1; k < recordCount; k++) {
-              len = (int) DataUtil.readVLong(in, resultLength);
-              recordBytes = new byte[len];
-              in.readFully(recordBytes);
-              Object[] currFields = DatabaseCommon.deserializeFields(dbName, common, recordBytes, 0, tableSchema, common.getSchemaVersion(), null, serializedSchemaVersion, false);
-              Record currRecord = new Record(tableSchema);
-              currRecord.setFields(currFields);
-
-              currRetRecords[k] = currRecord;
-              if (debug) {
-                System.out.println("hit record: shard=" + calledShard + ", replica=" + replica);
-              }
-            }
-          }
-
-          recordRet = aggregateResults(recordRet, currRetRecords);
-
-
-          retKeys = aggregateResults(retKeys, currRetKeys);
-
-
-          Counter[] retCounters = null;
-          int counterCount = in.readInt();
-          if (counterCount > 0) {
-            retCounters = new Counter[counterCount];
-            for (int i = 0; i < counterCount; i++) {
-              retCounters[i] = new Counter();
-              retCounters[i].deserialize(in);
-            }
-            System.arraycopy(retCounters, 0, counters, 0, Math.min(counters.length, retCounters.length));
-          }
-
-          if (in.readBoolean()) {
-            groupByContext.deserialize(in, client.getCommon(), dbName);
-          }
-
-          if (/*originalShard != -1 ||*/localShard == -1 || localShard == -2 || (retKeys != null && retKeys.length >= count) || (recordRet != null && recordRet.length >= count)) {
-            break;
-          }
+          return new SelectContextImpl(tableSchema.getName(), indexSchema.getName(), leftOperator, nextShard, nextKey, retKeys, recordCache);
         }
-        if (recordRet == null) {
-          String[] indexColumns = null;
-          for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
-            if (entry.getValue().isPrimaryKey()) {
-              indexColumns = entry.getValue().getFields();
-              break;
-            }
-          }
-          if (retKeys != null) {
-            List<IdEntry> keysToRead = new ArrayList<>();
-            for (int i = 0; i < retKeys.length; i++) {
-              Object[][] id = retKeys[i];
-
-              if (!recordCache.containsKey(tableSchema.getName(), id[0])) {
-                keysToRead.add(new ExpressionImpl.IdEntry(i, id[0]));
-              }
-            }
-            doReadRecords(dbName, client, count, forceSelectOnServer, tableSchema, keysToRead, indexColumns, columns, recordCache, viewVersion);
-          }
-        }
-        else {
-          String[] primaryKeyFields = null;
-          for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
-            if (entry.getValue().isPrimaryKey()) {
-              primaryKeyFields = entry.getValue().getFields();
-              break;
-            }
-          }
-          retKeys = new Object[recordRet.length][][];
-          for (int i = 0; i < recordRet.length; i++) {
-            Record record = recordRet[i];
-
-            Object[] key = new Object[primaryKeyFields.length];
-            for (int j = 0; j < primaryKeyFields.length; j++) {
-              key[j] = record.getFields()[tableSchema.getFieldOffset(primaryKeyFields[j])];
-            }
-
-            if (retKeys[i] == null) {
-              retKeys[i] = new Object[][]{key};
-            }
-
-            nextKey = key;
-
-            recordCache.put(tableSchema.getName(), key, new CachedRecord(record, null));
-          }
-        }
-        if (previousSchemaVersion < common.getSchemaVersion()) {
-          throw new SchemaOutOfSyncException();
-        }
-
-        return new SelectContextImpl(tableSchema.getName(), indexSchema.getName(), leftOperator, nextShard, nextKey, retKeys, recordCache);
+        return new SelectContextImpl();
       }
-      return new SelectContextImpl();
-    }
-    catch (IOException e) {
-      throw new DatabaseException(e);
-    }
-    finally {
-      ctx.stop();
+      catch (Exception e) {
+        if (handlePreparedNotFound(e)) {
+          preparedIndexLookups.remove(preparedKey.toString());
+          preparedKey = new StringBuilder();
+          continue;
+        }
+        throw new DatabaseException(e);
+      }
+      finally {
+        ctx.stop();
+      }
     }
   }
+
+  private static boolean handlePreparedNotFound(Exception e) {
+    try {
+      boolean preparedNotFound = false;
+      int index = ExceptionUtils.indexOfThrowable(e, PreparedIndexLookupNotFoundException.class);
+      if (-1 != index) {
+        preparedNotFound = true;
+      }
+      else if (e.getMessage() != null && e.getMessage().contains("PreparedIndexLookupNotFoundException")) {
+        preparedNotFound = true;
+      }
+      if (!preparedNotFound) {
+        throw e;
+      }
+
+      return true;
+    }
+    catch (PreparedIndexLookupNotFoundException e1) {
+      throw e1;
+    }
+    catch (Exception e1) {
+      throw new DatabaseException(e1);
+    }
+  }
+
+
 
   private static void writeColumns(
       TableSchema tableSchema, List<ColumnImpl> columns, DataOutputStream out, DataUtil.ResultLength resultLength) throws IOException {

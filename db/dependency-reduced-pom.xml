@@ -3,13 +3,13 @@
   <parent>
     <artifactId>sonicbase-root</artifactId>
     <groupId>com.lowryengineering</groupId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.9</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.lowryengineering</groupId>
   <artifactId>sonicbase</artifactId>
   <name>sonicbase</name>
-  <version>1.0-SNAPSHOT</version>
+  <version>0.9</version>
   <url>http://maven.apache.org</url>
   <build>
     <pluginManagement>

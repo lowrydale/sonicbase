@@ -113,10 +113,13 @@ public class ReadManager {
           if (entry == null) {
             break;
           }
-          if (entry.getValue() instanceof Long) {
-            entry.setValue(index.get(entry.getKey()));
+          byte[][] records = null;
+          synchronized (index.getMutex(entry.getKey())) {
+            if (entry.getValue() instanceof Long) {
+              entry.setValue(index.get(entry.getKey()));
+            }
+            records = server.fromUnsafeToRecords(entry.getValue());
           }
-          byte[][] records = server.fromUnsafeToRecords(entry.getValue());
           for (byte[] bytes : records) {
             Record record = new Record(tableSchema);
             record.deserialize(dbName, server.getCommon(), bytes, null, true);
@@ -339,6 +342,9 @@ public class ReadManager {
       PreparedIndexLookup prepared = null;
       if (isPrepared) {
         prepared = preparedIndexLookups.get(preparedId);
+        if (prepared == null) {
+          throw new PreparedIndexLookupNotFoundException();
+        }
       }
       else {
         prepared = new PreparedIndexLookup();
@@ -910,7 +916,13 @@ public class ReadManager {
         break;
       }
       boolean forceSelectOnServer = false;
-      byte[][] records = server.fromUnsafeToRecords(entry.getValue());
+      byte[][] records = null;
+      synchronized (index.getMutex(entry.getKey())) {
+        if (entry.getValue() instanceof Long) {
+          entry.setValue(index.get(entry.getKey()));
+        }
+        records = server.fromUnsafeToRecords(entry.getValue());
+      }
       if (parms != null && expression != null) {
         for (byte[] bytes : records) {
           Record record = new Record(tableSchema);
@@ -1101,14 +1113,25 @@ public class ReadManager {
             break;
           }
         }
+        byte[][] currKeys = null;
+        byte[][] records = null;
+        synchronized (index.getMutex(entry.getKey())) {
+          if (entry.getValue() instanceof Long) {
+            entry.setValue(index.get(entry.getKey()));
+          }
+          if (keys) {
+            currKeys = server.fromUnsafeToKeys(entry.getValue());
+          }
+          else {
+            records = server.fromUnsafeToRecords(entry.getValue());
+          }
+        }
         if (keys) {
-          byte[][] currKeys = server.fromUnsafeToKeys(entry.getValue());
           for (byte[] currKey : currKeys) {
             retKeys.add(currKey);
           }
         }
         else {
-          byte[][] records = server.fromUnsafeToRecords(entry.getValue());
           if (parms != null && expression != null && evaluateExpression) {
             for (byte[] bytes : records) {
               Record record = new Record(tableSchema);
@@ -1270,36 +1293,46 @@ public class ReadManager {
               }
             }
           }
+          byte[][] records = null;
+          byte[][] currKeys = null;
           synchronized (index.getMutex(entry.getKey())) {
             if (value instanceof Long) {
               value = index.get(entry.getKey());
             }
+            if (value instanceof Long) {
+              value = index.get(entry.getKey());
+            }
             if (keys) {
-              byte[][] currKeys = server.fromUnsafeToKeys(value);
-              for (byte[] currKey : currKeys) {
-                retKeys.add(currKey);
+              currKeys = server.fromUnsafeToKeys(value);
+            }
+            else {
+              records = server.fromUnsafeToRecords(value);
+            }
+          }
+          if (keys) {
+            for (byte[] currKey : currKeys) {
+              retKeys.add(currKey);
+            }
+          }
+          else {
+            if (parms != null && expression != null && evaluateExpresion) {
+              for (byte[] bytes : records) {
+                Record record = new Record(tableSchema);
+                record.deserialize(dbName, server.getCommon(), bytes, null, true);
+                boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
+                if (pass) {
+                  byte[][] currRecords = new byte[][]{bytes};
+                  Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, null, tableSchema, counters, groupContext);
+                  if (counters == null) {
+                    retRecords.add(ret[0]);
+                  }
+                }
               }
             }
             else {
-              byte[][] records = server.fromUnsafeToRecords(value);
-              if (parms != null && expression != null && evaluateExpresion) {
-                for (byte[] bytes : records) {
-                  Record record = new Record(tableSchema);
-                  record.deserialize(dbName, server.getCommon(), bytes, null, true);
-                  boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
-                  if (pass) {
-                    byte[][] currRecords = new byte[][]{bytes};
-                    Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, null, tableSchema, counters, groupContext);
-                    if (counters == null) {
-                      retRecords.add(ret[0]);
-                    }
-                  }
-                }
-              } else {
-                Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, null, tableSchema, counters, groupContext);
-                if (counters == null) {
-                  retRecords.addAll(Arrays.asList(ret));
-                }
+              Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, null, tableSchema, counters, groupContext);
+              if (counters == null) {
+                retRecords.addAll(Arrays.asList(ret));
               }
             }
           }
@@ -1497,14 +1530,26 @@ public class ReadManager {
             }
           }
 
-          if (keys) {
-            byte[][] currKeys = null;
-            synchronized (index) {
+          byte[][] currKeys = null;
+          byte[][] records = null;
+          synchronized (index.getMutex(currEntry.getKey())) {
+            if (currEntry.getValue() instanceof Long) {
+              currEntry.setValue(index.get(currEntry.getKey()));
+            }
+            if (keys) {
               Object unsafeAddress = currEntry.getValue();//index.get(entry.getKey());
               if (unsafeAddress != null) {
                 currKeys = server.fromUnsafeToKeys(unsafeAddress);
               }
             }
+            else {
+              Object unsafeAddress = currEntry.getValue();//index.get(entry.getKey());
+              if (unsafeAddress != null) {
+                records = server.fromUnsafeToRecords(unsafeAddress);
+              }
+            }
+          }
+          if (keys) {
             if (currKeys != null) {
               for (byte[] currKey : currKeys) {
                 retKeys.add(currKey);
@@ -1512,13 +1557,6 @@ public class ReadManager {
             }
           }
           else {
-            byte[][] records = null;
-            synchronized (index) {
-              Object unsafeAddress = currEntry.getValue();//index.get(entry.getKey());
-              if (unsafeAddress != null) {
-                records = server.fromUnsafeToRecords(unsafeAddress);
-              }
-            }
             if (records != null) {
               if (server.getCommon().getTables(dbName).get(tableSchema.getName()).getIndices().get(indexSchema.getName()).getLastPartitions() != null) {
                 List<byte[]> remaining = new ArrayList<>();
@@ -1664,9 +1702,17 @@ public class ReadManager {
       Index index = server.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
       Map.Entry<Object[], Object> entry = index.lastEntry();
       if (entry != null) {
-        Object unsafeAddress = entry.getValue();
-        if (unsafeAddress != null) {
-          byte[][] records = server.fromUnsafeToRecords(unsafeAddress);
+        byte[][] records = null;
+        synchronized (index.getMutex(entry.getKey())) {
+          Object unsafeAddress = entry.getValue();
+          if (unsafeAddress instanceof Long) {
+            unsafeAddress = index.get(entry.getKey());
+          }
+          if (unsafeAddress != null) {
+            records = server.fromUnsafeToRecords(unsafeAddress);
+          }
+        }
+        if (records != null) {
           Record record = new Record(dbName, server.getCommon(), records[0]);
           Object value = record.getFields()[tableSchema.getFieldOffset(columnName)];
           if (counter.isDestTypeLong()) {
@@ -1679,9 +1725,17 @@ public class ReadManager {
       }
       entry = index.firstEntry();
       if (entry != null) {
-        Object unsafeAddress = entry.getValue();
-        if (unsafeAddress != null) {
-          byte[][] records = server.fromUnsafeToRecords(unsafeAddress);
+        byte[][] records = null;
+        synchronized (index.getMutex(entry.getKey())) {
+          Object unsafeAddress = entry.getValue();
+          if (unsafeAddress instanceof Long) {
+            unsafeAddress = index.get(entry.getKey());
+          }
+          if (unsafeAddress != null) {
+            records = server.fromUnsafeToRecords(unsafeAddress);
+          }
+        }
+        if (records != null) {
           Record record = new Record(dbName, server.getCommon(), records[0]);
           Object value = record.getFields()[tableSchema.getFieldOffset(columnName)];
           if (counter.isDestTypeLong()) {

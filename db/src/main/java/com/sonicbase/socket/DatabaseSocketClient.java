@@ -275,9 +275,9 @@ public class DatabaseSocketClient {
   }
 
   public static final boolean ENABLE_BATCH = true;
-  private static final int BATCH_SIZE = 80;
+  private static final int BATCH_SIZE = 160; //last was 80
 
-  private Map<String, ConcurrentLinkedQueue<Request>> requestQueues = new HashMap<>();
+  private Map<String, ArrayBlockingQueue<Request>> requestQueues = new HashMap<>();
 
   public static class Request {
     private String command;
@@ -333,11 +333,11 @@ public class DatabaseSocketClient {
 
   static class BatchSender implements Runnable {
 
-    private final ConcurrentLinkedQueue<Request> queue;
+    private final ArrayBlockingQueue<Request> queue;
     private final String host;
     private final int port;
 
-    public BatchSender(String host, int port, ConcurrentLinkedQueue<Request> requests) {
+    public BatchSender(String host, int port, ArrayBlockingQueue<Request> requests) {
       this.queue = requests;
       this.host = host;
       this.port = port;
@@ -350,9 +350,9 @@ public class DatabaseSocketClient {
         List<Request> requests = new ArrayList<>();
         try {
 
-          Request request = queue.poll();//30000, TimeUnit.MILLISECONDS);
+          Request request = queue.poll(30000, TimeUnit.MILLISECONDS);
           if (request == null) {
-            Thread.sleep(0, 5000);
+            Thread.sleep(1);
             continue;
           }
           requests.add(request);
@@ -679,7 +679,7 @@ public class DatabaseSocketClient {
   private static final int BATCH_THREAD_COUNT = 2;
 
   private static void initBatchSender(String host, int port, DatabaseSocketClient socketClient) {
-    socketClient.requestQueues.put(host + ":" + port, new ConcurrentLinkedQueue<Request>());
+    socketClient.requestQueues.put(host + ":" + port, new ArrayBlockingQueue<Request>(1000));
 
 
     for (int i = 0; i < BATCH_THREAD_COUNT; i++) {
@@ -698,7 +698,7 @@ public class DatabaseSocketClient {
   public byte[] do_send(String batchKey, String command, byte[] body, String hostPort) {
     try {
       if (ENABLE_BATCH) {
-        ConcurrentLinkedQueue<Request> queue = null;
+        ArrayBlockingQueue<Request> queue = null;
         synchronized (this) {
           queue = requestQueues.get(hostPort);
           if (queue == null) {
@@ -737,7 +737,7 @@ public class DatabaseSocketClient {
     try {
 
       if (ENABLE_BATCH) {
-        ConcurrentLinkedQueue<Request> queue = null;
+        ArrayBlockingQueue<Request> queue = null;
         for (Request request : requests) {
           synchronized (request.socketClient) {
             queue = request.socketClient.requestQueues.get(request.hostPort);

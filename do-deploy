@@ -1,2 +1,3 @@
 #!/bin/bash
+mkdir -p $3/logs
 ssh -n -f -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $1 bash $2/bin/deploy $3 $4 $5 $6

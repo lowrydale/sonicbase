@@ -1,0 +1,5 @@
+#!/bin/bash
+
+mkdir -p tmp
+
+ls -l lib > tmp/jars

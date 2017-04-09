@@ -1275,33 +1275,21 @@ public class ReadManager {
         return null;
       }
 
-      List<Map.Entry<Object[], Object>> entries = index.equalsEntries(originalKey);
-      if (entries != null) {
-        for (Map.Entry<Object[], Object> currEntry : entries) {
-          entry = currEntry;
-          if (server.getCommon().compareKey(indexSchema.getComparators(), originalKey, entry.getKey()) != 0) {
-            break;
-          }
-          Object value = entry.getValue();
-          if (value == null) {
-            break;
-          }
-          if (excludeKeys != null) {
-            for (Object[] excludeKey : excludeKeys) {
-              if (server.getCommon().compareKey(indexSchema.getComparators(), excludeKey, originalKey) == 0) {
-                return null;
-              }
-            }
-          }
-          byte[][] records = null;
-          byte[][] currKeys = null;
-          synchronized (index.getMutex(entry.getKey())) {
-            if (value instanceof Long) {
-              value = index.get(entry.getKey());
-            }
-            if (value instanceof Long) {
-              value = index.get(entry.getKey());
-            }
+      boolean hasNull = false;
+      for (Object part : originalKey) {
+        if (part == null) {
+          hasNull = true;
+          break;
+        }
+      }
+      List<Map.Entry<Object[], Object>> entries = null;
+      if (!hasNull && originalKey.length == indexSchema.getFields().length && (indexSchema.isPrimaryKey() || indexSchema.isUnique())) {
+        byte[][] records = null;
+        byte[][] currKeys = null;
+        Object value = null;
+        synchronized (index.getMutex(originalKey)) {
+          value = index.get(originalKey);
+          if (value != null) {
             if (keys) {
               currKeys = server.fromUnsafeToKeys(value);
             }
@@ -1309,32 +1297,44 @@ public class ReadManager {
               records = server.fromUnsafeToRecords(value);
             }
           }
-          if (keys) {
-            for (byte[] currKey : currKeys) {
-              retKeys.add(currKey);
+        }
+        if (value != null) {
+          handleRecord(dbName, tableSchema, parms, evaluateExpresion, expression, columnOffsets, forceSelectOnServer, retKeys, retRecords, keys, counters, groupContext, records, currKeys);
+        }
+      }
+      else {
+        entries = index.equalsEntries(originalKey);
+        if (entries != null) {
+          for (Map.Entry<Object[], Object> currEntry : entries) {
+            entry = currEntry;
+            if (server.getCommon().compareKey(indexSchema.getComparators(), originalKey, entry.getKey()) != 0) {
+              break;
             }
-          }
-          else {
-            if (parms != null && expression != null && evaluateExpresion) {
-              for (byte[] bytes : records) {
-                Record record = new Record(tableSchema);
-                record.deserialize(dbName, server.getCommon(), bytes, null, true);
-                boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
-                if (pass) {
-                  byte[][] currRecords = new byte[][]{bytes};
-                  Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, null, tableSchema, counters, groupContext);
-                  if (counters == null) {
-                    retRecords.add(ret[0]);
-                  }
+            Object value = entry.getValue();
+            if (value == null) {
+              break;
+            }
+            if (excludeKeys != null) {
+              for (Object[] excludeKey : excludeKeys) {
+                if (server.getCommon().compareKey(indexSchema.getComparators(), excludeKey, originalKey) == 0) {
+                  return null;
                 }
               }
             }
-            else {
-              Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, null, tableSchema, counters, groupContext);
-              if (counters == null) {
-                retRecords.addAll(Arrays.asList(ret));
+            byte[][] records = null;
+            byte[][] currKeys = null;
+            synchronized (index.getMutex(entry.getKey())) {
+              if (value instanceof Long) {
+                value = index.get(entry.getKey());
+              }
+              if (keys) {
+                currKeys = server.fromUnsafeToKeys(value);
+              }
+              else {
+                records = server.fromUnsafeToRecords(value);
               }
             }
+            handleRecord(dbName, tableSchema, parms, evaluateExpresion, expression, columnOffsets, forceSelectOnServer, retKeys, retRecords, keys, counters, groupContext, records, currKeys);
           }
         }
       }
@@ -1670,6 +1670,36 @@ public class ReadManager {
       }
     }
     return entry;
+  }
+
+  private void handleRecord(String dbName, TableSchema tableSchema, ParameterHandler parms, boolean evaluateExpresion, Expression expression, Set<Integer> columnOffsets, boolean forceSelectOnServer, List<byte[]> retKeys, List<Record> retRecords, boolean keys, Counter[] counters, GroupByContext groupContext, byte[][] records, byte[][] currKeys) {
+    if (keys) {
+      for (byte[] currKey : currKeys) {
+        retKeys.add(currKey);
+      }
+    }
+    else {
+      if (parms != null && expression != null && evaluateExpresion) {
+        for (byte[] bytes : records) {
+          Record record = new Record(tableSchema);
+          record.deserialize(dbName, server.getCommon(), bytes, null, true);
+          boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
+          if (pass) {
+            byte[][] currRecords = new byte[][]{bytes};
+            Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, null, tableSchema, counters, groupContext);
+            if (counters == null) {
+              retRecords.add(ret[0]);
+            }
+          }
+        }
+      }
+      else {
+        Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, null, tableSchema, counters, groupContext);
+        if (counters == null) {
+          retRecords.addAll(Arrays.asList(ret));
+        }
+      }
+    }
   }
 
   private void count(Counter[] counters, Record record) {

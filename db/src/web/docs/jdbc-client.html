@@ -8,9 +8,19 @@
 <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
 </head>
 
+<h3>Prerequisites</h3>
+<div class="mylink">
+Before you connect to the database you need to create the database using the client. See the
+<a class="mylink" href="getting-started.html">Getting Started Guide</a> for an example.<br/>
+    <br/>
+    You must also include the SonicBase jdbc driver jar in your classpath. The jar is located
+    int the "lib" directory of the install directory. It is named "sonicbase-[version].jar".
+</div>
+
 <h3>JDK Requirements</h3>
 The jvm running the jdbc client needs to be at least version 7.
 <br/>
+
 <h3>Connecting</h3>
 Include the following line before creating a connection:<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;Class.forName("com.sonicbase.jdbcdriver.Driver");
@@ -19,7 +29,6 @@ Include the following line before creating a connection:<br/>
 Connect to the database with the following code:<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;Connection conn = DriverManager.getConnection("jdbc:sonicbase:&lt;address&gt;:9010/&lt;database name&gt;");<br/>
 <br/>
-First create a database using the client.
 
 
 <body>

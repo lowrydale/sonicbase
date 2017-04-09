@@ -9,13 +9,14 @@
 </head>
 
 <body>
-In this benchmark we create a range query that selects the endire database and we iterate over all the results.<br/>
+In this benchmark we read records by id from the database one record at a time.<br/>
 <br/>
-<p>PreparedStatement stmt = con.prepareStatement("select persons.id1, id2 from persons where id1 >= 0 order by id1 asc)<br/><br/>
-	ResultSet rs = stmt.executeQuery();<br/>
 	for (int i = 0; ; i++) {<br/>
+	&nbsp;&nbsp;&nbsp;&nbsp;PreparedStatement stmt = con.prepareStatement("select id from persons where persons.id=?")<br/>
+	&nbsp;&nbsp;&nbsp;&nbsp;stmt.setLong(1, i);<br/>
+	&nbsp;&nbsp;&nbsp;&nbsp;ResultSet rs = stmt.executeQuery();<br/>
 	&nbsp;&nbsp;&nbsp;&nbsp;rs.next();<br/>
-	}<br/>
+	}<br/><br/>
 	
 		<div class="mylink">
 	<a href="benchmarks-schema.html">Schema and Insert Code</a><br/><br/>
@@ -33,7 +34,7 @@ In this benchmark we create a range query that selects the endire database and w
     </tr>
     <tr>
       <td>Record count</td>
-      <td>700 million</td>
+      <td>1 billion</td>
     </tr>
     <tr>
       <td>Server total mem</td>
@@ -41,7 +42,7 @@ In this benchmark we create a range query that selects the endire database and w
     </tr>
     <tr>
       <td>Server xmx</td>
-      <td>38g</td>
+      <td>32g</td>
     </tr>
     <tr>
       <td>Resident mem</td>
@@ -49,7 +50,7 @@ In this benchmark we create a range query that selects the endire database and w
     </tr>
     <tr>
       <td>Client machine count</td>
-      <td>8</td>
+      <td>16</td>
     </tr>
         <tr>
       <td>Cores per client machine</td>
@@ -62,19 +63,23 @@ In this benchmark we create a range query that selects the endire database and w
 
     <tr>
       <td>Call rate</td>
-      <td>1.15mil/sec</td>
+      <td>470k/sec</td>
     </tr>
-     <tr>
+    <tr>
+      <td>Call latency</td>
+      <td>1.6 millis</td>
+    </tr>
+    <tr>
       <td>Threads per client</td>
-      <td>16</td>
+      <td>256</td>
     </tr>
     <tr>
       <td>Server cpu</td>
-      <td>95%</td>
+      <td>30%</td>
     </tr>
     <tr>
     	<td>Shard Count</td>
-    	<td>4</td>
+    	<td>8</td>
     </tr>
     <tr>
     	<td>Replica Count</td>

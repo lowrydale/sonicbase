@@ -7,5 +7,7 @@ fi
 
 cd $SEARCH_HOME
 
-$SEARCH_HOME/bin/runclass com.sonicbase.cli.Deploy $1 $2
+mkdir -p $SEARCH_HOME/logs
+
+nohup $SEARCH_HOME/bin/runclass com.sonicbase.cli.Deploy $1 $2 > $SEARCH_HOME/logs/deploy.log 2>&1 &
 

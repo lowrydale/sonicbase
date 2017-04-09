@@ -65,7 +65,8 @@ public class TestIndex {
           dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null);
           dbServers[shard].setRole(role);
           dbServers[shard].disableLogProcessor();
-    //          return null;
+          dbServers[shard].setMinSizeForRepartition(0);
+          //          return null;
     //        }
     //      }));
         }

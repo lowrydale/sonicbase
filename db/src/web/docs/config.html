@@ -21,8 +21,11 @@ The config file must be named "config-&lt;cluster name&gt;.json".
 &nbsp;&nbsp;&nbsp;&nbsp;"database": {<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"dataDirectory": "$HOME/db-data",<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"installDirectory": "$HOME/database",<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"copmressRecords": false,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"useUnsafe": true,<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"maxJavaHeap": "50%",<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"maxProcessMemory": "90%",<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"maxJavaHeapTrigger": "90%",<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"maxProcessMemoryTrigger": "90%",<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"replicationFactor": 1,<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"shards" : [<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br/>
@@ -43,10 +46,22 @@ dataDirectory - path to the location of the database files.<br/>
 <br/>
 installDirectory - path to the location of the installation directory.<br/>
 <br/>
+compressRecords - if true, records will be compressed when stored in memory. This option won't help much
+unless you have lots of strings that compress well.<br/>
+<br/>
+useUnsafe - if true, records will be stores in unsafe memory (off java heap). This reduces the amount of
+memory that is subject to garbase collection. Using this option slows down SonicBase, but it increases
+the number of records you can load into the database<br/>
+<br/>
 maxJavaHeap - maximum java heap size. Can be absolute (e.g., 50g, 1024m). It can also be a percentage
 of the machine total memory (e.g., 50%).<br/>
 <br/>
-maxProcessMemory - maximum server memory footprint. Can be absolute or a percentage. It is recommended
+maxJavaHeapTrigger - amount of java heap above which SonicBase will start rejecting inserts. It can be absolute
+or a percentage. It is recommended that no more than 90% of the memory be used. You need to leave
+at least 5gig for SonicBase processing<br/>
+<br/>
+maxProcessMemoryTrigger - maximum server memory footprint above which SonicBase will start rejecting inserts.
+ It can be absolute or a percentage. It is recommended
 that no more than 90% of the memory be used.<br/>
 <br/>
 shards - list of shards (servers)<br/>

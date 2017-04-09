@@ -1,0 +1,12 @@
+#!/bin/bash
+
+mkdir -p .tmp
+
+export mac=`sw_vers | grep 'Mac OS X'`
+echo $mac
+if [ "$mac" == '' ]; then
+    top -b -n 1 -o RES > tmp/top
+else
+    top -l 1 > tmp/top
+fi
+

@@ -662,9 +662,9 @@ public class UpdateManager {
       if (shouldExecute.get()) {
         //because this is the primary key index we won't have more than one index entry for the key
         Index index = server.getIndices(dbName).getIndices().get(tableName).get(indexName);
+        Object newValue = server.toUnsafeFromRecords(new byte[][]{bytes});
         synchronized (index.getMutex(primaryKey)) {
           Object value = index.get(primaryKey);
-          Object newValue = server.toUnsafeFromRecords(new byte[][]{bytes});
           index.put(primaryKey, newValue);
           if (value != null) {
             server.freeUnsafeIds(value);
@@ -751,12 +751,10 @@ public class UpdateManager {
       }
       key = newKey;
     }
+    Object existingValue = null;
     synchronized (index.getMutex(key)) {
-      Object existingValue = index.get(key);
-      if (existingValue == null) {
-        index.put(key, server.toUnsafeFromKeys(new byte[][]{primaryKeyBytes}));
-      }
-      else {
+      existingValue = index.get(key);
+      if (existingValue != null) {
         byte[][] records = server.fromUnsafeToRecords(existingValue);
         boolean replaced = false;
         for (int i = 0; i < records.length; i++) {
@@ -778,6 +776,9 @@ public class UpdateManager {
           index.put(key, address);
         }
       }
+    }
+    if (existingValue == null) {
+      index.put(key, server.toUnsafeFromKeys(new byte[][]{primaryKeyBytes}));
     }
   }
 
@@ -803,8 +804,8 @@ public class UpdateManager {
 
 
     if (true) {
+      Object newUnsafeRecords = server.toUnsafeFromRecords(new byte[][]{recordBytes});
       synchronized (index.getMutex(key)) {
-        Object newUnsafeRecords = server.toUnsafeFromRecords(new byte[][]{recordBytes});
         Object existingValue = index.unsafePutIfAbsent(key, newUnsafeRecords);
         if (existingValue != null) {
           //synchronized (index) {
@@ -828,6 +829,7 @@ public class UpdateManager {
       }
     }
     else {
+      Object newValue = server.toUnsafeFromRecords(new byte[][]{recordBytes});
       synchronized (index.getMutex(key)) {
         Object existingValue = index.get(key);
         boolean sameTrans = false;
@@ -842,10 +844,11 @@ public class UpdateManager {
           }
         }
         if (!ignoreDuplicates && existingValue != null && !sameTrans) {
+          server.freeUnsafeIds(newValue);
           throw new DatabaseException("Unique constraint violated: table=" + tableName + ", index=" + indexName +  ", key=" + DatabaseCommon.keyToString(key));
         }
         //    if (existingValue == null) {
-        index.put(key, server.toUnsafeFromRecords(new byte[][]{recordBytes}));
+        index.put(key, newValue);
         if (existingValue != null) {
           server.freeUnsafeIds(existingValue);
         }
@@ -1018,8 +1021,9 @@ public class UpdateManager {
 
     Comparator[] comparators = schema.getIndices().get(primaryKeyIndexName).getComparators();
 
-    synchronized (server.getIndices(dbName).getIndices().get(schema.getName()).get(indexName).getMutex(key)) {
-      Object value = server.getIndices(dbName).getIndices().get(schema.getName()).get(indexName).get(key);
+    Index index = server.getIndices(dbName).getIndices().get(schema.getName()).get(indexName);
+    synchronized (index.getMutex(key)) {
+      Object value = index.get(key);
       if (value == null) {
         return;
       }
@@ -1037,7 +1041,7 @@ public class UpdateManager {
           }
           if (!mismatch) {
             server.freeUnsafeIds(value);
-            server.getIndices(dbName).getIndices().get(schema.getName()).get(indexName).remove(key);
+            index.remove(key);
           }
         }
         else {
@@ -1063,7 +1067,7 @@ public class UpdateManager {
           if (found) {
             server.freeUnsafeIds(value);
             value = server.toUnsafeFromKeys(newValues);
-            server.getIndices(dbName).getIndices().get(schema.getName()).get(indexName).put(key, value);
+            index.put(key, value);
           }
         }
       }

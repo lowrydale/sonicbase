@@ -137,6 +137,10 @@ public class DatabaseServer {
 
   }
 
+  public void setMinSizeForRepartition(int minSizeForRepartition) {
+    repartitioner.setMinSizeForRepartition(minSizeForRepartition);
+  }
+
   public long getCommandCount() {
     return commandCount.get();
   }
@@ -473,9 +477,12 @@ public class DatabaseServer {
 
     }
 
+    Thread thread = new Thread(new NetMonitor());
+    thread.start();
+
     boolean isInternal = false;
-    if (config.hasKey("clientIsPrivate")) {
-      isInternal = config.getBoolean("clientIsPrivate");
+    if (databaseDict.hasKey("clientIsPrivate")) {
+      isInternal = databaseDict.getBoolean("clientIsPrivate");
     }
     serversConfig = new ServersConfig(shards, replicationFactor, isInternal);
     this.replica = serversConfig.getThisReplica(host, port);
@@ -704,6 +711,363 @@ public class DatabaseServer {
     return totalGig;
   }
 
+  private double avgTransRate = 0;
+  private double avgRecRate = 0;
+
+
+  class NetMonitor implements Runnable {
+    public void run() {
+      List<Double> transRate = new ArrayList<>();
+      List<Double> recRate = new ArrayList<>();
+      try {
+        if (isMac()) {
+          ProcessBuilder builder = new ProcessBuilder().command("ifstat");
+          Process p = builder.start();
+          BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+          String firstLine = null;
+          Set<Integer> toSkip = new HashSet<>();
+          while (true) {
+            String line = in.readLine();
+            if (line == null) {
+              break;
+            }
+            String[] parts = line.trim().split("\\s+");
+            if (firstLine == null) {
+              for (int i = 0; i < parts.length; i++) {
+                if (parts[i].toLowerCase().contains("bridge")) {
+                  toSkip.add(i);
+                }
+              }
+              firstLine = line;
+            }
+            else {
+              try {
+                double trans = 0;
+                double rec = 0;
+                for (int i = 0; i < parts.length; i++) {
+                  if (toSkip.contains(i / 2)) {
+                    continue;
+                  }
+                  if (i % 2 == 0) {
+                    rec += Double.valueOf(parts[i]);
+                  }
+                  else if (i % 2 == 1) {
+                    trans += Double.valueOf(parts[i]);
+                  }
+                }
+                transRate.add(trans);
+                recRate.add(rec);
+                if (transRate.size() > 10) {
+                  transRate.remove(0);
+                }
+                if (recRate.size() > 10) {
+                  recRate.remove(0);
+                }
+                Double total = 0d;
+                for (Double currRec : recRate) {
+                  total += currRec;
+                }
+                avgRecRate = total / recRate.size();
+
+                total = 0d;
+                for (Double currTrans : transRate) {
+                  total += currTrans;
+                }
+                avgTransRate = total / transRate.size();
+              }
+              catch (Exception e) {
+                logger.error("Error reading net traffic line: line=" + line);
+              }
+            }
+          }
+          p.waitFor();
+        }
+        else if (isUnix()) {
+          while (true) {
+            int count = 0;
+            File file = new File(System.getProperty("user.dir"), "dstat.out");
+            file.delete();
+            ProcessBuilder builder = new ProcessBuilder().command("dstat --output dstat.out");
+            Process p = builder.start();
+            BufferedReader in = new BufferedReader(new InputStreamReader(new FileInputStream(file)));
+            int recvPos = 0;
+            int sendPos = 0;
+            while (true) {
+              String line = in.readLine();
+              if (line == null) {
+                break;
+              }
+              try {
+                if (count++ > 10000) {
+                  p.destroyForcibly();
+                  break;
+                }
+
+    /*
+
+    "Dstat 0.7.0 CSV output"
+  "Author:","Dag Wieers <dag@wieers.com>",,,,"URL:","http://dag.wieers.com/home-made/dstat/"
+  "Host:","ip-10-0-0-79",,,,"User:","ec2-user"
+  "Cmdline:","dstat --output out",,,,"Date:","09 Apr 2017 02:48:19 UTC"
+
+  "total cpu usage",,,,,,"dsk/total",,"net/total",,"paging",,"system",
+  "usr","sys","idl","wai","hiq","siq","read","writ","recv","send","in","out","int","csw"
+  20.409,1.659,74.506,3.404,0.0,0.021,707495.561,82419494.859,0.0,0.0,0.0,0.0,17998.361,18691.991
+  8.794,1.131,77.010,13.065,0.0,0.0,0.0,272334848.0,54.0,818.0,0.0,0.0,1514.0,477.0
+  9.217,1.641,75.758,13.384,0.0,0.0,0.0,276201472.0,54.0,346.0,0.0,0.0,1481.0,392.0
+
+     */
+                String[] parts = line.split(",");
+                if (line.contains("usr") && line.contains("recv") && line.contains("send")) {
+                  for (int i = 0; i < parts.length; i++) {
+                    if (parts[i].equals("\"recv\"")) {
+                      recvPos = i;
+                    }
+                    else if (parts[i].equals("\"send\"")) {
+                      sendPos = i;
+                    }
+                  }
+                }
+                else {
+                  Double trans = Double.valueOf(parts[sendPos]);
+                  Double rec = Double.valueOf(parts[recvPos]);
+                  transRate.add(trans);
+                  recRate.add(rec);
+                  if (transRate.size() > 10) {
+                    transRate.remove(0);
+                  }
+                  if (recRate.size() > 10) {
+                    recRate.remove(0);
+                  }
+                  Double total = 0d;
+                  for (Double currRec : recRate) {
+                    total += currRec;
+                  }
+                  avgRecRate = total / recRate.size();
+
+                  total = 0d;
+                  for (Double currTrans : transRate) {
+                    total += currTrans;
+                  }
+                  avgTransRate = total / transRate.size();
+                }
+              }
+              catch (Exception e) {
+                logger.error("Error reading net traffic line: line=" + line);
+              }
+            }
+            p.waitFor();
+          }
+        }
+      }
+      catch (Exception e) {
+        logger.error("Error in net monitor thread", e);
+      }
+    }
+  }
+
+  private String getDiskAvailable() throws IOException, InterruptedException {
+    ProcessBuilder builder = new ProcessBuilder().command("df", "-h");
+    Process p = builder.start();
+    Integer availPos = null;
+    Integer mountedPos = null;
+    List<String> avails = new ArrayList<>();
+    int bestLineMatching = -1;
+    int bestLineAmountMatch = 0;
+    int mountOffset = 0;
+    BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+    while (true) {
+      String line = in.readLine();
+      if (line == null) {
+        break;
+      }
+      String[] parts = line.split("\\s+");
+      if (availPos == null) {
+        for (int i = 0; i < parts.length; i++) {
+          if (parts[i].toLowerCase().trim().equals("avail")) {
+            availPos = i;
+          }
+          else if (parts[i].toLowerCase().trim().startsWith("mounted")) {
+            mountedPos = i;
+          }
+        }
+      }
+      else {
+        String mountPoint = parts[mountedPos];
+        if (dataDir.startsWith(mountPoint)) {
+          if (mountPoint.length() > bestLineAmountMatch) {
+            bestLineAmountMatch = mountPoint.length();
+            bestLineMatching = mountOffset;
+          }
+        }
+        avails.add(parts[availPos]);
+        mountOffset++;
+      }
+    }
+    p.waitFor();
+
+    if (bestLineMatching != -1) {
+      return avails.get(bestLineMatching);
+    }
+    return null;
+  }
+
+  public byte[] getOSStats(String command, byte[] body, boolean replayedCommand) {
+    Double resGig = null;
+    String secondToLastLine = null;
+    String lastLine = null;
+    Double cpu = null;
+    AtomicReference<Double> javaMemMax = new AtomicReference<>();
+    AtomicReference<Double> javaMemMin = new AtomicReference<>();
+    try {
+      if (isMac()) {
+        ProcessBuilder builder = new ProcessBuilder().command("top", "-l", "1", "-pid", String.valueOf(pid));
+        Process p = builder.start();
+        BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+        while (true) {
+          String line = in.readLine();
+          if (line == null) {
+            break;
+          }
+          secondToLastLine = lastLine;
+          lastLine = line;
+        }
+        p.waitFor();
+
+        secondToLastLine = secondToLastLine.trim();
+        lastLine = lastLine.trim();
+        String[] headerParts = secondToLastLine.split("\\s+");
+        String[] parts = lastLine.split("\\s+");
+        for (int i = 0; i < headerParts.length; i++) {
+          if (headerParts[i].toLowerCase().trim().equals("mem")) {
+            resGig = getMemValue(parts[i]);
+          }
+          else if (headerParts[i].toLowerCase().trim().equals("%cpu")) {
+            cpu = Double.valueOf(parts[i]);
+          }
+        }
+      }
+      else if (isUnix()) {
+        ProcessBuilder builder = new ProcessBuilder().command("top", "-b", "-n", "1", "-p", String.valueOf(pid));
+        Process p = builder.start();
+        BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+        while (true) {
+          String line = in.readLine();
+          if (line == null) {
+            break;
+          }
+          if (lastLine != null || line.trim().toLowerCase().startsWith("pid")) {
+            secondToLastLine = lastLine;
+            lastLine = line;
+          }
+          if (lastLine != null && secondToLastLine != null) {
+            break;
+          }
+        }
+        p.waitFor();
+
+        secondToLastLine = secondToLastLine.trim();
+        lastLine = lastLine.trim();
+        String[] headerParts = secondToLastLine.split("\\s+");
+        String[] parts = lastLine.split("\\s+");
+        for (int i = 0; i < headerParts.length; i++) {
+          if (headerParts[i].toLowerCase().trim().equals("res")) {
+            String memStr = parts[i];
+            resGig = getMemValue(memStr);
+          }
+          else if (headerParts[i].toLowerCase().trim().equals("%cpu")) {
+            cpu = Double.valueOf(parts[i]);
+          }
+        }
+      }
+
+      getJavaMemStats(javaMemMin, javaMemMax);
+
+      String diskAvail = getDiskAvailable();
+
+      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+      DataOutputStream out = new DataOutputStream(bytesOut);
+      out.writeLong(SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+      out.writeDouble(resGig);
+      out.writeDouble(cpu);
+      out.writeDouble(javaMemMin.get() == null ? 0 : javaMemMin.get());
+      out.writeDouble(javaMemMax.get() == null ? 0 : javaMemMax.get());
+      out.writeDouble(avgRecRate);
+      out.writeDouble(avgTransRate);
+      out.writeUTF(diskAvail);
+      out.writeUTF(host);
+      out.close();
+      return bytesOut.toByteArray();
+    }
+    catch (Exception e) {
+      logger.error("Error checking memory: line2=" + secondToLastLine + ", line1=" + lastLine, e);
+    }
+
+
+    return null;
+  }
+
+  private void getJavaMemStats(AtomicReference<Double> javaMemMin, AtomicReference<Double> javaMemMax) {
+    String line = null;
+    File file = new File(gclog + ".0.current");
+    try (ReversedLinesFileReader fr = new ReversedLinesFileReader(file, Charset.forName("utf-8"))) {
+      String ch;
+      do {
+        ch = fr.readLine();
+        if (ch == null) {
+          break;
+        }
+        if (ch.indexOf("[Eden") != -1) {
+          int pos = ch.indexOf("Heap:");
+          if (pos != -1) {
+            int pos2 = ch.indexOf("(", pos);
+            if (pos2 != -1) {
+              String value = ch.substring(pos + "Heap:".length(), pos2).trim().toLowerCase();
+              double maxGig = 0;
+              if (value.contains("g")) {
+                maxGig = Double.valueOf(value.substring(0, value.length() - 1));
+              }
+              else if (value.contains("m")) {
+                maxGig = Double.valueOf(value.substring(0, value.length() - 1)) / 1000d;
+              }
+              else if (value.contains("t")) {
+                maxGig = Double.valueOf(value.substring(0, value.length() - 1)) * 1000d;
+              }
+              javaMemMax.set(maxGig);
+            }
+
+            pos2 = ch.indexOf("->", pos);
+            if (pos2 != -1) {
+              int pos3 = ch.indexOf("(", pos2);
+              if (pos3 != -1) {
+                line = ch;
+                String value = ch.substring(pos2 + 2, pos3);
+                value = value.trim().toLowerCase();
+                double minGig = 0;
+                if (value.contains("g")) {
+                  minGig = Double.valueOf(value.substring(0, value.length() - 1));
+                }
+                else if (value.contains("m")) {
+                  minGig = Double.valueOf(value.substring(0, value.length() - 1)) / 1000d;
+                }
+                else if (value.contains("t")) {
+                  minGig = Double.valueOf(value.substring(0, value.length() - 1)) * 1000d;
+                }
+                javaMemMin.set(minGig);
+              }
+            }
+            break;
+          }
+        }
+      }
+      while (ch != null);
+    }
+    catch (Exception e) {
+      logger.error("Error getting java mem stats: line=" + line);
+    }
+  }
+
+
   private void checkJavaHeap(Double totalGig) throws IOException {
     String line = null;
     try {
@@ -718,6 +1082,9 @@ public class DatabaseServer {
         String ch;
         do {
           ch = fr.readLine();
+          if (ch == null) {
+            break;
+          }
           if (ch.indexOf("[Eden") != -1) {
             int pos = ch.indexOf("Heap:");
             if (pos != -1) {
@@ -1192,38 +1559,6 @@ public class DatabaseServer {
     executor.shutdownNow();
   }
 
-
-  public Object toUnsafeFromIds(long[] ids) throws IOException {
-    if (!useUnsafe) {
-      return ids;
-    }
-    else {
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-      out.writeInt(0);
-      out.writeInt(ids.length);
-      for (long id : ids) {
-        DataUtil.writeVLong(out, id, resultLength);
-      }
-      out.close();
-      byte[] bytes = bytesOut.toByteArray();
-      bytesOut = new ByteArrayOutputStream();
-      out = new DataOutputStream(bytesOut);
-      out.writeInt(bytes.length);
-      out.close();
-      byte[] lenBuffer = bytesOut.toByteArray();
-
-      System.arraycopy(lenBuffer, 0, bytes, 0, lenBuffer.length);
-
-      long address = unsafe.allocateMemory(bytes.length);
-      for (int i = 0; i < bytes.length; i++) {
-        unsafe.putByte(address + i, bytes[i]);
-      }
-      return -1 * address;
-    }
-  }
-
   public Object toUnsafeFromRecords(byte[][] records) {
     if (!useUnsafe) {
       return records;
@@ -1342,30 +1677,6 @@ public class DatabaseServer {
         throw new DatabaseException(e);
       }
     }
-  }
-
-  public long[] fromUnsafeToIds(long address) throws IOException {
-    address *= -1;
-    byte[] lenBuffer = new byte[4];
-    lenBuffer[0] = unsafe.getByte(address + 0);
-    lenBuffer[1] = unsafe.getByte(address + 1);
-    lenBuffer[2] = unsafe.getByte(address + 2);
-    lenBuffer[3] = unsafe.getByte(address + 3);
-    ByteArrayInputStream bytesIn = new ByteArrayInputStream(lenBuffer);
-    DataInputStream in = new DataInputStream(bytesIn);
-    int count = in.readInt();
-    byte[] bytes = new byte[count];
-    for (int i = 0; i < count; i++) {
-      bytes[i] = unsafe.getByte(address + i);
-    }
-    in = new DataInputStream(new ByteArrayInputStream(bytes));
-    DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-    in.readInt(); //byte count
-    long[] ret = new long[in.readInt()];
-    for (int i = 0; i < ret.length; i++) {
-      ret[i] = DataUtil.readVLong(in, resultLength);
-    }
-    return ret;
   }
 
   public byte[][] fromUnsafeToRecords(Object obj) {
@@ -1595,16 +1906,26 @@ public class DatabaseServer {
             }
             catch (Exception e) {
               boolean schemaOutOfSync = false;
-              int index = ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class);
-              if (-1 != index) {
+              if (SchemaOutOfSyncException.class.isAssignableFrom(e.getClass())) {
                 schemaOutOfSync = true;
               }
-              else if (e.getMessage() != null && e.getMessage().contains("SchemaOutOfSyncException")) {
-                schemaOutOfSync = true;
+              else {
+                if (e.getMessage() != null && e.getMessage().contains("SchemaOutOfSyncException")) {
+                  schemaOutOfSync = true;
+                }
+                else {
+                  int index = ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class);
+                  if (-1 != index) {
+                    schemaOutOfSync = true;
+                  }
+                }
               }
 
               if (!schemaOutOfSync) {
                 logger.error("Error processing request", e);
+              }
+              else {
+                logger.info("Schema out of sync: schemaVersion=" + common.getSchemaVersion());
               }
               throw new DatabaseException(e);
             }

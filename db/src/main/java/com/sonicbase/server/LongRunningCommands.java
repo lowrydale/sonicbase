@@ -22,7 +22,6 @@ public class LongRunningCommands {
 
   public LongRunningCommands(DatabaseServer server) {
     this.server = server;
-    commands = new CompoundCommand(this);
   }
 
   public void load() {
@@ -97,107 +96,36 @@ public class LongRunningCommands {
   }
 
   public void execute() {
-    synchronized (commands.commands) {
-      for (Command command : commands.commands) {
-        command.execute(commands.commands);
+    synchronized (commands) {
+      for (SingleCommand command : commands) {
+        command.execute(commands);
       }
     }
   }
 
-  public void addCommand(Command command) {
-    synchronized (commands.commands) {
-      commands.commands.add(command);
+  public void addCommand(SingleCommand command) {
+    synchronized (commands) {
+      commands.add(command);
     }
     save();
-    command.execute(commands.commands);
+    command.execute(commands);
   }
 
   public int getCommandCount() {
-    synchronized (commands.commands) {
-      return commands.commands.size();
+    synchronized (commands) {
+      return commands.size();
     }
   }
 
-  public interface Command {
-    void serialize(DataOutputStream out) throws IOException;
-    void deserialize(DataInputStream in) throws IOException;
-
-    void execute(List<Command> parentList);
-    void executeBlocking(List<Command> parentList);
+  public SingleCommand createSingleCommand(String command, byte[] body) {
+    return new SingleCommand(this, command, body);
   }
 
-  public static class CompoundCommand implements Command {
-    private final LongRunningCommands longRunningCommands;
-    List<Command> commands = new ArrayList<>();
-    CompoundCommand(LongRunningCommands longRunningCommands) {
-      this.longRunningCommands = longRunningCommands;
-    }
-    public void serialize(DataOutputStream out) throws IOException {
-      synchronized (commands) {
-        DataUtil.writeVLong(out, commands.size());
-        for (Command command : commands) {
-          serializeType(out, command);
-          command.serialize(out);
-        }
-      }
-    }
-
-    public void deserialize(DataInputStream in) throws IOException {
-      synchronized (commands) {
-        commands.clear();
-        int count = (int) DataUtil.readVLong(in);
-        for (int i = 0; i < count; i++) {
-          Command command = createType(longRunningCommands, in);
-          command.deserialize(in);
-          commands.add(command);
-        }
-      }
-    }
-
-    @Override
-    public void execute(final List<Command> parentList) {
-      Thread thread = new Thread(new Runnable(){
-        @Override
-        public void run() {
-          doExecute(parentList);
-        }
-      });
-      thread.start();
-    }
-
-    private void doExecute(List<Command> parentList) {
-      while (true) {
-        Command command = null;
-        synchronized (commands) {
-          if (commands.size() == 0) {
-            break;
-          }
-          command = commands.get(0);
-        }
-        command.executeBlocking(commands);
-      }
-      synchronized (parentList) {
-        parentList.remove(CompoundCommand.this);
-      }
-      longRunningCommands.save();
-    }
-
-    @Override
-    public void executeBlocking(List<Command> parentList) {
-      doExecute(parentList);
-    }
-
-    public void addCommand(Command singleCommand) {
-      synchronized (commands) {
-        commands.add(singleCommand);
-      }
-    }
-  }
-
-  public static class SingleCommand implements Command {
-    private final LongRunningCommands longRunningCommands;
+  public static class SingleCommand {
+    final LongRunningCommands longRunningCommands;
     String command;
     byte[] body;
+
     SingleCommand(LongRunningCommands longRunningCommands) {
       this.longRunningCommands = longRunningCommands;
     }
@@ -228,8 +156,7 @@ public class LongRunningCommands {
       }
     }
 
-    @Override
-    public void execute(final List<Command> parentList) {
+    public void execute(final List<SingleCommand> parentList) {
       Thread thread = new Thread(new Runnable(){
         @Override
         public void run() {
@@ -239,12 +166,11 @@ public class LongRunningCommands {
       thread.start();
     }
 
-    @Override
-    public void executeBlocking(final List<Command> parentList) {
+    public void executeBlocking(final List<SingleCommand> parentList) {
       doExecute(parentList);
     }
 
-    private void doExecute(List<Command> parentList) {
+    private void doExecute(List<SingleCommand> parentList) {
       longRunningCommands.server.handleCommand(command, body, false, false);
       synchronized (parentList) {
         parentList.remove(SingleCommand.this);
@@ -266,45 +192,29 @@ public class LongRunningCommands {
     }
   }
 
-  private CompoundCommand commands;
-
-  public CompoundCommand createCompoundCommand() {
-    return new CompoundCommand(this);
-  }
-  public SingleCommand createSingleCommand(String command, byte[] body) {
-    return new SingleCommand(this, command, body);
-  }
+  private List<SingleCommand> commands = new ArrayList<>();
 
   public void serialize(DataOutputStream out) throws IOException {
     synchronized (commands) {
-      commands.serialize(out);
-    }
-  }
-
-  private static void serializeType(DataOutputStream out, Command command) throws IOException {
-    if (command instanceof SingleCommand) {
-      out.write(Type.single.value);
-    }
-    else {
-      out.write(Type.compound.value);
+      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+      DataUtil.writeVLong(out, commands.size());
+      for (SingleCommand command : commands) {
+        command.serialize(out);
+      }
     }
   }
 
   public void deserialize(DataInputStream in) throws IOException {
     synchronized (commands) {
-      commands.deserialize(in);
+      commands.clear();
+      long serializationVersion = DataUtil.readVLong(in);
+      long count = DataUtil.readVLong(in);
+      for (int i = 0; i < count; i++) {
+        SingleCommand command = new SingleCommand(this);
+        command.deserialize(in);
+        commands.add(command);
+      }
     }
-  }
-
-  private static Command createType(LongRunningCommands longRunningCommands, DataInputStream in) throws IOException {
-    Command command;Type type = lookupTypeById.get(in.read());
-    if (type == Type.single) {
-      command = new SingleCommand(longRunningCommands);
-    }
-    else {
-      command = new CompoundCommand(longRunningCommands);
-    }
-    return command;
   }
 
 }

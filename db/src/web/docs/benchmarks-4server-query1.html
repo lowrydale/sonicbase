@@ -9,6 +9,8 @@
 </head>
 
 <body>
+In this benchmark we read records by id from the database one record at a time.<br/>
+<br/>
 	for (int i = 0; ; i++) {<br/>
 	&nbsp;&nbsp;&nbsp;&nbsp;PreparedStatement stmt = con.prepareStatement("select id from persons where persons.id=?")<br/>
 	&nbsp;&nbsp;&nbsp;&nbsp;stmt.setLong(1, i);<br/>
@@ -32,7 +34,7 @@
     </tr>
     <tr>
       <td>Record count</td>
-      <td>280 million</td>
+      <td>700 million</td>
     </tr>
     <tr>
       <td>Server total mem</td>
@@ -40,19 +42,19 @@
     </tr>
     <tr>
       <td>Server xmx</td>
-      <td>22g</td>
+      <td>33g</td>
     </tr>
     <tr>
       <td>Resident mem</td>
-      <td>57g</td>
+      <td>52g</td>
     </tr>
     <tr>
       <td>Client machine count</td>
-      <td>4</td>
+      <td>8</td>
     </tr>
         <tr>
       <td>Cores per client machine</td>
-      <td>8</td>
+      <td>4</td>
     </tr>
     <tr>
     	<td>Cores per server machine</td>
@@ -65,7 +67,7 @@
     </tr>
     <tr>
       <td>Call latency</td>
-      <td>3.5 millis</td>
+      <td>1.8 millis</td>
     </tr>
     <tr>
       <td>Threads per client</td>
@@ -73,15 +75,15 @@
     </tr>
     <tr>
       <td>Server cpu</td>
-      <td>40%</td>
+      <td>50%</td>
     </tr>
     <tr>
     	<td>Shard Count</td>
-    	<td>2</td>
+    	<td>4</td>
     </tr>
     <tr>
     	<td>Replica Count</td>
-    	<td>2</td>
+    	<td>1</td>
     </tr>
   </tbody>
 </table>

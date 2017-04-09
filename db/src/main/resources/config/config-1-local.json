@@ -1,7 +1,7 @@
 {
     "database": {
         "dataDirectory": "$HOME/db-data",
-        "installDirectory": "$HOME/database",
+        "installDirectory": "$HOME/sonicbase",
         "copmressRecords": false,
         "useUnsafe": true,
         "maxJavaHeap": "10%",
@@ -16,15 +16,6 @@
                 "publicAddress": "localhost",
                 "privateAddress": "localhost",
                 "port": 9010
-              }
-            ]
-          },
-          {
-            "replicas": [
-              {
-                "publicAddress": "localhost",
-                "privateAddress": "localhost",
-                "port": 9020
               }
             ]
           }

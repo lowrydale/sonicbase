@@ -1,0 +1,12 @@
+#!/bin/bash
+
+mkdir -p tmp
+
+export mac=`sw_vers | grep 'Mac OS X'`
+echo $mac
+if [ "$mac" == '' ]; then
+    cat /etc/*-release > tmp/distribution
+else
+    sw_vers > tmp/distribution
+fi
+

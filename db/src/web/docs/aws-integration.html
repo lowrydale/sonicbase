@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Untitled Document</title>
+
+
+<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+</head>
+
+<h3>Config Builder</h3>
+SonicBase will automatically create a config file based on the servers tagged in AWS. Machines
+you desire to be servers need the tag "sonicbase-server" with a value of the name of the cluster.
+Machines you desire to be clients need the tag "sonicbase-client with a value of the name of the cluster.
+A config file for the cluster must exist in the config directory, but doesn't need to have servers or
+clients previously configured. The existing config file will be updated with the tagged servers.<br/>
+<br/>
+To build your config file type "build config" in the client.
+<h3>Prerequisites</h3>
+In order for AWS integration to work you must have a file named ".awskeys" located in the home directory.
+The first line of the file is the aws access key. The second line of the file is the aws secret key.
+
+<body>
+</body>
+</html>

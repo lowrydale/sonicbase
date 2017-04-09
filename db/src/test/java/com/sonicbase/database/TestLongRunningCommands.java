@@ -37,18 +37,18 @@ public class TestLongRunningCommands {
     server.disableLogProcessor();
     server.disableRepartitioner();
 
-    LongRunningCommands.CompoundCommand command = server.getLongRunningCommands().createCompoundCommand();
-    command.addCommand(server.getLongRunningCommands().createSingleCommand("DatabaseServer:echo:1:1:test:10", null));
-    command.addCommand(server.getLongRunningCommands().createSingleCommand("DatabaseServer:echo2:1:1:test:10", null));
+    LongRunningCommands.SingleCommand command = server.getLongRunningCommands().createSingleCommand("DatabaseServer:echo:1:1:test:10", null);
+    //LongRunningCommands.SingleCommand command2 = server.getLongRunningCommands().createSingleCommand("DatabaseServer:echo2:1:1:test:10", null);
     server.getLongRunningCommands().addCommand(command);
+    //server.getLongRunningCommands().addCommand(command2);
 
-    while (true) {
-      if (DatabaseServer.echoCount.get() == 10) {
-        System.out.println("Echoed");
-        break;
-      }
-      Thread.sleep(1000);
-    }
+//    while (true) {
+//      if (DatabaseServer.echoCount.get() == 10) {
+//        System.out.println("Echoed");
+//        break;
+//      }
+//      Thread.sleep(1000);
+//    }
     server.getLongRunningCommands().addCommand(server.getLongRunningCommands().createSingleCommand("DatabaseServer:echo:1:1:test:11", null));
 
     while (true) {
@@ -59,13 +59,13 @@ public class TestLongRunningCommands {
       Thread.sleep(1000);
     }
 
-    while (true) {
-      if (DatabaseServer.echo2Count.get() == 10) {
-        System.out.println("Echoed");
-        break;
-      }
-      Thread.sleep(1000);
-    }
+//    while (true) {
+//      if (DatabaseServer.echo2Count.get() == 10) {
+//        System.out.println("Echoed");
+//        break;
+//      }
+//      Thread.sleep(1000);
+//    }
     assertEquals(server.getLongRunningCommands().getCommandCount(), 0);
 
     server.getLongRunningCommands().load();

@@ -9,14 +9,8 @@
 </head>
 
 <body>
-In this benchmark we create a range query that selects the endire database and we iterate over all the results.<br/>
+In this benchmark we add persons records and memberships records to the database in batches.<br/>
 <br/>
-<p>PreparedStatement stmt = con.prepareStatement("select persons.id1, id2 from persons where id1 >= 0 order by id1 asc)<br/><br/>
-	ResultSet rs = stmt.executeQuery();<br/>
-	for (int i = 0; ; i++) {<br/>
-	&nbsp;&nbsp;&nbsp;&nbsp;rs.next();<br/>
-	}<br/>
-	
 		<div class="mylink">
 	<a href="benchmarks-schema.html">Schema and Insert Code</a><br/><br/>
 	</div>
@@ -35,6 +29,10 @@ In this benchmark we create a range query that selects the endire database and w
       <td>Record count</td>
       <td>700 million</td>
     </tr>
+   <tr>
+       <td>Batch Size</td>
+       <td>1000</td>
+   </tr>
     <tr>
       <td>Server total mem</td>
       <td>60g</td>
@@ -62,15 +60,19 @@ In this benchmark we create a range query that selects the endire database and w
 
     <tr>
       <td>Call rate</td>
-      <td>1.15mil/sec</td>
+      <td>1.3mil/sec</td>
     </tr>
-     <tr>
+    <tr>
+      <td>Call latency</td>
+      <td>2500 nanos</td>
+    </tr>
+    <tr>
       <td>Threads per client</td>
-      <td>16</td>
+      <td>32</td>
     </tr>
     <tr>
       <td>Server cpu</td>
-      <td>95%</td>
+      <td>20%</td>
     </tr>
     <tr>
     	<td>Shard Count</td>

@@ -632,6 +632,7 @@ public class DatabaseClient {
       servers[i] = new Server[shard.getReplicas().length];
       for (int j = 0; j < servers[i].length; j++) {
         DatabaseServer.Host replicaHost = shard.getReplicas()[j];
+
         servers[i][j] = new Server(isPrivate ? replicaHost.getPrivateAddress() : replicaHost.getPublicAddress(), replicaHost.getPort());
       }
     }

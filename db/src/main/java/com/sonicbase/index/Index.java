@@ -226,16 +226,19 @@ public class Index {
   }
 
   public Object getMutex(Object[] key) {
-    int hash = 0;
+    int hash = 1;
     for (int i = 0; i < key.length; i++) {
+      if (key[i] == null) {
+        continue;
+      }
       if (key[i] instanceof byte[]) {
-        hash += Arrays.hashCode((byte[])key[i]);
+        hash = 31 * hash + Arrays.hashCode((byte[])key[i]);
       }
       else {
-        hash += key[i].hashCode();
+        hash = 31 * hash + key[i].hashCode();
       }
     }
-    return hash;
+    return mutexes[Math.abs(hash) % mutexes.length];
   }
 
   public void clear() {

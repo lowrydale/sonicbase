@@ -14,6 +14,11 @@ rsync -vlLt db/target/sonicbase-*.jar $HOME/sonicbase/lib
 
 rsync -rvlLt db/target/classes/config/config-* $HOME/sonicbase/config
 rsync -rvlLt $HOME/sonicbase-config/* $HOME/sonicbase/config
+rsync -rvlLt get-distribution $HOME/sonicbase/bin
+rsync -rvlLt get-df $HOME/sonicbase/bin
+rsync -rvlLt get-jarlist $HOME/sonicbase/bin
+rsync -rvlLt get-top $HOME/sonicbase/bin
+rsync -rvlLt get-dir $HOME/sonicbase/bin
 rsync -rvlLt runclass $HOME/sonicbase/bin
 rsync -rvlLt cli $HOME/sonicbase/bin
 rsync -rvlLt start-local-db $HOME/sonicbase/bin
@@ -30,6 +35,7 @@ rsync -rvlLt dump-threads $HOME/sonicbase/bin
 rsync -rvlLt terminal-size.py $HOME/sonicbase/bin
 rsync -rvlLt terminal-resize.py $HOME/sonicbase/bin
 rsync -rvlLt do-rsync $HOME/sonicbase/bin
+rsync -rvlLt rsync-file $HOME/sonicbase/bin
 rsync -rvlLt do-deploy $HOME/sonicbase/bin
 rsync -rvlLt deploy $HOME/sonicbase/bin
 rsync -rvlLt do-start $HOME/sonicbase/bin
@@ -38,6 +44,11 @@ rsync -rvlLt get-mem-total $HOME/sonicbase/bin
 rsync -rvlLt remote-get-mem-total $HOME/sonicbase/bin
 rsync -rvlLt db/src/main/resources/log4j.xml $HOME/sonicbase/config
 rsync -rvlLt db/src/main/resources/cli-log4j.xml $HOME/sonicbase/config
+chmod +x $HOME/sonicbase/bin/get-distribution
+chmod +x $HOME/sonicbase/bin/get-jarlist
+chmod +x $HOME/sonicbase/bin/get-df
+chmod +x $HOME/sonicbase/bin/get-top
+chmod +x $HOME/sonicbase/bin/get-dir
 chmod +x $HOME/sonicbase/bin/runclass
 chmod +x $HOME/sonicbase/bin/cli
 chmod +x $HOME/sonicbase/bin/start-local-db
@@ -56,6 +67,7 @@ chmod +x $HOME/sonicbase/bin/terminal-resize.py
 chmod +x $HOME/sonicbase/bin/deploy
 chmod +x $HOME/sonicbase/bin/do-deploy
 chmod +x $HOME/sonicbase/bin/do-rsync
+chmod +x $HOME/sonicbase/bin/rsync-file
 chmod +x $HOME/sonicbase/bin/do-start
 chmod +x $HOME/sonicbase/bin/do-start-bench
 chmod +x $HOME/sonicbase/bin/dump-threads

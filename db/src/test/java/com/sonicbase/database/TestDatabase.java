@@ -5,7 +5,6 @@ import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.BinaryExpression;
-import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.ColumnImpl;
 import com.sonicbase.query.impl.ExpressionImpl;
 import com.sonicbase.query.impl.SelectContextImpl;
@@ -48,200 +47,205 @@ public class TestDatabase {
 
   @BeforeClass
   public void beforeClass() throws Exception {
-    String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")));
-    final JsonDict config = new JsonDict(configStr);
+    try {
+      String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")));
+      final JsonDict config = new JsonDict(configStr);
 
-    JsonArray array = config.getDict("database").putArray("licenseKeys");
-    array.add(DatabaseServer.FOUR_SERVER_LICENSE);
+      JsonArray array = config.getDict("database").putArray("licenseKeys");
+      array.add(DatabaseServer.FOUR_SERVER_LICENSE);
 
-    FileUtils.deleteDirectory(new File("/data/database"));
+      FileUtils.deleteDirectory(new File("/data/database"));
 
-    DatabaseServer.getServers().clear();
+      DatabaseServer.getServers().clear();
 
-    final DatabaseServer[] dbServers = new DatabaseServer[4];
-    ThreadPoolExecutor executor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+      final DatabaseServer[] dbServers = new DatabaseServer[4];
+      ThreadPoolExecutor executor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
-    String role = "primaryMaster";
+      String role = "primaryMaster";
 
-    List<Future> futures = new ArrayList<>();
-    for (int i = 0; i < dbServers.length; i++) {
-      final int shard = i;
-//      futures.add(executor.submit(new Callable() {
-//        @Override
-//        public Object call() throws Exception {
-//          String role = "primaryMaster";
+      List<Future> futures = new ArrayList<>();
+      for (int i = 0; i < dbServers.length; i++) {
+        final int shard = i;
+        //      futures.add(executor.submit(new Callable() {
+        //        @Override
+        //        public Object call() throws Exception {
+        //          String role = "primaryMaster";
 
-      dbServers[shard] = new DatabaseServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null);
-      dbServers[shard].setRole(role);
-      dbServers[shard].disableLogProcessor();
-      dbServers[shard].setMinSizeForRepartition(0);
-//          return null;
-//        }
-//      }));
-    }
-    for (Future future : futures) {
-      future.get();
-    }
+        dbServers[shard] = new DatabaseServer();
+        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null);
+        dbServers[shard].setRole(role);
+        dbServers[shard].disableLogProcessor();
+        dbServers[shard].setMinSizeForRepartition(0);
+        //          return null;
+        //        }
+        //      }));
+      }
+      for (Future future : futures) {
+        future.get();
+      }
 
-    for (DatabaseServer server : dbServers) {
-      server.disableRepartitioner();
-    }
+      for (DatabaseServer server : dbServers) {
+        server.disableRepartitioner();
+      }
 
-    //DatabaseClient client = new DatabaseClient("localhost", 9010, true);
+      //DatabaseClient client = new DatabaseClient("localhost", 9010, true);
 
-    Class.forName("com.sonicbase.jdbcdriver.Driver");
+      Class.forName("com.sonicbase.jdbcdriver.Driver");
 
-    conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000", "user", "password");
+      conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000", "user", "password");
 
-    ((ConnectionProxy) conn).getDatabaseClient().createDatabase("test");
+      ((ConnectionProxy) conn).getDatabaseClient().createDatabase("test");
 
-    conn.close();
+      conn.close();
 
-    conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/test", "user", "password");
+      conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/test", "user", "password");
 
-    client = ((ConnectionProxy) conn).getDatabaseClient();
+      client = ((ConnectionProxy) conn).getDatabaseClient();
 
-    client.setPageSize(3);
+      client.setPageSize(3);
 
-    PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
-    stmt.executeUpdate();
+      PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
+      stmt.executeUpdate();
 
-    stmt = conn.prepareStatement("create table Memberships (personId BIGINT, membershipName VARCHAR(20), resortId BIGINT, PRIMARY KEY (personId, membershipName))");
-    stmt.executeUpdate();
+      stmt = conn.prepareStatement("create table Memberships (personId BIGINT, membershipName VARCHAR(20), resortId BIGINT, PRIMARY KEY (personId, membershipName))");
+      stmt.executeUpdate();
 
-    stmt = conn.prepareStatement("create table Resorts (resortId BIGINT, resortName VARCHAR(20), PRIMARY KEY (resortId))");
-    stmt.executeUpdate();
+      stmt = conn.prepareStatement("create table Resorts (resortId BIGINT, resortName VARCHAR(20), PRIMARY KEY (resortId))");
+      stmt.executeUpdate();
 
-    stmt = conn.prepareStatement("create table nokey (id BIGINT, id2 BIGINT)");
-    stmt.executeUpdate();
+      stmt = conn.prepareStatement("create table nokey (id BIGINT, id2 BIGINT)");
+      stmt.executeUpdate();
 
-    //test insertWithRecord
+      //test insertWithRecord
 
-    stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");
-    stmt.setLong(1, 1000);
-    stmt.setString(2, "resort-1000");
-    assertEquals(stmt.executeUpdate(), 1);
+      stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");
+      stmt.setLong(1, 1000);
+      stmt.setString(2, "resort-1000");
+      assertEquals(stmt.executeUpdate(), 1);
 
-    stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");
-    stmt.setLong(1, 2000);
-    stmt.setString(2, "resort-2000");
-    assertEquals(stmt.executeUpdate(), 1);
+      stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");
+      stmt.setLong(1, 2000);
+      stmt.setString(2, "resort-2000");
+      assertEquals(stmt.executeUpdate(), 1);
 
-    for (int i = 0; i < recordCount; i++) {
-      for (int j = 0; j < recordCount; j++) {
-        stmt = conn.prepareStatement("insert into Memberships (personId, membershipName, resortId) VALUES (?, ?, ?)");
+      for (int i = 0; i < recordCount; i++) {
+        for (int j = 0; j < recordCount; j++) {
+          stmt = conn.prepareStatement("insert into Memberships (personId, membershipName, resortId) VALUES (?, ?, ?)");
+          stmt.setLong(1, i);
+          stmt.setString(2, "membership-" + j);
+          stmt.setLong(3, new long[]{1000, 2000}[j % 2]);
+          assertEquals(stmt.executeUpdate(), 1);
+        }
+      }
+
+      for (int i = 0; i < recordCount; i++) {
+        stmt = conn.prepareStatement("insert into persons (id, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?)");
         stmt.setLong(1, i);
-        stmt.setString(2, "membership-" + j);
-        stmt.setLong(3, new long[]{1000, 2000}[j % 2]);
+        stmt.setString(2, "933-28-" + i);
+        stmt.setString(3, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+        stmt.setBoolean(4, false);
+        stmt.setString(5, "m");
+        assertEquals(stmt.executeUpdate(), 1);
+        ids.add((long) i);
+      }
+
+      for (int i = 0; i < recordCount; i++) {
+        stmt = conn.prepareStatement("insert into persons (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
+        stmt.setLong(1, i + 100);
+        stmt.setLong(2, (i + 100) % 2);
+        stmt.setString(3, "933-28-" + (i % 4));
+        stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+        stmt.setBoolean(5, false);
+        stmt.setString(6, "m");
+        int count = stmt.executeUpdate();
+        assertEquals(count, 1);
+        ids.add((long) (i + 100));
+      }
+
+      for (int i = 0; i < recordCount; i++) {
+        stmt = conn.prepareStatement("insert into nokey (id, id2) VALUES (?, ?)");
+        stmt.setLong(1, i);
+        stmt.setLong(2, i * 2);
+        assertEquals(stmt.executeUpdate(), 1);
+
+        stmt = conn.prepareStatement("insert into nokey (id, id2) VALUES (?, ?)");
+        stmt.setLong(1, i);
+        stmt.setLong(2, i * 2);
         assertEquals(stmt.executeUpdate(), 1);
       }
-    }
 
-    for (int i = 0; i < recordCount; i++) {
-      stmt = conn.prepareStatement("insert into persons (id, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?)");
-      stmt.setLong(1, i);
-      stmt.setString(2, "933-28-" + i);
-      stmt.setString(3, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
-      stmt.setBoolean(4, false);
-      stmt.setString(5, "m");
-      assertEquals(stmt.executeUpdate(), 1);
-      ids.add((long) i);
-    }
+      stmt = conn.prepareStatement("create index socialSecurityNumber on persons(socialSecurityNumber)");
+      stmt.executeUpdate();
 
-    for (int i = 0; i < recordCount; i++) {
-      stmt = conn.prepareStatement("insert into persons (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
-      stmt.setLong(1, i + 100);
-      stmt.setLong(2, (i + 100) % 2);
-      stmt.setString(3, "933-28-" + (i % 4));
-      stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
-      stmt.setBoolean(5, false);
-      stmt.setString(6, "m");
-      int count = stmt.executeUpdate();
-      assertEquals(count, 1);
-      ids.add((long) (i + 100));
-    }
+      //create index ssn2 on persons(socialSecurityNumber)
+      //    stmt = conn.prepareStatement("create index ssn on persons(socialSecurityNumber)");
+      //    stmt.executeUpdate();
 
-    for (int i = 0; i < recordCount; i++) {
-      stmt = conn.prepareStatement("insert into nokey (id, id2) VALUES (?, ?)");
-      stmt.setLong(1, i);
-      stmt.setLong(2, i * 2);
-      assertEquals(stmt.executeUpdate(), 1);
-
-      stmt = conn.prepareStatement("insert into nokey (id, id2) VALUES (?, ?)");
-      stmt.setLong(1, i);
-      stmt.setLong(2, i * 2);
-      assertEquals(stmt.executeUpdate(), 1);
-    }
-
-    stmt = conn.prepareStatement("create index socialSecurityNumber on persons(socialSecurityNumber)");
-    stmt.executeUpdate();
-
-    //create index ssn2 on persons(socialSecurityNumber)
-//    stmt = conn.prepareStatement("create index ssn on persons(socialSecurityNumber)");
-//    stmt.executeUpdate();
-
-    while (true) {
-      byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().send(null, 0, 0, "DatabaseServer:areAllLongRunningCommandsComplete:1:test", null, DatabaseClient.Replica.master);
-      if (new String(bytes).equals("true")) {
-        break;
+      while (true) {
+        byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().send(null, 0, 0, "DatabaseServer:areAllLongRunningCommandsComplete:1:test", null, DatabaseClient.Replica.master);
+        if (new String(bytes).equals("true")) {
+          break;
+        }
+        Thread.sleep(1000);
       }
-      Thread.sleep(1000);
-    }
 
-    IndexSchema indexSchema = null;
-    for (Map.Entry<String, IndexSchema> entry : client.getCommon().getTables("test").get("persons").getIndices().entrySet()) {
-      if (entry.getValue().getFields()[0].equalsIgnoreCase("socialsecuritynumber")) {
-        indexSchema = entry.getValue();
+      IndexSchema indexSchema = null;
+      for (Map.Entry<String, IndexSchema> entry : client.getCommon().getTables("test").get("persons").getIndices().entrySet()) {
+        if (entry.getValue().getFields()[0].equalsIgnoreCase("socialsecuritynumber")) {
+          indexSchema = entry.getValue();
+        }
       }
-    }
-    List<ColumnImpl> columns = new ArrayList<>();
-    columns.add(new ColumnImpl(null, null, "persons", "socialsecuritynumber", null));
-/*
-    AtomicReference<String> usedIndex = new AtomicReference<String>();
-    ExpressionImpl.RecordCache recordCache = new ExpressionImpl.RecordCache();
-    ParameterHandler parms = new ParameterHandler();
-    SelectContextImpl ret = ExpressionImpl.lookupIds(
-          "test", client.getCommon(), client, 0,
-          1000, client.getCommon().getTables("test").get("persons"), indexSchema, false, BinaryExpression.Operator.equal,
-          null,
-          null,
-          new Object[]{"933-28-0".getBytes()}, parms, null, null,
-      new Object[]{"933-28-0".getBytes()},
-          null,
-          columns, "socialsecuritynumber", 0, recordCache,
-          usedIndex, false, client.getCommon().getSchemaVersion(), null, null, false);
+      List<ColumnImpl> columns = new ArrayList<>();
+      columns.add(new ColumnImpl(null, null, "persons", "socialsecuritynumber", null));
+  /*
+      AtomicReference<String> usedIndex = new AtomicReference<String>();
+      ExpressionImpl.RecordCache recordCache = new ExpressionImpl.RecordCache();
+      ParameterHandler parms = new ParameterHandler();
+      SelectContextImpl ret = ExpressionImpl.lookupIds(
+            "test", client.getCommon(), client, 0,
+            1000, client.getCommon().getTables("test").get("persons"), indexSchema, false, BinaryExpression.Operator.equal,
+            null,
+            null,
+            new Object[]{"933-28-0".getBytes()}, parms, null, null,
+        new Object[]{"933-28-0".getBytes()},
+            null,
+            columns, "socialsecuritynumber", 0, recordCache,
+            usedIndex, false, client.getCommon().getSchemaVersion(), null, null, false);
 
-    assertEquals(ret.getCurrKeys().length, 4);
-*/
+      assertEquals(ret.getCurrKeys().length, 4);
+  */
 
-    client.beginRebalance("test", "persons", "_1__primarykey");
+      client.beginRebalance("test", "persons", "_1__primarykey");
 
-    while (true) {
-      if (client.isRepartitioningComplete("test")) {
-        break;
+      while (true) {
+        if (client.isRepartitioningComplete("test")) {
+          break;
+        }
+        Thread.sleep(1000);
       }
-      Thread.sleep(1000);
+
+      assertEquals(client.getPartitionSize("test", 0, "persons", "_1__primarykey"), 9);
+      assertEquals(client.getPartitionSize("test", 1, "persons", "_1__primarykey"), 11);
+
+      dbServers[0].enableSnapshot(false);
+      dbServers[1].enableSnapshot(false);
+
+      dbServers[0].runSnapshot();
+      dbServers[0].recoverFromSnapshot();
+      dbServers[0].getSnapshotManager().lockSnapshot("test");
+      dbServers[0].getSnapshotManager().unlockSnapshot(1);
+
+      long commandCount = dbServers[1].getCommandCount();
+      dbServers[1].purgeMemory();
+      dbServers[1].replayLogs();
+      //    assertEquals(dbServers[1].getLogManager().getCountLogged(), commandCount);
+      //    assertEquals(dbServers[1].getCommandCount(), commandCount * 2);
+
+      executor.shutdownNow();
     }
-
-    assertEquals(client.getPartitionSize("test", 0, "persons", "_1__primarykey"), 9);
-    assertEquals(client.getPartitionSize("test", 1, "persons", "_1__primarykey"), 11);
-
-    dbServers[0].enableSnapshot(false);
-    dbServers[1].enableSnapshot(false);
-
-    dbServers[0].runSnapshot();
-    dbServers[0].recoverFromSnapshot();
-    dbServers[0].getSnapshotManager().lockSnapshot("test");
-    dbServers[0].getSnapshotManager().unlockSnapshot(1);
-
-    long commandCount = dbServers[1].getCommandCount();
-    dbServers[1].purgeMemory();
-    dbServers[1].replayLogs();
-//    assertEquals(dbServers[1].getLogManager().getCountLogged(), commandCount);
-//    assertEquals(dbServers[1].getCommandCount(), commandCount * 2);
-
-    executor.shutdownNow();
+    catch (Exception e) {
+      e.printStackTrace();
+    }
   }
 
   @Test
@@ -1785,7 +1789,7 @@ public class TestDatabase {
     }
 
 
-    DatabaseClient client = new DatabaseClient("localhost", 9010, true);
+    DatabaseClient client = new DatabaseClient("localhost", 9010,-1, -1, true);
 
     Class.forName("com.sonicbase.jdbcdriver.Driver");
 
@@ -1880,7 +1884,7 @@ public class TestDatabase {
     }
 
 
-    DatabaseClient client = new DatabaseClient("localhost", 9010, true);
+    DatabaseClient client = new DatabaseClient("localhost", 9010, -1, -1, true);
 
     Class.forName("com.sonicbase.jdbcdriver.Driver");
 
@@ -1969,7 +1973,7 @@ public class TestDatabase {
     }
 
 
-    DatabaseClient client = new DatabaseClient("localhost", 9010, true);
+    DatabaseClient client = new DatabaseClient("localhost", 9010, -1, -1, true);
 
     Class.forName("com.sonicbase.jdbcdriver.Driver");
 

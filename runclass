@@ -54,7 +54,18 @@ then
   export _LOG4J_FILENAME_="out.log"
 fi
 
-java_opts="$java_opts  -Dlogfilename=$_LOG4J_FILENAME_"
+if [ "$_ERROR_LOG4J_FILENAME_" = "" ]
+then
+  export _ERROR_LOG4J_FILENAME_="errors.log"
+fi
+
+if [ "$_CLIENT_ERROR_LOG4J_FILENAME_" = "" ]
+then
+  export _CLIENT_ERROR_LOG4J_FILENAME_="client-errors.log"
+fi
+
+
+java_opts="$java_opts  -Dlogfilename=$_LOG4J_FILENAME_ -DerrorLogfilename=$_ERROR_LOG4J_FILENAME_ -DclientErrorLogfilename=$_CLIENT_ERROR_LOG4J_FILENAME_"
 
 echo $java_opts
 

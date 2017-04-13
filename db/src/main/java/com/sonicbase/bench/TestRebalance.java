@@ -51,7 +51,7 @@ public class TestRebalance {
     for (Future future : futures) {
       future.get();
     }
-    DatabaseClient client = new DatabaseClient("localhost", 9010, true);
+    DatabaseClient client = new DatabaseClient("localhost", 9010, -1, -1, true);
 
     ParameterHandler parms = new ParameterHandler();
 

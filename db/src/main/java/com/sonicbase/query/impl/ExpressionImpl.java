@@ -20,8 +20,6 @@ import com.sonicbase.util.DataUtil;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.sf.jsqlparser.statement.select.Limit;
 import org.apache.commons.lang.exception.ExceptionUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.*;
@@ -33,7 +31,7 @@ import static java.util.Collections.singletonList;
 
 public abstract class ExpressionImpl implements Expression {
 
-  private static Logger logger = LoggerFactory.getLogger(ExpressionImpl.class);
+  private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
 
   private static Map<Integer, Type> typesById = new HashMap<Integer, Type>();
   private String tableName;

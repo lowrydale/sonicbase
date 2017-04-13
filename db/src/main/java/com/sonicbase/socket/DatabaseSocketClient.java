@@ -9,8 +9,6 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import net.jpountz.lz4.LZ4Compressor;
 import net.jpountz.lz4.LZ4Factory;
 import net.jpountz.lz4.LZ4FastDecompressor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -39,7 +37,7 @@ public class DatabaseSocketClient {
 
   private static int CONNECTION_COUNT = 10000;
 
-  private static Logger logger = LoggerFactory.getLogger(DatabaseSocketClient.class);
+  private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
 
 
   private static ConcurrentHashMap<String, ArrayBlockingQueue<Connection>> pools = new ConcurrentHashMap<>();

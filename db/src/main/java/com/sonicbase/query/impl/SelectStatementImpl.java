@@ -17,8 +17,6 @@ import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.statement.select.Limit;
 import net.sf.jsqlparser.statement.select.Offset;
 import org.apache.commons.lang.exception.ExceptionUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.*;
@@ -29,7 +27,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class SelectStatementImpl extends StatementImpl implements SelectStatement {
 
-  private static Logger logger = LoggerFactory.getLogger(SelectStatementImpl.class);
+  private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
   private final ExpressionImpl.RecordCache recordCache;
 
   private DatabaseClient client;

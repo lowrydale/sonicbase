@@ -2,6 +2,7 @@ package com.sonicbase.server;
 
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.DatabaseCommon;
+import com.sonicbase.common.Logger;
 import com.sonicbase.common.Record;
 import com.sonicbase.common.SchemaOutOfSyncException;
 import com.sonicbase.index.Index;
@@ -12,8 +13,6 @@ import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.DataUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.*;
@@ -30,7 +29,7 @@ import static com.sonicbase.server.TransactionManager.OperationType.*;
  */
 public class UpdateManager {
 
-  private static Logger logger = LoggerFactory.getLogger(UpdateManager.class);
+  private Logger logger;
 
 
   private static final String CURR_VER_STR = "currVer:";
@@ -38,6 +37,7 @@ public class UpdateManager {
 
   public UpdateManager(DatabaseServer databaseServer) {
     this.server = databaseServer;
+    this.logger = new Logger(databaseServer.getDatabaseClient());
   }
 
   public byte[] deleteIndexEntry(String command, byte[] body, boolean replayedCommand) {
@@ -471,7 +471,8 @@ public class UpdateManager {
 //        }
         doInsertKey(id, recordBytes, primaryKey, index, tableSchema.getName(), indexName);
 
-        if (indexSchema.getCurrPartitions()[selectedShards.get(0)].getShardOwning() != server.getShard()) {
+        int selectedShard = selectedShards.get(0);
+        if (indexSchema.getCurrPartitions()[selectedShard].getShardOwning() != server.getShard()) {
           server.getRepartitioner().deleteIndexEntry(tableName, indexName, primaryKey);
         }
       }

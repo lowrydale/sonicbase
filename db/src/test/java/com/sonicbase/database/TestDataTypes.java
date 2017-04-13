@@ -165,7 +165,7 @@ public class TestDataTypes {
       ids.add((long) (i + 100));
     }
 
-    DatabaseClient client = new DatabaseClient("localhost", 9010, true);
+    DatabaseClient client = new DatabaseClient("localhost", 9010, -1, -1, true);
 
     client.beginRebalance("test", "persons", "_1__primarykey");
 

@@ -9,7 +9,7 @@ public class Connection {
   public Connection(String hosts) throws DatabaseException {
     try {
       String[] parts = hosts.split(":");
-      this.client = new DatabaseClient(parts[0], Integer.valueOf(parts[1]), true);
+      this.client = new DatabaseClient(parts[0], Integer.valueOf(parts[1]), -1, -1, true);
     }
     catch (Exception e) {
       throw new DatabaseException(e);

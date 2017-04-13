@@ -2,6 +2,7 @@ package com.sonicbase.server;
 
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.DatabaseCommon;
+import com.sonicbase.common.Logger;
 import com.sonicbase.common.Record;
 import com.sonicbase.common.SchemaOutOfSyncException;
 import com.sonicbase.index.Index;
@@ -22,8 +23,7 @@ import net.jpountz.lz4.LZ4FastDecompressor;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.input.ReversedLinesFileReader;
 import org.apache.commons.lang.exception.ExceptionUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.hsqldb.Database;
 import sun.misc.Unsafe;
 
 import javax.crypto.BadPaddingException;
@@ -55,7 +55,9 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public class DatabaseServer {
 
-  private static Logger logger = LoggerFactory.getLogger(DatabaseServer.class);
+  private Logger logger;
+  private static org.apache.log4j.Logger errorLogger = org.apache.log4j.Logger.getLogger("com.sonicbase.errorLogger");
+  private static org.apache.log4j.Logger clientErrorLogger = org.apache.log4j.Logger.getLogger("com.sonicbase.clientErrorLogger");
 
   public static final boolean ENABLE_RECORD_COMPRESSION = false;
   private AtomicLong commandCount = new AtomicLong();
@@ -75,6 +77,7 @@ public class DatabaseServer {
   private boolean useUnsafe;
   private String gclog;
   private String xmx;
+  private String installDir;
 
   @SuppressWarnings("restriction")
   private static Unsafe getUnsafe() {
@@ -137,6 +140,152 @@ public class DatabaseServer {
 
   }
 
+  public void setConfig(
+      final JsonDict config, String cluster, String host, int port, AtomicBoolean isRunning, boolean skipLicense, String gclog, String xmx) {
+    setConfig(config, cluster, host, port, false, isRunning, false, gclog, xmx);
+  }
+
+  public void setConfig(
+      final JsonDict config, String cluster, String host, int port,
+      boolean unitTest, AtomicBoolean isRunning, String gclog) {
+    setConfig(config, cluster, host, port, unitTest, isRunning, false, gclog, null);
+  }
+
+  public void setConfig(
+      final JsonDict config, String cluster, String host, int port,
+      boolean unitTest, AtomicBoolean isRunning, boolean skipLicense, String gclog, String xmx) {
+
+
+    this.isRunning = isRunning;
+    this.config = config;
+    this.cluster = cluster;
+    this.host = host;
+    this.port = port;
+    this.gclog = gclog;
+    this.xmx = xmx;
+
+    JsonDict databaseDict = config.getDict("database");
+    this.dataDir = databaseDict.getString("dataDirectory");
+    this.dataDir = dataDir.replace("$HOME", System.getProperty("user.home"));
+    this.installDir = databaseDict.getString("installDirectory");
+    this.installDir = installDir.replace("$HOME", System.getProperty("user.home"));
+    JsonArray shards = databaseDict.getArray("shards");
+    JsonDict firstServer = shards.getDict(0).getArray("replicas").getDict(0);
+    ServersConfig serversConfig = null;
+    executor = new ThreadPoolExecutor(256, 256, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+    if (!skipLicense) {
+      validateLicense(config);
+    }
+
+    if (databaseDict.hasKey("compressRecords")) {
+      compressRecords = databaseDict.getBoolean("compressRecords");
+    }
+    if (databaseDict.hasKey("useUnsafe")) {
+      useUnsafe = databaseDict.getBoolean("useUnsafe");
+    }
+    else {
+      useUnsafe = true;
+    }
+
+    this.masterAddress = firstServer.getString("privateAddress");
+    this.masterPort = firstServer.getInt("port");
+
+    if (firstServer.getString("privateAddress").equals(host) && firstServer.getLong("port") == port) {
+      this.shard = 0;
+      this.replica = 0;
+      common.setShard(0);
+      common.setReplica(0);
+
+    }
+    boolean isInternal = false;
+    if (databaseDict.hasKey("clientIsPrivate")) {
+      isInternal = databaseDict.getBoolean("clientIsPrivate");
+    }
+    serversConfig = new ServersConfig(shards, replicationFactor, isInternal);
+    this.replica = serversConfig.getThisReplica(host, port);
+
+    common.setShard(serversConfig.getThisShard(host, port));
+    common.setReplica(this.replica);
+    this.shard = common.getShard();
+    this.shardCount = serversConfig.getShardCount();
+
+    common.setServersConfig(serversConfig);
+
+    logger = new Logger(getDatabaseClient());
+    logger.info("config=" + config.toString());
+
+    this.updateManager = new UpdateManager(this);
+    this.snapshotManager = new SnapshotManager(this);
+    this.transactionManager = new TransactionManager(this);
+    this.readManager = new ReadManager(this);
+    this.logManager = new LogManager(this);
+    this.schemaManager = new SchemaManager(this);
+    //recordsById = new IdIndex(!unitTest, (int) (long) databaseDict.getLong("subPartitionsForIdIndex"), (int) (long) databaseDict.getLong("initialIndexSize"), (int) (long) databaseDict.getLong("indexEntrySize"));
+
+    this.replicationFactor = shards.getDict(0).getArray("replicas").size();
+//    if (replicationFactor < 2) {
+//      throw new DatabaseException("Replication Factor must be at least two");
+//    }
+
+
+    Thread thread = new Thread(new NetMonitor());
+    thread.start();
+
+    Thread statsThread = new Thread(new StatsMonitor());
+    statsThread.start();
+
+    if (shard != 0 || replica != 0) {
+      syncDbNames();
+    }
+
+    List<String> dbNames = getDbNames(dataDir);
+    for (String dbName : dbNames) {
+
+      getCommon().addDatabase(dbName);
+    }
+
+    if (shard != 0 || replica != 0) {
+      getDatabaseClient().syncSchema();
+    }
+    else {
+      common.loadSchema(dataDir);
+    }
+
+    common.saveSchema(dataDir);
+
+    for (String dbName : dbNames) {
+      logger.info("Loaded database schema: dbName=" + dbName + ", tableCount=" + common.getTables(dbName).size());
+      getIndices().put(dbName, new Indices());
+
+      schemaManager.addAllIndices(dbName);
+    }
+
+    common.setServersConfig(serversConfig);
+
+    initServersForUnitTest(host, port, unitTest, serversConfig);
+
+    repartitioner = new Repartitioner(this, common);
+
+    //common.getSchema().initRecordsById(shardCount, (int) (long) databaseDict.getLong("partitionCountForRecordIndex"));
+
+    //logger.info("RecordsById: partitionCount=" + common.getSchema().getRecordIndexPartitions().length);
+
+    longRunningCommands = new LongRunningCommands(this);
+    startLongRunningCommands();
+
+    startMemoryMonitor();
+
+    logger.info("Started server");
+
+    //logger.error("Testing errors", new DatabaseException());
+
+//    File file = new File(dataDir, "queue/" + shard + "/" + replica);
+//    queue = new Queue(file.getAbsolutePath(), "request-log", 0);
+//    Thread logThread = new Thread(queue);
+//    logThread.start();
+
+  }
+
   public void setMinSizeForRepartition(int minSizeForRepartition) {
     repartitioner.setMinSizeForRepartition(minSizeForRepartition);
   }
@@ -162,8 +311,7 @@ public class DatabaseServer {
       if (this.client.get() != null) {
         return this.client.get();
       }
-      DatabaseClient client = new DatabaseClient(masterAddress, masterPort, false);
-      client.setCommon(common);
+      DatabaseClient client = new DatabaseClient(masterAddress, masterPort, common.getShard(), common.getReplica(), false, common);
 //      if (client.getCommon().getSchema().getVersion() <= common.getSchema().getVersion()) {
 //        client.getCommon().getSchema().setTables(common.getSchema().getTables());
 //        client.getCommon().getSchema().setServersConfig(common.getSchema().getServersConfig());
@@ -409,141 +557,6 @@ public class DatabaseServer {
     }
   }
 
-  public void setConfig(
-      final JsonDict config, String cluster, String host, int port, AtomicBoolean isRunning, boolean skipLicense, String gclog, String xmx) {
-    setConfig(config, cluster, host, port, false, isRunning, false, gclog, xmx);
-  }
-
-  public void setConfig(
-      final JsonDict config, String cluster, String host, int port,
-      boolean unitTest, AtomicBoolean isRunning, String gclog) {
-    setConfig(config, cluster, host, port, unitTest, isRunning, false, gclog, null);
-  }
-
-  public void setConfig(
-      final JsonDict config, String cluster, String host, int port,
-      boolean unitTest, AtomicBoolean isRunning, boolean skipLicense, String gclog, String xmx) {
-    this.isRunning = isRunning;
-    this.config = config;
-    this.cluster = cluster;
-    this.host = host;
-    this.port = port;
-    this.gclog = gclog;
-    this.xmx = xmx;
-
-    logger.info("config=" + config.toString());
-    JsonDict databaseDict = config.getDict("database");
-    this.dataDir = databaseDict.getString("dataDirectory");
-    this.dataDir = dataDir.replace("$HOME", System.getProperty("user.home"));
-    JsonArray shards = databaseDict.getArray("shards");
-    JsonDict firstServer = shards.getDict(0).getArray("replicas").getDict(0);
-    ServersConfig serversConfig = null;
-    executor = new ThreadPoolExecutor(256, 256, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
-    if (!skipLicense) {
-      validateLicense(config);
-    }
-
-    if (databaseDict.hasKey("compressRecords")) {
-      compressRecords = databaseDict.getBoolean("compressRecords");
-    }
-    if (databaseDict.hasKey("useUnsafe")) {
-      useUnsafe = databaseDict.getBoolean("useUnsafe");
-    }
-    else {
-      useUnsafe = true;
-    }
-
-    this.updateManager = new UpdateManager(this);
-    this.snapshotManager = new SnapshotManager(this);
-    this.transactionManager = new TransactionManager(this);
-    this.readManager = new ReadManager(this);
-    this.logManager = new LogManager(this);
-    this.schemaManager = new SchemaManager(this);
-    //recordsById = new IdIndex(!unitTest, (int) (long) databaseDict.getLong("subPartitionsForIdIndex"), (int) (long) databaseDict.getLong("initialIndexSize"), (int) (long) databaseDict.getLong("indexEntrySize"));
-
-    this.replicationFactor = shards.getDict(0).getArray("replicas").size();
-//    if (replicationFactor < 2) {
-//      throw new DatabaseException("Replication Factor must be at least two");
-//    }
-
-    this.masterAddress = firstServer.getString("privateAddress");
-    this.masterPort = firstServer.getInt("port");
-
-    if (firstServer.getString("privateAddress").equals(host) && firstServer.getLong("port") == port) {
-      this.shard = 0;
-      this.replica = 0;
-      common.setShard(0);
-      common.setReplica(0);
-
-    }
-
-    Thread thread = new Thread(new NetMonitor());
-    thread.start();
-
-    boolean isInternal = false;
-    if (databaseDict.hasKey("clientIsPrivate")) {
-      isInternal = databaseDict.getBoolean("clientIsPrivate");
-    }
-    serversConfig = new ServersConfig(shards, replicationFactor, isInternal);
-    this.replica = serversConfig.getThisReplica(host, port);
-
-    common.setShard(serversConfig.getThisShard(host, port));
-    common.setReplica(this.replica);
-    this.shard = common.getShard();
-    this.shardCount = serversConfig.getShardCount();
-
-    common.setServersConfig(serversConfig);
-
-    if (shard != 0 || replica != 0) {
-      syncDbNames();
-    }
-
-    List<String> dbNames = getDbNames(dataDir);
-    for (String dbName : dbNames) {
-
-      getCommon().addDatabase(dbName);
-    }
-
-    if (shard != 0 || replica != 0) {
-      getDatabaseClient().syncSchema();
-    }
-    else {
-      common.loadSchema(dataDir);
-    }
-
-    common.saveSchema(dataDir);
-
-    for (String dbName : dbNames) {
-      logger.info("Loaded database schema: dbName=" + dbName + ", tableCount=" + common.getTables(dbName).size());
-      getIndices().put(dbName, new Indices());
-
-      schemaManager.addAllIndices(dbName);
-    }
-
-    common.setServersConfig(serversConfig);
-
-    initServersForUnitTest(host, port, unitTest, serversConfig);
-
-    repartitioner = new Repartitioner(this, common);
-
-    //common.getSchema().initRecordsById(shardCount, (int) (long) databaseDict.getLong("partitionCountForRecordIndex"));
-
-    //logger.info("RecordsById: partitionCount=" + common.getSchema().getRecordIndexPartitions().length);
-
-    longRunningCommands = new LongRunningCommands(this);
-    startLongRunningCommands();
-
-    startMemoryMonitor();
-
-    logger.info("Started server");
-
-
-//    File file = new File(dataDir, "queue/" + shard + "/" + replica);
-//    queue = new Queue(file.getAbsolutePath(), "request-log", 0);
-//    Thread logThread = new Thread(queue);
-//    logThread.start();
-
-  }
 
   public AtomicBoolean getAboveMemoryThreshold() {
     return aboveMemoryThreshold;
@@ -653,8 +666,13 @@ public class DatabaseServer {
           if (line == null) {
             break;
           }
-          secondToLastLine = lastLine;
-          lastLine = line;
+          if (lastLine != null || line.trim().toLowerCase().startsWith("pid")) {
+            secondToLastLine = lastLine;
+            lastLine = line;
+          }
+          if (lastLine != null && secondToLastLine != null) {
+            break;
+          }
         }
         p.waitFor();
 
@@ -721,116 +739,45 @@ public class DatabaseServer {
       List<Double> recRate = new ArrayList<>();
       try {
         if (isMac()) {
-          ProcessBuilder builder = new ProcessBuilder().command("ifstat");
-          Process p = builder.start();
-          BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-          String firstLine = null;
-          Set<Integer> toSkip = new HashSet<>();
           while (true) {
-            String line = in.readLine();
-            if (line == null) {
-              break;
-            }
-            String[] parts = line.trim().split("\\s+");
-            if (firstLine == null) {
-              for (int i = 0; i < parts.length; i++) {
-                if (parts[i].toLowerCase().contains("bridge")) {
-                  toSkip.add(i);
-                }
-              }
-              firstLine = line;
-            }
-            else {
-              try {
-                double trans = 0;
-                double rec = 0;
-                for (int i = 0; i < parts.length; i++) {
-                  if (toSkip.contains(i / 2)) {
-                    continue;
-                  }
-                  if (i % 2 == 0) {
-                    rec += Double.valueOf(parts[i]);
-                  }
-                  else if (i % 2 == 1) {
-                    trans += Double.valueOf(parts[i]);
-                  }
-                }
-                transRate.add(trans);
-                recRate.add(rec);
-                if (transRate.size() > 10) {
-                  transRate.remove(0);
-                }
-                if (recRate.size() > 10) {
-                  recRate.remove(0);
-                }
-                Double total = 0d;
-                for (Double currRec : recRate) {
-                  total += currRec;
-                }
-                avgRecRate = total / recRate.size();
-
-                total = 0d;
-                for (Double currTrans : transRate) {
-                  total += currTrans;
-                }
-                avgTransRate = total / transRate.size();
-              }
-              catch (Exception e) {
-                logger.error("Error reading net traffic line: line=" + line);
-              }
-            }
-          }
-          p.waitFor();
-        }
-        else if (isUnix()) {
-          while (true) {
-            int count = 0;
-            File file = new File(System.getProperty("user.dir"), "dstat.out");
-            file.delete();
-            ProcessBuilder builder = new ProcessBuilder().command("dstat --output dstat.out");
+            ProcessBuilder builder = new ProcessBuilder().command("ifstat");
             Process p = builder.start();
-            BufferedReader in = new BufferedReader(new InputStreamReader(new FileInputStream(file)));
-            int recvPos = 0;
-            int sendPos = 0;
+            BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            String firstLine = null;
+            String secondLine = null;
+            Set<Integer> toSkip = new HashSet<>();
             while (true) {
               String line = in.readLine();
               if (line == null) {
                 break;
               }
-              try {
-                if (count++ > 10000) {
-                  p.destroyForcibly();
-                  break;
-                }
-
-    /*
-
-    "Dstat 0.7.0 CSV output"
-  "Author:","Dag Wieers <dag@wieers.com>",,,,"URL:","http://dag.wieers.com/home-made/dstat/"
-  "Host:","ip-10-0-0-79",,,,"User:","ec2-user"
-  "Cmdline:","dstat --output out",,,,"Date:","09 Apr 2017 02:48:19 UTC"
-
-  "total cpu usage",,,,,,"dsk/total",,"net/total",,"paging",,"system",
-  "usr","sys","idl","wai","hiq","siq","read","writ","recv","send","in","out","int","csw"
-  20.409,1.659,74.506,3.404,0.0,0.021,707495.561,82419494.859,0.0,0.0,0.0,0.0,17998.361,18691.991
-  8.794,1.131,77.010,13.065,0.0,0.0,0.0,272334848.0,54.0,818.0,0.0,0.0,1514.0,477.0
-  9.217,1.641,75.758,13.384,0.0,0.0,0.0,276201472.0,54.0,346.0,0.0,0.0,1481.0,392.0
-
-     */
-                String[] parts = line.split(",");
-                if (line.contains("usr") && line.contains("recv") && line.contains("send")) {
-                  for (int i = 0; i < parts.length; i++) {
-                    if (parts[i].equals("\"recv\"")) {
-                      recvPos = i;
-                    }
-                    else if (parts[i].equals("\"send\"")) {
-                      sendPos = i;
-                    }
+              String[] parts = line.trim().split("\\s+");
+              if (firstLine == null) {
+                for (int i = 0; i < parts.length; i++) {
+                  if (parts[i].toLowerCase().contains("bridge")) {
+                    toSkip.add(i);
                   }
                 }
-                else {
-                  Double trans = Double.valueOf(parts[sendPos]);
-                  Double rec = Double.valueOf(parts[recvPos]);
+                firstLine = line;
+              }
+              else if (secondLine == null) {
+                secondLine = line;
+              }
+              else {
+                try {
+                  double trans = 0;
+                  double rec = 0;
+                  for (int i = 0; i < parts.length; i++) {
+                    if (toSkip.contains(i / 2)) {
+                      continue;
+                    }
+                    if (i % 2 == 0) {
+                      rec += Double.valueOf(parts[i]);
+                    }
+                    else if (i % 2 == 1) {
+                      trans += Double.valueOf(parts[i]);
+                    }
+                  }
                   transRate.add(trans);
                   recRate.add(rec);
                   if (transRate.size() > 10) {
@@ -851,10 +798,100 @@ public class DatabaseServer {
                   }
                   avgTransRate = total / transRate.size();
                 }
+                catch (Exception e) {
+                  logger.error("Error reading net traffic line: line=" + line, e);
+                }
+                break;
               }
-              catch (Exception e) {
-                logger.error("Error reading net traffic line: line=" + line);
+            }
+            p.waitFor();
+            Thread.sleep(1000);
+          }
+        }
+        else if (isUnix()) {
+          while (true) {
+            int count = 0;
+            File file = new File(installDir, "tmp/dstat.out");
+            file.getParentFile().mkdirs();
+            file.delete();
+            ProcessBuilder builder = new ProcessBuilder().command("/usr/bin/dstat", "--output", file.getAbsolutePath());
+            Process p = builder.start();
+            while (!file.exists()) {
+              Thread.sleep(1000);
+            }
+            outer:
+            while (true) {
+              try (BufferedReader in = new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
+                int recvPos = 0;
+                int sendPos = 0;
+                while (true) {
+                  String line = in.readLine();
+                  if (line == null) {
+                    break;
+                  }
+                  try {
+                    if (count++ > 10000) {
+                      p.destroyForcibly();
+                      break outer;
+                    }
+
+        /*
+
+        "Dstat 0.7.0 CSV output"
+      "Author:","Dag Wieers <dag@wieers.com>",,,,"URL:","http://dag.wieers.com/home-made/dstat/"
+      "Host:","ip-10-0-0-79",,,,"User:","ec2-user"
+      "Cmdline:","dstat --output out",,,,"Date:","09 Apr 2017 02:48:19 UTC"
+
+      "total cpu usage",,,,,,"dsk/total",,"net/total",,"paging",,"system",
+      "usr","sys","idl","wai","hiq","siq","read","writ","recv","send","in","out","int","csw"
+      20.409,1.659,74.506,3.404,0.0,0.021,707495.561,82419494.859,0.0,0.0,0.0,0.0,17998.361,18691.991
+      8.794,1.131,77.010,13.065,0.0,0.0,0.0,272334848.0,54.0,818.0,0.0,0.0,1514.0,477.0
+      9.217,1.641,75.758,13.384,0.0,0.0,0.0,276201472.0,54.0,346.0,0.0,0.0,1481.0,392.0
+
+         */
+                    String[] parts = line.split(",");
+                    if (line.contains("usr") && line.contains("recv") && line.contains("send")) {
+                      for (int i = 0; i < parts.length; i++) {
+                        if (parts[i].equals("\"recv\"")) {
+                          recvPos = i;
+                        }
+                        else if (parts[i].equals("\"send\"")) {
+                          sendPos = i;
+                        }
+                      }
+                    }
+                    else {
+                      Double trans = Double.valueOf(parts[sendPos]);
+                      Double rec = Double.valueOf(parts[recvPos]);
+                      transRate.add(trans);
+                      recRate.add(rec);
+                      if (transRate.size() > 10) {
+                        transRate.remove(0);
+                      }
+                      if (recRate.size() > 10) {
+                        recRate.remove(0);
+                      }
+                      Double total = 0d;
+                      for (Double currRec : recRate) {
+                        total += currRec;
+                      }
+                      avgRecRate = total / recRate.size();
+
+                      total = 0d;
+                      for (Double currTrans : transRate) {
+                        total += currTrans;
+                      }
+                      avgTransRate = total / transRate.size();
+                    }
+                  }
+                  catch (Exception e) {
+                    logger.error("Error reading net traffic line: line=" + line, e);
+                    Thread.sleep(5000);
+                    break outer;
+                  }
+                }
               }
+              Thread.sleep(1000);
             }
             p.waitFor();
           }
@@ -912,11 +949,50 @@ public class DatabaseServer {
     return null;
   }
 
-  public byte[] getOSStats(String command, byte[] body, boolean replayedCommand) {
-    Double resGig = null;
+  public byte[] logError(String command, byte[] body, boolean replayedCommand) {
+    try {
+      DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
+      boolean isClient = in.readBoolean();
+      String hostName = in.readUTF();
+      String msg = in.readUTF();
+      String exception = null;
+      if (in.readBoolean()) {
+        exception = in.readUTF();
+      }
+      StringBuilder actualMsg = new StringBuilder();
+      actualMsg.append("host=").append(hostName).append("\n");
+      actualMsg.append("msg=").append(msg).append("\n");
+      if (exception != null) {
+        actualMsg.append("exception=").append(exception);
+      }
+
+      if (isClient) {
+        clientErrorLogger.error(actualMsg.toString());
+      }
+      else {
+        errorLogger.error(actualMsg.toString());
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+    return null;
+  }
+
+  class OSStats {
+    double resGig;
+    double cpu;
+    double javaMemMin;
+    double javaMemMax;
+    double avgRecRate;
+    double avgTransRate;
+    String diskAvail;
+  }
+
+  public OSStats doGetOSStats() {
+    OSStats ret = new OSStats();
     String secondToLastLine = null;
     String lastLine = null;
-    Double cpu = null;
     AtomicReference<Double> javaMemMax = new AtomicReference<>();
     AtomicReference<Double> javaMemMin = new AtomicReference<>();
     try {
@@ -940,10 +1016,10 @@ public class DatabaseServer {
         String[] parts = lastLine.split("\\s+");
         for (int i = 0; i < headerParts.length; i++) {
           if (headerParts[i].toLowerCase().trim().equals("mem")) {
-            resGig = getMemValue(parts[i]);
+            ret.resGig = getMemValue(parts[i]);
           }
           else if (headerParts[i].toLowerCase().trim().equals("%cpu")) {
-            cpu = Double.valueOf(parts[i]);
+            ret.cpu = Double.valueOf(parts[i]);
           }
         }
       }
@@ -973,38 +1049,50 @@ public class DatabaseServer {
         for (int i = 0; i < headerParts.length; i++) {
           if (headerParts[i].toLowerCase().trim().equals("res")) {
             String memStr = parts[i];
-            resGig = getMemValue(memStr);
+            ret.resGig = getMemValue(memStr);
           }
           else if (headerParts[i].toLowerCase().trim().equals("%cpu")) {
-            cpu = Double.valueOf(parts[i]);
+            ret.cpu = Double.valueOf(parts[i]);
           }
         }
       }
 
       getJavaMemStats(javaMemMin, javaMemMax);
 
-      String diskAvail = getDiskAvailable();
+      ret.diskAvail = getDiskAvailable();
 
+      ret.javaMemMin = javaMemMin.get() == null ? 0 : javaMemMin.get();
+      ret.javaMemMax = javaMemMax.get() == null ? 0 : javaMemMax.get();
+      ret.avgRecRate = avgRecRate;
+      ret.avgTransRate = avgTransRate;
+    }
+    catch (Exception e) {
+      logger.error("Error checking memory: line2=" + secondToLastLine + ", line1=" + lastLine, e);
+      throw new DatabaseException(e);
+    }
+    return ret;
+  }
+
+  public byte[] getOSStats(String command, byte[] body, boolean replayedCommand) {
+    try {
+      OSStats stats = doGetOSStats();
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
       out.writeLong(SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-      out.writeDouble(resGig);
-      out.writeDouble(cpu);
-      out.writeDouble(javaMemMin.get() == null ? 0 : javaMemMin.get());
-      out.writeDouble(javaMemMax.get() == null ? 0 : javaMemMax.get());
-      out.writeDouble(avgRecRate);
-      out.writeDouble(avgTransRate);
-      out.writeUTF(diskAvail);
+      out.writeDouble(stats.resGig);
+      out.writeDouble(stats.cpu);
+      out.writeDouble(stats.javaMemMin);
+      out.writeDouble(stats.javaMemMax);
+      out.writeDouble(stats.avgRecRate);
+      out.writeDouble(stats.avgTransRate);
+      out.writeUTF(stats.diskAvail);
       out.writeUTF(host);
       out.close();
       return bytesOut.toByteArray();
     }
     catch (Exception e) {
-      logger.error("Error checking memory: line2=" + secondToLastLine + ", line1=" + lastLine, e);
+      throw new DatabaseException(e);
     }
-
-
-    return null;
   }
 
   private void getJavaMemStats(AtomicReference<Double> javaMemMin, AtomicReference<Double> javaMemMax) {
@@ -1078,6 +1166,9 @@ public class DatabaseServer {
       }
 
       File file = new File(gclog + ".0.current");
+      if (!file.exists()) {
+        return;
+      }
       try (ReversedLinesFileReader fr = new ReversedLinesFileReader(file, Charset.forName("utf-8"))) {
         String ch;
         do {
@@ -2192,6 +2283,7 @@ public class DatabaseServer {
     String dbName = parts[4];
     common.getSchemaReadLock(dbName).lock();
     try {
+      logger.info("Requesting next record id - begin");
       int schemaVersion = Integer.valueOf(parts[3]);
       if (schemaVersion < getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + common.getSchemaVersion() + ":");
@@ -2218,6 +2310,8 @@ public class DatabaseServer {
           writer.write(String.valueOf(maxId));
         }
       }
+
+      logger.info("Requesting next record id - finished: nextId=" + nextId + ", maxId=" + maxId);
 
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
@@ -2794,4 +2888,23 @@ public class DatabaseServer {
     return null;
   }
 
+  private class StatsMonitor implements Runnable {
+    @Override
+    public void run() {
+      while (true) {
+        try {
+          Thread.sleep(30000);
+          OSStats stats = doGetOSStats();
+          logger.info("OS Stats: CPU=" + String.format("%.2f", stats.cpu) + ", resGig=" + String.format("%.2f", stats.resGig) +
+            ", javaMemMin=" + String.format("%.2f", stats.javaMemMin) + ", javaMemMax=" + String.format("%.2f", stats.javaMemMax) +
+            ", NetOut=" + String.format("%.2f", stats.avgTransRate) + ", NetIn=" + String.format("%.2f", stats.avgRecRate) +
+              ", DiskAvail=" + stats.diskAvail);
+        }
+        catch (InterruptedException e) {
+          break;
+        }
+
+      }
+    }
+  }
 }

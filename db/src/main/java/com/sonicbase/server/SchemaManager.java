@@ -1,6 +1,7 @@
 package com.sonicbase.server;
 
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.Logger;
 import com.sonicbase.common.SchemaOutOfSyncException;
 import com.sonicbase.index.Indices;
 import com.sonicbase.query.DatabaseException;
@@ -10,8 +11,6 @@ import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.DataUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.*;
@@ -23,12 +22,13 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public class SchemaManager {
 
-  private static Logger logger = LoggerFactory.getLogger(SchemaManager.class);
+  private Logger logger;
 
   private final DatabaseServer server;
 
   public SchemaManager(DatabaseServer databaseServer) {
     this.server = databaseServer;
+    this.logger = new Logger(databaseServer.getDatabaseClient());
   }
 
   public static class AutoIncrementValue {

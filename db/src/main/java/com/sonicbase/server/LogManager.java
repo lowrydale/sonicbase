@@ -1,13 +1,12 @@
 package com.sonicbase.server;
 
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.Logger;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.util.DataUtil;
 import com.sonicbase.util.ISO8601;
 import com.sonicbase.util.StreamUtils;
 import com.sonicbase.research.socket.NettyServer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.text.ParseException;
@@ -27,7 +26,7 @@ public class LogManager {
 
   private static final String DATABASE_STR = "database";
   private static final String UTF8_STR = "utf-8";
-  private static Logger logger = LoggerFactory.getLogger(LogManager.class);
+  private Logger logger;
   private final DatabaseServer databaseServer;
   private final ThreadPoolExecutor executor;
 
@@ -42,6 +41,7 @@ public class LogManager {
 
   public LogManager(DatabaseServer databaseServer) {
     this.databaseServer = databaseServer;
+    logger = new Logger(databaseServer.getDatabaseClient());
     executor = new ThreadPoolExecutor(64, 64, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
     synchronized (this) {

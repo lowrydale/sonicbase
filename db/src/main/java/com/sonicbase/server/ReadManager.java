@@ -2,6 +2,7 @@ package com.sonicbase.server;
 
 import com.codahale.metrics.MetricRegistry;
 import com.sonicbase.common.DatabaseCommon;
+import com.sonicbase.common.Logger;
 import com.sonicbase.common.Record;
 import com.sonicbase.common.SchemaOutOfSyncException;
 import com.sonicbase.index.Index;
@@ -15,8 +16,6 @@ import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.DataUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.*;
@@ -27,7 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class ReadManager {
 
-  private static Logger logger = LoggerFactory.getLogger(ReadManager.class);
+  private Logger logger;
 
   private final DatabaseServer server;
   private Thread preparedReaper;
@@ -35,6 +34,8 @@ public class ReadManager {
   public ReadManager(DatabaseServer databaseServer) {
 
     this.server = databaseServer;
+    this.logger = new Logger(databaseServer.getDatabaseClient());
+
     new java.util.Timer().scheduleAtFixedRate(new TimerTask() {
       @Override
       public void run() {

@@ -11,8 +11,6 @@ import org.anarres.lzo.LzoDecompressor1x;
 import org.anarres.lzo.LzoInputStream;
 import org.anarres.lzo.LzoOutputStream;
 import org.apache.commons.io.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.*;
@@ -25,7 +23,7 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class DiskBasedResultSet {
 
-  private static Logger logger = LoggerFactory.getLogger(DiskBasedResultSet.class);
+  private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
 
   private static AtomicLong nextResultSetId = new AtomicLong();
   private int count;

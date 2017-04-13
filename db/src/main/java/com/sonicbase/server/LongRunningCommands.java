@@ -1,9 +1,8 @@
 package com.sonicbase.server;
 
+import com.sonicbase.common.Logger;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.util.DataUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -16,12 +15,13 @@ import java.util.Map;
  */
 public class LongRunningCommands {
 
-  private static Logger logger = LoggerFactory.getLogger(LongRunningCommands.class);
+  private Logger logger;
 
   private final DatabaseServer server;
 
   public LongRunningCommands(DatabaseServer server) {
     this.server = server;
+    this.logger = new Logger(server.getDatabaseClient());
   }
 
   public void load() {

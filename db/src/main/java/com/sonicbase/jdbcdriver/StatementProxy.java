@@ -3,8 +3,6 @@ package com.sonicbase.jdbcdriver;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.ResultSetImpl;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.math.BigDecimal;
@@ -22,7 +20,6 @@ import java.util.List;
  */
 public class StatementProxy extends ParameterHandler implements java.sql.Statement, PreparedStatement {
 
-  public static Logger LOGGER = LoggerFactory.getLogger(StatementProxy.class);
   private final String dbName;
 
   private String sql;

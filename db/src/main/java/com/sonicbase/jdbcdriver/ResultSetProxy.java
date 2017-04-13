@@ -1,8 +1,6 @@
 package com.sonicbase.jdbcdriver;
 
 import com.sonicbase.query.impl.ResultSetImpl;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
 import java.io.Reader;
@@ -22,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class ResultSetProxy implements java.sql.ResultSet {
 
-  private static Logger LOGGER = LoggerFactory.getLogger(ResultSetProxy.class);
+  private static org.apache.log4j.Logger LOGGER = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
 
   private List<ResultSetInfo> resultSets = new ArrayList<ResultSetInfo>();
   private int currResultSetOffset;

@@ -7,6 +7,7 @@ package com.sonicbase.jdbcdriver;
  */
 
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.Logger;
 import com.sonicbase.query.DatabaseException;
 
 import java.sql.*;
@@ -55,7 +56,9 @@ public class ConnectionProxy implements Connection {
         if (databaseClient != null) {
           databaseClient.shutdown();
         }
-        databaseClient = new DatabaseClient(host, port, true);
+        databaseClient = new DatabaseClient(host, port, -1, -1, true);
+        Logger.setIsClient(true);
+        Logger.setReady();
       }
       if (db != null) {
         databaseClient.initDb(db);

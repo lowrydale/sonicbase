@@ -2,6 +2,7 @@ package com.sonicbase.index;
 
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.DatabaseCommon;
+import com.sonicbase.common.Logger;
 import com.sonicbase.common.Record;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
@@ -15,8 +16,6 @@ import com.sonicbase.util.DataUtil;
 import com.sonicbase.util.JsonArray;
 import com.sonicbase.util.JsonDict;
 import com.sonicbase.util.StreamUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.*;
@@ -33,7 +32,7 @@ public class Repartitioner extends Thread {
 
   private static final String INDEX_STR = ", index=";
   private static final String NAME_STR = "name";
-  private static Logger logger = LoggerFactory.getLogger(Repartitioner.class);
+  private static Logger logger;
 
 
   private final DatabaseServer databaseServer;
@@ -50,6 +49,7 @@ public class Repartitioner extends Thread {
 
   public Repartitioner(DatabaseServer databaseServer, DatabaseCommon common) {
     super("Repartitioner Thread");
+    logger = new Logger(databaseServer.getDatabaseClient());
     this.databaseServer = databaseServer;
     this.common = common;
     this.indices = databaseServer.getIndices();
@@ -1350,7 +1350,8 @@ public class Repartitioner extends Thread {
 
     if (operator == BinaryExpression.Operator.equal) {
 
-      if (partitions[0].getUpperKey() == null) {
+      TableSchema.Partition partitionZero = partitions[0];
+      if (partitionZero.getUpperKey() == null) {
         selectedPartitions.add(0);
         return;
       }

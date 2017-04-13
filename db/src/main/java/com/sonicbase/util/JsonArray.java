@@ -7,8 +7,6 @@ package com.sonicbase.util;
  */
 
 import com.google.gson.JsonElement;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,7 +15,7 @@ import java.util.Map;
 public class JsonArray {
   private List<Object> list = new ArrayList<Object>();
 
-  private static Logger logger = LoggerFactory.getLogger(JsonArray.class);
+  private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
 
   public int size() {
     return list.size();

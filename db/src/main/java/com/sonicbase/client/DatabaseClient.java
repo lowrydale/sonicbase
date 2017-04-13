@@ -2,6 +2,7 @@ package com.sonicbase.client;
 
 import com.codahale.metrics.MetricRegistry;
 import com.sonicbase.common.DatabaseCommon;
+import com.sonicbase.common.Logger;
 import com.sonicbase.common.Record;
 import com.sonicbase.common.SchemaOutOfSyncException;
 import com.sonicbase.index.Repartitioner;
@@ -12,7 +13,6 @@ import com.sonicbase.query.*;
 import com.sonicbase.query.impl.*;
 import com.sonicbase.schema.*;
 import com.sonicbase.server.DatabaseServer;
-import com.sonicbase.server.PreparedIndexLookupNotFoundException;
 import com.sonicbase.server.ReadManager;
 import com.sonicbase.server.SnapshotManager;
 import com.sonicbase.socket.DatabaseSocketClient;
@@ -40,8 +40,6 @@ import net.sf.jsqlparser.statement.select.*;
 import net.sf.jsqlparser.statement.truncate.Truncate;
 import net.sf.jsqlparser.statement.update.Update;
 import org.apache.commons.lang.exception.ExceptionUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.sql.SQLException;
@@ -63,7 +61,8 @@ public class DatabaseClient {
   private DatabaseCommon common = new DatabaseCommon();
   private ThreadPoolExecutor executor = new ThreadPoolExecutor(128, 128, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
-  private static Logger logger = LoggerFactory.getLogger(DatabaseClient.class);
+  private static org.apache.log4j.Logger localLogger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
+  private Logger logger;
 
   private int pageSize = ReadManager.SELECT_PAGE_SIZE;
 
@@ -116,6 +115,54 @@ public class DatabaseClient {
   };
 
   private static Set<String> writeVerbs = new HashSet<String>();
+
+  public DatabaseClient(String host, int port, int shard, int replica, boolean isClient) {
+    this(host, port, shard, replica, isClient, null);
+  }
+
+  public DatabaseClient(String host, int port, int shard, int replica, boolean isClient, DatabaseCommon common) {
+    servers = new Server[1][];
+    servers[0] = new Server[1];
+    servers[0][0] = new Server(host, port);
+    this.isClient = isClient;
+    if (common != null) {
+      this.common = common;
+    }
+
+    if (shard != 0 && replica != 0) {
+      syncConfig();
+    }
+
+    ExpressionImpl.startPreparedReaper(this);
+
+    configureServers();
+
+    logger = new Logger(this);
+
+    statsTimer = new java.util.Timer();
+//    statsTimer.scheduleAtFixedRate(new TimerTask() {
+//      @Override
+//      public void run() {
+//        System.out.println("IndexLookup stats: count=" + INDEX_LOOKUP_STATS.getCount() + ", rate=" + INDEX_LOOKUP_STATS.getFiveMinuteRate() +
+//            ", durationAvg=" + INDEX_LOOKUP_STATS.getSnapshot().getMean() / 1000000d +
+//            ", duration99.9=" + INDEX_LOOKUP_STATS.getSnapshot().get999thPercentile() / 1000000d);
+//        System.out.println("BatchIndexLookup stats: count=" + BATCH_INDEX_LOOKUP_STATS.getCount() + ", rate=" + BATCH_INDEX_LOOKUP_STATS.getFiveMinuteRate() +
+//            ", durationAvg=" + BATCH_INDEX_LOOKUP_STATS.getSnapshot().getMean() / 1000000d +
+//            ", duration99.9=" + BATCH_INDEX_LOOKUP_STATS.getSnapshot().get999thPercentile() / 1000000d);
+//        System.out.println("BatchIndexLookup stats: count=" + JOIN_EVALUATE.getCount() + ", rate=" + JOIN_EVALUATE.getFiveMinuteRate() +
+//            ", durationAvg=" + JOIN_EVALUATE.getSnapshot().getMean() / 1000000d +
+//            ", duration99.9=" + JOIN_EVALUATE.getSnapshot().get999thPercentile() / 1000000d);
+//      }
+//    }, 20 * 1000, 20 * 1000);
+
+    for (String verb : write_verbs_array) {
+      write_verbs.add(verb);
+    }
+
+  }
+
+
+
 
   public Set<String> getWrite_verbs() {
     return write_verbs;
@@ -349,149 +396,166 @@ public class DatabaseClient {
 
   public int[] executeBatch() throws UnsupportedEncodingException, SQLException {
 
-    final List<PreparedInsert> withRecordPrepared = new ArrayList<>();
-    final List<PreparedInsert> prepared = new ArrayList<>();
-    for (InsertRequest request : batch.get()) {
-      List<PreparedInsert> inserts = prepareInsert(request);
-      for (PreparedInsert insert : inserts) {
-        if (insert.keyInfo.indexSchema.getValue().isPrimaryKey()) {
-          withRecordPrepared.add(insert);
+    try {
+      final Object mutex = new Object();
+      final List<PreparedInsert> withRecordPrepared = new ArrayList<>();
+      final List<PreparedInsert> prepared = new ArrayList<>();
+      long nonTransId = 0;
+      if (!isExplicitTrans.get()) {
+        nonTransId = allocateId(batch.get().get(0).dbName);
+      }
+      for (InsertRequest request : batch.get()) {
+        List<PreparedInsert> inserts = prepareInsert(request, nonTransId);
+        for (PreparedInsert insert : inserts) {
+          if (insert.keyInfo.indexSchema.getValue().isPrimaryKey()) {
+            withRecordPrepared.add(insert);
+          }
+          else {
+            prepared.add(insert);
+          }
         }
-        else {
-          prepared.add(insert);
+      }
+      while (true) {
+        final AtomicInteger totalCount = new AtomicInteger();
+        try {
+          if (batch.get() == null) {
+            throw new DatabaseException("No batch initiated");
+          }
+
+          String dbName = batch.get().get(0).dbName;
+          final String command = "DatabaseServer:batchInsertIndexEntryByKeyWithRecord:1:" + common.getSchemaVersion() + ":" + dbName;
+
+          final List<List<PreparedInsert>> withRecordProcessed = new ArrayList<>();
+          final List<List<PreparedInsert>> processed = new ArrayList<>();
+          final List<ByteArrayOutputStream> withRecordBytesOut = new ArrayList<>();
+          final List<DataOutputStream> withRecordOut = new ArrayList<>();
+          final List<ByteArrayOutputStream> bytesOut = new ArrayList<>();
+          final List<DataOutputStream> out = new ArrayList<>();
+          for (int i = 0; i < getShardCount(); i++) {
+            ByteArrayOutputStream bOut = new ByteArrayOutputStream();
+            withRecordBytesOut.add(bOut);
+            withRecordOut.add(new DataOutputStream(bOut));
+            bOut = new ByteArrayOutputStream();
+            bytesOut.add(bOut);
+            out.add(new DataOutputStream(bOut));
+            withRecordProcessed.add(new ArrayList<PreparedInsert>());
+            processed.add(new ArrayList<PreparedInsert>());
+          }
+          synchronized (mutex) {
+            for (PreparedInsert insert : withRecordPrepared) {
+              serializeInsertKeyWithRecord(withRecordOut.get(insert.keyInfo.shard), insert.dbName, insert.tableName,
+                  insert.keyInfo, insert.record);
+              withRecordProcessed.get(insert.keyInfo.shard).add(insert);
+            }
+          }
+          for (PreparedInsert insert : prepared) {
+            serializeInsertKey(out.get(insert.keyInfo.shard), insert.dbName, insert.tableName, insert.keyInfo,
+                insert.primaryKeyIndexName, insert.primaryKey);
+            processed.get(insert.keyInfo.shard).add(insert);
+          }
+
+
+          List<Future> futures = new ArrayList<>();
+          for (int i = 0; i < bytesOut.size(); i++) {
+            final int offset = i;
+            futures.add(executor.submit(new Callable() {
+              @Override
+              public Object call() throws Exception {
+                ByteArrayOutputStream currBytes = withRecordBytesOut.get(offset);
+                byte[] bytes = currBytes.toByteArray();
+                if (bytes == null || bytes.length == 0) {
+                  return null;
+                }
+                byte[] ret = send(null, offset, 0, command, bytes, DatabaseClient.Replica.all);
+                if (ret == null) {
+                  throw new FailedToInsertException("No response for key insert");
+                }
+                for (PreparedInsert insert : withRecordProcessed.get(offset)) {
+                  synchronized (mutex) {
+                    withRecordPrepared.remove(insert);
+                  }
+                }
+                DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
+                long serializationVersion = DataUtil.readVLong(in);
+                int retVal = in.readInt();
+                totalCount.addAndGet(retVal);
+                //if (retVal != 1) {
+                //  throw new FailedToInsertException("Incorrect response from server: value=" + retVal);
+                //}
+                return null;
+              }
+            }));
+          }
+          for (Future future : futures) {
+            future.get();
+          }
+          final String command2 = "DatabaseServer:batchInsertIndexEntryByKey:1:" + common.getSchemaVersion() + ":" + dbName;
+
+          futures = new ArrayList<>();
+          for (int i = 0; i < bytesOut.size(); i++) {
+            final int offset = i;
+            futures.add(executor.submit(new Callable() {
+              @Override
+              public Object call() throws Exception {
+                ByteArrayOutputStream currBytes = bytesOut.get(offset);
+                byte[] bytes = currBytes.toByteArray();
+                if (bytes == null || bytes.length == 0) {
+                  return null;
+                }
+                send(null, offset, rand.nextLong(), command2, bytes, DatabaseClient.Replica.all);
+
+                for (PreparedInsert insert : processed.get(offset)) {
+                  prepared.remove(insert);
+                }
+
+                return null;
+              }
+            }));
+          }
+          for (Future future : futures) {
+            future.get();
+          }
+
+          int[] ret = new int[totalCount.get()];
+          for (int i = 0; i < ret.length; i++) {
+            ret[i] = 1;
+          }
+          return ret;
+        }
+
+        catch (Exception e) {
+          if (e.getCause() instanceof SchemaOutOfSyncException) {
+            for (PreparedInsert insert : withRecordPrepared) {
+              List<KeyInfo> keys = getKeys(common.getTables(insert.dbName).get(insert.tableSchema.getName()), insert.columnNames, insert.values, insert.id);
+              for (KeyInfo key : keys) {
+                if (key.indexSchema.getKey().equals(insert.indexName)) {
+                  insert.keyInfo.shard = key.shard;
+                  break;
+                }
+              }
+            }
+
+            for (PreparedInsert insert : prepared) {
+              List<KeyInfo> keys = getKeys(common.getTables(insert.dbName).get(insert.tableSchema.getName()), insert.columnNames, insert.values, insert.id);
+              for (KeyInfo key : keys) {
+                if (key.indexSchema.getKey().equals(insert.indexName)) {
+                  insert.keyInfo.shard = key.shard;
+                  break;
+                }
+              }
+            }
+
+            continue;
+          }
+          throw new DatabaseException(e);
         }
       }
     }
-    while (true) {
-      final AtomicInteger totalCount = new AtomicInteger();
-      try {
-        if (batch.get() == null) {
-          throw new DatabaseException("No batch initiated");
-        }
-
-        String dbName = batch.get().get(0).dbName;
-        final String command = "DatabaseServer:batchInsertIndexEntryByKeyWithRecord:1:" + common.getSchemaVersion() + ":" + dbName;
-
-        final List<List<PreparedInsert>> withRecordProcessed = new ArrayList<>();
-        final List<List<PreparedInsert>> processed = new ArrayList<>();
-        final List<ByteArrayOutputStream> withRecordBytesOut = new ArrayList<>();
-        final List<DataOutputStream> withRecordOut = new ArrayList<>();
-        final List<ByteArrayOutputStream> bytesOut = new ArrayList<>();
-        final List<DataOutputStream> out = new ArrayList<>();
-        for (int i = 0; i < getShardCount(); i++) {
-          ByteArrayOutputStream bOut = new ByteArrayOutputStream();
-          withRecordBytesOut.add(bOut);
-          withRecordOut.add(new DataOutputStream(bOut));
-          bOut = new ByteArrayOutputStream();
-          bytesOut.add(bOut);
-          out.add(new DataOutputStream(bOut));
-          withRecordProcessed.add(new ArrayList<PreparedInsert>());
-          processed.add(new ArrayList<PreparedInsert>());
-        }
-        for (PreparedInsert insert : withRecordPrepared) {
-          serializeInsertKeyWithRecord(withRecordOut.get(insert.keyInfo.shard), insert.dbName, insert.tableName,
-                insert.keyInfo, insert.record);
-          withRecordProcessed.get(insert.keyInfo.shard).add(insert);
-        }
-        for (PreparedInsert insert : prepared) {
-          serializeInsertKey(out.get(insert.keyInfo.shard), insert.dbName, insert.tableName, insert.keyInfo,
-              insert.primaryKeyIndexName, insert.primaryKey);
-          processed.get(insert.keyInfo.shard).add(insert);
-        }
-
-
-        List<Future> futures = new ArrayList<>();
-        for (int i = 0; i < bytesOut.size(); i++) {
-          final int offset = i;
-          futures.add(executor.submit(new Callable() {
-            @Override
-            public Object call() throws Exception {
-              ByteArrayOutputStream currBytes = withRecordBytesOut.get(offset);
-              byte[] bytes = currBytes.toByteArray();
-              if (bytes == null || bytes.length == 0) {
-                return null;
-              }
-              byte[] ret = send(null, offset, 0, command, bytes, DatabaseClient.Replica.all);
-              if (ret == null) {
-                throw new FailedToInsertException("No response for key insert");
-              }
-              for (PreparedInsert insert : withRecordProcessed.get(offset)) {
-                withRecordPrepared.remove(insert);
-              }
-              DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
-              long serializationVersion = DataUtil.readVLong(in);
-              int retVal = in.readInt();
-              totalCount.addAndGet(retVal);
-              //if (retVal != 1) {
-              //  throw new FailedToInsertException("Incorrect response from server: value=" + retVal);
-              //}
-              return null;
-            }
-          }));
-        }
-        for (Future future : futures) {
-          future.get();
-        }
-        final String command2 = "DatabaseServer:batchInsertIndexEntryByKey:1:" + common.getSchemaVersion() + ":" + dbName;
-
-        futures = new ArrayList<>();
-        for (int i = 0; i < bytesOut.size(); i++) {
-          final int offset = i;
-          futures.add(executor.submit(new Callable() {
-            @Override
-            public Object call() throws Exception {
-              ByteArrayOutputStream currBytes = bytesOut.get(offset);
-              byte[] bytes = currBytes.toByteArray();
-              if (bytes == null || bytes.length == 0) {
-                return null;
-              }
-              send(null, offset, rand.nextLong(), command2, bytes, DatabaseClient.Replica.all);
-
-              for (PreparedInsert insert : processed.get(offset)) {
-                prepared.remove(insert);
-              }
-
-              return null;
-            }
-          }));
-        }
-        for (Future future : futures) {
-          future.get();
-        }
-
-        int[] ret = new int[totalCount.get()];
-        for (int i = 0; i < ret.length; i++) {
-          ret[i] = 1;
-        }
-        return ret;
+    catch (Exception e) {
+      if (!(e instanceof  SchemaOutOfSyncException)) {
+        logger.sendErrorToServer("Error processing batch request", e);
       }
-
-      catch (Exception e) {
-        if (e.getCause() instanceof SchemaOutOfSyncException) {
-          for (PreparedInsert insert: withRecordPrepared) {
-            List<KeyInfo> keys = getKeys(common.getTables(insert.dbName).get(insert.tableSchema.getName()), insert.columnNames, insert.values, insert.id);
-            for (KeyInfo key : keys) {
-              if (key.indexSchema.getKey().equals(insert.indexName)) {
-                insert.keyInfo.shard = key.shard;
-                break;
-              }
-            }
-          }
-
-          for (PreparedInsert insert: prepared) {
-            List<KeyInfo> keys = getKeys(common.getTables(insert.dbName).get(insert.tableSchema.getName()), insert.columnNames, insert.values, insert.id);
-            for (KeyInfo key : keys) {
-              if (key.indexSchema.getKey().equals(insert.indexName)) {
-                insert.keyInfo.shard = key.shard;
-                break;
-              }
-            }
-          }
-
-          continue;
-        }
-        throw new DatabaseException(e);
-      }
+      throw new DatabaseException(e);
     }
   }
 
@@ -571,40 +635,6 @@ public class DatabaseClient {
     return DatabaseSocketClient.do_send(requests);
   }
 
-  public DatabaseClient(String host, int port, boolean isClient) {
-    servers = new Server[1][];
-    servers[0] = new Server[1];
-    servers[0][0] = new Server(host, port);
-    this.isClient = isClient;
-
-    syncConfig();
-
-    ExpressionImpl.startPreparedReaper(this);
-
-    configureServers();
-
-    statsTimer = new java.util.Timer();
-//    statsTimer.scheduleAtFixedRate(new TimerTask() {
-//      @Override
-//      public void run() {
-//        System.out.println("IndexLookup stats: count=" + INDEX_LOOKUP_STATS.getCount() + ", rate=" + INDEX_LOOKUP_STATS.getFiveMinuteRate() +
-//            ", durationAvg=" + INDEX_LOOKUP_STATS.getSnapshot().getMean() / 1000000d +
-//            ", duration99.9=" + INDEX_LOOKUP_STATS.getSnapshot().get999thPercentile() / 1000000d);
-//        System.out.println("BatchIndexLookup stats: count=" + BATCH_INDEX_LOOKUP_STATS.getCount() + ", rate=" + BATCH_INDEX_LOOKUP_STATS.getFiveMinuteRate() +
-//            ", durationAvg=" + BATCH_INDEX_LOOKUP_STATS.getSnapshot().getMean() / 1000000d +
-//            ", duration99.9=" + BATCH_INDEX_LOOKUP_STATS.getSnapshot().get999thPercentile() / 1000000d);
-//        System.out.println("BatchIndexLookup stats: count=" + JOIN_EVALUATE.getCount() + ", rate=" + JOIN_EVALUATE.getFiveMinuteRate() +
-//            ", durationAvg=" + JOIN_EVALUATE.getSnapshot().getMean() / 1000000d +
-//            ", duration99.9=" + JOIN_EVALUATE.getSnapshot().get999thPercentile() / 1000000d);
-//      }
-//    }, 20 * 1000, 20 * 1000);
-
-    for (String verb : write_verbs_array) {
-      write_verbs.add(verb);
-    }
-
-  }
-
   private static final MetricRegistry METRICS = new MetricRegistry();
 
   public static final com.codahale.metrics.Timer INDEX_LOOKUP_STATS = METRICS.timer("indexLookup");
@@ -649,7 +679,7 @@ public class DatabaseClient {
       if (ret != null) {
         common.deserializeConfig(new DataInputStream(new ByteArrayInputStream(ret)));
 
-        logger.info("Client received config from server");
+        localLogger.info("Client received config from server");
       }
     }
     catch (Exception t) {
@@ -735,7 +765,6 @@ public class DatabaseClient {
   private String handleSchemaOutOfSyncException(String command, Exception e) {
     try {
       String[] parts = command.split(":");
-      String dbName = parts[4];
       int previousVersion = common.getSchemaVersion();
       boolean schemaOutOfSync = false;
       String msg = null;
@@ -788,6 +817,7 @@ public class DatabaseClient {
       throw e1;
     }
     catch (Exception e1) {
+      localLogger.error("Error handling schema out of sync", e);
       throw new DatabaseException(e1);
     }
   }
@@ -923,8 +953,8 @@ public class DatabaseClient {
                   localCommand = handleSchemaOutOfSyncException(localCommand, e);
                 }
                 catch (Exception t) {
-                  logger.error("Error synching schema", t);
-                  logger.error("Error sending request", e);
+                  localLogger.error("Error synching schema", t);
+                  localLogger.error("Error sending request", e);
                   throw t;
                 }
               }
@@ -953,8 +983,8 @@ public class DatabaseClient {
                       throw s;
                     }
                     catch (Exception t) {
-                      logger.error("Error synching schema", t);
-                      logger.error("Error sending request", e);
+                      localLogger.error("Error synching schema", t);
+                      localLogger.error("Error sending request", e);
                       throw t;
                     }
                   }
@@ -971,7 +1001,7 @@ public class DatabaseClient {
           }
         }
         catch (SocketException e) {
-          logger.error("Error sending message - will retry:", e);
+          localLogger.error("Error sending message - will retry:", e);
           if (attempt == 0) {
             throw new DatabaseException(e);
           }
@@ -1114,6 +1144,9 @@ public class DatabaseClient {
         continue;
       }
       catch (Exception e) {
+        if (!(e instanceof SchemaOutOfSyncException)) {
+          logger.sendErrorToServer("Error processing request", e);
+        }
         throw new SQLException(e);
       }
     }
@@ -1759,7 +1792,7 @@ public class DatabaseClient {
     public String indexName;
   }
 
-  public List<PreparedInsert> prepareInsert(InsertRequest request) throws UnsupportedEncodingException, SQLException {
+  public List<PreparedInsert> prepareInsert(InsertRequest request, long nonTransId) throws UnsupportedEncodingException, SQLException {
     List<PreparedInsert> ret = new ArrayList<>();
 
     String dbName = request.dbName;
@@ -1767,7 +1800,7 @@ public class DatabaseClient {
     List<String> columnNames;
     List<Object> values;
 
-    long id = allocateId(dbName);
+    long id = 0;//allocateId(dbName);
 
     String tableName = request.insertStatement.getTableName();
 
@@ -1778,7 +1811,7 @@ public class DatabaseClient {
 
     long transId = 0;
     if (!isExplicitTrans.get()) {
-      transId = allocateId(dbName);
+      transId = nonTransId;
     }
     else {
       transId = transactionId.get();
@@ -1877,7 +1910,12 @@ public class DatabaseClient {
           batch.get().add(request);
         }
         else {
-          List<PreparedInsert> inserts = prepareInsert(request);
+          long nonTransId = 0;
+          if (!isExplicitTrans.get()) {
+            nonTransId = allocateId(dbName);
+          }
+
+          List<PreparedInsert> inserts = prepareInsert(request, nonTransId);
           for (int i = 0; i < inserts.size(); i++) {
             if (i < insertCountCompleted) {
               continue;

@@ -65,7 +65,7 @@ public class TestTransactions {
       server.disableRepartitioner();
     }
 
-    DatabaseClient client = new DatabaseClient("localhost", 9010, true);
+    DatabaseClient client = new DatabaseClient("localhost", 9010, -1, -1, true);
 
     Class.forName("com.sonicbase.jdbcdriver.Driver");
 

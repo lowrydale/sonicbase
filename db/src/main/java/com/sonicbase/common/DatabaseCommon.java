@@ -1,12 +1,11 @@
 package com.sonicbase.common;
 
+import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.*;
 import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.server.SnapshotManager;
 import com.sonicbase.util.DataUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.math.BigDecimal;
@@ -30,7 +29,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 public class DatabaseCommon {
 
-  private static Logger logger = LoggerFactory.getLogger(DatabaseCommon.class);
+  private org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
 
 
   private int shard = -1;
@@ -41,7 +40,6 @@ public class DatabaseCommon {
   private ConcurrentHashMap<String, Lock> schemaWriteLock = new ConcurrentHashMap<>();
   private DatabaseServer.ServersConfig serversConfig;
   private int schemaVersion;
-
 
   public Lock getSchemaReadLock(String dbName) {
     return schemaReadLock.get(dbName);
@@ -860,6 +858,9 @@ public class DatabaseCommon {
 
   public static String keyToString(Object[] key) {
     try {
+      if (key == null) {
+        return "null";
+      }
       StringBuilder keyStr = new StringBuilder("[");
       for (Object curr : key) {
         if (curr instanceof byte[]) {

@@ -1,5 +1,6 @@
 package com.sonicbase.research.socket;
 
+import com.sonicbase.common.Logger;
 import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.socket.DatabaseSocketClient;
 import com.sonicbase.socket.Util;
@@ -17,8 +18,6 @@ import net.jpountz.lz4.LZ4Compressor;
 import net.jpountz.lz4.LZ4Factory;
 import net.jpountz.lz4.LZ4FastDecompressor;
 import org.apache.commons.cli.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -37,6 +36,8 @@ import java.util.zip.GZIPOutputStream;
  */
 public class NettyServer {
 
+  private static Logger logger;
+
   public static final boolean ENABLE_COMPRESSION = false;
   private static final String UTF8_STR = "utf-8";
   private static final String PORT_STR = "port";
@@ -45,6 +46,11 @@ public class NettyServer {
   private boolean isRunning;
   private int port;
   private static String cluster;
+  private DatabaseServer databaseServer = null;
+  private RequestHandler dlqServer;
+  private ChannelFuture f;
+  private EventLoopGroup bossGroup;
+  private EventLoopGroup workerGroup;
 
   interface RequestHandler {
     String handleCommand(String command, String jsonStr) throws InterruptedException;
@@ -74,14 +80,6 @@ public class NettyServer {
       this.body = body;
     }
   }
-
-
-  private DatabaseServer databaseServer = null;
-  private RequestHandler dlqServer;
-  private static Logger logger = LoggerFactory.getLogger(NettyServer.class);
-  private ChannelFuture f;
-  private EventLoopGroup bossGroup;
-  private EventLoopGroup workerGroup;
 
   public NettyServer() {
 
@@ -722,6 +720,8 @@ public class NettyServer {
 
   public void setDatabaseServer(DatabaseServer databaseServer)  {
     this.databaseServer = databaseServer;
+    logger = new Logger(databaseServer.getDatabaseClient());
+    Logger.setIsClient(false);
 //    File file = new File(databaseServer.getDataDir(), "queue/" + databaseServer.getShard() + "/" + databaseServer.getReplica());
 //    queue = new Queue(file.getAbsolutePath(), "request-log", 0);
 //    Thread logThread = new Thread(queue);
@@ -844,7 +844,6 @@ public class NettyServer {
       try {
 
         final DatabaseServer databaseServer = new DatabaseServer();
-        logger.info("databaseServer=" + databaseServer);
         final AtomicBoolean isRunning = new AtomicBoolean(false);
         databaseServer.setConfig(config, cluster, host, port, isRunning, skipLicense, gclog, xmx);
         databaseServer.setRole(role);
@@ -898,6 +897,8 @@ public class NettyServer {
         }
       });
       nettyThread.start();
+
+      Logger.setReady();
 
       this.isRunning = true;
       nettyThread.join();

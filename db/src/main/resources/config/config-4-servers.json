@@ -1,6 +1,7 @@
 {
     "database": {
         "dataDirectory": "/data/database",
+        "installDirectory": "$HOME/database",
         "partitionCountForRecordIndex" : 10000,
         "subPartitionsForIdIndex" : 10,
         "initialIndexSize" : 10000000,

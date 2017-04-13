@@ -1,14 +1,13 @@
 package com.sonicbase.server;
 
 import com.sonicbase.common.DatabaseCommon;
+import com.sonicbase.common.Logger;
 import com.sonicbase.index.Index;
 import com.sonicbase.index.Index;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.DataUtil;
 import org.apache.commons.io.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.text.ParseException;
@@ -26,7 +25,7 @@ public class SnapshotManager {
   private static final String INDEX_STR = ", index=";
   private static final String RATE_STR = ", rate=";
   private static final String DURATION_STR = ", duration(s)=";
-  public static Logger logger = LoggerFactory.getLogger(SnapshotManager.class);
+  public Logger logger;
 
   public static final int SNAPSHOT_BUCKET_COUNT = 128;
   public static final int SNAPSHOT_SERIALIZATION_VERSION = 19;
@@ -38,6 +37,7 @@ public class SnapshotManager {
 
   public SnapshotManager(DatabaseServer databaseServer) {
     this.server = databaseServer;
+    this.logger = new Logger(databaseServer.getDatabaseClient());
   }
 
   public void unlockSnapshot(int highestSnapshot) {

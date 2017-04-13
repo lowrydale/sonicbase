@@ -16,6 +16,8 @@ fi
 cd $SEARCH_HOME
 echo "start-search_home=$SEARCH_HOME"
 
+export _CLIENT_ERROR_LOG4J_FILENAME_=$SEARCH_HOME/logs/client-errors.log
+export _ERROR_LOG4J_FILENAME_=$SEARCH_HOME/logs/errors.log
 export _LOG4J_FILENAME_=$SEARCH_HOME/logs/$2.log
 export _GC_LOG_FILENAME_=$SEARCH_HOME/logs/gc-$2.log
 export LOG4J_FILE="log4j.xml"

@@ -1,5 +1,12 @@
 #!/bin/bash
 
-mkdir -p tmp
+export SEARCH_HOME=$1
 
-ls -l lib > tmp/jars
+if [ ${1:0:1} != "/" ]
+then
+  export SEARCH_HOME=$HOME/$SEARCH_HOME
+fi
+
+mkdir -p $SEARCH_HOME/tmp
+
+ls -l $SEARCH_HOME/lib > $SEARCH_HOME/tmp/jars

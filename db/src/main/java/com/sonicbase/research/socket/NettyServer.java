@@ -699,7 +699,12 @@ public class NettyServer {
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) { // (4)
       // Close the connection when an exception is raised.
-      logger.error("exceptionCaught", cause);
+      if (cause.getMessage().contains("Connection reset")) {
+        logger.errorLocalOnly("Netty Exception Caught", cause);
+      }
+      else {
+        logger.error("Netty Exception Caught", cause);
+      }
       ctx.close();
     }
   }
@@ -834,7 +839,6 @@ public class NettyServer {
           file = new File(System.getProperty("user.dir"), "db/src/main/resources/config/config-" + cluster + ".json");
         }
         configStr = StreamUtils.inputStreamToString(new BufferedInputStream(new FileInputStream(file)));
-        logger.info("Config: " + configStr);
       }
       JsonDict config = new JsonDict(configStr);
       String role = line.getOptionValue("role");

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export mac=`sw_vers | grep 'Mac OS X'`
+export mac=`which sw_vers`
 if [ "$mac" == '' ]; then
 
 kill -9 `ps -aux | grep java | grep $3 | grep $5 | grep -v grep | awk '{print $2}'`

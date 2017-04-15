@@ -23,7 +23,6 @@ import net.jpountz.lz4.LZ4FastDecompressor;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.input.ReversedLinesFileReader;
 import org.apache.commons.lang.exception.ExceptionUtils;
-import org.hsqldb.Database;
 import sun.misc.Unsafe;
 
 import javax.crypto.BadPaddingException;
@@ -658,7 +657,7 @@ public class DatabaseServer {
         line = line.substring("MemTotal:".length()).trim();
         totalGig = getMemValue(line);
 
-        builder = new ProcessBuilder().command("top", "-b", "-n", "1", "-o", "RES", "-p", String.valueOf(pid));
+        builder = new ProcessBuilder().command("top", "-b", "-n", "1", "-p", String.valueOf(pid));
         p = builder.start();
         in = new BufferedReader(new InputStreamReader(p.getInputStream()));
         while (true) {
@@ -723,7 +722,7 @@ public class DatabaseServer {
       }
     }
     catch (Exception e) {
-      logger.error("Error checking memory: line2=" + secondToLastLine + ", line1=" + lastLine);
+      logger.error("Error checking memory: line2=" + secondToLastLine + ", line1=" + lastLine, e);
     }
 
     return totalGig;
@@ -824,6 +823,7 @@ public class DatabaseServer {
               try (BufferedReader in = new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
                 int recvPos = 0;
                 int sendPos = 0;
+                boolean nextIsValid = false;
                 while (true) {
                   String line = in.readLine();
                   if (line == null) {
@@ -859,8 +859,9 @@ public class DatabaseServer {
                           sendPos = i;
                         }
                       }
+                      nextIsValid = true;
                     }
-                    else {
+                    else if (nextIsValid) {
                       Double trans = Double.valueOf(parts[sendPos]);
                       Double rec = Double.valueOf(parts[recvPos]);
                       transRate.add(trans);
@@ -1547,6 +1548,7 @@ public class DatabaseServer {
     if (shard == 0 && replica == 0) {
       return null;
     }
+    String[] parts = command.split(":");
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
     long serializationVersion = DataUtil.readVLong(in);
     common.deserializeSchema(common, in);
@@ -1937,6 +1939,7 @@ public class DatabaseServer {
     priorityCommands.add("getConfig");
     priorityCommands.add("healthCheckPriority");
     priorityCommands.add("getDbNames");
+    priorityCommands.add("updateServersConfig");
   }
 
   public static class Response {

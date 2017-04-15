@@ -85,6 +85,10 @@ public class Logger {
     ready = true;
   }
 
+  public void errorLocalOnly(String msg, Throwable throwable) {
+    logger.error(msg, throwable);
+  }
+
   class Error {
     DatabaseClient client;
     String msg;

@@ -180,9 +180,19 @@ public class DatabaseCommon {
       int count = in.readInt();
       for (int i = 0; i < count; i++) {
         String dbName = in.readUTF();
-        Schema newSchema = new Schema();
-        newSchema.deserialize(common, in);
-        schema.put(dbName, newSchema);
+//        if (common.getSchemaWriteLock(dbName) != null) { //not there on client
+//          common.getSchemaWriteLock(dbName).lock();
+//        }
+        try {
+          Schema newSchema = new Schema();
+          newSchema.deserialize(common, in);
+          schema.put(dbName, newSchema);
+        }
+        finally {
+//          if (common.getSchemaWriteLock(dbName) != null) {
+//            common.getSchemaWriteLock(dbName).unlock();
+//          }
+        }
       }
     }
     catch (IOException e) {

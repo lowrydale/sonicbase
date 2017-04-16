@@ -178,7 +178,7 @@ public abstract class ExpressionImpl implements Expression {
         Long lastMinLong = lastCounter.getMinLong();
         if (minLong != null) {
           if (lastMinLong != null) {
-            retCounter.setMaxLong(Math.max(minLong, lastMinLong));
+            retCounter.setMinLong(Math.max(minLong, lastMinLong));
           }
         }
         else {
@@ -828,7 +828,7 @@ public abstract class ExpressionImpl implements Expression {
     int replicaCount = client.getCommon().getServersConfig().getShards()[0].getReplicas().length;
     int replica = ThreadLocalRandom.current().nextInt(0, replicaCount);
     AtomicReference<String> usedIndex = new AtomicReference<>();
-    SelectContextImpl context = ExpressionImpl.lookupIds(dbName, client.getCommon(), client, replica, 1, tableSchema, primaryKeyIndex, forceSelectOnServer,
+    SelectContextImpl context = ExpressionImpl.lookupIds(dbName, client.getCommon(), client, replica, 1, tableSchema.getName(), primaryKeyIndex.getName(), forceSelectOnServer,
         BinaryExpression.Operator.equal, null, null, key, parms, expression, null, key, null,
         columns, primaryKeyIndex.getFields()[0], nextShard, recordCache, usedIndex, true, viewVersion, expression == null ? null : ((ExpressionImpl)expression).getCounters(),
         expression == null ? null : ((ExpressionImpl)expression).groupByContext, debug);
@@ -883,7 +883,7 @@ public abstract class ExpressionImpl implements Expression {
     int replicaCount = client.getCommon().getServersConfig().getShards()[0].getReplicas().length;
     int replica = ThreadLocalRandom.current().nextInt(0, replicaCount);
     AtomicReference<String> usedIndex = new AtomicReference<>();
-    ExpressionImpl.lookupIds(dbName, client.getCommon(), client, replica, 1, tableSchema, primaryKeyIndex, forceSelectOnServer,
+    ExpressionImpl.lookupIds(dbName, client.getCommon(), client, replica, 1, tableSchema.getName(), primaryKeyIndex.getName(), forceSelectOnServer,
         BinaryExpression.Operator.equal, null, null, key, parms, expression, null, key, null,
         columns, primaryKeyIndex.getFields()[0], nextShard, recordCache, usedIndex, false, viewVersion,
         expression == null ? null : ((ExpressionImpl)expression).getCounters(),
@@ -1270,7 +1270,7 @@ public abstract class ExpressionImpl implements Expression {
 
   public static SelectContextImpl lookupIds(
       String dbName, DatabaseCommon common, DatabaseClient client, int replica,
-      int count, TableSchema tableSchema, IndexSchema indexSchema, boolean forceSelectOnServer, BinaryExpression.Operator leftOperator,
+      int count, String tableName, String indexName, boolean forceSelectOnServer, BinaryExpression.Operator leftOperator,
       BinaryExpression.Operator rightOperator,
       List<OrderByExpressionImpl> orderByExpressions,
       Object[] leftValue, ParameterHandler parms, Expression expression, Object[] rightValue,
@@ -1283,6 +1283,9 @@ public abstract class ExpressionImpl implements Expression {
     StringBuilder preparedKey = new StringBuilder();
     while (true) {
       try {
+        viewVersion = common.getSchemaVersion();
+        TableSchema tableSchema = common.getTables(dbName).get(tableName);
+        IndexSchema indexSchema = tableSchema.getIndexes().get(indexName);
         int originalShard = shard;
         List<Integer> selectedShards = null;
         int currShardOffset = 0;
@@ -1763,10 +1766,13 @@ public abstract class ExpressionImpl implements Expression {
         return new SelectContextImpl();
       }
       catch (Exception e) {
-        if (handlePreparedNotFound(e)) {
+         if (handlePreparedNotFound(e)) {
           preparedIndexLookups.remove(preparedKey.toString());
           preparedKey = new StringBuilder();
           continue;
+        }
+        if (e instanceof SchemaOutOfSyncException) {
+           continue;
         }
         throw new DatabaseException(e);
       }
@@ -1777,27 +1783,14 @@ public abstract class ExpressionImpl implements Expression {
   }
 
   private static boolean handlePreparedNotFound(Exception e) {
-    try {
-      boolean preparedNotFound = false;
-      int index = ExceptionUtils.indexOfThrowable(e, PreparedIndexLookupNotFoundException.class);
-      if (-1 != index) {
-        preparedNotFound = true;
-      }
-      else if (e.getMessage() != null && e.getMessage().contains("PreparedIndexLookupNotFoundException")) {
-        preparedNotFound = true;
-      }
-      if (!preparedNotFound) {
-        throw e;
-      }
-
+    int index = ExceptionUtils.indexOfThrowable(e, PreparedIndexLookupNotFoundException.class);
+    if (-1 != index) {
       return true;
     }
-    catch (PreparedIndexLookupNotFoundException e1) {
-      throw e1;
+    else if (e.getMessage() != null && e.getMessage().contains("PreparedIndexLookupNotFoundException")) {
+      return true;
     }
-    catch (Exception e1) {
-      throw new DatabaseException(e1);
-    }
+    return false;
   }
 
 

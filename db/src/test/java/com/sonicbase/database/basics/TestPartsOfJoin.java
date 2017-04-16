@@ -153,7 +153,7 @@ public class TestPartsOfJoin {
     ExpressionImpl.RecordCache recordCache = new ExpressionImpl.RecordCache();
     AtomicReference<String> usedIndex = new AtomicReference<>();
     SelectContextImpl ret = ExpressionImpl.lookupIds("test",
-          client.getCommon(), client, 0, 1000, tableSchema, indexSchema, false, BinaryExpression.Operator.less,
+          client.getCommon(), client, 0, 1000, tableSchema.getName(), indexSchema.getName(), false, BinaryExpression.Operator.less,
           null, null, new Object[]{100L}, null, null, null, new Object[]{100L}, null, null, "id", 0, recordCache, usedIndex,
         false, client.getCommon().getSchemaVersion(), null, null, false);
 

@@ -232,8 +232,8 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
         }
 
         SelectContextImpl context = ExpressionImpl.lookupIds(dbName, getClient().getCommon(), getClient(), getReplica(), count,
-            getClient().getCommon().getTables(dbName).get(getTableName()),
-            getClient().getCommon().getTables(dbName).get(getTableName()).getIndices().get(indexName), isForceSelectOnServer(),
+            getTableName(),
+            indexName, isForceSelectOnServer(),
             operator, null, getOrderByExpressions(), leftKey, getParms(), getTopLevelExpression(), null, new Object[]{originalLeftValue}, null, getColumns(), columnName,
             getNextShard(), getRecordCache(), usedIndex, false, getViewVersion(), getCounters(), getGroupByContext(), debug);
         setNextShard(context.getNextShard());
@@ -560,8 +560,8 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
       }
       else {
         SelectContextImpl context = ExpressionImpl.lookupIds(dbName, getClient().getCommon(), getClient(), getReplica(), count,
-            getClient().getCommon().getTables(dbName).get(getTableName()),
-            getClient().getCommon().getTables(dbName).get(getTableName()).getIndices().get(indexName), isForceSelectOnServer(),
+            getTableName(),
+            indexName, isForceSelectOnServer(),
             leftOp, null, getOrderByExpressions(), singleKey, getParms(), getTopLevelExpression(), null,
             originalSingleKey, null, getColumns(), leftColumn, getNextShard(),
             getRecordCache(), usedIndex, false, getViewVersion(), getCounters(), getGroupByContext(), debug);
@@ -613,8 +613,8 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
       }
       else {
         SelectContextImpl context = ExpressionImpl.lookupIds(dbName, getClient().getCommon(), getClient(), getReplica(), count,
-            getClient().getCommon().getTables(dbName).get(getTableName()),
-            getClient().getCommon().getTables(dbName).get(getTableName()).getIndices().get(indexName), isForceSelectOnServer(),
+            getTableName(),
+            indexName, isForceSelectOnServer(),
             leftOp, rightOp, getOrderByExpressions(), leftKey, getParms(), getTopLevelExpression(), rightKey,
             new Object[]{originalLeftValue}, new Object[]{originalRightValue}, getColumns(), leftColumn, getNextShard(),
             getRecordCache(), usedIndex, false, getViewVersion(), getCounters(), getGroupByContext(), debug);

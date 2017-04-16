@@ -107,6 +107,26 @@ public class TestIndex {
   }
 
   @Test
+  public void testStringOrder() {
+    List<String> list = new ArrayList<>();
+    for (int i = 0; i < 10; i++) {
+      list.add(String.valueOf(i));
+    }
+    for (int i = 100; i < 110; i++) {
+      list.add(String.valueOf(i));
+    }
+
+    list.sort(new Comparator<String>(){
+      @Override
+      public int compare(String o1, String o2) {
+        return o1.compareTo(o2);
+      }
+    });
+    for (String str : list) {
+      System.out.println(str);
+    }
+  }
+  @Test
   public void test() {
 
     Schema schema = client.getSchema("test");

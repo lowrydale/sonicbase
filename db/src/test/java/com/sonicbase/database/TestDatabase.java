@@ -329,7 +329,7 @@ public class TestDatabase {
      ParameterHandler parms = new ParameterHandler();
      SelectContextImpl ret = ExpressionImpl.lookupIds(
            "test", client.getCommon(), client, 0,
-           1000, client.getCommon().getTables("test").get("persons"), indexSchema, false, BinaryExpression.Operator.equal,
+           1000, "persons", indexSchema.getName(), false, BinaryExpression.Operator.equal,
            null,
            null,
            new Object[]{"933-28-0".getBytes()}, parms, null, null,

@@ -357,7 +357,7 @@ public class DatabaseClient {
             String port = servers[shard][replica].hostPort;
             logger.info("calling server: port=" + port);
             boolean forceSelectOnServer = false;
-            SelectContextImpl context = ExpressionImpl.lookupIds(dbName, common, this, replica, 1, tableSchema, indexSchema, forceSelectOnServer, BinaryExpression.Operator.equal, null, null, keyObj, parms,
+            SelectContextImpl context = ExpressionImpl.lookupIds(dbName, common, this, replica, 1, tableSchema.getName(), indexSchema.getName(), forceSelectOnServer, BinaryExpression.Operator.equal, null, null, keyObj, parms,
                 null, null, keyObj, null, columns, columnName, shard, recordCache, usedIndex, false, common.getSchemaVersion(), null, null, false);
             Object[][][] keys = context.getCurrKeys();
             if (keys != null && keys.length > 0 && keys[0].length > 0 && keys[0][0].length > 0) {
@@ -1800,13 +1800,18 @@ public class DatabaseClient {
     List<String> columnNames;
     List<Object> values;
 
-    long id = 0;//allocateId(dbName);
-
     String tableName = request.insertStatement.getTableName();
 
     TableSchema tableSchema = common.getTables(dbName).get(tableName);
     if (tableSchema == null) {
       throw new DatabaseException("Table does not exist: name=" + tableName);
+    }
+
+    long id = 0;
+    for (IndexSchema indexSchema : tableSchema.getIndexes().values()) {
+      if (indexSchema.isPrimaryKey() && indexSchema.getFields()[0].equals("_id")) {
+        id = allocateId(dbName);
+      }
     }
 
     long transId = 0;

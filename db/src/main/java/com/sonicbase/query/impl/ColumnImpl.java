@@ -115,7 +115,10 @@ public class ColumnImpl extends ExpressionImpl {
   public Object evaluateSingleRecord(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms) {
     for (int i = 0; i < tableSchemas.length; i++) {
       if (tableSchemas[i].getName().equals(tableName)) {
-        int offset = tableSchemas[i].getFieldOffset(columnName);
+        Integer offset = tableSchemas[i].getFieldOffset(columnName);
+        if (offset == null) {
+          throw new DatabaseException("Invalid column name: table=" + tableName + ", name=" + columnName);
+        }
         if (records[i] == null) {
           return null;
         }

@@ -7,17 +7,22 @@
 </head>
 
 <body>
+<br/>
 Batch inserts are used to achieve high performance inserts. You may achieve up to ten times the throughput
 over a standard insert. A batch size of 1000 may be effective.<br/>
 <br/>
-<p>Syntax<table border="1" cellspacing="0" cellpadding="4">
-  <tbody>
+<p>Syntax<table class="border-table" border="1"><tr><td>
+	<table class="syntax-table" cellpadding="4">
+	<tbody>
   	<tr class="syntax-main"><td>jdbc call</td><td>purpose</td></tr>
-		  <tr><td width="103">PreparedStatement.addBatch()</td><td width="430">Called after setting all the parameters for the insert statement.
+	<tr><td width="103" align="right">PreparedStatement.addBatch()</td><td width="430">Called after setting all the parameters for the insert statement.
 		  Basically called in place of executeUpdate()</td></tr>
-	  <tr><td width="103">PreparedStatement.executeBatch()</td><td width="430">Called after adding all requests to the batch.
+	  <tr><td width="103" align="right">PreparedStatement.executeBatch()</td><td width="430">Called after adding all requests to the batch.
 	  	Processes the batch.</td></tr>
   </tbody>
+</table>
+</td>
+</tr>
 </table>
 <br/>
 <br/>

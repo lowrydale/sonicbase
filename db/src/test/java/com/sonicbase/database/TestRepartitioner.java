@@ -28,8 +28,13 @@ public class TestRepartitioner {
         "index", "table", currPartitionSizes,
         newPartitionSize, new Repartitioner.GetKeyAtOffset() {
           @Override
-          public Object[] getKeyAtOffset(String dbName, int shard, String tableName, String indexName, long currPartitionSize, long currOffset) {
-            return new Object[]{lists[shard][(int)currOffset]};
+          public List<Object[]> getKeyAtOffset(String dbName, int shard, String tableName, String indexName,
+                                         List<Repartitioner.OffsetEntry> offsets) {
+            List<Object[]> ret = new ArrayList<>();
+            for (Repartitioner.OffsetEntry entry : offsets) {
+              ret.add(new Object[]{lists[shard][(int)entry.getOffset()]});
+            }
+            return ret;
           }
         });
 
@@ -51,8 +56,12 @@ public class TestRepartitioner {
         "index", "table", currPartitionSizes,
         newPartitionSize, new Repartitioner.GetKeyAtOffset() {
           @Override
-          public Object[] getKeyAtOffset(String dbName, int shard, String tableName, String indexName, long currPartitionSize, long currOffset) {
-            return new Object[]{lists[shard][(int)currOffset]};
+          public List<Object[]> getKeyAtOffset(String dbName, int shard, String tableName, String indexName, List<Repartitioner.OffsetEntry> offsets) {
+            List<Object[]> ret = new ArrayList<>();
+            for (Repartitioner.OffsetEntry entry : offsets) {
+              ret.add(new Object[]{lists[shard][(int)entry.getOffset()]});
+            }
+            return ret;
           }
         });
 
@@ -74,8 +83,12 @@ public class TestRepartitioner {
         "index", "table", currPartitionSizes,
         newPartitionSize, new Repartitioner.GetKeyAtOffset() {
           @Override
-          public Object[] getKeyAtOffset(String dbName, int shard, String tableName, String indexName, long currPartitionSize, long currOffset) {
-            return new Object[]{lists[shard][(int)currOffset]};
+          public List<Object[]> getKeyAtOffset(String dbName, int shard, String tableName, String indexName, List<Repartitioner.OffsetEntry> offsets) {
+            List<Object[]> ret = new ArrayList<>();
+            for (Repartitioner.OffsetEntry entry : offsets) {
+              ret.add(new Object[]{lists[shard][(int)entry.getOffset()]});
+            }
+            return ret;
           }
         });
 
@@ -97,8 +110,12 @@ public class TestRepartitioner {
         "index", "table", currPartitionSizes,
         newPartitionSize, new Repartitioner.GetKeyAtOffset() {
           @Override
-          public Object[] getKeyAtOffset(String dbName, int shard, String tableName, String indexName, long currPartitionSize, long currOffset) {
-            return new Object[]{lists[shard][(int)currOffset]};
+          public List<Object[]> getKeyAtOffset(String dbName, int shard, String tableName, String indexName, List<Repartitioner.OffsetEntry> offsets) {
+            List<Object[]> ret = new ArrayList<>();
+            for (Repartitioner.OffsetEntry entry : offsets) {
+              ret.add(new Object[]{lists[shard][(int)entry.getOffset()]});
+            }
+            return ret;
           }
         });
 
@@ -128,8 +145,12 @@ public class TestRepartitioner {
         "index", "table", currPartitionSizes,
         newPartitionSize, new Repartitioner.GetKeyAtOffset() {
           @Override
-          public Object[] getKeyAtOffset(String dbName, int shard, String tableName, String indexName, long currPartitionSize, long currOffset) {
-            return new Object[]{lists[shard][(int) currOffset]};
+          public List<Object[]> getKeyAtOffset(String dbName, int shard, String tableName, String indexName, List<Repartitioner.OffsetEntry> offsets) {
+            List<Object[]> ret = new ArrayList<>();
+            for (Repartitioner.OffsetEntry entry : offsets) {
+              ret.add(new Object[]{lists[shard][(int)entry.getOffset()]});
+            }
+            return ret;
           }
         });
 
@@ -159,8 +180,12 @@ public class TestRepartitioner {
         "index", "table", currPartitionSizes,
         newPartitionSize, new Repartitioner.GetKeyAtOffset() {
           @Override
-          public Object[] getKeyAtOffset(String dbName, int shard, String tableName, String indexName, long currPartitionSize, long currOffset) {
-            return new Object[]{lists[shard][(int) currOffset]};
+          public List<Object[]> getKeyAtOffset(String dbName, int shard, String tableName, String indexName, List<Repartitioner.OffsetEntry> offsets) {
+            List<Object[]> ret = new ArrayList<>();
+            for (Repartitioner.OffsetEntry entry : offsets) {
+              ret.add(new Object[]{lists[shard][(int)entry.getOffset()]});
+            }
+            return ret;
           }
         });
 
@@ -188,8 +213,12 @@ public class TestRepartitioner {
         "index", "table", currPartitionSizes,
         newPartitionSize, new Repartitioner.GetKeyAtOffset() {
           @Override
-          public Object[] getKeyAtOffset(String dbName, int shard, String tableName, String indexName, long currPartitionSize, long currOffset) {
-            return new Object[]{lists[shard][(int) currOffset]};
+          public List<Object[]> getKeyAtOffset(String dbName, int shard, String tableName, String indexName, List<Repartitioner.OffsetEntry> offsets) {
+            List<Object[]> ret = new ArrayList<>();
+            for (Repartitioner.OffsetEntry entry : offsets) {
+              ret.add(new Object[]{lists[shard][(int)entry.getOffset()]});
+            }
+            return ret;
           }
         });
 

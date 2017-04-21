@@ -801,7 +801,7 @@ public class UpdateManager {
       throw new DatabaseException("Invalid record, null");
     }
 
-    server.getRepartitioner().notifyAdded(key, tableName, indexName);
+    //server.getRepartitioner().notifyAdded(key, tableName, indexName);
 
 
     if (true) {

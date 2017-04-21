@@ -27,7 +27,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import static java.util.Arrays.asList;
 import static org.testng.Assert.assertEquals;
+import static sun.security.jca.ProviderList.newList;
 
 /**
  * Responsible for
@@ -336,7 +338,7 @@ public class TestIndex {
 
     Thread.sleep(10000);
 
-    System.out.println("key at offset: " + index.getKeyAtOffset(50000, null, null)[0]);
+    System.out.println("key at offset: " + index.getKeyAtOffset(asList(new Long[]{50000L}), null, null).get(0)[0]);
 
     assertEquals((long)index.firstEntry().getKey()[0], 0);
     assertEquals((long)index.higherEntry(new Object[]{0L}).getKey()[0], 1);

@@ -447,11 +447,11 @@ public class DatabaseClient {
                   insert.keyInfo, insert.record);
               withRecordProcessed.get(insert.keyInfo.shard).add(insert);
             }
-          }
-          for (PreparedInsert insert : prepared) {
-            serializeInsertKey(out.get(insert.keyInfo.shard), insert.dbName, insert.tableName, insert.keyInfo,
-                insert.primaryKeyIndexName, insert.primaryKey);
-            processed.get(insert.keyInfo.shard).add(insert);
+            for (PreparedInsert insert : prepared) {
+              serializeInsertKey(out.get(insert.keyInfo.shard), insert.dbName, insert.tableName, insert.keyInfo,
+                  insert.primaryKeyIndexName, insert.primaryKey);
+              processed.get(insert.keyInfo.shard).add(insert);
+            }
           }
 
 
@@ -1171,7 +1171,7 @@ public class DatabaseClient {
     }
   }
 
-  private ResultSet doDescribe(String dbName, String sql) {
+  private ResultSet doDescribe(String dbName, String sql) throws InterruptedException, ExecutionException, IOException {
     String[] parts = sql.split(" ");
     if (parts[1].trim().equalsIgnoreCase("table")) {
       String table = parts[2].trim().toLowerCase();
@@ -1247,10 +1247,138 @@ public class DatabaseClient {
       String[] lines = ret.split("\\n");
       return new ResultSetImpl(lines);
     }
+    else if (parts[1].trim().equalsIgnoreCase("shards")) {
+      return describeShards(dbName);
+    }
+    else if (parts[1].trim().equalsIgnoreCase("server") &&
+        parts[2].trim().equalsIgnoreCase("stats")) {
+      return describeServerStats(dbName);
+    }
     else {
       throw new DatabaseException("Unknown target for describe: target=" + parts[1]);
     }
 
+  }
+
+  private ResultSetImpl describeServerStats(final String dbName) throws ExecutionException, InterruptedException {
+    List<Map<String, String>> serverStatsData = new ArrayList<>();
+
+    List<Future<Map<String, String>>> futures = new ArrayList<>();
+    for (int i = 0; i < getShardCount(); i++) {
+      for (int j = 0; j < getReplicaCount(); j++) {
+        final int shard = i;
+        final int replica = j;
+        futures.add(executor.submit(new Callable<Map<String, String>>(){
+          @Override
+          public Map<String, String> call() throws Exception {
+            String command = "DatabaseServer:getOSStats:1:" + getCommon().getSchemaVersion() + ":" + dbName;
+            byte[] ret = send(null, shard, replica, command, null, DatabaseClient.Replica.specified);
+
+            DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
+            in.readLong();//serialization version
+            double resGig = in.readDouble();
+            double cpu = in.readDouble();
+            double javaMemMin = in.readDouble();
+            double javaMemMax = in.readDouble();
+            double recRate = in.readDouble() / 1000000000d;
+            double transRate = in.readDouble() / 1000000000d;
+            String diskAvail = in.readUTF();
+            String host = in.readUTF();
+
+            Map<String, String> line = new HashMap<>();
+
+            line.put("host", host);
+            line.put("cpu", String.format("%.0f", cpu));
+            line.put("resGig", String.format("%.2f", resGig));
+            line.put("javaMemMin", String.format("%.2f", javaMemMin));
+            line.put("javaMemMax", String.format("%.2f", javaMemMax));
+            line.put("receive", String.format("%.4f", recRate));
+            line.put("transmit", String.format("%.4f", transRate));
+            line.put("diskAvail", diskAvail);
+            return line;
+          }
+        }));
+
+      }
+    }
+
+    for (Future<Map<String, String>> future : futures) {
+      serverStatsData.add(future.get());
+    }
+    return new ResultSetImpl(serverStatsData);
+  }
+
+  class Entry {
+    public Entry(String table, String index, int shard, String result) {
+      this.table = table;
+      this.index = index;
+      this.shard = shard;
+      this.result = result;
+    }
+
+    private String getKey() {
+      return table + ":" + index + ":" + shard;
+    }
+    private String table;
+    private String index;
+    private int shard;
+    private String result;
+  }
+
+  private ResultSet describeShards(String dbName) throws IOException, ExecutionException, InterruptedException {
+    syncSchema();
+    StringBuilder ret = new StringBuilder();
+    List<Future<Entry>> futures = new ArrayList<>();
+    for (final Map.Entry<String, TableSchema> table : getCommon().getTables(dbName).entrySet()) {
+      for (final Map.Entry<String, IndexSchema> indexSchema : table.getValue().getIndexes().entrySet()) {
+        final String command = "DatabaseServer:getPartitionSize:1:" + getCommon().getSchemaVersion() + ":" +
+            dbName + ":" + table.getKey() + ":" + indexSchema.getKey();
+        for (int i = 0; i < getShardCount(); i++) {
+          final int currShard = i;
+          futures.add(executor.submit(new Callable<Entry>(){
+            @Override
+            public Entry call() throws Exception {
+              byte[] currRet = send(null, currShard, 0, command, null, DatabaseClient.Replica.master);
+              DataInputStream in = new DataInputStream(new ByteArrayInputStream(currRet));
+              long serializationVersion = DataUtil.readVLong(in);
+              long count = in.readLong();
+              return new Entry(table.getKey(), indexSchema.getKey(), currShard, "Table=" + table.getKey() + ", Index=" + indexSchema.getKey() +
+                  ", Shard=" + currShard + ", count=" + count + "\n");
+            }
+          }));
+        }
+      }
+    }
+    Map<String, Entry> entries = new HashMap<>();
+    for (Future<Entry> future : futures) {
+      Entry entry = future.get();
+      entries.put(entry.getKey(), entry);
+    }
+
+    for (final Map.Entry<String, TableSchema> table : getCommon().getTables(dbName).entrySet()) {
+      for (final Map.Entry<String, IndexSchema> indexSchema : table.getValue().getIndexes().entrySet()) {
+        int shard = 0;
+        for (TableSchema.Partition partition : indexSchema.getValue().getCurrPartitions()) {
+          StringBuilder builder = new StringBuilder();
+          if (partition.getUpperKey() == null) {
+            builder.append("[null]");
+          }
+          else {
+            builder.append(DatabaseCommon.keyToString(partition.getUpperKey()));
+          }
+          ret.append("Table=" + table.getKey() + ", Index=" + indexSchema.getKey() + ", shard=" + shard + ", key=" +
+              builder.toString()).append("\n");
+          shard++;
+        }
+        for (int i = 0; i < getShardCount(); i++) {
+          ret.append(entries.get(table.getKey() + ":" + indexSchema.getKey() + ":" + i).result);
+        }
+      }
+    }
+
+    String retStr = ret.toString();
+    String[] lines = retStr.split("\\n");
+    return new ResultSetImpl(lines);
   }
 
   private StringBuilder doDescribeIndex(String dbName, String table, String index, StringBuilder builder) {

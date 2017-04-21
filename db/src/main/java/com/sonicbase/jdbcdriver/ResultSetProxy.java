@@ -1,6 +1,7 @@
 package com.sonicbase.jdbcdriver;
 
 import com.sonicbase.query.impl.ResultSetImpl;
+import org.hsqldb.lib.StringInputStream;
 
 import java.io.InputStream;
 import java.io.Reader;
@@ -167,39 +168,59 @@ public class ResultSetProxy implements java.sql.ResultSet {
   }
 
   public boolean isBeforeFirst() throws SQLException {
-    for (ResultSetInfo info : resultSets) {
-      if (info.resultSet != null && !info.resultSet.isBeforeFirst()) {
-        return false;
+    try {
+      for (ResultSetInfo info : resultSets) {
+        if (info.resultSet != null && !info.resultSet.isBeforeFirst()) {
+          return false;
+        }
       }
+      return true;
     }
-    return true;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public boolean isAfterLast() throws SQLException {
-    for (ResultSetInfo info : resultSets) {
-      if (info.resultSet != null && !info.resultSet.isAfterLast()) {
-        return false;
+    try {
+      for (ResultSetInfo info : resultSets) {
+        if (info.resultSet != null && !info.resultSet.isAfterLast()) {
+          return false;
+        }
       }
+      return true;
     }
-    return true;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public boolean isFirst() throws SQLException {
-    for (ResultSetInfo resultSet : resultSets) {
-      if (resultSet.resultSet != null && !resultSet.resultSet.isFirst()) {
-        return false;
+    try {
+      for (ResultSetInfo resultSet : resultSets) {
+        if (resultSet.resultSet != null && !resultSet.resultSet.isFirst()) {
+          return false;
+        }
       }
+      return true;
     }
-    return true;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public boolean isLast() throws SQLException {
-    for (ResultSetInfo info : resultSets) {
-      if (info.resultSet != null && (!info.resultSet.isLast() && !info.resultSet.isAfterLast())) {
-        return false;
+    try {
+      for (ResultSetInfo info : resultSets) {
+        if (info.resultSet != null && (!info.resultSet.isLast() && !info.resultSet.isAfterLast())) {
+          return false;
+        }
       }
+      return true;
     }
-    return true;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public void beforeFirst() throws SQLException {
@@ -253,133 +274,198 @@ public class ResultSetProxy implements java.sql.ResultSet {
   }
 
   public String getString(int columnIndex) throws SQLException {
-    String ret = resultSet.getString(columnIndex);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      String ret = resultSet.getString(columnIndex);
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public boolean getBoolean(int columnIndex) throws SQLException {
-    Boolean ret = resultSet.getBoolean(columnIndex);
-    if (ret == null) {
-      wasNull = true;
-      return false;
+    try {
+      Boolean ret = resultSet.getBoolean(columnIndex);
+      if (ret == null) {
+        wasNull = true;
+        return false;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public byte getByte(int columnIndex) throws SQLException {
-    Byte ret = resultSet.getByte(columnIndex);
-    if (ret == null) {
-      wasNull = true;
-      return 0;
+    try {
+      Byte ret = resultSet.getByte(columnIndex);
+      if (ret == null) {
+        wasNull = true;
+        return 0;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public short getShort(int columnIndex) throws SQLException {
-    Short ret = resultSet.getShort(columnIndex);
-    if (ret == null) {
-      wasNull = true;
-      return 0;
+    try {
+      Short ret = resultSet.getShort(columnIndex);
+      if (ret == null) {
+        wasNull = true;
+        return 0;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public int getInt(int columnIndex) throws SQLException {
-    Integer ret = resultSet.getInt(columnIndex);
-    if (ret == null) {
-      wasNull = true;
-      return 0;
+    try {
+      Integer ret = resultSet.getInt(columnIndex);
+      if (ret == null) {
+        wasNull = true;
+        return 0;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public long getLong(int columnIndex) throws SQLException {
-    Long ret = resultSet.getLong(columnIndex);
-    if (ret == null) {
-      wasNull = true;
-      return 0;
+    try {
+      Long ret = resultSet.getLong(columnIndex);
+      if (ret == null) {
+        wasNull = true;
+        return 0;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public float getFloat(int columnIndex) throws SQLException {
-    Float ret = resultSet.getFloat(columnIndex);
-    if (ret == null) {
-      wasNull = true;
-      return 0;
+    try {
+      Float ret = resultSet.getFloat(columnIndex);
+      if (ret == null) {
+        wasNull = true;
+        return 0;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public double getDouble(int columnIndex) throws SQLException {
-    Double ret = resultSet.getDouble(columnIndex);
-    if (ret == null) {
-      wasNull = true;
-      return 0;
+    try {
+      Double ret = resultSet.getDouble(columnIndex);
+      if (ret == null) {
+        wasNull = true;
+        return 0;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public BigDecimal getBigDecimal(int columnIndex, int scale) throws SQLException {
-    BigDecimal ret = resultSet.getBigDecimal(columnIndex, scale);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      BigDecimal ret = resultSet.getBigDecimal(columnIndex, scale);
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public byte[] getBytes(int columnIndex) throws SQLException {
-    byte[] ret = resultSet.getBytes(columnIndex);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      byte[] ret = resultSet.getBytes(columnIndex);
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public Date getDate(int columnIndex) throws SQLException {
-    Date ret = resultSet.getDate(columnIndex);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      Date ret = resultSet.getDate(columnIndex);
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public Time getTime(int columnIndex) throws SQLException {
-    Time ret = resultSet.getTime(columnIndex);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      Time ret = resultSet.getTime(columnIndex);
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public Timestamp getTimestamp(int columnIndex) throws SQLException {
-    Timestamp ret = resultSet.getTimestamp(columnIndex);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      Timestamp ret = resultSet.getTimestamp(columnIndex);
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public InputStream getAsciiStream(int columnIndex) throws SQLException {
@@ -387,7 +473,13 @@ public class ResultSetProxy implements java.sql.ResultSet {
   }
 
   public InputStream getUnicodeStream(int columnIndex) throws SQLException {
-    throw new SQLException("Not supported");
+    InputStream ret = (InputStream)resultSet.getField(columnIndex);
+    if (ret == null) {
+      wasNull = true;
+      return null;
+    }
+    wasNull = false;
+    return ret;
   }
 
   public String getString(String columnLabel) throws SQLException {
@@ -406,123 +498,183 @@ public class ResultSetProxy implements java.sql.ResultSet {
   }
 
   public boolean getBoolean(String columnLabel) throws SQLException {
-    Boolean ret = resultSet.getBoolean(columnLabel);
-    if (ret == null) {
-      wasNull = true;
-      return false;
+    try {
+      Boolean ret = resultSet.getBoolean(columnLabel);
+      if (ret == null) {
+        wasNull = true;
+        return false;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public byte getByte(String columnLabel) throws SQLException {
-    Byte ret = resultSet.getByte(columnLabel);
-    if (ret == null) {
-      wasNull = true;
-      return 0;
+    try {
+      Byte ret = resultSet.getByte(columnLabel);
+      if (ret == null) {
+        wasNull = true;
+        return 0;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public short getShort(String columnLabel) throws SQLException {
-    Short ret = resultSet.getShort(columnLabel);
-    if (ret == null) {
-      wasNull = true;
-      return 0;
+    try {
+      Short ret = resultSet.getShort(columnLabel);
+      if (ret == null) {
+        wasNull = true;
+        return 0;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public int getInt(String columnLabel) throws SQLException {
-    Integer ret = resultSet.getInt(columnLabel);
-    if (ret == null) {
-      wasNull = true;
-      return 0;
+    try {
+      Integer ret = resultSet.getInt(columnLabel);
+      if (ret == null) {
+        wasNull = true;
+        return 0;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public long getLong(String columnLabel) throws SQLException {
+    try {
       Long ret = resultSet.getLong(columnLabel);
-    if (ret == null) {
-      wasNull = true;
-      return 0;
+      if (ret == null) {
+        wasNull = true;
+        return 0;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public float getFloat(String columnLabel) throws SQLException {
-    Float ret = resultSet.getFloat(columnLabel);
-    if (ret == null) {
-      wasNull = true;
-      return 0;
+    try {
+      Float ret = resultSet.getFloat(columnLabel);
+      if (ret == null) {
+        wasNull = true;
+        return 0;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public double getDouble(String columnLabel) throws SQLException {
-    Double ret = resultSet.getDouble(columnLabel);
-    if (ret == null) {
-      wasNull = true;
-      return 0;
+    try {
+      Double ret = resultSet.getDouble(columnLabel);
+      if (ret == null) {
+        wasNull = true;
+        return 0;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public BigDecimal getBigDecimal(String columnLabel, int scale) throws SQLException {
-    BigDecimal ret = resultSet.getBigDecimal(columnLabel, scale);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      BigDecimal ret = resultSet.getBigDecimal(columnLabel, scale);
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public byte[] getBytes(String columnLabel) throws SQLException {
-    byte[]  ret = resultSet.getBytes(columnLabel);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      byte[]  ret = resultSet.getBytes(columnLabel);
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public Date getDate(String columnLabel) throws SQLException {
-    Date ret = resultSet.getDate(columnLabel);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      Date ret = resultSet.getDate(columnLabel);
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public Time getTime(String columnLabel) throws SQLException {
-    Time ret = resultSet.getTime(columnLabel);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      Time ret = resultSet.getTime(columnLabel);
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public Timestamp getTimestamp(String columnLabel) throws SQLException {
-    Timestamp ret = resultSet.getTimestamp(columnLabel);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      Timestamp ret = resultSet.getTimestamp(columnLabel);
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public InputStream getAsciiStream(String columnLabel) throws SQLException {
@@ -530,33 +682,50 @@ public class ResultSetProxy implements java.sql.ResultSet {
   }
 
   public InputStream getUnicodeStream(String columnLabel) throws SQLException {
-    InputStream ret = resultSet.getUnicodeStream(columnLabel);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      InputStream ret = resultSet.getUnicodeStream(columnLabel);
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public InputStream getBinaryStream(String columnLabel) throws SQLException {
-    InputStream ret = resultSet.getBinaryStream(columnLabel);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      InputStream ret = resultSet.getBinaryStream(columnLabel);
+
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public InputStream getBinaryStream(int columnIndex) throws SQLException {
-    InputStream ret = resultSet.getBinaryStream(columnIndex);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      InputStream ret = resultSet.getBinaryStream(columnIndex);
+
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
 
@@ -569,37 +738,66 @@ public class ResultSetProxy implements java.sql.ResultSet {
   }
 
   public Reader getCharacterStream(int columnIndex) throws SQLException {
-    throw new SQLException("Not supported");
+    try {
+      Reader ret = resultSet.getCharacterStream(columnIndex);
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return ret;
+    }
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public Reader getCharacterStream(String columnLabel) throws SQLException {
-    Reader ret = resultSet.getCharacterStream(columnLabel);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      Reader ret = resultSet.getCharacterStream(columnLabel);
+
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public BigDecimal getBigDecimal(int columnIndex) throws SQLException {
-    BigDecimal ret = resultSet.getBigDecimal(columnIndex);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      BigDecimal ret = resultSet.getBigDecimal(columnIndex);
+
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public BigDecimal getBigDecimal(String columnLabel) throws SQLException {
-    BigDecimal ret = resultSet.getBigDecimal(columnLabel);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      BigDecimal ret = resultSet.getBigDecimal(columnLabel);
+
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public Ref getRef(int columnIndex) throws SQLException {
@@ -607,23 +805,35 @@ public class ResultSetProxy implements java.sql.ResultSet {
   }
 
   public Blob getBlob(int columnIndex) throws SQLException {
-    byte[]ret = resultSet.getBytes(columnIndex);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      byte[]ret = resultSet.getBytes(columnIndex);
+
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return new com.sonicbase.query.impl.Blob(ret);
     }
-    wasNull = false;
-    return new com.sonicbase.query.impl.Blob(ret);
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public Clob getClob(int columnIndex) throws SQLException {
-    String ret = resultSet.getString(columnIndex);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      String ret = resultSet.getString(columnIndex);
+
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return new com.sonicbase.query.impl.Clob(ret);
     }
-    wasNull = false;
-    return new com.sonicbase.query.impl.Clob(ret);
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public Array getArray(int columnIndex) throws SQLException {
@@ -639,23 +849,35 @@ public class ResultSetProxy implements java.sql.ResultSet {
   }
 
   public Blob getBlob(String columnLabel) throws SQLException {
-    byte[]ret = resultSet.getBytes(columnLabel);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      byte[]ret = resultSet.getBytes(columnLabel);
+
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return new com.sonicbase.query.impl.Blob(ret);
     }
-    wasNull = false;
-    return new com.sonicbase.query.impl.Blob(ret);
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public Clob getClob(String columnLabel) throws SQLException {
-    String ret = resultSet.getString(columnLabel);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      String ret = resultSet.getString(columnLabel);
+
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return new com.sonicbase.query.impl.Clob(ret);
     }
-    wasNull = false;
-    return new com.sonicbase.query.impl.Clob(ret);
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public Array getArray(String columnLabel) throws SQLException {
@@ -663,6 +885,7 @@ public class ResultSetProxy implements java.sql.ResultSet {
   }
 
   public Date getDate(int columnIndex, Calendar cal) throws SQLException {
+    throw new NotImplementedException();
 //    if (getCurrentRow() == null) {
 //      wasNull = true;
 //      return null;
@@ -674,10 +897,10 @@ public class ResultSetProxy implements java.sql.ResultSet {
 //    }
 //    wasNull = false;
 //    return ret;
-    return null;
   }
 
   public Date getDate(String columnLabel, Calendar cal) throws SQLException {
+    throw new NotImplementedException();
 //      columnLabel = getNameFromAlias(columnLabel, getCurrentRow().getSelectStatement());
 //    if (getCurrentRow() == null) {
 //      wasNull = true;
@@ -690,25 +913,26 @@ public class ResultSetProxy implements java.sql.ResultSet {
 //    }
 //    wasNull = false;
 //    return ret;
-    return null;
   }
 
   public Time getTime(int columnIndex, Calendar cal) throws SQLException {
-//    if (getCurrentRow() == null) {
-//      wasNull = true;
-//      return null;
+    throw new NotImplementedException();
+//    try {
+//      Time ret = resultSet.getTime(columnIndex, cal);
+//      if (ret == null) {
+//        wasNull = true;
+//        return null;
+//      }
+//      wasNull = false;
+//      return ret;
 //    }
-//    Time ret = getCurrentRow().getTime(columnIndex, cal);
-//    if (ret == null) {
-//      wasNull = true;
-//      return null;
+//    catch (Exception e) {
+//      throw new SQLException(e);
 //    }
-//    wasNull = false;
-//    return ret;
-    return null;
   }
 
   public Time getTime(String columnLabel, Calendar cal) throws SQLException {
+    throw new NotImplementedException();
 //      columnLabel = getNameFromAlias(columnLabel, getCurrentRow().getSelectStatement());
 //    if (getCurrentRow() == null) {
 //      wasNull = true;
@@ -721,10 +945,10 @@ public class ResultSetProxy implements java.sql.ResultSet {
 //    }
 //    wasNull = false;
 //    return ret;
-    return null;
   }
 
   public Timestamp getTimestamp(int columnIndex, Calendar cal) throws SQLException {
+    throw new NotImplementedException();
 //    Timestamp ret = resultSet.getTimestamp(columnIndex, cal);
 //    if (ret == null) {
 //      wasNull = true;
@@ -732,10 +956,10 @@ public class ResultSetProxy implements java.sql.ResultSet {
 //    }
 //    wasNull = false;
 //    return ret;
-    return null;
   }
 
   public Timestamp getTimestamp(String columnLabel, Calendar cal) throws SQLException {
+    throw new NotImplementedException();
 //      columnLabel = getNameFromAlias(columnLabel, getCurrentRow().getSelectStatement());
 //    if (getCurrentRow() == null) {
 //      wasNull = true;
@@ -748,7 +972,6 @@ public class ResultSetProxy implements java.sql.ResultSet {
 //    }
 //    wasNull = false;
 //    return ret;
-    return null;
   }
 
   public URL getURL(int columnIndex) throws SQLException {
@@ -760,23 +983,33 @@ public class ResultSetProxy implements java.sql.ResultSet {
   }
 
   public NClob getNClob(int columnIndex) throws SQLException {
-    String ret = resultSet.getString(columnIndex);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      String ret = resultSet.getString(columnIndex);
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return new com.sonicbase.query.impl.NClob(ret);
     }
-    wasNull = false;
-    return new com.sonicbase.query.impl.NClob(ret);
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public NClob getNClob(String columnLabel) throws SQLException {
-    String ret = resultSet.getString(columnLabel);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      String ret = resultSet.getString(columnLabel);
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return new com.sonicbase.query.impl.NClob(ret);
     }
-    wasNull = false;
-    return new com.sonicbase.query.impl.NClob(ret);
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public SQLXML getSQLXML(int columnIndex) throws SQLException {
@@ -788,43 +1021,63 @@ public class ResultSetProxy implements java.sql.ResultSet {
   }
 
   public String getNString(int columnIndex) throws SQLException {
-    String ret = resultSet.getString(columnIndex);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      String ret = resultSet.getString(columnIndex);
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public String getNString(String columnLabel) throws SQLException {
-    String ret = resultSet.getString(columnLabel);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      String ret = resultSet.getString(columnLabel);
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public Reader getNCharacterStream(int columnIndex) throws SQLException {
-    String ret = resultSet.getString(columnIndex);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      String ret = resultSet.getString(columnIndex);
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return new StringReader(ret);
     }
-    wasNull = false;
-    return new StringReader(ret);
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public Reader getNCharacterStream(String columnLabel) throws SQLException {
-    String ret = resultSet.getString(columnLabel);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      String ret = resultSet.getString(columnLabel);
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return new StringReader(ret);
     }
-    wasNull = false;
-    return new StringReader(ret);
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public SQLWarning getWarnings() throws SQLException {
@@ -892,8 +1145,7 @@ public class ResultSetProxy implements java.sql.ResultSet {
   }
 
   public int getConcurrency() throws SQLException {
-    //return resultSets.get(currResultSetOffset).resultSet.getConcurrency();
-    return 0;
+    throw new SQLException("not supported");
   }
 
   public boolean rowUpdated() throws SQLException {
@@ -1090,8 +1342,7 @@ public class ResultSetProxy implements java.sql.ResultSet {
   }
 
   public java.sql.Statement getStatement() throws SQLException {
-    //return resultSets.get(currResultSetOffset).resultSet.getStatement();
-    return null;
+    throw new SQLException("not supported");
   }
 
   public Object getObject(int columnIndex, Map<String, Class<?>> map) throws SQLException {

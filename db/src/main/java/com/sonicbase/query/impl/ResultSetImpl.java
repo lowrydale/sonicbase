@@ -35,6 +35,7 @@ import java.util.*;
 public class ResultSetImpl implements ResultSet {
   private static final String UTF8_STR = "utf-8";
   private static final String LENGTH_STR = "length";
+  private List<Map<String, String>> mapResults;
   private String[] describeStrs;
   private String dbName;
   private GroupByContext groupByContext;
@@ -61,6 +62,10 @@ public class ResultSetImpl implements ResultSet {
 
   public ResultSetImpl(String[] describeStrs) {
     this.describeStrs = describeStrs;
+  }
+
+  public ResultSetImpl(List<Map<String, String>> mapResults) {
+    this.mapResults = mapResults;
   }
 
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP", justification="copying the returned data is too slow")
@@ -317,6 +322,12 @@ public class ResultSetImpl implements ResultSet {
 
     if (describeStrs != null) {
       if (currPos > describeStrs.length - 1) {
+        return false;
+      }
+      return true;
+    }
+    if (mapResults != null) {
+      if (currPos > mapResults.size() - 1) {
         return false;
       }
       return true;
@@ -618,6 +629,9 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public String getString(String columnLabel) {
+    if (mapResults != null) {
+      return mapResults.get(currPos).get(columnLabel);
+    }
     String[] actualColumn = getActualColumn(columnLabel);
     Object ret = getField(actualColumn);
     SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(columnLabel.toLowerCase());
@@ -1225,6 +1239,14 @@ public class ResultSetImpl implements ResultSet {
     return new InputStreamReader(new ByteArrayInputStream(bytes));
   }
 
+  public Reader getCharacterStream(int columnIndex) {
+    byte[] bytes = (byte[]) getField(columnIndex);
+    if (bytes == null) {
+      return null;
+    }
+    return new InputStreamReader(new ByteArrayInputStream(bytes));
+  }
+
   public BigDecimal getBigDecimal(String columnLabel) {
     String[] actualColumn = getActualColumn(columnLabel);
     return (BigDecimal) getField(actualColumn);
@@ -1246,7 +1268,7 @@ public class ResultSetImpl implements ResultSet {
     return getInt(ret, function);
   }
 
-  private Object getField(int columnIndex) {
+  public Object getField(int columnIndex) {
     List<ColumnImpl> columns = selectStatement.getSelectColumns();
     ColumnImpl column = columns.get(columnIndex - 1);
     String function = column.getFunction();

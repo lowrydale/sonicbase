@@ -887,4 +887,8 @@ public class DatabaseCommon {
       throw new DatabaseException(e);
     }
   }
+
+  public void setSchema(String dbName, Schema schema) {
+    this.schema.put(dbName, schema);
+  }
 }

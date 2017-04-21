@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Untitled Document</title>
+<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+</head>
+
+<body>
+Returns OS statistics from all the servers.
+<br/>
+
+<p>Syntax<table class="border-table" border="1"><tr><td> <table class="syntax-table" cellpadding="4">
+    <tbody>
+    <tr class="syntax-main">
+           <td width="512" colspan=2 >
+            DESCRIBE SERVER STATS
+		</td>
+	  </tr>
+  </tbody>
+</table>
+</td>
+</tr>
+</table>
+<br/>
+<br/>
+Example:<br/>
+<br/>
+PreparedStatement stmt = conn.prepareStatement("describe server stats")<br/>
+ResultSet rs = stmt.executeQuery();<br/>
+while (rs.next()) {<br/>
+
+&nbsp;&nbsp;System.out.println("Host: " + rs.getString("host"))<br/>
+&nbsp;&nbsp;System.out.println("CPU %: " + rs.getString("cpu"))<br/>
+&nbsp;&nbsp;System.out.println("ResMem Gig: " + rs.getString("resGig"))<br/>
+&nbsp;&nbsp;System.out.println("Java Mem Min Gig: " + rs.getString("javaMemMin"))<br/>
+&nbsp;&nbsp;System.out.println("Java Mem Max Gig: " + rs.getString("javaMemMax"))<br/>
+&nbsp;&nbsp;System.out.println("Net In GByte: " + rs.getString("receive"))<br/>
+&nbsp;&nbsp;System.out.println("Net Out GByte: " + rs.getString("transmit"))<br/>
+&nbsp;&nbsp;System.out.println("Disk Avail Gig: " + rs.getString("diskAvail"))<br/>
+}
+<br/>
+
+</body>
+</html>

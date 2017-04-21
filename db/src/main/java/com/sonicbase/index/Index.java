@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -1347,11 +1348,11 @@ public class Index {
     return size.get();
   }
 
-  public Object[] getKeyAtOffset(final long offset, final Object[] minKey, final Object[] maxKey) {
+  public List<Object[]> getKeyAtOffset(final List<Long> offsets, final Object[] minKey, final Object[] maxKey) {
     long begin = System.currentTimeMillis();
     final AtomicLong countSkipped = new AtomicLong();
     final AtomicLong currOffset = new AtomicLong();
-    final AtomicReference<Object[]> foundKey = new AtomicReference<>();
+    final List<Object[]> ret = new ArrayList<>();
     if (firstEntry() != null) {
       Object[] floorKey = null;
       if (minKey != null) {
@@ -1366,33 +1367,44 @@ public class Index {
       else {
         floorKey = firstEntry().getKey();
       }
+      final AtomicInteger curr = new AtomicInteger();
       visitTailMap(floorKey, new Index.Visitor() {
         @Override
         public boolean visit(Object[] key, Object value) throws IOException {
           if (maxKey != null && comparator.compare(key, maxKey) > 0) {
-            foundKey.set(key);
+            ret.add(key);
             return false;
           }
           currOffset.incrementAndGet();
-          if (currOffset.get() >= offset) {
-            foundKey.set(key);
-            return false;
+          if (currOffset.get() >= offsets.get(curr.get())) {
+            ret.add(key);
+            curr.incrementAndGet();
+            if (curr.get() == offsets.size()) {
+              return false;
+            }
           }
           return true;
         }
       });
     }
-    logger.info("getKeyAtOffset - scanForKey: " +
-            ", offsetInPartition=" + currOffset.get() + ", duration=" + (System.currentTimeMillis() - begin) +
-            ", startKey=" + DatabaseCommon.keyToString(firstEntry().getKey()) +
-            ", endKey=" + DatabaseCommon.keyToString(lastEntry().getKey()) +
-            ", foundKey=" + DatabaseCommon.keyToString(foundKey.get()) +
-            ", countSkipped=" + countSkipped.get());
 
-    if (foundKey.get() == null) {
-      return lastEntry().getKey();
+    for (int i = ret.size(); i < offsets.size(); i++) {
+      ret.add(lastEntry().getKey());
     }
-    return foundKey.get();
+
+    StringBuilder builder = new StringBuilder();
+    for (Object[] key : ret) {
+      builder.append(",").append(DatabaseCommon.keyToString(key));
+    }
+    logger.info("getKeyAtOffset - scanForKey: " +
+        ", offsetInPartition=" + currOffset.get() + ", duration=" + (System.currentTimeMillis() - begin) +
+        ", startKey=" + DatabaseCommon.keyToString(firstEntry().getKey()) +
+        ", endKey=" + DatabaseCommon.keyToString(lastEntry().getKey()) +
+        ", foundKeys=" + builder.toString() +
+        ", countSkipped=" + countSkipped.get());
+
+
+    return ret;
   }
 
   public boolean visitTailMap(Object[] key, Index.Visitor visitor) {

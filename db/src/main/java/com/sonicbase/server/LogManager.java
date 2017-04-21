@@ -280,9 +280,15 @@ public class LogManager {
         }
         else {
           requests = new ArrayList<>();
+          long lowestSequence = Long.MAX_VALUE;
           for (int i = 0; i < count; i++) {
-            requests.add(readRequest());
+            NettyServer.Request request = readRequest();
+            if (sequenceNumber < lowestSequence) {
+              lowestSequence = sequenceNumber;
+            }
+            requests.add(request);
           }
+          sequenceNumber = lowestSequence;
           command = null;
           buffer = null;
         }

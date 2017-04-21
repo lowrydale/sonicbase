@@ -363,13 +363,13 @@ public class DatabaseServer {
 
   public void runSnapshot() throws InterruptedException, ParseException, IOException {
     for (String dbName : getDbNames(dataDir)) {
-      //snapshotManager.runSnapshot(dbName);
+      snapshotManager.runSnapshot(dbName);
     }
   }
 
   public void recoverFromSnapshot() throws Exception {
     for (String dbName : getDbNames(dataDir)) {
-      //snapshotManager.recoverFromSnapshot(dbName);
+      snapshotManager.recoverFromSnapshot(dbName);
     }
   }
 

@@ -176,6 +176,7 @@ public class LogManager {
             File dataRootDir = new File(directory);
             dataRootDir.mkdirs();
             String dt = DatabaseServer.format8601(new Date(System.currentTimeMillis()));
+            dt = dt.replace(':', '_');
             File newFile = new File(dataRootDir, offset + "-" + dt + ".bin");
             writer = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(newFile), 102400));
           }
@@ -526,6 +527,7 @@ public class LogManager {
               int pos = name.indexOf('-');
               int pos2 = name.lastIndexOf('.');
               String dateStr = name.substring(pos + 1, pos2);
+              dateStr = dateStr.replace('_', ':');
               Date fileDate = ISO8601.from8601String(dateStr).getTime();
               long fileTime = fileDate.getTime();
               if (fileTime < lastSnapshot - (30 * 1000) && file.exists() && !file.delete()) {

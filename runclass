@@ -1,11 +1,5 @@
 #!/bin/bash
 
-#cd $( dirname $0 )
-#if [ "$SEARCH_HOME" = "" ]
-#then
-  export SEARCH_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
-#fi
-
 export SEARCH_HOME=$(echo $SEARCH_HOME | sed 's/\/bin\/..//g')
 echo "SH=$SEARCH_HOME"
 
@@ -13,12 +7,6 @@ if [ "$_XMX_" = "" ]
 then
   export _XMX_=2000m
 fi
-export _CLASS_=$1
-export _CONFIG_=default_server
-export _CONFIG_=default_server
-export _JPROFILER_HOME_=/home/tools/jprofiler3
-export _NODE_SYS_PROPS_='-Dunified.configuration.bootstrap.properties='$BOOTSTRAP_PROPERTIES
-export _SYS_PROPS_=$_SYS_PROPS_' '$_NODE_SYS_PROPS_
 
 export _GC_=$_GC_LOG_FILENAME_
 
@@ -27,26 +15,7 @@ then
   export _GC_="$SEARCH_HOME/logs/gc.log"
 fi
 
-java_opts="$java_opts -Dclass="$1
-java_opts="$java_opts -Dp1="$2
-java_opts="$java_opts -Dp2="$3
-java_opts="$java_opts -Dp3="$4
-java_opts="$java_opts -Dp4="$5
-java_opts="$java_opts -Dp5="$6
-java_opts="$java_opts -Dp6="$7
-java_opts="$java_opts -Dp7="$8
-java_opts="$java_opts -Dp8="$9
-java_opts="$java_opts -Dp9="$10
-java_opts="$java_opts -Dp10="$11
-java_opts="$java_opts -Dp11="$12
-java_opts="$java_opts -Dp12="$13
-java_opts="$java_opts -Dp13="$14
-#-XX:+UseParallelGC
-
-
-#java_opts="$java_opts -showversion -server  -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=68 -XX:+CMSConcurrentMTEnabled -XX:+UseParNewGC -XX:NewSize=256m -XX:MaxNewSize=460m -XX:+UseCompressedOops"
-
-java_opts="$java_opts -server  -XX:NewRatio=2 -XX:SurvivorRatio=10 -XX:+UseG1GC -XX:MaxGCPauseMillis=150 -XX:-ResizePLAB -XX:ParallelGCThreads=4 -XX:ConcGCThreads=2 -XX:-OmitStackTraceInFastThrow"
+java_opts="-server  -XX:NewRatio=2 -XX:SurvivorRatio=10 -XX:+UseG1GC -XX:MaxGCPauseMillis=150 -XX:-ResizePLAB -XX:ParallelGCThreads=4 -XX:ConcGCThreads=2 -XX:-OmitStackTraceInFastThrow"
 java_opts="$java_opts -verbose:gc -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=3 -XX:GCLogFileSize=2m -Xloggc:$_GC_"
 
 if [ "$_LOG4J_FILENAME_" = "" ]

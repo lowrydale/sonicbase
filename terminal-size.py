@@ -6,6 +6,9 @@ import platform
 import subprocess
 
 
+def is_os_64bit():
+    return platform.machine().endswith('64')
+
 def get_terminal_size():
     """ getTerminalSize()
      - get width and height of console
@@ -14,6 +17,8 @@ def get_terminal_size():
      http://stackoverflow.com/questions/566746/how-to-get-console-window-width-in-python
     """
     current_os = platform.system()
+
+    print('OS=' + current_os + ' is64=' + str(is_os_64bit()))
     tuple_xy = None
     if current_os == 'Windows':
         tuple_xy = _get_terminal_size_windows()
@@ -23,7 +28,6 @@ def get_terminal_size():
     if current_os in ['Linux', 'Darwin'] or current_os.startswith('CYGWIN'):
         tuple_xy = _get_terminal_size_linux()
     if tuple_xy is None:
-        print "default"
         tuple_xy = (80, 25)      # default value
     return tuple_xy
 
@@ -34,7 +38,7 @@ def _get_terminal_size_windows():
         # stdin handle is -10
         # stdout handle is -11
         # stderr handle is -12
-        h = windll.kernel32.GetStdHandle(-12)
+        h = windll.kernel32.GetStdHandle(-11)
         csbi = create_string_buffer(22)
         res = windll.kernel32.GetConsoleScreenBufferInfo(h, csbi)
         if res:
@@ -86,8 +90,16 @@ def _get_terminal_size_linux():
 
 if __name__ == "__main__":
     sizex, sizey = get_terminal_size()
-    with open('bin/size.txt', 'wb') as fh:
-      fh.write(str(sizex) + ',' + str(sizey))
-      fh.flush()
+    current_os = platform.system()
+    tuple_xy = None
+    if current_os == 'Windows':
+        with open('bin/size.txt', 'wb') as fh:
+          fh.write(bytearray(str(sizex) + ',' + str(sizey), 'utf-8'))
+          fh.flush()
+    else:
+        with open('bin/size.txt', 'wb') as fh:
+          fh.write(str(sizex) + ',' + str(sizey))
+          fh.flush()
+
 #    print  str(sizex) + ',' + str(sizey)
 

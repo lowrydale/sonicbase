@@ -4,7 +4,7 @@
   <groupId>com.lowryengineering</groupId>
   <artifactId>sonicbase-root</artifactId>
   <packaging>pom</packaging>
-  <version>0.9</version>
+  <version>0.9.1</version>
   <name>sonicbase-root</name>
   <url>http://maven.apache.org</url>
   <build>

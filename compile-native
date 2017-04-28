@@ -1,0 +1,3 @@
+gcc -m64 -c -I "/cygdrive/c/Program Files/Java/jdk1.8.0_131/include" -I "/cygdrive/c/Program Files/Java/jdk1.8.0_131/include/win32" terminal.cpp
+gcc -m64 -shared -o win-util.dll terminal.o
+gcc -m64 -o win-util terminal.cpp -L./ -lwin-util -I "/cygdrive/c/Program Files/Java/jdk1.8.0_131/include" -I "/cygdrive/c/Program Files/Java/jdk1.8.0_131/include/win32"

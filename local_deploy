@@ -18,6 +18,8 @@ rsync -rvlLt get-distribution $HOME/sonicbase/bin
 rsync -rvlLt get-df $HOME/sonicbase/bin
 rsync -rvlLt win $HOME/sonicbase/lib
 rsync -rvlLt get-jarlist $HOME/sonicbase/bin
+rsync -rvlLt get-cpu.bat $HOME/sonicbase/bin
+rsync -rvlLt disk-avail.bat $HOME/sonicbase/bin
 rsync -rvlLt get-top $HOME/sonicbase/bin
 rsync -rvlLt get-dir $HOME/sonicbase/bin
 rsync -rvlLt runclass $HOME/sonicbase/bin

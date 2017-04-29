@@ -407,6 +407,56 @@ public class DatabaseServer {
     }
   }
 
+  public double getResGigWindows() throws IOException, InterruptedException {
+    ProcessBuilder builder = new ProcessBuilder().command("tasklist",  "/fi", "\"pid eq " + pid + "\"");
+    Process p = builder.start();
+    BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+    String header = in.readLine();
+    String separator = in.readLine();
+    String separator2 = in.readLine();
+    String values = in.readLine();
+    p.waitFor();
+
+    String[] parts = values.split("\\s+");
+    String kbytes = parts[4];
+    kbytes = kbytes.replaceAll(",", "");
+    return Double.valueOf(kbytes) / 1000d / 1000d;
+  }
+
+  public double getCpuUtilizationWindows() throws IOException, InterruptedException {
+
+    ProcessBuilder builder = new ProcessBuilder().command("bin/get-cpu.bat", String.valueOf(pid));
+//    "wmic", "path", "Win32_PerfFormattedData_PerfProc_Process",
+//        "where", "\"IDProcess=" + pid + "\"", "get", "IDProcess,PercentProcessorTime");
+    Process p = builder.start();
+    BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+    String values = in.readLine();
+    p.waitFor();
+
+    logger.info("cpu utilization str=" + values);
+    String[] parts = values.split("\\s+");
+    String cpu = parts[1];
+    return Double.valueOf(cpu);
+  }
+
+  public String getDiskAvailWindows() throws IOException, InterruptedException {
+    // disk avail:
+    //        SETLOCAL
+    //
+    //        FOR /F "usebackq tokens=1,2" %%f IN (`PowerShell -NoProfile -EncodedCommand "CgBnAHcAbQBpACAAVwBpAG4AMwAyAF8ATABvAGcAaQBjAGEAbABEAGkAcwBrACAALQBGAGkAbAB0AGUAcgAgACIAQwBhAHAAdABpAG8AbgA9ACcAQwA6ACcAIgB8ACUAewAkAGcAPQAxADAANwAzADcANAAxADgAMgA0ADsAWwBpAG4AdABdACQAZgA9ACgAJABfAC4ARgByAGUAZQBTAHAAYQBjAGUALwAkAGcAKQA7AFsAaQBuAHQAXQAkAHQAPQAoACQAXwAuAFMAaQB6AGUALwAkAGcAKQA7AFcAcgBpAHQAZQAtAEgAbwBzAHQAIAAoACQAdAAtACQAZgApACwAJABmAH0ACgA="`) DO ((SET U=%%f)&(SET F=%%g))
+    //
+    //        @ECHO Used: %U%
+    //            @ECHO Free: %F%
+
+    ProcessBuilder builder = new ProcessBuilder().command("bin/disk-avail.bat");
+    Process p = builder.start();
+    BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+    String values = in.readLine();
+    p.waitFor();
+
+    return values;
+  }
+
   public static class Host {
     private String publicAddress;
     private String privateAddress;
@@ -897,6 +947,42 @@ public class DatabaseServer {
             p.waitFor();
           }
         }
+        else if (isWindows()) {
+          Double lastReceive = null;
+          Double lastTransmit = null;
+          long lastRecorded = 0;
+          while (true) {
+            ProcessBuilder builder = new ProcessBuilder().command("netstat", "-e");
+            Process p = builder.start();
+            try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+              while (true) {
+                String line = in.readLine();
+                if (line.startsWith("Bytes")) {
+                  String[] parts = line.split("\\s+");
+                  String receiveStr = parts[1];
+                  String transmitStr = parts[2];
+                  if (lastReceive == null) {
+                    lastReceive = Double.valueOf(receiveStr);
+                    lastTransmit = Double.valueOf(transmitStr);
+                    lastRecorded = System.currentTimeMillis();
+                  }
+                  else {
+                    Double receive = Double.valueOf(receiveStr);
+                    Double transmit = Double.valueOf(transmitStr);
+                    avgRecRate = (receive - lastReceive) / (System.currentTimeMillis() - lastRecorded) / 1000d;
+                    avgTransRate = (transmit - lastTransmit) / (System.currentTimeMillis() - lastRecorded) / 1000d;
+                    lastReceive = receive;
+                    lastTransmit = transmit;
+                    lastRecorded = System.currentTimeMillis();
+                  }
+                  break;
+                }
+                Thread.sleep(2000);
+              }
+            }
+            p.waitFor();
+          }
+        }
       }
       catch (Exception e) {
         logger.error("Error in net monitor thread", e);
@@ -1023,6 +1109,7 @@ public class DatabaseServer {
             ret.cpu = Double.valueOf(parts[i]);
           }
         }
+        ret.diskAvail = getDiskAvailable();
       }
       else if (isUnix()) {
         ProcessBuilder builder = new ProcessBuilder().command("top", "-b", "-n", "1", "-p", String.valueOf(pid));
@@ -1056,11 +1143,15 @@ public class DatabaseServer {
             ret.cpu = Double.valueOf(parts[i]);
           }
         }
+        ret.diskAvail = getDiskAvailable();
+      }
+      else if (isWindows()) {
+        ret.resGig = getResGigWindows();
+        ret.cpu = getCpuUtilizationWindows();
+        ret.diskAvail = getDiskAvailWindows();
       }
 
       getJavaMemStats(javaMemMin, javaMemMax);
-
-      ret.diskAvail = getDiskAvailable();
 
       ret.javaMemMin = javaMemMin.get() == null ? 0 : javaMemMin.get();
       ret.javaMemMax = javaMemMax.get() == null ? 0 : javaMemMax.get();

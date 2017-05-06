@@ -1,6 +1,9 @@
-
+@echo off
 reg Query "HKLM\Hardware\Description\System\CentralProcessor\0" | find /i "x86" > NUL && set OS=32BIT || set OS=64BIT
 
+echo SEARCH_HOME=%SEARCH_HOME%
+
+pushd %SEARCH_HOME%
 
 if "%_XMX_%" == "" (
   SET _XMX_=2000m
@@ -64,16 +67,11 @@ for /r lib %%i in (*.*) do (
     )
 )
 
-pushd ..
-echo %SEARCH_HOME%
-
 if "%OS%"=="64BIT" (
-    echo %SEARCH_HOME%/bin/win/x64/ansicon.exe java %_JAVA_OPTS_% %_SYS_PROPS_% -classpath %_SEARCH_CLASSPATH_% %*
-    ::%SEARCH_HOME%/bin/win/x64/ansicon.exe
+    echo java %_JAVA_OPTS_% %_SYS_PROPS_% -classpath %_SEARCH_CLASSPATH_% %*
     java %_JAVA_OPTS_% %_SYS_PROPS_% -classpath %_SEARCH_CLASSPATH_% %*
 )
 if "%OS%"=="32BIT" (
-    ::%SEARCH_HOME%/bin/win/x86/ansicon.exe
     java %_JAVA_OPTS_% %_SYS_PROPS_% -classpath %_SEARCH_CLASSPATH_% %*
 )
 

@@ -112,7 +112,7 @@
         <version>1.0.5</version>
     </dependency>
 
-    <dependency><groupId>io.netty</groupId><artifactId>netty-all</artifactId><version>4.1.1.Final</version></dependency>
+    <dependency><groupId>io.netty</groupId><artifactId>netty-all</artifactId><version>4.1.9.Final</version></dependency>
 
     <dependency>
         <groupId>commons-cli</groupId>
@@ -120,12 +120,12 @@
         <version>1.3.1</version>
     </dependency>
 
-    <dependency>
-    	<groupId>io.netty</groupId>
-    	<artifactId>netty-transport-native-epoll</artifactId>
-      <classifier>linux-x86_64</classifier>
-      <version>4.0.36.Final</version>
-    </dependency>
+    <!--<dependency>-->
+    	<!--<groupId>io.netty</groupId>-->
+    	<!--<artifactId>netty-transport-native-epoll</artifactId>-->
+      <!--<classifier>linux-x86_64</classifier>-->
+      <!--<version>4.0.36.Final</version>-->
+    <!--</dependency>-->
 
     <dependency>
         <groupId>com.codahale.metrics</groupId>

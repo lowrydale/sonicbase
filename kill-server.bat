@@ -1,7 +1,7 @@
 @echo off
 SetLocal EnableDelayedExpansion
 set count=0
-for /F "delims=" %%a in ('wmic process where "name='java.exe' and CommandLine like '%%port %5%%'" get processid') do (
+for /F "delims=" %%a in ('wmic process where "name='java.exe' and CommandLine like '%%port %1%%'" get processid') do (
   set pid=%%a
   set /a count=!count! + 1
   if !count! GTR 1 goto Exit
@@ -19,7 +19,7 @@ if NOT "%pid" == "" (
     if NOT "%val%" == "" (
         timeout 1
         set count=0
-        for /F "delims=" %%a in ('wmic process where "name='java.exe' and CommandLine like '%%port %5%%'" get processid') do (
+        for /F "delims=" %%a in ('wmic process where "name='java.exe' and CommandLine like '%%port %1%%'" get processid') do (
           set pid=%%a
           set /a count=!count! + 1
           if !count! GTR 1 goto Exit

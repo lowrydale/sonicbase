@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Untitled Document</title>
+
+
+<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+</head>
+
+<body>
+<br/>
+Groups results
+<br/>
+<p>Syntax<table class="border-table" border="1"><tr><td> <table class="syntax-table" cellpadding="4">
+    <tbody>
+  
+    <tr class="syntax-main">
+           <td width="512" colspan=2 >
+            SELECT select_columns FROM table_name [GROUP BY column_name]
+		</td>
+	  </tr>
+	  <tr><td><table cellpadding=4 cellspacing=0>
+          <tr><td align="right">column_name:&nbsp;&nbsp;</td><td width="430"> column to group by</td></tr>
+	  </table></td></tr>
+	  
+  </tbody>
+</table>
+</td>
+</tr>
+</table>
+
+<p>Example</p>
+select * from persons where age < 50 group by age
+
+</body>
+</html>

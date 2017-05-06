@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Untitled Document</title>
+
+
+<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+</head>
+
+<body>
+<br/>
+Limits the number of results to return
+<br/>
+<p>Syntax<table class="border-table" border="1"><tr><td> <table class="syntax-table" cellpadding="4">
+    <tbody>
+  
+    <tr class="syntax-main">
+           <td width="512" colspan=2 >
+            SELECT select_columns FROM table_name LIMIT count
+		</td>
+	  </tr>
+	  <tr><td><table cellpadding=4 cellspacing=0>
+          <tr><td align="right">count:&nbsp;&nbsp;</td><td width="430">number of results to limit the query to</td></tr>
+	  </table></td></tr>
+	  
+  </tbody>
+</table>
+</td>
+</tr>
+</table>
+
+<p>Example</p>
+PreparedStatement stmt = conn.prepareStatement("select * from persons where id < ? and id > ? limit 3");<br/>
+stmt.setLong(1, 100);<br/>
+stmt.setLong(2, 2);<br/>
+ResultSet ret = stmt.executeQuery();<br/>
+
+</body>
+</html>

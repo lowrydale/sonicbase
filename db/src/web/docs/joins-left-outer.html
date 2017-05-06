@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Untitled Document</title>
+
+
+<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+</head>
+<body>
+<br/>
+Performs a join where all records in the left table are returned. If there is no matching record on
+the right then null is returned for the right side.
+<br/>
+<h3>Syntax</h3>
+<table class="border-table" border="1"><tr><td> <table class="syntax-table" cellpadding="4">
+    <tbody>
+  
+    <tr class="syntax-main">
+           <td width="512" colspan=2 >
+            SELECT select_columns FROM table_name LEFT OUTER JOIN join_table ON join_criteria
+		</td>
+	  </tr>
+	  <tr><td><table cellpadding=4 cellspacing=0>
+          <tr><td align="right">join_table:&nbsp;&nbsp;</td><td width="430"> table to join with</td></tr>
+          <tr><td align="right">join_criteria:&nbsp;&nbsp;</td><td width="430"> where clause that specifies how records must match between the tables</td></tr>
+	  </table></td></tr>
+	  
+  </tbody>
+</table>
+</td>
+</tr>
+</table>
+
+<h3>Example</h3>
+PreparedStatement stmt = conn.prepareStatement(<br/>
+"select persons.id, persons.socialsecuritynumber, memberships.membershipname, memberships.personid from persons
+left outer join Memberships on persons.id = Memberships.PersonId where memberships.personid<2  order by memberships.personid desc");<br/>
+<br/>
+ResultSet ret = stmt.executeQuery();<br/>
+
+
+
+</body>
+</html>

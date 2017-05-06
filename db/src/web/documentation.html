@@ -15,21 +15,21 @@
 	var trees = []
 var TREE_ITEMS = [
 	['Documentation', '/',
-	    ['Geting Started', 'docs/getting-started.html'],
+	    ['Getting Started', 'docs/getting-started.html'],
         ['Features', 'docs/features.html'],
 		['SQL Syntax', null,
 			['Select', 0,
 				['Select Basics', 'docs/select-basics.html'],
 				['Select Order By', 'docs/select-order-by.html'],
 				['Select Functions', 'docs/select-functions.html'],
-				['Select Count', 'docs/select-count.html'],
 				['Select Group By', 'docs/select-group-by.html'],
 				['Select Limit', 'docs/select-limit.html'],
 				['Joins', 0,
-				    ['Inner', 'docs/joins-inner'],
+				    ['Inner', 'docs/joins-inner.html'],
 				    ['Left Outer', 'docs/joins-left-outer.html'],
 				    ['Right Outer', 'docs/joins-right-outer.html'],
-				    ['Full', 'docs/joins-full.html']
+				    ['Full', 'docs/joins-full.html'],
+                    ['Three-Way', 'docs/joins-three-way.html']
 				]
 			 ],
 			 ['Insert', 'docs/insert.html'],
@@ -43,7 +43,10 @@ var TREE_ITEMS = [
             ['Describe Server Stats', 'docs/describe-server-stats.html']
 		],
 		['Administration', 0,
-                ['Setup', 'docs/setup.html'],
+                ['Setup', 0,
+                    ['Common', 'docs/setup.html'],
+                    ['Windows', 'docs/setup-windows.html']
+                ],
                 ['Config', 'docs/config.html'],
                 ['Client', 'docs/client.html'],
                 ['AWS Integration', 'docs/aws-integration.html']

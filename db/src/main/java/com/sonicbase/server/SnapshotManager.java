@@ -249,6 +249,9 @@ public class SnapshotManager {
             Thread.sleep(timeToWait);
           }
         }
+        else {
+          Thread.sleep(10000);
+        }
         while (!enableSnapshot) {
           Thread.sleep(1000);
         }

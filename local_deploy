@@ -6,7 +6,7 @@ mkdir -p $HOME/sonicbase/logs
 #mkdir -p $HOME/sonicbase/lib/linux64
 
 ./build-jar
-mkdir -p $HOME/sonicbase/lib
+mkdir -p $HOME/sonicbase/libs
 rsync -vlLt db/target/sonicbase-*.jar $HOME/sonicbase/lib
 #rsync -vlLt repo/* $HOME/sonicbase/lib
 #mvn dependency:copy-dependencies -DoutputDirectory=$HOME/sonicbase/lib
@@ -24,6 +24,13 @@ rsync -rvlLt get-top $HOME/sonicbase/bin
 rsync -rvlLt get-dir $HOME/sonicbase/bin
 rsync -rvlLt runclass $HOME/sonicbase/bin
 rsync -rvlLt runclass.bat $HOME/sonicbase/bin
+rsync -rvlLt purge-data.bat $HOME/sonicbase/bin
+rsync -rvlLt remote-start-bench-server.ps1 $HOME/sonicbase/bin
+rsync -rvlLt remote-start-db-server.ps1 $HOME/sonicbase/bin
+rsync -rvlLt remote-purge-data.ps1 $HOME/sonicbase/bin
+rsync -rvlLt remote-kill-server.ps1 $HOME/sonicbase/bin
+rsync -rvlLt remote-get-mem-total.ps1 $HOME/sonicbase/bin
+rsync -rvlLt remote-create-file.ps1 $HOME/sonicbase/bin
 rsync -rvlLt cli $HOME/sonicbase/bin
 rsync -rvlLt cli.bat $HOME/sonicbase/bin
 rsync -rvlLt enable-ansi.py $HOME/sonicbase/bin
@@ -35,14 +42,18 @@ rsync -rvlLt start-local-rest $HOME/sonicbase/bin
 rsync -rvlLt start $HOME/sonicbase/bin
 rsync -rvlLt start-db-server $HOME/sonicbase/bin
 rsync -rvlLt start-db-server.bat $HOME/sonicbase/bin
+rsync -rvlLt start-db-server-task.bat $HOME/sonicbase/bin
+rsync -rvlLt start-db-server.vbs $HOME/sonicbase/bin
 rsync -rvlLt start-bench-server $HOME/sonicbase/bin
 rsync -rvlLt start-bench-server.bat $HOME/sonicbase/bin
+rsync -rvlLt start-bench-server-task.bat $HOME/sonicbase/bin
+rsync -rvlLt start-bench-server.vbs $HOME/sonicbase/bin
 rsync -rvlLt remote-start-db-server $HOME/sonicbase/bin
 rsync -rvlLt remote-start-rest-server $HOME/sonicbase/bin
-rsync -rvlLt kill-server $HOME/sonicbase/bin
 rsync -rvlLt dump-threads $HOME/sonicbase/bin
 rsync -rvlLt terminal-size.py $HOME/sonicbase/bin
 rsync -rvlLt terminal-size.bat $HOME/sonicbase/bin
+rsync -rvlLt terminal-size-cygwin.bat $HOME/sonicbase/bin
 rsync -rvlLt terminal-resize.py $HOME/sonicbase/bin
 rsync -rvlLt do-rsync $HOME/sonicbase/bin
 rsync -rvlLt rsync-file $HOME/sonicbase/bin

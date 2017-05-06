@@ -1,0 +1,82 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Untitled Document</title>
+
+
+<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+</head>
+
+<body>
+<br/>
+SonicBase supports the read committed transaction isolation level.<br/>
+
+<h3>Simple Example</h3>
+conn.setAutoCommit(false);<br/>
+<br/>
+PreparedStatement stmt = conn.prepareStatement("insert into persons (id) VALUES (?)");<br/>
+<br/>
+stmt.setLong(1, 100000);<br/>
+int count = stmt.executeUpdate();<br/>
+assertEquals(count, 1);<br/>
+<br/>
+conn.commit();<br/>
+
+<h3>Concurrent Access Example</h3>
+PreparedStatement stmt = conn.prepareStatement("truncate table persons");<br/>
+stmt.execute();<br/>
+<br/>
+conn.setAutoCommit(false);<br/>
+<br/>
+stmt = conn.prepareStatement("insert into persons (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");<br/>
+stmt.setLong(1, 100);<br/>
+stmt.setLong(2, (100) % 2);<br/>
+stmt.setString(3, "933-28-" + (4));<br/>
+stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");<br/>
+stmt.setBoolean(5, false);<br/>
+stmt.setString(6, "m");<br/>
+int count = stmt.executeUpdate();<br/>
+assertEquals(count, 1);<br/>
+<br/>
+final CountDownLatch latch = new CountDownLatch(1);<br/>
+Thread thread = new Thread(new Runnable() {<br/>
+&nbsp;&nbsp;@Override<br/>
+&nbsp;&nbsp;public void run() {<br/>
+&nbsp;&nbsp;&nbsp;try {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;PreparedStatement stmt = conn2.prepareStatement("update persons set id = ?, socialSecurityNumber=? where id=?");<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stmt.setLong(1, 1000);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stmt.setString(2, "ssn");<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stmt.setLong(3, 100);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int count = stmt.executeUpdate();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;assertEquals(count, 0); // record not found<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;catch (Exception e) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;finally {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;latch.countDown();<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;}<br/>
+});<br/>
+thread.start();<br/>
+<br/>
+latch.await();<br/>
+<br/>
+stmt = conn.prepareStatement("update persons set id = ?, socialSecurityNumber=? where id=?");<br/>
+stmt.setLong(1, 1000);<br/>
+stmt.setString(2, "ssn");<br/>
+stmt.setLong(3, 100);<br/>
+count = stmt.executeUpdate();<br/>
+assertEquals(count, 1);<br/>
+<br/>
+conn.commit();<br/>
+<br/>
+stmt = conn.prepareStatement("select * from persons where id=1000");<br/>
+ResultSet resultSet = stmt.executeQuery();<br/>
+assertTrue(resultSet.next());<br/>
+assertEquals(resultSet.getLong("id"), 1000);<br/>
+assertEquals(resultSet.getString("socialsecuritynumber"), "ssn");<br/>
+<br/>
+</body>
+</html>

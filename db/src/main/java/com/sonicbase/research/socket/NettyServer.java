@@ -761,6 +761,7 @@ public class NettyServer {
     try {
 
       ServerBootstrap b = new ServerBootstrap(); // (2)
+      logger.info("creating group");
       b.group(bossGroup, workerGroup)
           .channel(NioServerSocketChannel.class) // (3)
           .childHandler(new ChannelInitializer<SocketChannel>() { // (4)
@@ -772,15 +773,19 @@ public class NettyServer {
           //.option(ChannelOption.SO_BACKLOG, 128)          // (5)
           //.option(ChannelOption.TCP_NODELAY, true)
           //.option(ChannelOption.SO_LINGER, 1000)
-          .option(ChannelOption.SO_KEEPALIVE, true); // (6)
+         .childOption(ChannelOption.SO_KEEPALIVE, true)
+      ; // (6)
       ;
       // Bind and start to accept incoming connections.
+      logger.info("binding port");
       ChannelFuture f = b.bind(port).sync(); // (7)
 
       // Wait until the server socket is closed.
       // In this example, this does not happen, but you can do that to gracefully
       // shut down your server.
+      logger.info("bound port");
       f.channel().closeFuture().sync();
+      logger.info("exiting netty server");
     }
     catch (InterruptedException e) {
       throw new com.sonicbase.query.DatabaseException(e);
@@ -792,7 +797,7 @@ public class NettyServer {
   }
 
   public static void main(String[] args) {
-    System.out.println("Starting server");
+    System.out.println("Starting server: workingDir=" + System.getProperty("user.dir"));
     NettyServer server = new NettyServer();
     server.startServer(args, null, false);
   }
@@ -863,12 +868,15 @@ public class NettyServer {
                   databaseServer.getSnapshotManager().recoverFromSnapshot(dbName);
                 }
               //}
+              logger.info("applying queues");
               databaseServer.getLogManager().applyQueues();
 
+              logger.info("starting repartitioner");
               databaseServer.startRepartitioner();
               Thread thread = new Thread(new Runnable() {
                 @Override
                 public void run() {
+                  logger.info("running snapshot loop");
                   databaseServer.getSnapshotManager().runSnapshotLoop();
                 }
               });
@@ -883,8 +891,7 @@ public class NettyServer {
         thread.start();
       }
       catch (Exception e) {
-        System.out.println("Error recovering snapshot");
-        e.printStackTrace();
+        logger.error("Error recovering snapshot", e);
         System.exit(1);
       }
 
@@ -893,10 +900,11 @@ public class NettyServer {
         @Override
         public void run() {
           try {
+            logger.info("starting netty server");
             NettyServer.this.run();
           }
           catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Error starting netty server", e);
           }
         }
       });
@@ -906,10 +914,13 @@ public class NettyServer {
 
       this.isRunning = true;
       nettyThread.join();
+      logger.info("joined netty thread");
     }
     catch (Exception e) {
+      logger.error("Error starting server", e);
       throw new com.sonicbase.query.DatabaseException(e);
     }
+    logger.info("exiting netty server");
   }
 
   public static String getHelpPage(NettyServer server) throws IOException {

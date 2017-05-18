@@ -216,7 +216,7 @@ public class DatabaseCommon {
     return 0;
   }
 
-  public static Object[] deserializeKey(TableSchema tableSchema, DataInputStream in) {
+  public static Object[] deserializeKey(TableSchema tableSchema, DataInputStream in) throws EOFException {
     try {
       long serializationVersion = DataUtil.readVLong(in);
       DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
@@ -328,6 +328,9 @@ public class DatabaseCommon {
         }
       }
       return fields;
+    }
+    catch (EOFException e) {
+      throw e;
     }
     catch (IOException e) {
       throw new DatabaseException(e);

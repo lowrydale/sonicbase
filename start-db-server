@@ -3,10 +3,10 @@ export SEARCH_HOME=$4
 #export MODE=yprof
 mkdir $4/logs
 
-#if [ $2 == "9010" ]
-#then
-#  export MODE=yprof
-#fi
+if [ $1 == "10.0.0.134" ]
+then
+  export MODE=yprof
+fi
 
 if [ ${4:0:1} != "/" ]
 then

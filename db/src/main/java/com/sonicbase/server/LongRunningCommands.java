@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * Responsible for
@@ -96,10 +97,8 @@ public class LongRunningCommands {
   }
 
   public void execute() {
-    synchronized (commands) {
-      for (SingleCommand command : commands) {
-        command.execute(commands);
-      }
+    for (SingleCommand command : commands) {
+      command.execute(commands);
     }
   }
 
@@ -156,7 +155,7 @@ public class LongRunningCommands {
       }
     }
 
-    public void execute(final List<SingleCommand> parentList) {
+    public void execute(final ConcurrentLinkedQueue<SingleCommand> parentList) {
       Thread thread = new Thread(new Runnable(){
         @Override
         public void run() {
@@ -166,11 +165,7 @@ public class LongRunningCommands {
       thread.start();
     }
 
-    public void executeBlocking(final List<SingleCommand> parentList) {
-      doExecute(parentList);
-    }
-
-    private void doExecute(List<SingleCommand> parentList) {
+    private void doExecute(ConcurrentLinkedQueue<SingleCommand> parentList) {
       longRunningCommands.server.handleCommand(command, body, false, false);
       synchronized (parentList) {
         parentList.remove(SingleCommand.this);
@@ -192,7 +187,7 @@ public class LongRunningCommands {
     }
   }
 
-  private List<SingleCommand> commands = new ArrayList<>();
+  private ConcurrentLinkedQueue<SingleCommand> commands = new ConcurrentLinkedQueue<>();
 
   public void serialize(DataOutputStream out) throws IOException {
     synchronized (commands) {

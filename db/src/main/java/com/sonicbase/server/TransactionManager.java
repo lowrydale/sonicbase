@@ -102,6 +102,7 @@ public class TransactionManager {
     private List<RecordLock> locks = new ArrayList<>();
     private ConcurrentHashMap<String, List<Record>> records = new ConcurrentHashMap<>();
     private List<Operation> operations = new ArrayList<>();
+
     public Transaction(long transactionId) {
       this.id = transactionId;
     }
@@ -185,13 +186,13 @@ public class TransactionManager {
   public void preHandleTransaction(String dbName, String tableName, String indexName, boolean isExplicitTrans, boolean isCommitting, long transactionId, Object[] primaryKey,
                                    AtomicBoolean shouldExecute,
                                    AtomicBoolean shouldDeleteLock) {
+    ConcurrentSkipListMap<Object[], RecordLock> tableLocks = null;
+    if (!locks.containsKey(dbName)) {
+      locks.put(dbName, new ConcurrentHashMap<String, ConcurrentSkipListMap<Object[], RecordLock>>());
+    }
+    tableLocks = locks.get(dbName).get(tableName);
     synchronized (locks) {
-      if (!locks.containsKey(dbName)) {
-        locks.put(dbName, new ConcurrentHashMap<String, ConcurrentSkipListMap<Object[], RecordLock>>());
-      }
-      ConcurrentSkipListMap<Object[], RecordLock> tableLocks = locks.get(dbName).get(tableName);
       if (tableLocks == null) {
-
         IndexSchema primaryKeySchema = null;
         for (Map.Entry<String, IndexSchema> entry : server.getCommon().getTables(dbName).get(tableName).getIndices().entrySet()) {
           if (entry.getValue().isPrimaryKey()) {
@@ -220,44 +221,43 @@ public class TransactionManager {
         });
         locks.get(dbName).put(tableName, tableLocks);
       }
-      RecordLock lock = tableLocks.get(primaryKey);
-      if (lock == null) {
-        if (isExplicitTrans) {
-          Transaction trans = transactions.get(transactionId);
-          if (trans == null) {
-            trans = new Transaction(transactionId);
-            transactions.put(transactionId, trans);
-          }
-          lock = new RecordLock();
-          lock.lockCount = 1;
-          lock.transaction = trans;
-          lock.tableName = tableName;
-          lock.indexName = indexName;
-          lock.primaryKey = primaryKey;
-          trans.locks.add(lock);
-          tableLocks.put(primaryKey, lock);
-          shouldExecute.set(false);
+    }
+    RecordLock lock = tableLocks.get(primaryKey);
+    if (lock == null) {
+      if (isExplicitTrans) {
+        Transaction trans = transactions.get(transactionId);
+        if (trans == null) {
+          trans = new Transaction(transactionId);
+          transactions.put(transactionId, trans);
         }
-        else {
-          shouldExecute.set(true);
-        }
-      }
-      else if (isExplicitTrans) {
-        if (lock.transaction.id != transactionId) {
-          throw new RecordLockedException();
-        }
-        if (isCommitting) {
-          shouldExecute.set(true);
-          shouldDeleteLock.set(true);
-        }
-        else {
-          lock.lockCount++;
-        }
+        lock = new RecordLock();
+        lock.lockCount = 1;
+        lock.transaction = trans;
+        lock.tableName = tableName;
+        lock.indexName = indexName;
+        lock.primaryKey = primaryKey;
+        trans.locks.add(lock);
+        tableLocks.put(primaryKey, lock);
+        shouldExecute.set(false);
       }
       else {
-        throw new RecordLockedException();
+        shouldExecute.set(true);
       }
     }
+    else if (isExplicitTrans) {
+      if (lock.transaction.id != transactionId) {
+        throw new RecordLockedException();
+      }
+      if (isCommitting) {
+        shouldExecute.set(true);
+        shouldDeleteLock.set(true);
+      }
+      else {
+        lock.lockCount++;
+      }
+    }
+    else {
+      throw new RecordLockedException();
+    }
   }
-
 }

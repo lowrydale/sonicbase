@@ -45,6 +45,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 
 
 /**
@@ -77,6 +78,9 @@ public class DatabaseServer {
   private String gclog;
   private String xmx;
   private String installDir;
+  private boolean throttleInsert;
+  private DeleteManager deleteManager;
+  private Object batchMutex = new Object();
 
   @SuppressWarnings("restriction")
   private static Unsafe getUnsafe() {
@@ -213,6 +217,8 @@ public class DatabaseServer {
     logger = new Logger(getDatabaseClient());
     logger.info("config=" + config.toString());
 
+    this.deleteManager = new DeleteManager(this);
+    this.deleteManager.start();
     this.updateManager = new UpdateManager(this);
     this.snapshotManager = new SnapshotManager(this);
     this.transactionManager = new TransactionManager(this);
@@ -455,6 +461,22 @@ public class DatabaseServer {
     p.waitFor();
 
     return values;
+  }
+
+  public void setThrottleInsert(boolean throttle) {
+    this.throttleInsert = throttle;
+  }
+
+  public boolean isThrottleInsert() {
+    return throttleInsert;
+  }
+
+  public DeleteManager getDeleteManager() {
+    return deleteManager;
+  }
+
+  public Object getBatchMutex() {
+    return batchMutex;
   }
 
   public static class Host {
@@ -1034,6 +1056,23 @@ public class DatabaseServer {
       return avails.get(bestLineMatching);
     }
     return null;
+  }
+
+  public byte[] getFile(String command, byte[] body, boolean replayedCommand) {
+    DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
+    try {
+      String filename = StreamUtils.inputStreamToString(in);
+      File file = new File(installDir, filename);
+      if (!file.exists()) {
+        return null;
+      }
+      FileInputStream fileIn = new FileInputStream(file);
+      String ret = StreamUtils.inputStreamToString(fileIn);
+      return ret.getBytes("utf-8");
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
   }
 
   public byte[] logError(String command, byte[] body, boolean replayedCommand) {

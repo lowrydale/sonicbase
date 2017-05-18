@@ -710,10 +710,24 @@ public class DatabaseSocketClient {
         request.command = command;
         request.body = body;
 
-        queue.add(request);
+        if (batchKey == null) {
+          try {
+            List<Request> nonMatchingRequets = new ArrayList<>();
+            nonMatchingRequets.add(request);
+            String[] parts = hostPort.split(":");
+            sendBatch(parts[0], Integer.valueOf(parts[1]), nonMatchingRequets);
+          }
+          catch (Exception t) {
+            request.exception = t;
+            request.latch.countDown();
+          }
+        }
+        else {
+          queue.put(request);
 
-        if (!request.latch.await(365, TimeUnit.DAYS)) {
-          throw new Exception("Request timeout");
+          if (!request.latch.await(365, TimeUnit.DAYS)) {
+            throw new Exception("Request timeout");
+          }
         }
 
         if (request.exception != null) {
@@ -727,7 +741,8 @@ public class DatabaseSocketClient {
       return null;
     }
     catch (Exception e) {
-      throw new DatabaseException(e);
+      String[] parts = hostPort.split(":");
+      throw new DatabaseException("Server error: host=" + parts[0] + ", port=" + parts[1], e);
     }
   }
 

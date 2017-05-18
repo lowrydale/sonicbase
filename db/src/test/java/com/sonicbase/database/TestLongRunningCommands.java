@@ -49,6 +49,8 @@ public class TestLongRunningCommands {
 //      }
 //      Thread.sleep(1000);
 //    }
+    Thread.sleep(1000);
+
     server.getLongRunningCommands().addCommand(server.getLongRunningCommands().createSingleCommand("DatabaseServer:echo:1:1:test:11", null));
 
     while (true) {
@@ -58,6 +60,8 @@ public class TestLongRunningCommands {
       }
       Thread.sleep(1000);
     }
+
+    Thread.sleep(1000);
 
 //    while (true) {
 //      if (DatabaseServer.echo2Count.get() == 10) {

@@ -1,7 +1,9 @@
 {
     "database": {
-        "dataDirectory": "c:\\\\db-data",
-        "installDirectory": "c:\\\\sonicbase",
+        "xdataDirectory": "c:\\\\db-data",
+        "xinstallDirectory": "c:\\\\sonicbase",
+      "dataDirectory": "$HOME/db-data",
+      "installDirectory": "$HOME/sonicbase",
         "copmressRecords": false,
         "useUnsafe": true,
         "maxJavaHeap": "20%",
@@ -14,17 +16,26 @@
           {
             "replicas": [
               {
-                "publicAddress": "184.72.89.253",
-                "privateAddress": "184.72.89.253",
+                "publicAddress": "localhost",
+                "privateAddress": "localhost",
                 "port": 9010
+              }
+            ]
+          },
+          {
+            "replicas": [
+              {
+                "publicAddress": "localhost",
+                "privateAddress": "localhost",
+                "port": 9020
               }
             ]
           }
         ],
       "clients": [
         {
-          "publicAddress": "184.72.89.253",
-          "privateAddress": "184.72.89.253",
+          "publicAddress": "localhost",
+          "privateAddress": "localhost",
           "port": 8080
         }
       ]

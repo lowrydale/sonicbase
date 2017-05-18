@@ -93,11 +93,11 @@ if __name__ == "__main__":
     current_os = platform.system()
     tuple_xy = None
     if current_os == 'Windows':
-        with open('bin/size.txt', 'wb') as fh:
+        with open('tmp/size.txt', 'wb') as fh:
           fh.write(bytearray(str(sizex) + ',' + str(sizey), 'utf-8'))
           fh.flush()
     else:
-        with open('bin/size.txt', 'wb') as fh:
+        with open('tmp/size.txt', 'wb') as fh:
           fh.write(str(sizex) + ',' + str(sizey))
           fh.flush()
 

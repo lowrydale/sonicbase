@@ -119,7 +119,9 @@ public class ReadManager {
             if (entry.getValue() instanceof Long) {
               entry.setValue(index.get(entry.getKey()));
             }
-            records = server.fromUnsafeToRecords(entry.getValue());
+            if (entry.getValue() != null) {
+              records = server.fromUnsafeToRecords(entry.getValue());
+            }
           }
           for (byte[] bytes : records) {
             Record record = new Record(tableSchema);
@@ -922,7 +924,9 @@ public class ReadManager {
         if (entry.getValue() instanceof Long) {
           entry.setValue(index.get(entry.getKey()));
         }
-        records = server.fromUnsafeToRecords(entry.getValue());
+        if (entry.getValue() != null) {
+          records = server.fromUnsafeToRecords(entry.getValue());
+        }
       }
       if (parms != null && expression != null) {
         for (byte[] bytes : records) {
@@ -1120,11 +1124,13 @@ public class ReadManager {
           if (entry.getValue() instanceof Long) {
             entry.setValue(index.get(entry.getKey()));
           }
-          if (keys) {
-            currKeys = server.fromUnsafeToKeys(entry.getValue());
-          }
-          else {
-            records = server.fromUnsafeToRecords(entry.getValue());
+          if (entry.getValue() != null) {
+            if (keys) {
+              currKeys = server.fromUnsafeToKeys(entry.getValue());
+            }
+            else {
+              records = server.fromUnsafeToRecords(entry.getValue());
+            }
           }
         }
         if (keys) {
@@ -1328,11 +1334,13 @@ public class ReadManager {
               if (value instanceof Long) {
                 value = index.get(entry.getKey());
               }
-              if (keys) {
-                currKeys = server.fromUnsafeToKeys(value);
-              }
-              else {
-                records = server.fromUnsafeToRecords(value);
+              if (value != null) {
+                if (keys) {
+                  currKeys = server.fromUnsafeToKeys(value);
+                }
+                else {
+                  records = server.fromUnsafeToRecords(value);
+                }
               }
             }
             handleRecord(dbName, tableSchema, parms, evaluateExpresion, expression, columnOffsets, forceSelectOnServer, retKeys, retRecords, keys, counters, groupContext, records, currKeys);

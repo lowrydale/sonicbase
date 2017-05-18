@@ -31,6 +31,7 @@ rsync -rvlLt remote-purge-data.ps1 $HOME/sonicbase/bin
 rsync -rvlLt remote-kill-server.ps1 $HOME/sonicbase/bin
 rsync -rvlLt remote-get-mem-total.ps1 $HOME/sonicbase/bin
 rsync -rvlLt remote-create-file.ps1 $HOME/sonicbase/bin
+rsync -rvlLt zip-dir.ps1 $HOME/sonicbase/bin
 rsync -rvlLt cli $HOME/sonicbase/bin
 rsync -rvlLt cli.bat $HOME/sonicbase/bin
 rsync -rvlLt enable-ansi.py $HOME/sonicbase/bin

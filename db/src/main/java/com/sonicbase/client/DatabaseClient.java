@@ -522,7 +522,6 @@ public class DatabaseClient {
           }
           return ret;
         }
-
         catch (Exception e) {
           if (e.getCause() instanceof SchemaOutOfSyncException) {
             for (PreparedInsert insert : withRecordPrepared) {
@@ -1328,46 +1327,64 @@ public class DatabaseClient {
   private ResultSet describeShards(String dbName) throws IOException, ExecutionException, InterruptedException {
     syncSchema();
     StringBuilder ret = new StringBuilder();
-    List<Future<Entry>> futures = new ArrayList<>();
-    for (final Map.Entry<String, TableSchema> table : getCommon().getTables(dbName).entrySet()) {
-      for (final Map.Entry<String, IndexSchema> indexSchema : table.getValue().getIndexes().entrySet()) {
-        final String command = "DatabaseServer:getPartitionSize:1:" + getCommon().getSchemaVersion() + ":" +
-            dbName + ":" + table.getKey() + ":" + indexSchema.getKey();
-        for (int i = 0; i < getShardCount(); i++) {
-          final int currShard = i;
-          futures.add(executor.submit(new Callable<Entry>(){
-            @Override
-            public Entry call() throws Exception {
-              byte[] currRet = send(null, currShard, 0, command, null, DatabaseClient.Replica.master);
-              DataInputStream in = new DataInputStream(new ByteArrayInputStream(currRet));
-              long serializationVersion = DataUtil.readVLong(in);
-              long count = in.readLong();
-              return new Entry(table.getKey(), indexSchema.getKey(), currShard, "Table=" + table.getKey() + ", Index=" + indexSchema.getKey() +
-                  ", Shard=" + currShard + ", count=" + count + "\n");
-            }
-          }));
+
+    Map<String, Entry> entries = new HashMap<>();
+    Repartitioner.GlobalIndexCounts counts = Repartitioner.getIndexCounts(dbName, this);
+    for (Map.Entry<String, Repartitioner.TableIndexCounts> tableEntry : counts.getTables().entrySet()) {
+      for (Map.Entry<String, Repartitioner.IndexCounts> indexEntry : tableEntry.getValue().getIndices().entrySet()) {
+        ConcurrentHashMap<Integer, Long> currCounts = indexEntry.getValue().getCounts();
+        for (Map.Entry<Integer, Long> countEntry : currCounts.entrySet()) {
+          Entry entry = new Entry(tableEntry.getKey(),indexEntry.getKey(), countEntry.getKey(), "Table=" +
+              tableEntry.getKey() + ", Index=" + indexEntry.getKey() +
+              ", Shard=" + countEntry.getKey() + ", count=" + countEntry.getValue() + "\n");
+          entries.put(entry.getKey(), entry);
         }
       }
     }
-    Map<String, Entry> entries = new HashMap<>();
-    for (Future<Entry> future : futures) {
-      Entry entry = future.get();
-      entries.put(entry.getKey(), entry);
-    }
+
+//    List<Future<Entry>> futures = new ArrayList<>();
+//    for (final Map.Entry<String, TableSchema> table : getCommon().getTables(dbName).entrySet()) {
+//      for (final Map.Entry<String, IndexSchema> indexSchema : table.getValue().getIndexes().entrySet()) {
+//        final String command = "DatabaseServer:getPartitionSize:1:" + getCommon().getSchemaVersion() + ":" +
+//            dbName + ":" + table.getKey() + ":" + indexSchema.getKey();
+//        for (int i = 0; i < getShardCount(); i++) {
+//          final int currShard = i;
+//          futures.add(executor.submit(new Callable<Entry>(){
+//            @Override
+//            public Entry call() throws Exception {
+//              byte[] currRet = send(null, currShard, 0, command, null, DatabaseClient.Replica.master);
+//              DataInputStream in = new DataInputStream(new ByteArrayInputStream(currRet));
+//              long serializationVersion = DataUtil.readVLong(in);
+//              long count = in.readLong();
+//              return new Entry(table.getKey(), indexSchema.getKey(), currShard, "Table=" + table.getKey() + ", Index=" + indexSchema.getKey() +
+//                  ", Shard=" + currShard + ", count=" + count + "\n");
+//            }
+//          }));
+//        }
+//      }
+//    }
+//    Map<String, Entry> entries = new HashMap<>();
+//    for (Future<Entry> future : futures) {
+//      Entry entry = future.get();
+//      entries.put(entry.getKey(), entry);
+//    }
 
     for (final Map.Entry<String, TableSchema> table : getCommon().getTables(dbName).entrySet()) {
       for (final Map.Entry<String, IndexSchema> indexSchema : table.getValue().getIndexes().entrySet()) {
         int shard = 0;
-        for (TableSchema.Partition partition : indexSchema.getValue().getCurrPartitions()) {
-          StringBuilder builder = new StringBuilder();
-          if (partition.getUpperKey() == null) {
-            builder.append("[null]");
+        TableSchema.Partition[] partitions = indexSchema.getValue().getCurrPartitions();
+        TableSchema.Partition[] lastPartitions = indexSchema.getValue().getLastPartitions();
+        for (int i = 0; i < partitions.length; i++) {
+          String key = "[null]";
+          if (partitions[i].getUpperKey() != null) {
+            key = DatabaseCommon.keyToString(partitions[i].getUpperKey());
           }
-          else {
-            builder.append(DatabaseCommon.keyToString(partition.getUpperKey()));
+          String lastKey = "[null]";
+          if (lastPartitions != null && lastPartitions[i].getUpperKey() != null) {
+            lastKey = DatabaseCommon.keyToString(lastPartitions[i].getUpperKey());
           }
           ret.append("Table=" + table.getKey() + ", Index=" + indexSchema.getKey() + ", shard=" + shard + ", key=" +
-              builder.toString()).append("\n");
+              key).append(", lastKey=").append(lastKey).append("\n");
           shard++;
         }
         for (int i = 0; i < getShardCount(); i++) {

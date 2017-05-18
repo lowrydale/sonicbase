@@ -13,6 +13,7 @@ import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.DataUtil;
+import org.hsqldb.Database;
 
 import java.io.*;
 import java.util.*;
@@ -89,13 +90,13 @@ public class UpdateManager {
             }
           }
           Index index = server.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexSchema.getKey());
-          synchronized (index.getMutex(key)) {
+          //synchronized (index.getMutex(key)) {
             Object obj = index.remove(key);
             if (obj == null) {
               continue;
             }
             server.freeUnsafeIds(obj);
-          }
+          //}
         }
       }
 
@@ -364,7 +365,15 @@ public class UpdateManager {
     }
   }
 
+  private AtomicLong insertCount = new AtomicLong();
+
   public byte[] batchInsertIndexEntryByKeyWithRecord(String command, byte[] body, boolean replayedCommand) {
+    String[] parts = command.split(":");
+    int schemaVersion = Integer.valueOf(parts[3]);
+    if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
+      throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
+    }
+
     ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
     DataInputStream in = new DataInputStream(bytesIn);
     int count = 0;
@@ -372,9 +381,19 @@ public class UpdateManager {
     AtomicBoolean isExplicitTrans = new AtomicBoolean();
     try {
       while (true) {
-        doInsertIndexEntryByKeyWithRecord(command, in, replayedCommand, transactionId, isExplicitTrans, false);
-        count++;
+        synchronized (server.getBatchMutex()) {
+          doInsertIndexEntryByKeyWithRecord(command, in, replayedCommand, transactionId, isExplicitTrans, false);
+          count++;
+          //if (insertCount.incrementAndGet() % 5000 == 0) {
+          while (server.isThrottleInsert()) {
+            Thread.sleep(100);
+          }
+          //}
+        }
       }
+    }
+    catch (InterruptedException e) {
+      //ignore
     }
     catch (EOFException e) {
       //expected
@@ -407,9 +426,14 @@ public class UpdateManager {
         Transaction trans = server.getTransactionManager().getTransaction(transactionId.get());
         trans.addOperation(insertWithRecord, command, body, replayedCommand);
       }
+      //if (insertCount.incrementAndGet() % 5000 == 0) {
+        if (server.isThrottleInsert()) {
+          Thread.sleep(1);
+        }
+      //}
       return ret;
     }
-    catch (EOFException e) {
+    catch (Exception e) {
       throw new DatabaseException(e);
     }
   }
@@ -807,7 +831,7 @@ public class UpdateManager {
     if (true) {
       Object newUnsafeRecords = server.toUnsafeFromRecords(new byte[][]{recordBytes});
       synchronized (index.getMutex(key)) {
-        Object existingValue = index.unsafePutIfAbsent(key, newUnsafeRecords);
+        Object existingValue = index.put(key, newUnsafeRecords);
         if (existingValue != null) {
           //synchronized (index) {
           boolean sameTrans = false;
@@ -820,10 +844,10 @@ public class UpdateManager {
             }
           }
           if (!ignoreDuplicates && existingValue != null && !sameTrans) {
+            index.put(key, existingValue);
+            server.freeUnsafeIds(newUnsafeRecords);
             throw new DatabaseException("Unique constraint violated: table=" + tableName + ", index=" + indexName +  ", key=" + DatabaseCommon.keyToString(key));
           }
-
-          index.put(key, newUnsafeRecords);
 
           server.freeUnsafeIds(existingValue);
         }
@@ -936,12 +960,12 @@ public class UpdateManager {
       Object[] key = DatabaseCommon.deserializeKey(tableSchema, in);
 
       Index index = server.getIndices(dbName).getIndices().get(tableName).get(indexName);
-      synchronized (index.getMutex(key)) {
+      //synchronized (index.getMutex(key)) {
         Object value = index.remove(key);
         if (value != null) {
           server.freeUnsafeIds(value);
         }
-      }
+      //}
 
       return null;
     }
@@ -969,10 +993,12 @@ public class UpdateManager {
             if (indexEntry == null) {
               break;
             }
-            synchronized (indexEntry.getKey()) {
+            //synchronized (indexEntry.getKey()) {
               Object value = index.remove(indexEntry.getKey());
-              server.freeUnsafeIds(value);
-            }
+              if (value != null) {
+                server.freeUnsafeIds(value);
+              }
+            //}
             indexEntry = index.higherEntry(indexEntry.getKey());
           }
           while (true);
@@ -984,10 +1010,12 @@ public class UpdateManager {
           if (indexEntry == null) {
             break;
           }
-          synchronized (indexEntry.getKey()) {
+          //synchronized (indexEntry.getKey()) {
             Object value = index.remove(indexEntry.getKey());
-            server.freeUnsafeIds(value);
-          }
+            if (value != null) {
+              server.freeUnsafeIds(value);
+            }
+          //}
           indexEntry = index.higherEntry(indexEntry.getKey());
         }
         while (true);
@@ -1033,16 +1061,23 @@ public class UpdateManager {
         if (ids.length == 1) {
           boolean mismatch = false;
           if (!indexName.equals(primaryKeyIndexName)) {
-            Object[] lhsKey = DatabaseCommon.deserializeKey(schema, new DataInputStream(new ByteArrayInputStream(ids[0])));
-            for (int i = 0; i < lhsKey.length; i++) {
-              if (0 != comparators[i].compare(lhsKey[i], primaryKey[i])) {
-                mismatch = true;
+            try {
+              Object[] lhsKey = DatabaseCommon.deserializeKey(schema, new DataInputStream(new ByteArrayInputStream(ids[0])));
+              for (int i = 0; i < lhsKey.length; i++) {
+                if (0 != comparators[i].compare(lhsKey[i], primaryKey[i])) {
+                  mismatch = true;
+                }
               }
+            }
+            catch (EOFException e) {
+              throw new DatabaseException(e);
             }
           }
           if (!mismatch) {
-            server.freeUnsafeIds(value);
-            index.remove(key);
+            value = index.remove(key);
+            if (value != null) {
+              server.freeUnsafeIds(value);
+            }
           }
         }
         else {
@@ -1051,11 +1086,16 @@ public class UpdateManager {
           boolean found = false;
           for (byte[] currValue : ids) {
             boolean mismatch = false;
-            Object[] lhsKey = DatabaseCommon.deserializeKey(schema, new DataInputStream(new ByteArrayInputStream(currValue)));
-            for (int i = 0; i < lhsKey.length; i++) {
-              if (0 != comparators[i].compare(lhsKey[i], primaryKey[i])) {
-                mismatch = true;
+            try {
+              Object[] lhsKey = DatabaseCommon.deserializeKey(schema, new DataInputStream(new ByteArrayInputStream(currValue)));
+              for (int i = 0; i < lhsKey.length; i++) {
+                if (0 != comparators[i].compare(lhsKey[i], primaryKey[i])) {
+                  mismatch = true;
+                }
               }
+            }
+            catch (EOFException e) {
+              throw new DatabaseException(e);
             }
 
             if (mismatch) {
@@ -1066,9 +1106,11 @@ public class UpdateManager {
             }
           }
           if (found) {
-            server.freeUnsafeIds(value);
             value = server.toUnsafeFromKeys(newValues);
-            index.put(key, value);
+            value = index.put(key, value);
+            if (value != null) {
+              server.freeUnsafeIds(value);
+            }
           }
         }
       }

@@ -13,6 +13,8 @@ import java.sql.Date;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static org.hsqldb.HsqlDateTime.e;
+
 /**
  * Created by IntelliJ IDEA.
  * User: lowryda
@@ -211,10 +213,8 @@ public class ResultSetProxy implements java.sql.ResultSet {
 
   public boolean isLast() throws SQLException {
     try {
-      for (ResultSetInfo info : resultSets) {
-        if (info.resultSet != null && (!info.resultSet.isLast() && !info.resultSet.isAfterLast())) {
-          return false;
-        }
+      if (resultSet != null && (!resultSet.isLast() && !resultSet.isAfterLast())) {
+        return false;
       }
       return true;
     }
@@ -275,7 +275,7 @@ public class ResultSetProxy implements java.sql.ResultSet {
 
   public String getString(int columnIndex) throws SQLException {
     try {
-      String ret = resultSet.getString(columnIndex);
+        String ret = resultSet.getString(columnIndex);
       if (ret == null) {
         wasNull = true;
         return null;

@@ -1410,6 +1410,7 @@ public class Index {
   public boolean visitTailMap(Object[] key, Index.Visitor visitor) {
     try {
       if (longIndex != null) {
+
         boolean shouldSkip = false;
         while (true) {
           int count = 0;

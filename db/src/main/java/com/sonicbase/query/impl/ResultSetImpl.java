@@ -155,6 +155,10 @@ public class ResultSetImpl implements ResultSet {
     selectStatement.forceSelectOnServer();
   }
 
+  public String[] getDescribeStrs() {
+    return describeStrs;
+  }
+
   public static class MultiTableRecordList {
     private String[] tableNames;
     private long[][] ids;
@@ -552,6 +556,18 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public boolean isLast() {
+    if (describeStrs != null) {
+      if (currPos >= describeStrs.length - 1) {
+        return true;
+      }
+      return false;
+    }
+    if (mapResults != null) {
+      if (currPos >= mapResults.size() - 1) {
+        return true;
+      }
+      return false;
+    }
     return currPos == selectContext.getCurrKeys().length - 1 && !isBeforeFirst();
   }
 

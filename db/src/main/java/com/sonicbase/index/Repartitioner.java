@@ -1108,43 +1108,82 @@ public class Repartitioner extends Thread {
           }
           try {
             TableSchema.Partition currPartition = indexSchema.getCurrPartitions()[databaseServer.getShard()];
-            if (currPartition.getUpperKey() != null) {
+            //if (currPartition.getUpperKey() != null) {
               final AtomicReference<ArrayList<MapEntry>> currEntries = new AtomicReference<>(new ArrayList<MapEntry>());
               try {
-                index.visitTailMap(currPartition.getUpperKey(), new Index.Visitor() {
-                  @Override
-                  public boolean visit(Object[] key, Object value) throws IOException {
-                    countVisited.incrementAndGet();
-                    currEntries.get().add(new MapEntry(key, value));
-                    if (currEntries.get().size() >= 10000 * databaseServer.getShardCount()) {
-                      final List<MapEntry> toProcess = currEntries.get();
-                      currEntries.set(new ArrayList<MapEntry>());
-                      countSubmitted.incrementAndGet();
-                      if (countSubmitted.get() > 20) {
-                       databaseServer.setThrottleInsert(true);
-                      }
-                      executor.submit(new Runnable() {
-                        @Override
-                        public void run() {
-                          long begin = System.currentTimeMillis();
-                          try {
-                            logger.info("doProcessEntries: table=" + tableName + ", index=" + indexName + ", count=" + toProcess.size());
-                            doProcessEntries(moveProcessors, tableName, indexName, toProcess, index, indexSchema, dbName, fieldOffsets, tableSchema, parts, keysToDelete);
-                          }
-                          catch (Exception e) {
-                            logger.error("Error moving entries", e);
-                          }
-                          finally {
-                            countFinished.incrementAndGet();
-                            logger.info("doProcessEntries - finished: table=" + tableName + ", index=" + indexName + ", count=" + toProcess.size() +
-                              ", duration=" + (System.currentTimeMillis() - begin));
-                          }
+                if (databaseServer.getShard() > 0) {
+                  TableSchema.Partition lowerPartition = indexSchema.getCurrPartitions()[databaseServer.getShard() - 1];
+                  index.visitHeadMap(lowerPartition.getUpperKey(), new Index.Visitor() {
+                    @Override
+                    public boolean visit(Object[] key, Object value) throws IOException {
+                      countVisited.incrementAndGet();
+                      currEntries.get().add(new MapEntry(key, value));
+                      if (currEntries.get().size() >= 10000 * databaseServer.getShardCount()) {
+                        final List<MapEntry> toProcess = currEntries.get();
+                        currEntries.set(new ArrayList<MapEntry>());
+                        countSubmitted.incrementAndGet();
+                        if (countSubmitted.get() > 20) {
+                          databaseServer.setThrottleInsert(true);
                         }
-                      });
+                        executor.submit(new Runnable() {
+                          @Override
+                          public void run() {
+                            long begin = System.currentTimeMillis();
+                            try {
+                              logger.info("doProcessEntries: table=" + tableName + ", index=" + indexName + ", count=" + toProcess.size());
+                              doProcessEntries(moveProcessors, tableName, indexName, toProcess, index, indexSchema, dbName, fieldOffsets, tableSchema, parts);
+                            }
+                            catch (Exception e) {
+                              logger.error("Error moving entries", e);
+                            }
+                            finally {
+                              countFinished.incrementAndGet();
+                              logger.info("doProcessEntries - finished: table=" + tableName + ", index=" + indexName + ", count=" + toProcess.size() +
+                                  ", duration=" + (System.currentTimeMillis() - begin));
+                            }
+                          }
+                        });
+                      }
+                      return true;
                     }
-                    return true;
-                  }
-                });
+                  });
+                }
+                if (currPartition.getUpperKey() != null) {
+                  index.visitTailMap(currPartition.getUpperKey(), new Index.Visitor() {
+                    @Override
+                    public boolean visit(Object[] key, Object value) throws IOException {
+                      countVisited.incrementAndGet();
+                      currEntries.get().add(new MapEntry(key, value));
+                      if (currEntries.get().size() >= 10000 * databaseServer.getShardCount()) {
+                        final List<MapEntry> toProcess = currEntries.get();
+                        currEntries.set(new ArrayList<MapEntry>());
+                        countSubmitted.incrementAndGet();
+                        if (countSubmitted.get() > 20) {
+                          databaseServer.setThrottleInsert(true);
+                        }
+                        executor.submit(new Runnable() {
+                          @Override
+                          public void run() {
+                            long begin = System.currentTimeMillis();
+                            try {
+                              logger.info("doProcessEntries: table=" + tableName + ", index=" + indexName + ", count=" + toProcess.size());
+                              doProcessEntries(moveProcessors, tableName, indexName, toProcess, index, indexSchema, dbName, fieldOffsets, tableSchema, parts);
+                            }
+                            catch (Exception e) {
+                              logger.error("Error moving entries", e);
+                            }
+                            finally {
+                              countFinished.incrementAndGet();
+                              logger.info("doProcessEntries - finished: table=" + tableName + ", index=" + indexName + ", count=" + toProcess.size() +
+                                  ", duration=" + (System.currentTimeMillis() - begin));
+                            }
+                          }
+                        });
+                      }
+                      return true;
+                    }
+                  });
+                }
 
                 if (countSubmitted.get() > 0) {
                   while (countSubmitted.get() > countFinished.get()) {
@@ -1159,14 +1198,14 @@ public class Repartitioner extends Thread {
               if (currEntries.get() != null && currEntries.get().size() != 0) {
                 try {
                   logger.info("doProcessEntries: table=" + tableName + ", index=" + indexName + ", count=" + currEntries.get().size());
-                  doProcessEntries(moveProcessors, tableName, indexName, currEntries.get(), index, indexSchema, dbName, fieldOffsets, tableSchema, parts, keysToDelete);
+                  doProcessEntries(moveProcessors, tableName, indexName, currEntries.get(), index, indexSchema, dbName, fieldOffsets, tableSchema, parts);
                 }
                 finally {
                   logger.info("doProcessEntries - finished: table=" + tableName + ", index=" + indexName + ", count=" + currEntries.get().size() +
                       ", duration=" + (System.currentTimeMillis() - begin));
                 }
               }
-            }
+            //}
             logger.info("doProcessEntries - all finished: table=" + tableName + ", index=" + indexName +
                 ", count=" + countVisited.get() + ", countToDelete=" + keysToDelete.size());
           }
@@ -1197,8 +1236,7 @@ public class Repartitioner extends Thread {
 
   private void doProcessEntries(MoveProcessor[] moveProcessors, final String tableName, final String indexName,
                                 List<MapEntry> toProcess, final Index index, final IndexSchema indexSchema, final String dbName,
-                                int[] fieldOffsets, TableSchema tableSchema, String[] parts,
-                                final ConcurrentLinkedQueue<Object[]> keysToDelete) {
+                                int[] fieldOffsets, TableSchema tableSchema, String[] parts) {
     final Map<Integer, List<MoveRequest>> moveRequests = new HashMap<>();
     for (int i = 0; i < databaseServer.getShardCount(); i++) {
       moveRequests.put(i, new ArrayList<MoveRequest>());

@@ -773,8 +773,7 @@ public class NettyServer {
           //.option(ChannelOption.SO_BACKLOG, 128)          // (5)
           //.option(ChannelOption.TCP_NODELAY, true)
           //.option(ChannelOption.SO_LINGER, 1000)
-         .childOption(ChannelOption.SO_KEEPALIVE, true)
-      ; // (6)
+          .childOption(ChannelOption.SO_KEEPALIVE, true); // (6)
       ;
       // Bind and start to accept incoming connections.
       logger.info("binding port");

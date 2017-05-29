@@ -34,10 +34,10 @@ public class DatabaseCommon {
 
   private int shard = -1;
   private int replica = -1;
-  private ConcurrentHashMap<String, Schema> schema = new ConcurrentHashMap<>();
-  private ConcurrentHashMap<String, ReadWriteLock> schemaReadWriteLock = new ConcurrentHashMap<>();
-  private ConcurrentHashMap<String, Lock> schemaReadLock = new ConcurrentHashMap<>();
-  private ConcurrentHashMap<String, Lock> schemaWriteLock = new ConcurrentHashMap<>();
+  private Map<String, Schema> schema = new ConcurrentHashMap<>();
+  private Map<String, ReadWriteLock> schemaReadWriteLock = new ConcurrentHashMap<>();
+  private Map<String, Lock> schemaReadLock = new ConcurrentHashMap<>();
+  private Map<String, Lock> schemaWriteLock = new ConcurrentHashMap<>();
   private DatabaseServer.ServersConfig serversConfig;
   private int schemaVersion;
 

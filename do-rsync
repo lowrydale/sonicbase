@@ -1,2 +1,7 @@
 #!/bin/bash
-rsync -rvlLt --delete --exclude 'logs' --exclude 'tmp' -e 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' * $1
+ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $1 mkdir -p $2
+rsync -rvlLtaR -e 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' bin/* $1:$2
+rsync -rvlLtaR -e 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' config/* $1:$2
+rsync -rvlLtaR -e 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' lib/* $1:$2
+
+#--exclude 'logs' --exclude 'tmp' -e 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no'

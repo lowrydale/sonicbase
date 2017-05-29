@@ -20,6 +20,8 @@ import com.sonicbase.util.DataUtil;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Responsible for
@@ -56,6 +58,15 @@ public class ReadManager {
 
   public byte[] countRecords(String command, byte[] body) {
     try {
+      if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
+        try {
+          Thread.sleep(10);
+        }
+        catch (InterruptedException e) {
+          throw new DatabaseException(e);
+        }
+      }
+
       String[] parts = command.split(":");
       String dbName = parts[4];
       int schemaVersion = Integer.valueOf(parts[3]);
@@ -163,6 +174,15 @@ public class ReadManager {
 
   public byte[] batchIndexLookup(String command, byte[] body) {
     try {
+      if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
+        try {
+          Thread.sleep(10);
+        }
+        catch (InterruptedException e) {
+          throw new DatabaseException(e);
+        }
+      }
+
       String[] parts = command.split(":");
       String dbName = parts[4];
       int schemaVersion = Integer.valueOf(parts[3]);
@@ -225,12 +245,13 @@ public class ReadManager {
         List<byte[]> retKeys = new ArrayList<>();
         List<Record> retRecords = new ArrayList<>();
 
+        AtomicReference<byte[]> firstRecord = new AtomicReference<>();
         boolean forceSelectOnServer = false;
         if (indexSchema.isPrimaryKey()) {
-          doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, null, false, null, columnOffsets, forceSelectOnServer, null, leftKey, leftKey, leftOperator, index, ascending, retKeys, retRecords, server.getCommon().getSchemaVersion(), false, counters, groupContext);
+          doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, null, false, null, columnOffsets, forceSelectOnServer, null, leftKey, leftKey, leftOperator, index, ascending, retKeys, retRecords, firstRecord, server.getCommon().getSchemaVersion(), false, counters, groupContext);
         }
         else {
-          doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, null, false, null, columnOffsets, forceSelectOnServer, null, leftKey, leftKey, leftOperator, index, ascending, retKeys, retRecords, server.getCommon().getSchemaVersion(), true, counters, groupContext);
+          doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, null, false, null, columnOffsets, forceSelectOnServer, null, leftKey, leftKey, leftOperator, index, ascending, retKeys, retRecords, firstRecord, server.getCommon().getSchemaVersion(), true, counters, groupContext);
 
 //          if (indexSchema.isPrimaryKeyGroup()) {
 //            if (((Long)leftKey[0]) == 5) {
@@ -323,9 +344,20 @@ public class ReadManager {
 
   private ConcurrentHashMap<Long, PreparedIndexLookup> preparedIndexLookups = new ConcurrentHashMap<>();
 
+  private AtomicInteger lookupCount = new AtomicInteger();
   public byte[] indexLookup(String dbName, DataInputStream in) {
     //Timer.Context context = INDEX_LOOKUP_STATS.time();
     try {
+
+      if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
+        try {
+          Thread.sleep(10);
+        }
+        catch (InterruptedException e) {
+          throw new DatabaseException(e);
+        }
+      }
+
       int schemaVersion = in.readInt();
       if (schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
@@ -533,9 +565,10 @@ public class ReadManager {
       }
 
 
+      AtomicReference<byte[]> firstRecord = new AtomicReference<>();
       if (indexSchema.isPrimaryKey()) {
         if (rightOperator == null) {
-          entry = doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, parms, evaluateExpression, expression, columnOffsets, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, leftOperator, index, ascending, retKeys, retRecords, viewVersion, false, counters, groupContext);
+          entry = doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, parms, evaluateExpression, expression, columnOffsets, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, leftOperator, index, ascending, retKeys, retRecords, firstRecord, viewVersion, false, counters, groupContext);
         }
         else {
           entry = doIndexLookupTwoKeys(dbName, count, tableSchema, indexSchema, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, columnOffsets, originalRightKey, rightKey, leftOperator, rightOperator, parms, evaluateExpression, expression, index, ascending, retKeys, retRecords, false, counters, groupContext);
@@ -544,7 +577,7 @@ public class ReadManager {
       }
       else {
         if (rightOperator == null) {
-          entry = doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, parms, evaluateExpression, expression, columnOffsets, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, leftOperator, index, ascending, retKeys, retRecords, viewVersion, true, counters, groupContext);
+          entry = doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, parms, evaluateExpression, expression, columnOffsets, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, leftOperator, index, ascending, retKeys, retRecords, firstRecord, viewVersion, true, counters, groupContext);
         }
         else {
           entry = doIndexLookupTwoKeys(dbName, count, tableSchema, indexSchema, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, columnOffsets, originalRightKey, rightKey, leftOperator, rightOperator, parms, evaluateExpression, expression, index, ascending, retKeys, retRecords, true, counters, groupContext);
@@ -567,13 +600,20 @@ public class ReadManager {
         DataUtil.writeVLong(out, key.length, resultLength);
         out.write(key);
       }
-      DataUtil.writeVLong(out, retRecords.size(), resultLength);
-      if (retRecords.size() > 0) {
-        byte[] bytes = retRecords.get(0).serialize(server.getCommon());
-        DataUtil.writeVLong(out, bytes.length, resultLength);
-        out.write(bytes);
+      if (firstRecord.get() != null) {
+        DataUtil.writeVLong(out, retRecords.size() + 1, resultLength);
+        DataUtil.writeVLong(out, firstRecord.get().length, resultLength);
+        out.write(firstRecord.get());
       }
-      for (int i = 1; i < retRecords.size(); i++) {
+      else {
+        DataUtil.writeVLong(out, retRecords.size(), resultLength);
+        if (retRecords.size() > 0) {
+          byte[] bytes = retRecords.get(0).serialize(server.getCommon());
+          DataUtil.writeVLong(out, bytes.length, resultLength);
+          out.write(bytes);
+        }
+      }
+      for (int i = firstRecord.get() == null ? 1 : 0; i < retRecords.size(); i++) {
         Record record = retRecords.get(i);
         DatabaseCommon.serializeFields(record.getFields(), out, tableSchema, schemaVersion, false);
       }
@@ -671,6 +711,15 @@ public class ReadManager {
 
   public byte[] serverSelect(String command, byte[] body) {
     try {
+      if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
+        try {
+          Thread.sleep(10);
+        }
+        catch (InterruptedException e) {
+          throw new DatabaseException(e);
+        }
+      }
+
       String[] parts = command.split(":");
       String dbName = parts[4];
       int schemaVersion = Integer.valueOf(parts[3]);
@@ -738,6 +787,15 @@ public class ReadManager {
 
   public byte[] indexLookupExpression(String command, byte[] body) {
     try {
+      if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
+        try {
+          Thread.sleep(10);
+        }
+        catch (InterruptedException e) {
+          throw new DatabaseException(e);
+        }
+      }
+
       String[] parts = command.split(":");
       String dbName = parts[4];
       int schemaVersion = Integer.valueOf(parts[3]);
@@ -1270,6 +1328,7 @@ public class ReadManager {
       Boolean ascending,
       List<byte[]> retKeys,
       List<Record> retRecords,
+      AtomicReference<byte[]> firstRecord,
       long viewVersion,
       boolean keys,
       Counter[] counters,
@@ -1306,7 +1365,16 @@ public class ReadManager {
           }
         }
         if (value != null) {
-          handleRecord(dbName, tableSchema, parms, evaluateExpresion, expression, columnOffsets, forceSelectOnServer, retKeys, retRecords, keys, counters, groupContext, records, currKeys);
+          if (records != null && records[0].length < 300 && !keys && (true ||operator == BinaryExpression.Operator.equal) && firstRecord.get() == null &&
+              (parms == null || expression == null || !evaluateExpresion) && groupContext == null && counters == null) {
+            firstRecord.set(records[0]);
+            for (int i = 1; i < records.length; i++) {
+              retRecords.add(new Record(dbName, server.getCommon(), records[i], columnOffsets , false));
+            }
+          }
+          else {
+            handleRecord(dbName, tableSchema, parms, evaluateExpresion, expression, columnOffsets, forceSelectOnServer, retKeys, retRecords, keys, counters, groupContext, records, currKeys);
+          }
         }
       }
       else {
@@ -1343,7 +1411,16 @@ public class ReadManager {
                 }
               }
             }
-            handleRecord(dbName, tableSchema, parms, evaluateExpresion, expression, columnOffsets, forceSelectOnServer, retKeys, retRecords, keys, counters, groupContext, records, currKeys);
+            if (records != null && records[0].length < 300 && !keys && (true || operator == BinaryExpression.Operator.equal) && firstRecord.get() == null &&
+                (parms == null || expression == null || !evaluateExpresion) && groupContext == null && counters == null) {
+              firstRecord.set(records[0]);
+              for (int i = 1; i < records.length; i++) {
+                retRecords.add(new Record(dbName, server.getCommon(), records[i], columnOffsets , false));
+              }
+            }
+            else {
+              handleRecord(dbName, tableSchema, parms, evaluateExpresion, expression, columnOffsets, forceSelectOnServer, retKeys, retRecords, keys, counters, groupContext, records, currKeys);
+            }
           }
         }
       }
@@ -1627,9 +1704,17 @@ public class ReadManager {
                   boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
                   if (pass) {
                     byte[][] currRecords = new byte[][]{bytes};
-                    Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, null, tableSchema, counters, groupContext);
-                    if (counters == null) {
-                      retRecords.add(ret[0]);
+                    if (currRecords != null && currRecords[0].length < 300 && (true || operator == BinaryExpression.Operator.equal) && firstRecord.get() == null && groupContext == null && counters == null) {
+                      firstRecord.set(currRecords[0]);
+//                      for (int i = 1; i < currRecords.length; i++) {
+//                        retRecords.add(new Record(dbName, server.getCommon(), currRecords[i], columnOffsets , false));
+//                      }
+                    }
+                    else {
+                      Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, null, tableSchema, counters, groupContext);
+                      if (counters == null) {
+                        retRecords.add(ret[0]);
+                      }
                     }
                   }
                 }
@@ -1638,9 +1723,17 @@ public class ReadManager {
                 if (records.length > 2) {
                   logger.error("Records size: " + records.length);
                 }
-                Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, entry.getKey(), tableSchema, counters, groupContext);
-                if (counters == null) {
-                  retRecords.addAll(Arrays.asList(ret));
+                if (records != null && records[0].length < 300 && (true || operator == BinaryExpression.Operator.equal) && firstRecord.get() == null && groupContext == null && counters == null) {
+                  firstRecord.set(records[0]);
+                  for (int i = 1; i < records.length; i++) {
+                    retRecords.add(new Record(dbName, server.getCommon(), records[i], columnOffsets , false));
+                  }
+                }
+                else {
+                  Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, entry.getKey(), tableSchema, counters, groupContext);
+                  if (counters == null) {
+                    retRecords.addAll(Arrays.asList(ret));
+                  }
                 }
               }
             }

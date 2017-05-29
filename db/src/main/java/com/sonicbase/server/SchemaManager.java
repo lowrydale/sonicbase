@@ -436,12 +436,8 @@ public class SchemaManager {
     return null;
   }
 
-  public byte[] createIndex(String command, byte[] body, boolean replayedCommand) {
+  public List<String> createIndex(String command, byte[] body, boolean replayedCommand, AtomicReference<String> table) {
     try {
-      if (server.getShard() == 0 && server.getReplica() == 0 && command.contains(":slave:")) {
-        return null;
-      }
-
       String[] parts = command.split(":");
       int schemaVersion = Integer.valueOf(parts[3]);
       String dbName = parts[4];
@@ -449,26 +445,26 @@ public class SchemaManager {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
       }
       String masterSlave = parts[5];
-      String table = parts[6];
+      table.set(parts[6]);
       String indexName = parts[7];
       boolean isUnique = Boolean.valueOf(parts[8]);
       String fieldsStr = parts[9];
       String[] fields = fieldsStr.split(",");
 
       if (replayedCommand) {
-        logger.info("replayedCommand: crateIndex, table=" + table + ", index=" + indexName);
-        if (server.getCommon().getTables(dbName).get(table).getIndexes().containsKey(indexName.toLowerCase())) {
+        logger.info("replayedCommand: createIndex, table=" + table.get() + ", index=" + indexName);
+        if (server.getCommon().getTables(dbName).get(table.get()).getIndexes().containsKey(indexName.toLowerCase())) {
           ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
           DataOutputStream out = new DataOutputStream(bytesOut);
           DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
           server.getCommon().serializeSchema(out);
           out.close();
 
-          return bytesOut.toByteArray();
+          return null;
         }
       }
 
-      List<String> createdIndices = createIndex(dbName, table, indexName, isUnique, fields);
+      List<String> createdIndices = createIndex(dbName, table.get(), indexName, isUnique, fields);
 
       if (masterSlave.equals("master")) {
 
@@ -476,7 +472,7 @@ public class SchemaManager {
         DataOutputStream out = new DataOutputStream(bytesOut);
         DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
         server.getCommon().serializeSchema(out);
-        out.writeUTF(table);
+        out.writeUTF(table.get());
         out.writeInt(createdIndices.size());
         for (String currIndexName : createdIndices) {
           out.writeUTF(currIndexName);
@@ -494,29 +490,7 @@ public class SchemaManager {
           }
         }
       }
-
-      for (String currIndexName : createdIndices) {
-        command = "DatabaseServer:populateIndex:1:1:" + dbName + ":" + table + ":" + currIndexName;
-        AtomicReference<String> selectedHost = new AtomicReference<>();
-        for (int i = 0; i < server.getShardCount(); i++) {
-          for (int j = 0; j < server.getReplicationFactor(); j++) {
-            if (i == 0 && j == 0) {
-              server.getUpdateManager().populateIndex(command, null);
-            }
-            else {
-              server.getDatabaseClient().send(null, i, j, command, null, DatabaseClient.Replica.all);
-            }
-          }
-        }
-      }
-
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-      server.getCommon().serializeSchema(out);
-      out.close();
-
-      return bytesOut.toByteArray();
+      return createdIndices;
     }
     catch (IOException e) {
       throw new DatabaseException(e);

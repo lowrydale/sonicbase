@@ -9,6 +9,13 @@
    margin-top=-5px;
 }
 
+div.mobile { display: none }
+table.desktop { display: block }
+@media (max-width: 640px) {
+	div.mobile { display: block }
+	table.desktop { display: none }
+}
+
 mainPageH2 {
 
 	color: #fff;

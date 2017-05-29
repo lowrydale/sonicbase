@@ -1,4 +1,4 @@
-export _XMX_=4g
+export _XMX_=500m
 export SEARCH_HOME=$4
 #export MODE=yprof
 mkdir $4/logs

@@ -21,7 +21,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.CRC32;
@@ -261,7 +264,7 @@ public class DatabaseSocketClient {
       this.sock.configureBlocking(true);
 
 //      this.sock = new Socket(host, port);
-//      sock.setSoLinger(true, 120);
+      sock.socket().setSoLinger(true, 120);
 //
       //sock.setSoLinger(false, 0);
       sock.socket().setKeepAlive(true);
@@ -710,6 +713,7 @@ public class DatabaseSocketClient {
         request.command = command;
         request.body = body;
 
+        batchKey = null;
         if (batchKey == null) {
           try {
             List<Request> nonMatchingRequets = new ArrayList<>();

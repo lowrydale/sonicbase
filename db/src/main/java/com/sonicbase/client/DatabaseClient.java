@@ -776,6 +776,19 @@ public class DatabaseClient {
         schemaOutOfSync = true;
         msg = e.getMessage();
       }
+      else {
+        Throwable t = e;
+        while (true) {
+          t = t.getCause();
+          if (t == null) {
+            break;
+          }
+          if (t.getMessage() != null && t.getMessage().contains("SchemaOutOfSyncException")) {
+            schemaOutOfSync = true;
+            msg = t.getMessage();
+          }
+        }
+      }
       if (!schemaOutOfSync) {
         throw e;
       }

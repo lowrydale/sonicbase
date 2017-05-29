@@ -91,11 +91,11 @@ public class UpdateManager {
           }
           Index index = server.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexSchema.getKey());
           //synchronized (index.getMutex(key)) {
-            Object obj = index.remove(key);
-            if (obj == null) {
-              continue;
-            }
-            server.freeUnsafeIds(obj);
+          Object obj = index.remove(key);
+          if (obj == null) {
+            continue;
+          }
+          server.freeUnsafeIds(obj);
           //}
         }
       }
@@ -130,43 +130,58 @@ public class UpdateManager {
     Index primaryKeyIndex = server.getIndices().get(dbName).getIndices().get(tableName).get(primaryKeyIndexName);
     Map.Entry<Object[], Object> entry = primaryKeyIndex.firstEntry();
     while (entry != null) {
-      synchronized (primaryKeyIndex.getMutex(entry.getKey())) {
-        Object value = primaryKeyIndex.get(entry.getKey());
-        byte[][] records = server.fromUnsafeToRecords(value);
-        for (int i = 0; i < records.length; i++) {
-          Record record = new Record(dbName, server.getCommon(), records[i]);
-          Object[] fields = record.getFields();
-          List<String> columnNames = new ArrayList<>();
-          List<Object> values = new ArrayList<>();
-          for (int j = 0; j < fields.length; j++) {
-            values.add(fields[j]);
-            columnNames.add(tableSchema.getFields().get(j).getName());
-          }
+    //  server.getCommon().getSchemaReadLock(dbName).lock();
+      try {
+        synchronized (primaryKeyIndex.getMutex(entry.getKey())) {
+          Object value = primaryKeyIndex.get(entry.getKey());
+          byte[][] records = server.fromUnsafeToRecords(value);
+          for (int i = 0; i < records.length; i++) {
+            Record record = new Record(dbName, server.getCommon(), records[i]);
+            Object[] fields = record.getFields();
+            List<String> columnNames = new ArrayList<>();
+            List<Object> values = new ArrayList<>();
+            for (int j = 0; j < fields.length; j++) {
+              values.add(fields[j]);
+              columnNames.add(tableSchema.getFields().get(j).getName());
+            }
 
-          DatabaseClient.KeyInfo primaryKey = new DatabaseClient.KeyInfo();
-          tableSchema = server.getCommon().getTables(dbName).get(tableName);
+            DatabaseClient.KeyInfo primaryKey = new DatabaseClient.KeyInfo();
+            tableSchema = server.getCommon().getTables(dbName).get(tableName);
 
-          long id = 0;
-          if (tableSchema.getFields().get(0).getName().equals("_id")) {
-            id = (long) record.getFields()[0];
-          }
-          List<DatabaseClient.KeyInfo> keys = server.getDatabaseClient().getKeys(tableSchema, columnNames, values, id);
+            long id = 0;
+            if (tableSchema.getFields().get(0).getName().equals("_id")) {
+              id = (long) record.getFields()[0];
+            }
+            List<DatabaseClient.KeyInfo> keys = server.getDatabaseClient().getKeys(tableSchema, columnNames, values, id);
 
-          for (final DatabaseClient.KeyInfo keyInfo : keys) {
-            if (keyInfo.getIndexSchema().getValue().isPrimaryKey()) {
-              primaryKey.setKey(keyInfo.getKey());
-              primaryKey.setIndexSchema(keyInfo.getIndexSchema());
-              break;
+            for (final DatabaseClient.KeyInfo keyInfo : keys) {
+              if (keyInfo.getIndexSchema().getValue().isPrimaryKey()) {
+                primaryKey.setKey(keyInfo.getKey());
+                primaryKey.setIndexSchema(keyInfo.getIndexSchema());
+                break;
+              }
+            }
+            for (final DatabaseClient.KeyInfo keyInfo : keys) {
+              if (keyInfo.getIndexSchema().getKey().equals(indexName)) {
+                while (true) {
+                  try {
+                    server.getDatabaseClient().insertKey(dbName, tableName, keyInfo, primaryKeyIndexName, primaryKey.getKey());
+                    break;
+                  }
+                  catch (SchemaOutOfSyncException e) {
+                    continue;
+                  }
+                }
+              }
             }
           }
-          for (final DatabaseClient.KeyInfo keyInfo : keys) {
-            if (keyInfo.getIndexSchema().getKey().equals(indexName)) {
-              server.getDatabaseClient().insertKey(dbName, tableName, keyInfo, primaryKeyIndexName, primaryKey.getKey());
-            }
-          }
+          entry = primaryKeyIndex.higherEntry(entry.getKey());
         }
-        entry = primaryKeyIndex.higherEntry(entry.getKey());
       }
+      finally {
+      //  server.getCommon().getSchemaReadLock(dbName).unlock();
+      }
+
     }
     return null;
   }
@@ -381,7 +396,10 @@ public class UpdateManager {
     AtomicBoolean isExplicitTrans = new AtomicBoolean();
     try {
       while (true) {
-        synchronized (server.getBatchMutex()) {
+        synchronized (server.getBatchRepartCount()) {
+//          while (server.getBatchRepartCount().get() != 0) {
+//            Thread.sleep(10);
+//          }
           doInsertIndexEntryByKeyWithRecord(command, in, replayedCommand, transactionId, isExplicitTrans, false);
           count++;
           //if (insertCount.incrementAndGet() % 5000 == 0) {
@@ -427,9 +445,9 @@ public class UpdateManager {
         trans.addOperation(insertWithRecord, command, body, replayedCommand);
       }
       //if (insertCount.incrementAndGet() % 5000 == 0) {
-        if (server.isThrottleInsert()) {
-          Thread.sleep(1);
-        }
+      if (server.isThrottleInsert()) {
+        Thread.sleep(1);
+      }
       //}
       return ret;
     }
@@ -790,7 +808,7 @@ public class UpdateManager {
         }
 
         if (indexSchema.isUnique()) {
-          throw new DatabaseException("Unique constraint violated: table=" + tableName + ", index=" + indexSchema.getName() +  ", key=" + DatabaseCommon.keyToString(key));
+          throw new DatabaseException("Unique constraint violated: table=" + tableName + ", index=" + indexSchema.getName() + ", key=" + DatabaseCommon.keyToString(key));
         }
         if (!replaced) {
           byte[][] newRecords = new byte[records.length + 1][];
@@ -807,9 +825,9 @@ public class UpdateManager {
     }
   }
 
-    /**
-     * Caller must synchronized index
-     */
+  /**
+   * Caller must synchronized index
+   */
 
   private void doActualInsertKeyWithRecord(
       byte[] recordBytes, Object[] key, Index index, String tableName, String indexName, boolean ignoreDuplicates) {
@@ -846,7 +864,7 @@ public class UpdateManager {
           if (!ignoreDuplicates && existingValue != null && !sameTrans) {
             index.put(key, existingValue);
             server.freeUnsafeIds(newUnsafeRecords);
-            throw new DatabaseException("Unique constraint violated: table=" + tableName + ", index=" + indexName +  ", key=" + DatabaseCommon.keyToString(key));
+            throw new DatabaseException("Unique constraint violated: table=" + tableName + ", index=" + indexName + ", key=" + DatabaseCommon.keyToString(key));
           }
 
           server.freeUnsafeIds(existingValue);
@@ -870,7 +888,7 @@ public class UpdateManager {
         }
         if (!ignoreDuplicates && existingValue != null && !sameTrans) {
           server.freeUnsafeIds(newValue);
-          throw new DatabaseException("Unique constraint violated: table=" + tableName + ", index=" + indexName +  ", key=" + DatabaseCommon.keyToString(key));
+          throw new DatabaseException("Unique constraint violated: table=" + tableName + ", index=" + indexName + ", key=" + DatabaseCommon.keyToString(key));
         }
         //    if (existingValue == null) {
         index.put(key, newValue);
@@ -961,10 +979,10 @@ public class UpdateManager {
 
       Index index = server.getIndices(dbName).getIndices().get(tableName).get(indexName);
       //synchronized (index.getMutex(key)) {
-        Object value = index.remove(key);
-        if (value != null) {
-          server.freeUnsafeIds(value);
-        }
+      Object value = index.remove(key);
+      if (value != null) {
+        server.freeUnsafeIds(value);
+      }
       //}
 
       return null;
@@ -994,10 +1012,10 @@ public class UpdateManager {
               break;
             }
             //synchronized (indexEntry.getKey()) {
-              Object value = index.remove(indexEntry.getKey());
-              if (value != null) {
-                server.freeUnsafeIds(value);
-              }
+            Object value = index.remove(indexEntry.getKey());
+            if (value != null) {
+              server.freeUnsafeIds(value);
+            }
             //}
             indexEntry = index.higherEntry(indexEntry.getKey());
           }
@@ -1011,10 +1029,10 @@ public class UpdateManager {
             break;
           }
           //synchronized (indexEntry.getKey()) {
-            Object value = index.remove(indexEntry.getKey());
-            if (value != null) {
-              server.freeUnsafeIds(value);
-            }
+          Object value = index.remove(indexEntry.getKey());
+          if (value != null) {
+            server.freeUnsafeIds(value);
+          }
           //}
           indexEntry = index.higherEntry(indexEntry.getKey());
         }

@@ -757,7 +757,7 @@ public class NettyServer {
 
   public void run() {
     EventLoopGroup bossGroup = new NioEventLoopGroup(); // (1)
-    EventLoopGroup workerGroup = new NioEventLoopGroup(256);
+    EventLoopGroup workerGroup = new NioEventLoopGroup(1024);
     try {
 
       ServerBootstrap b = new ServerBootstrap(); // (2)
@@ -770,9 +770,9 @@ public class NettyServer {
               ch.pipeline().addLast(new ServerHandler());
             }
           })
-          //.option(ChannelOption.SO_BACKLOG, 128)          // (5)
-          //.option(ChannelOption.TCP_NODELAY, true)
-          //.option(ChannelOption.SO_LINGER, 1000)
+          .option(ChannelOption.SO_BACKLOG, 128)          // (5)
+          .option(ChannelOption.TCP_NODELAY, true)
+          .option(ChannelOption.SO_LINGER, 1000)
           .childOption(ChannelOption.SO_KEEPALIVE, true); // (6)
       ;
       // Bind and start to accept incoming connections.

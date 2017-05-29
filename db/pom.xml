@@ -1,152 +1,194 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
-  <modelVersion>4.0.0</modelVersion>
-  <groupId>com.lowryengineering</groupId>
-  <artifactId>sonicbase</artifactId>
-  <packaging>jar</packaging>
-  <version>0.9.1</version>
-  <name>sonicbase</name>
-  <url>http://maven.apache.org</url>
-
-  <parent>
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
     <groupId>com.lowryengineering</groupId>
-    <artifactId>sonicbase-root</artifactId>
+    <artifactId>sonicbase</artifactId>
+    <packaging>jar</packaging>
     <version>0.9.1</version>
-  </parent>
+    <name>sonicbase</name>
+    <url>http://maven.apache.org</url>
 
-  <build>
-    <pluginManagement>
-      <plugins>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-compiler-plugin</artifactId>
-          <version>2.3.2</version>
-          <configuration>
-	     <source>1.7</source>
-	     <target>1.7</target>
-          </configuration>
-        </plugin>
-        <plugin>
-          <groupId>org.jacoco</groupId>
-          <artifactId>jacoco-maven-plugin</artifactId>
-          <version>0.7.0.201403182114</version>
-          <executions>
-              <execution>
-                  <goals>
-                      <goal>prepare-agent</goal>
-                  </goals>
-              </execution>
-          </executions>
-          <configuration>
-              <destFile>${sonar.jacoco.reportPath}</destFile>
-          </configuration>
-      </plugin>
-      </plugins>
-    </pluginManagement>
-  </build>
+    <parent>
+        <groupId>com.lowryengineering</groupId>
+        <artifactId>sonicbase-root</artifactId>
+        <version>0.9.1</version>
+    </parent>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>2.3.2</version>
+                    <configuration>
+                        <source>1.7</source>
+                        <target>1.7</target>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.jacoco</groupId>
+                    <artifactId>jacoco-maven-plugin</artifactId>
+                    <version>0.7.0.201403182114</version>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>prepare-agent</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                    <configuration>
+                        <destFile>${sonar.jacoco.reportPath}</destFile>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
 
 
-  <distributionManagement>
-      <site>
-         <id>maven-repository</id>
-         <name>http://repo2.maven.org/maven2/</name>
-         <url>http://repo2.maven.org/maven2/</url>
-      </site>
+    <distributionManagement>
+        <site>
+            <id>maven-repository</id>
+            <name>http://repo2.maven.org/maven2/</name>
+            <url>http://repo2.maven.org/maven2/</url>
+        </site>
 
-      <repository>
-        <id>project.local</id>
-        <name>project</name>
-        <url>file:${project.basedir}/repo</url>
-    </repository>
+        <repository>
+            <id>project.local</id>
+            <name>project</name>
+            <url>file:${project.basedir}/repo</url>
+        </repository>
     </distributionManagement>
 
-  <dependencies>
-      <dependency>
-          <groupId>commons-io</groupId>
-          <artifactId>commons-io</artifactId>
-          <version>2.5</version>
-      </dependency>
+    <dependencies>
+        <!--Apache 2.0 - license confirmed-->
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.5</version>
+        </dependency>
 
-      <dependency>
-          <groupId>net.jpountz.lz4</groupId>
-          <artifactId>lz4</artifactId>
-          <version>1.3.0</version>
-      </dependency>
+        <!--Apache 2.0 - license confirmed-->
+        <dependency>
+            <groupId>net.jpountz.lz4</groupId>
+            <artifactId>lz4</artifactId>
+            <version>1.3.0</version>
+        </dependency>
 
-    <dependency>
-        <groupId>org.apache.commons</groupId>
-        <artifactId>commons-crypto</artifactId>
-        <version>1.0.0</version>
-    </dependency>
+        <!--Apache 2.0 - license confirmed-->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-crypto</artifactId>
+            <version>1.0.0</version>
+        </dependency>
 
-    <dependency> <groupId>org.apache.maven.plugin-tools</groupId> <artifactId>maven-plugin-annotations</artifactId><version>3.2</version><scope>provided</scope></dependency>
-     <dependency><groupId>org.apache.commons</groupId><artifactId>commons-lang3</artifactId><version>3.3.2</version></dependency>
+        <!--Apache 2.0 - license confirmed-->
+        <dependency>
+            <groupId>org.apache.maven.plugin-tools</groupId>
+            <artifactId>maven-plugin-annotations</artifactId>
+            <version>3.2</version>
+            <scope>provided</scope>
+        </dependency>
 
-      <dependency>
-          <groupId>log4j</groupId>
-          <artifactId>log4j</artifactId>
-          <version>1.2.17</version>
-      </dependency>
+        <!--Apache 2.0 - license confirmed-->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>3.3.2</version>
+        </dependency>
 
-    <dependency> <groupId>org.testng</groupId><artifactId>testng</artifactId><version>6.8</version><scope>provided</scope></dependency>
-    <dependency> <groupId>com.google.code.gson</groupId><artifactId>gson</artifactId><version>2.2.3</version></dependency>
+        <!--Apache 2.0 - license confirmed-->
+        <dependency>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+            <version>1.2.17</version>
+        </dependency>
 
-    <dependency>
-    	<groupId>com.github.jsqlparser</groupId>
-    	<artifactId>jsqlparser</artifactId>
-    	<version>0.9.5</version>
-    </dependency>
+        <!--Apache 2.0 - license confirmed -->
+        <dependency>
+            <groupId>org.testng</groupId>
+            <artifactId>testng</artifactId>
+            <version>6.8</version>
+            <scope>provided</scope>
+        </dependency>
 
-<dependency>
-	<groupId>it.unimi.dsi</groupId>
-	<artifactId>fastutil</artifactId>
-	<version>7.0.2</version>
-</dependency>
+        <!--Apache 2.0 - license confirmed-->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.2.3</version>
+        </dependency>
 
-    <dependency> <groupId>commons-configuration</groupId> <artifactId>commons-configuration</artifactId> <version>1.6</version></dependency>
+        <!--Apache 2.0 - license confirmed-->
+        <dependency>
+            <groupId>com.github.jsqlparser</groupId>
+            <artifactId>jsqlparser</artifactId>
+            <version>0.9.5</version>
+        </dependency>
 
-    <!--<dependency><groupId>lz4-lzo</groupId><artifactId>lz4-lzo</artifactId><version>1.3</version><systemPath>${project.basedir}/../repo/lz4-1.3-SNAPSHOT.jar</systemPath><scope>system</scope></dependency>-->
-    <dependency>
-        <groupId>org.anarres.lzo</groupId>
-        <artifactId>lzo-hadoop</artifactId>
-        <version>1.0.5</version>
-    </dependency>
+        <!--Apache 2.0 - license confirmed-->
+        <dependency>
+            <groupId>it.unimi.dsi</groupId>
+            <artifactId>fastutil</artifactId>
+            <version>7.0.2</version>
+        </dependency>
 
-    <dependency><groupId>io.netty</groupId><artifactId>netty-all</artifactId><version>4.1.9.Final</version></dependency>
+        <!--Apache 2.0 - license confirmed-->
+        <dependency>
+            <groupId>commons-configuration</groupId>
+            <artifactId>commons-configuration</artifactId>
+            <version>1.6</version>
+        </dependency>
 
-    <dependency>
-        <groupId>commons-cli</groupId>
-        <artifactId>commons-cli</artifactId>
-        <version>1.3.1</version>
-    </dependency>
+        <!--Apache 2.0 - license confirmed-->
+        <dependency>
+            <groupId>org.anarres.lzo</groupId>
+            <artifactId>lzo-hadoop</artifactId>
+            <version>1.0.5</version>
+        </dependency>
 
-    <!--<dependency>-->
-    	<!--<groupId>io.netty</groupId>-->
-    	<!--<artifactId>netty-transport-native-epoll</artifactId>-->
-      <!--<classifier>linux-x86_64</classifier>-->
-      <!--<version>4.0.36.Final</version>-->
-    <!--</dependency>-->
+        <!--Apache 2.0 - license confirmed-->
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-all</artifactId>
+            <version>4.1.9.Final</version>
+        </dependency>
 
-    <dependency>
-        <groupId>com.codahale.metrics</groupId>
-        <artifactId>metrics-core</artifactId>
-        <version>3.0.2</version>
-    </dependency>
+        <!--Apache 2.0 - license confirmed-->
+        <dependency>
+            <groupId>commons-cli</groupId>
+            <artifactId>commons-cli</artifactId>
+            <version>1.3.1</version>
+        </dependency>
 
-  </dependencies>
+        <!--<dependency>-->
+        <!--<groupId>io.netty</groupId>-->
+        <!--<artifactId>netty-transport-native-epoll</artifactId>-->
+        <!--<classifier>linux-x86_64</classifier>-->
+        <!--<version>4.0.36.Final</version>-->
+        <!--</dependency>-->
+
+        <!--Apache 2.0 - license confirmed-->
+        <dependency>
+            <groupId>com.codahale.metrics</groupId>
+            <artifactId>metrics-core</artifactId>
+            <version>3.0.2</version>
+        </dependency>
+
+    </dependencies>
     <properties>
 
-      <maven-release-plugin.version>2.1</maven-release-plugin.version>
-      <versions-maven-plugin.version>1.2</versions-maven-plugin.version>
-      <sonar.core.codeCoveragePlugin>jacoco</sonar.core.codeCoveragePlugin>
-      <sonar.jacoco.reportPath>${project.basedir}/target/jacoco.exec</sonar.jacoco.reportPath>
+        <maven-release-plugin.version>2.1</maven-release-plugin.version>
+        <versions-maven-plugin.version>1.2</versions-maven-plugin.version>
+        <sonar.core.codeCoveragePlugin>jacoco</sonar.core.codeCoveragePlugin>
+        <sonar.jacoco.reportPath>${project.basedir}/target/jacoco.exec</sonar.jacoco.reportPath>
 
-      <sonar.sources>${project.basedir}/src/main/java</sonar.sources>
-      <sonar.binaries>${project.basedir}/target/classes</sonar.binaries>
-      <sonar.tests>${project.basedir}/src/test/java</sonar.tests>
-      <sonar.dynamicAnalysis>reuseReports</sonar.dynamicAnalysis>
-      <sonar.junit.reportsPath>${project.basedir}/target/test-reports</sonar.junit.reportsPath>
-      <sonar.java.coveragePlugin>jacoco</sonar.java.coveragePlugin>
+        <sonar.sources>${project.basedir}/src/main/java</sonar.sources>
+        <sonar.binaries>${project.basedir}/target/classes</sonar.binaries>
+        <sonar.tests>${project.basedir}/src/test/java</sonar.tests>
+        <sonar.dynamicAnalysis>reuseReports</sonar.dynamicAnalysis>
+        <sonar.junit.reportsPath>${project.basedir}/target/test-reports</sonar.junit.reportsPath>
+        <sonar.java.coveragePlugin>jacoco</sonar.java.coveragePlugin>
 
     </properties>
 </project>

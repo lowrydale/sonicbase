@@ -7,7 +7,7 @@ mkdir -p $HOME/sonicbase/logs
 
 ./build-jar
 mkdir -p $HOME/sonicbase/libs
-rsync -vlLt db/target/sonicbase-*.jar $HOME/sonicbase/lib
+rsync -vlLt --exclude sonicbase-*shaded.jar db/target/sonicbase-*.jar $HOME/sonicbase/lib
 #rsync -vlLt repo/* $HOME/sonicbase/lib
 #mvn dependency:copy-dependencies -DoutputDirectory=$HOME/sonicbase/lib
 #rsync -rvlLt repo/linux64/* $HOME/sonicbase/lib/linux64
@@ -25,6 +25,7 @@ rsync -rvlLt get-dir $HOME/sonicbase/bin
 rsync -rvlLt runclass $HOME/sonicbase/bin
 rsync -rvlLt runclass.bat $HOME/sonicbase/bin
 rsync -rvlLt purge-data.bat $HOME/sonicbase/bin
+rsync -rvlLt get-credentials.ps1 $HOME/sonicbase/bin
 rsync -rvlLt remote-start-bench-server.ps1 $HOME/sonicbase/bin
 rsync -rvlLt remote-start-db-server.ps1 $HOME/sonicbase/bin
 rsync -rvlLt remote-purge-data.ps1 $HOME/sonicbase/bin

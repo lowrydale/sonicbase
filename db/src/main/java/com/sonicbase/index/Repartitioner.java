@@ -37,10 +37,10 @@ public class Repartitioner extends Thread {
 
   private final DatabaseServer databaseServer;
   private final DatabaseCommon common;
-  private final ConcurrentHashMap<String, Indices> indices;
-  private ConcurrentHashMap<String, Boolean> repartitioningComplete = new ConcurrentHashMap<>();
-  private ConcurrentHashMap<String, Boolean> deletingComplete = new ConcurrentHashMap<>();
-  private ConcurrentHashMap<Integer, AtomicInteger> repartitioningRecordsByIdComplete = new ConcurrentHashMap<>();
+  private final Map<String, Indices> indices;
+  private Map<String, Boolean> repartitioningComplete = new ConcurrentHashMap<>();
+  private Map<String, Boolean> deletingComplete = new ConcurrentHashMap<>();
+  private Map<Integer, AtomicInteger> repartitioningRecordsByIdComplete = new ConcurrentHashMap<>();
   private AtomicBoolean isRepartitioningIndex = new AtomicBoolean();
 
   private String currIndexRepartitioning;
@@ -1015,6 +1015,7 @@ public class Repartitioner extends Thread {
                 @Override
                 public void run() {
                   try {
+                    List<Object> toFree = new ArrayList<>();
                     long begin = System.currentTimeMillis();
                     moveIndexEntriesToShard(dbName, tableName, indexName, isPrimaryKey, shard, list);
                     for (MoveRequest request : list) {
@@ -1022,7 +1023,7 @@ public class Repartitioner extends Thread {
                         //synchronized (index.getMutex(request.key)) {
                           Object value = index.remove(request.key);
                           if (value != null) {
-                            databaseServer.freeUnsafeIds(value);
+                            toFree.add(value);
                           }
                         //}
                       }
@@ -1030,6 +1031,16 @@ public class Repartitioner extends Thread {
                         keysToDelete.add(request.getKey());
                       }
                     }
+                    try {
+                      Thread.sleep(1000);
+                    }
+                    catch (InterruptedException e) {
+                      throw new DatabaseException(e);
+                    }
+                    for (Object obj : toFree) {
+                      databaseServer.freeUnsafeIds(obj);
+                    }
+
                     logger.info("moved entries: table=" + tableName + ", index=" + indexName + ", count=" + list.size() +
                         ", shard=" + shard + ", duration=" + (System.currentTimeMillis() - begin));
                   }
@@ -1242,6 +1253,7 @@ public class Repartitioner extends Thread {
       moveRequests.put(i, new ArrayList<MoveRequest>());
     }
 
+    List<Object> toFree = new ArrayList<>();
     for (MapEntry entry : toProcess) {
       try {
         byte[][] content = null;
@@ -1273,7 +1285,8 @@ public class Repartitioner extends Thread {
                   record.setDbViewFlags(Record.DB_VIEW_FLAG_DELETING);
                   newContent[i] = record.serialize(common);
                 }
-                databaseServer.freeUnsafeIds(entry.value);
+                toFree.add(entry.value);
+                //databaseServer.freeUnsafeIds(entry.value);
                 Object newValue = databaseServer.toUnsafeFromRecords(newContent);
                 index.put(entry.key, newValue);
               }
@@ -1302,6 +1315,17 @@ public class Repartitioner extends Thread {
       catch (Exception t) {
         logger.error("Error moving record: table=" + parts[4] + INDEX_STR + parts[5], t);
       }
+    }
+
+    try {
+      Thread.sleep(1000);
+    }
+    catch (InterruptedException e) {
+      throw new DatabaseException(e);
+    }
+
+    for (Object obj : toFree) {
+      databaseServer.freeUnsafeIds(obj);
     }
 
     try {
@@ -1393,6 +1417,9 @@ public class Repartitioner extends Thread {
                       }
                     //}
                   }
+
+                  Thread.sleep(1000);
+
                   for (Object address : toFree) {
                     if (address != null) {
                       databaseServer.freeUnsafeIds(address);
@@ -1483,7 +1510,8 @@ public class Repartitioner extends Thread {
 
   public byte[] moveIndexEntries(String command, byte[] body) {
     try {
-      synchronized (databaseServer.getBatchMutex()) {
+      synchronized (databaseServer.getBatchRepartCount()) {
+        databaseServer.getBatchRepartCount().incrementAndGet();
         String[] parts = command.split(":");
         String dbName = parts[4];
 
@@ -1515,6 +1543,9 @@ public class Repartitioner extends Thread {
     }
     catch (IOException e) {
       throw new DatabaseException(e);
+    }
+    finally {
+      databaseServer.getBatchRepartCount().decrementAndGet();
     }
   }
 

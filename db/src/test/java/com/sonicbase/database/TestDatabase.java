@@ -107,6 +107,9 @@ public class TestDatabase {
       PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
       stmt.executeUpdate();
 
+      stmt = conn.prepareStatement("create table Children (parent BIGINT, socialSecurityNumber VARCHAR(20), bio VARCHAR(256))");
+      stmt.executeUpdate();
+
       stmt = conn.prepareStatement("create table Memberships (personId BIGINT, membershipName VARCHAR(20), resortId BIGINT, PRIMARY KEY (personId, membershipName))");
       stmt.executeUpdate();
 
@@ -163,6 +166,22 @@ public class TestDatabase {
       }
 
       for (int i = 0; i < recordCount; i++) {
+        stmt = conn.prepareStatement("insert into children (parent, socialSecurityNumber, bio) VALUES (?, ?, ?)");
+        stmt.setLong(1, i);
+        stmt.setString(2, "933-28-" + i);
+        stmt.setString(3, "xxxx yyyyyy zzzzzz xxxxx yyyy zzzzz xxxxxx yyyyyyy zzzzzzzz xxxxxxx yyyyyy");
+        assertEquals(stmt.executeUpdate(), 1);
+        ids.add((long) i);
+
+        stmt = conn.prepareStatement("insert into children (parent, socialSecurityNumber, bio) VALUES (?, ?, ?)");
+        stmt.setLong(1, i + 100);
+        stmt.setString(2, "933-28-" + i);
+        stmt.setString(3, "xxxx yyyyyy zzzzzz xxxxx yyyy zzzzz xxxxxx yyyyyyy zzzzzzzz xxxxxxx yyyyyy");
+        assertEquals(stmt.executeUpdate(), 1);
+        ids.add((long) i);
+      }
+
+      for (int i = 0; i < recordCount; i++) {
         stmt = conn.prepareStatement("insert into nokey (id, id2) VALUES (?, ?)");
         stmt.setLong(1, i);
         stmt.setLong(2, i * 2);
@@ -175,6 +194,9 @@ public class TestDatabase {
       }
 
       stmt = conn.prepareStatement("create index socialSecurityNumber on persons(socialSecurityNumber)");
+      stmt.executeUpdate();
+
+      stmt = conn.prepareStatement("create index socialSecurityNumber on children(socialSecurityNumber)");
       stmt.executeUpdate();
 
       //create index ssn2 on persons(socialSecurityNumber)
@@ -214,8 +236,11 @@ public class TestDatabase {
 
       assertEquals(ret.getCurrKeys().length, 4);
   */
+      long size = client.getPartitionSize("test", 0, "children", "_1_socialsecuritynumber");
+      assertEquals(size, 10);
 
       client.beginRebalance("test", "persons", "_1__primarykey");
+
 
       while (true) {
         if (client.isRepartitioningComplete("test")) {
@@ -226,6 +251,14 @@ public class TestDatabase {
 
       assertEquals(client.getPartitionSize("test", 0, "persons", "_1__primarykey"), 9);
       assertEquals(client.getPartitionSize("test", 1, "persons", "_1__primarykey"), 11);
+      long count = client.getPartitionSize("test", 0, "children", "_1__primarykey");
+      assertEquals(count, 9);
+      count = client.getPartitionSize("test", 1, "children", "_1__primarykey");
+      assertEquals(count, 11);
+      count = client.getPartitionSize("test", 0, "children", "_1_socialsecuritynumber");
+      assertEquals(count, 4);
+      count = client.getPartitionSize("test", 1, "children", "_1_socialsecuritynumber");
+      assertEquals(count, 6);
 
       dbServers[0].enableSnapshot(false);
       dbServers[1].enableSnapshot(false);
@@ -246,6 +279,59 @@ public class TestDatabase {
     catch (Exception e) {
       e.printStackTrace();
     }
+  }
+
+  @Test
+  public void testSecondaryIndexWithNoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from children where socialsecuritynumber = '933-28-5'");
+    ResultSet ret = stmt.executeQuery();
+    assertTrue(ret.next());
+    assertEquals(ret.getString("socialSecurityNumber"), "933-28-5");
+
+    stmt = conn.prepareStatement("select * from children where socialsecuritynumber >= '933-28-0'");
+    ret = stmt.executeQuery();
+    assertTrue(ret.next());
+    assertEquals(ret.getString("socialSecurityNumber"), "933-28-0");
+    assertTrue(ret.next());
+    assertEquals(ret.getString("socialSecurityNumber"), "933-28-0");
+    assertTrue(ret.next());
+    assertEquals(ret.getString("socialSecurityNumber"), "933-28-1");
+    assertTrue(ret.next());
+    assertEquals(ret.getString("socialSecurityNumber"), "933-28-1");
+    assertTrue(ret.next());
+    assertEquals(ret.getString("socialSecurityNumber"), "933-28-2");
+    assertTrue(ret.next());
+    assertEquals(ret.getString("socialSecurityNumber"), "933-28-2");
+    assertTrue(ret.next());
+    assertEquals(ret.getString("socialSecurityNumber"), "933-28-3");
+    assertTrue(ret.next());
+    assertEquals(ret.getString("socialSecurityNumber"), "933-28-3");
+    assertTrue(ret.next());
+    assertEquals(ret.getString("socialSecurityNumber"), "933-28-4");
+    assertTrue(ret.next());
+    assertEquals(ret.getString("socialSecurityNumber"), "933-28-4");
+    assertTrue(ret.next());
+    assertEquals(ret.getString("socialSecurityNumber"), "933-28-5");
+    assertTrue(ret.next());
+    assertEquals(ret.getString("socialSecurityNumber"), "933-28-5");
+    assertTrue(ret.next());
+    assertEquals(ret.getString("socialSecurityNumber"), "933-28-6");
+    assertTrue(ret.next());
+    assertEquals(ret.getString("socialSecurityNumber"), "933-28-6");
+    assertTrue(ret.next());
+    assertEquals(ret.getString("socialSecurityNumber"), "933-28-7");
+    assertTrue(ret.next());
+    assertEquals(ret.getString("socialSecurityNumber"), "933-28-7");
+    assertTrue(ret.next());
+    assertEquals(ret.getString("socialSecurityNumber"), "933-28-8");
+    assertTrue(ret.next());
+    assertEquals(ret.getString("socialSecurityNumber"), "933-28-8");
+    assertTrue(ret.next());
+    assertEquals(ret.getString("socialSecurityNumber"), "933-28-9");
+    assertTrue(ret.next());
+    assertEquals(ret.getString("socialSecurityNumber"), "933-28-9");
+    assertFalse(ret.next());
+
   }
 
   @Test

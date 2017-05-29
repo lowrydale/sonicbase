@@ -11,15 +11,18 @@ import com.sonicbase.index.Repartitioner;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.ExpressionImpl;
+import com.sonicbase.research.socket.NettyServer;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.DataUtil;
 import com.sonicbase.util.JsonArray;
 import com.sonicbase.util.JsonDict;
 import com.sonicbase.util.StreamUtils;
-import com.sonicbase.research.socket.NettyServer;
 import net.jpountz.lz4.LZ4Compressor;
 import net.jpountz.lz4.LZ4Factory;
 import net.jpountz.lz4.LZ4FastDecompressor;
+import org.anarres.lzo.LzoDecompressor1x;
+import org.anarres.lzo.LzoInputStream;
+import org.anarres.lzo.LzoOutputStream;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.input.ReversedLinesFileReader;
 import org.apache.commons.lang.exception.ExceptionUtils;
@@ -45,7 +48,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 
 /**
@@ -80,7 +83,11 @@ public class DatabaseServer {
   private String installDir;
   private boolean throttleInsert;
   private DeleteManager deleteManager;
-  private Object batchMutex = new Object();
+  private ReentrantReadWriteLock batchLock = new ReentrantReadWriteLock();
+  private ReentrantReadWriteLock.ReadLock batchReadLock = batchLock.readLock();
+  private ReentrantReadWriteLock.WriteLock batchWriteLock = batchLock.writeLock();
+  private AtomicInteger batchRepartCount = new AtomicInteger();
+
 
   @SuppressWarnings("restriction")
   private static Unsafe getUnsafe() {
@@ -106,7 +113,7 @@ public class DatabaseServer {
   private DatabaseClient.Replica role;
   private int shard;
   private int shardCount;
-  private ConcurrentHashMap<String, Indices> indexes = new ConcurrentHashMap<>();
+  private Map<String, Indices> indexes = new ConcurrentHashMap<>();
   private LongRunningCommands longRunningCommands;
 
   private static ConcurrentHashMap<Integer, Map<Integer, DatabaseServer>> servers = new ConcurrentHashMap<>();
@@ -475,8 +482,16 @@ public class DatabaseServer {
     return deleteManager;
   }
 
-  public Object getBatchMutex() {
-    return batchMutex;
+  public ReentrantReadWriteLock.ReadLock getBatchReadLock() {
+    return batchReadLock;
+  }
+
+  public ReentrantReadWriteLock.WriteLock getBatchWriteLock() {
+    return batchWriteLock;
+  }
+
+  public AtomicInteger getBatchRepartCount() {
+    return batchRepartCount;
   }
 
   public static class Host {
@@ -903,7 +918,7 @@ public class DatabaseServer {
                   }
                   try {
                     if (count++ > 10000) {
-                      p.destroyForcibly();
+                      p.destroy();;
                       break outer;
                     }
 
@@ -1646,7 +1661,7 @@ public class DatabaseServer {
     return indexes.get(dbName);
   }
 
-  public ConcurrentHashMap<String, Indices> getIndices() {
+  public Map<String, Indices> getIndices() {
     return indexes;
   }
 
@@ -2103,9 +2118,9 @@ public class DatabaseServer {
 
       List<Future<byte[]>> futures = new ArrayList<>();
       for (final NettyServer.Request request : requests) {
-        futures.add(executor.submit(new Callable<byte[]>() {
-          @Override
-          public byte[] call() throws Exception {
+//        futures.add(executor.submit(new Callable<byte[]>() {
+//          @Override
+//          public byte[] call() throws Exception {
             String command = request.getCommand();
             byte[] body = request.getBody();
 
@@ -2153,19 +2168,20 @@ public class DatabaseServer {
               }
               throw new DatabaseException(e);
             }
-            return ret;
-          }
-        }));
+            retList.add(new Response(ret));
+            //return ret;
+          //}
+        //}));
       }
-      for (Future<byte[]> future : futures) {
-        commandCount.incrementAndGet();
-        try {
-          retList.add(new Response(future.get()));
-        }
-        catch (Exception e) {
-          retList.add(new Response(e));
-        }
-      }
+//      for (Future<byte[]> future : futures) {
+//        commandCount.incrementAndGet();
+//        try {
+//          retList.add(new Response(future.get()));
+//        }
+//        catch (Exception e) {
+//          retList.add(new Response(e));
+//        }
+//      }
       if (logRequest != null) {
         logRequest.latch.await();
       }
@@ -2981,36 +2997,66 @@ public class DatabaseServer {
   public byte[] doPopulateIndex(final String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
     String dbName = parts[4];
-    common.getSchemaReadLock(dbName).lock();
-    try {
-      return updateManager.doPopulateIndex(command, body);
-    }
-    finally {
-      common.getSchemaReadLock(dbName).unlock();
-    }
+    return updateManager.doPopulateIndex(command, body);
   }
 
   public byte[] populateIndex(final String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
     String dbName = parts[4];
-    common.getSchemaReadLock(dbName).lock();
-    try {
+//    common.getSchemaReadLock(dbName).lock();
+//    try {
       return updateManager.populateIndex(command, body);
-    }
-    finally {
-      common.getSchemaReadLock(dbName).unlock();
-    }
+//    }
+//    finally {
+//      common.getSchemaReadLock(dbName).unlock();
+//    }
   }
 
   public byte[] createIndex(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
     String dbName = parts[4];
+    List<String> createdIndices = null;
+    AtomicReference<String> table = new AtomicReference<>();
     common.getSchemaWriteLock(dbName).lock();
     try {
-      return schemaManager.createIndex(command, body, replayedCommand);
+      if (getShard() == 0 && getReplica() == 0 && command.contains(":slave:")) {
+        return null;
+      }
+
+      createdIndices = schemaManager.createIndex(command, body, replayedCommand, table);
     }
     finally {
       common.getSchemaWriteLock(dbName).unlock();
+    }
+
+    try {
+      if (createdIndices != null) {
+        for (String currIndexName : createdIndices) {
+          command = "DatabaseServer:populateIndex:1:1:" + dbName + ":" + table.get() + ":" + currIndexName;
+          AtomicReference<String> selectedHost = new AtomicReference<>();
+          for (int i = 0; i < getShardCount(); i++) {
+            for (int j = 0; j < getReplicationFactor(); j++) {
+              if (i == 0 && j == 0) {
+                getUpdateManager().populateIndex(command, null);
+              }
+              else {
+                getDatabaseClient().send(null, i, j, command, null, DatabaseClient.Replica.all);
+              }
+            }
+          }
+        }
+      }
+
+      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+      DataOutputStream out = new DataOutputStream(bytesOut);
+      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+      getCommon().serializeSchema(out);
+      out.close();
+
+      return bytesOut.toByteArray();
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
     }
   }
 

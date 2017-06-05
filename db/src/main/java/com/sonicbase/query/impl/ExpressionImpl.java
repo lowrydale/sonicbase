@@ -1452,9 +1452,6 @@ public abstract class ExpressionImpl implements Expression {
           while (true) {
             boolean isPrepared = prepared.serversPrepared[localShard][replica];
             long preparedId = prepared.preparedId;
-            if (!isPrepared) {
-              System.out.println("Not prepared:" + preparedKeyStr);
-            }
 
             //TableSchema.Partition[] partitions = indexSchema.getValue().getCurrPartitions();
             Random rand = new Random(System.currentTimeMillis());

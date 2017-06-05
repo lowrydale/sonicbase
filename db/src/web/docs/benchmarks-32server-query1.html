@@ -2,14 +2,39 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Untitled Document</title>
-
-
-<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+<title>SonicBase - Benchmarks 32-Server Identity Query</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="In this benchmark we read records by id from the database one record at a time on a 32 server cluster.">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="../javascript/main.js"></script>
 </head>
 
 <body>
-In this benchmark we read records by id from the database one record at a time.<br/>
+<div class="container">
+    <header id="myHeader">
+        <a href="../index.html">
+            <h4 class="logo">SonicBase™</h4>
+        </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+
+    <div style="margin-left: 4em;">
+
+In this benchmark we read records by id from the database one record at a time on a 32 server cluster.<br/>
 <br/>
 	for (int i = 0; ; i++) {<br/>
 	&nbsp;&nbsp;&nbsp;&nbsp;PreparedStatement stmt = con.prepareStatement("select id from persons where persons.id=?")<br/>
@@ -87,6 +112,7 @@ In this benchmark we read records by id from the database one record at a time.<
     </tr>
   </tbody>
 </table>
-	
+</div>
+</div>
 </body>
 </html>

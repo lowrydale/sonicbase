@@ -853,7 +853,7 @@ public class NettyServer {
 
         final DatabaseServer databaseServer = new DatabaseServer();
         final AtomicBoolean isRunning = new AtomicBoolean(false);
-        databaseServer.setConfig(config, cluster, host, port, isRunning, skipLicense, gclog, xmx);
+        databaseServer.setConfig(config, cluster, host, port, isRunning, gclog, xmx);
         databaseServer.setRole(role);
 
         setDatabaseServer(databaseServer);

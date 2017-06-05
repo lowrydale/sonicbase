@@ -2,12 +2,38 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Untitled Document</title>
+    <meta name="description" content="SonicBase integration with AWS. Configuration files can be generated based on tags on the server instances.">
 
-
-<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <title>SonicBase - Amazon Web Services Integration</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Intructions on how to use the SonicBase integration with AWS. Configuration files may be automatically created based on AWS tags.">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="../javascript/main.js"></script>
 </head>
+<body>
+<div class="container">
+    <header id="myHeader">
+        <a href="../index.html">
+            <h4 class="logo">SonicBase™</h4>
+        </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+    </header>
 
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+
+    <div style="margin-left: 4em;">
 <h3>Config Builder</h3>
 SonicBase will automatically create a config file based on the servers tagged in AWS. Machines
 you desire to be servers need the tag "sonicbase-server" with a value of the name of the cluster.
@@ -20,6 +46,7 @@ To build your config file type "build config" in the client.
 In order for AWS integration to work you must have a file named ".awskeys" located in the home directory.
 The first line of the file is the aws access key. The second line of the file is the aws secret key.
 
-<body>
+</div>
+</div>
 </body>
 </html>

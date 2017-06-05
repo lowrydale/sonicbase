@@ -151,7 +151,7 @@ public class DatabaseServer {
   }
 
   public void setConfig(
-      final JsonDict config, String cluster, String host, int port, AtomicBoolean isRunning, boolean skipLicense, String gclog, String xmx) {
+      final JsonDict config, String cluster, String host, int port, AtomicBoolean isRunning, String gclog, String xmx) {
     setConfig(config, cluster, host, port, false, isRunning, false, gclog, xmx);
   }
 
@@ -423,17 +423,21 @@ public class DatabaseServer {
   public double getResGigWindows() throws IOException, InterruptedException {
     ProcessBuilder builder = new ProcessBuilder().command("tasklist",  "/fi", "\"pid eq " + pid + "\"");
     Process p = builder.start();
-    BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-    String header = in.readLine();
-    String separator = in.readLine();
-    String separator2 = in.readLine();
-    String values = in.readLine();
-    p.waitFor();
+    try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+      String header = in.readLine();
+      String separator = in.readLine();
+      String separator2 = in.readLine();
+      String values = in.readLine();
+      p.waitFor();
 
-    String[] parts = values.split("\\s+");
-    String kbytes = parts[4];
-    kbytes = kbytes.replaceAll(",", "");
-    return Double.valueOf(kbytes) / 1000d / 1000d;
+      String[] parts = values.split("\\s+");
+      String kbytes = parts[4];
+      kbytes = kbytes.replaceAll(",", "");
+      return Double.valueOf(kbytes) / 1000d / 1000d;
+    }
+    finally {
+      p.destroy();
+    }
   }
 
   public double getCpuUtilizationWindows() throws IOException, InterruptedException {
@@ -442,14 +446,18 @@ public class DatabaseServer {
 //    "wmic", "path", "Win32_PerfFormattedData_PerfProc_Process",
 //        "where", "\"IDProcess=" + pid + "\"", "get", "IDProcess,PercentProcessorTime");
     Process p = builder.start();
-    BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-    String values = in.readLine();
-    p.waitFor();
+    try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+      String values = in.readLine();
+      p.waitFor();
 
-    logger.info("cpu utilization str=" + values);
-    String[] parts = values.split("\\s+");
-    String cpu = parts[1];
-    return Double.valueOf(cpu);
+      logger.info("cpu utilization str=" + values);
+      String[] parts = values.split("\\s+");
+      String cpu = parts[1];
+      return Double.valueOf(cpu);
+    }
+    finally {
+      p.destroy();
+    }
   }
 
   public String getDiskAvailWindows() throws IOException, InterruptedException {
@@ -463,11 +471,15 @@ public class DatabaseServer {
 
     ProcessBuilder builder = new ProcessBuilder().command("bin/disk-avail.bat");
     Process p = builder.start();
-    BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-    String values = in.readLine();
-    p.waitFor();
+    try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+      String values = in.readLine();
+      p.waitFor();
 
-    return values;
+      return values;
+    }
+    finally {
+      p.destroy();
+    }
   }
 
   public void setThrottleInsert(boolean throttle) {
@@ -705,30 +717,36 @@ public class DatabaseServer {
       if (isMac()) {
         ProcessBuilder builder = new ProcessBuilder().command("sysctl", "hw.memsize");
         Process p = builder.start();
-        BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-        String line = in.readLine();
-        p.waitFor();
-        String[] parts = line.split(" ");
-        String memStr = parts[1];
-        totalGig = getMemValue(memStr);
-
+        try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+          String line = in.readLine();
+          p.waitFor();
+          String[] parts = line.split(" ");
+          String memStr = parts[1];
+          totalGig = getMemValue(memStr);
+        }
+        finally {
+          p.destroy();
+        }
         builder = new ProcessBuilder().command("top", "-l", "1", "-pid", String.valueOf(pid));
         p = builder.start();
-        in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-        while (true) {
-          line = in.readLine();
-          if (line == null) {
-            break;
+        try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+          while (true) {
+            String line = in.readLine();
+            if (line == null) {
+              break;
+            }
+            secondToLastLine = lastLine;
+            lastLine = line;
           }
-          secondToLastLine = lastLine;
-          lastLine = line;
+          p.waitFor();
         }
-        p.waitFor();
-
+        finally {
+          p.destroy();
+        }
         secondToLastLine = secondToLastLine.trim();
         lastLine = lastLine.trim();
         String[] headerParts = secondToLastLine.split("\\s+");
-        parts = lastLine.split("\\s+");
+        String[] parts = lastLine.split("\\s+");
         for (int i = 0; i < headerParts.length; i++) {
           if (headerParts[i].toLowerCase().trim().equals("mem")) {
             resGig = getMemValue(parts[i]);
@@ -738,29 +756,38 @@ public class DatabaseServer {
       else if (isUnix()) {
         ProcessBuilder builder = new ProcessBuilder().command("grep", "MemTotal", "/proc/meminfo");
         Process p = builder.start();
-        BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-        String line = in.readLine();
-        p.waitFor();
-        line = line.substring("MemTotal:".length()).trim();
-        totalGig = getMemValue(line);
-
+        try {
+          BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+          String line = in.readLine();
+          p.waitFor();
+          line = line.substring("MemTotal:".length()).trim();
+          totalGig = getMemValue(line);
+        }
+        finally {
+          p.destroy();
+        }
         builder = new ProcessBuilder().command("top", "-b", "-n", "1", "-p", String.valueOf(pid));
         p = builder.start();
-        in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-        while (true) {
-          line = in.readLine();
-          if (line == null) {
-            break;
+        try {
+          BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+          while (true) {
+            String line = in.readLine();
+            if (line == null) {
+              break;
+            }
+            if (lastLine != null || line.trim().toLowerCase().startsWith("pid")) {
+              secondToLastLine = lastLine;
+              lastLine = line;
+            }
+            if (lastLine != null && secondToLastLine != null) {
+              break;
+            }
           }
-          if (lastLine != null || line.trim().toLowerCase().startsWith("pid")) {
-            secondToLastLine = lastLine;
-            lastLine = line;
-          }
-          if (lastLine != null && secondToLastLine != null) {
-            break;
-          }
+          p.waitFor();
         }
-        p.waitFor();
+        finally {
+          p.destroy();
+        }
 
         secondToLastLine = secondToLastLine.trim();
         lastLine = lastLine.trim();
@@ -828,69 +855,73 @@ public class DatabaseServer {
           while (true) {
             ProcessBuilder builder = new ProcessBuilder().command("ifstat");
             Process p = builder.start();
-            BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            String firstLine = null;
-            String secondLine = null;
-            Set<Integer> toSkip = new HashSet<>();
-            while (true) {
-              String line = in.readLine();
-              if (line == null) {
-                break;
-              }
-              String[] parts = line.trim().split("\\s+");
-              if (firstLine == null) {
-                for (int i = 0; i < parts.length; i++) {
-                  if (parts[i].toLowerCase().contains("bridge")) {
-                    toSkip.add(i);
-                  }
+            try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+              String firstLine = null;
+              String secondLine = null;
+              Set<Integer> toSkip = new HashSet<>();
+              while (true) {
+                String line = in.readLine();
+                if (line == null) {
+                  break;
                 }
-                firstLine = line;
-              }
-              else if (secondLine == null) {
-                secondLine = line;
-              }
-              else {
-                try {
-                  double trans = 0;
-                  double rec = 0;
+                String[] parts = line.trim().split("\\s+");
+                if (firstLine == null) {
                   for (int i = 0; i < parts.length; i++) {
-                    if (toSkip.contains(i / 2)) {
-                      continue;
-                    }
-                    if (i % 2 == 0) {
-                      rec += Double.valueOf(parts[i]);
-                    }
-                    else if (i % 2 == 1) {
-                      trans += Double.valueOf(parts[i]);
+                    if (parts[i].toLowerCase().contains("bridge")) {
+                      toSkip.add(i);
                     }
                   }
-                  transRate.add(trans);
-                  recRate.add(rec);
-                  if (transRate.size() > 10) {
-                    transRate.remove(0);
-                  }
-                  if (recRate.size() > 10) {
-                    recRate.remove(0);
-                  }
-                  Double total = 0d;
-                  for (Double currRec : recRate) {
-                    total += currRec;
-                  }
-                  avgRecRate = total / recRate.size();
+                  firstLine = line;
+                }
+                else if (secondLine == null) {
+                  secondLine = line;
+                }
+                else {
+                  try {
+                    double trans = 0;
+                    double rec = 0;
+                    for (int i = 0; i < parts.length; i++) {
+                      if (toSkip.contains(i / 2)) {
+                        continue;
+                      }
+                      if (i % 2 == 0) {
+                        rec += Double.valueOf(parts[i]);
+                      }
+                      else if (i % 2 == 1) {
+                        trans += Double.valueOf(parts[i]);
+                      }
+                    }
+                    transRate.add(trans);
+                    recRate.add(rec);
+                    if (transRate.size() > 10) {
+                      transRate.remove(0);
+                    }
+                    if (recRate.size() > 10) {
+                      recRate.remove(0);
+                    }
+                    Double total = 0d;
+                    for (Double currRec : recRate) {
+                      total += currRec;
+                    }
+                    avgRecRate = total / recRate.size();
 
-                  total = 0d;
-                  for (Double currTrans : transRate) {
-                    total += currTrans;
+                    total = 0d;
+                    for (Double currTrans : transRate) {
+                      total += currTrans;
+                    }
+                    avgTransRate = total / transRate.size();
                   }
-                  avgTransRate = total / transRate.size();
+                  catch (Exception e) {
+                    logger.error("Error reading net traffic line: line=" + line, e);
+                  }
+                  break;
                 }
-                catch (Exception e) {
-                  logger.error("Error reading net traffic line: line=" + line, e);
-                }
-                break;
               }
+              p.waitFor();
             }
-            p.waitFor();
+            finally {
+              p.destroy();
+            }
             Thread.sleep(1000);
           }
         }
@@ -902,86 +933,92 @@ public class DatabaseServer {
             file.delete();
             ProcessBuilder builder = new ProcessBuilder().command("/usr/bin/dstat", "--output", file.getAbsolutePath());
             Process p = builder.start();
-            while (!file.exists()) {
-              Thread.sleep(1000);
-            }
-            outer:
-            while (true) {
-              try (BufferedReader in = new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
-                int recvPos = 0;
-                int sendPos = 0;
-                boolean nextIsValid = false;
-                while (true) {
-                  String line = in.readLine();
-                  if (line == null) {
-                    break;
-                  }
-                  try {
-                    if (count++ > 10000) {
-                      p.destroy();;
+            try {
+              while (!file.exists()) {
+                Thread.sleep(1000);
+              }
+              outer:
+              while (true) {
+                try (BufferedReader in = new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
+                  int recvPos = 0;
+                  int sendPos = 0;
+                  boolean nextIsValid = false;
+                  while (true) {
+                    String line = in.readLine();
+                    if (line == null) {
+                      break;
+                    }
+                    try {
+                      if (count++ > 10000) {
+                        p.destroy();
+                        ;
+                        break outer;
+                      }
+
+          /*
+
+          "Dstat 0.7.0 CSV output"
+        "Author:","Dag Wieers <dag@wieers.com>",,,,"URL:","http://dag.wieers.com/home-made/dstat/"
+        "Host:","ip-10-0-0-79",,,,"User:","ec2-user"
+        "Cmdline:","dstat --output out",,,,"Date:","09 Apr 2017 02:48:19 UTC"
+
+        "total cpu usage",,,,,,"dsk/total",,"net/total",,"paging",,"system",
+        "usr","sys","idl","wai","hiq","siq","read","writ","recv","send","in","out","int","csw"
+        20.409,1.659,74.506,3.404,0.0,0.021,707495.561,82419494.859,0.0,0.0,0.0,0.0,17998.361,18691.991
+        8.794,1.131,77.010,13.065,0.0,0.0,0.0,272334848.0,54.0,818.0,0.0,0.0,1514.0,477.0
+        9.217,1.641,75.758,13.384,0.0,0.0,0.0,276201472.0,54.0,346.0,0.0,0.0,1481.0,392.0
+
+           */
+                      String[] parts = line.split(",");
+                      if (line.contains("usr") && line.contains("recv") && line.contains("send")) {
+                        for (int i = 0; i < parts.length; i++) {
+                          if (parts[i].equals("\"recv\"")) {
+                            recvPos = i;
+                          }
+                          else if (parts[i].equals("\"send\"")) {
+                            sendPos = i;
+                          }
+                        }
+                        nextIsValid = true;
+                      }
+                      else if (nextIsValid) {
+                        Double trans = Double.valueOf(parts[sendPos]);
+                        Double rec = Double.valueOf(parts[recvPos]);
+                        transRate.add(trans);
+                        recRate.add(rec);
+                        if (transRate.size() > 10) {
+                          transRate.remove(0);
+                        }
+                        if (recRate.size() > 10) {
+                          recRate.remove(0);
+                        }
+                        Double total = 0d;
+                        for (Double currRec : recRate) {
+                          total += currRec;
+                        }
+                        avgRecRate = total / recRate.size();
+
+                        total = 0d;
+                        for (Double currTrans : transRate) {
+                          total += currTrans;
+                        }
+                        avgTransRate = total / transRate.size();
+                      }
+                    }
+                    catch (Exception e) {
+                      logger.error("Error reading net traffic line: line=" + line, e);
+                      Thread.sleep(5000);
                       break outer;
                     }
-
-        /*
-
-        "Dstat 0.7.0 CSV output"
-      "Author:","Dag Wieers <dag@wieers.com>",,,,"URL:","http://dag.wieers.com/home-made/dstat/"
-      "Host:","ip-10-0-0-79",,,,"User:","ec2-user"
-      "Cmdline:","dstat --output out",,,,"Date:","09 Apr 2017 02:48:19 UTC"
-
-      "total cpu usage",,,,,,"dsk/total",,"net/total",,"paging",,"system",
-      "usr","sys","idl","wai","hiq","siq","read","writ","recv","send","in","out","int","csw"
-      20.409,1.659,74.506,3.404,0.0,0.021,707495.561,82419494.859,0.0,0.0,0.0,0.0,17998.361,18691.991
-      8.794,1.131,77.010,13.065,0.0,0.0,0.0,272334848.0,54.0,818.0,0.0,0.0,1514.0,477.0
-      9.217,1.641,75.758,13.384,0.0,0.0,0.0,276201472.0,54.0,346.0,0.0,0.0,1481.0,392.0
-
-         */
-                    String[] parts = line.split(",");
-                    if (line.contains("usr") && line.contains("recv") && line.contains("send")) {
-                      for (int i = 0; i < parts.length; i++) {
-                        if (parts[i].equals("\"recv\"")) {
-                          recvPos = i;
-                        }
-                        else if (parts[i].equals("\"send\"")) {
-                          sendPos = i;
-                        }
-                      }
-                      nextIsValid = true;
-                    }
-                    else if (nextIsValid) {
-                      Double trans = Double.valueOf(parts[sendPos]);
-                      Double rec = Double.valueOf(parts[recvPos]);
-                      transRate.add(trans);
-                      recRate.add(rec);
-                      if (transRate.size() > 10) {
-                        transRate.remove(0);
-                      }
-                      if (recRate.size() > 10) {
-                        recRate.remove(0);
-                      }
-                      Double total = 0d;
-                      for (Double currRec : recRate) {
-                        total += currRec;
-                      }
-                      avgRecRate = total / recRate.size();
-
-                      total = 0d;
-                      for (Double currTrans : transRate) {
-                        total += currTrans;
-                      }
-                      avgTransRate = total / transRate.size();
-                    }
-                  }
-                  catch (Exception e) {
-                    logger.error("Error reading net traffic line: line=" + line, e);
-                    Thread.sleep(5000);
-                    break outer;
                   }
                 }
+                Thread.sleep(1000);
               }
-              Thread.sleep(1000);
+              p.waitFor();
             }
-            p.waitFor();
+            finally {
+              p.destroy();
+            }
           }
         }
         else if (isWindows()) {
@@ -1016,8 +1053,11 @@ public class DatabaseServer {
                 }
                 Thread.sleep(2000);
               }
+              p.waitFor();
             }
-            p.waitFor();
+            finally {
+              p.destroy();
+            }
           }
         }
       }
@@ -1030,45 +1070,51 @@ public class DatabaseServer {
   private String getDiskAvailable() throws IOException, InterruptedException {
     ProcessBuilder builder = new ProcessBuilder().command("df", "-h");
     Process p = builder.start();
-    Integer availPos = null;
-    Integer mountedPos = null;
-    List<String> avails = new ArrayList<>();
-    int bestLineMatching = -1;
-    int bestLineAmountMatch = 0;
-    int mountOffset = 0;
-    BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-    while (true) {
-      String line = in.readLine();
-      if (line == null) {
-        break;
-      }
-      String[] parts = line.split("\\s+");
-      if (availPos == null) {
-        for (int i = 0; i < parts.length; i++) {
-          if (parts[i].toLowerCase().trim().equals("avail")) {
-            availPos = i;
+    try {
+      Integer availPos = null;
+      Integer mountedPos = null;
+      List<String> avails = new ArrayList<>();
+      int bestLineMatching = -1;
+      int bestLineAmountMatch = 0;
+      int mountOffset = 0;
+      try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+        while (true) {
+          String line = in.readLine();
+          if (line == null) {
+            break;
           }
-          else if (parts[i].toLowerCase().trim().startsWith("mounted")) {
-            mountedPos = i;
+          String[] parts = line.split("\\s+");
+          if (availPos == null) {
+            for (int i = 0; i < parts.length; i++) {
+              if (parts[i].toLowerCase().trim().equals("avail")) {
+                availPos = i;
+              }
+              else if (parts[i].toLowerCase().trim().startsWith("mounted")) {
+                mountedPos = i;
+              }
+            }
+          }
+          else {
+            String mountPoint = parts[mountedPos];
+            if (dataDir.startsWith(mountPoint)) {
+              if (mountPoint.length() > bestLineAmountMatch) {
+                bestLineAmountMatch = mountPoint.length();
+                bestLineMatching = mountOffset;
+              }
+            }
+            avails.add(parts[availPos]);
+            mountOffset++;
           }
         }
-      }
-      else {
-        String mountPoint = parts[mountedPos];
-        if (dataDir.startsWith(mountPoint)) {
-          if (mountPoint.length() > bestLineAmountMatch) {
-            bestLineAmountMatch = mountPoint.length();
-            bestLineMatching = mountOffset;
-          }
+        p.waitFor();
+
+        if (bestLineMatching != -1) {
+          return avails.get(bestLineMatching);
         }
-        avails.add(parts[availPos]);
-        mountOffset++;
       }
     }
-    p.waitFor();
-
-    if (bestLineMatching != -1) {
-      return avails.get(bestLineMatching);
+    finally {
+      p.destroy();
     }
     return null;
   }
@@ -1081,9 +1127,10 @@ public class DatabaseServer {
       if (!file.exists()) {
         return null;
       }
-      FileInputStream fileIn = new FileInputStream(file);
-      String ret = StreamUtils.inputStreamToString(fileIn);
-      return ret.getBytes("utf-8");
+      try (FileInputStream fileIn = new FileInputStream(file)) {
+        String ret = StreamUtils.inputStreamToString(fileIn);
+        return ret.getBytes("utf-8");
+      }
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -1140,16 +1187,20 @@ public class DatabaseServer {
       if (isMac()) {
         ProcessBuilder builder = new ProcessBuilder().command("top", "-l", "1", "-pid", String.valueOf(pid));
         Process p = builder.start();
-        BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-        while (true) {
-          String line = in.readLine();
-          if (line == null) {
-            break;
+        try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+          while (true) {
+            String line = in.readLine();
+            if (line == null) {
+              break;
+            }
+            secondToLastLine = lastLine;
+            lastLine = line;
           }
-          secondToLastLine = lastLine;
-          lastLine = line;
+          p.waitFor();
         }
-        p.waitFor();
+        finally {
+          p.destroy();
+        }
 
         secondToLastLine = secondToLastLine.trim();
         lastLine = lastLine.trim();
@@ -1168,21 +1219,25 @@ public class DatabaseServer {
       else if (isUnix()) {
         ProcessBuilder builder = new ProcessBuilder().command("top", "-b", "-n", "1", "-p", String.valueOf(pid));
         Process p = builder.start();
-        BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-        while (true) {
-          String line = in.readLine();
-          if (line == null) {
-            break;
+        try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+          while (true) {
+            String line = in.readLine();
+            if (line == null) {
+              break;
+            }
+            if (lastLine != null || line.trim().toLowerCase().startsWith("pid")) {
+              secondToLastLine = lastLine;
+              lastLine = line;
+            }
+            if (lastLine != null && secondToLastLine != null) {
+              break;
+            }
           }
-          if (lastLine != null || line.trim().toLowerCase().startsWith("pid")) {
-            secondToLastLine = lastLine;
-            lastLine = line;
-          }
-          if (lastLine != null && secondToLastLine != null) {
-            break;
-          }
+          p.waitFor();
         }
-        p.waitFor();
+        finally {
+          p.destroy();
+        }
 
         secondToLastLine = secondToLastLine.trim();
         lastLine = lastLine.trim();
@@ -1481,7 +1536,7 @@ public class DatabaseServer {
   }
 
   public static void validateLicense(JsonDict config) {
-/*
+
     try {
       int licensedServerCount = 0;
       int actualServerCount = 0;
@@ -1537,7 +1592,6 @@ public class DatabaseServer {
     catch (Exception e) {
       throw new DatabaseException(e);
     }
-  */
   }
 
   private static byte[] encryptF(String input, Key pkey, Cipher c) throws InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
@@ -2872,29 +2926,29 @@ public class DatabaseServer {
     }
   }
 
-  public byte[] doDeleteMovedIndexEntries(final String command, final byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[4];
-    common.getSchemaReadLock(dbName).lock();
-    try {
-      return repartitioner.doDeleteMovedIndexEntries(command, body);
-    }
-    finally {
-      common.getSchemaReadLock(dbName).unlock();
-    }
-  }
-
-  public byte[] deleteMovedIndexEntries(final String command, final byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[4];
-    common.getSchemaReadLock(dbName).lock();
-    try {
-      return repartitioner.deleteMovedIndexEntries(command, body);
-    }
-    finally {
-      common.getSchemaReadLock(dbName).unlock();
-    }
-  }
+//  public byte[] doDeleteMovedIndexEntries(final String command, final byte[] body, boolean replayedCommand) {
+//    String[] parts = command.split(":");
+//    String dbName = parts[4];
+//    common.getSchemaReadLock(dbName).lock();
+//    try {
+//      return repartitioner.doDeleteMovedIndexEntries(command, body);
+//    }
+//    finally {
+//      common.getSchemaReadLock(dbName).unlock();
+//    }
+//  }
+//
+//  public byte[] deleteMovedIndexEntries(final String command, final byte[] body, boolean replayedCommand) {
+//    String[] parts = command.split(":");
+//    String dbName = parts[4];
+//    common.getSchemaReadLock(dbName).lock();
+//    try {
+//      return repartitioner.deleteMovedIndexEntries(command, body);
+//    }
+//    finally {
+//      common.getSchemaReadLock(dbName).unlock();
+//    }
+//  }
 
   public byte[] listIndexFiles(String command, byte[] body, boolean replayedCommand) {
     return null;

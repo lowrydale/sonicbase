@@ -2,10 +2,36 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Untitled Document</title>
-
-<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+<title>SonicBase - Cygwin Setup</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="SonicBase setup instructions specific to cygwin.">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="../javascript/main.js"></script>
 </head>
+<body>
+<div class="container">
+    <header id="myHeader">
+        <a href="../index.html">
+            <h4 class="logo">SonicBase™</h4>
+        </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+
+    <div style="margin-left: 4em;">
 
 <h3>SSH</h3>
 You must install open ssh client with cygwin.
@@ -14,6 +40,7 @@ You must install open ssh client with cygwin.
 <h3>Rsync</h3>
 You must install rsync with cygwin/
 
-<body>
+</div>
+</div>
 </body>
 </html>

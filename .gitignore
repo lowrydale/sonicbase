@@ -2,3 +2,7 @@
 *.iml
 .idea
 log
+Debug
+Release
+x64
+x86

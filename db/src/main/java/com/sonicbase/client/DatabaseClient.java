@@ -94,7 +94,6 @@ public class DatabaseClient {
       "updateSchema",
       "beginRebalanceOrderedIndex",
       "moveIndexEntries",
-      "rebalanceOrderedIndex",
       "notifyDeletingComplete",
       "notifyRepartitioningComplete",
       "notifyRepartitioningRecordsByIdComplete",

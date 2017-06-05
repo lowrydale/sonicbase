@@ -950,7 +950,6 @@ public class Repartitioner extends Thread {
   public byte[] rebalanceOrderedIndex(String command, byte[] body) {
     command = command.replace(":rebalanceOrderedIndex:", ":doRebalanceOrderedIndex:");
     databaseServer.getLongRunningCommands().addCommand(databaseServer.getLongRunningCommands().createSingleCommand(command, body));
-    //doRebalanceOrderedIndex(command, body);
     return null;
   }
 
@@ -1353,112 +1352,111 @@ public class Repartitioner extends Thread {
     return indicesToDelete;
   }
 
-  public byte[] deleteMovedIndexEntries(String command, final byte[] body) {
-    command = command.replace(":deleteMovedIndexEntries:", ":doDeleteMovedIndexEntries:");
-    databaseServer.getLongRunningCommands().addCommand(databaseServer.getLongRunningCommands().createSingleCommand(command, body));
-    //doDeleteMovedIndexEntries(command, body);
-    return null;
-  }
-
-  public byte[] doDeleteMovedIndexEntries(final String command, final byte[] body) {
-    ThreadPoolExecutor executor = new ThreadPoolExecutor(16, 16, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
-    try {
-      long begin = System.currentTimeMillis();
-      String[] parts = command.split(":");
-      String dbName = parts[4];
-      String tableName = parts[5];
-      String indexName = parts[6];
-      final AtomicInteger freedCount = new AtomicInteger();
-      logger.info("doDeleteMovedIndexEntries: shard=" + databaseServer.getShard() + ", dbName=" + dbName +
-        ", tableName=" + tableName + ", indexName=" + indexName);
-      try {
-        currTableRepartitioning = null;
-        currIndexRepartitioning = null;
-
-        final Index index = indices.get(dbName).getIndices().get(tableName).get(indexName);
-        if (entriesToDelete.get(tableName) != null) {
-          ConcurrentLinkedQueue<Object[]> keys = entriesToDelete.get(tableName).get(indexName);
-          logger.info("Deleting moved index entries: table=" + tableToDeleteEntriesFrom + INDEX_STR + indexName + ", count=" + keys.size());
-          if (keys.size() != 0) {
-            List<Future> futures = new ArrayList<>();
-
-            int offset = 0;
-            Map<Integer, List<Object[]>> byMutex = new HashMap<>();
-            for (Object[] key : keys) {
-              //Object mutex = index.getMutex(key);
-              List<Object[]> list = byMutex.get(offset % 100);
-              if (list == null) {
-                list = new ArrayList<>();
-                byMutex.put(offset % 100, list);
-              }
-              list.add(key);
-              offset++;
-            }
-
-            for (final List<Object[]> list : byMutex.values()) {
-              futures.add(executor.submit(new Callable(){
-                @Override
-                public Object call() throws Exception {
-                  int offset = 0;
-                  List<Object> toFree = new ArrayList<>();
-                  outer:
-                  while (offset < list.size()) {
-                    //synchronized (index.getMutex(list.get(offset))) {//index.getMutex(list.get(0))) {
-                      for (int i = 0; i < 100000; i++) {
-                        if (offset >= list.size()) {
-                          break outer;
-                        }
-                        Object obj = index.remove(list.get(offset));
-                        if (obj != null) {
-                          freedCount.incrementAndGet();
-                          toFree.add(obj);
-                        }
-                        offset++;
-                      }
-                    //}
-                  }
-
-                  Thread.sleep(1000);
-
-                  for (Object address : toFree) {
-                    if (address != null) {
-                      databaseServer.freeUnsafeIds(address);
-                    }
-                  }
-                  return null;
-                }
-              }));
-            }
-            for (Future future : futures) {
-              future.get();
-            }
-
-            keys.clear();
-
-            tableToDeleteEntriesFrom = null;
-
-            logger.info("Deleting moved index entries from index - finished: table=" +
-                tableName + ", shard=" + databaseServer.getShard() +
-                ", freedCount=" + freedCount.get() +
-                ", replica=" + databaseServer.getReplica() + ", duration=" + (System.currentTimeMillis() - begin) / 1000f + "sec");
-          }
-        }
-      }
-      catch (Exception e) {
-        logger.error("Error deleting moved index entries", e);
-      }
-      String notifyCommand = "DatabaseServer:notifyDeletingComplete:1:" + common.getSchemaVersion() + ":" + dbName + ":" + databaseServer.getShard() + ":" + databaseServer.getReplica();
-      Random rand = new Random(System.currentTimeMillis());
-      databaseServer.getDatabaseClient().send(null, 0, rand.nextLong(), notifyCommand, null, DatabaseClient.Replica.master);
-    }
-    catch (Exception e) {
-      logger.error("Error rebalancing index", e);
-    }
-    finally {
-      executor.shutdownNow();
-    }
-    return null;
-  }
+//  public byte[] deleteMovedIndexEntries(String command, final byte[] body) {
+//    command = command.replace(":deleteMovedIndexEntries:", ":doDeleteMovedIndexEntries:");
+//    databaseServer.getLongRunningCommands().addCommand(databaseServer.getLongRunningCommands().createSingleCommand(command, body));
+//    return null;
+//  }
+//
+//  public byte[] doDeleteMovedIndexEntries(final String command, final byte[] body) {
+//    ThreadPoolExecutor executor = new ThreadPoolExecutor(16, 16, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+//    try {
+//      long begin = System.currentTimeMillis();
+//      String[] parts = command.split(":");
+//      String dbName = parts[4];
+//      String tableName = parts[5];
+//      String indexName = parts[6];
+//      final AtomicInteger freedCount = new AtomicInteger();
+//      logger.info("doDeleteMovedIndexEntries: shard=" + databaseServer.getShard() + ", dbName=" + dbName +
+//        ", tableName=" + tableName + ", indexName=" + indexName);
+//      try {
+//        currTableRepartitioning = null;
+//        currIndexRepartitioning = null;
+//
+//        final Index index = indices.get(dbName).getIndices().get(tableName).get(indexName);
+//        if (entriesToDelete.get(tableName) != null) {
+//          ConcurrentLinkedQueue<Object[]> keys = entriesToDelete.get(tableName).get(indexName);
+//          logger.info("Deleting moved index entries: table=" + tableToDeleteEntriesFrom + INDEX_STR + indexName + ", count=" + keys.size());
+//          if (keys.size() != 0) {
+//            List<Future> futures = new ArrayList<>();
+//
+//            int offset = 0;
+//            Map<Integer, List<Object[]>> byMutex = new HashMap<>();
+//            for (Object[] key : keys) {
+//              //Object mutex = index.getMutex(key);
+//              List<Object[]> list = byMutex.get(offset % 100);
+//              if (list == null) {
+//                list = new ArrayList<>();
+//                byMutex.put(offset % 100, list);
+//              }
+//              list.add(key);
+//              offset++;
+//            }
+//
+//            for (final List<Object[]> list : byMutex.values()) {
+//              futures.add(executor.submit(new Callable(){
+//                @Override
+//                public Object call() throws Exception {
+//                  int offset = 0;
+//                  List<Object> toFree = new ArrayList<>();
+//                  outer:
+//                  while (offset < list.size()) {
+//                    //synchronized (index.getMutex(list.get(offset))) {//index.getMutex(list.get(0))) {
+//                      for (int i = 0; i < 100000; i++) {
+//                        if (offset >= list.size()) {
+//                          break outer;
+//                        }
+//                        Object obj = index.remove(list.get(offset));
+//                        if (obj != null) {
+//                          freedCount.incrementAndGet();
+//                          toFree.add(obj);
+//                        }
+//                        offset++;
+//                      }
+//                    //}
+//                  }
+//
+//                  Thread.sleep(1000);
+//
+//                  for (Object address : toFree) {
+//                    if (address != null) {
+//                      databaseServer.freeUnsafeIds(address);
+//                    }
+//                  }
+//                  return null;
+//                }
+//              }));
+//            }
+//            for (Future future : futures) {
+//              future.get();
+//            }
+//
+//            keys.clear();
+//
+//            tableToDeleteEntriesFrom = null;
+//
+//            logger.info("Deleting moved index entries from index - finished: table=" +
+//                tableName + ", shard=" + databaseServer.getShard() +
+//                ", freedCount=" + freedCount.get() +
+//                ", replica=" + databaseServer.getReplica() + ", duration=" + (System.currentTimeMillis() - begin) / 1000f + "sec");
+//          }
+//        }
+//      }
+//      catch (Exception e) {
+//        logger.error("Error deleting moved index entries", e);
+//      }
+//      String notifyCommand = "DatabaseServer:notifyDeletingComplete:1:" + common.getSchemaVersion() + ":" + dbName + ":" + databaseServer.getShard() + ":" + databaseServer.getReplica();
+//      Random rand = new Random(System.currentTimeMillis());
+//      databaseServer.getDatabaseClient().send(null, 0, rand.nextLong(), notifyCommand, null, DatabaseClient.Replica.master);
+//    }
+//    catch (Exception e) {
+//      logger.error("Error rebalancing index", e);
+//    }
+//    finally {
+//      executor.shutdownNow();
+//    }
+//    return null;
+//  }
 
   private void moveIndexEntriesToShard(
       String dbName, String tableName, String indexName, boolean primaryKey, int shard, List<MoveRequest> moveRequests) {

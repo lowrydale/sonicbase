@@ -2,11 +2,36 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Untitled Document</title>
-
-
-<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+<title>SonicBase - Diagnostics</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Instructions on how to gather diagnostic information from the SonicBase cluster.">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="../javascript/main.js"></script>
 </head>
+<body>
+<div class="container">
+    <header id="myHeader">
+        <a href="../index.html">
+            <h4 class="logo">SonicBase™</h4>
+        </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+
+    <div style="margin-left: 4em;">
 
 <h3>Overview</h3>
 When reporting an issue to SonicBase, you need to include a diangostics file. This is a file that contains
@@ -24,6 +49,7 @@ Windows, the user needs to zip the contents of the {installDir}/tmp directory.<b
 After the tarball or zip file is created, send it to SonicBase <a href="mailto:support@sonicbase.com">Support</a>
 with a list of the queries you were doing at the time the problem occurred.
 </div>
-<body>
+</div>
+</div>
 </body>
 </html>

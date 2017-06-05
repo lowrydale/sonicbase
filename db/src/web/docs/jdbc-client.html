@@ -2,23 +2,64 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Untitled Document</title>
-
-
-<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+<title>SonicBase - JDBC Driver</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="SonicBase support for the JDBC standard. Instructions on how to install the JDBC drive and how to connect with it.">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="../javascript/main.js"></script>
 </head>
+<body>
+<div class="container">
+    <header id="myHeader">
+        <a href="../index.html">
+            <h4 class="logo">SonicBase™</h4>
+        </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+    </header>
 
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+
+    <div style="margin-left: 4em;">
+
+    <h3>Installing the JDBC Driver Jar</h3>
+    For your code to be able to reference the jdbc driver you will need to install the jar in your local maven repository.
+    In your project's main directory, issue the following command:<br/>
+    <br/>
+    mvn install:install-file -Dfile=&lt;path&gt;/sonicbase-&lt;version&gt;.jar -DgroupId=com.sonicbase -DartifactId=sonicbase -Dversion=&lt;version&gt; -Dpackaging=jar<br/>
+    <br/>
+    For example:<br/>
+    <br/>
+    mvn install:install-file -Dfile=/home/user/sonicbase-0.9.2.jar -DgroupId=com.sonicbase -DartifactId=sonicbase -Dversion=0.9.2 -Dpackaging=jar<br/>
+    <br/>
+    The jar is located in the "lib" directory of the install directory. It is named "sonicbase-&lt;version&gt;.jar".<br/>
+    <br/>
+    Then add the jar to your project pom.xml file. In the dependencies section add the following:<br/>
+    <br/>
+    &nbsp;&nbsp;&lt;dependency&gt;<br/>
+    &nbsp;&nbsp;&nbsp;&nbsp;&lt;groupId&gt;com.sonicbase&lt;/groupId&gt;<br/>
+    &nbsp;&nbsp;&nbsp;&nbsp;&lt;artifactId&gt;sonicbase&lt;/artifactId&gt;<br/>
+    &nbsp;&nbsp;&nbsp;&nbsp;&lt;version&gt;&lt;version&gt;&lt;/version&gt;<br/>
+    &nbsp;&nbsp;&lt;/dependency&gt;<br/>
 <h3>Prerequisites</h3>
 <div class="mylink">
-Before you connect to the database you need to create the database using the client. See the
+Before you connect to the database you need to create the database using the administrative client. See the
 <a class="mylink" href="getting-started.html">Getting Started Guide</a> for an example.<br/>
-    <br/>
-    You must also include the SonicBase jdbc driver jar in your classpath. The jar is located
-    int the "lib" directory of the install directory. It is named "sonicbase-[version].jar".
 </div>
 
 <h3>JDK Requirements</h3>
-The jvm running the jdbc client needs to be at least version 7.
+The jvm running the jdbc driver needs to be at least version 7.
 <br/>
 
 <h3>Connecting</h3>
@@ -32,6 +73,7 @@ Connect to the database with the following code:<br/>
 "address" should be the ip address of the first server in the config file.
 
 
-<body>
+</div>
+</div>
 </body>
 </html>

@@ -2,11 +2,37 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Untitled Document</title>
-
-
-<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+<title>SonicBase - Supported Data Types</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="A list of all the jdbc datatypes and an indication of which ones are supported by SonicBase.">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="../javascript/main.js"></script>
 </head>
+
+<body>
+<div class="container">
+    <header id="myHeader">
+        <a href="../index.html">
+            <h4 class="logo">SonicBase™</h4>
+        </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+
+    <div style="margin-left: 4em;">
 
 <h3>Data Types</h3>
 <table border="1" cellpadding=2 cellspacing="0">
@@ -52,7 +78,7 @@
     <tr><td>TIMESTAMP_WITH_TIMEZONE</td><td>Not Supported</td></tr>
     <tr><td>PARAMETER</td><td>Not Supported</td></tr>
 </table>
-
-<body>
+</div>
+</div>
 </body>
 </html>

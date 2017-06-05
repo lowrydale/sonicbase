@@ -2,11 +2,38 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Untitled Document</title>
-<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+<title>SonicBase - Select SQL Syntax Order By</title>
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="SonicBase SQL syntax for order-by expressions. This allows you to specify how the results are sorted.">
+	<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+	<script type="text/javascript" src="../javascript/main.js"></script>
 </head>
 
 <body>
+<div class="container">
+	<header id="myHeader">
+		<a href="../index.html">
+			<h4 class="logo">SonicBase™</h4>
+		</a>
+		<nav>
+			<ul>
+				<li><a href="../index.html">HOME</a></li>
+				<li> <a href="../documentation.html">DOCUMENTATION</a></li>
+				<li><a href="../contact.html">CONTACT</a></li>
+			</ul>
+		</nav>
+	</header>
+
+	<script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+	</script>
+
+
+	<div style="margin-left: 4em;">
+
 Reads records from the database and returns them in the specified sort order.<br/>
 <br/>
 <p>Syntax<table class="border-table" border="1"><tr><td>
@@ -69,6 +96,7 @@ select * from persons order by name asc, age desc<br/>
 	</tr>
 	</tbody>
 </table>
-
+</div>
+</div>
 </body>
 </html>

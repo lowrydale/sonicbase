@@ -6,14 +6,16 @@
 .image {
    position: relative;
    width: 100%; /* for IE 6 */
-   margin-top=-5px;
+
 }
 
 div.mobile { display: none }
-table.desktop { display: block }
-@media (max-width: 640px) {
-	div.mobile { display: block }
-	table.desktop { display: none }
+div.desktop { display: block }
+table.desktop { display: block; width="100%"; }
+
+iframe {
+	width:100%;
+	height:1024px;
 }
 
 mainPageH2 {
@@ -25,6 +27,7 @@ mainPageH2 {
     left: 500px;
     top: 150px;
     width: 100%;
+	font-family: arial;
 }
 mainPageH3 {
 
@@ -35,6 +38,7 @@ mainPageH3 {
     left: 500px;
     top: 250px;
     width: 100%;
+	font-family: arial;
 }
 mainPageH4 {
 	color: #fff;
@@ -44,10 +48,11 @@ mainPageH4 {
     left: 530px;
     top: 190px;
     width: 100%;
+	font-family: arial;
 }
 
 t0i {
-	
+
 	color: #FFFFFF;
 	font-size: 14px;
 	text-align: left;
@@ -70,7 +75,10 @@ body {
 	margin-left: 0px;
 	font-style: normal;
 	font-weight: 200;
+	font-size: 14px;
+
 }
+
 /* Container */
 .container {
 	width: 100%;
@@ -85,13 +93,13 @@ body {
 	margin-right: 0px;
 	height: 1000px;
 	background-color: #f2f2f2;
+	font-size: 16px;
 }
 /* Navigation */
 header {
 	width: 100%;
 	height: 5%;
 	background-color: #26a5bf;
-	   margin-bottom=-5px;
 
 }
 table.border-table, tr.border-table, td.border-table {
@@ -126,13 +134,13 @@ td.syntax-detail{
 .logo {
 	color: #fff;
 	font-weight: bold;
-	text-align: undefined;
 	width: 10%;
 	float: left;
 	margin-top: 15px;
 	margin-left: 25px;
 	letter-spacing: 4px;
 	margin-bottom: -5px;
+	font-family: arial;
 }
 nav {
 	float: right;
@@ -153,6 +161,7 @@ nav ul li {
 	letter-spacing: 2px;
 	font-weight: bold;
 	transition: all 0.3s linear;
+	font-family: arial;
 }
 
 ul li a:link {
@@ -164,10 +173,10 @@ ul li a:visited {
 	text-decoration: none;
 }
 ul li:hover a {
-	color: #2C9AB7;
+	color: #abaeae;
 }
 .mylink a:link {
-	color: #11B0F7;
+	color: #26a5bf;
 	text-decoration: underline;
 }
 .mylink a:visited {
@@ -185,6 +194,7 @@ hover a {
 	margin-bottom: 0px;
 	margin-left: 0px;
 	letter-spacing: 4px;
+	font-family: arial
 }
 /* Hero Section */
 .hero {
@@ -263,7 +273,6 @@ hover a {
 /* Parallax Section */
 .banner {
 	background-color: #2D9AB7;
-	background-image: url(../images/parallax.png);
 	height: 400px;
 	background-attachment: fixed;
 	background-size: cover;
@@ -343,6 +352,7 @@ footer .footer_column p {
 	border: 3px solid #FFFFFF;
 	color: #FFFFFF;
 	transition: all 0.3s linear;
+	font-family: arial;
 }
 .button:hover {
 	background-color: #FEFEFE;
@@ -365,7 +375,6 @@ footer .footer_column p {
 	padding-top: 60px;
 	padding-bottom: 60PX;
 	margin-bottom: 0px;
-	background-image: url(../images/pattern.png);
 	background-repeat: repeat;
 }
 footer {
@@ -377,13 +386,64 @@ footer {
 
 /* Mobile */
 @media (max-width: 320px) {
-.logo {
+	div.mobile { display: block }
+	div.desktop { display: none }
+	table.desktop { display: none }
+
+	body {
+		font-family: source-sans-pro;
+		background-color: #f2f2f2;
+		margin-top: 0px;
+		margin-right: 0px;
+		margin-bottom: 0px;
+		margin-left: 0px;
+		font-style: normal;
+		font-weight: 200;
+		font-size: 5vw;
+
+	}
+
+	mainPageH2 {
+
+		color: #fff;
+		font-weight: bold;
+		position: absolute;
+		font-size: 30px;
+		left: 120px;
+		top: 30px;
+		width: 100%;
+		font-family: arial;
+	}
+	mainPageH3 {
+
+		color: #fff;
+		font-weight: bold;
+		position: absolute;
+		font-size: 24px;
+		left: 10px;
+		top: 160px;
+		width: 100%;
+		font-family: arial;
+	}
+	mainPageH4 {
+		color: #fff;
+		font-weight: bold;
+		position: absolute;
+		font-size: 14px;
+		left: 110px;
+		top: 70px;
+		width: 100%;
+		font-family: arial;
+	}
+
+	.logo {
 	width: 100%;
 	text-align: center;
 	margin-top: 13px;
 	margin-right: 0px;
 	margin-bottom: 0px;
 	margin-left: 0px;
+		font-family: arial;
 }
 .container header nav {
 	margin-top: 0px;
@@ -403,6 +463,7 @@ nav ul li {
 	margin-left: 0px;
 	width: 100%;
 	text-align: center;
+	font-family: arial;
 }
 .text_column {
 	width: 100%;
@@ -458,12 +519,63 @@ nav ul li {
 	padding-right: 10px;
 	line-height: 22px;
 	text-align: center;
+	font-family: arial
 }
 }
 
 /* Small Tablets */
-@media (min-width: 321px)and (max-width: 767px) {
-.logo {
+@media (min-device-width: 321px)and (max-device-width: 767px) {
+	div.mobile { display: block }
+	div.desktop { display: none }
+	table.desktop { display: none }
+
+	body {
+		font-family: source-sans-pro;
+		background-color: #f2f2f2;
+		margin-top: 0px;
+		margin-right: 0px;
+		margin-bottom: 0px;
+		margin-left: 0px;
+		font-style: normal;
+		font-weight: 200;
+		font-size: 5vw;
+
+	}
+
+	mainPageH2 {
+
+		color: #fff;
+		font-weight: bold;
+		position: absolute;
+		font-size: 30px;
+		left: 120px;
+		top: 30px;
+		width: 100%;
+		font-family: arial;
+	}
+	mainPageH3 {
+
+		color: #fff;
+		font-weight: bold;
+		position: absolute;
+		font-size: 24px;
+		left: 10px;
+		top: 160px;
+		width: 100%;
+		font-family: arial;
+	}
+	mainPageH4 {
+		color: #fff;
+		font-weight: bold;
+		position: absolute;
+		font-size: 14px;
+		left: 110px;
+		top: 70px;
+		width: 100%;
+		font-family: arial;
+	}
+
+	.logo {
 	width: 100%;
 	text-align: center;
 	margin-top: 13px;
@@ -471,6 +583,7 @@ nav ul li {
 	margin-bottom: 0px;
 	margin-left: 0px;
 	color: #043745;
+		font-family: arial;
 }
 .container header nav {
 	margin-top: 0px;
@@ -496,6 +609,7 @@ nav ul li {
 	text-align: center;
 	padding-top: 8px;
 	padding-bottom: 8px;
+	font-family: arial;
 }
 .text_column {
 	width: 100%;

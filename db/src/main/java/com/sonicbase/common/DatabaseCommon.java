@@ -853,10 +853,10 @@ public class DatabaseCommon {
         configFile.delete();
       }
       configFile.getParentFile().mkdirs();
-      DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(configFile)));
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-      out.write(serializeConfig());
-      out.close();
+      try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(configFile)))) {
+        DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+        out.write(serializeConfig());
+      }
     }
   }
 

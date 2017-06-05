@@ -568,6 +568,9 @@ public class ResultSetImpl implements ResultSet {
       }
       return false;
     }
+    if (selectContext.getCurrKeys() == null) {
+      return true;
+    }
     return currPos == selectContext.getCurrKeys().length - 1 && !isBeforeFirst();
   }
 

@@ -2,11 +2,37 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Untitled Document</title>
-<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+<title>SonicBase - Performance Considerations</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="SonicBase remcomendations to get the best performance out of your SonicBase cluster.">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="../javascript/main.js"></script>
 </head>
 
 <body>
+<div class="container">
+    <header id="myHeader">
+        <a href="../index.html">
+            <h4 class="logo">SonicBase™</h4>
+        </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+
+    <div style="margin-left: 4em;">
 
 <h2>Prepared Statements</h2>
 It is important that you use a parameterized prepared statement. You should not use contstants for parameters
@@ -37,6 +63,8 @@ recommended that you have an SSD disk with 5k iops.
 <div class="mylink">
     The nework will likely be your bottlneck when using SonicBase. It is recommened that you configure
 the most performance network that you can. On aws it is recommended that you use <a href="http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/enhanced-networking.html">"Enhanced Networking."</a>
+</div>
+</div>
 </div>
 </body>
 </html>

@@ -221,137 +221,9 @@ public class DiskBasedResultSet {
     }
     File outFile = new File(file, name);
     DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new LzoOutputStream(new FileOutputStream(outFile))));
-
-    DataInputStream in1 = new DataInputStream(new BufferedInputStream(new LzoInputStream(new FileInputStream(file1), new LzoDecompressor1x())));
-    DataInputStream in2 = new DataInputStream(new BufferedInputStream(new LzoInputStream(new FileInputStream(file2), new LzoDecompressor1x())));
-
-    List<OrderByExpressionImpl> orderByExpressions = select.getOrderByExpressions();
-    final int[] fieldOffsets = new int[orderByExpressions.size()];
-    final boolean[] ascendingFlags = new boolean[orderByExpressions.size()];
-    final Comparator[] comparators = new Comparator[orderByExpressions.size()];
-    final int[] tableOffsets = new int[orderByExpressions.size()];
-    for (int i = 0; i < orderByExpressions.size(); i++) {
-      String tableName = orderByExpressions.get(i).getTableName();
-      for (int j = 0; j < tableNames.length; j++) {
-        if (tableName == null) {
-          tableOffsets[i] = 0;
-        }
-        else {
-          if (tableName.equals(tableNames[j])) {
-            tableOffsets[i] = j;
-            break;
-          }
-        }
-      }
-      if (tableName == null) {
-        tableName = tableNames[0];
-      }
-      TableSchema tableSchema = server.getClient().getCommon().getTables(dbName).get(tableName);
-      fieldOffsets[i] = tableSchema.getFieldOffset(orderByExpressions.get(i).getColumnName());
-      ascendingFlags[i] = orderByExpressions.get(i).isAscending();
-      FieldSchema fieldSchema = tableSchema.getFields().get(fieldOffsets[i]);
-      comparators[i] = fieldSchema.getType().getComparator();
-    }
-
-    Comparator<Record[]> comparator = new Comparator<Record[]>() {
-      @Override
-      public int compare(Record[] o1, Record[] o2) {
-        for (int i = 0; i < fieldOffsets.length; i++) {
-          if (o1[tableOffsets[i]] == null && o2[tableOffsets[i]] == null) {
-            continue;
-          }
-          if (o1[tableOffsets[i]] == null) {
-            return -1 * (ascendingFlags[i] ? 1 : -1);
-          }
-          if (o2[tableOffsets[i]] == null) {
-            return 1 * (ascendingFlags[i] ? 1 : -1);
-          }
-
-          int value = comparators[i].compare(o1[tableOffsets[i]].getFields()[fieldOffsets[i]], o2[tableOffsets[i]].getFields()[fieldOffsets[i]]);
-          if (value < 0) {
-            return -1 * (ascendingFlags[i] ? 1 : -1);
-          }
-          if (value > 0) {
-            return 1 * (ascendingFlags[i] ? 1 : -1);
-          }
-        }
-        return 0;
-      }
-    };
-
-    AtomicInteger page = new AtomicInteger();
-    AtomicInteger rowNumber = new AtomicInteger();
-    DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-    Record[] row1 = null;
-    Record[] row2 = null;
-    while (true) {
-      if (row1 == null) {
-        row1 = readRow(dbName, in1, resultLength);
-      }
-      if (row2 == null) {
-        row2 = readRow(dbName, in2, resultLength);
-      }
-      if (row1 == null) {
-        if (row2 == null) {
-          break;
-        }
-        out = writeRow(row2, out, rowNumber, page, file, resultLength);
-        row2 = null;
-        continue;
-      }
-      if (row2 == null) {
-        if (row1 == null) {
-          break;
-        }
-        out = writeRow(row1, out, rowNumber, page, file, resultLength);
-        row1 = null;
-        continue;
-      }
-
-      int compareValue = comparator.compare(row1, row2);
-      if (compareValue == 0) {
-        out = writeRow(row1, out, rowNumber, page, file, resultLength);
-        out = writeRow(row2, out, rowNumber, page, file, resultLength);
-        row1 = null;
-        row2 = null;
-      }
-      else if (compareValue == 1) {
-        out = writeRow(row2, out, rowNumber, page, file, resultLength);
-        row2 = null;
-      }
-      else {
-        out = writeRow(row1, out, rowNumber, page, file, resultLength);
-        row1 = null;
-      }
-    }
-    out.close();
-
-    in1.close();
-    in2.close();
-
-    file1.delete();
-    file2.delete();
-    if (!lastTwoFiles) {
-      outFile.renameTo(file1);
-    }
-  }
-
-  static class MergeRow {
-    private int streamOffset;
-    private Record[] row;
-  }
-
-  private void mergeNFiles(String dbName, File dir, File[] files) {
-    try {
-      String name = "page-0";
-      File outFile = new File(dir, name);
-      DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new LzoOutputStream(new FileOutputStream(outFile))));
-
-      List<DataInputStream> inStreams = new ArrayList<>();
-      for (File file : files) {
-        DataInputStream in = new DataInputStream(new BufferedInputStream(new LzoInputStream(new FileInputStream(file), new LzoDecompressor1x())));
-        inStreams.add(in);
-      }
+    try (DataInputStream in1 = new DataInputStream(new BufferedInputStream(new LzoInputStream(new FileInputStream(file1), new LzoDecompressor1x())));
+        DataInputStream in2 = new DataInputStream(new BufferedInputStream(new LzoInputStream(new FileInputStream(file2), new LzoDecompressor1x()))))
+    {
 
       List<OrderByExpressionImpl> orderByExpressions = select.getOrderByExpressions();
       final int[] fieldOffsets = new int[orderByExpressions.size()];
@@ -381,21 +253,21 @@ public class DiskBasedResultSet {
         comparators[i] = fieldSchema.getType().getComparator();
       }
 
-      Comparator<MergeRow> comparator = new Comparator<MergeRow>() {
+      Comparator<Record[]> comparator = new Comparator<Record[]>() {
         @Override
-        public int compare(MergeRow o1, MergeRow o2) {
+        public int compare(Record[] o1, Record[] o2) {
           for (int i = 0; i < fieldOffsets.length; i++) {
-            if (o1.row[tableOffsets[i]] == null && o2.row[tableOffsets[i]] == null) {
+            if (o1[tableOffsets[i]] == null && o2[tableOffsets[i]] == null) {
               continue;
             }
-            if (o1.row[tableOffsets[i]] == null) {
+            if (o1[tableOffsets[i]] == null) {
               return -1 * (ascendingFlags[i] ? 1 : -1);
             }
-            if (o2.row[tableOffsets[i]] == null) {
+            if (o2[tableOffsets[i]] == null) {
               return 1 * (ascendingFlags[i] ? 1 : -1);
             }
 
-            int value = comparators[i].compare(o1.row[tableOffsets[i]].getFields()[fieldOffsets[i]], o2.row[tableOffsets[i]].getFields()[fieldOffsets[i]]);
+            int value = comparators[i].compare(o1[tableOffsets[i]].getFields()[fieldOffsets[i]], o2[tableOffsets[i]].getFields()[fieldOffsets[i]]);
             if (value < 0) {
               return -1 * (ascendingFlags[i] ? 1 : -1);
             }
@@ -407,45 +279,145 @@ public class DiskBasedResultSet {
         }
       };
 
-      ConcurrentSkipListMap<MergeRow, List<MergeRow>> currRows = new ConcurrentSkipListMap<MergeRow, List<MergeRow>>(comparator);
-      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-      for (int i = 0; i < inStreams.size(); i++) {
-        DataInputStream in = inStreams.get(i);
-        Record[] row = readRow(dbName, in, resultLength);
-        if (row == null) {
-          continue;
-        }
-        MergeRow mergeRow = new MergeRow();
-        mergeRow.row = row;
-        mergeRow.streamOffset = i;
-        List<MergeRow> rows = currRows.get(mergeRow);
-        if (rows == null) {
-          rows = new ArrayList<>();
-        }
-        rows.add(mergeRow);
-        currRows.put(mergeRow, rows);
-      }
-
       AtomicInteger page = new AtomicInteger();
       AtomicInteger rowNumber = new AtomicInteger();
+      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+      Record[] row1 = null;
+      Record[] row2 = null;
       while (true) {
-        Map.Entry<MergeRow, List<MergeRow>> first = currRows.firstEntry();
-        if (first == null || first.getKey().row == null) {
-          break;
+        if (row1 == null) {
+          row1 = readRow(dbName, in1, resultLength);
         }
-        List<MergeRow> toAdd = new ArrayList<>();
-        for (MergeRow row : first.getValue()) {
-          out = writeRow(row.row, out, rowNumber, page, dir, resultLength);
-          Record[] nextRow = readRow(dbName, inStreams.get(row.streamOffset), resultLength);
-          if (nextRow != null) {
-            MergeRow mergeRow = new MergeRow();
-            mergeRow.row = nextRow;
-            mergeRow.streamOffset = row.streamOffset;
-            toAdd.add(mergeRow);
+        if (row2 == null) {
+          row2 = readRow(dbName, in2, resultLength);
+        }
+        if (row1 == null) {
+          if (row2 == null) {
+            break;
           }
+          out = writeRow(row2, out, rowNumber, page, file, resultLength);
+          row2 = null;
+          continue;
         }
-        currRows.remove(first.getKey());
-        for (MergeRow mergeRow : toAdd) {
+        if (row2 == null) {
+          if (row1 == null) {
+            break;
+          }
+          out = writeRow(row1, out, rowNumber, page, file, resultLength);
+          row1 = null;
+          continue;
+        }
+
+        int compareValue = comparator.compare(row1, row2);
+        if (compareValue == 0) {
+          out = writeRow(row1, out, rowNumber, page, file, resultLength);
+          out = writeRow(row2, out, rowNumber, page, file, resultLength);
+          row1 = null;
+          row2 = null;
+        }
+        else if (compareValue == 1) {
+          out = writeRow(row2, out, rowNumber, page, file, resultLength);
+          row2 = null;
+        }
+        else {
+          out = writeRow(row1, out, rowNumber, page, file, resultLength);
+          row1 = null;
+        }
+      }
+    }
+    finally {
+      out.close();
+    }
+
+    file1.delete();
+    file2.delete();
+    if (!lastTwoFiles) {
+      outFile.renameTo(file1);
+    }
+  }
+
+  static class MergeRow {
+    private int streamOffset;
+    private Record[] row;
+  }
+
+  private void mergeNFiles(String dbName, File dir, File[] files) {
+    try {
+      String name = "page-0";
+      File outFile = new File(dir, name);
+      List<DataInputStream> inStreams = new ArrayList<>();
+      DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new LzoOutputStream(new FileOutputStream(outFile))));
+      try {
+        for (File file : files) {
+          DataInputStream in = new DataInputStream(new BufferedInputStream(new LzoInputStream(new FileInputStream(file), new LzoDecompressor1x())));
+          inStreams.add(in);
+        }
+
+        List<OrderByExpressionImpl> orderByExpressions = select.getOrderByExpressions();
+        final int[] fieldOffsets = new int[orderByExpressions.size()];
+        final boolean[] ascendingFlags = new boolean[orderByExpressions.size()];
+        final Comparator[] comparators = new Comparator[orderByExpressions.size()];
+        final int[] tableOffsets = new int[orderByExpressions.size()];
+        for (int i = 0; i < orderByExpressions.size(); i++) {
+          String tableName = orderByExpressions.get(i).getTableName();
+          for (int j = 0; j < tableNames.length; j++) {
+            if (tableName == null) {
+              tableOffsets[i] = 0;
+            }
+            else {
+              if (tableName.equals(tableNames[j])) {
+                tableOffsets[i] = j;
+                break;
+              }
+            }
+          }
+          if (tableName == null) {
+            tableName = tableNames[0];
+          }
+          TableSchema tableSchema = server.getClient().getCommon().getTables(dbName).get(tableName);
+          fieldOffsets[i] = tableSchema.getFieldOffset(orderByExpressions.get(i).getColumnName());
+          ascendingFlags[i] = orderByExpressions.get(i).isAscending();
+          FieldSchema fieldSchema = tableSchema.getFields().get(fieldOffsets[i]);
+          comparators[i] = fieldSchema.getType().getComparator();
+        }
+
+        Comparator<MergeRow> comparator = new Comparator<MergeRow>() {
+          @Override
+          public int compare(MergeRow o1, MergeRow o2) {
+            for (int i = 0; i < fieldOffsets.length; i++) {
+              if (o1.row[tableOffsets[i]] == null && o2.row[tableOffsets[i]] == null) {
+                continue;
+              }
+              if (o1.row[tableOffsets[i]] == null) {
+                return -1 * (ascendingFlags[i] ? 1 : -1);
+              }
+              if (o2.row[tableOffsets[i]] == null) {
+                return 1 * (ascendingFlags[i] ? 1 : -1);
+              }
+
+              int value = comparators[i].compare(o1.row[tableOffsets[i]].getFields()[fieldOffsets[i]], o2.row[tableOffsets[i]].getFields()[fieldOffsets[i]]);
+              if (value < 0) {
+                return -1 * (ascendingFlags[i] ? 1 : -1);
+              }
+              if (value > 0) {
+                return 1 * (ascendingFlags[i] ? 1 : -1);
+              }
+            }
+            return 0;
+          }
+        };
+
+        ConcurrentSkipListMap<MergeRow, List<MergeRow>> currRows = new ConcurrentSkipListMap<MergeRow, List<MergeRow>>(comparator);
+        DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+        for (int i = 0; i < inStreams.size(); i++) {
+          DataInputStream in = inStreams.get(i);
+          Record[] row = readRow(dbName, in, resultLength);
+          if (row == null) {
+            continue;
+          }
+          MergeRow mergeRow = new MergeRow();
+          mergeRow.row = row;
+          mergeRow.streamOffset = i;
           List<MergeRow> rows = currRows.get(mergeRow);
           if (rows == null) {
             rows = new ArrayList<>();
@@ -453,11 +425,41 @@ public class DiskBasedResultSet {
           rows.add(mergeRow);
           currRows.put(mergeRow, rows);
         }
-      }
-      out.close();
 
-      for (DataInputStream in : inStreams) {
-        in.close();
+        AtomicInteger page = new AtomicInteger();
+        AtomicInteger rowNumber = new AtomicInteger();
+        while (true) {
+          Map.Entry<MergeRow, List<MergeRow>> first = currRows.firstEntry();
+          if (first == null || first.getKey().row == null) {
+            break;
+          }
+          List<MergeRow> toAdd = new ArrayList<>();
+          for (MergeRow row : first.getValue()) {
+            out = writeRow(row.row, out, rowNumber, page, dir, resultLength);
+            Record[] nextRow = readRow(dbName, inStreams.get(row.streamOffset), resultLength);
+            if (nextRow != null) {
+              MergeRow mergeRow = new MergeRow();
+              mergeRow.row = nextRow;
+              mergeRow.streamOffset = row.streamOffset;
+              toAdd.add(mergeRow);
+            }
+          }
+          currRows.remove(first.getKey());
+          for (MergeRow mergeRow : toAdd) {
+            List<MergeRow> rows = currRows.get(mergeRow);
+            if (rows == null) {
+              rows = new ArrayList<>();
+            }
+            rows.add(mergeRow);
+            currRows.put(mergeRow, rows);
+          }
+        }
+      }
+      finally {
+        out.close();
+        for (DataInputStream in : inStreams) {
+          in.close();
+        }
       }
 
       for (File file : files) {
@@ -532,26 +534,26 @@ public class DiskBasedResultSet {
     try {
 
       File subFile = new File(file, String.valueOf(fileOffset));
-      BufferedOutputStream bufferedOut = new BufferedOutputStream(new LzoOutputStream(new FileOutputStream(subFile)));
-      DataOutputStream out = new DataOutputStream(bufferedOut);
+      try (BufferedOutputStream bufferedOut = new BufferedOutputStream(new LzoOutputStream(new FileOutputStream(subFile)));
+        DataOutputStream out = new DataOutputStream(bufferedOut)) {
 
-      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-      for (int i = 0; i < records.length; i++) {
-        for (int j = 0; j < records[0].length; j++) {
-          ExpressionImpl.CachedRecord record = records[i][j];
-          if (record == null) {
-            out.writeBoolean(false);
-          }
-          else {
-            out.writeBoolean(true);
-            Record rec = record.getRecord();//record.serialize(server.getCommon());
-            byte[] bytes = rec.serialize(server.getCommon());
-            DataUtil.writeVLong(out, bytes.length, resultLength);
-            out.write(bytes);
+        DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+        for (int i = 0; i < records.length; i++) {
+          for (int j = 0; j < records[0].length; j++) {
+            ExpressionImpl.CachedRecord record = records[i][j];
+            if (record == null) {
+              out.writeBoolean(false);
+            }
+            else {
+              out.writeBoolean(true);
+              Record rec = record.getRecord();//record.serialize(server.getCommon());
+              byte[] bytes = rec.serialize(server.getCommon());
+              DataUtil.writeVLong(out, bytes.length, resultLength);
+              out.write(bytes);
+            }
           }
         }
       }
-      out.close();
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -588,55 +590,55 @@ public class DiskBasedResultSet {
     if (!subFile.exists()) {
       return null;
     }
-    BufferedInputStream bufferedIn = new BufferedInputStream(new LzoInputStream(new FileInputStream(subFile), new LzoDecompressor1x()));
-    DataInputStream in = new DataInputStream(bufferedIn);
+    try (BufferedInputStream bufferedIn = new BufferedInputStream(new LzoInputStream(new FileInputStream(subFile), new LzoDecompressor1x()));
+         DataInputStream in = new DataInputStream(bufferedIn)) {
 
-    DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
 
-//    //skip to the right page
-//    try {
-//      for (int i = 0; i < pageNumber * count; i++) {
-//        for (int j = 0; j < tableNames.length; j++) {
-//          if (in.readBoolean()) {
-//            int len = (int) DataUtil.readVLong(in, resultLength);
-//            byte[] bytes = new byte[len];
-//            in.readFully(bytes);
-//          }
-//        }
-//      }
-//    }
-//    catch (EOFException e) {
-//      //expected
-//    }
+      //    //skip to the right page
+      //    try {
+      //      for (int i = 0; i < pageNumber * count; i++) {
+      //        for (int j = 0; j < tableNames.length; j++) {
+      //          if (in.readBoolean()) {
+      //            int len = (int) DataUtil.readVLong(in, resultLength);
+      //            byte[] bytes = new byte[len];
+      //            in.readFully(bytes);
+      //          }
+      //        }
+      //      }
+      //    }
+      //    catch (EOFException e) {
+      //      //expected
+      //    }
 
-    List<byte[][]> records = new ArrayList<>();
-    try {
-      while (true) {
-        byte[][] row = new byte[tableNames.length][];
-        for (int j = 0; j < tableNames.length; j++) {
-          if (in.readBoolean()) {
-            int len = (int) DataUtil.readVLong(in, resultLength);
-            byte[] bytes = new byte[len];
-            in.readFully(bytes);
-            row[j] = bytes;
+      List<byte[][]> records = new ArrayList<>();
+      try {
+        while (true) {
+          byte[][] row = new byte[tableNames.length][];
+          for (int j = 0; j < tableNames.length; j++) {
+            if (in.readBoolean()) {
+              int len = (int) DataUtil.readVLong(in, resultLength);
+              byte[] bytes = new byte[len];
+              in.readFully(bytes);
+              row[j] = bytes;
+            }
           }
+          records.add(row);
         }
-        records.add(row);
       }
-    }
-    catch (EOFException e) {
-      //expected
-    }
+      catch (EOFException e) {
+        //expected
+      }
 
-    if (records.size() == 0) {
-      return null;
-    }
+      if (records.size() == 0) {
+        return null;
+      }
 
-    byte[][][] ret = new byte[records.size()][][];
-    for (int i = 0; i < ret.length; i++) {
-      ret[i] = records.get(i);
+      byte[][][] ret = new byte[records.size()][][];
+      for (int i = 0; i < ret.length; i++) {
+        ret[i] = records.get(i);
+      }
+      return ret;
     }
-
-    return ret;
   }
 }

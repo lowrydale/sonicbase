@@ -6,7 +6,7 @@ mkdir -p $HOME/sonicbase/logs
 #mkdir -p $HOME/sonicbase/lib/linux64
 
 ./build-jar
-mkdir -p $HOME/sonicbase/libs
+mkdir -p $HOME/sonicbase/lib
 rsync -vlLt --exclude sonicbase-*shaded.jar db/target/sonicbase-*.jar $HOME/sonicbase/lib
 #rsync -vlLt repo/* $HOME/sonicbase/lib
 #mvn dependency:copy-dependencies -DoutputDirectory=$HOME/sonicbase/lib

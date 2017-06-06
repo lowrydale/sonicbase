@@ -2,10 +2,10 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>SonicBase - Benchmarks 32-Server Range Query</title>
+<title>SonicBase - Benchmarks 4-Server Range Query</title>
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="In this benchmark we create a range query that selects the entire database and we iterate over all the results on a 32 server cluster.">
+    <meta name="description" content="In this benchmark we create a range query that selects the entire database and we iterate over all the results on a 4, 8, 16 and 32 server cluster.">
     <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
     <script type="text/javascript" src="../javascript/main.js"></script>
 </head>
@@ -34,7 +34,7 @@
 
     <div style="margin-left: 4em;">
 
-In this benchmark we create a range query that selects the entire database and we iterate over all the results on a 32 server cluster.<br/>
+In this benchmark we create a range query that selects the entire database and we iterate over all the results on a 4, 8, 16, and 32 server cluster.<br/>
 <br/>
 <p>PreparedStatement stmt = con.prepareStatement("select persons.id1, id2 from persons where id1 >= 0 order by id1 asc)<br/><br/>
 	ResultSet rs = stmt.executeQuery();<br/>
@@ -43,71 +43,116 @@ In this benchmark we create a range query that selects the entire database and w
 	}<br/>
 	
 		<div class="mylink">
-	<a href="benchmarks-schema.html">Schema and Insert Code</a><br/><br/>
+	<a href="benchmarks-schema.html?framed=true">Schema and Insert Code</a><br/><br/>
 	</div>
-	
-<table width="411" border="1" cellpadding=2 cellspacing="0">
-  <tbody>
-   <tr class="example-header">
-      <td width="50">Metric</td>
-      <td width="33">Value</td>
+
+<table class="syntax-table" border="1" cellpadding=2 cellspacing="0">
+    <tbody>
+    <tr class="syntax-main">
+      <td>Metric</td>
+      <td>4-server</td>
+        <td>8-server</td>
+        <td>16-server</td>
+        <td>32-server</td>
     </tr>
     <tr>
       <td>Record size</td>
       <td>120 bytes</td>
+        <td>120 bytes</td>
+        <td>120 bytes</td>
+        <td>120 bytes</td>
     </tr>
     <tr>
       <td>Record count</td>
-      <td>4 billion</td>
+      <td>500 million</td>
+        <td>1 billion</td>
+        <td>2 billion</td>
+        <td>4 billion</td>
     </tr>
     <tr>
       <td>Server total mem</td>
       <td>60g</td>
+        <td>60g</td>
+        <td>60g</td>
+        <td>60g</td>
     </tr>
     <tr>
       <td>Server xmx</td>
-      <td>33g</td>
+      <td>32g</td>
+        <td>32g</td>
+        <td>32g</td>
+        <td>32g</td>
     </tr>
     <tr>
       <td>Resident mem</td>
       <td>52g</td>
+        <td>52g</td>
+        <td>52g</td>
+        <td>52g</td>
     </tr>
     <tr>
       <td>Client machine count</td>
-      <td>32</td>
+      <td>8</td>
+        <td>16</td>
+        <td>32</td>
+        <td>64</td>
     </tr>
         <tr>
       <td>Cores per client machine</td>
       <td>4</td>
+            <td>4</td>
+            <td>4</td>
+            <td>4</td>
     </tr>
     <tr>
     	<td>Cores per server machine</td>
     	<td>8</td>
+        <td>8</td>
+        <td>8</td>
+        <td>8</td>
     </tr>
 
     <tr>
       <td>Call rate</td>
-      <td>17.6mil/sec</td>
+      <td>3.7 mil/sec</td>
+        <td>5.8 mil/sec</td>
+        <td>9.7 mil/sec</td>
+        <td>17.6 mil/sec</td>
     </tr>
    <tr>
        <td>Call latency</td>
+       <td>8860 nanos</td>
+       <td>10800 nanos</td>
+       <td>12500 nanos</td>
        <td>14400 nanos</td>
    </tr>
      <tr>
       <td>Threads per client</td>
       <td>16</td>
+         <td>16</td>
+         <td>16</td>
+         <td>16</td>
     </tr>
     <tr>
       <td>Server cpu</td>
-      <td>15%</td>
+      <td>95%</td>
+        <td>95%</td>
+        <td>95%</td>
+        <td>95%</td>
     </tr>
     <tr>
     	<td>Shard Count</td>
-    	<td>32</td>
+    	<td>4</td>
+        <td>8</td>
+        <td>15</td>
+        <td>32</td>
     </tr>
     <tr>
     	<td>Replica Count</td>
     	<td>1</td>
+        <td>1</td>
+        <td>1</td>
+        <td>1</td>
     </tr>
   </tbody>
 </table>

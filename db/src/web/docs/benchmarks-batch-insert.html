@@ -2,10 +2,10 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>SonicBase - Benchmarks 8-Server Batch Insert</title>
+<title>SonicBase - Benchmarks 4-Server Batch Insert</title>
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="In this benchmark we add person records and membership records to the database in batches on an 8 server cluster.">
+    <meta name="description" content="In this benchmark we add persons record and membership records to the database in batches on a 4, 8, 16 and 32 server cluster.">
     <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
     <script type="text/javascript" src="../javascript/main.js"></script>
 </head>
@@ -34,78 +34,125 @@
 
     <div style="margin-left: 4em;">
 
-In this benchmark we add person records and membership records to the database in batches on an 8 server cluster.<br/>
+In this benchmark we add person records and membership records to the database in batches on a 4, 8, 16 and 32 server cluster.<br/>
 <br/>
 		<div class="mylink">
-	<a href="benchmarks-schema.html">Schema and Insert Code</a><br/><br/>
+	<a href="benchmarks-schema.html?framed=true">Schema and Insert Code</a><br/><br/>
 	</div>
 	
-<table width="411" border="1" cellpadding=2 cellspacing="0">
+<table class="syntax-table" border="1" cellpadding=2 cellspacing="0">
   <tbody>
-   <tr class="example-header">
-      <td width="50">Metric</td>
-      <td width="33">Value</td>
+   <tr class="syntax-main">
+      <td>Metric</td>
+      <td>4-Server</td>
+       <td>8-Server</td>
+       <td>16-Server</td>
+       <td>32-Server</td>
     </tr>
     <tr>
       <td>Record size</td>
       <td>120 bytes</td>
+        <td>120 bytes</td>
+        <td>120 bytes</td>
+        <td>120 bytes</td>
     </tr>
     <tr>
       <td>Record count</td>
-      <td>1 billion</td>
+      <td>500 million</td>
+        <td>1 billion</td>
+        <td>2 billion</td>
+        <td>4 billion</td>
     </tr>
    <tr>
        <td>Batch Size</td>
+       <td>1000</td>
+       <td>1000</td>
+       <td>1000</td>
        <td>1000</td>
    </tr>
     <tr>
       <td>Server total mem</td>
       <td>60g</td>
+        <td>60g</td>
+        <td>60g</td>
+        <td>60g</td>
     </tr>
     <tr>
       <td>Server xmx</td>
       <td>33g</td>
+        <td>33g</td>
+        <td>33g</td>
+        <td>33g</td>
     </tr>
     <tr>
       <td>Resident mem</td>
       <td>52g</td>
+        <td>52g</td>
+        <td>52g</td>
+        <td>52g</td>
     </tr>
     <tr>
       <td>Client machine count</td>
-      <td>16</td>
+      <td>8</td>
+        <td>16</td>
+        <td>32</td>
+        <td>64</td>
     </tr>
         <tr>
       <td>Cores per client machine</td>
       <td>4</td>
+            <td>4</td>
+            <td>4</td>
+            <td>4</td>
     </tr>
     <tr>
     	<td>Cores per server machine</td>
     	<td>8</td>
+        <td>8</td>
+        <td>8</td>
+        <td>8</td>
     </tr>
-
     <tr>
       <td>Call rate</td>
-      <td>1.3mil/sec</td>
+      <td>650k/sec</td>
+        <td>1.3 mil/sec</td>
+        <td>2.1 mil/sec</td>
+        <td>4.4 mil/sec</td>
     </tr>
     <tr>
       <td>Call latency</td>
-      <td>28000 nanos</td>
+      <td>26400 nanos</td>
+        <td>28000 nanos</td>
+        <td>13000 nanos</td>
+        <td>2500 nanos</td>
     </tr>
     <tr>
       <td>Threads per client</td>
       <td>32</td>
+        <td>32</td>
+        <td>32</td>
+        <td>32</td>
     </tr>
     <tr>
       <td>Server cpu</td>
       <td>20%</td>
+        <td>20%</td>
+        <td>20%</td>
+        <td>20%</td>
     </tr>
     <tr>
     	<td>Shard Count</td>
-    	<td>8</td>
+    	<td>4</td>
+        <td>8</td>
+        <td>16</td>
+        <td>32</td>
     </tr>
     <tr>
     	<td>Replica Count</td>
     	<td>1</td>
+        <td>1</td>
+        <td>1</td>
+        <td>1</td>
     </tr>
   </tbody>
 </table>

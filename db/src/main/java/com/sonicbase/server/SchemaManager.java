@@ -119,8 +119,8 @@ public class SchemaManager {
         return null;
       }
       String[] parts = command.split(":");
-      String dbName = parts[4];
-      String masterSlave = parts[5];
+      String dbName = parts[5];
+      String masterSlave = parts[6];
       dbName = dbName.toLowerCase();
 
       if (replayedCommand && null != server.getCommon().getSchema(dbName)) {
@@ -161,9 +161,10 @@ public class SchemaManager {
       return null;
     }
     try {
-      String dbName = parts[4];
-      String tableName = parts[5];
-      String masterSlave = parts[6];
+      int serializationVersionNumber = Integer.valueOf(parts[3]);
+      String dbName = parts[5];
+      String tableName = parts[6];
+      String masterSlave = parts[7];
 
       server.getCommon().getSchemaWriteLock(dbName).lock();
       try {
@@ -186,8 +187,7 @@ public class SchemaManager {
 
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-      server.getCommon().serializeSchema(out);
+      server.getCommon().serializeSchema(out, serializationVersionNumber);
       out.close();
 
       return bytesOut.toByteArray();
@@ -199,7 +199,7 @@ public class SchemaManager {
 
   public byte[] createTableSlave(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
 
     if (server.getShard() == 0 && server.getReplica() == 0 && command.contains(":slave")) {
       return null;
@@ -209,7 +209,6 @@ public class SchemaManager {
     try {
       ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
       DataInputStream in = new DataInputStream(bytesIn);
-      long serializationVersion = DataUtil.readVLong(in);
       server.getCommon().deserializeSchema(server.getCommon(), in);
       String tableName = in.readUTF();
       TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
@@ -233,8 +232,9 @@ public class SchemaManager {
         return null;
       }
       String[] parts = command.split(":");
-      String dbName = parts[4];
-      String masterSlave = parts[5];
+      int serializationVersionNumber = Integer.valueOf(parts[3]);
+      String dbName = parts[5];
+      String masterSlave = parts[6];
 
       String tableName = null;
       server.getCommon().getSchemaWriteLock(dbName).lock();
@@ -261,8 +261,7 @@ public class SchemaManager {
           if (server.getCommon().getTables(dbName).containsKey(tableName.toLowerCase())) {
             ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
             DataOutputStream out = new DataOutputStream(bytesOut);
-            DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-            server.getCommon().serializeSchema(out);
+            server.getCommon().serializeSchema(out, serializationVersionNumber);
             out.close();
 
             return bytesOut.toByteArray();
@@ -312,19 +311,18 @@ public class SchemaManager {
 
           ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
           DataOutputStream out = new DataOutputStream(bytesOut);
-          DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-          server.getCommon().serializeSchema(out);
+          server.getCommon().serializeSchema(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
           out.writeUTF(tableName);
 
-          command = "DatabaseServer:createTableSlave:1:1:" + dbName + ":slave";
+          command = "DatabaseServer:createTableSlave:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION +
+              ":1:" + dbName + ":slave";
           server.getDatabaseClient().send(null, i, rand.nextLong(), command, bytesOut.toByteArray(), DatabaseClient.Replica.all);
         }
       }
 
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-      server.getCommon().serializeSchema(out);
+      server.getCommon().serializeSchema(out, serializationVersionNumber);
       out.close();
 
       return bytesOut.toByteArray();
@@ -338,9 +336,10 @@ public class SchemaManager {
 
     try {
       String[] parts = command.split(":");
-      String dbName = parts[4];
-      String tableName = parts[5].toLowerCase();
-      String columnName = parts[6].toLowerCase();
+      int serializationVersionNumber = Integer.valueOf(parts[3]);
+      String dbName = parts[5];
+      String tableName = parts[6].toLowerCase();
+      String columnName = parts[7].toLowerCase();
 
       TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
       tableSchema.saveFields(server.getCommon().getSchemaVersion());
@@ -358,8 +357,7 @@ public class SchemaManager {
 
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-      server.getCommon().serializeSchema(out);
+      server.getCommon().serializeSchema(out, serializationVersionNumber);
       out.close();
 
       return bytesOut.toByteArray();
@@ -373,10 +371,11 @@ public class SchemaManager {
 
     try {
       String[] parts = command.split(":");
-      String dbName = parts[4];
-      String tableName = parts[5].toLowerCase();
-      String columnName = parts[6].toLowerCase();
-      String dataType = parts[7];
+      int serializationVersionNumber = Integer.valueOf(parts[3]);
+      String dbName = parts[5];
+      String tableName = parts[6].toLowerCase();
+      String columnName = parts[7].toLowerCase();
+      String dataType = parts[8];
 
       TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
       tableSchema.saveFields(server.getCommon().getSchemaVersion());
@@ -393,8 +392,7 @@ public class SchemaManager {
 
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-      server.getCommon().serializeSchema(out);
+      server.getCommon().serializeSchema(out, serializationVersionNumber);
       out.close();
 
       return bytesOut.toByteArray();
@@ -407,14 +405,13 @@ public class SchemaManager {
   public byte[] createIndexSlave(String command, byte[] body) {
     try {
       String[] parts = command.split(":");
-      String dbName = parts[4];
+      String dbName = parts[5];
 
       if (server.getShard() == 0 && server.getReplica() == 0 && command.contains(":slave")) {
         return null;
       }
 
       DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
-      long serializationVersion = DataUtil.readVLong(in);
       server.getCommon().deserializeSchema(server.getCommon(), in);
       server.getCommon().saveSchema(server.getDataDir());
 
@@ -439,16 +436,17 @@ public class SchemaManager {
   public List<String> createIndex(String command, byte[] body, boolean replayedCommand, AtomicReference<String> table) {
     try {
       String[] parts = command.split(":");
-      int schemaVersion = Integer.valueOf(parts[3]);
-      String dbName = parts[4];
+      int serializationVersionNumber = Integer.valueOf(parts[3]);
+      int schemaVersion = Integer.valueOf(parts[4]);
+      String dbName = parts[5];
       if (schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
       }
-      String masterSlave = parts[5];
-      table.set(parts[6]);
-      String indexName = parts[7];
-      boolean isUnique = Boolean.valueOf(parts[8]);
-      String fieldsStr = parts[9];
+      String masterSlave = parts[6];
+      table.set(parts[7]);
+      String indexName = parts[8];
+      boolean isUnique = Boolean.valueOf(parts[9]);
+      String fieldsStr = parts[10];
       String[] fields = fieldsStr.split(",");
 
       if (replayedCommand) {
@@ -456,8 +454,7 @@ public class SchemaManager {
         if (server.getCommon().getTables(dbName).get(table.get()).getIndexes().containsKey(indexName.toLowerCase())) {
           ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
           DataOutputStream out = new DataOutputStream(bytesOut);
-          DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-          server.getCommon().serializeSchema(out);
+          server.getCommon().serializeSchema(out, serializationVersionNumber);
           out.close();
 
           return null;
@@ -470,8 +467,7 @@ public class SchemaManager {
 
         ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bytesOut);
-        DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-        server.getCommon().serializeSchema(out);
+        server.getCommon().serializeSchema(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
         out.writeUTF(table.get());
         out.writeInt(createdIndices.size());
         for (String currIndexName : createdIndices) {
@@ -485,7 +481,8 @@ public class SchemaManager {
             if (i == 0 && j == 0) {
               continue;
             }
-            command = "DatabaseServer:createIndexSlave:1:1:" + dbName + ":slave";
+            command = "DatabaseServer:createIndexSlave:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION +
+                ":1:" + dbName + ":slave";
             server.getDatabaseClient().send(null, i, j, command, slaveBody, DatabaseClient.Replica.specified);
           }
         }
@@ -501,14 +498,13 @@ public class SchemaManager {
   public byte[] dropIndexSlave(String command, byte[] body) {
      try {
        String[] parts = command.split(":");
-       String dbName = parts[4];
+       String dbName = parts[5];
 
        if (server.getShard() == 0 && server.getReplica() == 0 && command.contains(":slave")) {
          return null;
        }
 
        DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
-       long serializationVersion = DataUtil.readVLong(in);
        server.getCommon().deserializeSchema(server.getCommon(), in);
        server.getCommon().saveSchema(server.getDataDir());
 
@@ -532,13 +528,14 @@ public class SchemaManager {
         }
 
         String[] parts = command.split(":");
-        int schemaVersion = Integer.valueOf(parts[3]);
-        String dbName = parts[4];
+        int serializationVersionNumber = Integer.valueOf(parts[3]);
+        int schemaVersion = Integer.valueOf(parts[4]);
+        String dbName = parts[5];
         if (schemaVersion < server.getSchemaVersion()) {
           throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
         }
-        String table = parts[5];
-        String indexName = parts[6];
+        String table = parts[6];
+        String indexName = parts[7];
 
         List<IndexSchema> toDrop = new ArrayList<>();
         for (Map.Entry<String, IndexSchema> entry : server.getCommon().getTables(dbName).get(table).getIndices().entrySet()) {
@@ -561,8 +558,7 @@ public class SchemaManager {
         AtomicReference<String> selectedHost = new AtomicReference<String>();
         ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bytesOut);
-        DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-        server.getCommon().serializeSchema(out);
+        server.getCommon().serializeSchema(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
         out.writeUTF(table);
         DataUtil.writeVLong(out, toDrop.size());
         for (IndexSchema indexSchema : toDrop) {
@@ -576,15 +572,15 @@ public class SchemaManager {
             if (i == 0 && j == 0) {
               continue;
             }
-            command = "DatabaseServer:dropIndexSlave:1:1:" + dbName + ":slave";
+            command = "DatabaseServer:dropIndexSlave:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION +
+                ":1:" + dbName + ":slave";
             server.getDatabaseClient().send(null, i, j, command, slaveBytes, DatabaseClient.Replica.specified);
           }
         }
 
         bytesOut = new ByteArrayOutputStream();
         out = new DataOutputStream(bytesOut);
-        DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-        server.getCommon().serializeSchema(out);
+        server.getCommon().serializeSchema(out, serializationVersionNumber);
         out.close();
 
         return bytesOut.toByteArray();

@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+    <meta name="description" content="Instructions on how to setup a SonicBase cluster. Various items need to be configured as outlined.">
+
+    <title>SonicBase - Setup</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="../javascript/main.js"></script>
+</head>
+<body>
+<div class="container">
+    <header id="myHeader">
+        <a href="../index.html">
+            <h4 class="logo">SonicBase™</h4>
+        </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+
+    <div style="margin-left: 4em;">
+
+<h1>Python Requirements</h1>
+Python must be installed on the clients and the servers
+<br/>
+
+<h1>SSH Access</h1>
+There must be passwordless ssh access between all the servers and between the client and all the servers.
+If you don't want ssh access to the servers outside a firewall, move the client inside the firewall and run
+it from there.
+</div>
+</div>
+</body>
+</html>

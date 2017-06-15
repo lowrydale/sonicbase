@@ -35,83 +35,92 @@
 
  <div style="margin-left: 4em;">
 
-<h3>Location</h3>
+<h1>Location</h1>
 Config files are located in the "&lt;installDir&gt;/config" directory.
 <br/>
 
-<h3>Naming</h3>
+<h1>Naming</h1>
 The config file must be named "config-&lt;cluster name&gt;.json".
 <br/>
 
-<h3>Example</h3>
+<h1>Example</h1>
 {<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;"database": {<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"dataDirectory": "$HOME/db-data",<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"installDirectory": "$HOME/database",<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"compressRecords": false,<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"useUnsafe": true,<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"maxJavaHeap": "50%",<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"maxJavaHeapTrigger": "90%",<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"maxProcessMemoryTrigger": "90%",<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"replicationFactor": 1,<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"shards" : [<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"replicas": [<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"privateAddress": "localhost",<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"publicAddress": "localhost",<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"port": 9010<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"clients" : [<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"privateAddress": "localhost",<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"publicAddress": "localhost",<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"port": 8080<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;"dataDirectory": "$HOME/db-data",<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;"installDirectory": "$HOME/database",<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;"compressRecords": false,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;"useUnsafe": true,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;"maxJavaHeap": "50%",<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;"maxJavaHeapTrigger": "90%",<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;"maxProcessMemoryTrigger": "90%",<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;"user": "ubuntu",<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;"clientIsPrivate": false,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;"shards" : [<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"replicas": [<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"privateAddress": "localhost",<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"publicAddress": "localhost",<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"port": 9010<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;"clients" : [<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"privateAddress": "localhost",<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"publicAddress": "localhost",<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"port": 8080<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;]<br/>
 }<br/>
 
-<h3>Elements</h3>
-dataDirectory - path to the location of the database files.<br/>
+<h1>Elements</h1>
+  <b>dataDirectory</b> - path to the location of the database files. Note on Windows you will need to escape the
+  backslashes so the value can be stored in the json file.<br/>
+  <br/>
+  On Windows the directory may look like "c:\\\\sonicbase". On linux it may look like "/mnt/sonicbase". On linux and mac
+  you also have the option of prefixing your path with "$HOME" to specify the home directory. This option is not available on Windows.<br/>
 <br/>
-installDirectory - path to the location of the installation directory.<br/>
+  <b>installDirectory</b> - path to the location of the installation directory. See dataDirectory for detailed instructions<br/>
 <br/>
-compressRecords - if true, records will be compressed when stored in memory. This option won't help much
+  <b>compressRecords</b> - if true, records will be compressed when stored in memory. This option won't help much
 unless you have lots of strings that compress well.<br/>
 <br/>
-useUnsafe - if true, records will be stores in unsafe memory (off java heap). This reduces the amount of
+  <b>useUnsafe</b> - if true, records will be stores in unsafe memory (off java heap). This reduces the amount of
 memory that is subject to garbase collection. Using this option slows down SonicBase, but it increases
 the number of records you can load into the database<br/>
 <br/>
-maxJavaHeap - maximum java heap size. Can be absolute (e.g., 50g, 1024m). It can also be a percentage
+  <b>maxJavaHeap</b> - maximum java heap size. Can be absolute (e.g., 50g, 1024m). It can also be a percentage
 of the machine total memory (e.g., 50%).<br/>
 <br/>
-maxJavaHeapTrigger - amount of java heap above which SonicBase will start rejecting inserts. It can be absolute
+  <b>maxJavaHeapTrigger</b> - amount of java heap above which SonicBase will start rejecting inserts. It can be absolute
 or a percentage. It is recommended that no more than 90% of the memory be used. You need to leave
 at least 5gig for SonicBase processing<br/>
 <br/>
-maxProcessMemoryTrigger - maximum server memory footprint above which SonicBase will start rejecting inserts.
+  <b>maxProcessMemoryTrigger</b> - maximum server memory footprint above which SonicBase will start rejecting inserts.
  It can be absolute or a percentage. It is recommended
 that no more than 90% of the memory be used.<br/>
 <br/>
-shards - list of shards (servers)<br/>
+  <b>user</b> - for Linux and Mac this must be set the the userid of the user you will be running the server as. For
+  Windows you do not need to set this value.<br/>
+  <br/>
+  <b>clientIsPrivate</b> - set to true if the client machine is in the same private network as the servers. The client
+  must be able to call the servers on the private addresses that are configured.<br/>
+  <br/>
+  <b>shards</b> - list of shards (servers)<br/>
 <br/>
-replicas - list of replicas. Only one replica can be configured in the free version<br/>
+  <b>replicas</b> - list of replicas. Only one replica can be configured in the free version<br/>
 <br/>
-&nbsp;&nbsp;&nbsp;privateAddress - address private to the cluster. If there is no private address, set this
+  &nbsp;&nbsp;&nbsp;<b>privateAddress</b> - address private to the cluster. If there is no private address, set this
 to the public address<br/>
-&nbsp;&nbsp;&nbsp;publicAddress - address the server can be accessed external to the cluster<br/>
-&nbsp;&nbsp;&nbsp;port - port for the server to listen on<br/>
+  &nbsp;&nbsp;&nbsp;<b>publicAddress</b> - address the server can be accessed external to the cluster<br/>
+  &nbsp;&nbsp;&nbsp;<b>port</b> - port for the server to listen on<br/>
 <br/>
-clients - list of clients. These are servers where the client will run<br/>
+  <b>clients</b> - list of clients. These are servers where the client will run<br/>
 <br/>
-&nbsp;&nbsp;&nbsp;privateAddress - address private to the cluster. If there is no private address, set this
+  &nbsp;&nbsp;&nbsp;<b>privateAddress</b> - address private to the cluster. If there is no private address, set this
 to the public address<br/>
-&nbsp;&nbsp;&nbsp;publicAddress - address the server can be accessed external to the cluster<br/>
-&nbsp;&nbsp;&nbsp;port - port for the server to listen on<br/>
+  &nbsp;&nbsp;&nbsp;<b>publicAddress</b> - address the server can be accessed external to the cluster<br/>
+  &nbsp;&nbsp;&nbsp;<b>port</b> - port for the server to listen on<br/>
 
 </div>
 </div>

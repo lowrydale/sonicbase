@@ -12,7 +12,8 @@ rsync -vlLt --exclude sonicbase-*shaded.jar db/target/sonicbase-*.jar $HOME/soni
 #mvn dependency:copy-dependencies -DoutputDirectory=$HOME/sonicbase/lib
 #rsync -rvlLt repo/linux64/* $HOME/sonicbase/lib/linux64
 
-rsync -rvlLt db/target/classes/config/config-* $HOME/sonicbase/config
+rsync -rvlLt db/target/classes/config/config-1-local.json $HOME/sonicbase/config
+rsync -rvlLt db/target/classes/config/config-license-server.json $HOME/sonicbase/config
 rsync -rvlLt $HOME/sonicbase-config/* $HOME/sonicbase/config
 rsync -rvlLt get-distribution $HOME/sonicbase/bin
 rsync -rvlLt get-df $HOME/sonicbase/bin
@@ -27,6 +28,7 @@ rsync -rvlLt runclass.bat $HOME/sonicbase/bin
 rsync -rvlLt purge-data.bat $HOME/sonicbase/bin
 rsync -rvlLt get-credentials.ps1 $HOME/sonicbase/bin
 rsync -rvlLt remote-start-bench-server.ps1 $HOME/sonicbase/bin
+rsync -rvlLt remote-start-license-server.ps1 $HOME/sonicbase/bin
 rsync -rvlLt remote-start-db-server.ps1 $HOME/sonicbase/bin
 rsync -rvlLt remote-purge-data.ps1 $HOME/sonicbase/bin
 rsync -rvlLt remote-kill-server.ps1 $HOME/sonicbase/bin
@@ -47,9 +49,13 @@ rsync -rvlLt start-db-server.bat $HOME/sonicbase/bin
 rsync -rvlLt start-db-server-task.bat $HOME/sonicbase/bin
 rsync -rvlLt start-db-server.vbs $HOME/sonicbase/bin
 rsync -rvlLt start-bench-server $HOME/sonicbase/bin
+rsync -rvlLt start-license-server $HOME/sonicbase/bin
 rsync -rvlLt start-bench-server.bat $HOME/sonicbase/bin
+rsync -rvlLt start-license-server.bat $HOME/sonicbase/bin
 rsync -rvlLt start-bench-server-task.bat $HOME/sonicbase/bin
+rsync -rvlLt start-license-server-task.bat $HOME/sonicbase/bin
 rsync -rvlLt start-bench-server.vbs $HOME/sonicbase/bin
+rsync -rvlLt start-license-server.vbs $HOME/sonicbase/bin
 rsync -rvlLt remote-start-db-server $HOME/sonicbase/bin
 rsync -rvlLt remote-start-rest-server $HOME/sonicbase/bin
 rsync -rvlLt dump-threads $HOME/sonicbase/bin
@@ -63,7 +69,9 @@ rsync -rvlLt do-deploy $HOME/sonicbase/bin
 rsync -rvlLt deploy $HOME/sonicbase/bin
 rsync -rvlLt do-start $HOME/sonicbase/bin
 rsync -rvlLt do-start-bench $HOME/sonicbase/bin
+rsync -rvlLt do-start-license-server $HOME/sonicbase/bin
 rsync -rvlLt do-start-bench.bat $HOME/sonicbase/bin
+rsync -rvlLt do-start-license-server.bat $HOME/sonicbase/bin
 rsync -rvlLt get-mem-total $HOME/sonicbase/bin
 rsync -rvlLt get-mem-total.bat $HOME/sonicbase/bin
 rsync -rvlLt remote-get-mem-total $HOME/sonicbase/bin
@@ -86,6 +94,7 @@ chmod +x $HOME/sonicbase/bin/start
 chmod +x $HOME/sonicbase/bin/start-id-servers
 chmod +x $HOME/sonicbase/bin/start-db-server
 chmod +x $HOME/sonicbase/bin/start-bench-server
+chmod +x $HOME/sonicbase/bin/start-license-server
 chmod +x $HOME/sonicbase/bin/remote-start-db-server
 chmod +x $HOME/sonicbase/bin/remote-start-rest-server
 chmod +x $HOME/sonicbase/bin/kill-server
@@ -97,6 +106,7 @@ chmod +x $HOME/sonicbase/bin/do-rsync
 chmod +x $HOME/sonicbase/bin/rsync-file
 chmod +x $HOME/sonicbase/bin/do-start
 chmod +x $HOME/sonicbase/bin/do-start-bench
+chmod +x $HOME/sonicbase/bin/do-start-license-server
 chmod +x $HOME/sonicbase/bin/dump-threads
 chmod +x $HOME/sonicbase/bin/get-mem-total
 chmod +x $HOME/sonicbase/bin/remote-get-mem-total

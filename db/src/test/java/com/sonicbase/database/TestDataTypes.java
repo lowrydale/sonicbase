@@ -37,7 +37,7 @@ public class TestDataTypes {
 
     FileUtils.deleteDirectory(new File("/data/database"));
 
-    JsonArray array = config.getDict("database").putArray("licenseKeys");
+    JsonArray array = config.putArray("licenseKeys");
     array.add(DatabaseServer.FOUR_SERVER_LICENSE);
 
     DatabaseServer.getServers().clear();
@@ -51,7 +51,7 @@ public class TestDataTypes {
     for (int i = 0; i < dbServers.length; i++) {
       final int shard = i;
       dbServers[shard] = new DatabaseServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null);
+      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null, true);
       dbServers[shard].setRole(role);
       dbServers[shard].disableLogProcessor();
       dbServers[shard].setMinSizeForRepartition(0);
@@ -819,7 +819,7 @@ public class TestDataTypes {
       fail();
     }
     catch (SQLException e) {
-      assertEquals(e.getMessage(), "java.sql.SQLException: value too long: field=id, width=16");
+      assertEquals(e.getCause().getMessage(), "java.sql.SQLException: value too long: field=id, width=16");
     }
 
     stmt = conn.prepareStatement("insert into width (id, id2, name) VALUES (?, ?, ?)");

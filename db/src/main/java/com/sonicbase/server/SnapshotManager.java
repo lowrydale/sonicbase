@@ -28,7 +28,8 @@ public class SnapshotManager {
   public Logger logger;
 
   public static final int SNAPSHOT_BUCKET_COUNT = 128;
-  public static final int SNAPSHOT_SERIALIZATION_VERSION = 19;
+  public static final int SNAPSHOT_SERIALIZATION_VERSION = 20;
+  public static final int SNAPSHOT_SERIALIZATION_VERSION_19 = 19;
 
   private final DatabaseServer server;
   private long lastSnapshot = -1;
@@ -109,134 +110,179 @@ public class SnapshotManager {
     return highestSnapshot;
   }
 
+  private long totalBytes = 0;
+  private AtomicLong finishedBytes = new AtomicLong();
+  private int totalFileCount = 0;
+  private int finishedFileCount = 0;
+  private Exception errorRecovering = null;
+
+  public double getPercentRecoverComplete() {
+    if (totalBytes == 0) {
+      return 0;
+    }
+    return (double) finishedBytes.get() / (double) totalBytes;
+  }
+
+  public Exception getErrorRecovering() {
+    return errorRecovering;
+  }
+
   public void recoverFromSnapshot(String dbName) throws Exception {
 
-    server.purge(dbName);
+    totalFileCount = 0;
+    finishedFileCount = 0;
+    totalBytes = 0;
+    finishedBytes.set(0);
+    errorRecovering = null;
 
-    String dataRoot = new File(server.getDataDir(), SNAPSHOT_STR + server.getShard() + "/" + server.getReplica() + "/" + dbName).getAbsolutePath();
-    File dataRootDir = new File(dataRoot);
-    dataRootDir.mkdirs();
-    int highestSnapshot = getHighestSafeSnapshotVersion(dataRootDir);
+    try {
+      server.purge(dbName);
 
-    if (highestSnapshot == -1) {
-      return;
-    }
+      String dataRoot = new File(server.getDataDir(), SNAPSHOT_STR + server.getShard() + "/" + server.getReplica() + "/" + dbName).getAbsolutePath();
+      File dataRootDir = new File(dataRoot);
+      dataRootDir.mkdirs();
+      int highestSnapshot = getHighestSafeSnapshotVersion(dataRootDir);
 
-    final File snapshotDir = new File(dataRoot, String.valueOf(highestSnapshot));
-
-    logger.info("Recover from snapshot: dir=" + snapshotDir.getAbsolutePath());
-
-    ThreadPoolExecutor executor = new ThreadPoolExecutor(SNAPSHOT_BUCKET_COUNT, SNAPSHOT_BUCKET_COUNT, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
-
-    final AtomicLong recoveredCount = new AtomicLong();
-    recoveredCount.set(0);
-
-    Map<String, TableSchema> tables = server.getCommon().getTables(dbName);
-    for (Map.Entry<String, TableSchema> schema : tables.entrySet()) {
-      logger.info("Deserialized table schema: table=" + schema.getKey());
-      for (Map.Entry<String, IndexSchema> index : schema.getValue().getIndices().entrySet()) {
-        logger.info("Deserialized index: table=" + schema.getKey() + INDEX_STR + index.getKey());
-        server.getSchemaManager().doCreateIndex(dbName, schema.getValue(), index.getKey(), index.getValue().getFields());
+      if (highestSnapshot == -1) {
+        return;
       }
 
-    }
+      final File snapshotDir = new File(dataRoot, String.valueOf(highestSnapshot));
 
-    final long indexBegin = System.currentTimeMillis();
-    recoveredCount.set(0);
-    final AtomicLong lastLogged = new AtomicLong(System.currentTimeMillis());
-    File file = snapshotDir;
-    if (file.exists()) {
-      for (File tableFile : file.listFiles()) {
-        final String tableName = tableFile.getName();
-        if (!tableFile.isDirectory()) {
-          continue;
+      logger.info("Recover from snapshot: dir=" + snapshotDir.getAbsolutePath());
+
+      ThreadPoolExecutor executor = new ThreadPoolExecutor(SNAPSHOT_BUCKET_COUNT, SNAPSHOT_BUCKET_COUNT, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+
+      final AtomicLong recoveredCount = new AtomicLong();
+      recoveredCount.set(0);
+
+      Map<String, TableSchema> tables = server.getCommon().getTables(dbName);
+      for (Map.Entry<String, TableSchema> schema : tables.entrySet()) {
+        logger.info("Deserialized table schema: table=" + schema.getKey());
+        for (Map.Entry<String, IndexSchema> index : schema.getValue().getIndices().entrySet()) {
+          logger.info("Deserialized index: table=" + schema.getKey() + INDEX_STR + index.getKey());
+          server.getSchemaManager().doCreateIndex(dbName, schema.getValue(), index.getKey(), index.getValue().getFields());
         }
-        final AtomicBoolean firstThread = new AtomicBoolean();
-        for (File indexDir : tableFile.listFiles()) {
-          final String indexName = indexDir.getName();
-          List<Future> futures = new ArrayList<>();
-          final AtomicInteger offset = new AtomicInteger();
-          for (final File indexFile : indexDir.listFiles()) {
-            final int currOffset = offset.get();
-            logger.info("Recovering: table=" + tableName + INDEX_STR + indexName);
-            final TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
-            final IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
-            final Index index = server.getIndices(dbName).getIndices().get(tableName).get(indexName);
-            logger.info("Table: table=" + tableName + ", indexName=" + indexName +
-                ", schemaNull=" + (indexSchema == null) +
-                ", byIdNull=" + (tableSchema.getIndexesById().get(indexSchema.getIndexId()) == null) +
-                ", indexId=" + indexSchema.getIndexId());
-            futures.add(executor.submit(new Callable<Boolean>() {
-                                          @Override
-                                          public Boolean call() throws Exception {
-                                            int countForFile = 0;
-                                            try (DataInputStream inStream = new DataInputStream(new BufferedInputStream(new FileInputStream(indexFile)))) {
-                                              boolean isPrimaryKey = indexSchema.isPrimaryKey();
-                                              DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-                                              while (true) {
 
-                                                if (!inStream.readBoolean()) {
-                                                  break;
-                                                }
-                                                Object[] key = DatabaseCommon.deserializeKey(tableSchema, inStream);
+      }
 
-                                                int count = (int) DataUtil.readVLong(inStream, resultLength);
-                                                byte[][] records = new byte[count][];
-                                                for (int i = 0; i < records.length; i++) {
-                                                  int len = (int) DataUtil.readVLong(inStream, resultLength);
-                                                  records[i] = new byte[len];
-                                                  inStream.readFully(records[i]);
-                                                }
+      final long indexBegin = System.currentTimeMillis();
+      recoveredCount.set(0);
+      final AtomicLong lastLogged = new AtomicLong(System.currentTimeMillis());
+      File file = snapshotDir;
 
-                                                Object address;
-                                                if (isPrimaryKey) {
-                                                  address = server.toUnsafeFromRecords(records);
-                                                }
-                                                else {
-                                                  address = server.toUnsafeFromKeys(records);
-                                                }
+      if (file.exists()) {
+        for (File tableFile : file.listFiles()) {
+          if (!tableFile.isDirectory()) {
+            continue;
+          }
+          for (File indexDir : tableFile.listFiles()) {
+            for (final File indexFile : indexDir.listFiles()) {
+              totalBytes += indexFile.length();
+              totalFileCount++;
+            }
+          }
+        }
+      }
+      if (file.exists()) {
+        for (File tableFile : file.listFiles()) {
+          final String tableName = tableFile.getName();
+          if (!tableFile.isDirectory()) {
+            continue;
+          }
+          final AtomicBoolean firstThread = new AtomicBoolean();
+          for (File indexDir : tableFile.listFiles()) {
+            final String indexName = indexDir.getName();
+            List<Future> futures = new ArrayList<>();
+            final AtomicInteger offset = new AtomicInteger();
+            for (final File indexFile : indexDir.listFiles()) {
+              final int currOffset = offset.get();
+              logger.info("Recovering: table=" + tableName + INDEX_STR + indexName);
+              final TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
+              final IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
+              final Index index = server.getIndices(dbName).getIndices().get(tableName).get(indexName);
+              logger.info("Table: table=" + tableName + ", indexName=" + indexName +
+                  ", schemaNull=" + (indexSchema == null) +
+                  ", byIdNull=" + (tableSchema.getIndexesById().get(indexSchema.getIndexId()) == null) +
+                  ", indexId=" + indexSchema.getIndexId());
+              futures.add(executor.submit(new Callable<Boolean>() {
+                                            @Override
+                                            public Boolean call() throws Exception {
+                                              int countForFile = 0;
+                                              try (DataInputStream inStream = new DataInputStream(new BufferedInputStream(new ByteCounterStream(finishedBytes, new FileInputStream(indexFile))))) {
+                                                boolean isPrimaryKey = indexSchema.isPrimaryKey();
+                                                DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+                                                while (true) {
 
-                                                index.put(key, address);
+                                                  if (!inStream.readBoolean()) {
+                                                    break;
+                                                  }
+                                                  Object[] key = DatabaseCommon.deserializeKey(tableSchema, inStream);
 
-                                                countForFile++;
-                                                recoveredCount.incrementAndGet();
-                                                if (currOffset == 0 && (System.currentTimeMillis() - lastLogged.get()) > 2000) {
-                                                  lastLogged.set(System.currentTimeMillis());
-                                                  logger.info("Recover progress - table=" + tableName + INDEX_STR + indexName + ": count=" + recoveredCount.get() + RATE_STR +
-                                                      ((float) recoveredCount.get() / (float) ((System.currentTimeMillis() - indexBegin)) * 1000f) +
-                                                      DURATION_STR + (System.currentTimeMillis() - indexBegin) / 1000f);
+                                                  int count = (int) DataUtil.readVLong(inStream, resultLength);
+                                                  byte[][] records = new byte[count][];
+                                                  for (int i = 0; i < records.length; i++) {
+                                                    int len = (int) DataUtil.readVLong(inStream, resultLength);
+                                                    records[i] = new byte[len];
+                                                    inStream.readFully(records[i]);
+                                                  }
+
+                                                  Object address;
+                                                  if (isPrimaryKey) {
+                                                    address = server.toUnsafeFromRecords(records);
+                                                  }
+                                                  else {
+                                                    address = server.toUnsafeFromKeys(records);
+                                                  }
+
+                                                  index.put(key, address);
+
+                                                  countForFile++;
+                                                  recoveredCount.incrementAndGet();
+                                                  if (currOffset == 0 && (System.currentTimeMillis() - lastLogged.get()) > 2000) {
+                                                    lastLogged.set(System.currentTimeMillis());
+                                                    logger.info("Recover progress - table=" + tableName + INDEX_STR + indexName + ": count=" + recoveredCount.get() + RATE_STR +
+                                                        ((float) recoveredCount.get() / (float) ((System.currentTimeMillis() - indexBegin)) * 1000f) +
+                                                        DURATION_STR + (System.currentTimeMillis() - indexBegin) / 1000f);
+                                                  }
                                                 }
                                               }
+                                              catch (EOFException e) {
+                                                throw new Exception(e);
+                                              }
+                                              return true;
                                             }
-                                            catch (EOFException e) {
-                                              throw new Exception(e);
-                                            }
-                                            return true;
                                           }
-                                        }
-            ));
-            offset.incrementAndGet();
-          }
-          for (Future future : futures) {
-            try {
-              if (!(Boolean) future.get()) {
-                throw new Exception("Error recovering from bucket");
+              ));
+              offset.incrementAndGet();
+            }
+            for (Future future : futures) {
+              try {
+                if (!(Boolean) future.get()) {
+                  throw new Exception("Error recovering from bucket");
+                }
+                finishedFileCount++;
+              }
+              catch (Exception t) {
+                errorRecovering = t;
+                throw new Exception("Error recovering from bucket", t);
               }
             }
-            catch (Exception t) {
-              throw new Exception("Error recovering from bucket", t);
-            }
-          }
-          logger.info("Recover progress - finished index. table=" + tableName + INDEX_STR + indexName + ": count=" + recoveredCount.get() + RATE_STR +
-              ((float) recoveredCount.get() / (float) ((System.currentTimeMillis() - indexBegin)) * 1000f) +
-              DURATION_STR + (System.currentTimeMillis() - indexBegin) / 1000f);
+            logger.info("Recover progress - finished index. table=" + tableName + INDEX_STR + indexName + ": count=" + recoveredCount.get() + RATE_STR +
+                ((float) recoveredCount.get() / (float) ((System.currentTimeMillis() - indexBegin)) * 1000f) +
+                DURATION_STR + (System.currentTimeMillis() - indexBegin) / 1000f);
 
+          }
         }
       }
+      logger.info("Recover progress - finished all indices. count=" + recoveredCount.get() + RATE_STR +
+          ((float) recoveredCount.get() / (float) ((System.currentTimeMillis() - indexBegin)) * 1000f) +
+          DURATION_STR + (System.currentTimeMillis() - indexBegin) / 1000f);
     }
-    logger.info("Recover progress - finished all indices. count=" + recoveredCount.get() + RATE_STR +
-        ((float) recoveredCount.get() / (float) ((System.currentTimeMillis() - indexBegin)) * 1000f) +
-        DURATION_STR + (System.currentTimeMillis() - indexBegin) / 1000f);
+    catch (Exception e) {
+      errorRecovering = e;
+      throw e;
+    }
   }
 
   public void runSnapshotLoop() {
@@ -414,4 +460,62 @@ public class SnapshotManager {
     this.enableSnapshot = enable;
   }
 
+  private class ByteCounterStream extends InputStream {
+    private final FileInputStream stream;
+    private final AtomicLong finishedBytes;
+
+    public ByteCounterStream(AtomicLong finishedBytes, FileInputStream fileInputStream) {
+      this.stream = fileInputStream;
+      this.finishedBytes = finishedBytes;
+    }
+
+    public synchronized void reset() throws IOException {
+      stream.reset();
+    }
+
+    public boolean markSupported() {
+      return stream.markSupported();
+    }
+
+    public synchronized void mark(int readlimit) {
+      stream.mark(readlimit);
+    }
+
+    public long skip(long n) throws IOException {
+      return stream.skip(n);
+    }
+
+    public int available() throws IOException {
+      return stream.available();
+    }
+
+    public void close() throws IOException {
+      stream.close();
+    }
+
+    public int read(byte b[]) throws IOException {
+      int read = stream.read(b);
+      if (read != -1) {
+        finishedBytes.addAndGet(read);
+      }
+      return read;
+    }
+
+    public int read(byte b[], int off, int len) throws IOException {
+      int read = stream.read(b, off, len);
+      if (read != -1) {
+        finishedBytes.addAndGet(read);
+      }
+      return read;
+    }
+
+    @Override
+    public int read() throws IOException {
+      int read = stream.read();
+      if (read != -1) {
+        finishedBytes.addAndGet(read);
+      }
+      return read;
+    }
+  }
 }

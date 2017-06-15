@@ -192,7 +192,8 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
                 throw new Exception("No shards selected for query");
               }
 
-              String command = "DatabaseServer:updateRecord:1:" + client.getCommon().getSchemaVersion() + ":" + dbName + ":" + tableName + ":" +
+              String command = "DatabaseServer:updateRecord:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+                  client.getCommon().getSchemaVersion() + ":" + dbName + ":" + tableName + ":" +
                   indexSchema.getName() + ":" + client.isExplicitTrans() + ":" + client.isCommitting() + ":" + client.getTransactionId();
               ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
               DataOutputStream out = new DataOutputStream(bytesOut);

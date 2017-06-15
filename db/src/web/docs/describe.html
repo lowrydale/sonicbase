@@ -33,10 +33,10 @@
 
 
     <div style="margin-left: 4em;">
+<h1>SQL Describe Table Statement</h1>
+Describes a table. In addition to the table, the indices associated with that table are returned.<br/>
 
-Describes a table<br/>
-
-<p>Syntax<table class="border-table" border="1"><tr><td> <table class="syntax-table" cellpadding="4">
+<h3>Syntax</h3><table class="border-table" border="1"><tr><td> <table class="syntax-table" cellpadding="4">
     <tbody>
     <tr class="syntax-main">
            <td width="512" colspan=2 >
@@ -53,8 +53,7 @@ Describes a table<br/>
 </table>
 <br/>
 <br/>
-Example:<br/>
-<br/>
+<h3>Example</h3>
 PreparedStatement stmt = conn.prepareStatement("describe table persons")<br/>
 ResultSet rs = stmt.executeQuery();<br/>
 while (rs.next()) {<br/>

@@ -1,43 +1,29 @@
 {
-    "database": {
-        "xdataDirectory": "c:\\\\db-data",
-        "xinstallDirectory": "c:\\\\sonicbase",
-      "dataDirectory": "$HOME/db-data",
-      "installDirectory": "$HOME/sonicbase",
-        "copmressRecords": false,
-        "useUnsafe": true,
-        "maxJavaHeap": "20%",
-        "maxJavaHeapTrigger": "95%",
-        "user": "ubuntu",
-        "maxProcessMemoryTrigger": "90%",
-        "replicationFactor": 1,
-        "clientIsPrivate": false,
-        "shards" : [
-          {
-            "replicas": [
-              {
-                "publicAddress": "localhost",
-                "privateAddress": "localhost",
-                "port": 9010
-              }
-            ]
-          },
-          {
-            "replicas": [
-              {
-                "publicAddress": "localhost",
-                "privateAddress": "localhost",
-                "port": 9020
-              }
-            ]
-          }
-        ],
-      "clients": [
+  "dataDirectory": "$HOME/db-data",
+  "installDirectory": "$HOME/sonicbase",
+  "copmressRecords": false,
+  "useUnsafe": true,
+  "maxJavaHeap": "20%",
+  "maxJavaHeapTrigger": "95%",
+  "user": "ubuntu",
+  "maxProcessMemoryTrigger": "90%",
+  "clientIsPrivate": false,
+  "shards" : [
+    {
+      "replicas": [
         {
           "publicAddress": "localhost",
           "privateAddress": "localhost",
-          "port": 8080
+          "port": 9010
         }
       ]
     }
+  ],
+  "clients": [
+    {
+      "publicAddress": "localhost",
+      "privateAddress": "localhost",
+      "port": 8080
+    }
+  ]
 }

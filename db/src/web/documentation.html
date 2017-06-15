@@ -28,13 +28,6 @@ var TREE_ITEMS = [
 				['Select Functions', 'docs/select-functions.html?framed=true'],
 				['Select Group By', 'docs/select-group-by.html?framed=true'],
 				['Select Limit', 'docs/select-limit.html?framed=true'],
-				['Joins', 0,
-				    ['Inner', 'docs/joins-inner.html?framed=true'],
-				    ['Left Outer', 'docs/joins-left-outer.html?framed=true'],
-				    ['Right Outer', 'docs/joins-right-outer.html?framed=true'],
-				    ['Full', 'docs/joins-full.html?framed=true'],
-                    ['Three-Way', 'docs/joins-three-way.html?framed=true']
-				]
 			 ],
 			 ['Insert', 'docs/insert.html?framed=true'],
 			 ['Batch Insert', 'docs/batch_insert.html?framed=true'],
@@ -43,12 +36,12 @@ var TREE_ITEMS = [
 			 ['Create Table', 'docs/create-table.html?framed=true'],
 			 ['Create Index', 'docs/create-index.html?framed=true'],
 			 ['Describe Table', 'docs/describe.html?framed=true'],
-            ['Describe Shards', 'docs/describe-shards.html?framed=true'],
-            ['Describe Server Stats', 'docs/describe-server-stats.html?framed=true']
+            ['Describe Tables', 'docs/describe-tables.html?framed=true'],
 		],
 		['Administration', 0,
                 ['Setup', 0,
                     ['Common', 'docs/setup.html?framed=true'],
+                    ['Linux and Mac', 'docs/setup-linux-mac.html?framed=true'],
                     ['Windows', 'docs/setup-windows.html?framed=true'],
                     ['Cygwin', 'docs/setup-cygwin.html?framed=true']
                 ],
@@ -59,16 +52,30 @@ var TREE_ITEMS = [
 		],
 		['JDBC Driver',  'docs/jdbc-client.html?framed=true'],
 		['Data Types',  'docs/datatypes.html?framed=true'],
-		['Transactions',  'docs/transactions.html?framed=true'],
-        ['Monitoring',  'docs/monitoring.html?framed=true'],
 		['Performance Considerations', 'docs/performance-considerations.html?framed=true'],
+        ['Troubleshooting', 'docs/troubleshooting.html?framed=true'],
 		['Benchmarks',  0,
             ['Batch Insert', 'docs/benchmarks-batch-insert.html?framed=true'],
             ['Identity Query', 'docs/benchmarks-identity-query.html?framed=true'],
             ['Range Query', 'docs/benchmarks-range-query.html?framed=true'],
 		],
 		['Pro Version',  0,
-		    ['Features', 'docs/pro-features.html?framed=true']
+		    ['Features', 'docs/pro-features.html?framed=true'],
+            ['SQL Syntax', null,
+                ['Select', 0,
+                    ['Joins', 0,
+                        ['Inner', 'docs/joins-inner.html?framed=true'],
+                        ['Left Outer', 'docs/joins-left-outer.html?framed=true'],
+                        ['Right Outer', 'docs/joins-right-outer.html?framed=true'],
+                        ['Full', 'docs/joins-full.html?framed=true'],
+                        ['Three-Way', 'docs/joins-three-way.html?framed=true']
+                    ]
+                ],
+                ['Describe Shards', 'docs/describe-shards.html?framed=true'],
+                ['Describe Server Stats', 'docs/describe-server-stats.html?framed=true']
+            ],
+            ['Transactions',  'docs/transactions.html?framed=true'],
+            ['Monitoring',  'docs/monitoring.html?framed=true']
 		]
 	]
 ];
@@ -138,35 +145,39 @@ var TREE_TPL = {
                      <a href="docs/select-functions.html">SQL Syntax Functions</a><br/>
                      <a href="docs/select-group-by.html">SQL Syntax Group By</a><br/>
                      <a href="docs/select-limit.html">SQL Syntax Limit</a><br/>
-                     <a href="docs/joins-inner.html">SQL Syntax Inner Join</a><br/>
-                     <a href="docs/joins-left-outer.html">SQL Syntax Left Outer Join</a><br/>
-                     <a href="docs/joins-right-outer.html">SQL Syntax Right Outer Join</a><br/>
-                     <a href="docs/joins-full.html">SQL Syntax Full Join</a><br/>
-                     <a href="docs/joins-three-way.html">SQL Syntax 3-way Join</a><br/>
                      <a href="docs/insert.html">SQL Syntax Insert</a><br/>
                      <a href="docs/batch_insert.html">SQL Syntax Batch Insert</a><br/>
                      <a href="docs/delete.html">SQL Syntax Delete</a><br/>
                      <a href="docs/update.html">SQL Syntax Update</a><br/>
                      <a href="docs/create-table.html">SQL Syntax Create Table</a><br/>
                      <a href="docs/create-index.html">SQL Syntax Create Index</a><br/>
-                     <a href="docs/describe.html">SQL Syntax Describe</a><br/>
-                     <a href="docs/describe-shards.html">SQL Syntax Describe Shards</a><br/>
-                     <a href="docs/describe-server-stats.html">SQL Syntax Describe Server Stats</a><br/>
-                     <a href="docs/setup.html">Administration Setup</a><br/>
+                     <a href="docs/describe.html">SQL Syntax Describe Table</a><br/>
+                    <a href="docs/describe-tables.html">SQL Syntax Describe Tables</a><br/>
+                     <a href="docs/setup.html">Administration Setup Common</a><br/>
+                     <a href="docs/setup-linux-mac.html">Administration Setup Linux and Mac</a><br/>
                      <a href="docs/setup-windows.html">Administration Setup Windows</a><br/>
+                     <a href="docs/setup-cygwin.html">Administration Setup Cygwin</a><br/>
                      <a href="docs/diagnostics.html">Administration Diagnostics</a><br/>
                      <a href="docs/config.html">Administration Config</a><br/>
                      <a href="docs/client.html">Administration Client</a><br/>
                      <a href="docs/aws-integration.html">Administration AWS Configuration</a><br/>
                      <a href="docs/jdbc-client.html">JDBC Driver</a><br/>
                      <a href="docs/datatypes.html">Data Types</a><br/>
-                     <a href="docs/transactions.html">Transactions</a><br/>
                      <a href="docs/monitoring.html">Monitoring</a><br/>
                      <a href="docs/performance-considerations.html">Performance Considerations</a><br/>
-                     <a href="docs/benchmarks-batch-insert.html">Benchmarks Batch Insert</a><br/>
+                    <a href="docs/troubleshooting.html">Troubleshooting</a><br/>
+                    <a href="docs/benchmarks-batch-insert.html">Benchmarks Batch Insert</a><br/>
                      <a href="docs/benchmarks-identity-query.html">Benchmarks Identity Query</a><br/>
                      <a href="docs/benchmarks-range-query.html">Benchmarks Range Query</a><br/>
-                     <a href="docs/pro-features.html">Pro Version Features</a><br/>
+                     <a href="docs/pro-features.html">Pro - Version Features</a><br/>
+                     <a href="docs/joins-inner.html">Pro - SQL Syntax Inner Join</a><br/>
+                     <a href="docs/joins-left-outer.html">Pro - SQL Syntax Left Outer Join</a><br/>
+                     <a href="docs/joins-right-outer.html">Pro - SQL Syntax Right Outer Join</a><br/>
+                     <a href="docs/joins-full.html">Pro - SQL Syntax Full Join</a><br/>
+                     <a href="docs/joins-three-way.html">Pro - SQL Syntax 3-way Join</a><br/>
+                     <a href="docs/describe-shards.html">Pro - SQL Syntax Describe Shards</a><br/>
+                     <a href="docs/describe-server-stats.html">Pro - SQL Syntax Describe Server Stats</a><br/>
+                     <a href="docs/transactions.html">Pro - Transactions</a><br/>
              </div>
          </div>
      </div>

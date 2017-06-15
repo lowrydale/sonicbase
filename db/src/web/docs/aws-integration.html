@@ -34,19 +34,30 @@
 
 
     <div style="margin-left: 4em;">
-<h3>Config Builder</h3>
+<h1>Config Builder</h1>
 SonicBase will automatically create a config file based on the servers tagged in AWS. Machines
 you desire to be servers need the tag "sonicbase-server" with a value of the name of the cluster.
 Machines you desire to be clients need the tag "sonicbase-client with a value of the name of the cluster.
 A config file for the cluster must exist in the config directory, but doesn't need to have servers or
 clients previously configured. The existing config file will be updated with the tagged servers.<br/>
 <br/>
-To build your config file type "build config" in the client.
-<h3>Prerequisites</h3>
+To build your config file type "build config" in the client.<br/>
+<h1>Prerequisites</h1>
 In order for AWS integration to work you must have a file named ".awskeys" located in the home directory.
-The first line of the file is the aws access key. The second line of the file is the aws secret key.
+The first line of the file is the aws access key. The second line of the file is the aws secret key.<br/>
+        <h1>Recommendations</h1>
+        It is recommended that you instantiate the servers using the AWS api. You can then easily tag all your
+        servers and clients with code like the following:<br/><br/>
 
-</div>
+        CreateTagsRequest createTagsRequest_requests = new CreateTagsRequest();
+        createTagsRequest_requests.setResources(instanceIds);
+        createTagsRequest_requests.setTags(requestTags);
+
+        ec2.createTags(createTagsRequest_requests);
+
+
+
+    </div>
 </div>
 </body>
 </html>

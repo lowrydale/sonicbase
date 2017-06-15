@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>SonicBase - Benchmarks 4-Server Range Query</title>
+<title>SonicBase - Benchmarks Range Query</title>
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="In this benchmark we create a range query that selects the entire database and we iterate over all the results on a 4, 8, 16 and 32 server cluster.">
@@ -33,7 +33,7 @@
 
 
     <div style="margin-left: 4em;">
-
+<h1>Range Query Benchmark</h1>
 In this benchmark we create a range query that selects the entire database and we iterate over all the results on a 4, 8, 16, and 32 server cluster.<br/>
 <br/>
 <p>PreparedStatement stmt = con.prepareStatement("select persons.id1, id2 from persons where id1 >= 0 order by id1 asc)<br/><br/>

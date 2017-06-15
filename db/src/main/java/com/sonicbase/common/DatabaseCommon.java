@@ -40,6 +40,7 @@ public class DatabaseCommon {
   private Map<String, Lock> schemaWriteLock = new ConcurrentHashMap<>();
   private DatabaseServer.ServersConfig serversConfig;
   private int schemaVersion;
+  private boolean haveProLicense;
 
   public Lock getSchemaReadLock(String dbName) {
     return schemaReadLock.get(dbName);
@@ -69,7 +70,6 @@ public class DatabaseCommon {
         logger.info("Loading schema: file=" + schemaFile.getAbsolutePath());
         if (schemaFile.exists()) {
           try (DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(schemaFile)))) {
-            long serializationVersion = DataUtil.readVLong(in);
             deserializeSchema(this, in);
           }
         }
@@ -106,12 +106,11 @@ public class DatabaseCommon {
 
         schemaFile.getParentFile().mkdirs();
         try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(schemaFile)))) {
-          DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
           if (shard == 0 && replica == 0) {
             this.schemaVersion++;
             //          schema.get(dbName).incrementSchemaVersion();
           }
-          serializeSchema(out);
+          serializeSchema(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
         }
 
         loadSchema(dataDir);
@@ -123,9 +122,12 @@ public class DatabaseCommon {
     }
   }
 
-  public void serializeSchema(DataOutputStream out) throws IOException {
-    DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+  public void serializeSchema(DataOutputStream out, int serializationVersionNumber) throws IOException {
+    DataUtil.writeVLong(out, serializationVersionNumber);
     out.writeInt(this.schemaVersion);
+    if (serializationVersionNumber >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION) {
+      out.writeBoolean(haveProLicense);
+    }
     if (serversConfig == null) {
       out.writeBoolean(false);
     }
@@ -174,6 +176,9 @@ public class DatabaseCommon {
     try {
       long serializationVersion = DataUtil.readVLong(in);
       this.schemaVersion = in.readInt();
+      if (serializationVersion >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION) {
+        this.haveProLicense = in.readBoolean();
+      }
       if (in.readBoolean()) {
         deserializeConfig(in);
       }
@@ -489,11 +494,11 @@ public class DatabaseCommon {
     ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
     DataOutputStream out = new DataOutputStream(bytesOut);
     DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-    if (serializeHeader) {
+  //  if (serializeHeader) {
       DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
       DataUtil.writeVLong(out, schemaVersion);
-      DataUtil.writeVLong(out, fields.length, resultLength);
-    }
+  //  }
+   // DataUtil.writeVLong(out, fields.length, resultLength);
     int offset = 0;
     byte[] buffer = new byte[16];
     for (Object field : fields) {
@@ -637,18 +642,19 @@ public class DatabaseCommon {
     DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
     List<FieldSchema> currFieldList = tableSchema.getFields();
     List<FieldSchema> serializedFieldList = null;
-    if (deserializeHeader) {
+//    if (deserializeHeader) {
       long serializationVersion = DataUtil.readVLong(bytes, byteOffset, resultLength);
       byteOffset += resultLength.getLength();
       serializedSchemaVersion.set((int) DataUtil.readVLong(bytes, byteOffset, resultLength));
       byteOffset += resultLength.getLength();
       serializedFieldList = tableSchema.getFieldsForVersion(schemaVersion, serializedSchemaVersion.get());
-      int fieldCount = (int) DataUtil.readVLong(bytes, byteOffset, resultLength);
-    }
-    else {
-      serializedFieldList = tableSchema.getFieldsForVersion(schemaVersion, serializedSchemaVersion.get());
-    }
-    byteOffset += resultLength.getLength();
+     // int fieldCount = (int) DataUtil.readVLong(bytes, byteOffset, resultLength);
+//    }
+//    else {
+//     // int fieldCount = (int) DataUtil.readVLong(bytes, byteOffset, resultLength);
+//      serializedFieldList = tableSchema.getFieldsForVersion(schemaVersion, serializedSchemaVersion.get());
+//    }
+//    byteOffset += resultLength.getLength();
     Object[] fields = new Object[currFieldList.size()];
     int offset = 0;
     boolean isCurrentSchema = currFieldList == serializedFieldList;
@@ -893,5 +899,14 @@ public class DatabaseCommon {
 
   public void setSchema(String dbName, Schema schema) {
     this.schema.put(dbName, schema);
+  }
+
+  public void setHaveProLicense(boolean haveProLicense) {
+
+    this.haveProLicense = haveProLicense;
+  }
+
+  public boolean haveProLicense() {
+    return haveProLicense;
   }
 }

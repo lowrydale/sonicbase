@@ -141,7 +141,8 @@ public abstract class ExpressionImpl implements Expression {
 
   public static void evaluateCounter(DatabaseCommon common, DatabaseClient client, String dbName, Counter counter) throws IOException {
     byte[] bytes = counter.serialize();
-    String command = "DatabaseServer:evaluateCounter:1:" + common.getSchemaVersion() + ":" + dbName;
+    String command = "DatabaseServer:evaluateCounter:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+        common.getSchemaVersion() + ":" + dbName;
 
     String batchKey = "DatabaseServer:evaluateCounter";
 
@@ -1072,7 +1073,8 @@ public abstract class ExpressionImpl implements Expression {
               out.close();
 
 
-              String command = "DatabaseServer:batchIndexLookup:1:" + common.getSchemaVersion() + ":" + dbName + ":" + count;
+              String command = "DatabaseServer:batchIndexLookup:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+                  common.getSchemaVersion() + ":" + dbName + ":" + count;
               byte[] lookupRet = client.send(null, shard, -1, command, bytesOut.toByteArray(), DatabaseClient.Replica.def);
               if (previousSchemaVersion < common.getSchemaVersion()) {
                 throw new SchemaOutOfSyncException();
@@ -1247,7 +1249,8 @@ public abstract class ExpressionImpl implements Expression {
                       prepared.getValue().lastTimeUsed < System.currentTimeMillis() - 15 * 60 * 1000) {
                 preparedIndexLookups.remove(prepared.getKey());
 
-                String command = "DatabaseServer:expirePreparedStatement:1:" + client.getCommon().getSchemaVersion() + ":null:" + prepared.getValue().preparedId;
+                String command = "DatabaseServer:expirePreparedStatement:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION +
+                    ":" + client.getCommon().getSchemaVersion() + ":null:" + prepared.getValue().preparedId;
 
                 client.sendToAllShards(null, 0, command, null, DatabaseClient.Replica.all);
               }
@@ -1583,7 +1586,8 @@ public abstract class ExpressionImpl implements Expression {
               replicas.add(1);
             }
 
-            String command = "DatabaseServer:indexLookup:1:" + common.getSchemaVersion() + ":" + dbName + ":" + rand.nextLong();
+            String command = "DatabaseServer:indexLookup:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+                common.getSchemaVersion() + ":" + dbName + ":" + rand.nextLong();
             byte[] bytes = bytesOut.toByteArray();
 
             String batchKey = null;
@@ -1935,7 +1939,8 @@ public abstract class ExpressionImpl implements Expression {
 
         out.close();
 
-        String command = "DatabaseServer:indexLookupExpression:1:" + common.getSchemaVersion() + ":" + dbName + ":" + count;
+        String command = "DatabaseServer:indexLookupExpression:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+            common.getSchemaVersion() + ":" + dbName + ":" + count;
         byte[] lookupRet = client.send(null, localShard, 0, command, bytesOut.toByteArray(), DatabaseClient.Replica.def);
         if (previousSchemaVersion < common.getSchemaVersion()) {
           throw new SchemaOutOfSyncException();

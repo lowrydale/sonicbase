@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+<head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Create an account to the SonicBase website.">
+
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+
+    <meta charset="UTF-8">
+    <title>SonicBase - Create Account</title>
+    <script type="text/javascript" src="../javascript/jquery-3.2.1.min.js"></script>
+    <script type="text/javascript" src="../javascript/main.js"></script>
+    <script>
+        function createAccount(form) {
+            var email = document.getElementById("email").value;
+            var password = document.getElementById("password").value;
+            var password2 = document.getElementById("password2").value;
+            if (password !== password2) {
+                alert("Passwords don't match: " + password + " " + password2);
+                return;
+            }
+
+            $.ajaxSetup({
+                error: function(xhr){
+                    alert('Request Status: ' + xhr.status + ' Status Text: ' + xhr.statusText + ' ' + xhr.responseText);
+                }
+            });
+
+            $.ajax({
+                headers:{
+                    "Accept":"application/text",
+                    "Content-type":"application/json"
+                },   url:"/app/account/create?email=" + encodeURI(email) + "&password=" + encodeURI(password),
+                success:function(response){
+                    createCookie("SBSessionId", response, COOKIE_LIFE);
+                    window.location.href = "/app-static/licenses.html";
+                },
+                statusCode: {
+                    409: function() {
+                        alert('Email already in use');
+                    }
+                }
+            });
+        }
+    </script>
+
+</head>
+
+<body>
+<div class="container">
+    <header> <a href="../index.html">
+        <h4 class="logo">SonicBase™</h4>
+    </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../downloads.html">DOWNLOADS</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <div style="margin-left: 4em;">
+    <br/>
+        <br/>
+        <br/>
+        <br/>
+    <form id="create-account-form" name="create-account-form" action="javascript:;">
+    <table>
+        <tr>
+            <td align="right">Email:</td>
+            <td><input type="text" id="email"></td>
+        </tr>
+        <tr>
+            <td align="right">Password:</td>
+            <td><input type="password" id="password"></td>
+        </tr>
+        <tr>
+            <td align="right">Renter Password:</td>
+            <td><input type="password" id="password2"></td>
+        </tr>
+        <tr>
+            <td></td><td><button type="button" onclick="createAccount(document.getElementById('create-account-form'))">Create Account</button></td>
+        </tr>
+    </table>
+    </form>
+    </div>
+</div>
+</body>
+</html>

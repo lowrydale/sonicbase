@@ -33,7 +33,7 @@ public class TestLogManager {
     String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")));
      final JsonDict config = new JsonDict(configStr);
 
-     JsonArray array = config.getDict("database").putArray("licenseKeys");
+     JsonArray array = config.putArray("licenseKeys");
      array.add(DatabaseServer.FOUR_SERVER_LICENSE);
 
      FileUtils.deleteDirectory(new File("/data/database"));

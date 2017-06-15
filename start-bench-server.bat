@@ -1,4 +1,4 @@
-SET _XMX_=4g
+SET _XMX_=512m
 SET SEARCH_HOME=%2
 mkdir %2\logs
 

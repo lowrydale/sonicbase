@@ -2,6 +2,7 @@ package com.sonicbase.common;
 
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.query.DatabaseException;
+import com.sonicbase.server.SnapshotManager;
 import org.apache.commons.lang.exception.ExceptionUtils;
 
 import java.io.ByteArrayOutputStream;
@@ -52,7 +53,8 @@ public class Logger {
               out.close();
               byte[] body = bytesOut.toByteArray();
 
-              String command = "DatabaseServer:logError:1:" + error.client.getCommon().getSchemaVersion();
+              String command = "DatabaseServer:logError:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+                  error.client.getCommon().getSchemaVersion();
               byte[] ret = error.client.send(null, 0, 0, command, body, DatabaseClient.Replica.master);
 
             }

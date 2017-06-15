@@ -2,6 +2,7 @@ package com.sonicbase.database;
 
 import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.server.LongRunningCommands;
+import com.sonicbase.server.SnapshotManager;
 import com.sonicbase.util.JsonArray;
 import com.sonicbase.util.JsonDict;
 import com.sonicbase.util.StreamUtils;
@@ -25,7 +26,7 @@ public class TestLongRunningCommands {
     String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")));
     final JsonDict config = new JsonDict(configStr);
 
-    JsonArray array = config.getDict("database").putArray("licenseKeys");
+    JsonArray array = config.putArray("licenseKeys");
     array.add(DatabaseServer.FOUR_SERVER_LICENSE);
 
     FileUtils.deleteDirectory(new File("/data/database"));
@@ -33,11 +34,12 @@ public class TestLongRunningCommands {
     DatabaseServer.getServers().clear();
 
     DatabaseServer server = new DatabaseServer();
-    server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true), null);
+    server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true), null, true);
     server.disableLogProcessor();
     server.disableRepartitioner();
 
-    LongRunningCommands.SingleCommand command = server.getLongRunningCommands().createSingleCommand("DatabaseServer:echo:1:1:test:10", null);
+    LongRunningCommands.SingleCommand command = server.getLongRunningCommands().createSingleCommand("DatabaseServer:echo:1:" +
+        SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:test:10", null);
     //LongRunningCommands.SingleCommand command2 = server.getLongRunningCommands().createSingleCommand("DatabaseServer:echo2:1:1:test:10", null);
     server.getLongRunningCommands().addCommand(command);
     //server.getLongRunningCommands().addCommand(command2);
@@ -51,7 +53,8 @@ public class TestLongRunningCommands {
 //    }
     Thread.sleep(1000);
 
-    server.getLongRunningCommands().addCommand(server.getLongRunningCommands().createSingleCommand("DatabaseServer:echo:1:1:test:11", null));
+    server.getLongRunningCommands().addCommand(server.getLongRunningCommands().createSingleCommand(
+        "DatabaseServer:echo:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:test:11", null));
 
     while (true) {
       if (DatabaseServer.echoCount.get() == 11) {
@@ -83,7 +86,7 @@ public class TestLongRunningCommands {
     int count = DatabaseServer.blockCount.get();
 
     server = new DatabaseServer();
-    server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true), null);
+    server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true), null, true);
     server.disableLogProcessor();
     server.disableRepartitioner();
 

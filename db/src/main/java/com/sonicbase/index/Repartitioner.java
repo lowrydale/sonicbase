@@ -265,7 +265,8 @@ public class Repartitioner extends Thread {
             futures.add(executor.submit(new Callable() {
               @Override
               public Object call() {
-                String command = "DatabaseServer:rebalanceOrderedIndex:1:" + common.getSchemaVersion() + ":" + dbName + ":" + finalTableName + ":" + indexName;
+                String command = "DatabaseServer:rebalanceOrderedIndex:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION +
+                    ":" + common.getSchemaVersion() + ":" + dbName + ":" + finalTableName + ":" + indexName;
                 Random rand = new Random(System.currentTimeMillis());
                 try {
                   databaseServer.getDatabaseClient().send(null, shard, rand.nextLong(), command, null, DatabaseClient.Replica.all);
@@ -660,18 +661,18 @@ public class Repartitioner extends Thread {
 
   public byte[] notifyRepartitioningComplete(String command, byte[] body) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
-    int shard = Integer.valueOf(parts[5]);
-    int replica = Integer.valueOf(parts[6]);
+    String dbName = parts[5];
+    int shard = Integer.valueOf(parts[6]);
+    int replica = Integer.valueOf(parts[7]);
     repartitioningComplete.put(shard + ":" + replica, true);
     return null;
   }
 
   public byte[] notifyDeletingComplete(String command, byte[] body) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
-    int shard = Integer.valueOf(parts[5]);
-    int replica = Integer.valueOf(parts[6]);
+    String dbName = parts[5];
+    int shard = Integer.valueOf(parts[6]);
+    int replica = Integer.valueOf(parts[7]);
     deletingComplete.put(shard + ":" + replica, true);
     return null;
   }
@@ -680,8 +681,8 @@ public class Repartitioner extends Thread {
     logger.info("getKeyAtOffset: dbName=" + dbName + ", shard=" + shard + ", table=" + tableName +
         ", index=" + indexName + ", offsetCount=" + offsets.size());
     long begin = System.currentTimeMillis();
-    String command = "DatabaseServer:getKeyAtOffset:1:" + common.getSchemaVersion() + ":" + dbName + ":" + tableName +
-        ":" + indexName;
+    String command = "DatabaseServer:getKeyAtOffset:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+        common.getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + indexName;
     ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
     DataOutputStream out = new DataOutputStream(bytesOut);
     out.writeInt(offsets.size());
@@ -714,9 +715,9 @@ public class Repartitioner extends Thread {
   public byte[] getKeyAtOffset(String command, byte[] body) {
     try {
       String[] parts = command.split(":");
-      String dbName = parts[4];
-      String tableName = parts[5];
-      String indexName = parts[6];
+      String dbName = parts[5];
+      String tableName = parts[6];
+      String indexName = parts[7];
       DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
       List<Long> offsets = new ArrayList<>();
       int count = in.readInt();
@@ -801,7 +802,8 @@ public class Repartitioner extends Thread {
 
   private long getPartitionSize(String dbName, int shard, String tableName, String indexName) {
     try {
-      String command = "DatabaseServer:getPartitionSize:1:" + common.getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + indexName;
+      String command = "DatabaseServer:getPartitionSize:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+          common.getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + indexName;
       Random rand = new Random(System.currentTimeMillis());
       byte[] ret = databaseServer.getDatabaseClient().send(null, shard, rand.nextLong(), command, null, DatabaseClient.Replica.master);
       DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
@@ -816,9 +818,9 @@ public class Repartitioner extends Thread {
   public byte[] getPartitionSize(String command, byte[] body) {
     try {
       String[] parts = command.split(":");
-      String dbName = parts[4];
-      String tableName = parts[5];
-      String indexName = parts[6];
+      String dbName = parts[5];
+      String tableName = parts[6];
+      String indexName = parts[7];
 
       logger.info("getPartitionSize: dbName=" + dbName + ", table=" + tableName + ", index=" + indexName);
       if (dbName == null || tableName == null || indexName == null) {
@@ -1079,9 +1081,9 @@ public class Repartitioner extends Thread {
   public byte[] doRebalanceOrderedIndex(final String command, final byte[] body) {
     try {
       final String[] parts = command.split(":");
-      final String dbName = parts[4];
-      final String tableName = parts[5];
-      final String indexName = parts[6];
+      final String dbName = parts[5];
+      final String tableName = parts[6];
+      final String indexName = parts[7];
       logger.info("doRebalanceOrderedIndex: shard=" + databaseServer.getShard() + ", dbName=" + dbName +
         ", tableName=" + tableName + ", indexName=" + indexName);
 
@@ -1234,7 +1236,8 @@ public class Repartitioner extends Thread {
       finally {
         common.getSchemaReadLock(dbName).unlock();
       }
-      String notifyCommand = "DatabaseServer:notifyRepartitioningComplete:1:" + common.getSchemaVersion() + ":" + dbName + ":" + databaseServer.getShard() + ":" + databaseServer.getReplica();
+      String notifyCommand = "DatabaseServer:notifyRepartitioningComplete:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION +
+          ":" + common.getSchemaVersion() + ":" + dbName + ":" + databaseServer.getShard() + ":" + databaseServer.getReplica();
       Random rand = new Random(System.currentTimeMillis());
       databaseServer.getDatabaseClient().send(null, 0, rand.nextLong(), notifyCommand, null, DatabaseClient.Replica.master);
     }
@@ -1498,7 +1501,8 @@ public class Repartitioner extends Thread {
 
       byte[] body = bytesOut.toByteArray();
 
-      String command = "DatabaseServer:moveIndexEntries:1:" + common.getSchemaVersion() + ":" + dbName;
+      String command = "DatabaseServer:moveIndexEntries:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+          common.getSchemaVersion() + ":" + dbName;
       databaseServer.getDatabaseClient().send(null, shard, databaseServer.getReplica(), command, body, DatabaseClient.Replica.specified);
     }
     catch (IOException e) {
@@ -1511,7 +1515,7 @@ public class Repartitioner extends Thread {
       synchronized (databaseServer.getBatchRepartCount()) {
         databaseServer.getBatchRepartCount().incrementAndGet();
         String[] parts = command.split(":");
-        String dbName = parts[4];
+        String dbName = parts[5];
 
         DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
         long serializationVersion = DataUtil.readVLong(in);
@@ -1904,7 +1908,7 @@ public class Repartitioner extends Thread {
       DataOutputStream out = new DataOutputStream(bytesOut);
 
       String[] parts = command.split(":");
-      String dbName = parts[4];
+      String dbName = parts[5];
 
       logger.info("getIndexCounts - begin: dbName=" + dbName);
 
@@ -1940,7 +1944,8 @@ public class Repartitioner extends Thread {
         futures.add(client.getExecutor().submit(new Callable(){
           @Override
           public Object call() throws Exception {
-            String command = "DatabaseServer:getIndexCounts:1:" + client.getCommon().getSchemaVersion() + ":" + dbName;
+            String command = "DatabaseServer:getIndexCounts:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+                client.getCommon().getSchemaVersion() + ":" + dbName;
             byte[] response = client.send(null, shard, 0, command, null, DatabaseClient.Replica.master);
             synchronized (ret) {
               DataInputStream in = new DataInputStream(new ByteArrayInputStream(response));
@@ -2008,7 +2013,8 @@ public class Repartitioner extends Thread {
     while (true) {
       try {
         for (String dbName : databaseServer.getDbNames(databaseServer.getDataDir())) {
-          String command = "DatabaseServer:beginRebalance:1:1:" + dbName + ":" + false;
+          String command = "DatabaseServer:beginRebalance:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION +
+              ":1:" + dbName + ":" + false;
           beginRebalance(command, (byte[]) null);
         }
         Thread.sleep(2000);
@@ -2053,8 +2059,8 @@ public class Repartitioner extends Thread {
 
   public byte[] beginRebalance(String command, byte[] body) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
-    boolean force = Boolean.valueOf(parts[5]);
+    String dbName = parts[5];
+    boolean force = Boolean.valueOf(parts[6]);
     try {
 
       while (isRebalancing.get()) {
@@ -2070,12 +2076,12 @@ public class Repartitioner extends Thread {
       logger.info("Config: " + configStr);
       JsonDict config = new JsonDict(configStr);
 
-      config = config.getDict("database");
       boolean isInternal = false;
       if (config.hasKey("clientIsPrivate")) {
         isInternal = config.getBoolean("clientIsPrivate");
       }
-      DatabaseServer.ServersConfig newConfig = new DatabaseServer.ServersConfig(config.getArray("shards"), config.getInt("replicationFactor"), isInternal);
+      DatabaseServer.ServersConfig newConfig = new DatabaseServer.ServersConfig(config.getArray("shards"),
+          config.getArray("shards").getDict(0).getArray("replicas").size(), isInternal);
       DatabaseServer.Shard[] newShards = newConfig.getShards();
 
       common.setServersConfig(newConfig);

@@ -35,10 +35,10 @@
 	</script>
 
 <div style="margin-left: 4em;">
-
+<h1>SQL Update Statement</h1>
 <br/>
 Update records in a table.<br/>
-<p>Syntax<table class="border-table" border="1"><tr><td> <table class="syntax-table" cellpadding="4">
+<h3>Syntax</h3><table class="border-table" border="1"><tr><td> <table class="syntax-table" cellpadding="4">
 	<tbody>
     <tr class="syntax-main">
            <td colspan=2 width=512>
@@ -63,9 +63,8 @@ Update records in a table.<br/>
 </tr>
 </table>
 <br/>
-<br/>
-Example:<br/>
-<br/>
+
+<h3>Example</h3>
 PreparedStatement stmt = conn.prepareStatement("update persons set name='john' where name=?");<br/>
 stmt.setString(1, "bob");<br/>
 stmt.executeUpdate();<br/>

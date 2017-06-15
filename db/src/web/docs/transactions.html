@@ -37,7 +37,7 @@
 <br/>
 SonicBase supports the read committed transaction isolation level.<br/>
 
-<h3>Simple Example</h3>
+<h1>Simple Example</h1>
 conn.setAutoCommit(false);<br/>
 <br/>
 PreparedStatement stmt = conn.prepareStatement("insert into persons (id) VALUES (?)");<br/>
@@ -48,7 +48,7 @@ assertEquals(count, 1);<br/>
 <br/>
 conn.commit();<br/>
 
-<h3>Concurrent Access Example</h3>
+<h1>Concurrent Access Example</h1>
 PreparedStatement stmt = conn.prepareStatement("truncate table persons");<br/>
 stmt.execute();<br/>
 <br/>

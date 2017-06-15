@@ -1,0 +1,151 @@
+<!doctype html>
+<html>
+<head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Manage SonicBase licenses.">
+
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+
+    <meta charset="UTF-8">
+    <title>SonicBase - License Manager</title>
+    <script type="text/javascript" src="../javascript/jquery-3.2.1.min.js"></script>
+    <script type="text/javascript" src="../javascript/main.js"></script>
+    <script>
+        function loadLicenses() {
+
+            $.ajaxSetup({
+                error: function(xhr){
+                    alert('Request Status: ' + xhr.status + ' Status Text: ' + xhr.statusText + ' ' + xhr.responseText);
+                }
+            });
+
+            var sessionId = readCookie("SBSessionId");
+
+            $.ajax({
+                headers:{
+                    "Accept":"application/json",
+                    "Content-type":"application/json"
+                },   url:"/app/license/licenses?sessionId=" + sessionId,
+                success:function(response){
+                    touchCookie("SBSessionId");
+                    var table = document.getElementById("licenses");
+
+                    while(table.rows.length > 1) {
+                        table.deleteRow(1);
+                    }
+                    var r = response;//JSON.parse(response);
+                    var size = r.licenses.length;
+                    for (var i = 0; i < size; i++) {
+                        var cores = r.licenses[i].cores;
+                        var expireDate = r.licenses[i].expireDate;
+
+                        var rowCount = table.rows.length;
+                        var row = table.insertRow(rowCount);
+                        var c1 = row.insertCell(0);
+                        var c2 = row.insertCell(1);
+                        c1.innerHTML=cores;
+                        c2.innerHTML=expireDate;
+                    }
+                }
+            });
+        }
+
+
+        function requestTrial() {
+
+            $.ajaxSetup({
+                error: function(xhr){
+                    alert('Request Status: ' + xhr.status + ' Status Text: ' + xhr.statusText + ' ' + xhr.responseText);
+                }
+            });
+
+            var sessionId = readCookie("SBSessionId");
+
+            $.ajax({
+                headers:{
+                    "Accept":"application/json",
+                    "Content-type":"application/json"
+                },   url:"/app/license/requestTrial?sessionId=" + sessionId,
+                success:function(response){
+                    touchCookie("SBSessionId");
+                    loadLicenses()
+                    alert("Trial license granted");
+                },
+                statusCode: {
+                    402: function() {
+                        alert('Trial license already used for this account.');
+                    }
+                }
+            });
+        }
+
+        function getAccountKey() {
+
+            $.ajaxSetup({
+                error: function(xhr){
+                    alert('Request Status: ' + xhr.status + ' Status Text: ' + xhr.statusText + ' ' + xhr.responseText);
+                }
+            });
+
+            var sessionId = readCookie("SBSessionId");
+
+            $.ajax({
+                headers:{
+                    "Accept":"application/text",
+                    "Content-type":"application/json"
+                },   url:"/app/account/key?sessionId=" + sessionId,
+                success:function(response){
+                    touchCookie("SBSessionId");
+                    alert("key=" + response);
+                }
+            });
+        }
+
+        function purchase(form) {
+            window.location.href = "/app-static/purchase.html";
+        }
+    </script>
+
+</head>
+
+<body>
+
+<script>
+    loadLicenses();
+</script>
+
+<div class="container">
+    <header> <a href="../index.html">
+        <h4 class="logo">SonicBase™</h4>
+    </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li><a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../downloads.html">DOWNLOADS</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <div style="margin-left: 4em;">
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+    <button type="button" onclick="purchase()">Purchase Licenses</button><br/>
+    <button type="button" onclick="requestTrial()">Request 30-day Trial License</button><br/>
+    <button type="button" onclick="getAccountKey()">Get Account Key</button><br/>
+    <br/>
+
+    <h2>Existing Licenses</h2>
+    <table id="licenses" class="syntax-table" border="1" cellpadding=2 cellspacing="0">
+        <tr class="syntax-main">
+            <td># Cores</td>
+            <td>Expire Date</td>
+        </tr>
+    </table>
+    </div>
+</div>
+</body>
+</html>

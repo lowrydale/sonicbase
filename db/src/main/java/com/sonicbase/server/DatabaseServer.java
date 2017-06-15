@@ -1,10 +1,8 @@
 package com.sonicbase.server;
 
+import com.google.api.client.http.HttpResponse;
 import com.sonicbase.client.DatabaseClient;
-import com.sonicbase.common.DatabaseCommon;
-import com.sonicbase.common.Logger;
-import com.sonicbase.common.Record;
-import com.sonicbase.common.SchemaOutOfSyncException;
+import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
 import com.sonicbase.index.Indices;
 import com.sonicbase.index.Repartitioner;
@@ -20,9 +18,6 @@ import com.sonicbase.util.StreamUtils;
 import net.jpountz.lz4.LZ4Compressor;
 import net.jpountz.lz4.LZ4Factory;
 import net.jpountz.lz4.LZ4FastDecompressor;
-import org.anarres.lzo.LzoDecompressor1x;
-import org.anarres.lzo.LzoInputStream;
-import org.anarres.lzo.LzoOutputStream;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.input.ReversedLinesFileReader;
 import org.apache.commons.lang.exception.ExceptionUtils;
@@ -33,12 +28,15 @@ import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+import javax.net.ssl.*;
 import java.io.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.charset.Charset;
 import java.security.InvalidKeyException;
 import java.security.Key;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -87,7 +85,10 @@ public class DatabaseServer {
   private ReentrantReadWriteLock.ReadLock batchReadLock = batchLock.readLock();
   private ReentrantReadWriteLock.WriteLock batchWriteLock = batchLock.writeLock();
   private AtomicInteger batchRepartCount = new AtomicInteger();
-
+  private boolean usingMultipleReplicas = false;
+  private Boolean disableNow = false;
+  private boolean haveProLicense;
+  private boolean overrideProLicense;
 
   @SuppressWarnings("restriction")
   private static Unsafe getUnsafe() {
@@ -151,19 +152,20 @@ public class DatabaseServer {
   }
 
   public void setConfig(
-      final JsonDict config, String cluster, String host, int port, AtomicBoolean isRunning, String gclog, String xmx) {
-    setConfig(config, cluster, host, port, false, isRunning, false, gclog, xmx);
+      final JsonDict config, String cluster, String host, int port, AtomicBoolean isRunning, String gclog, String xmx,
+      boolean overrideProLicense) {
+    setConfig(config, cluster, host, port, false, isRunning, false, gclog, xmx, overrideProLicense);
   }
 
   public void setConfig(
       final JsonDict config, String cluster, String host, int port,
-      boolean unitTest, AtomicBoolean isRunning, String gclog) {
-    setConfig(config, cluster, host, port, unitTest, isRunning, false, gclog, null);
+      boolean unitTest, AtomicBoolean isRunning, String gclog, boolean overrideProLicense) {
+    setConfig(config, cluster, host, port, unitTest, isRunning, false, gclog, null, overrideProLicense);
   }
 
   public void setConfig(
       final JsonDict config, String cluster, String host, int port,
-      boolean unitTest, AtomicBoolean isRunning, boolean skipLicense, String gclog, String xmx) {
+      boolean unitTest, AtomicBoolean isRunning, boolean skipLicense, String gclog, String xmx, boolean overrideProLicense) {
 
 
     this.isRunning = isRunning;
@@ -173,13 +175,18 @@ public class DatabaseServer {
     this.port = port;
     this.gclog = gclog;
     this.xmx = xmx;
+    this.overrideProLicense = overrideProLicense;
 
-    JsonDict databaseDict = config.getDict("database");
+    JsonDict databaseDict = config;
     this.dataDir = databaseDict.getString("dataDirectory");
     this.dataDir = dataDir.replace("$HOME", System.getProperty("user.home"));
     this.installDir = databaseDict.getString("installDirectory");
     this.installDir = installDir.replace("$HOME", System.getProperty("user.home"));
     JsonArray shards = databaseDict.getArray("shards");
+    int replicaCount = shards.getDict(0).getArray("replicas").size();
+    if (replicaCount > 1) {
+      usingMultipleReplicas = true;
+    }
     JsonDict firstServer = shards.getDict(0).getArray("replicas").getDict(0);
     ServersConfig serversConfig = null;
     executor = new ThreadPoolExecutor(256, 256, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
@@ -287,6 +294,9 @@ public class DatabaseServer {
 
     startMemoryMonitor();
 
+    disable();
+    startLicenseValidator();
+
     logger.info("Started server");
 
     //logger.error("Testing errors", new DatabaseException());
@@ -296,6 +306,106 @@ public class DatabaseServer {
 //    Thread logThread = new Thread(queue);
 //    logThread.start();
 
+  }
+
+
+  public static void disable() {
+    try {
+      SSLContext sslc = SSLContext.getInstance("TLS");
+      TrustManager[] trustManagerArray = { new NullX509TrustManager() };
+      sslc.init(null, trustManagerArray, null);
+      HttpsURLConnection.setDefaultSSLSocketFactory(sslc.getSocketFactory());
+      HttpsURLConnection.setDefaultHostnameVerifier(new NullHostnameVerifier());
+    } catch(Exception e) {
+      e.printStackTrace();
+    }
+  }
+
+  private static class NullX509TrustManager implements X509TrustManager {
+    public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+      System.out.println();
+    }
+    public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+      System.out.println();
+    }
+    public X509Certificate[] getAcceptedIssuers() {
+      return new X509Certificate[0];
+    }
+  }
+
+  private static class NullHostnameVerifier implements HostnameVerifier {
+    public boolean verify(String hostname, SSLSession session) {
+      return true;
+    }
+  }
+
+  private void startLicenseValidator() {
+    if (overrideProLicense) {
+      logger.info("Overriding pro license");
+      haveProLicense = true;
+      common.setHaveProLicense(haveProLicense);
+      common.saveSchema(dataDir);
+      return;
+    }
+    haveProLicense = false;
+
+    if (usingMultipleReplicas) {
+      throw new InsufficientLicense("You must have a pro license to use multiple replicas");
+    }
+
+    final AtomicInteger licensePort = new AtomicInteger();
+    String json = null;
+    try {
+      json = StreamUtils.inputStreamToString(DatabaseServer.class.getResourceAsStream("/config-license-server.json"));
+    }
+    catch (Exception e) {
+      logger.error("Error initializing license validator", e);
+      return;
+    }
+    JsonDict config = new JsonDict(json);
+    licensePort.set(config.getDict("server").getInt("port"));
+    final String address = config.getDict("server").getString("privateAddress");
+
+    final AtomicBoolean lastHaveProLicense = new AtomicBoolean(haveProLicense);
+
+    Thread thread = new Thread(new Runnable(){
+      @Override
+      public void run() {
+        while (true) {
+          try {
+            int cores = Runtime.getRuntime().availableProcessors();
+            HttpResponse response = DatabaseClient.restGet("https://" + address + ":" + licensePort.get() + "/license/checkIn?" +
+              "address=" + DatabaseServer.this.host + "&port=" +  DatabaseServer.this.port + "&cores=" + cores);
+            String responseStr = StreamUtils.inputStreamToString(response.getContent());
+            logger.info("CheckIn response: " + responseStr);
+
+            JsonDict dict = new JsonDict(responseStr);
+
+            DatabaseServer.this.haveProLicense = dict.getBoolean("inCompliance");
+            DatabaseServer.this.disableNow = dict.getBoolean("disableNow");
+
+            logger.info("lastHaveProLicense=" + lastHaveProLicense.get() + ", haveProLicense=" + haveProLicense);
+            if (lastHaveProLicense.get() != haveProLicense) {
+              common.setHaveProLicense(haveProLicense);
+              common.saveSchema(dataDir);
+              lastHaveProLicense.set(haveProLicense);
+              logger.info("Saving schema with haveProLicense=" + haveProLicense);
+            }
+          }
+          catch (Exception e) {
+            logger.error("license server not found");
+            errorLogger.debug("License server not found", e);
+          }
+          try {
+            Thread.sleep(60 * 1000);
+          }
+          catch (InterruptedException e) {
+            logger.error("Error checking licenses", e);
+          }
+        }
+      }
+    });
+    thread.start();
   }
 
   public void setMinSizeForRepartition(int minSizeForRepartition) {
@@ -506,6 +616,10 @@ public class DatabaseServer {
     return batchRepartCount;
   }
 
+  public void overrideProLicense() {
+    this.overrideProLicense = true;
+  }
+
   public static class Host {
     private String publicAddress;
     private String privateAddress;
@@ -705,7 +819,7 @@ public class DatabaseServer {
 
   private Double checkResidentMemory() {
     Double totalGig = null;
-    String max = config.getDict("database").getString("maxProcessMemoryTrigger");
+    String max = config.getString("maxProcessMemoryTrigger");
     if (max == null) {
       logger.info("Max process memory not set in config. Not enforcing max memory");
     }
@@ -1360,7 +1474,7 @@ public class DatabaseServer {
   private void checkJavaHeap(Double totalGig) throws IOException {
     String line = null;
     try {
-      String max = config.getDict("database").getString("maxJavaHeapTrigger");
+      String max = config.getString("maxJavaHeapTrigger");
       if (max == null) {
         logger.info("Max java heap trigger not set in config. Not enforcing max");
         return;
@@ -1541,7 +1655,7 @@ public class DatabaseServer {
       int licensedServerCount = 0;
       int actualServerCount = 0;
       boolean pro = false;
-      JsonArray keys = config.getDict("database").getArray("licenseKeys");
+      JsonArray keys = config.getArray("licenseKeys");
       if (keys == null || keys.size() == 0) {
         pro = false;
       }
@@ -1574,7 +1688,7 @@ public class DatabaseServer {
         }
       }
 
-      JsonArray shards = config.getDict("database").getArray("shards");
+      JsonArray shards = config.getArray("shards");
       for (int i = 0; i < shards.size(); i++) {
         JsonDict shard = shards.getDict(i);
         JsonArray replicas = shard.getArray("replicas");
@@ -1614,7 +1728,7 @@ public class DatabaseServer {
   private void syncDbNames() {
     try {
       logger.info("Syncing database names: shard=" + shard + ", replica=" + replica);
-      String command = "DatabaseServer:getDbNames:1:1:__none__";
+      String command = "DatabaseServer:getDbNames:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__";
       byte[] ret = getDatabaseClient().send(null, 0, 0, command, null, DatabaseClient.Replica.specified);
       DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
       long serializationVersion = DataUtil.readVLong(in);
@@ -1749,7 +1863,6 @@ public class DatabaseServer {
     }
     String[] parts = command.split(":");
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
-    long serializationVersion = DataUtil.readVLong(in);
     common.deserializeSchema(common, in);
     common.saveSchema(dataDir);
     return null;
@@ -1768,11 +1881,11 @@ public class DatabaseServer {
           }
           ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
           DataOutputStream out = new DataOutputStream(bytesOut);
-          DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-          common.serializeSchema(out);
+          common.serializeSchema(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
           out.close();
 
-          String command = "DatabaseServer:updateSchema:1:" + common.getSchemaVersion() + ":__none__";
+          String command = "DatabaseServer:updateSchema:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+              common.getSchemaVersion() + ":__none__";
           getDatabaseClient().send(null, i, j, command, bytesOut.toByteArray(), DatabaseClient.Replica.specified);
         }
       }
@@ -1812,7 +1925,8 @@ public class DatabaseServer {
           common.getServersConfig().serialize(out);
           out.close();
 
-          String command = "DatabaseServer:updateServersConfig:1:1:__none__";
+          String command = "DatabaseServer:updateServersConfig:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION +
+              ":1:__none__";
           getDatabaseClient().send(null, i, j, command, bytesOut.toByteArray(), DatabaseClient.Replica.specified);
         }
       }
@@ -2136,6 +2250,7 @@ public class DatabaseServer {
     priorityCommands.add("synchSchema");
     priorityCommands.add("updateSchema");
     priorityCommands.add("getConfig");
+    priorityCommands.add("getRecoverProgress");
     priorityCommands.add("healthCheckPriority");
     priorityCommands.add("getDbNames");
     priorityCommands.add("updateServersConfig");
@@ -2175,6 +2290,11 @@ public class DatabaseServer {
 //        futures.add(executor.submit(new Callable<byte[]>() {
 //          @Override
 //          public byte[] call() throws Exception {
+          try {
+            if (disableNow && usingMultipleReplicas) {
+              throw new LicenseOutOfComplianceException("Licenses out of compliance");
+            }
+
             String command = request.getCommand();
             byte[] body = request.getBody();
 
@@ -2223,6 +2343,10 @@ public class DatabaseServer {
               throw new DatabaseException(e);
             }
             retList.add(new Response(ret));
+          }
+          catch (Exception e) {
+            retList.add(new Response(e));
+          }
             //return ret;
           //}
         //}));
@@ -2260,6 +2384,10 @@ public class DatabaseServer {
       }
       else {
         methodStr = command.substring(pos + 1, pos2);
+      }
+
+      if (disableNow && usingMultipleReplicas) {
+        throw new LicenseOutOfComplianceException("Licenses out of compliance");
       }
 
       LogRequest request = null;
@@ -2339,6 +2467,22 @@ public class DatabaseServer {
     }
   }
 
+  public byte[] getRecoverProgress(String command, byte[] body, boolean replayedCommand) {
+
+    try {
+      JsonDict dict = new JsonDict();
+      dict.put("percentComplete", snapshotManager.getPercentRecoverComplete());
+      Exception error = snapshotManager.getErrorRecovering();
+      if (error != null) {
+        dict.put("error", true);
+      }
+      return dict.toString().getBytes("utf-8");
+    }
+    catch (UnsupportedEncodingException e) {
+      throw new DatabaseException(e);
+    }
+  }
+
   public byte[] reconfigureCluster(String command, byte[] body, boolean replayedCommand) {
     ServersConfig oldConfig = common.getServersConfig();
     ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
@@ -2352,7 +2496,6 @@ public class DatabaseServer {
       String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(new FileInputStream(file)));
       logger.info("Config: " + configStr);
       JsonDict config = new JsonDict(configStr);
-      config = config.getDict("database");
 
       validateLicense(config);
 
@@ -2360,7 +2503,8 @@ public class DatabaseServer {
       if (config.hasKey("clientIsPrivate")) {
         isInternal = config.getBoolean("clientIsPrivate");
       }
-      DatabaseServer.ServersConfig newConfig = new DatabaseServer.ServersConfig(config.getArray("shards"), config.getInt("replicationFactor"), isInternal);
+      DatabaseServer.ServersConfig newConfig = new DatabaseServer.ServersConfig(config.getArray("shards"),
+          config.getArray("shards").getDict(0).getArray("replicas").size(), isInternal);
 
       common.setServersConfig(newConfig);
 
@@ -2393,12 +2537,11 @@ public class DatabaseServer {
 
   public byte[] getSchema(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-
+    int serializationVersionNumber = Integer.valueOf(parts[3]);
     try {
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-      common.serializeSchema(out);
+      common.serializeSchema(out, serializationVersionNumber);
       out.close();
 
       return bytesOut.toByteArray();
@@ -2431,15 +2574,15 @@ public class DatabaseServer {
   public byte[] echo(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
     logger.info("called echo");
-    echoCount.set(Integer.valueOf(parts[5]));
+    echoCount.set(Integer.valueOf(parts[6]));
     return body;
   }
 
   public byte[] echo2(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
     logger.info("called echo2");
-    if (parts.length == 6) {
-      if (echoCount.get() != Integer.valueOf(parts[5])) {
+    if (parts.length == 7) {
+      if (echoCount.get() != Integer.valueOf(parts[6])) {
         throw new DatabaseException("InvalidState");
       }
     }
@@ -2449,10 +2592,10 @@ public class DatabaseServer {
 
   public byte[] reserveNextIdFromReplica(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
-      int schemaVersion = Integer.valueOf(parts[3]);
+      int schemaVersion = Integer.valueOf(parts[4]);
       if (schemaVersion < getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + common.getSchemaVersion() + ":");
       }
@@ -2483,11 +2626,11 @@ public class DatabaseServer {
 
   public byte[] allocateRecordIds(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       logger.info("Requesting next record id - begin");
-      int schemaVersion = Integer.valueOf(parts[3]);
+      int schemaVersion = Integer.valueOf(parts[4]);
       if (schemaVersion < getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + common.getSchemaVersion() + ":");
       }
@@ -2535,7 +2678,7 @@ public class DatabaseServer {
 
   public byte[] deleteIndexEntryByKey(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return updateManager.deleteIndexEntryByKey(command, body, replayedCommand);
@@ -2547,7 +2690,7 @@ public class DatabaseServer {
 
   public byte[] commit(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return updateManager.commit(command, body, replayedCommand);
@@ -2559,7 +2702,7 @@ public class DatabaseServer {
 
   public byte[] rollback(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return updateManager.rollback(command, body, replayedCommand);
@@ -2571,7 +2714,7 @@ public class DatabaseServer {
 
   public byte[] insertIndexEntryByKey(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return updateManager.insertIndexEntryByKey(command, body, replayedCommand);
@@ -2583,7 +2726,7 @@ public class DatabaseServer {
 
   public byte[] insertIndexEntryByKeyWithRecord(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return updateManager.insertIndexEntryByKeyWithRecord(command, body, replayedCommand);
@@ -2595,7 +2738,7 @@ public class DatabaseServer {
 
   public byte[] batchInsertIndexEntryByKey(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return updateManager.batchInsertIndexEntryByKey(command, body, replayedCommand);
@@ -2607,7 +2750,7 @@ public class DatabaseServer {
 
   public byte[] batchInsertIndexEntryByKeyWithRecord(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return updateManager.batchInsertIndexEntryByKeyWithRecord(command, body, replayedCommand);
@@ -2619,7 +2762,7 @@ public class DatabaseServer {
 
   public byte[] abortTransaction(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return transactionManager.abortTransaction(command, body);
@@ -2631,7 +2774,7 @@ public class DatabaseServer {
 
   public byte[] updateRecord(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return updateManager.updateRecord(command, body, replayedCommand);
@@ -2656,7 +2799,7 @@ public class DatabaseServer {
 
   public byte[] deleteRecord(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return updateManager.deleteRecord(command, body, replayedCommand);
@@ -2668,7 +2811,7 @@ public class DatabaseServer {
 
   public byte[] deleteIndexEntry(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return updateManager.deleteIndexEntry(command, body, replayedCommand);
@@ -2691,7 +2834,7 @@ public class DatabaseServer {
 
   public byte[] truncateTable(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return updateManager.truncateTable(command, body, replayedCommand);
@@ -2703,7 +2846,7 @@ public class DatabaseServer {
 
   public byte[] countRecords(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return readManager.countRecords(command, body);
@@ -2715,7 +2858,7 @@ public class DatabaseServer {
 
   public byte[] batchIndexLookup(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return readManager.batchIndexLookup(command, body);
@@ -2745,7 +2888,7 @@ public class DatabaseServer {
 
   public byte[] closeResultSet(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return readManager.closeResultSet(command, body, replayedCommand);
@@ -2757,7 +2900,7 @@ public class DatabaseServer {
 
   public byte[] serverSelectDelete(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return readManager.serverSelectDelete(command, body, replayedCommand);
@@ -2769,7 +2912,7 @@ public class DatabaseServer {
 
   public byte[] serverSelect(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return readManager.serverSelect(command, body);
@@ -2781,7 +2924,7 @@ public class DatabaseServer {
 
   public byte[] indexLookupExpression(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return readManager.indexLookupExpression(command, body);
@@ -2793,7 +2936,7 @@ public class DatabaseServer {
 
   public byte[] evaluateCounter(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return readManager.evaluateCounter(command, body);
@@ -2805,7 +2948,7 @@ public class DatabaseServer {
 
   public byte[] getIndexCounts(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return repartitioner.getIndexCounts(command, body);
@@ -2817,7 +2960,7 @@ public class DatabaseServer {
 
   public byte[] isRepartitioningRecordsByIdComplete(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return repartitioner.isRepartitioningRecordsByIdComplete(command, body);
@@ -2829,7 +2972,7 @@ public class DatabaseServer {
 
   public byte[] isRepartitioningComplete(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return repartitioner.isRepartitioningComplete(command, body);
@@ -2841,7 +2984,7 @@ public class DatabaseServer {
 
   public byte[] isDeletingComplete(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return repartitioner.isDeletingComplete(command, body);
@@ -2853,7 +2996,7 @@ public class DatabaseServer {
 
   public byte[] notifyRepartitioningComplete(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return repartitioner.notifyRepartitioningComplete(command, body);
@@ -2865,7 +3008,7 @@ public class DatabaseServer {
 
   public byte[] notifyDeletingComplete(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return repartitioner.notifyDeletingComplete(command, body);
@@ -2883,7 +3026,7 @@ public class DatabaseServer {
 
   public byte[] getKeyAtOffset(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return repartitioner.getKeyAtOffset(command, body);
@@ -2895,7 +3038,7 @@ public class DatabaseServer {
 
   public byte[] getPartitionSize(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return repartitioner.getPartitionSize(command, body);
@@ -2916,7 +3059,7 @@ public class DatabaseServer {
 
   public byte[] moveIndexEntries(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaReadLock(dbName).lock();
     try {
       return repartitioner.moveIndexEntries(command, body);
@@ -2990,7 +3133,7 @@ public class DatabaseServer {
 
   public byte[] addColumn(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaWriteLock(dbName).lock();
     try {
       return schemaManager.addColumn(command, body);
@@ -3002,7 +3145,7 @@ public class DatabaseServer {
 
   public byte[] dropColumn(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaWriteLock(dbName).lock();
     try {
       return schemaManager.dropColumn(command, body);
@@ -3014,7 +3157,7 @@ public class DatabaseServer {
 
   public byte[] dropIndexSlave(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaWriteLock(dbName).lock();
     try {
       return schemaManager.dropIndexSlave(command, body);
@@ -3026,7 +3169,7 @@ public class DatabaseServer {
 
   public byte[] dropIndex(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaWriteLock(dbName).lock();
     try {
       return schemaManager.dropIndex(command, body);
@@ -3038,7 +3181,7 @@ public class DatabaseServer {
 
   public byte[] createIndexSlave(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     common.getSchemaWriteLock(dbName).lock();
     try {
       return schemaManager.createIndexSlave(command, body);
@@ -3050,13 +3193,13 @@ public class DatabaseServer {
 
   public byte[] doPopulateIndex(final String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
     return updateManager.doPopulateIndex(command, body);
   }
 
   public byte[] populateIndex(final String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
 //    common.getSchemaReadLock(dbName).lock();
 //    try {
       return updateManager.populateIndex(command, body);
@@ -3068,7 +3211,8 @@ public class DatabaseServer {
 
   public byte[] createIndex(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    int serializationVersion = Integer.valueOf(parts[3]);
+    String dbName = parts[5];
     List<String> createdIndices = null;
     AtomicReference<String> table = new AtomicReference<>();
     common.getSchemaWriteLock(dbName).lock();
@@ -3086,7 +3230,8 @@ public class DatabaseServer {
     try {
       if (createdIndices != null) {
         for (String currIndexName : createdIndices) {
-          command = "DatabaseServer:populateIndex:1:1:" + dbName + ":" + table.get() + ":" + currIndexName;
+          command = "DatabaseServer:populateIndex:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:" +
+              dbName + ":" + table.get() + ":" + currIndexName;
           AtomicReference<String> selectedHost = new AtomicReference<>();
           for (int i = 0; i < getShardCount(); i++) {
             for (int j = 0; j < getReplicationFactor(); j++) {
@@ -3103,8 +3248,7 @@ public class DatabaseServer {
 
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-      getCommon().serializeSchema(out);
+      getCommon().serializeSchema(out, serializationVersion);
       out.close();
 
       return bytesOut.toByteArray();
@@ -3116,7 +3260,7 @@ public class DatabaseServer {
 
   public byte[] expirePreparedStatement(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    long preparedId = Long.valueOf(parts[5]);
+    long preparedId = Long.valueOf(parts[6]);
     readManager.expirePreparedStatement(preparedId);
     return null;
   }

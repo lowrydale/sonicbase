@@ -113,10 +113,12 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
 
               out.close();
 
-              String command = "DatabaseServer:deleteRecord:1:" + client.getCommon().getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + indexSchema.getName();
+              String command = "DatabaseServer:deleteRecord:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+                  client.getCommon().getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + indexSchema.getName();
               client.send("DatabaseServer:deleteRecord", selectedShards.get(0), rand.nextLong(), command, bytesOut.toByteArray(), DatabaseClient.Replica.def);
 
-              command = "DatabaseServer:deleteIndexEntry:1:" + client.getCommon().getSchemaVersion() + ":" + dbName + ":" + tableSchema.getName();
+              command = "DatabaseServer:deleteIndexEntry:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+                  client.getCommon().getSchemaVersion() + ":" + dbName + ":" + tableSchema.getName();
               bytesOut = new ByteArrayOutputStream();
               out = new DataOutputStream(bytesOut);
               DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);

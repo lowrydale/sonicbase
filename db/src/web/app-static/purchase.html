@@ -1,0 +1,113 @@
+<!doctype html>
+<html>
+<head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Purchase SonicBase licenses.">
+
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+
+    <meta charset="UTF-8">
+    <title>SonicBase - Purchase Licenses</title>
+    <script type="text/javascript" src="../javascript/jquery-3.2.1.min.js"></script>
+    <script type="text/javascript" src="../javascript/main.js"></script>
+    <script>
+        function calculatePrice(form) {
+            var coreCount = document.getElementById("coreCount").value;
+            var promoCode = document.getElementById("promoCode").value;
+
+            $.ajaxSetup({
+                error: function(xhr){
+                    alert('Request Status: ' + xhr.status + ' Status Text: ' + xhr.statusText + ' ' + xhr.responseText);
+                }
+            });
+
+            var sessionId = readCookie("SBSessionId");
+
+            $.ajax({
+                headers:{
+                    "Accept":"application/text",
+                    "Content-type":"application/json"
+                },   url:"/app/license/calculatePrice?cores=" + coreCount + "&promoCode=" + promoCode + "&sessionId=" + sessionId,
+                success:function(response){
+                    touchCookie("SBSessionId");
+                    var price = response;
+                    document.getElementById("price").innerHTML = price;
+                }
+            });
+        }
+
+        function purchase(form) {
+            var coreCount = document.getElementById("coreCount").value;
+            var promoCode = document.getElementById("promoCode").value;
+
+            $.ajaxSetup({
+                error: function(xhr){
+                    alert('Request Status: ' + xhr.status + ' Status Text: ' + xhr.statusText + ' ' + xhr.responseText);
+                }
+            });
+
+            var sessionId = readCookie("SBSessionId");
+
+            $.ajax({
+                headers:{
+                    "Accept":"application/json",
+                    "Content-type":"application/json"
+                },   url:"/app/license/purchase?cores=" + coreCount + "&promoCode=" + promoCode + "&sessionId=" + sessionId,
+                success:function(response){
+                    touchCookie("SBSessionId");
+                    window.location.href = "/app-static/licenses.html";
+                }
+            });
+        }
+    </script>
+
+</head>
+
+<body>
+<div class="container">
+    <header> <a href="../index.html">
+        <h4 class="logo">SonicBase™</h4>
+    </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../downloads.html">DOWNLOADS</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <div style="margin-left: 4em;">
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        Licenses cost $31.25 per core per year. Or $250 for 8 cores per year.<br/>
+    <br/>
+    <form id="purchase-form" name="purchase-form" action="javascript:;">
+    <table>
+        <tr>
+            <td align="right"># of Cores</td>
+            <td><input type="text" id="coreCount"></td>
+        </tr>
+        <tr>
+            <td align="right">Promo Code</td>
+            <td><input type="text" id="promoCode"></td>
+        </tr>
+        <tr>
+            <td align="right">Price</td>
+            <td id="price">$0.00</td>
+        </tr>
+        <tr>
+            <td></td><td><button type="button" onclick="calculatePrice(document.getElementById('purchase-form'))">Calculate Price</button></td>
+        </tr>
+        <tr>
+            <td></td><td><button type="button" onclick="purchase(document.getElementById('purchase-form'))">Purchase</button></td>
+        </tr>
+    </table>
+    </form>
+    </div>
+</div>
+</body>
+</html>

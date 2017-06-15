@@ -734,7 +734,8 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
         out.close();
 
         int previousSchemaVersion = client.getCommon().getSchemaVersion();
-        String command = "DatabaseServer:serverSelect:1:" + client.getCommon().getSchemaVersion() + ":" + dbName + ":" + ReadManager.SELECT_PAGE_SIZE;
+        String command = "DatabaseServer:serverSelect:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+            client.getCommon().getSchemaVersion() + ":" + dbName + ":" + ReadManager.SELECT_PAGE_SIZE;
 
         byte[] recordRet = client.send(null, Math.abs(ThreadLocalRandom.current().nextInt() % client.getShardCount()), Math.abs(ThreadLocalRandom.current().nextLong()), command, bytesOut.toByteArray(), DatabaseClient.Replica.def);
         if (previousSchemaVersion < client.getCommon().getSchemaVersion()) {
@@ -933,7 +934,8 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
 
             out.close();
 
-            String command = "DatabaseServer:countRecords:1:" + client.getCommon().getSchemaVersion() + ":" + dbName + ":" + fromTable;
+            String command = "DatabaseServer:countRecords:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+                client.getCommon().getSchemaVersion() + ":" + dbName + ":" + fromTable;
             byte[] lookupRet = client.send(null, shard, 0, command, bytesOut.toByteArray(), DatabaseClient.Replica.def);
             if (previousSchemaVersion < client.getCommon().getSchemaVersion()) {
               throw new SchemaOutOfSyncException();

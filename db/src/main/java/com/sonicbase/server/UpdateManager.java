@@ -44,9 +44,9 @@ public class UpdateManager {
   public byte[] deleteIndexEntry(String command, byte[] body, boolean replayedCommand) {
     try {
       String[] parts = command.split(":");
-      String dbName = parts[4];
-      String tableName = parts[5];
-      int schemaVersion = Integer.valueOf(parts[3]);
+      String dbName = parts[5];
+      String tableName = parts[6];
+      int schemaVersion = Integer.valueOf(parts[4]);
       if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
@@ -115,9 +115,9 @@ public class UpdateManager {
 
   public byte[] doPopulateIndex(final String command, byte[] body) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
-    String tableName = parts[5];
-    String indexName = parts[6];
+    String dbName = parts[5];
+    String tableName = parts[6];
+    String indexName = parts[7];
 
     TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
     String primaryKeyIndexName = null;
@@ -201,17 +201,17 @@ public class UpdateManager {
                                         AtomicBoolean isExplicitTransRet, AtomicLong transactionIdRet, boolean isCommitting) {
     try {
       String[] parts = command.split(":");
-      String dbName = parts[4];
-      int schemaVersion = Integer.valueOf(parts[3]);
+      String dbName = parts[5];
+      int schemaVersion = Integer.valueOf(parts[4]);
       if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
-      String tableName = parts[5];
-      String indexName = parts[6];
-      String primaryKeyIndexName = parts[7];
-      boolean isExplicitTrans = Boolean.valueOf(parts[8]);
+      String tableName = parts[6];
+      String indexName = parts[7];
+      String primaryKeyIndexName = parts[8];
+      boolean isExplicitTrans = Boolean.valueOf(parts[9]);
       //boolean isCommitting = Boolean.valueOf(parts[9]);
-      long transactionId = Long.valueOf(parts[10]);
+      long transactionId = Long.valueOf(parts[11]);
       if (isExplicitTrans && isExplicitTransRet != null) {
         isExplicitTransRet.set(true);
         transactionIdRet.set(transactionId);
@@ -302,8 +302,8 @@ public class UpdateManager {
       }
 
       String[] parts = command.split(":");
-      String dbName = parts[4];
-      int schemaVersion = Integer.valueOf(parts[3]);
+      String dbName = parts[5];
+      int schemaVersion = Integer.valueOf(parts[4]);
       if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
@@ -384,7 +384,7 @@ public class UpdateManager {
 
   public byte[] batchInsertIndexEntryByKeyWithRecord(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    int schemaVersion = Integer.valueOf(parts[3]);
+    int schemaVersion = Integer.valueOf(parts[4]);
     if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
       throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
     }
@@ -465,8 +465,8 @@ public class UpdateManager {
       }
 
       String[] parts = command.split(":");
-      String dbName = parts[4];
-      int schemaVersion = Integer.valueOf(parts[3]);
+      String dbName = parts[5];
+      int schemaVersion = Integer.valueOf(parts[4]);
       if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
@@ -587,12 +587,12 @@ public class UpdateManager {
 
   public byte[] rollback(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
-    int schemaVersion = Integer.valueOf(parts[3]);
+    String dbName = parts[5];
+    int schemaVersion = Integer.valueOf(parts[4]);
     if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
       throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
     }
-    long transactionId = Long.valueOf(parts[5]);
+    long transactionId = Long.valueOf(parts[6]);
 
     Transaction trans = server.getTransactionManager().getTransaction(transactionId);
     ConcurrentHashMap<String, ConcurrentSkipListMap<Object[], RecordLock>> tableLocks = server.getTransactionManager().getLocks(dbName);
@@ -609,12 +609,12 @@ public class UpdateManager {
 
   public byte[] commit(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
-    int schemaVersion = Integer.valueOf(parts[3]);
+    String dbName = parts[5];
+    int schemaVersion = Integer.valueOf(parts[4]);
     if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
       throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
     }
-    long transactionId = Long.valueOf(parts[5]);
+    long transactionId = Long.valueOf(parts[6]);
 
     Transaction trans = server.getTransactionManager().getTransaction(transactionId);
     if (trans != null) {
@@ -672,16 +672,16 @@ public class UpdateManager {
                                AtomicBoolean isExplicitTransRet, AtomicLong transactionIdRet, boolean isCommitting) {
     try {
       String[] parts = command.split(":");
-      String dbName = parts[4];
-      int schemaVersion = Integer.valueOf(parts[3]);
+      String dbName = parts[5];
+      int schemaVersion = Integer.valueOf(parts[4]);
       if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
-      String tableName = parts[5];
-      String indexName = parts[6];
-      boolean isExplicitTrans = Boolean.valueOf(parts[7]);
-      //boolean isCommitting = Boolean.valueOf(parts[8]);
-      long transactionId = Long.valueOf(parts[9]);
+      String tableName = parts[6];
+      String indexName = parts[7];
+      boolean isExplicitTrans = Boolean.valueOf(parts[8]);
+      //boolean isCommitting = Boolean.valueOf(parts[9]);
+      long transactionId = Long.valueOf(parts[10]);
 
       if (isExplicitTrans && isExplicitTransRet != null) {
         isExplicitTransRet.set(true);
@@ -963,10 +963,10 @@ public class UpdateManager {
   public byte[] deleteRecord(String command, byte[] body, boolean replayedCommand) {
     try {
       String[] parts = command.split(":");
-      String dbName = parts[4];
-      String tableName = parts[5];
-      String indexName = parts[6];
-      int schemaVersion = Integer.valueOf(parts[3]);
+      String dbName = parts[5];
+      String tableName = parts[6];
+      String indexName = parts[7];
+      int schemaVersion = Integer.valueOf(parts[4]);
       if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
@@ -994,13 +994,13 @@ public class UpdateManager {
 
   public byte[] truncateTable(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
-    int schemaVersion = Integer.valueOf(parts[3]);
+    String dbName = parts[5];
+    int schemaVersion = Integer.valueOf(parts[4]);
     if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
       throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
     }
-    String table = parts[5];
-    String phase = parts[6];
+    String table = parts[6];
+    String phase = parts[7];
     TableSchema tableSchema = server.getCommon().getTables(dbName).get(table);
     for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
       Index index = server.getIndices(dbName).getIndices().get(table).get(entry.getKey());

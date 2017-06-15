@@ -33,7 +33,7 @@ public class TestMisc {
     String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")));
     final JsonDict config = new JsonDict(configStr);
 
-    JsonArray array = config.getDict("database").putArray("licenseKeys");
+    JsonArray array = config.putArray("licenseKeys");
     array.add(DatabaseServer.FOUR_SERVER_LICENSE);
 
     FileUtils.deleteDirectory(new File("/data/database"));
@@ -53,7 +53,7 @@ public class TestMisc {
 //          String role = "primaryMaster";
 
       dbServers[shard] = new DatabaseServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null);
+      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null, true);
       dbServers[shard].setRole(role);
       dbServers[shard].disableLogProcessor();
 //          return null;

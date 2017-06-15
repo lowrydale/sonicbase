@@ -33,11 +33,11 @@
 
 
     <div style="margin-left: 4em;">
-
+<h1>SQL Select With Limit Statement</h1>
 <br/>
 Limits the number of results to return
 <br/>
-<p>Syntax<table class="border-table" border="1"><tr><td> <table class="syntax-table" cellpadding="4">
+<h3>Syntax</h3><table class="border-table" border="1"><tr><td> <table class="syntax-table" cellpadding="4">
     <tbody>
   
     <tr class="syntax-main">
@@ -55,7 +55,7 @@ Limits the number of results to return
 </tr>
 </table>
 
-<p>Example</p>
+        <h3>Example</h3>
 PreparedStatement stmt = conn.prepareStatement("select * from persons where id < ? and id > ? limit 3");<br/>
 stmt.setLong(1, 100);<br/>
 stmt.setLong(2, 2);<br/>

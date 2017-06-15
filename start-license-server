@@ -1,0 +1,18 @@
+export _XMX_=512m
+export SEARCH_HOME=$3
+#export MODE=yprof
+mkdir $3/logs
+
+if [ ${3:0:1} != "/" ]
+then
+  export SEARCH_HOME=$HOME/$SEARCH_HOME
+fi
+
+cd $SEARCH_HOME
+echo "start-search_home=$SEARCH_HOME"
+
+export _LOG4J_FILENAME_=$SEARCH_HOME/logs/license-$2.log
+export _GC_LOG_FILENAME_=$SEARCH_HOME/logs/gc-license-$2.log
+export LOG4J_FILE="log4j.xml"
+echo "starting LicenseServer: search_home=" + $SEARCH_HOME
+nohup $SEARCH_HOME/bin/runclass com.sonicbase.license.LicenseServer -port $2 > $SEARCH_HOME/logs/license-$2.sysout.log 2>&1 &

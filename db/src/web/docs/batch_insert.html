@@ -33,12 +33,12 @@
 
 
 	<div style="margin-left: 4em;">
-
+<h1>Batch Insert</h1>
 <br/>
 Batch inserts are used to achieve high performance inserts. You may achieve up to ten times the throughput
 over a standard insert. A batch size of 1000 may be effective.<br/>
 <br/>
-<p>Syntax<table class="border-table" border="1"><tr><td>
+<h3>Syntax</h3><table class="border-table" border="1"><tr><td>
 	<table class="syntax-table" cellpadding="4">
 	<tbody>
   	<tr class="syntax-main"><td>jdbc call</td><td>purpose</td></tr>
@@ -52,9 +52,8 @@ over a standard insert. A batch size of 1000 may be effective.<br/>
 </tr>
 </table>
 <br/>
-<br/>
-Example:<br/>
-<br/>
+
+<h3>Example</h3>
 PreparedStatement stmt = conn.prepareStatement("insert into persons (name, age, occupation) values ('bob', ?, ?)")<br/>
 for (int i = 0; i < 100; i++) {<br/>
 &nbsp;&nbsp;stmt.setInt(1, i);<br/>

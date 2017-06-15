@@ -24,7 +24,6 @@ import java.util.zip.GZIPInputStream;
  */
 public class LogManager {
 
-  private static final String DATABASE_STR = "database";
   private static final String UTF8_STR = "utf-8";
   private Logger logger;
   private final DatabaseServer databaseServer;
@@ -315,7 +314,7 @@ public class LogManager {
       in.readFully(commandBuffer);
       String command = new String(commandBuffer, UTF8_STR);
       String[] parts = command.split(":");
-      String dbName = parts[4];
+      String dbName = parts[5];
       StringBuilder builder = new StringBuilder();
       for (int i = 0; i < parts.length; i++) {
         if (i != 0) {

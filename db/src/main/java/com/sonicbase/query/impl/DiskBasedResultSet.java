@@ -7,6 +7,7 @@ import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.util.DataUtil;
+import com.sonicbase.util.ISO8601;
 import org.anarres.lzo.LzoDecompressor1x;
 import org.anarres.lzo.LzoInputStream;
 import org.anarres.lzo.LzoOutputStream;
@@ -44,14 +45,16 @@ public class DiskBasedResultSet {
     this.select = select;
     this.count = count;
     File file = null;
-    while (true) {
-      resultSetId = nextResultSetId.getAndIncrement();
-      file = new File(server.getDataDir(), "result-sets/" + databaseServer.getShard() + "/" + server.getReplica() + "/" + resultSetId);
-      if (!file.exists()) {
-        break;
+    synchronized (this) {
+      while (true) {
+        resultSetId = nextResultSetId.getAndIncrement();
+        file = new File(server.getDataDir(), "result-sets/" + databaseServer.getShard() + "/" + server.getReplica() + "/" + resultSetId);
+        if (!file.exists()) {
+          break;
+        }
       }
+      file.mkdirs();
     }
-    file.mkdirs();
 
     ExpressionImpl.CachedRecord[][] records = resultSet.getReadRecordsAndSerializedRecords();
     if (records == null) {
@@ -168,6 +171,46 @@ public class DiskBasedResultSet {
     batch.clear();
 
     mergeSort(dbName, file);
+
+    updateAccessTime(file);
+  }
+
+  public static void deleteOldResultSets(DatabaseServer server) {
+    File file = new File(server.getDataDir(), "result-sets/" + server.getShard() + "/" + server.getReplica() + "/");
+    File[] resultSets = file.listFiles();
+    if (resultSets != null) {
+      for (File resultSet : resultSets) {
+        File timeFile = new File(resultSet, "time-accessed.txt");
+        if (timeFile.exists()) {
+          try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(timeFile)))) {
+            String str = reader.readLine();
+            Calendar cal = ISO8601.from8601String(str);
+            long updateTime = cal.getTimeInMillis();
+            if (updateTime < System.currentTimeMillis() - 24 * 60 * 60 * 1000) {
+              FileUtils.deleteDirectory(resultSet);
+              logger.info("Deleted old disk-based result set: dir=" + resultSet.getAbsolutePath());
+            }
+          }
+          catch (Exception e) {
+            logger.error("Error deleting result set", e);
+            continue;
+          }
+        }
+      }
+    }
+  }
+
+  private void updateAccessTime(File file) {
+    synchronized (this) {
+      String str = ISO8601.fromDate(new Date(System.currentTimeMillis()));
+      File timeFile = new File(file, "time-accessed.txt");
+      try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(timeFile)))) {
+        writer.write(str);
+      }
+      catch (IOException e) {
+        throw new DatabaseException(e);
+      }
+    }
   }
 
   private void getKeepers(String dbName, DatabaseServer databaseServer, String[] tableNames, Map<String, Integer> tableOffsets, boolean[][] keepers, String column,
@@ -335,6 +378,7 @@ public class DiskBasedResultSet {
       outFile.renameTo(file1);
     }
   }
+
 
   static class MergeRow {
     private int streamOffset;
@@ -586,6 +630,7 @@ public class DiskBasedResultSet {
     if (!file.exists()) {
       return null;
     }
+    updateAccessTime(file);
     File subFile = new File(file, "page-" + pageNumber);
     if (!subFile.exists()) {
       return null;

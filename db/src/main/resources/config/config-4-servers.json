@@ -1,45 +1,42 @@
 {
-    "database": {
-        "dataDirectory": "/data/database",
-        "installDirectory": "$HOME/database",
-        "partitionCountForRecordIndex" : 10000,
-        "subPartitionsForIdIndex" : 10,
-        "initialIndexSize" : 10000000,
-        "indexEntrySize" : 60,
-        "maxJavaHeap": "50%",
-        "maxProcessMemory": "90%",
-      "replicationFactor": 2,
-        "shards" : [
-          {
-            "replicas": [
-              {
-                "privateAddress": "localhost",
-                "publicAddress": "localhost",
-                "port": 9010
-              },
-              {
-                "publicAddress": "localhost",
-                "privateAddress": "localhost",
-                "port": 9060
-              }
-            ]
-          },
-          {
-            "replicas": [
-              {
-                "publicAddress": "localhost",
-                "privateAddress": "localhost",
-                "port": 9110
-              },
-              {
-                "publicAddress": "localhost",
-                "privateAddress": "localhost",
-                "port": 9160
-              }
-            ]
-          }
-
-        ]
+  "dataDirectory": "/data/database",
+  "installDirectory": "$HOME/database",
+  "partitionCountForRecordIndex" : 10000,
+  "subPartitionsForIdIndex" : 10,
+  "initialIndexSize" : 10000000,
+  "indexEntrySize" : 60,
+  "maxJavaHeap": "50%",
+  "maxProcessMemory": "90%",
+  "shards" : [
+    {
+      "replicas": [
+        {
+          "privateAddress": "localhost",
+          "publicAddress": "localhost",
+          "port": 9010
+        },
+        {
+          "publicAddress": "localhost",
+          "privateAddress": "localhost",
+          "port": 9060
+        }
+      ]
+    },
+    {
+      "replicas": [
+        {
+          "publicAddress": "localhost",
+          "privateAddress": "localhost",
+          "port": 9110
+        },
+        {
+          "publicAddress": "localhost",
+          "privateAddress": "localhost",
+          "port": 9160
+        }
+      ]
     }
+
+  ]
 
 }

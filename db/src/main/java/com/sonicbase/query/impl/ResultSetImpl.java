@@ -552,6 +552,14 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public boolean isFirst() {
+
+    if (selectContext == null) {
+      return false;
+    }
+    if (selectContext.getCurrKeys() == null) {
+      return false;
+    }
+
     return currPos == 0 && selectContext.getCurrKeys().length > 0;
   }
 
@@ -567,6 +575,9 @@ public class ResultSetImpl implements ResultSet {
         return true;
       }
       return false;
+    }
+    if (selectContext == null) {
+      return true;
     }
     if (selectContext.getCurrKeys() == null) {
       return true;
@@ -589,7 +600,8 @@ public class ResultSetImpl implements ResultSet {
   public void close() throws Exception {
 
     if (selectStatement != null && selectStatement.isServerSelect()) {
-      String command = "DatabaseServer:serverSelectDelete:1:" + databaseClient.getCommon().getSchemaVersion() + ":" + dbName + ":" + selectStatement.getServerSelectResultSetId();
+      String command = "DatabaseServer:serverSelectDelete:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+          databaseClient.getCommon().getSchemaVersion() + ":" + dbName + ":" + selectStatement.getServerSelectResultSetId();
 
       byte[] recordRet = databaseClient.send(null, selectStatement.getServerSelectShardNumber(), selectStatement.getServerSelectReplicaNumber(), command, null, DatabaseClient.Replica.specified);
 
@@ -1619,7 +1631,8 @@ public class ResultSetImpl implements ResultSet {
 
         out.close();
 
-        String command = "DatabaseServer:serverSelect:1:" + databaseClient.getCommon().getSchemaVersion() + ":" + dbName + ":" + ReadManager.SELECT_PAGE_SIZE;
+        String command = "DatabaseServer:serverSelect:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+            databaseClient.getCommon().getSchemaVersion() + ":" + dbName + ":" + ReadManager.SELECT_PAGE_SIZE;
 
         byte[] recordRet = databaseClient.send(null, selectStatement.getServerSelectShardNumber(), selectStatement.getServerSelectReplicaNumber(), command, bytesOut.toByteArray(), DatabaseClient.Replica.specified);
         if (previousSchemaVersion < databaseClient.getCommon().getSchemaVersion()) {

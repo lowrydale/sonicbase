@@ -126,8 +126,8 @@ public class TransactionManager {
 
   byte[] abortTransaction(String command, byte[] body) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
-    long transactionId = Long.valueOf(parts[5]);
+    String dbName = parts[5];
+    long transactionId = Long.valueOf(parts[6]);
 
     synchronized (locks) {
       Transaction trans = transactions.get(transactionId);

@@ -32,6 +32,7 @@ public class ReadManager {
 
   private final DatabaseServer server;
   private Thread preparedReaper;
+  private Thread diskReaper;
 
   public ReadManager(DatabaseServer databaseServer) {
 
@@ -51,6 +52,31 @@ public class ReadManager {
     }, 20 * 1000, 20 * 1000);
 
     startPreparedReaper();
+
+    startDiskResultsReaper();
+  }
+
+  private void startDiskResultsReaper() {
+    diskReaper = new Thread(new Runnable(){
+      @Override
+      public void run() {
+        while (true) {
+          try {
+            DiskBasedResultSet.deleteOldResultSets(server);
+          }
+          catch (Exception e) {
+            logger.error("Error in disk results reaper thread", e);
+          }
+          try {
+            Thread.sleep(100 * 1000);
+          }
+          catch (InterruptedException e) {
+            break;
+          }
+        }
+      }
+    });
+    diskReaper.start();
   }
 
 
@@ -68,12 +94,12 @@ public class ReadManager {
       }
 
       String[] parts = command.split(":");
-      String dbName = parts[4];
-      int schemaVersion = Integer.valueOf(parts[3]);
+      String dbName = parts[5];
+      int schemaVersion = Integer.valueOf(parts[4]);
       if (schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
       }
-      String fromTable = parts[5];
+      String fromTable = parts[6];
 
       Expression expression = null;
       DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
@@ -184,12 +210,12 @@ public class ReadManager {
       }
 
       String[] parts = command.split(":");
-      String dbName = parts[4];
-      int schemaVersion = Integer.valueOf(parts[3]);
+      String dbName = parts[5];
+      int schemaVersion = Integer.valueOf(parts[4]);
       if (schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
       }
-      int count = Integer.valueOf(parts[5]);
+      int count = Integer.valueOf(parts[6]);
       DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
       long serializationVersion = DataUtil.readVLong(in);
       String tableName = in.readUTF();
@@ -691,7 +717,7 @@ public class ReadManager {
 
   public byte[] closeResultSet(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    long resultSetId = Long.valueOf(parts[4]);
+    long resultSetId = Long.valueOf(parts[5]);
 
     DiskBasedResultSet resultSet = new DiskBasedResultSet(server, resultSetId);
     resultSet.delete();
@@ -701,8 +727,8 @@ public class ReadManager {
 
   public byte[] serverSelectDelete(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
-    String dbName = parts[4];
-    long id = Long.valueOf(parts[5]);
+    String dbName = parts[5];
+    long id = Long.valueOf(parts[6]);
 
     DiskBasedResultSet resultSet = new DiskBasedResultSet(server, id);
     resultSet.delete();
@@ -721,12 +747,12 @@ public class ReadManager {
       }
 
       String[] parts = command.split(":");
-      String dbName = parts[4];
-      int schemaVersion = Integer.valueOf(parts[3]);
+      String dbName = parts[5];
+      int schemaVersion = Integer.valueOf(parts[4]);
       if (schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
       }
-      int count = Integer.valueOf(parts[5]);
+      int count = Integer.valueOf(parts[6]);
 
       DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
       long serializationVersion = DataUtil.readVLong(in);
@@ -797,12 +823,12 @@ public class ReadManager {
       }
 
       String[] parts = command.split(":");
-      String dbName = parts[4];
-      int schemaVersion = Integer.valueOf(parts[3]);
+      String dbName = parts[5];
+      int schemaVersion = Integer.valueOf(parts[4]);
       if (schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
       }
-      int count = Integer.valueOf(parts[5]);
+      int count = Integer.valueOf(parts[6]);
 
       DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
       long serializationVersion = DataUtil.readVLong(in);
@@ -1815,7 +1841,7 @@ public class ReadManager {
   public byte[] evaluateCounter(String command, byte[] body) {
 
     String[] parts = command.split(":");
-    String dbName = parts[4];
+    String dbName = parts[5];
 
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
     Counter counter = new Counter();

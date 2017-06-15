@@ -1,11 +1,281 @@
-expected=158630, found=158634
-expected=158636, found=158641
-expected=158644, found=158648
-expected=158649, found=158650
-expected=158654, found=158662
-expected=158734, found=158745
-expected=158752, found=158761
-expected=279136, found=279139
-expected=279140, found=279148
-expected=279162, found=77818
-expected=158630, found=158634
+ved 35 bytes  59,581,608.00 bytes/sec
+total size is 89,350,474  speedup is 1.00
+Dale-Lowry-MacBook-Pro:sonicbase-bench lowryda$ mvn dependency:tree
+[INFO] Scanning for projects...
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Build Order:
+[INFO] 
+[INFO] sonicbase-cli
+[INFO] cli
+[INFO]                                                                         
+[INFO] ------------------------------------------------------------------------
+[INFO] Building sonicbase-cli 0.9.2.2
+[INFO] ------------------------------------------------------------------------
+[INFO] 
+[INFO] --- maven-dependency-plugin:2.8:tree (default-cli) @ sonicbase-cli ---
+[INFO] com.sonicbase:sonicbase-cli:pom:0.9.2.2
+[INFO]                                                                         
+[INFO] ------------------------------------------------------------------------
+[INFO] Building cli 0.9.2.2
+[INFO] ------------------------------------------------------------------------
+[INFO] 
+[INFO] --- maven-dependency-plugin:2.8:tree (default-cli) @ sonicbase-misc ---
+[INFO] com.sonicbase:sonicbase-misc:jar:0.9.2.2
+[INFO] +- com.sonicbase:sonicbase:jar:0.9.2.2:provided
+[INFO] +- com.amazonaws:aws-java-sdk:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-pinpoint:jar:1.11.109:compile
+[INFO] |  |  \- com.amazonaws:jmespath-java:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-xray:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-opsworkscm:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-support:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-simpledb:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-servicecatalog:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-servermigration:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-simpleworkflow:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-storagegateway:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-route53:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-s3:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-importexport:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-sts:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-sqs:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-rds:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-redshift:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-elasticbeanstalk:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-glacier:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-iam:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-datapipeline:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-elasticloadbalancing:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-elasticloadbalancingv2:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-emr:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-elasticache:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-elastictranscoder:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-ec2:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-dynamodb:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-sns:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-budgets:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-cloudtrail:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-cloudwatch:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-logs:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-events:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-cognitoidentity:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-cognitosync:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-directconnect:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-cloudformation:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-cloudfront:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-clouddirectory:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-kinesis:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-opsworks:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-ses:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-autoscaling:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-cloudsearch:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-cloudwatchmetrics:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-codedeploy:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-codepipeline:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-kms:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-config:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-lambda:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-ecs:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-ecr:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-cloudhsm:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-ssm:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-workspaces:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-machinelearning:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-directory:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-efs:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-codecommit:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-devicefarm:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-elasticsearch:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-waf:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-marketplacecommerceanalytics:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-inspector:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-iot:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-api-gateway:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-acm:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-gamelift:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-dms:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-marketplacemeteringservice:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-cognitoidp:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-discovery:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-applicationautoscaling:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-snowball:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-rekognition:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-polly:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-lightsail:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-stepfunctions:jar:1.11.109:compile
+[INFO] |  |  \- com.jayway.jsonpath:json-path:jar:2.2.0:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-health:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-costandusagereport:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-codebuild:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-appstream:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-shield:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-batch:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-lex:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-mechanicalturkrequester:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-organizations:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-workdocs:jar:1.11.109:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-core:jar:1.11.109:compile
+[INFO] |  |  +- software.amazon.ion:ion-java:jar:1.0.2:compile
+[INFO] |  |  +- com.fasterxml.jackson.core:jackson-databind:jar:2.6.6:compile
+[INFO] |  |  |  +- com.fasterxml.jackson.core:jackson-annotations:jar:2.6.0:compile
+[INFO] |  |  |  \- com.fasterxml.jackson.core:jackson-core:jar:2.6.6:compile
+[INFO] |  |  +- com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:jar:2.6.6:compile
+[INFO] |  |  \- joda-time:joda-time:jar:2.8.1:compile
+[INFO] |  +- com.amazonaws:aws-java-sdk-models:jar:1.11.109:compile
+[INFO] |  \- com.amazonaws:aws-java-sdk-swf-libraries:jar:1.11.22:compile
+[INFO] +- jline:jline:jar:0.9.9:compile
+[INFO] |  \- junit:junit:jar:3.8.1:compile
+[INFO] +- org.apache.commons:commons-crypto:jar:1.0.0:compile
+[INFO] |  \- net.java.dev.jna:jna:jar:4.2.2:compile
+[INFO] +- commons-io:commons-io:jar:2.5:compile
+[INFO] +- org.apache.maven.plugin-tools:maven-plugin-annotations:jar:3.2:provided
+[INFO] |  \- org.apache.maven:maven-artifact:jar:3.0:provided
+[INFO] |     \- org.codehaus.plexus:plexus-utils:jar:2.0.4:provided
+[INFO] +- org.apache.commons:commons-lang3:jar:3.3.2:compile
+[INFO] +- org.slf4j:slf4j-log4j12:jar:1.7.5:compile
+[INFO] |  +- org.slf4j:slf4j-api:jar:1.7.5:compile
+[INFO] |  \- log4j:log4j:jar:1.2.17:compile
+[INFO] +- org.testng:testng:jar:6.8:provided
+[INFO] |  +- org.beanshell:bsh:jar:2.0b4:provided
+[INFO] |  +- com.beust:jcommander:jar:1.27:provided
+[INFO] |  \- org.yaml:snakeyaml:jar:1.6:provided
+[INFO] +- com.google.code.gson:gson:jar:2.2.3:compile
+[INFO] +- com.github.jsqlparser:jsqlparser:jar:0.9.5:compile
+[INFO] +- it.unimi.dsi:fastutil:jar:7.0.2:compile
+[INFO] +- com.mashape.unirest:unirest-java:jar:1.4.9:compile
+[INFO] |  +- org.apache.httpcomponents:httpclient:jar:4.5.2:compile
+[INFO] |  |  +- org.apache.httpcomponents:httpcore:jar:4.4.4:compile
+[INFO] |  |  \- commons-codec:commons-codec:jar:1.9:compile
+[INFO] |  +- org.apache.httpcomponents:httpasyncclient:jar:4.1.1:compile
+[INFO] |  |  \- org.apache.httpcomponents:httpcore-nio:jar:4.4.4:compile
+[INFO] |  +- org.apache.httpcomponents:httpmime:jar:4.5.2:compile
+[INFO] |  \- org.json:json:jar:20160212:compile
+[INFO] +- org.eclipse.jetty:jetty-server:jar:9.4.2.v20170220:compile
+[INFO] |  +- javax.servlet:javax.servlet-api:jar:3.1.0:compile
+[INFO] |  +- org.eclipse.jetty:jetty-http:jar:9.4.2.v20170220:compile
+[INFO] |  |  \- org.eclipse.jetty:jetty-util:jar:9.4.2.v20170220:compile
+[INFO] |  \- org.eclipse.jetty:jetty-io:jar:9.4.2.v20170220:compile
+[INFO] +- commons-configuration:commons-configuration:jar:1.6:compile
+[INFO] |  +- commons-collections:commons-collections:jar:3.2.1:compile
+[INFO] |  +- commons-lang:commons-lang:jar:2.4:compile
+[INFO] |  +- commons-logging:commons-logging:jar:1.1.1:compile
+[INFO] |  +- commons-digester:commons-digester:jar:1.8:compile
+[INFO] |  |  \- commons-beanutils:commons-beanutils:jar:1.7.0:compile
+[INFO] |  \- commons-beanutils:commons-beanutils-core:jar:1.8.0:compile
+[INFO] +- io.netty:netty-all:jar:4.1.1.Final:compile
+[INFO] +- commons-cli:commons-cli:jar:1.3.1:compile
+[INFO] \- com.codahale.metrics:metrics-core:jar:3.0.2:compile
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary:
+[INFO] 
+[INFO] sonicbase-cli ...................................... SUCCESS [  1.324 s]
+[INFO] cli ................................................ SUCCESS [  0.472 s]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time: 2.106 s
+[INFO] Finished at: 2017-06-15T13:08:01-06:00
+[INFO] Final Memory: 14M/309M
+[INFO] ------------------------------------------------------------------------
+Dale-Lowry-MacBook-Pro:sonicbase-bench lowryda$ 
+Dale-Lowry-MacBook-Pro:sonicbase-bench lowryda$ cd ../sonicbase
+Dale-Lowry-MacBook-Pro:sonicbase lowryda$ mvn dependency:tree
+[INFO] Scanning for projects...
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Build Order:
+[INFO] 
+[INFO] sonicbase-root
+[INFO] sonicbase
+[INFO]                                                                         
+[INFO] ------------------------------------------------------------------------
+[INFO] Building sonicbase-root 0.9.2.2
+[INFO] ------------------------------------------------------------------------
+[INFO] 
+[INFO] --- maven-dependency-plugin:2.8:tree (default-cli) @ sonicbase-root ---
+[INFO] com.lowryengineering:sonicbase-root:pom:0.9.2.2
+[INFO]                                                                         
+[INFO] ------------------------------------------------------------------------
+[INFO] Building sonicbase 0.9.2.2
+[INFO] ------------------------------------------------------------------------
+[INFO] 
+[INFO] --- maven-dependency-plugin:2.8:tree (default-cli) @ sonicbase ---
+[INFO] com.lowryengineering:sonicbase:jar:0.9.2.2
+[INFO] +- com.mashape.unirest:unirest-java:jar:1.4.9:compile
+[INFO] |  +- org.apache.httpcomponents:httpclient:jar:4.5.2:compile
+[INFO] |  |  +- org.apache.httpcomponents:httpcore:jar:4.4.4:compile
+[INFO] |  |  \- commons-codec:commons-codec:jar:1.9:compile
+[INFO] |  +- org.apache.httpcomponents:httpasyncclient:jar:4.1.1:compile
+[INFO] |  |  \- org.apache.httpcomponents:httpcore-nio:jar:4.4.4:compile
+[INFO] |  +- org.apache.httpcomponents:httpmime:jar:4.5.2:compile
+[INFO] |  \- org.json:json:jar:20160212:compile
+[INFO] +- commons-io:commons-io:jar:2.5:compile
+[INFO] +- net.jpountz.lz4:lz4:jar:1.3.0:compile
+[INFO] +- org.apache.commons:commons-crypto:jar:1.0.0:compile
+[INFO] |  \- net.java.dev.jna:jna:jar:4.2.2:compile
+[INFO] +- org.apache.maven.plugin-tools:maven-plugin-annotations:jar:3.2:provided
+[INFO] |  \- org.apache.maven:maven-artifact:jar:3.0:provided
+[INFO] |     \- org.codehaus.plexus:plexus-utils:jar:2.0.4:provided
+[INFO] +- org.apache.commons:commons-lang3:jar:3.3.2:compile
+[INFO] +- log4j:log4j:jar:1.2.17:compile
+[INFO] +- org.testng:testng:jar:6.8:provided
+[INFO] |  +- junit:junit:jar:4.10:compile
+[INFO] |  |  \- org.hamcrest:hamcrest-core:jar:1.1:compile
+[INFO] |  +- org.beanshell:bsh:jar:2.0b4:provided
+[INFO] |  +- com.beust:jcommander:jar:1.27:provided
+[INFO] |  \- org.yaml:snakeyaml:jar:1.6:provided
+[INFO] +- com.google.code.gson:gson:jar:2.2.3:compile
+[INFO] +- com.github.jsqlparser:jsqlparser:jar:0.9.5:compile
+[INFO] +- it.unimi.dsi:fastutil:jar:7.0.2:compile
+[INFO] +- commons-configuration:commons-configuration:jar:1.6:compile
+[INFO] |  +- commons-collections:commons-collections:jar:3.2.1:compile
+[INFO] |  +- commons-lang:commons-lang:jar:2.4:compile
+[INFO] |  +- commons-logging:commons-logging:jar:1.1.1:compile
+[INFO] |  +- commons-digester:commons-digester:jar:1.8:compile
+[INFO] |  |  \- commons-beanutils:commons-beanutils:jar:1.7.0:compile
+[INFO] |  \- commons-beanutils:commons-beanutils-core:jar:1.8.0:compile
+[INFO] +- org.anarres.lzo:lzo-hadoop:jar:1.0.5:compile
+[INFO] |  +- org.apache.hadoop:hadoop-core:jar:1.2.1:compile
+[INFO] |  |  +- xmlenc:xmlenc:jar:0.52:compile
+[INFO] |  |  +- com.sun.jersey:jersey-core:jar:1.8:compile
+[INFO] |  |  +- com.sun.jersey:jersey-json:jar:1.8:compile
+[INFO] |  |  |  +- org.codehaus.jettison:jettison:jar:1.1:compile
+[INFO] |  |  |  |  \- stax:stax-api:jar:1.0.1:compile
+[INFO] |  |  |  +- com.sun.xml.bind:jaxb-impl:jar:2.2.3-1:compile
+[INFO] |  |  |  |  \- javax.xml.bind:jaxb-api:jar:2.2.2:compile
+[INFO] |  |  |  |     +- javax.xml.stream:stax-api:jar:1.0-2:compile
+[INFO] |  |  |  |     \- javax.activation:activation:jar:1.1:compile
+[INFO] |  |  |  +- org.codehaus.jackson:jackson-core-asl:jar:1.7.1:compile
+[INFO] |  |  |  +- org.codehaus.jackson:jackson-jaxrs:jar:1.7.1:compile
+[INFO] |  |  |  \- org.codehaus.jackson:jackson-xc:jar:1.7.1:compile
+[INFO] |  |  +- com.sun.jersey:jersey-server:jar:1.8:compile
+[INFO] |  |  |  \- asm:asm:jar:3.1:compile
+[INFO] |  |  +- commons-httpclient:commons-httpclient:jar:3.0.1:compile
+[INFO] |  |  +- org.apache.commons:commons-math:jar:2.1:compile
+[INFO] |  |  +- commons-net:commons-net:jar:1.4.1:compile
+[INFO] |  |  +- org.mortbay.jetty:jetty:jar:6.1.26:compile
+[INFO] |  |  |  \- org.mortbay.jetty:servlet-api:jar:2.5-20081211:compile
+[INFO] |  |  +- org.mortbay.jetty:jetty-util:jar:6.1.26:compile
+[INFO] |  |  +- tomcat:jasper-runtime:jar:5.5.12:compile
+[INFO] |  |  +- tomcat:jasper-compiler:jar:5.5.12:compile
+[INFO] |  |  +- org.mortbay.jetty:jsp-api-2.1:jar:6.1.14:compile
+[INFO] |  |  |  \- org.mortbay.jetty:servlet-api-2.5:jar:6.1.14:compile
+[INFO] |  |  +- org.mortbay.jetty:jsp-2.1:jar:6.1.14:compile
+[INFO] |  |  |  \- ant:ant:jar:1.6.5:compile
+[INFO] |  |  +- commons-el:commons-el:jar:1.0:compile
+[INFO] |  |  +- net.java.dev.jets3t:jets3t:jar:0.6.1:compile
+[INFO] |  |  +- hsqldb:hsqldb:jar:1.8.0.10:compile
+[INFO] |  |  +- oro:oro:jar:2.0.8:compile
+[INFO] |  |  +- org.eclipse.jdt:core:jar:3.1.1:compile
+[INFO] |  |  \- org.codehaus.jackson:jackson-mapper-asl:jar:1.8.8:compile
+[INFO] |  +- org.anarres.lzo:lzo-core:jar:1.0.5:compile
+[INFO] |  \- com.google.code.findbugs:annotations:jar:2.0.3:compile
+[INFO] +- io.netty:netty-all:jar:4.1.9.Final:compile
+[INFO] +- commons-cli:commons-cli:jar:1.3.1:compile
+[INFO] \- com.codahale.metrics:metrics-core:jar:3.0.2:compile
+[INFO]    \- org.slf4j:slf4j-api:jar:1.7.5:compile
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary:
+[INFO] 
+[INFO] sonicbase-root ..................................... SUCCESS [  0.542 s]
+[INFO] sonicbase .......................................... SUCCESS [  0.377 s]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS

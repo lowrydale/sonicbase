@@ -33,11 +33,11 @@
 
 
 	<div style="margin-left: 4em;">
-
+<h1>SQL Insert Statement</h1>
 <br/>
 Inserts a record into a table<br/>
 
-<p>Syntax<table class="border-table" border="1"><tr><td> <table class="syntax-table" cellpadding="4">
+<h3>Syntax</h3><table class="border-table" border="1"><tr><td> <table class="syntax-table" cellpadding="4">
   <tbody>
   
     <tr class="syntax-main">
@@ -57,9 +57,8 @@ Inserts a record into a table<br/>
 </table>
 </td></tr></table>
 <br/>
-<br/>
-Example:<br/>
-<br/>
+<h3>Example</h3>
+
 PreparedStatement stmt = conn.prepareStatement("insert into persons (name, age, occupation) values ('bob', ?, ?)")<br/>
 stmt.setInt(1, 30);<br/>
 stmt.setString(2, "artist");<br/>

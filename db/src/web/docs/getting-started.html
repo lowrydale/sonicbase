@@ -39,37 +39,43 @@
 <br/>
 In this tutorial we will walk you through the process of starting a cluster and inserting and reading from it.<br/>
 <br/>
-<h3>Download The Software</h3>
+<h1>Download The Software</h1>
 Go to the <a href="../downloads.html">downloads</a> section of the SonicBase website and download the latest version.
-<h3>Unpack Package</h3>
+<h1>Unpack Package</h1>
 Type "tar -xzf sonicbase-&lt;version&gt;.tgz" in the parent directory where you want the software to go.
-<h3>Start Client</h3>
+<h1>Start Client</h1>
 Go to the sonicbase/bin directory and type "./cli" for MacOS and Linux and "./cli.bat" for cygwin and "cli.bat" for Windows. This will start the SonicBase client.
-<h3>Use Cluster</h3>
+        <h1>Set Paths</h1>
+        Edit the config-1-loca.json file in the sonicbase/config directory. Set the dataDirectory and the installDirectory to
+        the locations you desire. Note on Windows you will need to escape the backslashes so the value can be stored in the json file.<br/>
+        <br/>
+        On Windows the directory may look like "c:\\\\sonicbase". On linux it may look like "/mnt/sonicbase". On linux and mac
+        you also have the option of prefixing your path with "$HOME" to specify the home directory. This option is not available on Windows.
+<h1>Use Cluster</h1>
 In the client, type:<br/>
 &nbsp;&nbsp;use cluster 1-local<br/><br/>
 This will allow you to use the 1-local cluster. You can create other clusters by modifying the config in
 the sonicbase/config directory.
-<h3>Start Cluster</h3>
+<h1>Start Cluster</h1>
 In the client, type:<br/>
 &nbsp;&nbsp;start cluster<br/><br/>
 This will start the cluster locally.
-<h3>Create Database</h3>
+<h1>Create Database</h1>
 In the client, type:<br/>
 &nbsp;&nbsp;create database db<br/>
 This will create the database named "db".
-<h3>Create Table</h3>
+<h1>Create Table</h1>
 In the client, type:<br/>
 &nbsp;&nbsp;create table persons (name VARCHAR, age INT, ssn VARCHAR, PRIMARY KEY (ssn))<br/>
-<h3>Insert Record</h3>
+<h1>Insert Record</h1>
 In the client, type:<br/>
 &nbsp;&nbsp;insert into persons (name, age, ssn) VALUES ('bob', 22, '555-66-7777')<br/>
-<h3>Select Record</h3>
+<h1>Select Record</h1>
 In the client, type:<br/>
 &nbsp;&nbsp;select * from persons<br/>
 <br/>
 You should see the inserted record displayed in the client.
-<h3>Access From JDBC Client</h3>
+<h1>Access From JDBC Client</h1>
 Create and run the following class:<br/>
 <br/>
 package foo;<br/>
@@ -83,7 +89,7 @@ class Test {<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;System.out.println(rs.getString("name") + " " + rs.getInt("age") + " " + rs.getString("ssn"));<br/>
 &nbsp;&nbsp;}<br/>
 }<br/>
-<h3>Stop Cluster</h3>
+<h1>Stop Cluster</h1>
 In the client, type:
 &nbsp;&nbsp;stop cluster
 </div>

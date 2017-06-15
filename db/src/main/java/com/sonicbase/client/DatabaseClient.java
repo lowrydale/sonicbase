@@ -1,10 +1,12 @@
 package com.sonicbase.client;
 
 import com.codahale.metrics.MetricRegistry;
-import com.sonicbase.common.DatabaseCommon;
-import com.sonicbase.common.Logger;
-import com.sonicbase.common.Record;
-import com.sonicbase.common.SchemaOutOfSyncException;
+import com.google.api.client.http.GenericUrl;
+import com.google.api.client.http.HttpHeaders;
+import com.google.api.client.http.HttpRequest;
+import com.google.api.client.http.HttpResponse;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.sonicbase.common.*;
 import com.sonicbase.index.Repartitioner;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.jdbcdriver.QueryType;
@@ -17,7 +19,9 @@ import com.sonicbase.server.ReadManager;
 import com.sonicbase.server.SnapshotManager;
 import com.sonicbase.socket.DatabaseSocketClient;
 import com.sonicbase.util.DataUtil;
+import com.sonicbase.util.JsonArray;
 import com.sonicbase.util.JsonDict;
+import com.sonicbase.util.StreamUtils;
 import net.sf.jsqlparser.expression.*;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.operators.conditional.AndExpression;
@@ -49,6 +53,8 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+
+import static java.util.Collections.singletonList;
 
 /**
  * User: lowryda
@@ -265,6 +271,10 @@ public class DatabaseClient {
   }
 
   public void beginExplicitTransaction(String dbName) {
+    if (!common.haveProLicense()) {
+      throw new InsufficientLicense("You must have a pro license to use explicit transactions");
+    }
+
     isExplicitTrans.set(true);
     transactionOps.set(null);
     isCommitting.set(false);
@@ -286,7 +296,8 @@ public class DatabaseClient {
     }
     */
 
-    String command = "DatabaseServer:commit:1:" + common.getSchemaVersion() + ":" + dbName + ":" + transactionId.get();
+    String command = "DatabaseServer:commit:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+        common.getSchemaVersion() + ":" + dbName + ":" + transactionId.get();
     sendToAllShards(null, 0, command, null, DatabaseClient.Replica.all);
 
     isExplicitTrans.set(false);
@@ -300,7 +311,8 @@ public class DatabaseClient {
 
   public void rollback(String dbName) {
 
-    String command = "DatabaseServer:rollback:1:" + common.getSchemaVersion() + ":" + dbName + ":" + transactionId.get();
+    String command = "DatabaseServer:rollback:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+        common.getSchemaVersion() + ":" + dbName + ":" + transactionId.get();
     sendToAllShards(null, 0, command, null, DatabaseClient.Replica.all);
 
     isExplicitTrans.set(false);
@@ -316,7 +328,8 @@ public class DatabaseClient {
   public void createDatabase(String dbName) {
     dbName = dbName.toLowerCase();
 
-    String command = "DatabaseServer:createDatabase:1:1:" + dbName + ":master";
+    String command = "DatabaseServer:createDatabase:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+        common.getSchemaVersion() + ":" + dbName + ":master";
 
     send(null, 0, 0, command, null, DatabaseClient.Replica.master);
   }
@@ -422,7 +435,8 @@ public class DatabaseClient {
           }
 
           String dbName = batch.get().get(0).dbName;
-          final String command = "DatabaseServer:batchInsertIndexEntryByKeyWithRecord:1:" + common.getSchemaVersion() + ":" + dbName;
+          final String command = "DatabaseServer:batchInsertIndexEntryByKeyWithRecord:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION +
+              ":" + common.getSchemaVersion() + ":" + dbName;
 
           final List<List<PreparedInsert>> withRecordProcessed = new ArrayList<>();
           final List<List<PreparedInsert>> processed = new ArrayList<>();
@@ -488,7 +502,8 @@ public class DatabaseClient {
           for (Future future : futures) {
             future.get();
           }
-          final String command2 = "DatabaseServer:batchInsertIndexEntryByKey:1:" + common.getSchemaVersion() + ":" + dbName;
+          final String command2 = "DatabaseServer:batchInsertIndexEntryByKey:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION +
+              ":" + common.getSchemaVersion() + ":" + dbName;
 
           futures = new ArrayList<>();
           for (int i = 0; i < bytesOut.size(); i++) {
@@ -577,12 +592,12 @@ public class DatabaseClient {
 
   public ReconfigureResults reconfigureCluster() {
     try {
-      String command = "DatabaseServer:healthCheck:1:1:__none__";
+      String command = "DatabaseServer:healthCheck:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__";
 
       try {
         byte[] bytes = send(null, 0, 0, command, null, DatabaseClient.Replica.master);
         if (new String(bytes, "utf-8").equals("{\"status\" : \"ok\"}")) {
-          command = "DatabaseServer:reconfigureCluster:1:1:__none__";
+          command = "DatabaseServer:reconfigureCluster:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__";
           bytes = send(null, 0, 0, command, null, DatabaseClient.Replica.master);
           DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
           int count = in.readInt();
@@ -671,7 +686,7 @@ public class DatabaseClient {
 
   private void syncConfig() {
 
-    String command = "DatabaseServer:getConfig:1:1:null";
+    String command = "DatabaseServer:getConfig:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:null";
     try {
       byte[] ret = send(null, 0, 0, command, null, Replica.master);
       if (ret != null) {
@@ -762,8 +777,6 @@ public class DatabaseClient {
 
   private String handleSchemaOutOfSyncException(String command, Exception e) {
     try {
-      String[] parts = command.split(":");
-      int previousVersion = common.getSchemaVersion();
       boolean schemaOutOfSync = false;
       String msg = null;
       int index = ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class);
@@ -1052,7 +1065,8 @@ public class DatabaseClient {
   private AtomicLong nextRecordId = new AtomicLong();
 
   public void doCreateIndex(String dbName, CreateIndexStatementImpl statement) throws IOException {
-    String command = "DatabaseServer:createIndex:1:" + common.getSchemaVersion() + ":" + dbName + ":master:" + statement.getTableName() + ":" + statement.getName() + ":" + statement.isUnique();
+    String command = "DatabaseServer:createIndex:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+        common.getSchemaVersion() + ":" + dbName + ":master:" + statement.getTableName() + ":" + statement.getName() + ":" + statement.isUnique();
     StringBuilder builder = new StringBuilder();
     boolean first = true;
     for (String field : statement.getColumns()) {
@@ -1066,7 +1080,6 @@ public class DatabaseClient {
 
     byte[] ret = send(null, 0, rand.nextLong(), command, null, DatabaseClient.Replica.master);
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
-    long serializationVersion = DataUtil.readVLong(in);
     common.deserializeSchema(common, in);
   }
 
@@ -1182,6 +1195,20 @@ public class DatabaseClient {
     }
   }
 
+  public static HttpResponse restGet(String url) throws IOException {
+    NetHttpTransport.Builder builder = new NetHttpTransport.Builder();
+
+    final HttpRequest request = builder.build().createRequestFactory().buildGetRequest(new GenericUrl(url));
+    request.setReadTimeout(120000);
+    final HttpHeaders headers = request.getHeaders();
+    headers.put("Accept", singletonList("application/json"));
+    headers.put("Content-Type", singletonList("application/json"));
+    //headers.put("User-Agent", "TreeGraphBenchmarkClient");
+    request.setHeaders(headers);
+
+    return request.execute();
+  }
+
   private ResultSet doDescribe(String dbName, String sql) throws InterruptedException, ExecutionException, IOException {
     String[] parts = sql.split(" ");
     if (parts[1].trim().equalsIgnoreCase("table")) {
@@ -1243,6 +1270,41 @@ public class DatabaseClient {
       String[] lines = ret.split("\\n");
       return new ResultSetImpl(lines);
     }
+    else if (parts[1].trim().equalsIgnoreCase("tables")) {
+      StringBuilder builder = new StringBuilder();
+      for (TableSchema tableSchema : common.getTables(dbName).values()) {
+        builder.append(tableSchema.getName() + "\n");
+      }
+      String ret = builder.toString();
+      String[] lines = ret.split("\\n");
+      return new ResultSetImpl(lines);
+    }
+    else if (parts[1].trim().equalsIgnoreCase("licenses")) {
+      try {
+        String json = StreamUtils.inputStreamToString(DatabaseClient.class.getResourceAsStream("/config-license-server.json"));
+        JsonDict config = new JsonDict(json);
+
+        HttpResponse response = restGet("https://" + config.getDict("server").getString("publicAddress") + ":" +
+            config.getDict("server").getInt("port") + "/license/currUsage");
+        JsonDict dict = new JsonDict(StreamUtils.inputStreamToString(response.getContent()));
+        StringBuilder builder = new StringBuilder();
+        builder.append("total cores in use=" + dict.getInt("totalCores") + "\n");
+        builder.append("total allocated cores=" + dict.getInt("allocatedCores") + "\n");
+        builder.append("in compliance=" + dict.getBoolean("inCompliance") + "\n");
+        builder.append("disabling now=" + dict.getBoolean("disableNow") + "\n");
+        JsonArray servers = dict.getArray("servers");
+        for (int i = 0; i < servers.size(); i++) {
+          builder.append(servers.getDict(i).getString("host") + "=" + servers.getDict(i).getInt("cores") + "\n");
+        }
+
+        String ret = builder.toString();
+        String[] lines = ret.split("\\n");
+        return new ResultSetImpl(lines);
+      }
+      catch (Exception e) {
+        throw new DatabaseException(e);
+      }
+    }
     else if (parts[1].trim().equalsIgnoreCase("index")) {
       String str = parts[2].trim().toLowerCase();
       String[] innerParts = str.split("\\.");
@@ -1272,51 +1334,66 @@ public class DatabaseClient {
   }
 
   private ResultSetImpl describeServerStats(final String dbName) throws ExecutionException, InterruptedException {
-    List<Map<String, String>> serverStatsData = new ArrayList<>();
+    while (true) {
+      try {
+        syncSchema();
 
-    List<Future<Map<String, String>>> futures = new ArrayList<>();
-    for (int i = 0; i < getShardCount(); i++) {
-      for (int j = 0; j < getReplicaCount(); j++) {
-        final int shard = i;
-        final int replica = j;
-        futures.add(executor.submit(new Callable<Map<String, String>>(){
-          @Override
-          public Map<String, String> call() throws Exception {
-            String command = "DatabaseServer:getOSStats:1:" + getCommon().getSchemaVersion() + ":" + dbName;
-            byte[] ret = send(null, shard, replica, command, null, DatabaseClient.Replica.specified);
+        if (!common.haveProLicense()) {
+          throw new InsufficientLicense("You must have a pro license to describe server stats");
+        }
 
-            DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
-            in.readLong();//serialization version
-            double resGig = in.readDouble();
-            double cpu = in.readDouble();
-            double javaMemMin = in.readDouble();
-            double javaMemMax = in.readDouble();
-            double recRate = in.readDouble() / 1000000000d;
-            double transRate = in.readDouble() / 1000000000d;
-            String diskAvail = in.readUTF();
-            String host = in.readUTF();
+        List<Map<String, String>> serverStatsData = new ArrayList<>();
 
-            Map<String, String> line = new HashMap<>();
+        List<Future<Map<String, String>>> futures = new ArrayList<>();
+        for (int i = 0; i < getShardCount(); i++) {
+          for (int j = 0; j < getReplicaCount(); j++) {
+            final int shard = i;
+            final int replica = j;
+            futures.add(executor.submit(new Callable<Map<String, String>>(){
+              @Override
+              public Map<String, String> call() throws Exception {
+                String command = "DatabaseServer:getOSStats:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+                    getCommon().getSchemaVersion() + ":" + dbName;
+                byte[] ret = send(null, shard, replica, command, null, DatabaseClient.Replica.specified);
 
-            line.put("host", host);
-            line.put("cpu", String.format("%.0f", cpu));
-            line.put("resGig", String.format("%.2f", resGig));
-            line.put("javaMemMin", String.format("%.2f", javaMemMin));
-            line.put("javaMemMax", String.format("%.2f", javaMemMax));
-            line.put("receive", String.format("%.4f", recRate));
-            line.put("transmit", String.format("%.4f", transRate));
-            line.put("diskAvail", diskAvail);
-            return line;
+                DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
+                in.readLong();//serialization version
+                double resGig = in.readDouble();
+                double cpu = in.readDouble();
+                double javaMemMin = in.readDouble();
+                double javaMemMax = in.readDouble();
+                double recRate = in.readDouble() / 1000000000d;
+                double transRate = in.readDouble() / 1000000000d;
+                String diskAvail = in.readUTF();
+                String host = in.readUTF();
+
+                Map<String, String> line = new HashMap<>();
+
+                line.put("host", host);
+                line.put("cpu", String.format("%.0f", cpu));
+                line.put("resGig", String.format("%.2f", resGig));
+                line.put("javaMemMin", String.format("%.2f", javaMemMin));
+                line.put("javaMemMax", String.format("%.2f", javaMemMax));
+                line.put("receive", String.format("%.4f", recRate));
+                line.put("transmit", String.format("%.4f", transRate));
+                line.put("diskAvail", diskAvail);
+                return line;
+              }
+            }));
+
           }
-        }));
+        }
 
+        for (Future<Map<String, String>> future : futures) {
+          serverStatsData.add(future.get());
+        }
+        return new ResultSetImpl(serverStatsData);
+      }
+      catch (SchemaOutOfSyncException e) {
+        continue;
       }
     }
 
-    for (Future<Map<String, String>> future : futures) {
-      serverStatsData.add(future.get());
-    }
-    return new ResultSetImpl(serverStatsData);
   }
 
   class Entry {
@@ -1337,77 +1414,89 @@ public class DatabaseClient {
   }
 
   private ResultSet describeShards(String dbName) throws IOException, ExecutionException, InterruptedException {
-    syncSchema();
-    StringBuilder ret = new StringBuilder();
+    while (true) {
+      try {
+        syncSchema();
 
-    Map<String, Entry> entries = new HashMap<>();
-    Repartitioner.GlobalIndexCounts counts = Repartitioner.getIndexCounts(dbName, this);
-    for (Map.Entry<String, Repartitioner.TableIndexCounts> tableEntry : counts.getTables().entrySet()) {
-      for (Map.Entry<String, Repartitioner.IndexCounts> indexEntry : tableEntry.getValue().getIndices().entrySet()) {
-        ConcurrentHashMap<Integer, Long> currCounts = indexEntry.getValue().getCounts();
-        for (Map.Entry<Integer, Long> countEntry : currCounts.entrySet()) {
-          Entry entry = new Entry(tableEntry.getKey(),indexEntry.getKey(), countEntry.getKey(), "Table=" +
-              tableEntry.getKey() + ", Index=" + indexEntry.getKey() +
-              ", Shard=" + countEntry.getKey() + ", count=" + countEntry.getValue() + "\n");
-          entries.put(entry.getKey(), entry);
+        if (!common.haveProLicense()) {
+          throw new InsufficientLicense("You must have a pro license to describe shards");
         }
+
+        StringBuilder ret = new StringBuilder();
+
+        Map<String, Entry> entries = new HashMap<>();
+        Repartitioner.GlobalIndexCounts counts = Repartitioner.getIndexCounts(dbName, this);
+        for (Map.Entry<String, Repartitioner.TableIndexCounts> tableEntry : counts.getTables().entrySet()) {
+          for (Map.Entry<String, Repartitioner.IndexCounts> indexEntry : tableEntry.getValue().getIndices().entrySet()) {
+            ConcurrentHashMap<Integer, Long> currCounts = indexEntry.getValue().getCounts();
+            for (Map.Entry<Integer, Long> countEntry : currCounts.entrySet()) {
+              Entry entry = new Entry(tableEntry.getKey(), indexEntry.getKey(), countEntry.getKey(), "Table=" +
+                  tableEntry.getKey() + ", Index=" + indexEntry.getKey() +
+                  ", Shard=" + countEntry.getKey() + ", count=" + countEntry.getValue() + "\n");
+              entries.put(entry.getKey(), entry);
+            }
+          }
+        }
+
+        //    List<Future<Entry>> futures = new ArrayList<>();
+        //    for (final Map.Entry<String, TableSchema> table : getCommon().getTables(dbName).entrySet()) {
+        //      for (final Map.Entry<String, IndexSchema> indexSchema : table.getValue().getIndexes().entrySet()) {
+        //        final String command = "DatabaseServer:getPartitionSize:1:" + getCommon().getSchemaVersion() + ":" +
+        //            dbName + ":" + table.getKey() + ":" + indexSchema.getKey();
+        //        for (int i = 0; i < getShardCount(); i++) {
+        //          final int currShard = i;
+        //          futures.add(executor.submit(new Callable<Entry>(){
+        //            @Override
+        //            public Entry call() throws Exception {
+        //              byte[] currRet = send(null, currShard, 0, command, null, DatabaseClient.Replica.master);
+        //              DataInputStream in = new DataInputStream(new ByteArrayInputStream(currRet));
+        //              long serializationVersion = DataUtil.readVLong(in);
+        //              long count = in.readLong();
+        //              return new Entry(table.getKey(), indexSchema.getKey(), currShard, "Table=" + table.getKey() + ", Index=" + indexSchema.getKey() +
+        //                  ", Shard=" + currShard + ", count=" + count + "\n");
+        //            }
+        //          }));
+        //        }
+        //      }
+        //    }
+        //    Map<String, Entry> entries = new HashMap<>();
+        //    for (Future<Entry> future : futures) {
+        //      Entry entry = future.get();
+        //      entries.put(entry.getKey(), entry);
+        //    }
+
+        for (final Map.Entry<String, TableSchema> table : getCommon().getTables(dbName).entrySet()) {
+          for (final Map.Entry<String, IndexSchema> indexSchema : table.getValue().getIndexes().entrySet()) {
+            int shard = 0;
+            TableSchema.Partition[] partitions = indexSchema.getValue().getCurrPartitions();
+            TableSchema.Partition[] lastPartitions = indexSchema.getValue().getLastPartitions();
+            for (int i = 0; i < partitions.length; i++) {
+              String key = "[null]";
+              if (partitions[i].getUpperKey() != null) {
+                key = DatabaseCommon.keyToString(partitions[i].getUpperKey());
+              }
+              String lastKey = "[null]";
+              if (lastPartitions != null && lastPartitions[i].getUpperKey() != null) {
+                lastKey = DatabaseCommon.keyToString(lastPartitions[i].getUpperKey());
+              }
+              ret.append("Table=" + table.getKey() + ", Index=" + indexSchema.getKey() + ", shard=" + shard + ", key=" +
+                  key).append(", lastKey=").append(lastKey).append("\n");
+              shard++;
+            }
+            for (int i = 0; i < getShardCount(); i++) {
+              ret.append(entries.get(table.getKey() + ":" + indexSchema.getKey() + ":" + i).result);
+            }
+          }
+        }
+
+        String retStr = ret.toString();
+        String[] lines = retStr.split("\\n");
+        return new ResultSetImpl(lines);
+      }
+      catch (SchemaOutOfSyncException e) {
+        continue;
       }
     }
-
-//    List<Future<Entry>> futures = new ArrayList<>();
-//    for (final Map.Entry<String, TableSchema> table : getCommon().getTables(dbName).entrySet()) {
-//      for (final Map.Entry<String, IndexSchema> indexSchema : table.getValue().getIndexes().entrySet()) {
-//        final String command = "DatabaseServer:getPartitionSize:1:" + getCommon().getSchemaVersion() + ":" +
-//            dbName + ":" + table.getKey() + ":" + indexSchema.getKey();
-//        for (int i = 0; i < getShardCount(); i++) {
-//          final int currShard = i;
-//          futures.add(executor.submit(new Callable<Entry>(){
-//            @Override
-//            public Entry call() throws Exception {
-//              byte[] currRet = send(null, currShard, 0, command, null, DatabaseClient.Replica.master);
-//              DataInputStream in = new DataInputStream(new ByteArrayInputStream(currRet));
-//              long serializationVersion = DataUtil.readVLong(in);
-//              long count = in.readLong();
-//              return new Entry(table.getKey(), indexSchema.getKey(), currShard, "Table=" + table.getKey() + ", Index=" + indexSchema.getKey() +
-//                  ", Shard=" + currShard + ", count=" + count + "\n");
-//            }
-//          }));
-//        }
-//      }
-//    }
-//    Map<String, Entry> entries = new HashMap<>();
-//    for (Future<Entry> future : futures) {
-//      Entry entry = future.get();
-//      entries.put(entry.getKey(), entry);
-//    }
-
-    for (final Map.Entry<String, TableSchema> table : getCommon().getTables(dbName).entrySet()) {
-      for (final Map.Entry<String, IndexSchema> indexSchema : table.getValue().getIndexes().entrySet()) {
-        int shard = 0;
-        TableSchema.Partition[] partitions = indexSchema.getValue().getCurrPartitions();
-        TableSchema.Partition[] lastPartitions = indexSchema.getValue().getLastPartitions();
-        for (int i = 0; i < partitions.length; i++) {
-          String key = "[null]";
-          if (partitions[i].getUpperKey() != null) {
-            key = DatabaseCommon.keyToString(partitions[i].getUpperKey());
-          }
-          String lastKey = "[null]";
-          if (lastPartitions != null && lastPartitions[i].getUpperKey() != null) {
-            lastKey = DatabaseCommon.keyToString(lastPartitions[i].getUpperKey());
-          }
-          ret.append("Table=" + table.getKey() + ", Index=" + indexSchema.getKey() + ", shard=" + shard + ", key=" +
-              key).append(", lastKey=").append(lastKey).append("\n");
-          shard++;
-        }
-        for (int i = 0; i < getShardCount(); i++) {
-          ret.append(entries.get(table.getKey() + ":" + indexSchema.getKey() + ":" + i).result);
-        }
-      }
-    }
-
-    String retStr = ret.toString();
-    String[] lines = retStr.split("\\n");
-    return new ResultSetImpl(lines);
   }
 
   private StringBuilder doDescribeIndex(String dbName, String table, String index, StringBuilder builder) {
@@ -1497,19 +1586,20 @@ public class DatabaseClient {
 
   private void doDropColumn(String dbName, String tableName, String columnName) throws IOException {
 
-    String command = "DatabaseServer:dropColumn:1:" + common.getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + columnName + ":master";
+    String command = "DatabaseServer:dropColumn:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+        common.getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + columnName + ":master";
     byte[] ret = send(null, 0, 0, command, null, DatabaseClient.Replica.master);
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
-    long serializationVersion = DataUtil.readVLong(in);
     common.deserializeSchema(common, in);
   }
 
   private void doAddColumn(String dbName, String tableName, String columnName, ColDataType type) throws IOException {
 
-    String command = "DatabaseServer:addColumn:1:" + common.getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + columnName + ":" + type.getDataType() + ":master";
+    String command = "DatabaseServer:addColumn:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+        common.getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + columnName + ":" + type.getDataType() +
+        ":master";
     byte[] ret = send(null, 0, 0, command, null, DatabaseClient.Replica.master);
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
-    long serializationVersion = DataUtil.readVLong(in);
     common.deserializeSchema(common, in);
   }
 
@@ -1519,7 +1609,8 @@ public class DatabaseClient {
       String table = drop.getName().getName().toLowerCase();
       doTruncateTable(dbName, table);
 
-      String command = "DatabaseServer:dropTable:1:" + common.getSchemaVersion() + ":" + dbName + ":" + table + ":master";
+      String command = "DatabaseServer:dropTable:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+          common.getSchemaVersion() + ":" + dbName + ":" + table + ":master";
       byte[] ret = send(null, 0, 0, command, null, DatabaseClient.Replica.master);
       DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
       long serializationVersion = DataUtil.readVLong(in);
@@ -1529,10 +1620,10 @@ public class DatabaseClient {
       String indexName = drop.getName().getName().toLowerCase();
       String tableName = drop.getName().getSchemaName().toLowerCase();
 
-      String command = "DatabaseServer:dropIndex:1:" + common.getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + indexName + ":master";
+      String command = "DatabaseServer:dropIndex:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+          common.getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + indexName + ":master";
       byte[] ret = send(null, 0, 0, command, null, DatabaseClient.Replica.master);
       DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
-      long serializationVersion = DataUtil.readVLong(in);
       common.deserializeSchema(common, in);
     }
     return 1;
@@ -1549,12 +1640,14 @@ public class DatabaseClient {
 
   private void doTruncateTable(String dbName, String table) {
 
-    String command = "DatabaseServer:truncateTable:1:" + common.getSchemaVersion() + ":" + dbName + ":" + table + ":secondary";
+    String command = "DatabaseServer:truncateTable:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+        common.getSchemaVersion() + ":" + dbName + ":" + table + ":secondary";
 
     Random rand = new Random(System.currentTimeMillis());
     sendToAllShards(null, rand.nextLong(), command, null, Replica.def);
 
-    command = "DatabaseServer:truncateTable:1:" + common.getSchemaVersion() + ":" + dbName + ":" + table + ":primary";
+    command = "DatabaseServer:truncateTable:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+        common.getSchemaVersion() + ":" + dbName + ":" + table + ":primary";
 
     rand = new Random(System.currentTimeMillis());
     sendToAllShards(null, rand.nextLong(), command, null, Replica.def);
@@ -1660,7 +1753,8 @@ public class DatabaseClient {
 
   public int doCreateTable(String dbName, CreateTableStatementImpl createTableStatement) {
     try {
-      String command = "DatabaseServer:createTable:1:" + common.getSchemaVersion() + ":" + dbName + ":master:query0";
+      String command = "DatabaseServer:createTable:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+          common.getSchemaVersion() + ":" + dbName + ":master:query0";
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
       DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
@@ -1669,7 +1763,6 @@ public class DatabaseClient {
 
       byte[] ret = send(null, 0, rand.nextLong(), command, bytesOut.toByteArray(), DatabaseClient.Replica.master);
       DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
-      long serializationVersion = DataUtil.readVLong(in);
       common.deserializeSchema(common, in);
 
       return 1;
@@ -1713,7 +1806,8 @@ public class DatabaseClient {
 
   public void insertKey(String dbName, String tableName, KeyInfo keyInfo, String primaryKeyIndexName, Object[] primaryKey) {
     try {
-      String command = "DatabaseServer:insertIndexEntryByKey:1:" + common.getSchemaVersion() + ":" + dbName;
+      String command = "DatabaseServer:insertIndexEntryByKey:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+          common.getSchemaVersion() + ":" + dbName;
 
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
@@ -1752,7 +1846,8 @@ public class DatabaseClient {
 
   public void insertKeyWithRecord(String dbName, String tableName, KeyInfo keyInfo, Record record) {
     try {
-      String command = "DatabaseServer:insertIndexEntryByKeyWithRecord:1:" + common.getSchemaVersion() + ":" + dbName;
+      String command = "DatabaseServer:insertIndexEntryByKeyWithRecord:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION +
+          ":" + common.getSchemaVersion() + ":" + dbName;
 
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
@@ -1807,8 +1902,9 @@ public class DatabaseClient {
 
   public void deleteKey(String dbName, String tableName, KeyInfo keyInfo, String primaryKeyIndexName, Object[] primaryKey) {
     try {
-      String command = "DatabaseServer:deleteIndexEntryByKey:1:" + common.getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + keyInfo.indexSchema.getKey() + ":" + primaryKeyIndexName
-          + ":" + isExplicitTrans() + ":" + isCommitting() + ":" + getTransactionId();
+      String command = "DatabaseServer:deleteIndexEntryByKey:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+          common.getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + keyInfo.indexSchema.getKey() +
+          ":" + primaryKeyIndexName + ":" + isExplicitTrans() + ":" + isCommitting() + ":" + getTransactionId();
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
       DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
@@ -2116,7 +2212,8 @@ public class DatabaseClient {
           id = nextId.getAndIncrement();
         }
         else {
-          String command = "DatabaseServer:allocateRecordIds:1:" + common.getSchemaVersion() + ":" + dbName;
+          String command = "DatabaseServer:allocateRecordIds:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+              common.getSchemaVersion() + ":" + dbName;
           byte[] ret = send(null, 0, rand.nextLong(), command, null, Replica.master);
           ByteArrayInputStream bytesIn = new ByteArrayInputStream(ret);
           DataInputStream in = new DataInputStream(bytesIn);
@@ -2388,6 +2485,9 @@ public class DatabaseClient {
 
       List<Join> joins = pselect.getJoins();
       if (joins != null) {
+        if (!common.haveProLicense()) {
+          throw new InsufficientLicense("You must have a pro license to execute joins");
+        }
         for (Join join : joins) {
           FromItem rightFromItem = join.getRightItem();
           Expression onExpressionSrc = join.getOnExpression();
@@ -2701,7 +2801,8 @@ public class DatabaseClient {
 
   public boolean isRepartitioningComplete(String dbName) {
     try {
-      String command = "DatabaseServer:isRepartitioningComplete:1:" + common.getSchemaVersion() + ":" + dbName;
+      String command = "DatabaseServer:isRepartitioningComplete:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+          common.getSchemaVersion() + ":" + dbName;
       byte[] bytes = send(null, 0, rand.nextLong(), command, null, DatabaseClient.Replica.master);
       DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
       long serializationVersion = DataUtil.readVLong(in);
@@ -2718,7 +2819,8 @@ public class DatabaseClient {
 
   public long getPartitionSize(String dbName, int shard, int replica, String tableName, String indexName) {
     try {
-      String command = "DatabaseServer:getPartitionSize:1:" + common.getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + indexName;
+      String command = "DatabaseServer:getPartitionSize:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+          common.getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + indexName;
       byte[] bytes = send(null, shard, replica, command, null, DatabaseClient.Replica.specified);
       DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
       long serializationVersion = DataUtil.readVLong(in);
@@ -2800,13 +2902,13 @@ public class DatabaseClient {
 //        }
     //logger.error("Schema out of sync: currVer=" + common.getSchemaVersion());
 
-    String command = "DatabaseServer:getSchema:1:" + common.getSchemaVersion() + ":__none__";
+    String command = "DatabaseServer:getSchema:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":"
+        + common.getSchemaVersion() + ":__none__";
     try {
 
       byte[] ret = send(null, 0, 0, command, null, Replica.master);
       if (ret != null) {
         DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
-        long serializationVersion = DataUtil.readVLong(in);
         common.deserializeSchema(common, in);
 
         logger.info("Schema received from server: currVer=" + common.getSchemaVersion());
@@ -2838,7 +2940,8 @@ public class DatabaseClient {
   public JsonDict getConfig(String dbName) {
     try {
       long auth_user = rand.nextLong();
-      String command = "DatabaseServer:getConfig:1:" + common.getSchemaVersion() + ":" + dbName + ":" + auth_user;
+      String command = "DatabaseServer:getConfig:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+          common.getSchemaVersion() + ":" + dbName + ":" + auth_user;
       byte[] ret = send(null, selectShard(0), auth_user, command, null, DatabaseClient.Replica.def);
       return new JsonDict(new String(ret, "utf-8"));
     }
@@ -2848,7 +2951,8 @@ public class DatabaseClient {
   }
 
   public void beginRebalance(String dbName, String tableName, String indexName) {
-    String command = "DatabaseServer:beginRebalance:1:1:" + dbName + ":" + tableName + ":" + indexName;
+    String command = "DatabaseServer:beginRebalance:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+        common.getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + indexName;
     send(null, 0, rand.nextLong(), command, null, DatabaseClient.Replica.master);
   }
 }

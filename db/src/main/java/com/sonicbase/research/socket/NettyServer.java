@@ -872,14 +872,10 @@ public class NettyServer {
 
               logger.info("starting repartitioner");
               databaseServer.startRepartitioner();
-              Thread thread = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                  logger.info("running snapshot loop");
-                  databaseServer.getSnapshotManager().runSnapshotLoop();
-                }
-              });
-              thread.start();
+
+              logger.info("running snapshot loop");
+              databaseServer.getSnapshotManager().runSnapshotLoop();
+
               isRunning.set(true);
             }
             catch (Exception e) {

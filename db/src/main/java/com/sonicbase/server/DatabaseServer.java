@@ -11,14 +11,12 @@ import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.ExpressionImpl;
 import com.sonicbase.research.socket.NettyServer;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.util.DataUtil;
-import com.sonicbase.util.JsonArray;
-import com.sonicbase.util.JsonDict;
-import com.sonicbase.util.StreamUtils;
+import com.sonicbase.util.*;
 import net.jpountz.lz4.LZ4Compressor;
 import net.jpountz.lz4.LZ4Factory;
 import net.jpountz.lz4.LZ4FastDecompressor;
 import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.input.ReversedLinesFileReader;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import sun.misc.Unsafe;
@@ -89,6 +87,12 @@ public class DatabaseServer {
   private Boolean disableNow = false;
   private boolean haveProLicense;
   private boolean overrideProLicense;
+  private String logSlicePoint;
+  private boolean isBackupComplete;
+  private boolean isRestoreComplete;
+  private Exception backupException;
+  private Exception restoreException;
+  private AWSClient awsClient;
 
   @SuppressWarnings("restriction")
   private static Unsafe getUnsafe() {
@@ -231,6 +235,8 @@ public class DatabaseServer {
     logger = new Logger(getDatabaseClient());
     logger.info("config=" + config.toString());
 
+    this.awsClient = new AWSClient(client.get());
+
     this.deleteManager = new DeleteManager(this);
     this.deleteManager.start();
     this.updateManager = new UpdateManager(this);
@@ -308,26 +314,36 @@ public class DatabaseServer {
 
   }
 
+  public AWSClient getAWSClient() {
+    return awsClient;
+  }
 
   public static void disable() {
     try {
       SSLContext sslc = SSLContext.getInstance("TLS");
-      TrustManager[] trustManagerArray = { new NullX509TrustManager() };
+      TrustManager[] trustManagerArray = {new NullX509TrustManager()};
       sslc.init(null, trustManagerArray, null);
       HttpsURLConnection.setDefaultSSLSocketFactory(sslc.getSocketFactory());
       HttpsURLConnection.setDefaultHostnameVerifier(new NullHostnameVerifier());
-    } catch(Exception e) {
+    }
+    catch (Exception e) {
       e.printStackTrace();
     }
+  }
+
+  public ThreadPoolExecutor getExecutor() {
+    return executor;
   }
 
   private static class NullX509TrustManager implements X509TrustManager {
     public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
       System.out.println();
     }
+
     public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
       System.out.println();
     }
+
     public X509Certificate[] getAcceptedIssuers() {
       return new X509Certificate[0];
     }
@@ -368,14 +384,14 @@ public class DatabaseServer {
 
     final AtomicBoolean lastHaveProLicense = new AtomicBoolean(haveProLicense);
 
-    Thread thread = new Thread(new Runnable(){
+    Thread thread = new Thread(new Runnable() {
       @Override
       public void run() {
         while (true) {
           try {
             int cores = Runtime.getRuntime().availableProcessors();
             HttpResponse response = DatabaseClient.restGet("https://" + address + ":" + licensePort.get() + "/license/checkIn?" +
-              "address=" + DatabaseServer.this.host + "&port=" +  DatabaseServer.this.port + "&cores=" + cores);
+                "address=" + DatabaseServer.this.host + "&port=" + DatabaseServer.this.port + "&cores=" + cores);
             String responseStr = StreamUtils.inputStreamToString(response.getContent());
             logger.info("CheckIn response: " + responseStr);
 
@@ -406,6 +422,386 @@ public class DatabaseServer {
       }
     });
     thread.start();
+  }
+
+  public byte[] prepareForBackup(String command, byte[] body, boolean replayedCommand) {
+
+    snapshotManager.pauseSnapshotRolling(true);
+
+    logSlicePoint = logManager.sliceLogs();
+
+    isBackupComplete = false;
+
+    backupException = null;
+
+    return null;
+  }
+
+  public byte[] doBackupFileSystem(String command, final byte[] body, boolean replayedCommand) {
+    Thread thread = new Thread(new Runnable(){
+      @Override
+      public void run() {
+        try {
+          DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
+          String directory = in.readUTF();
+          String subDirectory = in.readUTF();
+
+          directory = directory.replace("$HOME", System.getProperty("user.home"));
+
+          snapshotManager.backupFileSystem(directory, subDirectory);
+
+          logManager.backupFileSystem(directory, subDirectory, logSlicePoint);
+
+          isBackupComplete = true;
+        }
+        catch (Exception e) {
+          logger.error("Error backing up database", e);
+          backupException = e;
+        }
+      }
+    });
+    thread.start();
+    return null;
+  }
+
+  public byte[] doBackupAWS(String command, final byte[] body, boolean replayedCommand) {
+    Thread thread = new Thread(new Runnable(){
+      @Override
+      public void run() {
+        try {
+          DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
+          String subDirectory = in.readUTF();
+          String bucket = in.readUTF();
+          String prefix = in.readUTF();
+          snapshotManager.backupAWS(bucket, prefix, subDirectory);
+          logManager.backupAWS(bucket, prefix, subDirectory);
+
+          isBackupComplete = true;
+        }
+        catch (Exception e) {
+          logger.error("Error backing up database", e);
+          backupException = e;
+        }
+      }
+    });
+    thread.start();
+    return null;
+  }
+
+  public byte[] isBackupComplete(String command, byte[] body, boolean replayedCommand) {
+    try {
+      if (backupException != null) {
+        throw new DatabaseException(backupException);
+      }
+      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+      DataOutputStream out = new DataOutputStream(bytesOut);
+      out.writeBoolean(isBackupComplete);
+      out.close();
+      return bytesOut.toByteArray();
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public byte[] finishBackup(String command, byte[] body, boolean replayedCommand) {
+    try {
+      DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
+      boolean shared = in.readBoolean();
+      String directory = in.readUTF();
+      int maxBackupCount = in.readInt();
+
+      if (!shared) {
+        doDeleteFileSystemBackups(directory, maxBackupCount);
+      }
+      snapshotManager.pauseSnapshotRolling(false);
+      isBackupComplete = false;
+      return null;
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  private void doDeleteFileSystemBackups(String directory, int maxBackupCount) {
+    File file = new File(directory);
+    File[] backups = file.listFiles();
+    if (backups != null) {
+      Arrays.sort(backups, new Comparator<File>() {
+        @Override
+        public int compare(File o1, File o2) {
+          return o1.getAbsolutePath().compareTo(o2.getAbsolutePath());
+        }
+      });
+      for (int i = 0; i < backups.length; i++) {
+        if (i > maxBackupCount) {
+          try {
+            FileUtils.deleteDirectory(backups[i]);
+          }
+          catch (Exception e) {
+            logger.error("Error deleting backup: dir=" + backups[i].getAbsolutePath(), e);
+          }
+        }
+      }
+    }
+  }
+
+  public byte[] startBackup(String command, byte[] body, boolean replayedCommand) {
+
+    doBackup();
+
+    return null;
+  }
+
+  public void doBackup() {
+    try {
+      // tell all servers to pause snapshot and slice the queue
+      String command = "DatabaseServer:prepareForBackup:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__";
+      byte[][] ret = getDatabaseClient().sendToAllShards(null, 0, command, null, DatabaseClient.Replica.specified);
+
+      String subDirectory = ISO8601.to8601String(new Date(System.currentTimeMillis()));
+
+      JsonDict backup = config.getDict("backup");
+      String bucket = backup.getString("bucket");
+      String prefix = backup.getString("prefix");
+
+      String type = backup.getString("type");
+      if (type.equals("AWS")) {
+        // if aws
+        //    tell all servers to upload with a specific root directory
+        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(bytesOut);
+        out.writeUTF(subDirectory);
+        out.writeUTF(bucket);
+        out.writeUTF(prefix);
+        out.close();
+
+        command = "DatabaseServer:doBackupAWS:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__";
+        ret = getDatabaseClient().sendToAllShards(null, 0, command, bytesOut.toByteArray(), DatabaseClient.Replica.specified);
+      }
+      else if (type.equals("fileSystem")) {
+        // if fileSystem
+        //    tell all servers to copy files to backup directory with a specific root directory
+        String directory = backup.getString("directory");
+        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(bytesOut);
+        out.writeUTF(directory);
+        out.writeUTF(subDirectory);
+        out.close();
+        command = "DatabaseServer:doBackupFileSystem:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__";
+        ret = getDatabaseClient().sendToAllShards(null, 0, command, bytesOut.toByteArray(), DatabaseClient.Replica.specified);
+      }
+
+      while (true) {
+        command = "DatabaseServer:isBackupComplete:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__";
+
+        boolean finished = false;
+        outer:
+        for (int shard = 0; shard < shardCount; shard++) {
+          byte[] currRet = getDatabaseClient().send(null, shard, 0, command, null, DatabaseClient.Replica.specified);
+          DataInputStream in = new DataInputStream(new ByteArrayInputStream(currRet));
+          finished = in.readBoolean();
+          if (!finished) {
+            break outer;
+          }
+        }
+        if (finished) {
+          break;
+        }
+      }
+
+      String directory = backup.getString("directory");
+      Integer maxBackupCount = backup.getInt("maxBackupCount");
+      Boolean shared = backup.getBoolean("sharedDirectory");
+      if (shared == null) {
+        shared = false;
+      }
+      if (maxBackupCount != null) {
+        if (type.equals("AWS")) {
+          shared = true;
+          String key = prefix + "/" + subDirectory;
+          awsClient.deleteDirectory(bucket, key);
+        }
+        else if (type.equals("fileSystem")) {
+          // delete old backups
+          if (shared) {
+            doDeleteFileSystemBackups(directory, maxBackupCount);
+          }
+        }
+      }
+      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+      DataOutputStream out = new DataOutputStream(bytesOut);
+      out.writeBoolean(shared);
+      out.writeUTF(directory);
+      out.writeInt(maxBackupCount);
+      out.close();
+      command = "DatabaseServer:finishBackup:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__";
+      ret = getDatabaseClient().sendToAllShards(null, 0, command, bytesOut.toByteArray(), DatabaseClient.Replica.all);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public byte[] prepareForRestore(String command, byte[] body, boolean replayedCommand) {
+    isRestoreComplete = false;
+
+    isRunning.set(false);
+    snapshotManager.enableSnapshot(false);
+    snapshotManager.deleteSnapshots();
+
+    logManager.deleteLogs();
+
+    return null;
+  }
+
+  public byte[] doRestoreFileSystem(String command, final byte[] body, boolean replayedCommand) {
+    Thread thread = new Thread(new Runnable(){
+      @Override
+      public void run() {
+        try {
+          DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
+          String directory = in.readUTF();
+          String subDirectory = in.readUTF();
+
+          directory = directory.replace("$HOME", System.getProperty("user.home"));
+
+          snapshotManager.restoreFileSystem(directory, subDirectory);
+
+          logManager.restoreFileSystem(directory, subDirectory);
+
+          isRestoreComplete = true;
+        }
+        catch (Exception e) {
+          logger.error("Error restoring backup", e);
+          restoreException = e;
+        }
+      }
+    });
+    thread.start();
+
+    return null;
+  }
+
+  public byte[] doRestoreAWS(String command, final byte[] body, boolean replayedCommand) {
+    Thread thread = new Thread(new Runnable(){
+      @Override
+      public void run() {
+        try {
+          DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
+          String subDirectory = in.readUTF();
+          String bucket = in.readUTF();
+          String prefix = in.readUTF();
+
+          snapshotManager.restoreAWS(bucket, prefix, subDirectory);
+          logManager.restoreAWS(bucket, prefix, subDirectory);
+
+          isRestoreComplete = true;
+        }
+        catch (Exception e) {
+          logger.error("Error restoring backup", e);
+          restoreException = e;
+        }
+      }
+    });
+    thread.start();
+
+    return null;
+  }
+
+  public byte[] isRestoreComplete(String command, byte[] body, boolean replayedCommand) {
+    try {
+      if (restoreException != null) {
+        throw new DatabaseException(restoreException);
+      }
+      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+      DataOutputStream out = new DataOutputStream(bytesOut);
+      out.writeBoolean(isRestoreComplete);
+      out.close();
+      return bytesOut.toByteArray();
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+
+  public byte[] finishRestore(String command, byte[] body, boolean replayedCommand) {
+    snapshotManager.enableSnapshot(true);
+    isRunning.set(true);
+    isRestoreComplete = false;
+
+    return null;
+  }
+
+  public byte[] startRestore(String command, byte[] body, boolean replayedCommand) {
+    try {
+      DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
+      String directory = in.readUTF();
+
+      doRestore(directory);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+    return null;
+  }
+
+
+  private void doRestore(String subDirectory) {
+    try {
+      // delete snapshots and logs
+      // enter recovery mode (block commands)
+      String command = "DatabaseServer:prepareForRestore:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__";
+      byte[][] ret = getDatabaseClient().sendToAllShards(null, 0, command, null, DatabaseClient.Replica.all);
+
+      JsonDict backup = config.getDict("backup");
+      String type = backup.getString("type");
+      if (type.equals("AWS")) {
+        // if aws
+        //    tell all servers to upload with a specific root directory
+        byte[] bytes = subDirectory.getBytes("utf-8");
+        command = "DatabaseServer:doRestoreAWS:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__";
+        ret = getDatabaseClient().sendToAllShards(null, 0, command, bytes, DatabaseClient.Replica.all);
+      }
+      else if (type.equals("fileSystem")) {
+        // if fileSystem
+        //    tell all servers to copy files to backup directory with a specific root directory
+        String directory = backup.getString("directory");
+        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(bytesOut);
+        out.writeUTF(directory);
+        out.writeUTF(subDirectory);
+        out.close();
+        command = "DatabaseServer:doRestoreFileSystem:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__";
+        ret = getDatabaseClient().sendToAllShards(null, 0, command, bytesOut.toByteArray(), DatabaseClient.Replica.all);
+      }
+
+      while (true) {
+        command = "DatabaseServer:isRestoreComplete:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__";
+
+        boolean finished = false;
+        outer:
+        for (int shard = 0; shard < shardCount; shard++) {
+          byte[] currRet = getDatabaseClient().send(null, shard, 0, command, null, DatabaseClient.Replica.specified);
+          DataInputStream in = new DataInputStream(new ByteArrayInputStream(currRet));
+          finished = in.readBoolean();
+          if (!finished) {
+            break outer;
+          }
+        }
+        if (finished) {
+          break;
+        }
+      }
+
+
+      command = "DatabaseServer:finishRestore:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__";
+      ret = getDatabaseClient().sendToAllShards(null, 0, command, null, DatabaseClient.Replica.all);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
   }
 
   public void setMinSizeForRepartition(int minSizeForRepartition) {
@@ -531,7 +927,7 @@ public class DatabaseServer {
   }
 
   public double getResGigWindows() throws IOException, InterruptedException {
-    ProcessBuilder builder = new ProcessBuilder().command("tasklist",  "/fi", "\"pid eq " + pid + "\"");
+    ProcessBuilder builder = new ProcessBuilder().command("tasklist", "/fi", "\"pid eq " + pid + "\"");
     Process p = builder.start();
     try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
       String header = in.readLine();
@@ -2254,6 +2650,16 @@ public class DatabaseServer {
     priorityCommands.add("healthCheckPriority");
     priorityCommands.add("getDbNames");
     priorityCommands.add("updateServersConfig");
+    priorityCommands.add("prepareForRestore");
+    priorityCommands.add("doRestoreAWS");
+    priorityCommands.add("doRestoreFileSystem");
+    priorityCommands.add("isRestoreComplete");
+    priorityCommands.add("finishRestore");
+    priorityCommands.add("prepareForBackup");
+    priorityCommands.add("doBackupAWS");
+    priorityCommands.add("doBackupFileSystem");
+    priorityCommands.add("isBackupComplete");
+    priorityCommands.add("finishBackup");
   }
 
   public static class Response {
@@ -2290,65 +2696,65 @@ public class DatabaseServer {
 //        futures.add(executor.submit(new Callable<byte[]>() {
 //          @Override
 //          public byte[] call() throws Exception {
+        try {
+          if (disableNow && usingMultipleReplicas) {
+            throw new LicenseOutOfComplianceException("Licenses out of compliance");
+          }
+
+          String command = request.getCommand();
+          byte[] body = request.getBody();
+
+          int pos = command.indexOf(':');
+          int pos2 = command.indexOf(':', pos + 1);
+          String methodStr = null;
+          if (pos2 == -1) {
+            methodStr = command.substring(pos + 1);
+          }
+          else {
+            methodStr = command.substring(pos + 1, pos2);
+          }
+          byte[] ret = null;
+
+          if (!replayedCommand && !isRunning.get() && !priorityCommands.contains(methodStr)) {
+            throw new DatabaseException("Server not running: command=" + command);
+          }
+
+          Method method = DatabaseServer.class.getMethod(methodStr, String.class, byte[].class, boolean.class);
           try {
-            if (disableNow && usingMultipleReplicas) {
-              throw new LicenseOutOfComplianceException("Licenses out of compliance");
-            }
-
-            String command = request.getCommand();
-            byte[] body = request.getBody();
-
-            int pos = command.indexOf(':');
-            int pos2 = command.indexOf(':', pos + 1);
-            String methodStr = null;
-            if (pos2 == -1) {
-              methodStr = command.substring(pos + 1);
+            ret = (byte[]) method.invoke(DatabaseServer.this, command, body, replayedCommand);
+          }
+          catch (Exception e) {
+            boolean schemaOutOfSync = false;
+            if (SchemaOutOfSyncException.class.isAssignableFrom(e.getClass())) {
+              schemaOutOfSync = true;
             }
             else {
-              methodStr = command.substring(pos + 1, pos2);
-            }
-            byte[] ret = null;
-
-            if (!replayedCommand && !isRunning.get() && !priorityCommands.contains(methodStr)) {
-              throw new DatabaseException("Server not running: command=" + command);
-            }
-
-            Method method = DatabaseServer.class.getMethod(methodStr, String.class, byte[].class, boolean.class);
-            try {
-              ret = (byte[]) method.invoke(DatabaseServer.this, command, body, replayedCommand);
-            }
-            catch (Exception e) {
-              boolean schemaOutOfSync = false;
-              if (SchemaOutOfSyncException.class.isAssignableFrom(e.getClass())) {
+              if (e.getMessage() != null && e.getMessage().contains("SchemaOutOfSyncException")) {
                 schemaOutOfSync = true;
               }
               else {
-                if (e.getMessage() != null && e.getMessage().contains("SchemaOutOfSyncException")) {
+                int index = ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class);
+                if (-1 != index) {
                   schemaOutOfSync = true;
                 }
-                else {
-                  int index = ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class);
-                  if (-1 != index) {
-                    schemaOutOfSync = true;
-                  }
-                }
               }
-
-              if (!schemaOutOfSync) {
-                logger.error("Error processing request", e);
-              }
-              else {
-                logger.info("Schema out of sync: schemaVersion=" + common.getSchemaVersion());
-              }
-              throw new DatabaseException(e);
             }
-            retList.add(new Response(ret));
+
+            if (!schemaOutOfSync) {
+              logger.error("Error processing request", e);
+            }
+            else {
+              logger.info("Schema out of sync: schemaVersion=" + common.getSchemaVersion());
+            }
+            throw new DatabaseException(e);
           }
-          catch (Exception e) {
-            retList.add(new Response(e));
-          }
-            //return ret;
-          //}
+          retList.add(new Response(ret));
+        }
+        catch (Exception e) {
+          retList.add(new Response(e));
+        }
+        //return ret;
+        //}
         //}));
       }
 //      for (Future<byte[]> future : futures) {
@@ -3202,7 +3608,7 @@ public class DatabaseServer {
     String dbName = parts[5];
 //    common.getSchemaReadLock(dbName).lock();
 //    try {
-      return updateManager.populateIndex(command, body);
+    return updateManager.populateIndex(command, body);
 //    }
 //    finally {
 //      common.getSchemaReadLock(dbName).unlock();
@@ -3273,8 +3679,8 @@ public class DatabaseServer {
           Thread.sleep(30000);
           OSStats stats = doGetOSStats();
           logger.info("OS Stats: CPU=" + String.format("%.2f", stats.cpu) + ", resGig=" + String.format("%.2f", stats.resGig) +
-            ", javaMemMin=" + String.format("%.2f", stats.javaMemMin) + ", javaMemMax=" + String.format("%.2f", stats.javaMemMax) +
-            ", NetOut=" + String.format("%.2f", stats.avgTransRate) + ", NetIn=" + String.format("%.2f", stats.avgRecRate) +
+              ", javaMemMin=" + String.format("%.2f", stats.javaMemMin) + ", javaMemMax=" + String.format("%.2f", stats.javaMemMax) +
+              ", NetOut=" + String.format("%.2f", stats.avgTransRate) + ", NetIn=" + String.format("%.2f", stats.avgRecRate) +
               ", DiskAvail=" + stats.diskAvail);
         }
         catch (InterruptedException e) {

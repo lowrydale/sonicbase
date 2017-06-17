@@ -8,6 +8,14 @@
   "user": "ubuntu",
   "maxProcessMemoryTrigger": "90%",
   "clientIsPrivate": false,
+  "backup" : {
+    "type" : "fileSystem",
+    "directory": "$HOME/db-backup",
+    "period": "daily",
+    "time": "23:00",
+    "maxBackupCount": 10,
+    "sharedDirectory": false
+  },
   "shards" : [
     {
       "replicas": [

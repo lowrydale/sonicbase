@@ -1,22 +1,23 @@
 package com.sonicbase.server;
 
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.AWSClient;
 import com.sonicbase.common.Logger;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.util.DataUtil;
 import com.sonicbase.util.ISO8601;
 import com.sonicbase.util.StreamUtils;
 import com.sonicbase.research.socket.NettyServer;
+import org.apache.commons.io.FileUtils;
 
 import java.io.*;
 import java.text.ParseException;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.GZIPInputStream;
 
 /**
@@ -37,6 +38,10 @@ public class LogManager {
   private AtomicLong logSequenceNumber = new AtomicLong();
   private AtomicLong maxAllocatedLogSequenceNumber = new AtomicLong();
   private static final int SEQUENCE_NUM_ALLOC_COUNT = 100000;
+  private String currFilename;
+  private String sliceFilename;
+  private boolean shouldSlice = false;
+  private boolean didSlice = false;
 
   public LogManager(DatabaseServer databaseServer) {
     this.databaseServer = databaseServer;
@@ -110,6 +115,86 @@ public class LogManager {
     return countLogged.get();
   }
 
+  public String sliceLogs() {
+    shouldSlice = true;
+    while (!didSlice) {
+      try {
+        Thread.sleep(1000);
+      }
+      catch (InterruptedException e) {
+        throw new DatabaseException(e);
+      }
+    }
+    return sliceFilename;
+  }
+
+  public void deleteLogs() {
+    File dir = getLogReplicaDir();
+    try {
+      FileUtils.deleteDirectory(dir);
+      dir.mkdirs();
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+
+  }
+
+  public void backupFileSystem(String directory, String subDirectory, String logSlicePoint) {
+    try {
+      File dataRootDir = getLogReplicaDir();
+
+      File[] files = dataRootDir.listFiles();
+      if (files != null) {
+        Arrays.sort(files, new Comparator<File>() {
+          @Override
+          public int compare(File o1, File o2) {
+            return o1.getAbsolutePath().compareTo(o2.getAbsolutePath());
+          }
+        });
+        File destDir = new File(directory, subDirectory);
+        for (File file : files) {
+          if (file.getAbsolutePath().equals(logSlicePoint)) {
+            break;
+          }
+          File destFile = new File(destDir, file.getName());
+          FileUtils.copyFile(file, destFile);
+        }
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public void restoreFileSystem(String directory, String subDirectory) {
+    try {
+      File destDir = getLogReplicaDir();
+      File srcDir = new File(directory, subDirectory);
+
+      FileUtils.copyDirectory(srcDir, destDir);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public void backupAWS(String bucket, String prefix, String subDirectory) {
+    AWSClient awsClient = server.getAWSClient();
+    File srcDir = getLogReplicaDir();
+    subDirectory += "/queue/" + server.getShard() + "/" + server.getReplica();
+
+    awsClient.uploadDirectory(bucket, prefix, subDirectory, srcDir);
+  }
+
+  public void restoreAWS(String bucket, String prefix, String subDirectory) {
+    AWSClient awsClient = server.getAWSClient();
+    File destDir = getLogReplicaDir();
+    subDirectory += "/queue/" + server.getShard() + "/" + server.getReplica();
+
+    awsClient.downloadDirectory(bucket, prefix, subDirectory, destDir);
+  }
+
   private static class QueueEntry {
     private String command;
     private byte[] body;
@@ -166,10 +251,11 @@ public class LogManager {
 //              break;
 //            }
           }
-          if (writer == null || System.currentTimeMillis() - 2 * 60 * 100 > currQueueTime) {
+          if (shouldSlice || writer == null || System.currentTimeMillis() - 2 * 60 * 100 > currQueueTime) {
             if (writer != null) {
               writer.close();
             }
+            sliceFilename = currFilename;
             String directory = getLogRoot();
             currQueueTime = System.currentTimeMillis();
             File dataRootDir = new File(directory);
@@ -177,7 +263,9 @@ public class LogManager {
             String dt = DatabaseServer.format8601(new Date(System.currentTimeMillis()));
             dt = dt.replace(':', '_');
             File newFile = new File(dataRootDir, offset + "-" + dt + ".bin");
+            currFilename = newFile.getAbsolutePath();
             writer = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(newFile), 102400));
+            shouldSlice = false;
           }
 
           for (DatabaseServer.LogRequest request : requests) {
@@ -209,7 +297,7 @@ public class LogManager {
   }
 
   private String getLogRoot() {
-    return new File(server.getDataDir(), "queue/" + server.getShard() + "/" + server.getReplica()).getAbsolutePath();
+    return getLogReplicaDir().getAbsolutePath();
   }
 
   public void bindQueues() {
@@ -225,7 +313,7 @@ public class LogManager {
     unbindQueues();
     try {
 
-      String dataRoot = new File(server.getDataDir(), "queue/" + server.getShard() + "/" + server.getReplica()).getAbsolutePath();
+      String dataRoot = getLogReplicaDir().getAbsolutePath();
       File dataRootDir = new File(dataRoot);
       dataRootDir.mkdirs();
 
@@ -241,6 +329,10 @@ public class LogManager {
     finally {
       bindQueues();
     }
+  }
+
+  private File getLogReplicaDir() {
+    return new File(server.getDataDir(), "queue/" + server.getShard() + "/" + server.getReplica());
   }
 
   class LogSource {

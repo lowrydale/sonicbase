@@ -1,9 +1,10 @@
 package com.sonicbase.server;
 
+import com.sonicbase.common.AWSClient;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.Logger;
 import com.sonicbase.index.Index;
-import com.sonicbase.index.Index;
+import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.DataUtil;
@@ -18,6 +19,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class SnapshotManager {
 
@@ -35,6 +37,7 @@ public class SnapshotManager {
   private long lastSnapshot = -1;
   private ConcurrentHashMap<Integer, Integer> lockedSnapshots = new ConcurrentHashMap<Integer, Integer>();
   private boolean enableSnapshot = true;
+  private boolean pauseSnapshotRolling;
 
   public SnapshotManager(DatabaseServer databaseServer) {
     this.server = databaseServer;
@@ -46,7 +49,7 @@ public class SnapshotManager {
   }
 
   public String lockSnapshot(String dbName) {
-    String dataRoot = new File(server.getDataDir(), SNAPSHOT_STR + server.getShard() + "/" + server.getReplica() + "/" + dbName).getAbsolutePath();
+    String dataRoot = getSnapshotRootDir(dbName);
     File dataRootDir = new File(dataRoot);
     dataRootDir.mkdirs();
 
@@ -138,7 +141,7 @@ public class SnapshotManager {
     try {
       server.purge(dbName);
 
-      String dataRoot = new File(server.getDataDir(), SNAPSHOT_STR + server.getShard() + "/" + server.getReplica() + "/" + dbName).getAbsolutePath();
+      String dataRoot = getSnapshotRootDir(dbName);
       File dataRootDir = new File(dataRoot);
       dataRootDir.mkdirs();
       int highestSnapshot = getHighestSafeSnapshotVersion(dataRootDir);
@@ -285,32 +288,50 @@ public class SnapshotManager {
     }
   }
 
-  public void runSnapshotLoop() {
+  private File getSnapshotReplicaDir() {
+    return new File(server.getDataDir(), SNAPSHOT_STR + server.getShard() + "/" + server.getReplica());
+  }
+  private String getSnapshotRootDir(String dbName) {
+    return new File(getSnapshotReplicaDir(), dbName).getAbsolutePath();
+  }
 
-    while (true) {
-      try {
-        if (lastSnapshot != -1) {
-          long timeToWait = 30 * 1000 - (System.currentTimeMillis() - lastSnapshot);
-          if (timeToWait > 0) {
-            Thread.sleep(timeToWait);
+  Thread snapshotThread = null;
+  public void runSnapshotLoop() {
+    snapshotThread = new Thread(new Runnable(){
+      @Override
+      public void run() {
+        try {
+          while (true) {
+            try {
+              if (lastSnapshot != -1) {
+                long timeToWait = 30 * 1000 - (System.currentTimeMillis() - lastSnapshot);
+                if (timeToWait > 0) {
+                  Thread.sleep(timeToWait);
+                }
+              }
+              else {
+                Thread.sleep(10000);
+              }
+              while (!enableSnapshot) {
+                Thread.sleep(1000);
+              }
+
+              List<String> dbNames = server.getDbNames(server.getDataDir());
+              for (String dbName : dbNames) {
+                runSnapshot(dbName);
+              }
+            }
+            catch (Exception e) {
+              logger.error("Error creating snapshot", e);
+            }
           }
         }
-        else {
-          Thread.sleep(10000);
-        }
-        while (!enableSnapshot) {
-          Thread.sleep(1000);
-        }
-
-        List<String> dbNames = server.getDbNames(server.getDataDir());
-        for (String dbName : dbNames) {
-          runSnapshot(dbName);
+        finally {
+          snapshotThread = null;
         }
       }
-      catch (Exception e) {
-        logger.error("Error creating snapshot", e);
-      }
-    }
+    });
+    snapshotThread.start();
   }
 
   public void runSnapshot(String dbName) throws IOException, InterruptedException, ParseException {
@@ -321,7 +342,7 @@ public class SnapshotManager {
     logger.info("Snapshot - begin");
 
     //todo: may want to gzip this
-    String dataRoot = new File(server.getDataDir(), SNAPSHOT_STR + server.getShard() + "/" + server.getReplica() + "/" + dbName).getAbsolutePath();
+    String dataRoot = getSnapshotRootDir(dbName);
     File dataRootDir = new File(dataRoot);
     dataRootDir.mkdirs();
     int highestSnapshot = getHighestUnsafeSnapshotVersion(dataRootDir);
@@ -417,6 +438,11 @@ public class SnapshotManager {
     }
 
     File snapshotDir = new File(dataRoot, String.valueOf(highestSnapshot + 1));
+
+    while (pauseSnapshotRolling) {
+      Thread.sleep(10000);
+    }
+
     file.renameTo(snapshotDir);
 
     deleteOldSnapshots(dbName);
@@ -432,7 +458,7 @@ public class SnapshotManager {
   }
 
   private void deleteOldSnapshots(String dbName) throws IOException, InterruptedException, ParseException {
-    String dataRoot = new File(server.getDataDir(), SNAPSHOT_STR + server.getShard() + "/" + server.getReplica() + "/" + dbName).getAbsolutePath();
+    String dataRoot = getSnapshotRootDir(dbName);
     File dataRootDir = new File(dataRoot);
     dataRootDir.mkdirs();
     int highestSnapshot = getHighestSafeSnapshotVersion(dataRootDir);
@@ -458,6 +484,71 @@ public class SnapshotManager {
 
   public void enableSnapshot(boolean enable) {
     this.enableSnapshot = enable;
+    if (!enable) {
+      snapshotThread.interrupt();
+    }
+    else {
+      if (snapshotThread == null) {
+        runSnapshotLoop();
+      }
+    }
+  }
+
+  public void pauseSnapshotRolling(boolean pause) {
+    this.pauseSnapshotRolling = pause;
+  }
+
+  public void deleteSnapshots() {
+    File dir = getSnapshotReplicaDir();
+    try {
+      FileUtils.deleteDirectory(dir);
+      dir.mkdirs();
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public void backupFileSystem(String directory, String subDirectory) {
+    try {
+      File file = new File(directory, subDirectory);
+      file = new File(file, SNAPSHOT_STR + server.getShard() + "/" + server.getReplica());
+      FileUtils.deleteDirectory(file);
+      file.mkdirs();
+
+      FileUtils.copyDirectory(getSnapshotReplicaDir(), file);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public void restoreFileSystem(String directory, String subDirectory) {
+    try {
+      File file = new File(directory, subDirectory);
+      file = new File(file, SNAPSHOT_STR + server.getShard() + "/" + server.getReplica());
+
+      FileUtils.copyDirectory(file, getSnapshotReplicaDir());
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public void backupAWS(String bucket, String prefix, String subDirectory) {
+    AWSClient awsClient = server.getAWSClient();
+    File srcDir = getSnapshotReplicaDir();
+    subDirectory += "/" + SNAPSHOT_STR + server.getShard() + "/" + server.getReplica();
+
+    awsClient.uploadDirectory(bucket, prefix, subDirectory, srcDir);
+  }
+
+  public void restoreAWS(String bucket, String prefix, String subDirectory) {
+    AWSClient awsClient = server.getAWSClient();
+    File destDir = getSnapshotReplicaDir();
+    subDirectory += "/" + SNAPSHOT_STR + server.getShard() + "/" + server.getReplica();
+
+    awsClient.downloadDirectory(bucket, prefix, subDirectory, destDir);
   }
 
   private class ByteCounterStream extends InputStream {

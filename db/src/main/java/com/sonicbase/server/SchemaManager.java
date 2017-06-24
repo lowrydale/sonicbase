@@ -144,7 +144,7 @@ public class SchemaManager {
       if (masterSlave.equals("master")) {
         for (int i = 0; i < server.getShardCount(); i++) {
           command = command.replace(":master", ":slave");
-          server.getDatabaseClient().send(null, i, 0, command, body, DatabaseClient.Replica.all);
+          server.getDatabaseClient().send(null, i, 0, command, body, DatabaseClient.Replica.def);
         }
         server.pushSchema();
       }
@@ -180,7 +180,7 @@ public class SchemaManager {
         for (int i = 0; i < server.getShardCount(); i++) {
 
           command = command.replace(":master", ":slave");
-          byte[] ret = server.getDatabaseClient().send(null, i, rand.nextLong(), command, body, DatabaseClient.Replica.all);
+          byte[] ret = server.getDatabaseClient().send(null, i, rand.nextLong(), command, body, DatabaseClient.Replica.def);
         }
         server.pushSchema();
       }
@@ -209,7 +209,7 @@ public class SchemaManager {
     try {
       ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
       DataInputStream in = new DataInputStream(bytesIn);
-      server.getCommon().deserializeSchema(server.getCommon(), in);
+      server.getCommon().deserializeSchema(in);
       String tableName = in.readUTF();
       TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
       Map<String, IndexSchema> indices = tableSchema.getIndexes();
@@ -316,7 +316,7 @@ public class SchemaManager {
 
           command = "DatabaseServer:createTableSlave:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION +
               ":1:" + dbName + ":slave";
-          server.getDatabaseClient().send(null, i, rand.nextLong(), command, bytesOut.toByteArray(), DatabaseClient.Replica.all);
+          server.getDatabaseClient().send(null, i, rand.nextLong(), command, bytesOut.toByteArray(), DatabaseClient.Replica.def);
         }
       }
 
@@ -412,7 +412,7 @@ public class SchemaManager {
       }
 
       DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
-      server.getCommon().deserializeSchema(server.getCommon(), in);
+      server.getCommon().deserializeSchema(in);
       server.getCommon().saveSchema(server.getDataDir());
 
       String tableName = in.readUTF();
@@ -505,7 +505,7 @@ public class SchemaManager {
        }
 
        DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
-       server.getCommon().deserializeSchema(server.getCommon(), in);
+       server.getCommon().deserializeSchema(in);
        server.getCommon().saveSchema(server.getDataDir());
 
        String tableName = in.readUTF();

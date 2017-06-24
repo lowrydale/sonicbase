@@ -55,7 +55,7 @@ public class Logger {
 
               String command = "DatabaseServer:logError:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
                   error.client.getCommon().getSchemaVersion();
-              byte[] ret = error.client.send(null, 0, 0, command, body, DatabaseClient.Replica.master);
+              byte[] ret = error.client.sendToMaster(command, body);
 
             }
             catch (InterruptedException e) {

@@ -1,6 +1,5 @@
 package com.sonicbase.common;
 
-import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.*;
 import com.sonicbase.server.DatabaseServer;
@@ -41,6 +40,8 @@ public class DatabaseCommon {
   private DatabaseServer.ServersConfig serversConfig;
   private int schemaVersion;
   private boolean haveProLicense;
+  private int[] masterReplicas;
+  private boolean[][] deadNodes;
 
   public Lock getSchemaReadLock(String dbName) {
     return schemaReadLock.get(dbName);
@@ -70,7 +71,7 @@ public class DatabaseCommon {
         logger.info("Loading schema: file=" + schemaFile.getAbsolutePath());
         if (schemaFile.exists()) {
           try (DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(schemaFile)))) {
-            deserializeSchema(this, in);
+            deserializeSchema(in);
           }
         }
         else {
@@ -125,7 +126,7 @@ public class DatabaseCommon {
   public void serializeSchema(DataOutputStream out, int serializationVersionNumber) throws IOException {
     DataUtil.writeVLong(out, serializationVersionNumber);
     out.writeInt(this.schemaVersion);
-    if (serializationVersionNumber >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION) {
+    if (serializationVersionNumber >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION_21) {
       out.writeBoolean(haveProLicense);
     }
     if (serversConfig == null) {
@@ -133,17 +134,19 @@ public class DatabaseCommon {
     }
     else {
       out.writeBoolean(true);
-      out.write(serializeConfig());
+      out.write(serializeConfig(serializationVersionNumber));
     }
     out.writeInt(schema.keySet().size());
-    for (String dbName : schema.keySet()) {
-      getSchemaReadLock(dbName).lock();
-      try {
-        out.writeUTF(dbName);
-        serializeSchema(dbName, out);
-      }
-      finally {
-        getSchemaReadLock(dbName).unlock();
+    synchronized (this) {
+      for (String dbName : schema.keySet()) {
+       // getSchemaReadLock(dbName).lock();
+        try {
+          out.writeUTF(dbName);
+          serializeSchema(dbName, out);
+        }
+        finally {
+     //     getSchemaReadLock(dbName).unlock();
+        }
       }
     }
   }
@@ -171,12 +174,12 @@ public class DatabaseCommon {
     schema.get(dbName).serialize(out);
   }
 
-  public void deserializeSchema(DatabaseCommon common, DataInputStream in) {
+  public void deserializeSchema(DataInputStream in) {
 
     try {
       long serializationVersion = DataUtil.readVLong(in);
       this.schemaVersion = in.readInt();
-      if (serializationVersion >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION) {
+      if (serializationVersion >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION_21) {
         this.haveProLicense = in.readBoolean();
       }
       if (in.readBoolean()) {
@@ -190,8 +193,9 @@ public class DatabaseCommon {
 //        }
         try {
           Schema newSchema = new Schema();
-          newSchema.deserialize(common, in);
+          newSchema.deserialize(in);
           schema.put(dbName, newSchema);
+          createSchemaLocks(dbName);
         }
         finally {
 //          if (common.getSchemaWriteLock(dbName) != null) {
@@ -795,6 +799,7 @@ public class DatabaseCommon {
 
   public void setServersConfig(DatabaseServer.ServersConfig serversConfig) {
     this.serversConfig = serversConfig;
+
     Integer replicaCount = null;
     DatabaseServer.Shard[] shards = serversConfig.getShards();
     for (DatabaseServer.Shard shard : shards) {
@@ -820,18 +825,18 @@ public class DatabaseCommon {
     createSchemaLocks(dbName);
   }
 
-  public byte[] serializeConfig() throws IOException {
+  public byte[] serializeConfig(int serializationVersionNumber) throws IOException {
     ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
     DataOutputStream out = new DataOutputStream(bytesOut);
     DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-    serversConfig.serialize(out);
+    serversConfig.serialize(out, serializationVersionNumber);
     out.close();
     return bytesOut.toByteArray();
   }
 
   public void deserializeConfig(DataInputStream in) throws IOException {
     long serializationVersion = DataUtil.readVLong(in);
-    serversConfig = new DatabaseServer.ServersConfig(in);
+    serversConfig = new DatabaseServer.ServersConfig(in, serializationVersion);
   }
 
   public void loadServersConfig(String dataDir) throws IOException {
@@ -861,7 +866,7 @@ public class DatabaseCommon {
       configFile.getParentFile().mkdirs();
       try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(configFile)))) {
         DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-        out.write(serializeConfig());
+        out.write(serializeConfig(SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION));
       }
     }
   }
@@ -909,4 +914,5 @@ public class DatabaseCommon {
   public boolean haveProLicense() {
     return haveProLicense;
   }
+
 }

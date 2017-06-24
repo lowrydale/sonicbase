@@ -2,10 +2,10 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>SonicBase - Monitoring</title>
+<title>SonicBase - License Server</title>
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="SonicBase provides monitoring tools to give you insite into your SonicBase cluster.">
+    <meta name="description" content="SonicBase license server is use to monitor and manage licenses for the pro version of SonicBase.">
     <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
     <script type="text/javascript" src="../javascript/main.js"></script>
 </head>
@@ -33,7 +33,39 @@
 
 
     <div style="margin-left: 4em;">
+        <h1>License Server</h1>
+        To run the Pro version of SonicBase, you must run a license server. That license server must be reachable from
+        all your database servers and it must be able to reach SonicBase.com on port 443. There is one license server
+        for all your clusters.
 
+        <h1>Account Key</h1>
+        You must obtain your account key from the licenses page on sonicbase.com. This is the page that loads after you
+        login. Make sure you keep the key private. Save the account key to the following file on the machine that hosts the license server: <br/>
+        <br/>
+        &lt;installDir&gt;/keys/sonicbase-account-key.
+
+        <h1>Configuration</h1>
+        To configure the license server, you must create a file named "config-license-server.json" in the config directory.
+        Below is an example of the contents of the config file.<br/>
+        {<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;"installDirectory": "$HOME/sonicbase",<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;"user": "ubuntu",<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;"server": {<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"publicAddress": "localhost",<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"privateAddress": "localhost",<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"port": 8443<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+        }<br/>
+
+        <h1>Commands</h1>
+        <h3>deploy license server</h3>
+        From the administration client, type "deploy license server" to deploy code to the license server. Note that this
+        isn't available in Windows.
+        <h3>start license server</h3>
+        From the administration client, type "start license server" to start the license server.
+        <h4>stop license server</h4>
+        From the administration client, type "stop license server" to stop the license server.<br/>
+        <br/>
         If you purchase additional licenses, they will not show up immediately for your clusters because the cluster
         polls the main license server every hour. You will need to restart the license server.
     </div>

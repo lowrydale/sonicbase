@@ -17,7 +17,6 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.GZIPInputStream;
 
 /**
@@ -26,6 +25,8 @@ import java.util.zip.GZIPInputStream;
 public class LogManager {
 
   private static final String UTF8_STR = "utf-8";
+  private final List<LogProcessor> logProcessors = new ArrayList<>();
+  private final List<LogProcessor> peerLogProcessors = new ArrayList<>();
   private Logger logger;
   private final DatabaseServer databaseServer;
   private final ThreadPoolExecutor executor;
@@ -33,6 +34,7 @@ public class LogManager {
   private AtomicLong countLogged = new AtomicLong();
   private final DatabaseServer server;
   private ArrayBlockingQueue<DatabaseServer.LogRequest> logRequests = new ArrayBlockingQueue<>(1000);
+  private Map<Integer, ArrayBlockingQueue<DatabaseServer.LogRequest>> peerLogRequests = new ConcurrentHashMap<>();
   private AtomicBoolean unbindQueues = new AtomicBoolean();
   private final Object logLock = new Object();
   private AtomicLong logSequenceNumber = new AtomicLong();
@@ -45,48 +47,85 @@ public class LogManager {
 
   public LogManager(DatabaseServer databaseServer) {
     this.databaseServer = databaseServer;
+    this.server = databaseServer;
     logger = new Logger(databaseServer.getDatabaseClient());
     executor = new ThreadPoolExecutor(64, 64, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
     synchronized (this) {
       try {
-        File file = new File(databaseServer.getDataDir(), "logSequenceNum/" + databaseServer.getShard() + "/" + databaseServer.getReplica() + "/logSequenceNum.txt");
-        file.getParentFile().mkdirs();
-        if (!file.exists() || file.length() == 0) {
-          logSequenceNumber.set(0);
-          maxAllocatedLogSequenceNumber.set(SEQUENCE_NUM_ALLOC_COUNT);
-          try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
-            writer.write(String.valueOf(maxAllocatedLogSequenceNumber.get()));
-          }
-        }
-        else {
-          try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
-            String seq = null;
-            try {
-              seq = StreamUtils.readerToString(reader);
-              seq = seq.trim();
-              logSequenceNumber.set(Long.valueOf(seq));
-            }
-            catch (Exception e) {
-              logSequenceNumber.set(0);
-              logger.error("Error reading log sequence number: value=" + seq, e);
-            }
-            maxAllocatedLogSequenceNumber.set(logSequenceNumber.get() + SEQUENCE_NUM_ALLOC_COUNT);
-            try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
-              writer.write(String.valueOf(maxAllocatedLogSequenceNumber.get()));
-            }
-          }
-        }
+        skipToMaxSequenceNumber();
       }
       catch (IOException e) {
         throw new DatabaseException(e);
       }
     }
-    this.server = databaseServer;
     int logThreadCount = 1;//64;
     for (int i = 0; i < logThreadCount; i++) {
-      Thread thread = new Thread(new LogProcessor(i, logRequests, server.getDataDir(), server.getShard(), server.getReplica()));
+      LogProcessor logProcessor = new LogProcessor(i, -1, logRequests, server.getDataDir(), server.getShard(), server.getReplica());
+      logProcessors.add(logProcessor);
+      Thread thread = new Thread(logProcessor);
       thread.start();
+    }
+  }
+
+  public void startLoggingForPeer(int replicaNum) {
+    synchronized (peerLogRequests) {
+      if (!peerLogRequests.containsKey(replicaNum)) {
+        peerLogRequests.put(replicaNum, new ArrayBlockingQueue<DatabaseServer.LogRequest>(1000));
+        LogProcessor logProcessor = new LogProcessor(0, replicaNum, peerLogRequests.get(replicaNum), server.getDataDir(), server.getShard(), server.getReplica());
+        peerLogProcessors.add(logProcessor);
+        Thread thread = new Thread(logProcessor);
+        thread.start();
+      }
+    }
+  }
+
+  public void skipToMaxSequenceNumber() throws IOException {
+    File file = new File(databaseServer.getDataDir(), "logSequenceNum/" + databaseServer.getShard() + "/" + databaseServer.getReplica() + "/logSequenceNum.txt");
+    file.getParentFile().mkdirs();
+    if (!file.exists() || file.length() == 0) {
+      logSequenceNumber.set(0);
+      maxAllocatedLogSequenceNumber.set(SEQUENCE_NUM_ALLOC_COUNT);
+      try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
+        writer.write(String.valueOf(maxAllocatedLogSequenceNumber.get()));
+      }
+    }
+    else {
+      try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
+        String seq = null;
+        try {
+          seq = StreamUtils.readerToString(reader);
+          seq = seq.trim();
+          logSequenceNumber.set(Long.valueOf(seq));
+        }
+        catch (Exception e) {
+          logSequenceNumber.set(0);
+          logger.error("Error reading log sequence number: value=" + seq, e);
+        }
+        maxAllocatedLogSequenceNumber.set(logSequenceNumber.get() + SEQUENCE_NUM_ALLOC_COUNT);
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
+          writer.write(String.valueOf(maxAllocatedLogSequenceNumber.get()));
+        }
+      }
+      pushMaxSequenceNum();
+    }
+  }
+
+  public byte[] setMaxSequenceNum(String command, byte[] body) {
+    try {
+      String[] parts = command.split(":");
+      long sequenceNum = Long.valueOf(parts[6]);
+
+      maxAllocatedLogSequenceNumber.set(sequenceNum);
+      File file = new File(databaseServer.getDataDir(), "logSequenceNum/" + databaseServer.getShard() + "/" + databaseServer.getReplica() + "/logSequenceNum.txt");
+      file.getParentFile().mkdirs();
+      try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
+        writer.write(String.valueOf(maxAllocatedLogSequenceNumber.get()));
+      }
+      return null;
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
     }
   }
 
@@ -99,8 +138,24 @@ public class LogManager {
         try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
           writer.write(String.valueOf(maxAllocatedLogSequenceNumber.get()));
         }
+        pushMaxSequenceNum();
       }
       return logSequenceNumber.incrementAndGet();
+    }
+  }
+
+  void pushMaxSequenceNum() {
+    for (int replica = 0; replica < server.getReplicationFactor(); replica++) {
+      if (replica != server.getReplica()) {
+        try {
+          String command = "DatabaseServer:setMaxSequenceNum:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+              server.getCommon().getSchemaVersion() + ":__none__:" + maxAllocatedLogSequenceNumber.get();
+          server.getClient().send(null, server.getShard(), replica, command, null, DatabaseClient.Replica.specified, true);
+        }
+        catch (Exception e) {
+          logger.error("Error setting maxSequenceNum: shard=" + server.getShard() + ", replica=" + replica);
+        }
+      }
     }
   }
 
@@ -116,16 +171,30 @@ public class LogManager {
   }
 
   public String sliceLogs() {
-    shouldSlice = true;
-    while (!didSlice) {
-      try {
-        Thread.sleep(1000);
+    try {
+      File dataRootDir = getLogReplicaDir();
+      dataRootDir = new File(dataRootDir, "self");
+
+      StringBuilder sliceFiles = new StringBuilder();
+      File[] files = dataRootDir.listFiles();
+      if (files != null) {
+        for (File file : files) {
+          sliceFiles.append(file.getAbsolutePath()).append("\n");
+        }
       }
-      catch (InterruptedException e) {
-        throw new DatabaseException(e);
+      for (LogProcessor logProcessor : logProcessors) {
+        logProcessor.closeAndCreateLog();
       }
+
+      for (LogProcessor logProcessor : peerLogProcessors) {
+        logProcessor.closeAndCreateLog();
+      }
+
+      return sliceFiles.toString();
     }
-    return sliceFilename;
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
   }
 
   public void deleteLogs() {
@@ -143,22 +212,25 @@ public class LogManager {
   public void backupFileSystem(String directory, String subDirectory, String logSlicePoint) {
     try {
       File dataRootDir = getLogReplicaDir();
+      dataRootDir = new File(dataRootDir, "self");
 
       File[] files = dataRootDir.listFiles();
       if (files != null) {
-        Arrays.sort(files, new Comparator<File>() {
-          @Override
-          public int compare(File o1, File o2) {
-            return o1.getAbsolutePath().compareTo(o2.getAbsolutePath());
-          }
-        });
-        File destDir = new File(directory, subDirectory);
-        for (File file : files) {
-          if (file.getAbsolutePath().equals(logSlicePoint)) {
+        Set<String> sliceFiles = new HashSet<>();
+        BufferedReader reader = new BufferedReader(new StringReader(logSlicePoint));
+        while (true) {
+          String line = reader.readLine();
+          if (line == null) {
             break;
           }
-          File destFile = new File(destDir, file.getName());
-          FileUtils.copyFile(file, destFile);
+          sliceFiles.add(line);
+        }
+        File destDir = new File(directory, subDirectory);
+        for (File file : files) {
+          if (sliceFiles.contains(file.getAbsolutePath())) {
+            File destFile = new File(destDir, file.getName());
+            FileUtils.copyFile(file, destFile);
+          }
         }
       }
     }
@@ -195,6 +267,90 @@ public class LogManager {
     awsClient.downloadDirectory(bucket, prefix, subDirectory, destDir);
   }
 
+  public void sendLogsToPeer(int replicaNum) {
+    try {
+      DatabaseClient client = server.getClient();
+      File[] files = new File(getLogRoot() + "/peer-" + replicaNum).listFiles();
+      if (files != null) {
+        for (File file : files) {
+          byte[] bytes = StreamUtils.inputStreamToBytes(new BufferedInputStream(new FileInputStream(file)));
+          ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+          DataOutputStream out = new DataOutputStream(bytesOut);
+          out.writeInt(server.getReplica());
+          out.writeUTF(file.getName());
+          out.writeInt(bytes.length);
+          out.write(bytes);
+          out.close();
+          String command = "DatabaseServer:sendQueueFile:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+              server.getCommon().getSchemaVersion() + ":__none__";
+          client.send(null, server.getShard(), replicaNum, command, bytesOut.toByteArray(), DatabaseClient.Replica.specified, true);
+        }
+        deletePeerLogs(replicaNum);
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+  public void deletePeerLogs(int replicaNum) {
+
+    File[] files = new File(getLogRoot() + "/peer-" + replicaNum).listFiles();
+    if (files != null) {
+      for (File file : files) {
+        file.delete();
+      }
+    }
+  }
+
+  public void logRequestForPeer(String command, byte[] body, int deadReplica) {
+    startLoggingForPeer(deadReplica);
+
+    try {
+      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+      DataOutputStream out = new DataOutputStream(bytesOut);
+      byte[] buffer = command.getBytes(UTF8_STR);
+
+      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+      DataUtil.writeVLong(out, getNextSequencenNum(), resultLength);
+      out.writeInt(buffer.length);
+      out.write(buffer);
+      out.writeInt(body == null ? 0 : body.length);
+      if (body != null && body.length != 0) {
+        out.write(body);
+      }
+      DatabaseServer.LogRequest request = new DatabaseServer.LogRequest(1);
+      request.setBuffer(bytesOut.toByteArray());
+      peerLogRequests.get(deadReplica).put(request);
+      request.getLatch().await();
+    }
+    catch (InterruptedException | IOException e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public void receiveExternalLog(int peerReplica, String filename, byte[] bytes) {
+    try {
+      String directory = getLogRoot();
+      File dataRootDir = new File(directory);
+      dataRootDir.mkdirs();
+      File file = new File(dataRootDir, "self/peer-" + peerReplica + "-" + filename);
+      try (BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(file))) {
+        out.write(bytes);
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public boolean hasLogsForPeer(int replica) {
+    File[] files = new File(getLogRoot() + "/peer-" + replica).listFiles();
+    if (files != null) {
+      return files.length > 0;
+    }
+    return false;
+  }
+
   private static class QueueEntry {
     private String command;
     private byte[] body;
@@ -209,17 +365,20 @@ public class LogManager {
 
   public class LogProcessor implements Runnable {
     private final int offset;
-    private final ArrayBlockingQueue<DatabaseServer.LogRequest> logRequests;
+    private final ArrayBlockingQueue<DatabaseServer.LogRequest> currLogRequests;
     private final String dataDir;
     private final int shard;
     private final int replica;
+    private final int peerReplicaNum;
     private long currQueueTime = 0;
     private DataOutputStream writer = null;
 
     public LogProcessor(
-        int offset, ArrayBlockingQueue<DatabaseServer.LogRequest> logRequests, String dataDir, int shard, int replica) {
+        int offset, int peerReplicaNum, ArrayBlockingQueue<DatabaseServer.LogRequest> logRequests,
+        String dataDir, int shard, int replica) {
       this.offset = offset;
-      this.logRequests = logRequests;
+      this.peerReplicaNum = peerReplicaNum;
+      this.currLogRequests = logRequests;
       this.dataDir = dataDir;
       this.shard = shard;
       this.replica = replica;
@@ -231,7 +390,7 @@ public class LogManager {
         try {
           List<DatabaseServer.LogRequest> requests = new ArrayList<>();
           while (true) {
-            DatabaseServer.LogRequest request = logRequests.poll(30000, TimeUnit.MILLISECONDS);
+            DatabaseServer.LogRequest request = currLogRequests.poll(30000, TimeUnit.MILLISECONDS);
             if (request == null) {
               Thread.sleep(0, 50000);
             }
@@ -251,38 +410,27 @@ public class LogManager {
 //              break;
 //            }
           }
-          if (shouldSlice || writer == null || System.currentTimeMillis() - 2 * 60 * 100 > currQueueTime) {
-            if (writer != null) {
-              writer.close();
+          synchronized (this) {
+            if (shouldSlice || writer == null || System.currentTimeMillis() - 2 * 60 * 100 > currQueueTime) {
+              closeAndCreateLog();
             }
-            sliceFilename = currFilename;
-            String directory = getLogRoot();
-            currQueueTime = System.currentTimeMillis();
-            File dataRootDir = new File(directory);
-            dataRootDir.mkdirs();
-            String dt = DatabaseServer.format8601(new Date(System.currentTimeMillis()));
-            dt = dt.replace(':', '_');
-            File newFile = new File(dataRootDir, offset + "-" + dt + ".bin");
-            currFilename = newFile.getAbsolutePath();
-            writer = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(newFile), 102400));
-            shouldSlice = false;
-          }
 
-          for (DatabaseServer.LogRequest request : requests) {
-            if (request.getBuffers() != null) {
-              writer.writeInt(request.getBuffers().size());
-              for (byte[] buffer : request.getBuffers()) {
+            for (DatabaseServer.LogRequest request : requests) {
+              if (request.getBuffers() != null) {
+                writer.writeInt(request.getBuffers().size());
+                for (byte[] buffer : request.getBuffers()) {
+                  countLogged.incrementAndGet();
+                  writer.write(buffer);
+                }
+              }
+              else {
+                writer.writeInt(1);
+                writer.write(request.getBuffer());
                 countLogged.incrementAndGet();
-                writer.write(buffer);
               }
             }
-            else {
-              writer.writeInt(1);
-              writer.write(request.getBuffer());
-              countLogged.incrementAndGet();
-            }
+            writer.flush();
           }
-          writer.flush();
 
           for (DatabaseServer.LogRequest request : requests) {
             request.getLatch().countDown();
@@ -291,6 +439,32 @@ public class LogManager {
         catch (Exception t) {
           logger.error("Error processing log requests", t);
         }
+      }
+    }
+
+    private void closeAndCreateLog() throws IOException, ParseException {
+      synchronized (this) {
+        if (writer != null) {
+          writer.close();
+        }
+        sliceFilename = currFilename;
+        String directory = getLogRoot();
+        currQueueTime = System.currentTimeMillis();
+        File dataRootDir = new File(directory);
+        dataRootDir.mkdirs();
+        String dt = DatabaseServer.format8601(new Date(System.currentTimeMillis()));
+        dt = dt.replace(':', '_');
+        File newFile = null;
+        if (peerReplicaNum == -1) {
+          newFile = new File(dataRootDir, "/self/" + offset + "-" + dt + ".bin");
+        }
+        else {
+          newFile = new File(dataRootDir.getAbsolutePath() + "/peer-" + peerReplicaNum, offset + "-" + dt + ".bin");
+        }
+        newFile.getParentFile().mkdirs();
+        currFilename = newFile.getAbsolutePath();
+        writer = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(newFile), 102400));
+        shouldSlice = false;
       }
     }
 
@@ -314,11 +488,25 @@ public class LogManager {
     try {
 
       String dataRoot = getLogReplicaDir().getAbsolutePath();
-      File dataRootDir = new File(dataRoot);
+      File dataRootDir = new File(dataRoot, "self");
       dataRootDir.mkdirs();
 
       long begin = System.currentTimeMillis();
-      replayQueues(dataRootDir);
+      for (int replica = 0; replica < server.getReplicationFactor(); replica++) {
+        if (replica != server.getReplica()) {
+          try {
+            String command = "DatabaseServer:sendLogsToPeer:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+                server.getCommon().getSchemaVersion() + ":__none__:" + server.getReplica();
+            server.getClient().send(null, server.getShard(), replica, command, null, DatabaseClient.Replica.specified);
+          }
+          catch (Exception e) {
+            logger.error("Error getting logs from peer: replica=" + replica, e);
+          }
+        }
+      }
+
+      replayQueues(dataRootDir, null, false, false);
+
       long end = System.currentTimeMillis();
 
       logger.info("Finished replaying queue: duration=" + (end - begin));
@@ -436,19 +624,70 @@ public class LogManager {
     }
   }
 
-  private void replayQueues(File dataRootDir) throws IOException {
+  public void applyLogsFromPeers(String slicePoint) {
+    try {
+      String dataRoot = getLogReplicaDir().getAbsolutePath();
+      File dataRootDir = new File(dataRoot, "self");
+      dataRootDir.mkdirs();
+
+      replayQueues(dataRootDir, null, false, true);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public void applyLogsAfterSlice(String slicePoint) {
+    try {
+      String dataRoot = getLogReplicaDir().getAbsolutePath();
+      File dataRootDir = new File(dataRoot, "self");
+      dataRootDir.mkdirs();
+
+      replayQueues(dataRootDir, slicePoint, false, false);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  private void replayQueues(File dataRootDir, final String slicePoint, final boolean beforeSlice, boolean peerFiles) throws IOException {
     synchronized (logLock) {
       File[] files = dataRootDir.listFiles();
       if (files != null) {
         final AtomicInteger countProcessed = new AtomicInteger();
         logger.info("applyQueues - begin: fileCount=" + files.length);
         List<LogSource> sources = new ArrayList<>();
-        for (final File file : files) {
-          try {
-            sources.add(new LogSource(file));
+        Set<String> sliceFiles = new HashSet<>();
+        if (slicePoint != null) {
+          BufferedReader reader = new BufferedReader(new StringReader(slicePoint));
+          while (true) {
+            String line = reader.readLine();
+            if (line == null) {
+              break;
+            }
+            sliceFiles.add(line);
           }
-          catch (IOException e) {
-            logger.error("Error opening log source: name=" + file.getName());
+        }
+        for (File file : files) {
+          if (peerFiles) {
+            if (!file.getName().startsWith("peer")) {
+              continue;
+            }
+          }
+          if (slicePoint == null) {
+            sources.add(new LogSource(file));
+            continue;
+          }
+          if (beforeSlice) {
+            if (sliceFiles.contains(file.getAbsolutePath())) {
+              sources.add(new LogSource(file));
+            }
+          }
+
+          if (!beforeSlice) {
+            if (!sliceFiles.contains(file.getAbsolutePath())) {
+              sources.add(new LogSource(file));
+            }
           }
         }
         final long begin = System.currentTimeMillis();
@@ -531,9 +770,10 @@ public class LogManager {
 
   public DatabaseServer.LogRequest logRequests(List<NettyServer.Request> requests, boolean enableQueuing) throws IOException, InterruptedException {
     if (enableQueuing) {
-      DatabaseServer.LogRequest logRequest = null;
+      DatabaseServer.LogRequest logRequest = new DatabaseServer.LogRequest(requests.size());
       List<byte[]> serializedCommands = new ArrayList<>();
-      for (NettyServer.Request request : requests) {
+      for (int i = 0; i < requests.size(); i++) {
+        NettyServer.Request  request = requests.get(i);
         String command = request.getCommand();
         byte[] body = request.getBody();
         int pos = command.indexOf(':');
@@ -552,7 +792,9 @@ public class LogManager {
           byte[] buffer = command.getBytes(UTF8_STR);
 
           DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-          DataUtil.writeVLong(out, getNextSequencenNum(), resultLength);
+          long sequenceNumber = getNextSequencenNum();
+          logRequest.getSequenceNumbers()[i] = sequenceNumber;
+          DataUtil.writeVLong(out, sequenceNumber, resultLength);
           out.writeInt(buffer.length);
           out.write(buffer);
           out.writeInt(body == null ? 0 : body.length);
@@ -567,33 +809,40 @@ public class LogManager {
         }
       }
       if (serializedCommands.size() != 0) {
-        DatabaseServer.LogRequest request = new DatabaseServer.LogRequest();
-        request.setBuffers(serializedCommands);
-        logRequests.put(request);
-        return request;
+        logRequest.setBuffers(serializedCommands);
+        logRequests.put(logRequest);
+        return logRequest;
       }
     }
     return null;
   }
 
 
-  public DatabaseServer.LogRequest logRequest(String command, byte[] body, boolean enableQueuing, String methodStr, DatabaseServer.LogRequest request) {
+  public DatabaseServer.LogRequest logRequest(String command, byte[] body, boolean enableQueuing, String methodStr, Long existingSequenceNumber) {
+    DatabaseServer.LogRequest request = null;
     try {
       if (enableQueuing && DatabaseClient.getWriteVerbs().contains(methodStr)) {
-
+        request = new DatabaseServer.LogRequest(1);
         ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bytesOut);
         byte[] buffer = command.getBytes(UTF8_STR);
 
         DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-        DataUtil.writeVLong(out, getNextSequencenNum(), resultLength);
+        long sequenceNum = 0;
+        if (existingSequenceNumber != null) {
+          sequenceNum = existingSequenceNumber;
+        }
+        else {
+          sequenceNum = getNextSequencenNum();
+        }
+        DataUtil.writeVLong(out, sequenceNum, resultLength);
         out.writeInt(buffer.length);
         out.write(buffer);
         out.writeInt(body == null ? 0 : body.length);
         if (body != null && body.length != 0) {
           out.write(body);
         }
-        request = new DatabaseServer.LogRequest();
+        request.getSequenceNumbers()[0] = sequenceNum;
         request.setBuffer(bytesOut.toByteArray());
         logRequests.put(request);
       }
@@ -608,7 +857,7 @@ public class LogManager {
     try {
       synchronized (logLock) {
         if (lastSnapshot != -1) {
-          File[] files = new File(getLogRoot()).listFiles();
+          File[] files = new File(getLogRoot(), "self").listFiles();
           if (files != null) {
             for (File file : files) {
               String name = file.getName();

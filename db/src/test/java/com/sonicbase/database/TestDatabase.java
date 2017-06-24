@@ -204,7 +204,7 @@ public class TestDatabase {
       //    stmt.executeUpdate();
 
       while (true) {
-        byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().send(null, 0, 0, "DatabaseServer:areAllLongRunningCommandsComplete:1:test", null, DatabaseClient.Replica.master);
+        byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().sendToMaster("DatabaseServer:areAllLongRunningCommandsComplete:1:test", null);
         if (new String(bytes).equals("true")) {
           break;
         }
@@ -923,7 +923,7 @@ public class TestDatabase {
 
 
   @Test
-  public void tesSort2() throws SQLException {
+  public void testSort2() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select id, id2 from persons order by id2 asc, id asc");
     ResultSet ret = stmt.executeQuery();
 

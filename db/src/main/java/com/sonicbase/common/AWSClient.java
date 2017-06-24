@@ -1,16 +1,25 @@
 package com.sonicbase.common;
 
 import com.amazonaws.auth.BasicAWSCredentials;
+import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.services.clouddirectory.model.DeleteObjectRequest;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.s3.model.ListObjectsV2Request;
+import com.amazonaws.services.s3.model.ListObjectsV2Result;
+import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.amazonaws.services.s3.transfer.MultipleFileDownload;
 import com.amazonaws.services.s3.transfer.MultipleFileUpload;
 import com.amazonaws.services.s3.transfer.TransferManager;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.query.DatabaseException;
+import com.sonicbase.util.JsonDict;
+import com.sonicbase.util.StreamUtils;
 
 import java.io.*;
+import java.util.*;
+
+import static java.util.Arrays.asList;
 
 /**
  * Created by lowryda on 6/16/17.
@@ -19,6 +28,7 @@ public class AWSClient {
 
   private final DatabaseClient client;
   private final Logger logger;
+  private File installDir;
 
   public AWSClient(DatabaseClient client) {
     this.client = client;
@@ -26,10 +36,12 @@ public class AWSClient {
 
   }
 
-  public static TransferManager getTransferManager() {
-    File keysFile = new File(System.getProperty("user.home"), ".awskeys");
+  public TransferManager getTransferManager() {
+    File installDir = getInstallDir();
+    String cluster = client.getCluster();
+    File keysFile = new File(installDir, "/keys/" + cluster +"-awskeys");
     if (!keysFile.exists()) {
-      throw new DatabaseException(".awskeys file not found");
+      throw new DatabaseException(cluster + "-awskeys file not found");
     }
     BasicAWSCredentials awsCredentials = null;
     try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(keysFile)))) {
@@ -45,10 +57,36 @@ public class AWSClient {
     }
   }
 
-  public static AmazonS3 getS3Client() {
-    File keysFile = new File(System.getProperty("user.home"), ".awskeys");
+  private JsonDict getConfig() {
+    try {
+      String cluster = client.getCluster();
+      File file = new File(System.getProperty("user.dir"), "config/config-" + cluster + ".json");
+      if (!file.exists()) {
+        file = new File(System.getProperty("user.dir"), "db/src/main/resources/config/config-" + cluster + ".json");
+      }
+      String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(new FileInputStream(file)));
+      return new JsonDict(configStr);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public File getInstallDir() {
+    if (installDir == null) {
+      JsonDict config = getConfig();
+      String dir = config.getString("installDirectory");
+      installDir = new File(dir.replace("$HOME", System.getProperty("user.home")));
+    }
+    return installDir;
+  }
+
+  public AmazonS3 getS3Client() {
+    File installDir = getInstallDir();
+    String cluster = client.getCluster();
+    File keysFile = new File(installDir, "/keys/" + cluster +"-awskeys");
     if (!keysFile.exists()) {
-      throw new DatabaseException(".awskeys file not found");
+      throw new DatabaseException(cluster + "-awskeys file not found");
     }
     try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(keysFile)))) {
       String accessKey = reader.readLine();
@@ -65,7 +103,25 @@ public class AWSClient {
   public void deleteDirectory(String bucket, String prefix) {
     AmazonS3 s3client = getS3Client();
     try {
-      s3client.deleteObject(bucket, prefix);
+      try {
+        final ListObjectsV2Request req = new ListObjectsV2Request().withBucketName(bucket).withPrefix(prefix);
+        ListObjectsV2Result result;
+        do {
+          result = s3client.listObjectsV2(req);
+
+          for (S3ObjectSummary objectSummary :
+              result.getObjectSummaries()) {
+            String key = objectSummary.getKey();
+
+            s3client.deleteObject(bucket, key);
+          }
+          req.setContinuationToken(result.getNextContinuationToken());
+        }
+        while (result.isTruncated() == true);
+      }
+      catch (Exception e) {
+        throw new DatabaseException(e);
+      }
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -100,6 +156,43 @@ public class AWSClient {
     }
     finally {
       transferManager.shutdownNow();
+    }
+  }
+
+  public List<String> listDirectSubdirectories(String bucket, String prefix) {
+
+    List<String> dirs = new ArrayList<>();
+    AmazonS3 s3client = getS3Client();
+    try {
+      final ListObjectsV2Request req = new ListObjectsV2Request().withBucketName(bucket).withPrefix(prefix);
+      ListObjectsV2Result result;
+      do {
+        result = s3client.listObjectsV2(req);
+
+        for (S3ObjectSummary objectSummary :
+            result.getObjectSummaries()) {
+          String key = objectSummary.getKey();
+          if (key.charAt(0) == '/') {
+            key = key.substring(1);
+          }
+          int pos = key.indexOf("/");
+          if (pos != -1) {
+            key = key.substring(0, pos);
+          }
+          dirs.add(key);
+        }
+        req.setContinuationToken(result.getNextContinuationToken());
+      }
+      while (result.isTruncated() == true);
+
+      List<String> ret = new ArrayList<>();
+      for (String str : dirs) {
+        ret.add(str);
+      }
+      return ret;
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
     }
   }
 }

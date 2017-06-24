@@ -38,7 +38,7 @@ public class Repartitioner extends Thread {
   private final DatabaseServer databaseServer;
   private final DatabaseCommon common;
   private final Map<String, Indices> indices;
-  private Map<String, Boolean> repartitioningComplete = new ConcurrentHashMap<>();
+  private Map<Integer, Boolean> repartitioningComplete = new ConcurrentHashMap<>();
   private Map<String, Boolean> deletingComplete = new ConcurrentHashMap<>();
   private Map<Integer, AtomicInteger> repartitioningRecordsByIdComplete = new ConcurrentHashMap<>();
   private AtomicBoolean isRepartitioningIndex = new AtomicBoolean();
@@ -77,9 +77,7 @@ public class Repartitioner extends Thread {
       long totalBegin = System.currentTimeMillis();
 
       for (int i = 0; i < databaseServer.getShardCount(); i++) {
-        for (int j = 0; j < databaseServer.getReplicationFactor(); j++) {
-          repartitioningComplete.put(i + ":" + j, false);
-        }
+        repartitioningComplete.put(i, false);
       }
 
       //    beginRepartitioningThread = new Thread(new Runnable() {
@@ -217,7 +215,7 @@ public class Repartitioner extends Thread {
           out.close();
           DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytesOut.toByteArray()));
           schema = new Schema();
-          schema.deserialize(common, in);
+          schema.deserialize(in);
 
           for (String index : toRebalance) {
             String[] parts = index.split(" ");
@@ -269,7 +267,7 @@ public class Repartitioner extends Thread {
                     ":" + common.getSchemaVersion() + ":" + dbName + ":" + finalTableName + ":" + indexName;
                 Random rand = new Random(System.currentTimeMillis());
                 try {
-                  databaseServer.getDatabaseClient().send(null, shard, rand.nextLong(), command, null, DatabaseClient.Replica.all);
+                  databaseServer.getDatabaseClient().send(null, shard, rand.nextLong(), command, null, DatabaseClient.Replica.master);
                 }
                 catch (Exception e) {
                   logger.error("Error sending rebalanceOrderedIndex to shard: shard=" + shard, e);
@@ -562,9 +560,7 @@ public class Repartitioner extends Thread {
     repartitioningComplete.clear();
     for (int i = 0; i < databaseServer.getShardCount(); i++) {
       final int shard = i;
-      for (int j = 0; j < databaseServer.getReplicationFactor(); j++) {
-        repartitioningComplete.put(shard + ":" + j, false);
-      }
+      repartitioningComplete.put(shard, false);
     }
   }
 
@@ -664,7 +660,7 @@ public class Repartitioner extends Thread {
     String dbName = parts[5];
     int shard = Integer.valueOf(parts[6]);
     int replica = Integer.valueOf(parts[7]);
-    repartitioningComplete.put(shard + ":" + replica, true);
+    repartitioningComplete.put(shard, true);
     return null;
   }
 
@@ -1227,6 +1223,7 @@ public class Repartitioner extends Thread {
               moveProcessor.shutdown();
             }
             databaseServer.getDeleteManager().saveDeletes(dbName, tableName, indexName, keysToDelete);
+            deleteRecordsOnOtherReplicas(dbName, tableName, indexName, keysToDelete);
             executor.shutdownNow();
             logger.info("doRebalanceOrderedIndex finished: table=" + tableName + ", index=" + indexName + ", countVisited=" + countVisited.get() +
                 ", duration=" + (System.currentTimeMillis() - begin));
@@ -1239,10 +1236,117 @@ public class Repartitioner extends Thread {
       String notifyCommand = "DatabaseServer:notifyRepartitioningComplete:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION +
           ":" + common.getSchemaVersion() + ":" + dbName + ":" + databaseServer.getShard() + ":" + databaseServer.getReplica();
       Random rand = new Random(System.currentTimeMillis());
-      databaseServer.getDatabaseClient().send(null, 0, rand.nextLong(), notifyCommand, null, DatabaseClient.Replica.master);
+      databaseServer.getDatabaseClient().sendToMaster(notifyCommand, null);
     }
     catch (Exception e) {
       logger.error("Error rebalancing index", e);
+    }
+    return null;
+  }
+
+  private void deleteRecordsOnOtherReplicas(final String dbName, String tableName, String indexName, ConcurrentLinkedQueue<Object[]> keysToDelete) {
+
+    try {
+      TableSchema tableSchema = common.getTables(dbName).get(tableName);
+      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+      DataOutputStream out = new DataOutputStream(bytesOut);
+      out.writeUTF(dbName);
+      out.writeUTF(tableName);
+      out.writeUTF(indexName);
+      out.writeInt(keysToDelete.size());
+      for (Object[] key : keysToDelete) {
+        out.write(DatabaseCommon.serializeKey(tableSchema, indexName, key));
+      }
+      out.close();
+
+      final byte[] bytes = bytesOut.toByteArray();
+
+      List<Future> futures = new ArrayList<>();
+      int replicaCount = databaseServer.getReplicationFactor();
+      ThreadPoolExecutor executor = new ThreadPoolExecutor(replicaCount - 1, replicaCount - 1, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+      for (int i = 0; i < replicaCount; i++) {
+        final int replica = i;
+        if (replica == databaseServer.getReplica()) {
+          continue;
+        }
+        futures.add(executor.submit(new Callable(){
+          @Override
+          public Object call() throws Exception {
+            String command = "DatabaseServer:deleteMovedRecords:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+                common.getSchemaVersion() + ":" + dbName;
+            databaseServer.getDatabaseClient().send(null, databaseServer.getShard(), replica, command,
+                bytes, DatabaseClient.Replica.specified);
+            return null;
+          }
+        }));
+      }
+      for (Future future : futures) {
+        try {
+          future.get();
+        }
+        catch (Exception e) {
+          logger.error("Error deleting moved records on replica", e);
+        }
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+
+  public byte[] deleteMovedRecords(String command, byte[] body) {
+    try {
+      ConcurrentLinkedQueue<Object[]> keysToDelete = new ConcurrentLinkedQueue<>();
+      DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
+      String dbName = in.readUTF();
+      String tableName = in.readUTF();
+      String indexName = in.readUTF();
+      int count = in.readInt();
+      TableSchema tableSchema = common.getTables(dbName).get(tableName);
+      IndexSchema indexSchema = tableSchema.getIndexes().get(indexName);
+      for (int i = 0; i < count; i++) {
+        Object[] key = DatabaseCommon.deserializeKey(tableSchema, in);
+        keysToDelete.add(key);
+      }
+      databaseServer.getDeleteManager().saveDeletes(dbName, tableName, indexName, keysToDelete);
+
+      List<Object> toFree = new ArrayList<>();
+      Index index = databaseServer.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
+      for (Object[] key : keysToDelete) {
+        synchronized (index.getMutex(key)) {
+          Object value = index.get(key);
+          byte[][] content = null;
+          if (value != null) {
+            if (indexSchema.isPrimaryKey()) {
+              content = databaseServer.fromUnsafeToRecords(value);
+            }
+            else {
+              content = databaseServer.fromUnsafeToKeys(value);
+            }
+          }
+          if (content != null) {
+            if (indexSchema.isPrimaryKey()) {
+              byte[][] newContent = new byte[content.length][];
+              for (int i = 0; i < content.length; i++) {
+                Record record = new Record(dbName, common, content[i]);
+                record.setDbViewNumber(common.getSchemaVersion());
+                record.setDbViewFlags(Record.DB_VIEW_FLAG_DELETING);
+                newContent[i] = record.serialize(common);
+              }
+              toFree.add(value);
+              Object newValue = databaseServer.toUnsafeFromRecords(newContent);
+              index.put(key, newValue);
+            }
+          }
+        }
+      }
+      for (Object obj : toFree) {
+        databaseServer.freeUnsafeIds(obj);
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
     }
     return null;
   }
@@ -1503,7 +1607,7 @@ public class Repartitioner extends Thread {
 
       String command = "DatabaseServer:moveIndexEntries:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
           common.getSchemaVersion() + ":" + dbName;
-      databaseServer.getDatabaseClient().send(null, shard, databaseServer.getReplica(), command, body, DatabaseClient.Replica.specified);
+      databaseServer.getDatabaseClient().send(null, shard, 0, command, body, DatabaseClient.Replica.def);
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -2080,7 +2184,7 @@ public class Repartitioner extends Thread {
       if (config.hasKey("clientIsPrivate")) {
         isInternal = config.getBoolean("clientIsPrivate");
       }
-      DatabaseServer.ServersConfig newConfig = new DatabaseServer.ServersConfig(config.getArray("shards"),
+      DatabaseServer.ServersConfig newConfig = new DatabaseServer.ServersConfig(databaseServer.getCluster(), config.getArray("shards"),
           config.getArray("shards").getDict(0).getArray("replicas").size(), isInternal);
       DatabaseServer.Shard[] newShards = newConfig.getShards();
 

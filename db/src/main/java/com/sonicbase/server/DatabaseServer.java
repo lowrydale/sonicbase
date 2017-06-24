@@ -11,6 +11,7 @@ import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.ExpressionImpl;
 import com.sonicbase.research.socket.NettyServer;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.socket.DeadServerException;
 import com.sonicbase.util.*;
 import net.jpountz.lz4.LZ4Compressor;
 import net.jpountz.lz4.LZ4Factory;
@@ -19,6 +20,8 @@ import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.input.ReversedLinesFileReader;
 import org.apache.commons.lang.exception.ExceptionUtils;
+import org.quartz.*;
+import org.quartz.impl.StdSchedulerFactory;
 import sun.misc.Unsafe;
 
 import javax.crypto.BadPaddingException;
@@ -46,6 +49,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import static org.quartz.CronScheduleBuilder.cronSchedule;
+import static org.quartz.JobBuilder.newJob;
+import static org.quartz.TriggerBuilder.newTrigger;
+
 
 /**
  * User: lowryda
@@ -54,6 +61,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 public class DatabaseServer {
 
+  public static Object deathOverrideMutex = new Object();
+  public static boolean[][] deathOverride;
   private Logger logger;
   private static org.apache.log4j.Logger errorLogger = org.apache.log4j.Logger.getLogger("com.sonicbase.errorLogger");
   private static org.apache.log4j.Logger clientErrorLogger = org.apache.log4j.Logger.getLogger("com.sonicbase.clientErrorLogger");
@@ -93,6 +102,9 @@ public class DatabaseServer {
   private Exception backupException;
   private Exception restoreException;
   private AWSClient awsClient;
+  private boolean doingBackup;
+  private boolean onlyQueueCommands;
+  private AtomicInteger testWriteCallCount = new AtomicInteger();
 
   @SuppressWarnings("restriction")
   private static Unsafe getUnsafe() {
@@ -134,6 +146,7 @@ public class DatabaseServer {
   private ReadManager readManager;
   private LogManager logManager;
   private SchemaManager schemaManager;
+  private int cronIdentity = 0;
 
   public DatabaseServer() {
 
@@ -222,11 +235,12 @@ public class DatabaseServer {
     if (databaseDict.hasKey("clientIsPrivate")) {
       isInternal = databaseDict.getBoolean("clientIsPrivate");
     }
-    serversConfig = new ServersConfig(shards, replicationFactor, isInternal);
+    serversConfig = new ServersConfig(cluster, shards, replicationFactor, isInternal);
     this.replica = serversConfig.getThisReplica(host, port);
 
     common.setShard(serversConfig.getThisShard(host, port));
     common.setReplica(this.replica);
+    common.setServersConfig(serversConfig);
     this.shard = common.getShard();
     this.shardCount = serversConfig.getShardCount();
 
@@ -252,6 +266,7 @@ public class DatabaseServer {
 //      throw new DatabaseException("Replication Factor must be at least two");
 //    }
 
+    scheduleBackup();
 
     Thread thread = new Thread(new NetMonitor());
     thread.start();
@@ -303,6 +318,17 @@ public class DatabaseServer {
     disable();
     startLicenseValidator();
 
+    startMasterMonitor();
+
+    synchronized (deathOverrideMutex) {
+      if (deathOverride == null) {
+        deathOverride = new boolean[shardCount][];
+        for (int i = 0; i < shardCount; i++) {
+          deathOverride[i] = new boolean[replicationFactor];
+        }
+      }
+    }
+
     logger.info("Started server");
 
     //logger.error("Testing errors", new DatabaseException());
@@ -312,6 +338,321 @@ public class DatabaseServer {
 //    Thread logThread = new Thread(queue);
 //    logThread.start();
 
+  }
+
+  public int getTestWriteCallCount() {
+    return testWriteCallCount.get();
+  }
+
+  final int[] monitorShards = {0, 0, 0};
+  final int[] monitorReplicas = {0, 1, 2};
+
+  private void startMasterMonitor() {
+    Thread thread = new Thread(new Runnable(){
+      @Override
+      public void run() {
+        JsonArray shards = config.getArray("shards");
+        JsonArray replicas = shards.getDict(0).getArray("replicas");
+        if (replicas.size() < 3) {
+          monitorShards[2]= 1;
+          monitorReplicas[2] = 0;
+        }
+        boolean shouldMonitor = false;
+        if (shard == 0 && (replica == 0 || replica == 1 || replica == 3)) {
+          shouldMonitor = true;
+        }
+        else if (replicas.size() < 3 && shard == 1 && replica == 0) {
+          shouldMonitor = true;
+        }
+        if (shouldMonitor) {
+
+          for (int i = 0; i < shardCount; i++) {
+            final int shard = i;
+            Thread masterThread = new Thread(new Runnable(){
+              @Override
+              public void run() {
+                try {
+                  electNewMaster(shard, -1, monitorShards, monitorReplicas);
+                }
+                catch (Exception e) {
+                  throw new DatabaseException(e);
+                }
+                while (true) {
+                  try {
+                    Thread.sleep(deathOverride == null ? 5000 : 50);
+
+                    final int masterReplica = common.getServersConfig().getShards()[shard].getMasterReplica();
+                    final AtomicBoolean isHealthy = new AtomicBoolean(false);
+                    checkHealthOfServer(shard, masterReplica, isHealthy);
+
+                    if (!isHealthy.get()) {
+                      electNewMaster(shard, masterReplica, monitorShards, monitorReplicas);
+                    }
+                  }
+                  catch (Exception e) {
+                    logger.error("Error in master monitor: shard=" + shard, e);
+                  }
+                }
+              }
+            });
+            masterThread.start();
+          }
+        }
+      }
+    });
+    thread.start();
+  }
+
+  private void electNewMaster(int shard, int oldMasterReplica, int[] monitorShards, int[] monitorReplicas) throws InterruptedException, IOException {
+    int electedMaster = -1;
+    boolean isFirst = false;
+    int nextMonitor = -1;
+
+    for (int i = 0; i < monitorShards.length; i++) {
+      if (common.getServersConfig().getShards()[monitorShards[i]].getReplicas()[monitorReplicas[i]].dead) {
+        continue;
+      }
+      if (monitorShards[i] == this.shard && monitorReplicas[i] == this.replica) {
+        isFirst = true;
+        continue;
+      }
+      if (!common.getServersConfig().getShards()[monitorShards[i]].getReplicas()[monitorReplicas[i]].dead) {
+        nextMonitor = i;
+      }
+//      // let the lowest monitor initiate the election
+//      if (monitorShards[i] != 0 || monitorReplicas[i] != oldMasterReplica) {
+//        if (monitorShards[i] != shard || monitorReplicas[i] != replica) {
+//          isFirst = false;
+//          break;
+//        }
+//        nextMonitor = i;
+//        break;
+//      }
+    }
+    if (!isFirst) {
+      return;
+    }
+    if (nextMonitor != -1) {
+      outer:
+      while (true) {
+        for (int j = 0; j < replicationFactor; j++) {
+          if (j == oldMasterReplica) {
+            continue;
+          }
+          Thread.sleep(deathOverride == null ? 2000 : 50);
+
+          AtomicBoolean isHealthy = new AtomicBoolean();
+          checkHealthOfServer(shard, j, isHealthy);
+          if (isHealthy.get()) {
+            try {
+              final String command = "DatabaseServer:electNewMaster:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION +
+                  ":1:__none__:" + shard + ":" + j;
+              byte[] bytes = getDatabaseClient().send(null, monitorShards[nextMonitor], monitorReplicas[nextMonitor],
+                  command, null, DatabaseClient.Replica.specified);
+              DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
+              int otherServersElectedMaster = in.readInt();
+              if (otherServersElectedMaster != j) {
+                logger.info("Other server elected different master: shard=" + shard + ", other=" + otherServersElectedMaster);
+                Thread.sleep(2000);
+                continue;
+              }
+              else {
+                logger.info("Other server elected same master: shard=" + shard + ", master=" + otherServersElectedMaster);
+                electedMaster = otherServersElectedMaster;
+                break;
+              }
+            }
+            catch (Exception e) {
+              logger.error("Error electing new master: shard=" + shard, e);
+              Thread.sleep(2000);
+              continue;
+            }
+          }
+        }
+        try {
+          if (electedMaster != -1) {
+            String command = "DatabaseServer:promoteToMasterAndPushSchema:1:" +
+                SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__:" + shard + ":" + electedMaster;
+            common.getServersConfig().getShards()[shard].setMasterReplica(electedMaster);
+
+            getDatabaseClient().sendToMaster(command, null);
+
+
+            command = "DatabaseServer:promoteToMaster:1:" +
+                SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__:" + shard + ":" + electedMaster;
+
+            getDatabaseClient().send(null, shard, electedMaster,command, null, DatabaseClient.Replica.specified);
+            break;
+          }
+        }
+        catch (Exception e) {
+          logger.error("Error promoting master: shard=" + shard + ", electedMaster=" + electedMaster, e);
+          continue;
+        }
+      }
+    }
+  }
+
+  public byte[] electNewMaster(String command, byte[] body, boolean replayedCommand) throws InterruptedException, IOException {
+    String[] parts = command.split(":");
+    int requestedMasterShard = Integer.valueOf(parts[6]);
+    int requestedMasterReplica = Integer.valueOf(parts[7]);
+
+    final AtomicBoolean isHealthy = new AtomicBoolean(false);
+    checkHealthOfServer(requestedMasterShard, requestedMasterReplica, isHealthy);
+    if (!isHealthy.get()) {
+      logger.info("candidate master is unhealthy, rejecting: shard=" + requestedMasterShard + ", replica=" + requestedMasterReplica);
+      requestedMasterReplica = -1;
+    }
+    else {
+      logger.info("candidate master is health, accepting: candidateMaster=" + requestedMasterReplica);
+    }
+    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+    DataOutputStream out = new DataOutputStream(bytesOut);
+    out.writeInt(requestedMasterReplica);
+    out.close();
+    return bytesOut.toByteArray();
+  }
+
+  public byte[] promoteToMaster(String command, byte[] body, boolean replayedCommand) {
+    try {
+      logManager.skipToMaxSequenceNumber();
+
+      if (shard == 0) {
+        shutdownDeathMonitor();
+
+        startDeathMonitor();
+      }
+      return null;
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  private void shutdownDeathMonitor() {
+    shutdownDeathMonitor = true;
+    if (deathMonitorThreads != null) {
+      for (int i = 0; i < shardCount; i++) {
+        for (int j = 0; j < replicationFactor; j++) {
+          deathMonitorThreads[i][j].interrupt();
+        }
+      }
+    }
+    deathMonitorThreads = null;
+  }
+
+  private Thread[][] deathMonitorThreads = null;
+  boolean shutdownDeathMonitor = false;
+
+  private void startDeathMonitor() {
+    shutdownDeathMonitor = false;
+
+    deathMonitorThreads = new Thread[shardCount][];
+    for (int i = 0; i < shardCount; i++) {
+      final int shard = i;
+      deathMonitorThreads[i] = new Thread[replicationFactor];
+      for (int j = 0; j < replicationFactor; j++) {
+        final int replica = j;
+        deathMonitorThreads[i][j] = new Thread(new Runnable(){
+          @Override
+          public void run() {
+            while (!shutdownDeathMonitor) {
+              try {
+                Thread.sleep(deathOverride == null ? 2000 : 50);
+                AtomicBoolean isHealthy = new AtomicBoolean();
+                checkHealthOfServer(shard, replica, isHealthy);
+                boolean wasDead = common.getServersConfig().getShards()[shard].getReplicas()[replica].dead;
+                boolean changed = false;
+                if (wasDead && isHealthy.get()) {
+                  changed = true;
+                }
+                else if (!wasDead && !isHealthy.get()) {
+                  changed = true;
+                }
+                if (changed && isHealthy.get()) {
+                  String command = "DatabaseServer:prepareToComeAlive:1:" +
+                      SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__:";
+
+                  getDatabaseClient().send(null, shard, replica, command, null, DatabaseClient.Replica.specified, true);
+                }
+                if (wasDead && isHealthy.get()) {
+                  common.getServersConfig().getShards()[shard].getReplicas()[replica].dead = false;
+                  changed = true;
+                }
+                else if (!wasDead && !isHealthy.get()) {
+                  common.getServersConfig().getShards()[shard].getReplicas()[replica].dead = true;
+                  changed = true;
+                }
+                getSchemaFromPossibleMaster();
+                if (common.getServersConfig().getShards()[0].getMasterReplica() != DatabaseServer.this.replica) {
+                  shutdownDeathMonitor();
+                }
+                if (changed) {
+                  common.saveSchema(getDataDir());
+                  pushSchema();
+                }
+              }
+              catch (InterruptedException e) {
+                break;
+              }
+              catch (Exception e) {
+                logger.error("Error in death monitor thread: shard=" + shard + ", replica=" + replica, e);
+              }
+            }
+          }
+        });
+        deathMonitorThreads[i][j].start();
+      }
+    }
+  }
+
+  public byte[] promoteToMasterAndPushSchema(String command, byte[] body, boolean replayedCommand) {
+    String[] parts = command.split(":");
+    int shard = Integer.valueOf(parts[6]);
+    int replica = Integer.valueOf(parts[7]);
+
+    logger.info("promoting to master: shard=" + shard + ", replica=" + replica);
+    common.getServersConfig().getShards()[shard].setMasterReplica(replica);
+    common.saveSchema(getDataDir());
+    pushSchema();
+    return null;
+  }
+
+  private void checkHealthOfServer(final int shard, final int replica, final AtomicBoolean isHealthy) throws InterruptedException {
+    if (deathOverride != null) {
+      isHealthy.set(!deathOverride[shard][replica]);
+      return;
+    }
+
+    final AtomicBoolean finished = new AtomicBoolean();
+    isHealthy.set(false);
+    Thread checkThread = new Thread(new Runnable(){
+      @Override
+      public void run() {
+        try {
+          final String command = "DatabaseServer:healthCheck:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__";
+          byte[] bytes = getDatabaseClient().send(null, shard, replica, command, null, DatabaseClient.Replica.specified, true);
+          if (new String(bytes, "utf-8").equals("{\"status\" : \"ok\"}")) {
+            isHealthy.set(true);
+          }
+          finished.set(true);
+        }
+        catch (Exception e) {
+          logger.error("Error checking health of server: shard=" + shard + ", replica=" + replica);
+        }
+      }
+    });
+    checkThread.start();
+
+    int i = 0;
+    while (!finished.get()) {
+      Thread.sleep(deathOverride == null ? 100 : 20);
+      if (i++ > 50) {
+        checkThread.interrupt();
+        break;
+      }
+    }
   }
 
   public AWSClient getAWSClient() {
@@ -333,6 +674,41 @@ public class DatabaseServer {
 
   public ThreadPoolExecutor getExecutor() {
     return executor;
+  }
+
+  public Thread[][] getDeathMonitorThreads() {
+    return deathMonitorThreads;
+  }
+
+  /**
+   * make sure you're really still the master before making death decisions
+   */
+  public void getSchemaFromPossibleMaster() {
+    int[] masterAccordingToOther = new int[]{-1, -1};
+    int otherCount = 0;
+    for (int i = 0; i < monitorShards.length; i++) {
+      if (monitorShards[i] == this.shard && monitorReplicas[i] == this.replica) {
+        continue;
+      }
+      String command = "DatabaseServer:getSchema:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":"
+          + common.getSchemaVersion() + ":__none__";
+      try {
+
+        byte[] ret = getClient().send(null, monitorShards[i], monitorReplicas[i], command, null, DatabaseClient.Replica.specified);
+        DatabaseCommon tempCommon = new DatabaseCommon();
+        tempCommon.deserializeSchema(new DataInputStream(new ByteArrayInputStream(ret)));
+        masterAccordingToOther[otherCount++] = tempCommon.getServersConfig().getShards()[0].getMasterReplica();
+        if (otherCount == 2) {
+          if (masterAccordingToOther[0] == masterAccordingToOther[1] && masterAccordingToOther[0] != this.replica) {
+            common.deserializeSchema(new DataInputStream(new ByteArrayInputStream(ret)));
+          }
+        }
+      }
+      catch (Exception e) {
+        logger.error("Error getting schema: shard=" + monitorShards[i] + ", replica=" + monitorReplicas[i], e);
+      }
+    }
+    return ;
   }
 
   private static class NullX509TrustManager implements X509TrustManager {
@@ -553,11 +929,66 @@ public class DatabaseServer {
     return null;
   }
 
+  static class BackupJob implements Job {
+
+    @Override
+    public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
+      JobDataMap map = jobExecutionContext.getMergedJobDataMap();
+      DatabaseServer server = (DatabaseServer) map.get("server");
+      server.doBackup();
+    }
+  }
+
+  public void scheduleBackup() {
+    try {
+      JsonDict backup = config.getDict("backup");
+      if (backup == null) {
+        return;
+      }
+      String cronSchedule = backup.getString("cronSchedule");
+      if (cronSchedule == null) {
+        return;
+      }
+      JobDataMap map = new JobDataMap();
+      map.put("server", this);
+
+      logger.info("Scheduling backup: cronSchedule=" + cronSchedule);
+
+      JobDetail job = newJob(BackupJob.class)
+          .withIdentity("job" + cronIdentity, "group1")
+          .usingJobData(map)
+          .build();
+      Trigger trigger = newTrigger()
+          .withIdentity("trigger" + cronIdentity, "group1")
+          .withSchedule(cronSchedule(cronSchedule))
+          .forJob("myJob" + cronIdentity, "group1")
+          .build();
+      cronIdentity++;
+
+      SchedulerFactory sf = new StdSchedulerFactory();
+      Scheduler sched = sf.getScheduler();
+      sched.scheduleJob(job, trigger);
+      sched.start();
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
   public void doBackup() {
     try {
+      while (doingBackup) {
+        Thread.sleep(2000);
+      }
+      doingBackup = true;
+
+      logger.info("Backup Master - begin");
+
+      logger.info("Backup Master - prepareForBackup - begin");
       // tell all servers to pause snapshot and slice the queue
       String command = "DatabaseServer:prepareForBackup:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__";
       byte[][] ret = getDatabaseClient().sendToAllShards(null, 0, command, null, DatabaseClient.Replica.specified);
+      logger.info("Backup Master - prepareForBackup - finished");
 
       String subDirectory = ISO8601.to8601String(new Date(System.currentTimeMillis()));
 
@@ -576,8 +1007,12 @@ public class DatabaseServer {
         out.writeUTF(prefix);
         out.close();
 
+        logger.info("Backup Master - doBackupAWS - begin");
+
         command = "DatabaseServer:doBackupAWS:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__";
-        ret = getDatabaseClient().sendToAllShards(null, 0, command, bytesOut.toByteArray(), DatabaseClient.Replica.specified);
+        ret = getDatabaseClient().sendToAllShards(null, 0, command, bytesOut.toByteArray(), DatabaseClient.Replica.master);
+
+        logger.info("Backup Master - doBackupAWS - end");
       }
       else if (type.equals("fileSystem")) {
         // if fileSystem
@@ -588,8 +1023,13 @@ public class DatabaseServer {
         out.writeUTF(directory);
         out.writeUTF(subDirectory);
         out.close();
+
+        logger.info("Backup Master - doBackupFileSystem - begin");
+
         command = "DatabaseServer:doBackupFileSystem:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__";
-        ret = getDatabaseClient().sendToAllShards(null, 0, command, bytesOut.toByteArray(), DatabaseClient.Replica.specified);
+        ret = getDatabaseClient().sendToAllShards(null, 0, command, bytesOut.toByteArray(), DatabaseClient.Replica.master);
+
+        logger.info("Backup Master - doBackupFileSystem - end");
       }
 
       while (true) {
@@ -598,7 +1038,7 @@ public class DatabaseServer {
         boolean finished = false;
         outer:
         for (int shard = 0; shard < shardCount; shard++) {
-          byte[] currRet = getDatabaseClient().send(null, shard, 0, command, null, DatabaseClient.Replica.specified);
+          byte[] currRet = getDatabaseClient().send(null, shard, 0, command, null, DatabaseClient.Replica.master);
           DataInputStream in = new DataInputStream(new ByteArrayInputStream(currRet));
           finished = in.readBoolean();
           if (!finished) {
@@ -609,6 +1049,9 @@ public class DatabaseServer {
           break;
         }
       }
+      logger.info("Backup Master - doBackup finished");
+
+      logger.info("Backup Master - delete old backups - begin");
 
       String directory = backup.getString("directory");
       Integer maxBackupCount = backup.getInt("maxBackupCount");
@@ -617,18 +1060,21 @@ public class DatabaseServer {
         shared = false;
       }
       if (maxBackupCount != null) {
+        // delete old backups
         if (type.equals("AWS")) {
           shared = true;
-          String key = prefix + "/" + subDirectory;
-          awsClient.deleteDirectory(bucket, key);
+          doDeleteAWSBackups(bucket, prefix, maxBackupCount);
         }
         else if (type.equals("fileSystem")) {
-          // delete old backups
           if (shared) {
             doDeleteFileSystemBackups(directory, maxBackupCount);
           }
         }
       }
+      logger.info("Backup Master - delete old backups - finished");
+
+      logger.info("Backup Master - finishBackup - begin");
+
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
       out.writeBoolean(shared);
@@ -636,10 +1082,36 @@ public class DatabaseServer {
       out.writeInt(maxBackupCount);
       out.close();
       command = "DatabaseServer:finishBackup:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__";
-      ret = getDatabaseClient().sendToAllShards(null, 0, command, bytesOut.toByteArray(), DatabaseClient.Replica.all);
+      ret = getDatabaseClient().sendToAllShards(null, 0, command, bytesOut.toByteArray(), DatabaseClient.Replica.master);
+
+      logger.info("Backup Master - finishBackup - finished");
     }
     catch (Exception e) {
       throw new DatabaseException(e);
+    }
+    finally {
+      doingBackup = false;
+      logger.info("Backup - finished");
+    }
+  }
+
+  private void doDeleteAWSBackups(String bucket, String prefix, Integer maxBackupCount) {
+    List<String> dirs = awsClient.listDirectSubdirectories(bucket, prefix);
+    Collections.sort(dirs, new Comparator<String>() {
+      @Override
+      public int compare(String o1, String o2) {
+        return o1.compareTo(o2);
+      }
+    });
+    for (int i = 0; i < dirs.size(); i++) {
+      if (i > maxBackupCount) {
+        try {
+          awsClient.deleteDirectory(bucket, prefix + "/" + dirs.get(i));
+        }
+        catch (Exception e) {
+          logger.error("Error deleting backup from AWS: dir=" + prefix + "/" + dirs.get(i), e);
+        }
+      }
     }
   }
 
@@ -783,11 +1255,13 @@ public class DatabaseServer {
         boolean finished = false;
         outer:
         for (int shard = 0; shard < shardCount; shard++) {
-          byte[] currRet = getDatabaseClient().send(null, shard, 0, command, null, DatabaseClient.Replica.specified);
-          DataInputStream in = new DataInputStream(new ByteArrayInputStream(currRet));
-          finished = in.readBoolean();
-          if (!finished) {
-            break outer;
+          for (int replica = 0; replica < replicationFactor; replica++) {
+            byte[] currRet = getDatabaseClient().send(null, shard, replica, command, null, DatabaseClient.Replica.specified);
+            DataInputStream in = new DataInputStream(new ByteArrayInputStream(currRet));
+            finished = in.readBoolean();
+            if (!finished) {
+              break outer;
+            }
           }
         }
         if (finished) {
@@ -1020,6 +1494,7 @@ public class DatabaseServer {
     private String publicAddress;
     private String privateAddress;
     private int port;
+    private boolean dead;
 
     public Host(String publicAddress, String privateAddress, int port) {
       this.publicAddress = publicAddress;
@@ -1039,21 +1514,32 @@ public class DatabaseServer {
       return port;
     }
 
-    public Host(DataInputStream in) throws IOException {
+    public Host(DataInputStream in, long serializationVersionNumber) throws IOException {
       publicAddress = in.readUTF();
       privateAddress = in.readUTF();
       port = in.readInt();
+      if (serializationVersionNumber >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION_21) {
+        dead = in.readBoolean();
+      }
     }
 
-    public void serialize(DataOutputStream out) throws IOException {
+    public void serialize(DataOutputStream out, long serializationVersionNumber) throws IOException {
       out.writeUTF(publicAddress);
       out.writeUTF(privateAddress);
       out.writeInt(port);
+      if (serializationVersionNumber >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION_21) {
+        out.writeBoolean(dead);
+      }
+    }
+
+    public boolean isDead() {
+      return dead;
     }
   }
 
   public static class Shard {
     private Host[] replicas;
+    private int masterReplica;
 
     @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP2", justification = "copying the passed in data is too slow")
     @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
@@ -1061,19 +1547,33 @@ public class DatabaseServer {
       this.replicas = hosts;
     }
 
-    public Shard(DataInputStream in) throws IOException {
+    public Shard(DataInputStream in, long serializationVersionNumber) throws IOException {
       int count = in.readInt();
       replicas = new Host[count];
       for (int i = 0; i < replicas.length; i++) {
-        replicas[i] = new Host(in);
+        replicas[i] = new Host(in, serializationVersionNumber);
+      }
+      if (serializationVersionNumber >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION_21) {
+        masterReplica = (int)DataUtil.readVLong(in);
       }
     }
 
-    public void serialize(DataOutputStream out) throws IOException {
+    public void serialize(DataOutputStream out, long serializationVersionNumber) throws IOException {
       out.writeInt(replicas.length);
       for (Host host : replicas) {
-        host.serialize(out);
+        host.serialize(out, serializationVersionNumber);
       }
+      if (serializationVersionNumber >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION_21) {
+        DataUtil.writeVLong(out, masterReplica);
+      }
+    }
+
+    public void setMasterReplica(int masterReplica) {
+      this.masterReplica = masterReplica;
+    }
+
+    public int getMasterReplica() {
+      return this.masterReplica;
     }
 
     public boolean contains(String host, int port) {
@@ -1093,22 +1593,27 @@ public class DatabaseServer {
   }
 
   public static class ServersConfig {
+    private String cluster;
     private Shard[] shards;
     private boolean clientIsInternal;
 
-    public ServersConfig(DataInputStream in) throws IOException {
+    public ServersConfig(DataInputStream in, long serializationVersion) throws IOException {
+      if (serializationVersion >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION_21) {
+        cluster = in.readUTF();
+      }
       int count = in.readInt();
       shards = new Shard[count];
       for (int i = 0; i < count; i++) {
-        shards[i] = new Shard(in);
+        shards[i] = new Shard(in, serializationVersion);
       }
       clientIsInternal = in.readBoolean();
     }
 
-    public void serialize(DataOutputStream out) throws IOException {
+    public void serialize(DataOutputStream out, int serializationVersionNumber) throws IOException {
+      out.writeUTF(cluster);
       out.writeInt(shards.length);
       for (Shard shard : shards) {
-        shard.serialize(out);
+        shard.serialize(out, serializationVersionNumber);
       }
       out.writeBoolean(clientIsInternal);
     }
@@ -1122,8 +1627,13 @@ public class DatabaseServer {
       return shards.length;
     }
 
-    public ServersConfig(JsonArray inShards, int replicationFactor, boolean clientIsInternal) {
+    public String getCluster() {
+      return cluster;
+    }
+
+    public ServersConfig(String cluster, JsonArray inShards, int replicationFactor, boolean clientIsInternal) {
       int currServerOffset = 0;
+      this.cluster = cluster;
       int shardCount = inShards.size();
       shards = new Shard[shardCount];
       for (int i = 0; i < shardCount; i++) {
@@ -2125,7 +2635,7 @@ public class DatabaseServer {
     try {
       logger.info("Syncing database names: shard=" + shard + ", replica=" + replica);
       String command = "DatabaseServer:getDbNames:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__";
-      byte[] ret = getDatabaseClient().send(null, 0, 0, command, null, DatabaseClient.Replica.specified);
+      byte[] ret = getDatabaseClient().send(null, 0, 0, command, null, DatabaseClient.Replica.master);
       DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
       long serializationVersion = DataUtil.readVLong(in);
       int count = in.readInt();
@@ -2259,7 +2769,7 @@ public class DatabaseServer {
     }
     String[] parts = command.split(":");
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
-    common.deserializeSchema(common, in);
+    common.deserializeSchema(in);
     common.saveSchema(dataDir);
     return null;
   }
@@ -2267,14 +2777,14 @@ public class DatabaseServer {
   public void pushSchema() {
     //common.saveSchema(dataDir);
 
-    try {
-      for (int i = 0; i < shardCount; i++) {
+    for (int i = 0; i < shardCount; i++) {
 
 
-        for (int j = 0; j < replicationFactor; j++) {
-          if (i == 0 && j == 0) {
-            continue;
-          }
+      for (int j = 0; j < replicationFactor; j++) {
+        if (i == 0 && j == 0) {
+          continue;
+        }
+        try {
           ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
           DataOutputStream out = new DataOutputStream(bytesOut);
           common.serializeSchema(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
@@ -2284,10 +2794,10 @@ public class DatabaseServer {
               common.getSchemaVersion() + ":__none__";
           getDatabaseClient().send(null, i, j, command, bytesOut.toByteArray(), DatabaseClient.Replica.specified);
         }
+        catch (Exception e) {
+          logger.error("Error pushing schema to server: shard=" + i + ", replica=" + j);
+        }
       }
-    }
-    catch (IOException e) {
-      throw new DatabaseException(e);
     }
   }
 
@@ -2295,7 +2805,7 @@ public class DatabaseServer {
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
     try {
       long serializationVersion = DataUtil.readVLong(in);
-      ServersConfig serversConfig = new ServersConfig(in);
+      ServersConfig serversConfig = new ServersConfig(in, serializationVersion);
 
       common.setServersConfig(serversConfig);
       common.saveServersConfig(getDataDir());
@@ -2309,26 +2819,26 @@ public class DatabaseServer {
   }
 
   public void pushServersConfig() {
-    try {
-      for (int i = 0; i < shardCount; i++) {
-        for (int j = 0; j < replicationFactor; j++) {
-          if (i == 0 && j == 0) {
-            continue;
-          }
+    for (int i = 0; i < shardCount; i++) {
+      for (int j = 0; j < replicationFactor; j++) {
+        if (i == 0 && j == 0) {
+          continue;
+        }
+        try {
           ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
           DataOutputStream out = new DataOutputStream(bytesOut);
           DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-          common.getServersConfig().serialize(out);
+          common.getServersConfig().serialize(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
           out.close();
 
           String command = "DatabaseServer:updateServersConfig:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION +
               ":1:__none__";
           getDatabaseClient().send(null, i, j, command, bytesOut.toByteArray(), DatabaseClient.Replica.specified);
         }
+        catch (Exception e) {
+          logger.error("Error pushing servers config: shard=" + i + ", replica=" + j);
+        }
       }
-    }
-    catch (IOException e) {
-      throw new DatabaseException(e);
     }
   }
 
@@ -2610,6 +3120,11 @@ public class DatabaseServer {
     private byte[] buffer;
     private CountDownLatch latch = new CountDownLatch(1);
     private List<byte[]> buffers;
+    private long[] sequenceNumbers;
+
+    public LogRequest(int size) {
+      this.sequenceNumbers = new long[size];
+    }
 
     @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP", justification = "copying the returned data is too slow")
     public byte[] getBuffer() {
@@ -2636,6 +3151,10 @@ public class DatabaseServer {
 
     public List<byte[]> getBuffers() {
       return buffers;
+    }
+
+    public long[] getSequenceNumbers() {
+      return sequenceNumbers;
     }
   }
 
@@ -2683,7 +3202,7 @@ public class DatabaseServer {
     }
   }
 
-  public List<Response> handleCommands(List<NettyServer.Request> requests, final boolean replayedCommand, boolean enableQueuing) throws IOException {
+  public List<Response> dont_use_handleCommands(List<NettyServer.Request> requests, final boolean replayedCommand, boolean enableQueuing) throws IOException {
     List<Response> retList = new ArrayList<>();
     try {
       if (shutdown) {
@@ -2692,7 +3211,8 @@ public class DatabaseServer {
       LogRequest logRequest = logManager.logRequests(requests, enableQueuing);
 
       List<Future<byte[]>> futures = new ArrayList<>();
-      for (final NettyServer.Request request : requests) {
+      for (int requestOffset = 0; requestOffset < requests.size(); requestOffset++) {
+        NettyServer.Request request = requests.get(requestOffset);
 //        futures.add(executor.submit(new Callable<byte[]>() {
 //          @Override
 //          public byte[] call() throws Exception {
@@ -2748,6 +3268,20 @@ public class DatabaseServer {
             }
             throw new DatabaseException(e);
           }
+
+          int masterReplica = common.getServersConfig().getShards()[shard].getMasterReplica();
+          if (replica == masterReplica) {
+            if (command.contains("xx_repl_xx")) {
+              if (DatabaseClient.getWriteVerbs().contains(methodStr)) {
+                command += ":xx_sn_xx=" + logRequest.getSequenceNumbers()[requestOffset];
+                for (int i = 0; i < replicationFactor; i++) {
+                  if (i != replica) {
+                    client.get().send(null, shard, i, command, body, DatabaseClient.Replica.specified);
+                  }
+                }
+              }
+            }
+          }
           retList.add(new Response(ret));
         }
         catch (Exception e) {
@@ -2796,8 +3330,40 @@ public class DatabaseServer {
         throw new LicenseOutOfComplianceException("Licenses out of compliance");
       }
 
-      LogRequest request = null;
-      request = logManager.logRequest(command, body, enableQueuing, methodStr, request);
+//      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+//      DataOutputStream out = new DataOutputStream(bytesOut);
+//      out.writeUTF(localCommand);
+//      int len = body == null ? 0 : body.length;
+//      out.writeInt(len);
+//      if (len > 0) {
+//        out.write(body);
+//      }
+//      out.close();
+//      String queueCommand = "DatabaseServer:queueForOtherServer:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__:" + i;
+//      replicas[common.getServersConfig().getShards()[shard].getMasterReplica()].do_send(
+//          null, queueCommand, bytesOut.toByteArray())
+//
+      if (methodStr.equals("queueForOtherServer")) {
+        try {
+          String[] parts = command.split(":");
+          int replica = Integer.valueOf(parts[6]);
+
+          DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
+          String queueCommand = in.readUTF();
+          int len = in.readInt();
+          byte[] queueBody = new byte[len];
+          in.readFully(queueBody);
+          logManager.logRequestForPeer(queueCommand, queueBody, replica);
+          return null;
+        }
+        catch (Exception e) {
+          throw new DatabaseException(e);
+        }
+      }
+
+      Long existingSequenceNumber = getExistingSequenceNumber(command);
+
+      LogRequest logRequest = logManager.logRequest(command, body, enableQueuing, methodStr, existingSequenceNumber);
 
       byte[] ret = null;
 
@@ -2805,29 +3371,56 @@ public class DatabaseServer {
         throw new DatabaseException("Server not running: command=" + command);
       }
 
-      Method method = getClass().getMethod(methodStr, String.class, byte[].class, boolean.class);
-      try {
-        ret = (byte[]) method.invoke(this, command, body, replayedCommand);
-      }
-      catch (Exception e) {
-        boolean schemaOutOfSync = false;
-        int index = ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class);
-        if (-1 != index) {
-          schemaOutOfSync = true;
+      if (!onlyQueueCommands || !enableQueuing) {
+        Method method = getClass().getMethod(methodStr, String.class, byte[].class, boolean.class);
+        try {
+          ret = (byte[]) method.invoke(this, command, body, replayedCommand);
         }
-        else if (e.getMessage() != null && e.getMessage().contains("SchemaOutOfSyncException")) {
-          schemaOutOfSync = true;
+        catch (Exception e) {
+          boolean schemaOutOfSync = false;
+          int index = ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class);
+          if (-1 != index) {
+            schemaOutOfSync = true;
+          }
+          else if (e.getMessage() != null && e.getMessage().contains("SchemaOutOfSyncException")) {
+            schemaOutOfSync = true;
+          }
+
+          if (!schemaOutOfSync) {
+            logger.error("Error processing request", e);
+          }
+          throw new DatabaseException(e);
         }
 
-        if (!schemaOutOfSync) {
-          logger.error("Error processing request", e);
+        Shard currShard = common.getServersConfig().getShards()[shard];
+        int masterReplica = currShard.getMasterReplica();
+        if (replica == masterReplica) {
+          if (command.contains("xx_repl_xx")) {
+            if (DatabaseClient.getWriteVerbs().contains(methodStr)) {
+              command += ":xx_sn_xx=" + logRequest.getSequenceNumbers()[0];
+              for (int i = 0; i < replicationFactor; i++) {
+                if (i != replica) {
+                  if (currShard.getReplicas()[i].dead) {
+                    logManager.logRequestForPeer(command, body, i);
+                  }
+                  else {
+                    try {
+                      client.get().send(null, shard, i, command, body, DatabaseClient.Replica.specified);
+                    }
+                    catch (DeadServerException e) {
+                      logManager.logRequestForPeer(command, body, i);
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
-        throw new DatabaseException(e);
       }
 
       commandCount.incrementAndGet();
-      if (request != null) {
-        request.latch.await();
+      if (logRequest != null) {
+        logRequest.latch.await();
       }
 
       return ret;
@@ -2837,6 +3430,22 @@ public class DatabaseServer {
     }
   }
 
+  private Long getExistingSequenceNumber(String command) {
+    Long existingSequenceNumber = null;
+    int snPos = command.indexOf("xx_sn_xx=");
+    if (snPos != -1) {
+      String sn = null;
+      int endPos = command.indexOf(":", snPos);
+      if (endPos == -1) {
+        sn = command.substring(snPos + "xx_sn_xx=".length());
+      }
+      else {
+        sn = command.substring(snPos + "xx_sn_xx=".length(), endPos);
+      }
+      existingSequenceNumber = Long.valueOf(sn);
+    }
+    return existingSequenceNumber;
+  }
 
   public void purge(String dbName) {
     if (null != getIndices(dbName) && null != getIndices(dbName).getIndices()) {
@@ -2873,7 +3482,11 @@ public class DatabaseServer {
     }
   }
 
-  public byte[] getRecoverProgress(String command, byte[] body, boolean replayedCommand) {
+  public byte[] setMaxSequenceNum(String command, byte[] body, boolean replayedCommand) {
+    return logManager.setMaxSequenceNum(command, body);
+  }
+
+    public byte[] getRecoverProgress(String command, byte[] body, boolean replayedCommand) {
 
     try {
       JsonDict dict = new JsonDict();
@@ -2887,6 +3500,46 @@ public class DatabaseServer {
     catch (UnsupportedEncodingException e) {
       throw new DatabaseException(e);
     }
+  }
+
+  public byte[] pushMaxSequenceNum(String command, byte[] body, boolean replayedCommand) {
+    logManager.pushMaxSequenceNum();
+    return null;
+  }
+
+  public byte[] prepareToComeAlive(String command, byte[] body, boolean replayedCommand) {
+    String slicePoint = null;
+    try {
+      command = "DatabaseServer:pushMaxSequenceNum:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+          common.getSchemaVersion() + ":__none__";
+      getClient().send(null, shard, 0, command, null, DatabaseClient.Replica.master,
+          true);
+
+      if (shard == 0) {
+        command = "DatabaseServer:pushMaxRecordId:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+            common.getSchemaVersion() + ":__none__";
+        getClient().send(null, shard, 0, command, null, DatabaseClient.Replica.master,
+            true);
+      }
+
+      for (int replica = 0; replica < replicationFactor; replica++) {
+        if (replica != this.replica) {
+          command = "DatabaseServer:sendLogsToPeer:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+              common.getSchemaVersion() + ":__none__:" + this.replica;
+          getClient().send(null, shard, replica, command, null, DatabaseClient.Replica.specified,
+              true);
+        }
+      }
+      onlyQueueCommands = true;
+      slicePoint = logManager.sliceLogs();
+      logManager.applyLogsFromPeers(slicePoint);
+    }
+    finally {
+      onlyQueueCommands = false;
+    }
+    logManager.applyLogsAfterSlice(slicePoint);
+
+    return null;
   }
 
   public byte[] reconfigureCluster(String command, byte[] body, boolean replayedCommand) {
@@ -2909,7 +3562,7 @@ public class DatabaseServer {
       if (config.hasKey("clientIsPrivate")) {
         isInternal = config.getBoolean("clientIsPrivate");
       }
-      DatabaseServer.ServersConfig newConfig = new DatabaseServer.ServersConfig(config.getArray("shards"),
+      DatabaseServer.ServersConfig newConfig = new DatabaseServer.ServersConfig(cluster, config.getArray("shards"),
           config.getArray("shards").getDict(0).getArray("replicas").size(), isInternal);
 
       common.setServersConfig(newConfig);
@@ -2933,8 +3586,10 @@ public class DatabaseServer {
   }
 
   public byte[] getConfig(String command, byte[] body, boolean replayedCommand) {
+    String[] parts = command.split(":");
+    int serializationVersionNumber = Integer.valueOf(parts[3]);
     try {
-      return common.serializeConfig();
+      return common.serializeConfig(serializationVersionNumber);
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -3040,7 +3695,6 @@ public class DatabaseServer {
       if (schemaVersion < getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + common.getSchemaVersion() + ":");
       }
-      //todo: replicate file to other replicasz
       long nextId;
       long maxId;
       synchronized (nextIdLock) {
@@ -3063,6 +3717,8 @@ public class DatabaseServer {
         }
       }
 
+      pushMaxRecordId(dbName, maxId);
+
       logger.info("Requesting next record id - finished: nextId=" + nextId + ", maxId=" + maxId);
 
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
@@ -3081,6 +3737,90 @@ public class DatabaseServer {
     }
   }
 
+  public byte[] pushMaxRecordId(String command, byte[] body, boolean replayedCommand) {
+    try {
+      synchronized (nextIdLock) {
+        File file = new File(dataDir, "nextRecordId/" + getShard() + "/" + getReplica() + "/nextRecorId.txt");
+        file.getParentFile().mkdirs();
+        if (file.exists()) {
+          try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
+            long maxId = Long.valueOf(reader.readLine());
+            pushMaxRecordId("__none__", maxId);
+          }
+        }
+      }
+      return null;
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  private void pushMaxRecordId(String dbName, long maxId) {
+    String command;
+    command = "DatabaseServer:setMaxRecordId:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+        common.getSchemaVersion() + ":" + dbName + ":" + maxId;
+
+    getDatabaseClient().send(null, 0, 0, command, null, DatabaseClient.Replica.def, true);
+  }
+
+  public byte[] setMaxRecordId(String command, byte[] body, boolean replayedCommand) {
+    if (replica == common.getServersConfig().getShards()[0].getMasterReplica()) {
+      return null;
+    }
+    String[] parts = command.split(":");
+    String dbName = parts[5];
+    Long maxId = Long.valueOf(parts[6]);
+    common.getSchemaReadLock(dbName).lock();
+    try {
+      logger.info("setMaxRecordId - begin");
+      synchronized (nextIdLock) {
+        File file = new File(dataDir, "nextRecordId/" + getShard() + "/" + getReplica() + "/nextRecorId.txt");
+        file.getParentFile().mkdirs();
+        file.delete();
+
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
+          writer.write(String.valueOf(maxId));
+        }
+      }
+
+      logger.info("setMaxRecordId - end");
+
+      return null;
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+    finally {
+      common.getSchemaReadLock(dbName).unlock();
+    }
+  }
+
+  public byte[] sendLogsToPeer(String command, byte[] body, boolean replayedCommand) {
+    String[] parts = command.split(":");
+    int replicaNum = Integer.valueOf(parts[6]);
+
+    logManager.sendLogsToPeer(replicaNum);
+
+    return null;
+  }
+
+  public byte[] sendQueueFile(String command, byte[] body, boolean replayedCommand) {
+    try {
+      DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
+      int peerReplica = in.readInt();
+      String filename = in.readUTF();
+      int len = in.readInt();
+      byte[] bytes = new byte[len];
+      in.readFully(bytes);
+
+      logManager.receiveExternalLog(peerReplica, filename, bytes);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+    return null;
+  }
 
   public byte[] deleteIndexEntryByKey(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
@@ -3358,6 +4098,24 @@ public class DatabaseServer {
     common.getSchemaReadLock(dbName).lock();
     try {
       return repartitioner.getIndexCounts(command, body);
+    }
+    finally {
+      common.getSchemaReadLock(dbName).unlock();
+    }
+  }
+
+  public byte[] testWrite(String command, byte[] body, boolean replayedCommand) {
+    logger.info("Called testWrite");
+    testWriteCallCount.incrementAndGet();
+    return null;
+  }
+
+  public byte[] deleteMovedRecords(String command, byte[] body, boolean replayedCommand) {
+    String[] parts = command.split(":");
+    String dbName = parts[5];
+    common.getSchemaReadLock(dbName).lock();
+    try {
+      return repartitioner.deleteMovedRecords(command, body);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
@@ -3645,7 +4403,7 @@ public class DatabaseServer {
                 getUpdateManager().populateIndex(command, null);
               }
               else {
-                getDatabaseClient().send(null, i, j, command, null, DatabaseClient.Replica.all);
+                getDatabaseClient().send(null, i, j, command, null, DatabaseClient.Replica.def);
               }
             }
           }

@@ -636,7 +636,13 @@ public class NettyServer {
     }
 
     private List<DatabaseServer.Response> processRequests(List<Request> requests) throws IOException {
-      return getDatabaseServer().handleCommands(requests, false, true);
+      List<DatabaseServer.Response> ret = new ArrayList<>();
+      for (Request request : requests) {
+        byte[] retBody = getDatabaseServer().handleCommand(request.command, request.body, false, true);
+        DatabaseServer.Response response = new DatabaseServer.Response(retBody);
+        ret.add(response);
+      }
+      return ret;
     }
 
     private byte[] processRequest(String command, byte[] body) {

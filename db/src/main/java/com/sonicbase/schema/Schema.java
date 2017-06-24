@@ -61,7 +61,7 @@ public class Schema {
     }
   }
 
-  public void deserialize(DatabaseCommon common, DataInputStream in) {
+  public void deserialize(DataInputStream in) {
     try {
       int serializationVersion = in.readInt();
       synchronized (schemaMutex) {
@@ -71,7 +71,7 @@ public class Schema {
         Map<Integer, TableSchema> newTablesById = new HashMap<>();
         for (int i = 0; i < tableCount; i++) {
           TableSchema table = new TableSchema();
-          table.deserialize(common, in, serializationVersion);
+          table.deserialize(in, serializationVersion);
           newTables.put(table.getName(), table);
           newTablesById.put(table.getTableId(), table);
         }

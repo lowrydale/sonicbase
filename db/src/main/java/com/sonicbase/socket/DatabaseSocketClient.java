@@ -593,9 +593,10 @@ public class DatabaseSocketClient {
           for (Request currRequest : requests) {
             try {
               processResponse(bytesIn, currRequest);
-            } catch (Exception t) {
+            }
+            catch (Exception t) {
               System.out.println("Error processing response: command=" + currRequest.command);
-              throw new DatabaseException(t);
+              throw new DeadServerException(t);
             }
           }
           break;
@@ -604,7 +605,7 @@ public class DatabaseSocketClient {
           sock.sock.close();//clientHandler.channel.close();
           connectionCount.decrementAndGet();
           shouldReturn = false;
-          logger.error("Error sending message", e);
+          throw new DeadServerException(e);
         }
         finally {
           if (shouldReturn) {
@@ -614,7 +615,7 @@ public class DatabaseSocketClient {
       }
     }
     catch (IOException e) {
-      throw new DatabaseException(e);
+      throw new DeadServerException(e);
     }
   }
 
@@ -713,7 +714,7 @@ public class DatabaseSocketClient {
         request.command = command;
         request.body = body;
 
-        batchKey = null;
+        batchKey = null; //disabling batch
         if (batchKey == null) {
           try {
             List<Request> nonMatchingRequets = new ArrayList<>();
@@ -735,10 +736,14 @@ public class DatabaseSocketClient {
         }
 
         if (request.exception != null) {
-          throw request.exception;
+          throw new DeadServerException(request.exception);
         }
         if (!request.success) {
-          throw new Exception(new String(request.response, "utf-8"));
+          String exceptionStr = new String(request.response, "utf-8");
+          if (exceptionStr.contains("Server not running")) {
+            throw new DeadServerException();
+          }
+          throw new Exception(exceptionStr);
         }
         return request.response;
       }
@@ -746,7 +751,7 @@ public class DatabaseSocketClient {
     }
     catch (Exception e) {
       String[] parts = hostPort.split(":");
-      throw new DatabaseException("Server error: host=" + parts[0] + ", port=" + parts[1], e);
+      throw new DeadServerException("Server error: host=" + parts[0] + ", port=" + parts[1], e);
     }
   }
 
@@ -776,7 +781,11 @@ public class DatabaseSocketClient {
             throw request.exception;
           }
           if (!request.success) {
-            throw new Exception(new String(request.response, "utf-8"));
+            String exceptionStr = new String(request.response, "utf-8");
+            if (exceptionStr.contains("Server not running")) {
+              throw new DeadServerException();
+            }
+            throw new Exception(exceptionStr);
           }
         }
         return requests.get(0).response;

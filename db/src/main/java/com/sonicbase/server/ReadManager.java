@@ -21,7 +21,6 @@ import java.io.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Responsible for
@@ -253,7 +252,6 @@ public class ReadManager {
 
       //out.writeInt(SNAPSHOT_SERIALIZATION_VERSION);
 
-      boolean firstResult = true;
       DataUtil.writeVLong(out, keyCount, resultLength);
       for (int i = 0; i < keyCount; i++) {
         int offset = (int) DataUtil.readVLong(in, resultLength);
@@ -271,13 +269,12 @@ public class ReadManager {
         List<byte[]> retKeys = new ArrayList<>();
         List<Record> retRecords = new ArrayList<>();
 
-        AtomicReference<byte[]> firstRecord = new AtomicReference<>();
         boolean forceSelectOnServer = false;
         if (indexSchema.isPrimaryKey()) {
-          doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, null, false, null, columnOffsets, forceSelectOnServer, null, leftKey, leftKey, leftOperator, index, ascending, retKeys, retRecords, firstRecord, server.getCommon().getSchemaVersion(), false, counters, groupContext);
+          doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, null, false, null, columnOffsets, forceSelectOnServer, null, leftKey, leftKey, leftOperator, index, ascending, retKeys, retRecords, server.getCommon().getSchemaVersion(), false, counters, groupContext);
         }
         else {
-          doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, null, false, null, columnOffsets, forceSelectOnServer, null, leftKey, leftKey, leftOperator, index, ascending, retKeys, retRecords, firstRecord, server.getCommon().getSchemaVersion(), true, counters, groupContext);
+          doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, null, false, null, columnOffsets, forceSelectOnServer, null, leftKey, leftKey, leftOperator, index, ascending, retKeys, retRecords, server.getCommon().getSchemaVersion(), true, counters, groupContext);
 
 //          if (indexSchema.isPrimaryKeyGroup()) {
 //            if (((Long)leftKey[0]) == 5) {
@@ -299,17 +296,11 @@ public class ReadManager {
           out.write(key);
         }
         DataUtil.writeVLong(out, retRecords.size(), resultLength);
-        if (retRecords.size() > 0) {
-          if (firstResult) {
-            byte[] bytes = retRecords.get(0).serialize(server.getCommon());
-            DataUtil.writeVLong(out, bytes.length, resultLength);
-            out.write(bytes);
-            firstResult = false;
-          }
-        }
         for (int j = 0; j < retRecords.size(); j++) {
           Record record = retRecords.get(j);
-          DatabaseCommon.serializeFields(record.getFields(), out, tableSchema, schemaVersion, false);
+          byte[] bytes = record.serialize(server.getCommon());
+          DataUtil.writeVLong(out, bytes.length, resultLength);
+          out.write(bytes);
         }
       }
 
@@ -590,11 +581,9 @@ public class ReadManager {
         }
       }
 
-
-      AtomicReference<byte[]> firstRecord = new AtomicReference<>();
       if (indexSchema.isPrimaryKey()) {
         if (rightOperator == null) {
-          entry = doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, parms, evaluateExpression, expression, columnOffsets, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, leftOperator, index, ascending, retKeys, retRecords, firstRecord, viewVersion, false, counters, groupContext);
+          entry = doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, parms, evaluateExpression, expression, columnOffsets, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, leftOperator, index, ascending, retKeys, retRecords, viewVersion, false, counters, groupContext);
         }
         else {
           entry = doIndexLookupTwoKeys(dbName, count, tableSchema, indexSchema, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, columnOffsets, originalRightKey, rightKey, leftOperator, rightOperator, parms, evaluateExpression, expression, index, ascending, retKeys, retRecords, false, counters, groupContext);
@@ -603,7 +592,7 @@ public class ReadManager {
       }
       else {
         if (rightOperator == null) {
-          entry = doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, parms, evaluateExpression, expression, columnOffsets, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, leftOperator, index, ascending, retKeys, retRecords, firstRecord, viewVersion, true, counters, groupContext);
+          entry = doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, parms, evaluateExpression, expression, columnOffsets, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, leftOperator, index, ascending, retKeys, retRecords, viewVersion, true, counters, groupContext);
         }
         else {
           entry = doIndexLookupTwoKeys(dbName, count, tableSchema, indexSchema, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, columnOffsets, originalRightKey, rightKey, leftOperator, rightOperator, parms, evaluateExpression, expression, index, ascending, retKeys, retRecords, true, counters, groupContext);
@@ -626,22 +615,13 @@ public class ReadManager {
         DataUtil.writeVLong(out, key.length, resultLength);
         out.write(key);
       }
-      if (firstRecord.get() != null) {
-        DataUtil.writeVLong(out, retRecords.size() + 1, resultLength);
-        DataUtil.writeVLong(out, firstRecord.get().length, resultLength);
-        out.write(firstRecord.get());
-      }
-      else {
-        DataUtil.writeVLong(out, retRecords.size(), resultLength);
-        if (retRecords.size() > 0) {
-          byte[] bytes = retRecords.get(0).serialize(server.getCommon());
-          DataUtil.writeVLong(out, bytes.length, resultLength);
-          out.write(bytes);
-        }
-      }
-      for (int i = firstRecord.get() == null ? 1 : 0; i < retRecords.size(); i++) {
+      DataUtil.writeVLong(out, retRecords.size(), resultLength);
+
+      for (int i = 0; i < retRecords.size(); i++) {
         Record record = retRecords.get(i);
-        DatabaseCommon.serializeFields(record.getFields(), out, tableSchema, schemaVersion, false);
+        byte[] bytes = record.serialize(server.getCommon());
+        DataUtil.writeVLong(out, bytes.length, resultLength);
+        out.write(bytes);
       }
 
       if (counters == null) {
@@ -1354,7 +1334,6 @@ public class ReadManager {
       Boolean ascending,
       List<byte[]> retKeys,
       List<Record> retRecords,
-      AtomicReference<byte[]> firstRecord,
       long viewVersion,
       boolean keys,
       Counter[] counters,
@@ -1391,16 +1370,19 @@ public class ReadManager {
           }
         }
         if (value != null) {
-          if (records != null && records[0].length < 300 && !keys && (true ||operator == BinaryExpression.Operator.equal) && firstRecord.get() == null &&
-              (parms == null || expression == null || !evaluateExpresion) && groupContext == null && counters == null) {
-            firstRecord.set(records[0]);
-            for (int i = 1; i < records.length; i++) {
-              retRecords.add(new Record(dbName, server.getCommon(), records[i], columnOffsets , false));
-            }
+//          if (records != null && records[0].length < 300 && !keys && (true ||operator == BinaryExpression.Operator.equal)  &&
+//              (parms == null || expression == null || !evaluateExpresion) && groupContext == null && counters == null) {
+//            for (int i = 0; i < records.length; i++) {
+//              retRecords.add(new Record(dbName, server.getCommon(), records[i], columnOffsets , true));
+//            }
+//          }
+//          else {
+          Object[] keyToUse = key;
+          if (keyToUse == null) {
+            keyToUse = originalKey;
           }
-          else {
-            handleRecord(dbName, tableSchema, parms, evaluateExpresion, expression, columnOffsets, forceSelectOnServer, retKeys, retRecords, keys, counters, groupContext, records, currKeys);
-          }
+            handleRecord(dbName, tableSchema, indexSchema, viewVersion, index, keyToUse, parms, evaluateExpresion, expression, columnOffsets, forceSelectOnServer, retKeys, retRecords, keys, counters, groupContext, records, currKeys);
+          //}
         }
       }
       else {
@@ -1437,16 +1419,21 @@ public class ReadManager {
                 }
               }
             }
-            if (records != null && records[0].length < 300 && !keys && (true || operator == BinaryExpression.Operator.equal) && firstRecord.get() == null &&
-                (parms == null || expression == null || !evaluateExpresion) && groupContext == null && counters == null) {
-              firstRecord.set(records[0]);
-              for (int i = 1; i < records.length; i++) {
-                retRecords.add(new Record(dbName, server.getCommon(), records[i], columnOffsets , false));
-              }
+//            if (records != null && records[0].length < 300 && !keys && (true || operator == BinaryExpression.Operator.equal) &&
+//                (parms == null || expression == null || !evaluateExpresion) && groupContext == null && counters == null) {
+//              for (int i = 0; i < records.length; i++) {
+//                retRecords.add(new Record(dbName, server.getCommon(), records[i], columnOffsets , true));
+//              }
+//            }
+//            else {
+            Object[] keyToUse = key;
+            if (keyToUse == null) {
+              keyToUse = originalKey;
             }
-            else {
-              handleRecord(dbName, tableSchema, parms, evaluateExpresion, expression, columnOffsets, forceSelectOnServer, retKeys, retRecords, keys, counters, groupContext, records, currKeys);
+            if (value != null) {
+              handleRecord(dbName, tableSchema, indexSchema, viewVersion, index, keyToUse, parms, evaluateExpresion, expression, columnOffsets, forceSelectOnServer, retKeys, retRecords, keys, counters, groupContext, records, currKeys);
             }
+                //            }
           }
         }
       }
@@ -1669,59 +1656,7 @@ public class ReadManager {
             }
           }
           else {
-            if (records != null) {
-              if (server.getCommon().getTables(dbName).get(tableSchema.getName()).getIndices().get(indexSchema.getName()).getLastPartitions() != null) {
-                List<byte[]> remaining = new ArrayList<>();
-                for (byte[] bytes : records) {
-                  long dbViewNum = Record.getDbViewNumber(bytes);
-                  long dbViewFlags = Record.getDbViewFlags(bytes);
-                  if (dbViewNum <= viewVersion) {
-                    remaining.add(bytes);
-                  }
-                  else if (//dbViewNum < server.getCommon().getSchema().getVersion()  ||
-                      (dbViewFlags & Record.DB_VIEW_FLAG_ADDING) == 0
-                      ) {
-                    remaining.add(bytes);
-                  }
-                }
-                if (remaining.size() == 0) {
-                  records = null;
-                }
-                else {
-                  records = remaining.toArray(new byte[remaining.size()][]);
-                }
-              }
-              else {
-                List<byte[]> remaining = new ArrayList<>();
-                if (records != null) {
-                  for (byte[] bytes : records) {
-                    long dbViewNum = Record.getDbViewNumber(bytes);
-                    long dbViewFlags = Record.getDbViewFlags(bytes);
-                    if (dbViewNum <= viewVersion && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
-                      remaining.add(bytes);
-                    }
-                    else if (dbViewNum == server.getSchemaVersion() ||
-                        (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
-                      //        remaining.add(bytes);
-                    }
-                    else if ((dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
-                      synchronized (index.getMutex(currEntry.getKey())) {
-                        Object unsafeAddress = index.remove(currEntry.getKey());
-                        if (unsafeAddress != null) {
-                          server.freeUnsafeIds(unsafeAddress);
-                        }
-                      }
-                    }
-                  }
-                  if (remaining.size() == 0) {
-                    records = null;
-                  }
-                  else {
-                    records = remaining.toArray(new byte[remaining.size()][]);
-                  }
-                }
-              }
-            }
+            records = processViewFlags(dbName, tableSchema, indexSchema, index, viewVersion, currEntry.getKey(), records);
             if (records != null) {
               if (parms != null && expression != null && evaluateExpresion) {
                 for (byte[] bytes : records) {
@@ -1730,11 +1665,10 @@ public class ReadManager {
                   boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
                   if (pass) {
                     byte[][] currRecords = new byte[][]{bytes};
-                    if (currRecords != null && currRecords[0].length < 300 && (true || operator == BinaryExpression.Operator.equal) && firstRecord.get() == null && groupContext == null && counters == null) {
-                      firstRecord.set(currRecords[0]);
-//                      for (int i = 1; i < currRecords.length; i++) {
-//                        retRecords.add(new Record(dbName, server.getCommon(), currRecords[i], columnOffsets , false));
-//                      }
+                    if (currRecords != null && currRecords[0].length < 300 && (true || operator == BinaryExpression.Operator.equal) && groupContext == null && counters == null) {
+                      for (int i = 0; i < currRecords.length; i++) {
+                        retRecords.add(new Record(dbName, server.getCommon(), currRecords[i], columnOffsets , true));
+                      }
                     }
                     else {
                       Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, null, tableSchema, counters, groupContext);
@@ -1749,16 +1683,17 @@ public class ReadManager {
                 if (records.length > 2) {
                   logger.error("Records size: " + records.length);
                 }
-                if (records != null && records[0].length < 300 && (true || operator == BinaryExpression.Operator.equal) && firstRecord.get() == null && groupContext == null && counters == null) {
-                  firstRecord.set(records[0]);
-                  for (int i = 1; i < records.length; i++) {
-                    retRecords.add(new Record(dbName, server.getCommon(), records[i], columnOffsets , false));
+                if (records != null) {
+                  if (records[0].length < 300 && (true || operator == BinaryExpression.Operator.equal) && groupContext == null && counters == null) {
+                    for (int i = 0; i < records.length; i++) {
+                      retRecords.add(new Record(dbName, server.getCommon(), records[i], columnOffsets, true));
+                    }
                   }
-                }
-                else {
-                  Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, entry.getKey(), tableSchema, counters, groupContext);
-                  if (counters == null) {
-                    retRecords.addAll(Arrays.asList(ret));
+                  else {
+                    Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, entry.getKey(), tableSchema, counters, groupContext);
+                    if (counters == null) {
+                      retRecords.addAll(Arrays.asList(ret));
+                    }
                   }
                 }
               }
@@ -1800,31 +1735,130 @@ public class ReadManager {
     return entry;
   }
 
-  private void handleRecord(String dbName, TableSchema tableSchema, ParameterHandler parms, boolean evaluateExpresion, Expression expression, Set<Integer> columnOffsets, boolean forceSelectOnServer, List<byte[]> retKeys, List<Record> retRecords, boolean keys, Counter[] counters, GroupByContext groupContext, byte[][] records, byte[][] currKeys) {
+  private byte[][] processViewFlags(String dbName, TableSchema tableSchema, IndexSchema indexSchema, Index index,
+                                    long viewVersion, Object[] key, byte[][] records) {
+    if (records != null) {
+      if (server.getCommon().getTables(dbName).get(tableSchema.getName()).getIndices().get(indexSchema.getName()).getLastPartitions() != null) {
+        List<byte[]> remaining = new ArrayList<>();
+        for (byte[] bytes : records) {
+          long dbViewNum = Record.getDbViewNumber(bytes);
+          long dbViewFlags = Record.getDbViewFlags(bytes);
+          if (dbViewNum <= viewVersion) {
+            remaining.add(bytes);
+          }
+          else if (//dbViewNum < server.getCommon().getSchema().getVersion()  ||
+              (dbViewFlags & Record.DB_VIEW_FLAG_ADDING) == 0
+              ) {
+            remaining.add(bytes);
+          }
+        }
+        if (remaining.size() == 0) {
+          records = null;
+        }
+        else {
+          records = remaining.toArray(new byte[remaining.size()][]);
+        }
+      }
+      else {
+        List<byte[]> remaining = new ArrayList<>();
+        if (records != null) {
+          for (byte[] bytes : records) {
+            long dbViewNum = Record.getDbViewNumber(bytes);
+            long dbViewFlags = Record.getDbViewFlags(bytes);
+//                    if (dbViewNum > viewVersion && (dbViewFlags & Record.DB_VIEW_FLAG_ADDING) != 0) {
+//
+//                    }
+//                    else
+              if (dbViewNum <= viewVersion && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
+              remaining.add(bytes);
+            }
+            else if (dbViewNum == server.getSchemaVersion() ||
+                (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
+              //        remaining.add(bytes);
+            }
+            else if ((dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
+              synchronized (index.getMutex(key)) {
+                Object unsafeAddress = index.remove(key);
+                if (unsafeAddress != null) {
+                  server.freeUnsafeIds(unsafeAddress);
+                }
+              }
+            }
+          }
+          if (remaining.size() == 0) {
+            records = null;
+          }
+          else {
+            records = remaining.toArray(new byte[remaining.size()][]);
+          }
+        }
+      }
+    }
+    return records;
+  }
+
+  private void handleRecord(String dbName, TableSchema tableSchema, IndexSchema indexSchema, long viewVersion, Index index, Object[] key, ParameterHandler parms, boolean evaluateExpresion, Expression expression, Set<Integer> columnOffsets, boolean forceSelectOnServer, List<byte[]> retKeys, List<Record> retRecords, boolean keys, Counter[] counters, GroupByContext groupContext, byte[][] records, byte[][] currKeys) {
     if (keys) {
       for (byte[] currKey : currKeys) {
         retKeys.add(currKey);
       }
     }
     else {
-      if (parms != null && expression != null && evaluateExpresion) {
+      records = processViewFlags(dbName, tableSchema, indexSchema, index, viewVersion, key, records);
+
+      List<byte[]> remaining = new ArrayList<>();
+      if (records != null) {
         for (byte[] bytes : records) {
-          Record record = new Record(tableSchema);
-          record.deserialize(dbName, server.getCommon(), bytes, null, true);
-          boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
-          if (pass) {
-            byte[][] currRecords = new byte[][]{bytes};
-            Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, null, tableSchema, counters, groupContext);
-            if (counters == null) {
-              retRecords.add(ret[0]);
+          long dbViewNum = Record.getDbViewNumber(bytes);
+          long dbViewFlags = Record.getDbViewFlags(bytes);
+//                    if (dbViewNum > viewVersion && (dbViewFlags & Record.DB_VIEW_FLAG_ADDING) != 0) {
+//
+//                    }
+//                    else
+          if (dbViewNum <= viewVersion && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
+            remaining.add(bytes);
+          }
+          else if (dbViewNum == server.getSchemaVersion() ||
+              (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
+            //        remaining.add(bytes);
+          }
+          else if ((dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
+            synchronized (index.getMutex(key)) {
+              Object unsafeAddress = index.remove(key);
+              if (unsafeAddress != null) {
+                server.freeUnsafeIds(unsafeAddress);
+              }
             }
           }
         }
+        if (remaining.size() == 0) {
+          records = null;
+        }
+        else {
+          records = remaining.toArray(new byte[remaining.size()][]);
+        }
       }
-      else {
-        Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, null, tableSchema, counters, groupContext);
-        if (counters == null) {
-          retRecords.addAll(Arrays.asList(ret));
+
+      if (records != null) {
+        if (parms != null && expression != null && evaluateExpresion) {
+          for (byte[] bytes : records) {
+            Record record = new Record(tableSchema);
+            record.deserialize(dbName, server.getCommon(), bytes, null, true);
+            boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
+            if (pass) {
+              byte[][] currRecords = new byte[][]{bytes};
+              Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, null, tableSchema, counters, groupContext);
+              if (counters == null) {
+                retRecords.add(ret[0]);
+              }
+            }
+          }
+        }
+        else {
+          Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, null, tableSchema, counters, groupContext);
+          if (counters == null) {
+            retRecords.addAll(Arrays.asList(ret));
+          }
         }
       }
     }

@@ -150,7 +150,7 @@ public abstract class ExpressionImpl implements Expression {
     int shardCount = common.getServersConfig().getShardCount();
     int replicaCount = common.getServersConfig().getShards()[0].getReplicas().length;
     for (int i = 0; i < shardCount; i++) {
-      byte[] ret = client.send(batchKey, i, ThreadLocalRandom.current().nextInt(replicaCount), command, bytes, DatabaseClient.Replica.specified);
+      byte[] ret = client.send(batchKey, i, 0, command, bytes, DatabaseClient.Replica.def);
       DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
       Counter retCounter = new Counter();
       retCounter.deserialize(in);
@@ -1106,22 +1106,12 @@ public abstract class ExpressionImpl implements Expression {
                 int recordCount = (int) DataUtil.readVLong(in, resultLength);
                 if (recordCount != 0) {
                   Record[] records = new Record[recordCount];
-                  if (headerRecord == null) {
-                    int len = (int) DataUtil.readVLong(in, resultLength);
-                    byte[] recordBytes = new byte[len];
-                    in.readFully(recordBytes);
-                    headerRecord = new Record(dbName, common, recordBytes);
-                    serializedSchemaVersion = new AtomicInteger(headerRecord.getSerializedSchemaVersion());
-                  }
 
                   for (int l = 0; l < recordCount; l++) {
                     int len = (int) DataUtil.readVLong(in, resultLength);
                     byte[] recordBytes = new byte[len];
                     in.readFully(recordBytes);
-                    Object[] currFields = DatabaseCommon.deserializeFields(dbName, common, recordBytes, 0, tableSchema, common.getSchemaVersion(), null, serializedSchemaVersion, false);
-                    Record currRecord = new Record(tableSchema);
-                    currRecord.setFields(currFields);
-                    records[l] = currRecord;
+                    records[l] = new Record(dbName, common, recordBytes);
                   }
 
                   aggregateRecords(retRecords, offset, records);
@@ -1252,7 +1242,7 @@ public abstract class ExpressionImpl implements Expression {
                 String command = "DatabaseServer:expirePreparedStatement:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION +
                     ":" + client.getCommon().getSchemaVersion() + ":null:" + prepared.getValue().preparedId;
 
-                client.sendToAllShards(null, 0, command, null, DatabaseClient.Replica.all);
+                client.sendToAllShards(null, 0, command, null, DatabaseClient.Replica.def);
               }
             }
             Thread.sleep(10 * 1000);
@@ -1596,7 +1586,7 @@ public abstract class ExpressionImpl implements Expression {
             }
 
             //Timer.Context ctx = INDEX_LOOKUP_SEND_STATS.time();
-            byte[] lookupRet = client.send(batchKey, localShard, replica, command, bytes, DatabaseClient.Replica.specified);
+            byte[] lookupRet = client.send(batchKey, localShard, 0, command, bytes, DatabaseClient.Replica.def);
             //ctx.stop();
 
             prepared.serversPrepared[localShard][replica] = true;
@@ -1665,22 +1655,11 @@ public abstract class ExpressionImpl implements Expression {
             int recordCount = (int) DataUtil.readVLong(in, resultLength);
             Record[] currRetRecords = new Record[recordCount];
             if (recordCount > 0) {
-              int len = (int) DataUtil.readVLong(in, resultLength);
-              byte[] recordBytes = new byte[len];
-              in.readFully(recordBytes);
-              Record record = new Record(dbName, common, recordBytes);
-              currRetRecords[0] = record;
-              AtomicInteger serializedSchemaVersion = new AtomicInteger(record.getSerializedSchemaVersion());
-
-              for (int k = 1; k < recordCount; k++) {
-                len = (int) DataUtil.readVLong(in, resultLength);
-                recordBytes = new byte[len];
+              for (int k = 0; k < recordCount; k++) {
+                int len = (int) DataUtil.readVLong(in, resultLength);
+                byte[] recordBytes = new byte[len];
                 in.readFully(recordBytes);
-                Object[] currFields = DatabaseCommon.deserializeFields(dbName, common, recordBytes, 0, tableSchema, common.getSchemaVersion(), null, serializedSchemaVersion, false);
-                Record currRecord = new Record(tableSchema);
-                currRecord.setFields(currFields);
-
-                currRetRecords[k] = currRecord;
+                currRetRecords[k] = new Record(dbName, client.getCommon(), recordBytes);
                 if (debug) {
                   System.out.println("hit record: shard=" + calledShard + ", replica=" + replica);
                 }

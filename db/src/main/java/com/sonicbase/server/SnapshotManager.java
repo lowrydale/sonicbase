@@ -30,7 +30,9 @@ public class SnapshotManager {
   public Logger logger;
 
   public static final int SNAPSHOT_BUCKET_COUNT = 128;
-  public static final int SNAPSHOT_SERIALIZATION_VERSION = 20;
+  public static final int SNAPSHOT_SERIALIZATION_VERSION = 21;
+  public static final int SNAPSHOT_SERIALIZATION_VERSION_21 = 21;
+  public static final int SNAPSHOT_SERIALIZATION_VERSION_20 = 20;
   public static final int SNAPSHOT_SERIALIZATION_VERSION_19 = 19;
 
   private final DatabaseServer server;

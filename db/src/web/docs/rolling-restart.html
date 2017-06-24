@@ -2,14 +2,14 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>SonicBase - Pro Features</title>
+    <meta name="description" content="Instructions on how to do a rolling restart for a SonicBase cluster">
+
+    <title>SonicBase - Rolling Restart</title>
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="SonicBase Pro version features. You may gain access to the features by paying a licensing fee.">
     <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
     <script type="text/javascript" src="../javascript/main.js"></script>
 </head>
-
 <body>
 <div class="container">
     <header id="myHeader">
@@ -33,20 +33,13 @@
 
 
     <div style="margin-left: 4em;">
-<br/>
-    For a small fee, you will soon be able to unlock the following features:<br/>
-<h1>Features</h1>
-<ul>
-    <li>Replication</li>
-    <li>Backup and Restore</li>
-    <li>Cross-Shard Joins</li>
-    <li>Cross-Shard Transactions</li>
-    <li>Monitoring</li>
-    <li>Rolling Restart</li>
-    <li>24-hour Priority Response Email Support</li>
 
-</ul>
-<br/>
+<h1>Rolling Restart</h1>
+        Rolling restarts can be invoked when more that one replica is configured. To do the rolling restart,
+        Sonicbase stops the first replica. Then Sonicbase starts the first replica. When the first replica is completely
+        started, the next replica is stopped then started. And so forth. This should ensure that there is no interruption
+        of service while starting the cluster. The command to restart the cluster is "restart cluster".
+
 </div>
 </div>
 </body>

@@ -1,9 +1,7 @@
 package com.sonicbase.index;
 
 import com.sonicbase.client.DatabaseClient;
-import com.sonicbase.common.DatabaseCommon;
-import com.sonicbase.common.Logger;
-import com.sonicbase.common.Record;
+import com.sonicbase.common.*;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.OrderByExpressionImpl;
@@ -24,6 +22,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+
+import static org.yaml.snakeyaml.tokens.Token.ID.Tag;
 
 /**
  * Responsible for
@@ -263,11 +263,17 @@ public class Repartitioner extends Thread {
             futures.add(executor.submit(new Callable() {
               @Override
               public Object call() {
-                String command = "DatabaseServer:rebalanceOrderedIndex:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION +
-                    ":" + common.getSchemaVersion() + ":" + dbName + ":" + finalTableName + ":" + indexName;
+                ComObject cobj = new ComObject();
+                cobj.put(ComObject.Tag.dbName, dbName);
+                cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+                cobj.put(ComObject.Tag.tableName, finalTableName);
+                cobj.put(ComObject.Tag.indexName, indexName);
+                cobj.put(ComObject.Tag.method, "rebalanceOrderedIndex");
+                String command = "DatabaseServer:ComObject:rebalanceOrderedIndex:";
                 Random rand = new Random(System.currentTimeMillis());
                 try {
-                  databaseServer.getDatabaseClient().send(null, shard, rand.nextLong(), command, null, DatabaseClient.Replica.master);
+                  databaseServer.getDatabaseClient().send(null, shard, rand.nextLong(), command,
+                      cobj.serialize(), DatabaseClient.Replica.master);
                 }
                 catch (Exception e) {
                   logger.error("Error sending rebalanceOrderedIndex to shard: shard=" + shard, e);
@@ -580,58 +586,50 @@ public class Repartitioner extends Thread {
     return null;
   }
 
-  public byte[] isRepartitioningRecordsByIdComplete(String command, byte[] body) {
-    try {
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-      boolean finished = isRepartitioningRecordsByIdComplete();
-      out.writeBoolean(finished);
-      return bytesOut.toByteArray();
-    }
-    catch (IOException e) {
-      throw new DatabaseException(e);
-    }
+//  public byte[] isRepartitioningRecordsByIdComplete(String command, byte[] body) {
+//    try {
+//      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+//      DataOutputStream out = new DataOutputStream(bytesOut);
+//      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+//      boolean finished = isRepartitioningRecordsByIdComplete();
+//      out.writeBoolean(finished);
+//      return bytesOut.toByteArray();
+//    }
+//    catch (IOException e) {
+//      throw new DatabaseException(e);
+//    }
+//  }
+//
+//  private boolean isRepartitioningRecordsByIdComplete() {
+//    boolean finished = true;
+//    for (AtomicInteger entry : repartitioningRecordsByIdComplete.values()) {
+//      if (entry.get() > 0) {
+//        finished = false;
+//        break;
+//      }
+//    }
+//    return finished;
+//  }
+
+  public byte[] isRepartitioningComplete(ComObject cobj) {
+    ComObject retObj = new ComObject();
+    retObj.put(ComObject.Tag.finished, isRepartitioningComplete());
+    return retObj.serialize();
   }
 
-  private boolean isRepartitioningRecordsByIdComplete() {
-    boolean finished = true;
-    for (AtomicInteger entry : repartitioningRecordsByIdComplete.values()) {
-      if (entry.get() > 0) {
-        finished = false;
-        break;
-      }
-    }
-    return finished;
-  }
-
-  public byte[] isRepartitioningComplete(String command, byte[] body) {
-    try {
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-      boolean finished = isRepartitioningComplete();
-      out.writeBoolean(finished);
-      return bytesOut.toByteArray();
-    }
-    catch (IOException e) {
-      throw new DatabaseException(e);
-    }
-  }
-
-  public byte[] isDeletingComplete(String command, byte[] body) {
-    try {
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-      boolean finished = isDeletingComplete();
-      out.writeBoolean(finished);
-      return bytesOut.toByteArray();
-    }
-    catch (IOException e) {
-      throw new DatabaseException(e);
-    }
-  }
+//  public byte[] isDeletingComplete(String command, byte[] body) {
+//    try {
+//      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+//      DataOutputStream out = new DataOutputStream(bytesOut);
+//      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+//      boolean finished = isDeletingComplete();
+//      out.writeBoolean(finished);
+//      return bytesOut.toByteArray();
+//    }
+//    catch (IOException e) {
+//      throw new DatabaseException(e);
+//    }
+//  }
 
   private boolean isRepartitioningComplete() {
     boolean finished = true;
@@ -644,62 +642,62 @@ public class Repartitioner extends Thread {
     return finished;
   }
 
-  public boolean isDeletingComplete() {
-    boolean finished = true;
-    for (boolean entry : deletingComplete.values()) {
-      if (!entry) {
-        finished = false;
-        break;
-      }
-    }
-    return finished;
-  }
+//  public boolean isDeletingComplete() {
+//    boolean finished = true;
+//    for (boolean entry : deletingComplete.values()) {
+//      if (!entry) {
+//        finished = false;
+//        break;
+//      }
+//    }
+//    return finished;
+//  }
 
-  public byte[] notifyRepartitioningComplete(String command, byte[] body) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
-    int shard = Integer.valueOf(parts[6]);
-    int replica = Integer.valueOf(parts[7]);
+  public byte[] notifyRepartitioningComplete(ComObject cobj) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
+    int shard = cobj.getInt(ComObject.Tag.shard);
     repartitioningComplete.put(shard, true);
     return null;
   }
 
-  public byte[] notifyDeletingComplete(String command, byte[] body) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
-    int shard = Integer.valueOf(parts[6]);
-    int replica = Integer.valueOf(parts[7]);
-    deletingComplete.put(shard + ":" + replica, true);
-    return null;
-  }
+//  public byte[] notifyDeletingComplete(String command, byte[] body) {
+//    String[] parts = command.split(":");
+//    String dbName = parts[5];
+//    int shard = Integer.valueOf(parts[6]);
+//    int replica = Integer.valueOf(parts[7]);
+//    deletingComplete.put(shard + ":" + replica, true);
+//    return null;
+//  }
 
   private List<Object[]> getKeyAtOffset(String dbName, int shard, String tableName, String indexName, List<OffsetEntry> offsets) throws IOException {
     logger.info("getKeyAtOffset: dbName=" + dbName + ", shard=" + shard + ", table=" + tableName +
         ", index=" + indexName + ", offsetCount=" + offsets.size());
     long begin = System.currentTimeMillis();
-    String command = "DatabaseServer:getKeyAtOffset:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-        common.getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + indexName;
-    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-    DataOutputStream out = new DataOutputStream(bytesOut);
-    out.writeInt(offsets.size());
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.dbName, dbName);
+    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+    cobj.put(ComObject.Tag.tableName, tableName);
+    cobj.put(ComObject.Tag.indexName, indexName);
+    cobj.put(ComObject.Tag.method, "getKeyAtOffset");
+    String command = "DatabaseServer:ComObject:getKeyAtOffset:";
+    ComArray array = cobj.putArray(ComObject.Tag.offsets, ComObject.Type.longType);
     for (OffsetEntry offset : offsets) {
-      out.writeLong(offset.offset);
+      array.add(offset.offset);
     }
-    out.close();
-    Random rand = new Random(System.currentTimeMillis());
-    byte[] ret = databaseServer.getDatabaseClient().send(null, shard, rand.nextLong(), command, bytesOut.toByteArray(), DatabaseClient.Replica.master);
+    byte[] ret = databaseServer.getDatabaseClient().send(null, shard, 0, command, cobj.serialize(), DatabaseClient.Replica.master);
 
     if (ret == null) {
       throw new IllegalStateException("Key not found on shard: shard=" + shard + ", table=" + tableName + ", index=" + indexName );
     }
 
-    DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
-    long serializationVersion = DataUtil.readVLong(in);
-    int count = in.readInt();
+    ComObject retObj = new ComObject(ret);
+    ComArray keyArray = retObj.getArray(ComObject.Tag.keys);
     List<Object[]> keys = new ArrayList<>();
-    for (int i = 0; i < count; i++) {
-      Object[] key = DatabaseCommon.deserializeKey(common.getTables(dbName).get(tableName), in);
-      keys.add(key);
+    if (keyArray != null) {
+      for (int i = 0; i < keyArray.getArray().size(); i++) {
+        Object[] key = DatabaseCommon.deserializeKey(common.getTables(dbName).get(tableName), (byte[])keyArray.getArray().get(i));
+        keys.add(key);
+      }
     }
 
     logger.info("getKeyAtOffset finished: dbName=" + dbName + ", shard=" + shard + ", table=" + tableName +
@@ -708,17 +706,17 @@ public class Repartitioner extends Thread {
     return keys;
   }
 
-  public byte[] getKeyAtOffset(String command, byte[] body) {
+  public byte[] getKeyAtOffset(ComObject cobj) {
     try {
-      String[] parts = command.split(":");
-      String dbName = parts[5];
-      String tableName = parts[6];
-      String indexName = parts[7];
-      DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
+      String dbName = cobj.getString(ComObject.Tag.dbName);
+      String tableName = cobj.getString(ComObject.Tag.tableName);
+      String indexName = cobj.getString(ComObject.Tag.indexName);
       List<Long> offsets = new ArrayList<>();
-      int count = in.readInt();
-      for (int i = 0; i < count; i++) {
-        offsets.add(in.readLong());
+      ComArray offsetsArray = cobj.getArray(ComObject.Tag.offsets);
+      if (offsetsArray != null) {
+        for (int i = 0; i < offsetsArray.getArray().size(); i++) {
+          offsets.add((Long)offsetsArray.getArray().get(i));
+        }
       }
       final IndexSchema indexSchema = common.getTables(dbName).get(tableName).getIndices().get(indexName);
       final Index index = databaseServer.getIndices(dbName).getIndices().get(tableName).get(indexName);
@@ -773,16 +771,13 @@ public class Repartitioner extends Thread {
 
 
       if (keys != null) {
-        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-        DataOutputStream out = new DataOutputStream(bytesOut);
         try {
-          DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-          out.writeInt(keys.size());
+          ComObject retObj = new ComObject();
+          ComArray array = retObj.putArray(ComObject.Tag.keys, ComObject.Type.byteArrayType);
           for (Object[] key : keys) {
-            out.write(DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), indexName, key));
+            array.add(DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), indexName, key));
           }
-          out.close();
-          return bytesOut.toByteArray();
+          return retObj.serialize();
         }
         catch (Exception e) {
           throw new DatabaseException(e);
@@ -797,71 +792,62 @@ public class Repartitioner extends Thread {
   }
 
   private long getPartitionSize(String dbName, int shard, String tableName, String indexName) {
-    try {
-      String command = "DatabaseServer:getPartitionSize:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-          common.getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + indexName;
-      Random rand = new Random(System.currentTimeMillis());
-      byte[] ret = databaseServer.getDatabaseClient().send(null, shard, rand.nextLong(), command, null, DatabaseClient.Replica.master);
-      DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
-      long serializationVersion = DataUtil.readVLong(in);
-      return in.readLong();
-    }
-    catch (IOException e) {
-      throw new DatabaseException(e);
-    }
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.dbName, dbName);
+    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+    cobj.put(ComObject.Tag.tableName, tableName);
+    cobj.put(ComObject.Tag.indexName, indexName);
+    cobj.put(ComObject.Tag.method, "getPartitionSize");
+    String command = "DatabaseServer:ComObject:getPartitionSize:";
+    Random rand = new Random(System.currentTimeMillis());
+    byte[] ret = databaseServer.getDatabaseClient().send(null, shard, rand.nextLong(), command,
+        cobj.serialize(), DatabaseClient.Replica.master);
+    ComObject retObj = new ComObject(ret);
+    return retObj.getLong(ComObject.Tag.size);
   }
 
-  public byte[] getPartitionSize(String command, byte[] body) {
-    try {
-      String[] parts = command.split(":");
-      String dbName = parts[5];
-      String tableName = parts[6];
-      String indexName = parts[7];
+  public byte[] getPartitionSize(ComObject cobj) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
+    String tableName = cobj.getString(ComObject.Tag.tableName);
+    String indexName = cobj.getString(ComObject.Tag.indexName);
 
-      logger.info("getPartitionSize: dbName=" + dbName + ", table=" + tableName + ", index=" + indexName);
-      if (dbName == null || tableName == null || indexName == null) {
-        logger.error("getPartitionSize: parm is null: dbName=" + dbName + ", table=" + tableName + ", index=" + indexName);
-      }
-      //todo: really need to read all the records to get an accurate count
-      Indices tables = databaseServer.getIndices(dbName);
-      if (tables == null) {
-        logger.error("getPartitionSize: tables is null");
-        return null;
-      }
-      ConcurrentHashMap<String, Index> indices = tables.getIndices().get(tableName);
-      if (indices == null) {
-        logger.error("getPartitionSize: indices is null");
-        return null;
-      }
-      Index index = indices.get(indexName);
-      IndexSchema indexSchema = common.getTables(dbName).get(tableName).getIndexes().get(indexName);
-
-      TableSchema.Partition[] partitions = indexSchema.getCurrPartitions();
-      Object[] minKey = null;
-      Object[] maxKey = null;
-      if (databaseServer.getShard() == 0) {
-        if (index.firstEntry() != null) {
-          minKey = index.firstEntry().getKey();
-        }
-      }
-      else {
-        minKey = partitions[databaseServer.getShard() - 1].getUpperKey();
-      }
-      maxKey = partitions[databaseServer.getShard()].getUpperKey();
-
-      long size = index.getSize(minKey, maxKey);
-
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-      out.writeLong(size);
-      out.close();
-
-      return bytesOut.toByteArray();
+    logger.info("getPartitionSize: dbName=" + dbName + ", table=" + tableName + ", index=" + indexName);
+    if (dbName == null || tableName == null || indexName == null) {
+      logger.error("getPartitionSize: parm is null: dbName=" + dbName + ", table=" + tableName + ", index=" + indexName);
     }
-    catch (IOException e) {
-      throw new DatabaseException(e);
+    //todo: really need to read all the records to get an accurate count
+    Indices tables = databaseServer.getIndices(dbName);
+    if (tables == null) {
+      logger.error("getPartitionSize: tables is null");
+      return null;
     }
+    ConcurrentHashMap<String, Index> indices = tables.getIndices().get(tableName);
+    if (indices == null) {
+      logger.error("getPartitionSize: indices is null");
+      return null;
+    }
+    Index index = indices.get(indexName);
+    IndexSchema indexSchema = common.getTables(dbName).get(tableName).getIndexes().get(indexName);
+
+    TableSchema.Partition[] partitions = indexSchema.getCurrPartitions();
+    Object[] minKey = null;
+    Object[] maxKey = null;
+    if (databaseServer.getShard() == 0) {
+      if (index.firstEntry() != null) {
+        minKey = index.firstEntry().getKey();
+      }
+    }
+    else {
+      minKey = partitions[databaseServer.getShard() - 1].getUpperKey();
+    }
+    maxKey = partitions[databaseServer.getShard()].getUpperKey();
+
+    long size = index.getSize(minKey, maxKey);
+
+    ComObject retObj = new ComObject();
+    retObj.put(ComObject.Tag.size, size);
+
+    return retObj.serialize();
   }
 
   public void deleteIndexEntry(String tableName, String indexName, Object[] primaryKey) {
@@ -945,9 +931,10 @@ public class Repartitioner extends Thread {
 //    }
 //  }
 
-  public byte[] rebalanceOrderedIndex(String command, byte[] body) {
-    command = command.replace(":rebalanceOrderedIndex:", ":doRebalanceOrderedIndex:");
-    databaseServer.getLongRunningCommands().addCommand(databaseServer.getLongRunningCommands().createSingleCommand(command, body));
+  public byte[] rebalanceOrderedIndex(ComObject cobj) {
+    String command = "DatabaseServer:ComObject:doRebalanceOrderedIndex:";
+    cobj.put(ComObject.Tag.method, "doRebalanceOrderedIndex");
+    databaseServer.getLongRunningCommands().addCommand(databaseServer.getLongRunningCommands().createSingleCommand(command, cobj.serialize()));
     return null;
   }
 
@@ -1074,12 +1061,11 @@ public class Repartitioner extends Thread {
     }
   }
 
-  public byte[] doRebalanceOrderedIndex(final String command, final byte[] body) {
+  public byte[] doRebalanceOrderedIndex(final ComObject cobj) {
     try {
-      final String[] parts = command.split(":");
-      final String dbName = parts[5];
-      final String tableName = parts[6];
-      final String indexName = parts[7];
+      final String dbName = cobj.getString(ComObject.Tag.dbName);
+      final String tableName = cobj.getString(ComObject.Tag.tableName);
+      final String indexName = cobj.getString(ComObject.Tag.indexName);
       logger.info("doRebalanceOrderedIndex: shard=" + databaseServer.getShard() + ", dbName=" + dbName +
         ", tableName=" + tableName + ", indexName=" + indexName);
 
@@ -1139,7 +1125,7 @@ public class Repartitioner extends Thread {
                             long begin = System.currentTimeMillis();
                             try {
                               logger.info("doProcessEntries: table=" + tableName + ", index=" + indexName + ", count=" + toProcess.size());
-                              doProcessEntries(moveProcessors, tableName, indexName, toProcess, index, indexSchema, dbName, fieldOffsets, tableSchema, parts);
+                              doProcessEntries(moveProcessors, tableName, indexName, toProcess, index, indexSchema, dbName, fieldOffsets, tableSchema, cobj);
                             }
                             catch (Exception e) {
                               logger.error("Error moving entries", e);
@@ -1175,7 +1161,7 @@ public class Repartitioner extends Thread {
                             long begin = System.currentTimeMillis();
                             try {
                               logger.info("doProcessEntries: table=" + tableName + ", index=" + indexName + ", count=" + toProcess.size());
-                              doProcessEntries(moveProcessors, tableName, indexName, toProcess, index, indexSchema, dbName, fieldOffsets, tableSchema, parts);
+                              doProcessEntries(moveProcessors, tableName, indexName, toProcess, index, indexSchema, dbName, fieldOffsets, tableSchema, cobj);
                             }
                             catch (Exception e) {
                               logger.error("Error moving entries", e);
@@ -1206,7 +1192,7 @@ public class Repartitioner extends Thread {
               if (currEntries.get() != null && currEntries.get().size() != 0) {
                 try {
                   logger.info("doProcessEntries: table=" + tableName + ", index=" + indexName + ", count=" + currEntries.get().size());
-                  doProcessEntries(moveProcessors, tableName, indexName, currEntries.get(), index, indexSchema, dbName, fieldOffsets, tableSchema, parts);
+                  doProcessEntries(moveProcessors, tableName, indexName, currEntries.get(), index, indexSchema, dbName, fieldOffsets, tableSchema, cobj);
                 }
                 finally {
                   logger.info("doProcessEntries - finished: table=" + tableName + ", index=" + indexName + ", count=" + currEntries.get().size() +
@@ -1233,10 +1219,13 @@ public class Repartitioner extends Thread {
       finally {
         common.getSchemaReadLock(dbName).unlock();
       }
-      String notifyCommand = "DatabaseServer:notifyRepartitioningComplete:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION +
-          ":" + common.getSchemaVersion() + ":" + dbName + ":" + databaseServer.getShard() + ":" + databaseServer.getReplica();
-      Random rand = new Random(System.currentTimeMillis());
-      databaseServer.getDatabaseClient().sendToMaster(notifyCommand, null);
+      ComObject cobj2 = new ComObject();
+      cobj2.put(ComObject.Tag.dbName, dbName);
+      cobj2.put(ComObject.Tag.shard, databaseServer.getShard());
+      cobj2.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+      cobj2.put(ComObject.Tag.method, "notifyRepartitioningComplete");
+      String notifyCommand = "DatabaseServer:ComObject:notifyRepartitioningComplete:";
+      databaseServer.getDatabaseClient().sendToMaster(notifyCommand, cobj2.serialize());
     }
     catch (Exception e) {
       logger.error("Error rebalancing index", e);
@@ -1248,18 +1237,19 @@ public class Repartitioner extends Thread {
 
     try {
       TableSchema tableSchema = common.getTables(dbName).get(tableName);
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      DataOutputStream out = new DataOutputStream(bytesOut);
-      out.writeUTF(dbName);
-      out.writeUTF(tableName);
-      out.writeUTF(indexName);
-      out.writeInt(keysToDelete.size());
-      for (Object[] key : keysToDelete) {
-        out.write(DatabaseCommon.serializeKey(tableSchema, indexName, key));
-      }
-      out.close();
+      final ComObject cobj = new ComObject();
+      cobj.put(ComObject.Tag.dbName, dbName);
+      cobj.put(ComObject.Tag.method, "deleteMovedRecords");
+      cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+      cobj.put(ComObject.Tag.tableName, tableName);
+      cobj.put(ComObject.Tag.indexName, indexName);
 
-      final byte[] bytes = bytesOut.toByteArray();
+      ComArray keys = cobj.putArray(ComObject.Tag.keys, ComObject.Type.byteArrayType);
+      for (Object[] key : keysToDelete) {
+        keys.add(DatabaseCommon.serializeKey(tableSchema, indexName, key));
+      }
+
+      final byte[] bytes = cobj.serialize();
 
       List<Future> futures = new ArrayList<>();
       int replicaCount = databaseServer.getReplicationFactor();
@@ -1272,10 +1262,10 @@ public class Repartitioner extends Thread {
         futures.add(executor.submit(new Callable(){
           @Override
           public Object call() throws Exception {
-            String command = "DatabaseServer:deleteMovedRecords:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-                common.getSchemaVersion() + ":" + dbName;
-            databaseServer.getDatabaseClient().send(null, databaseServer.getShard(), replica, command,
-                bytes, DatabaseClient.Replica.specified);
+
+            String command = "DatabaseServer:ComObject:deleteMovedRecords:";
+            databaseServer.getDatabaseClient().send(null, databaseServer.getShard(), replica,
+                command, bytes, DatabaseClient.Replica.specified);
             return null;
           }
         }));
@@ -1295,19 +1285,20 @@ public class Repartitioner extends Thread {
   }
 
 
-  public byte[] deleteMovedRecords(String command, byte[] body) {
+  public byte[] deleteMovedRecords(ComObject cobj) {
     try {
       ConcurrentLinkedQueue<Object[]> keysToDelete = new ConcurrentLinkedQueue<>();
-      DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
-      String dbName = in.readUTF();
-      String tableName = in.readUTF();
-      String indexName = in.readUTF();
-      int count = in.readInt();
+      String dbName = cobj.getString(ComObject.Tag.dbName);
+      String tableName = cobj.getString(ComObject.Tag.tableName);
+      String indexName = cobj.getString(ComObject.Tag.indexName);
       TableSchema tableSchema = common.getTables(dbName).get(tableName);
       IndexSchema indexSchema = tableSchema.getIndexes().get(indexName);
-      for (int i = 0; i < count; i++) {
-        Object[] key = DatabaseCommon.deserializeKey(tableSchema, in);
-        keysToDelete.add(key);
+      ComArray keys = cobj.getArray(ComObject.Tag.keys);
+      if (keys != null) {
+        for (int i = 0; i < keys.getArray().size(); i++) {
+          Object[] key = DatabaseCommon.deserializeKey(tableSchema, (byte[])keys.getArray().get(i));
+          keysToDelete.add(key);
+        }
       }
       databaseServer.getDeleteManager().saveDeletes(dbName, tableName, indexName, keysToDelete);
 
@@ -1353,7 +1344,7 @@ public class Repartitioner extends Thread {
 
   private void doProcessEntries(MoveProcessor[] moveProcessors, final String tableName, final String indexName,
                                 List<MapEntry> toProcess, final Index index, final IndexSchema indexSchema, final String dbName,
-                                int[] fieldOffsets, TableSchema tableSchema, String[] parts) {
+                                int[] fieldOffsets, TableSchema tableSchema, ComObject cobj) {
     final Map<Integer, List<MoveRequest>> moveRequests = new HashMap<>();
     for (int i = 0; i < databaseServer.getShardCount(); i++) {
       moveRequests.put(i, new ArrayList<MoveRequest>());
@@ -1419,7 +1410,8 @@ public class Repartitioner extends Thread {
         }
       }
       catch (Exception t) {
-        logger.error("Error moving record: table=" + parts[4] + INDEX_STR + parts[5], t);
+        logger.error("Error moving record: table=" + cobj.getString(ComObject.Tag.tableName) +
+            INDEX_STR + cobj.getString(ComObject.Tag.indexName), t);
       }
     }
 
@@ -1567,78 +1559,70 @@ public class Repartitioner extends Thread {
 
   private void moveIndexEntriesToShard(
       String dbName, String tableName, String indexName, boolean primaryKey, int shard, List<MoveRequest> moveRequests) {
-    try {
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-      out.writeUTF(tableName);
-      out.writeUTF(indexName);
-      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-      DataUtil.writeVLong(out, moveRequests.size(), resultLength);
-      for (MoveRequest moveRequest : moveRequests) {
-        byte[] bytes = DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), indexName, moveRequest.key);
-        byte[][] content = moveRequest.getContent();
-        try {
-          if (primaryKey) {
-            for (int i = 0; i < content.length; i++) {
-              byte[] recordBytes = content[i];
-              Record record = new Record(dbName, common, recordBytes);
-              record.setDbViewNumber(common.getSchemaVersion());
-              record.setDbViewFlags(Record.DB_VIEW_FLAG_ADDING);
-              content[i] = record.serialize(common);
-            }
-          }
-          out.write(bytes);
-          DataUtil.writeVLong(out, content.length, resultLength);
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.dbName, dbName);
+    cobj.put(ComObject.Tag.tableName, tableName);
+    cobj.put(ComObject.Tag.indexName, indexName);
+    cobj.put(ComObject.Tag.method, "moveIndexEntries");
+    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+    ComArray keys = cobj.putArray(ComObject.Tag.keys, ComObject.Type.objectType);
+    for (MoveRequest moveRequest : moveRequests) {
+      byte[] bytes = DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), indexName, moveRequest.key);
+      ComObject innerObj = new ComObject();
+      keys.add(innerObj);
+      innerObj.remove(ComObject.Tag.serializationVersion);
+      innerObj.put(ComObject.Tag.keyBytes, bytes);
+
+      byte[][] content = moveRequest.getContent();
+      try {
+        if (primaryKey) {
           for (int i = 0; i < content.length; i++) {
-            DataUtil.writeVLong(out, content[i].length, resultLength);
-            out.write(content[i]);
+            byte[] recordBytes = content[i];
+            Record record = new Record(dbName, common, recordBytes);
+            record.setDbViewNumber(common.getSchemaVersion());
+            record.setDbViewFlags(Record.DB_VIEW_FLAG_ADDING);
+            content[i] = record.serialize(common);
           }
         }
-        catch (Exception e) {
-          logger.error("Error moving record", e);
-          out.write(bytes);
-          DataUtil.writeVLong(out, 0, resultLength);
+        ComArray records = innerObj.putArray(ComObject.Tag.records, ComObject.Type.byteArrayType);
+        for (int i = 0; i < content.length; i++) {
+          records.add(content[i]);
         }
       }
-      out.close();
-
-      byte[] body = bytesOut.toByteArray();
-
-      String command = "DatabaseServer:moveIndexEntries:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-          common.getSchemaVersion() + ":" + dbName;
-      databaseServer.getDatabaseClient().send(null, shard, 0, command, body, DatabaseClient.Replica.def);
+      catch (Exception e) {
+        logger.error("Error moving record", e);
+      }
     }
-    catch (IOException e) {
-      throw new DatabaseException(e);
-    }
+
+    byte[] body = cobj.serialize();
+
+    String command = "DatabaseServer:ComObject:moveIndexEntries:";
+    databaseServer.getDatabaseClient().send(null, shard, 0, command, body, DatabaseClient.Replica.def);
   }
 
-  public byte[] moveIndexEntries(String command, byte[] body) {
+  public byte[] moveIndexEntries(ComObject cobj) {
     try {
       synchronized (databaseServer.getBatchRepartCount()) {
         databaseServer.getBatchRepartCount().incrementAndGet();
-        String[] parts = command.split(":");
-        String dbName = parts[5];
+        String dbName = cobj.getString(ComObject.Tag.dbName);
 
-        DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
-        long serializationVersion = DataUtil.readVLong(in);
-        String tableName = in.readUTF();
-        String indexName = in.readUTF();
-        DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-        int count = (int) DataUtil.readVLong(in, resultLength);
+        String tableName = cobj.getString(ComObject.Tag.tableName);
+        String indexName = cobj.getString(ComObject.Tag.indexName);
+        ComArray keys = cobj.getArray(ComObject.Tag.keys);
         List<MoveRequest> moveRequests = new ArrayList<>();
-        for (int i = 0; i < count; i++) {
-          Object[] key = DatabaseCommon.deserializeKey(common.getTables(dbName).get(tableName), in);
-          int contentCount = (int) DataUtil.readVLong(in, resultLength);
-          byte[][] content = new byte[contentCount][];
-          for (int j = 0; j < contentCount; j++) {
-            int len = (int) DataUtil.readVLong(in, resultLength);
-            byte[] bytes = new byte[len];
-            in.readFully(bytes);
-            content[j] = bytes;
+        if (keys != null) {
+          for (int i = 0; i < keys.getArray().size(); i++) {
+            ComObject keyObj = (ComObject)keys.getArray().get(i);
+            Object[] key = DatabaseCommon.deserializeKey(common.getTables(dbName).get(tableName), keyObj.getByteArray(ComObject.Tag.keyBytes));
+            ComArray records = keyObj.getArray(ComObject.Tag.records);
+            if (records != null) {
+              byte[][] content = new byte[records.getArray().size()][];
+              for (int j = 0; j < content.length; j++) {
+                content[j] = (byte[])records.getArray().get(j);
+              }
+              moveRequests.add(new MoveRequest(key, content, false));
+            }
           }
-          moveRequests.add(new MoveRequest(key, content, false));
         }
         TableSchema tableSchema = common.getTables(dbName).get(tableName);
         Index index = databaseServer.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexName);
@@ -2006,33 +1990,36 @@ public class Repartitioner extends Thread {
     }
   }
 
-  public byte[] getIndexCounts(String command, byte[] body) {
+  public byte[] getIndexCounts(ComObject cobj) {
     try {
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      DataOutputStream out = new DataOutputStream(bytesOut);
-
-      String[] parts = command.split(":");
-      String dbName = parts[5];
+      String dbName = cobj.getString(ComObject.Tag.dbName);
 
       logger.info("getIndexCounts - begin: dbName=" + dbName);
 
-      out.writeInt(databaseServer.getIndices(dbName).getIndices().size());
+      ComObject retObj = new ComObject();
+      ComArray tables = retObj.putArray(ComObject.Tag.tables, ComObject.Type.objectType);
       for (Map.Entry<String, ConcurrentHashMap<String, Index>> entry : databaseServer.getIndices(dbName).getIndices().entrySet()) {
         String tableName = entry.getKey();
-        out.writeUTF(tableName);
-        out.writeInt(entry.getValue().entrySet().size());
+        ComObject tableObj = new ComObject();
+        tables.add(tableObj);
+        tableObj.remove(ComObject.Tag.serializationVersion);
+        tableObj.put(ComObject.Tag.tableName, tableName);
+        ComArray indices = tableObj.putArray(ComObject.Tag.indices, ComObject.Type.objectType);
         logger.info("getIndexCounts: dbName=" + dbName + ", table=" + tableName + ", indexCount=" + entry.getValue().entrySet().size());
         for (Map.Entry<String, Index> indexEntry : entry.getValue().entrySet()) {
+          ComObject indexObject = new ComObject();
+          indexObject.remove(ComObject.Tag.serializationVersion);
+          indices.add(indexObject);
           String indexName = indexEntry.getKey();
-          out.writeUTF(indexName);
+          indexObject.put(ComObject.Tag.indexName, indexName);
           Index index = indexEntry.getValue();
           long size = index.size();
-          out.writeLong(size);
+          indexObject.put(ComObject.Tag.size, size);
           logger.info("getIndexCounts: dbName=" + dbName + ", table=" + tableName + ", index=" + indexName + ", count=" + size);
         }
       }
-      out.close();
-      return bytesOut.toByteArray();
+
+      return retObj.serialize();
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -2048,36 +2035,40 @@ public class Repartitioner extends Thread {
         futures.add(client.getExecutor().submit(new Callable(){
           @Override
           public Object call() throws Exception {
-            String command = "DatabaseServer:getIndexCounts:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-                client.getCommon().getSchemaVersion() + ":" + dbName;
-            byte[] response = client.send(null, shard, 0, command, null, DatabaseClient.Replica.master);
+            ComObject cobj = new ComObject();
+            cobj.put(ComObject.Tag.dbName, dbName);
+            cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+            cobj.put(ComObject.Tag.method, "getIndexCounts");
+            String command = "DatabaseServer:ComObject:getIndexCounts:";
+            byte[] response = client.send(null, shard, 0, command, cobj.serialize(), DatabaseClient.Replica.master);
             synchronized (ret) {
-              DataInputStream in = new DataInputStream(new ByteArrayInputStream(response));
-              try {
-                int tableCount = in.readInt();
-                for (int i = 0; i < tableCount; i++) {
-                  String tableName = in.readUTF();
-                  int indexCount = in.readInt();
+              ComObject retObj = new ComObject(response);
+              ComArray tables = retObj.getArray(ComObject.Tag.tables);
+              if (tables != null) {
+                for (int i = 0; i < tables.getArray().size(); i++) {
+                  ComObject tableObj = (ComObject)tables.getArray().get(i);
+                  String tableName = tableObj.getString(ComObject.Tag.tableName);
 
                   TableIndexCounts tableIndexCounts = ret.tables.get(tableName);
                   if (tableIndexCounts == null) {
                     tableIndexCounts = new TableIndexCounts();
                     ret.tables.put(tableName, tableIndexCounts);
                   }
-                  for (int j = 0; j < indexCount; j++) {
-                    String indexName = in.readUTF();
-                    long size = in.readLong();
-                    IndexCounts indexCounts = tableIndexCounts.indices.get(indexName);
-                    if (indexCounts == null) {
-                      indexCounts = new IndexCounts();
-                      tableIndexCounts.indices.put(indexName, indexCounts);
+                  ComArray indices = tableObj.getArray(ComObject.Tag.indices);
+                  if (indices != null) {
+                    for (int j = 0; j < indices.getArray().size(); j++) {
+                      ComObject indexObj = (ComObject)indices.getArray().get(j);
+                      String indexName = indexObj.getString(ComObject.Tag.indexName);
+                      long size = indexObj.getLong(ComObject.Tag.size);
+                      IndexCounts indexCounts = tableIndexCounts.indices.get(indexName);
+                      if (indexCounts == null) {
+                        indexCounts = new IndexCounts();
+                        tableIndexCounts.indices.put(indexName, indexCounts);
+                      }
+                      indexCounts.counts.put(shard, size);
                     }
-                    indexCounts.counts.put(shard, size);
                   }
                 }
-              }
-              catch (EOFException e) {
-                //logger.error("Error getting index counts", e);
               }
               return null;
             }
@@ -2117,9 +2108,13 @@ public class Repartitioner extends Thread {
     while (true) {
       try {
         for (String dbName : databaseServer.getDbNames(databaseServer.getDataDir())) {
-          String command = "DatabaseServer:beginRebalance:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION +
-              ":1:" + dbName + ":" + false;
-          beginRebalance(command, (byte[]) null);
+          ComObject cobj = new ComObject();
+          cobj.put(ComObject.Tag.dbName, dbName);
+          cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+          cobj.put(ComObject.Tag.method, "beginRebalance");
+          cobj.put(ComObject.Tag.force, false);
+          String command = "DatabaseServer:ComObject:beginRebalance:";
+          beginRebalance(cobj);
         }
         Thread.sleep(2000);
       }
@@ -2161,10 +2156,9 @@ public class Repartitioner extends Thread {
 
   private AtomicBoolean isRebalancing = new AtomicBoolean();
 
-  public byte[] beginRebalance(String command, byte[] body) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
-    boolean force = Boolean.valueOf(parts[6]);
+  public byte[] beginRebalance(ComObject cobj) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
+    boolean force = cobj.getBoolean(ComObject.Tag.force);
     try {
 
       while (isRebalancing.get()) {

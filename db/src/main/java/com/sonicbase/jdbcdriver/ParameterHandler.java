@@ -308,6 +308,14 @@ public class ParameterHandler {
     getCurrParmsByIndex().put(parameterIndex, new Parameter.NClobReader(reader));
   }
 
+  public byte[] serialize() throws IOException {
+    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+    DataOutputStream out = new DataOutputStream(bytesOut);
+    serialize(out);
+    out.close();
+    return bytesOut.toByteArray();
+  }
+
   public void serialize(DataOutputStream out) throws IOException {
     int count = currParmsByIndex.size();
     out.writeInt(count);
@@ -315,6 +323,10 @@ public class ParameterHandler {
       Parameter.ParameterBase parm = currParmsByIndex.get(i);
       parm.serialize(out, true);
     }
+  }
+
+  public void deserialize(byte[] bytes) {
+    deserialize(new DataInputStream(new ByteArrayInputStream(bytes)));
   }
 
   public void deserialize(DataInputStream in) {

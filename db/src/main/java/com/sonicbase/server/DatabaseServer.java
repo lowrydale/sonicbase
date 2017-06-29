@@ -105,6 +105,7 @@ public class DatabaseServer {
   private boolean doingBackup;
   private boolean onlyQueueCommands;
   private AtomicInteger testWriteCallCount = new AtomicInteger();
+  private boolean doingRestore;
 
   @SuppressWarnings("restriction")
   private static Unsafe getUnsafe() {
@@ -348,13 +349,13 @@ public class DatabaseServer {
   final int[] monitorReplicas = {0, 1, 2};
 
   private void startMasterMonitor() {
-    Thread thread = new Thread(new Runnable(){
+    Thread thread = new Thread(new Runnable() {
       @Override
       public void run() {
         JsonArray shards = config.getArray("shards");
         JsonArray replicas = shards.getDict(0).getArray("replicas");
         if (replicas.size() < 3) {
-          monitorShards[2]= 1;
+          monitorShards[2] = 1;
           monitorReplicas[2] = 0;
         }
         boolean shouldMonitor = false;
@@ -368,7 +369,7 @@ public class DatabaseServer {
 
           for (int i = 0; i < shardCount; i++) {
             final int shard = i;
-            Thread masterThread = new Thread(new Runnable(){
+            Thread masterThread = new Thread(new Runnable() {
               @Override
               public void run() {
                 try {
@@ -481,7 +482,7 @@ public class DatabaseServer {
             command = "DatabaseServer:promoteToMaster:1:" +
                 SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__:" + shard + ":" + electedMaster;
 
-            getDatabaseClient().send(null, shard, electedMaster,command, null, DatabaseClient.Replica.specified);
+            getDatabaseClient().send(null, shard, electedMaster, command, null, DatabaseClient.Replica.specified);
             break;
           }
         }
@@ -554,7 +555,7 @@ public class DatabaseServer {
       deathMonitorThreads[i] = new Thread[replicationFactor];
       for (int j = 0; j < replicationFactor; j++) {
         final int replica = j;
-        deathMonitorThreads[i][j] = new Thread(new Runnable(){
+        deathMonitorThreads[i][j] = new Thread(new Runnable() {
           @Override
           public void run() {
             while (!shutdownDeathMonitor) {
@@ -627,7 +628,7 @@ public class DatabaseServer {
 
     final AtomicBoolean finished = new AtomicBoolean();
     isHealthy.set(false);
-    Thread checkThread = new Thread(new Runnable(){
+    Thread checkThread = new Thread(new Runnable() {
       @Override
       public void run() {
         try {
@@ -708,7 +709,7 @@ public class DatabaseServer {
         logger.error("Error getting schema: shard=" + monitorShards[i] + ", replica=" + monitorReplicas[i], e);
       }
     }
-    return ;
+    return;
   }
 
   private static class NullX509TrustManager implements X509TrustManager {
@@ -814,7 +815,7 @@ public class DatabaseServer {
   }
 
   public byte[] doBackupFileSystem(String command, final byte[] body, boolean replayedCommand) {
-    Thread thread = new Thread(new Runnable(){
+    Thread thread = new Thread(new Runnable() {
       @Override
       public void run() {
         try {
@@ -841,7 +842,7 @@ public class DatabaseServer {
   }
 
   public byte[] doBackupAWS(String command, final byte[] body, boolean replayedCommand) {
-    Thread thread = new Thread(new Runnable(){
+    Thread thread = new Thread(new Runnable() {
       @Override
       public void run() {
         try {
@@ -922,10 +923,29 @@ public class DatabaseServer {
     }
   }
 
+  public byte[] isEntireBackupComplete(String command, byte[] body, boolean replayedCommand) {
+    try {
+      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+      DataOutputStream out = new DataOutputStream(bytesOut);
+      out.writeBoolean(!doingBackup);
+
+      out.close();
+      return bytesOut.toByteArray();
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
   public byte[] startBackup(String command, byte[] body, boolean replayedCommand) {
 
-    doBackup();
-
+    Thread thread = new Thread(new Runnable(){
+      @Override
+      public void run() {
+        doBackup();
+      }
+    });
+    thread.start();
     return null;
   }
 
@@ -1128,7 +1148,7 @@ public class DatabaseServer {
   }
 
   public byte[] doRestoreFileSystem(String command, final byte[] body, boolean replayedCommand) {
-    Thread thread = new Thread(new Runnable(){
+    Thread thread = new Thread(new Runnable() {
       @Override
       public void run() {
         try {
@@ -1156,7 +1176,7 @@ public class DatabaseServer {
   }
 
   public byte[] doRestoreAWS(String command, final byte[] body, boolean replayedCommand) {
-    Thread thread = new Thread(new Runnable(){
+    Thread thread = new Thread(new Runnable() {
       @Override
       public void run() {
         try {
@@ -1206,22 +1226,42 @@ public class DatabaseServer {
     return null;
   }
 
-  public byte[] startRestore(String command, byte[] body, boolean replayedCommand) {
+  public byte[] isEntireRestoreComplete(String command, byte[] body, boolean replayedCommand) {
     try {
-      DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
-      String directory = in.readUTF();
-
-      doRestore(directory);
+      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+      DataOutputStream out = new DataOutputStream(bytesOut);
+      out.writeBoolean(!doingRestore);
+      out.close();
+      return bytesOut.toByteArray();
     }
     catch (Exception e) {
       throw new DatabaseException(e);
     }
+  }
+
+  public byte[] startRestore(String command, final byte[] body, boolean replayedCommand) {
+    Thread thread = new Thread(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
+          String directory = in.readUTF();
+
+          doRestore(directory);
+        }
+        catch (Exception e) {
+          logger.error("Error restoring backup", e);
+        }
+      }
+    });
+    thread.run();
     return null;
   }
 
 
   private void doRestore(String subDirectory) {
     try {
+      doingRestore = true;
       // delete snapshots and logs
       // enter recovery mode (block commands)
       String command = "DatabaseServer:prepareForRestore:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__";
@@ -1275,6 +1315,9 @@ public class DatabaseServer {
     }
     catch (Exception e) {
       throw new DatabaseException(e);
+    }
+    finally {
+      doingRestore = false;
     }
   }
 
@@ -1554,7 +1597,7 @@ public class DatabaseServer {
         replicas[i] = new Host(in, serializationVersionNumber);
       }
       if (serializationVersionNumber >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION_21) {
-        masterReplica = (int)DataUtil.readVLong(in);
+        masterReplica = (int) DataUtil.readVLong(in);
       }
     }
 
@@ -1609,7 +1652,7 @@ public class DatabaseServer {
       clientIsInternal = in.readBoolean();
     }
 
-    public void serialize(DataOutputStream out, int serializationVersionNumber) throws IOException {
+    public void serialize(DataOutputStream out, long serializationVersionNumber) throws IOException {
       out.writeUTF(cluster);
       out.writeInt(shards.length);
       for (Shard shard : shards) {
@@ -3326,6 +3369,12 @@ public class DatabaseServer {
         methodStr = command.substring(pos + 1, pos2);
       }
 
+      ComObject cobj = null;
+      if (methodStr.equals("ComObject")) {
+        cobj = new ComObject(body);
+        methodStr = cobj.getString(ComObject.Tag.method);
+      }
+
       if (disableNow && usingMultipleReplicas) {
         throw new LicenseOutOfComplianceException("Licenses out of compliance");
       }
@@ -3372,9 +3421,16 @@ public class DatabaseServer {
       }
 
       if (!onlyQueueCommands || !enableQueuing) {
-        Method method = getClass().getMethod(methodStr, String.class, byte[].class, boolean.class);
         try {
-          ret = (byte[]) method.invoke(this, command, body, replayedCommand);
+          if (cobj != null) {
+            methodStr = cobj.getString(ComObject.Tag.method);
+            Method method = getClass().getMethod(methodStr, ComObject.class, boolean.class);
+            ret = (byte[]) method.invoke(this, cobj, replayedCommand);
+          }
+          else {
+            Method method = getClass().getMethod(methodStr, String.class, byte[].class, boolean.class);
+            ret = (byte[]) method.invoke(this, command, body, replayedCommand);
+          }
         }
         catch (Exception e) {
           boolean schemaOutOfSync = false;
@@ -3425,7 +3481,7 @@ public class DatabaseServer {
 
       return ret;
     }
-    catch (InterruptedException | NoSuchMethodException e) {
+    catch (InterruptedException e) {
       throw new DatabaseException(e);
     }
   }
@@ -3486,7 +3542,7 @@ public class DatabaseServer {
     return logManager.setMaxSequenceNum(command, body);
   }
 
-    public byte[] getRecoverProgress(String command, byte[] body, boolean replayedCommand) {
+  public byte[] getRecoverProgress(String command, byte[] body, boolean replayedCommand) {
 
     try {
       JsonDict dict = new JsonDict();
@@ -3822,84 +3878,77 @@ public class DatabaseServer {
     return null;
   }
 
-  public byte[] deleteIndexEntryByKey(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] deleteIndexEntryByKey(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return updateManager.deleteIndexEntryByKey(command, body, replayedCommand);
+      return updateManager.deleteIndexEntryByKey(cobj, replayedCommand);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
     }
   }
 
-  public byte[] commit(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] commit(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return updateManager.commit(command, body, replayedCommand);
+      return updateManager.commit(cobj, replayedCommand);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
     }
   }
 
-  public byte[] rollback(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] rollback(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return updateManager.rollback(command, body, replayedCommand);
+      return updateManager.rollback(cobj, replayedCommand);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
     }
   }
 
-  public byte[] insertIndexEntryByKey(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] insertIndexEntryByKey(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return updateManager.insertIndexEntryByKey(command, body, replayedCommand);
+      return updateManager.insertIndexEntryByKey(cobj, replayedCommand);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
     }
   }
 
-  public byte[] insertIndexEntryByKeyWithRecord(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] insertIndexEntryByKeyWithRecord(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return updateManager.insertIndexEntryByKeyWithRecord(command, body, replayedCommand);
+      return updateManager.insertIndexEntryByKeyWithRecord(cobj, replayedCommand);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
     }
   }
 
-  public byte[] batchInsertIndexEntryByKey(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] batchInsertIndexEntryByKey(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return updateManager.batchInsertIndexEntryByKey(command, body, replayedCommand);
+      return updateManager.batchInsertIndexEntryByKey(cobj, replayedCommand);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
     }
   }
 
-  public byte[] batchInsertIndexEntryByKeyWithRecord(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] batchInsertIndexEntryByKeyWithRecord(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return updateManager.batchInsertIndexEntryByKeyWithRecord(command, body, replayedCommand);
+      return updateManager.batchInsertIndexEntryByKeyWithRecord(cobj, replayedCommand);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
@@ -3918,12 +3967,11 @@ public class DatabaseServer {
     }
   }
 
-  public byte[] updateRecord(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] updateRecord(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return updateManager.updateRecord(command, body, replayedCommand);
+      return updateManager.updateRecord(cobj, replayedCommand);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
@@ -3943,24 +3991,22 @@ public class DatabaseServer {
     }
   }
 
-  public byte[] deleteRecord(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] deleteRecord(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return updateManager.deleteRecord(command, body, replayedCommand);
+      return updateManager.deleteRecord(cobj, replayedCommand);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
     }
   }
 
-  public byte[] deleteIndexEntry(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] deleteIndexEntry(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return updateManager.deleteIndexEntry(command, body, replayedCommand);
+      return updateManager.deleteIndexEntry(cobj, replayedCommand);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
@@ -3978,49 +4024,45 @@ public class DatabaseServer {
     return null;
   }
 
-  public byte[] truncateTable(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] truncateTable(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return updateManager.truncateTable(command, body, replayedCommand);
+      return updateManager.truncateTable(cobj, replayedCommand);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
     }
   }
 
-  public byte[] countRecords(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] countRecords(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return readManager.countRecords(command, body);
+      return readManager.countRecords(cobj);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
     }
   }
 
-  public byte[] batchIndexLookup(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] batchIndexLookup(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return readManager.batchIndexLookup(command, body);
+      return readManager.batchIndexLookup(cobj);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
     }
   }
 
-  public byte[] indexLookup(String command, byte[] body, boolean replayedCommand) {
+  public byte[] indexLookup(ComObject cobj, boolean replayedCommand) {
     try {
-      DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
-      String dbName = in.readUTF();
+      String dbName = cobj.getString(ComObject.Tag.dbName);
       common.getSchemaReadLock(dbName).lock();
       try {
-        return readManager.indexLookup(dbName, in);
+        return readManager.indexLookup(cobj);
       }
       finally {
         common.getSchemaReadLock(dbName).unlock();
@@ -4032,72 +4074,66 @@ public class DatabaseServer {
   }
 
 
-  public byte[] closeResultSet(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] closeResultSet(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return readManager.closeResultSet(command, body, replayedCommand);
+      return readManager.closeResultSet(cobj, replayedCommand);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
     }
   }
 
-  public byte[] serverSelectDelete(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] serverSelectDelete(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return readManager.serverSelectDelete(command, body, replayedCommand);
+      return readManager.serverSelectDelete(cobj, replayedCommand);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
     }
   }
 
-  public byte[] serverSelect(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] serverSelect(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return readManager.serverSelect(command, body);
+      return readManager.serverSelect(cobj);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
     }
   }
 
-  public byte[] indexLookupExpression(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] indexLookupExpression(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return readManager.indexLookupExpression(command, body);
+      return readManager.indexLookupExpression(cobj);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
     }
   }
 
-  public byte[] evaluateCounter(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] evaluateCounter(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return readManager.evaluateCounter(command, body);
+      return readManager.evaluateCounter(cobj);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
     }
   }
 
-  public byte[] getIndexCounts(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] getIndexCounts(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return repartitioner.getIndexCounts(command, body);
+      return repartitioner.getIndexCounts(cobj);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
@@ -4110,123 +4146,117 @@ public class DatabaseServer {
     return null;
   }
 
-  public byte[] deleteMovedRecords(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] deleteMovedRecords(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return repartitioner.deleteMovedRecords(command, body);
+      return repartitioner.deleteMovedRecords(cobj);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
     }
   }
 
-  public byte[] isRepartitioningRecordsByIdComplete(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+//  public byte[] isRepartitioningRecordsByIdComplete(String command, byte[] body, boolean replayedCommand) {
+//    String[] parts = command.split(":");
+//    String dbName = parts[5];
+//    common.getSchemaReadLock(dbName).lock();
+//    try {
+//      return repartitioner.isRepartitioningRecordsByIdComplete(command, body);
+//    }
+//    finally {
+//      common.getSchemaReadLock(dbName).unlock();
+//    }
+//  }
+
+  public byte[] isRepartitioningComplete(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return repartitioner.isRepartitioningRecordsByIdComplete(command, body);
+      return repartitioner.isRepartitioningComplete(cobj);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
     }
   }
 
-  public byte[] isRepartitioningComplete(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+//  public byte[] isDeletingComplete(String command, byte[] body, boolean replayedCommand) {
+//    String[] parts = command.split(":");
+//    String dbName = parts[5];
+//    common.getSchemaReadLock(dbName).lock();
+//    try {
+//      return repartitioner.isDeletingComplete(command, body);
+//    }
+//    finally {
+//      common.getSchemaReadLock(dbName).unlock();
+//    }
+//  }
+
+  public byte[] notifyRepartitioningComplete(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return repartitioner.isRepartitioningComplete(command, body);
+      return repartitioner.notifyRepartitioningComplete(cobj);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
     }
   }
+//
+//  public byte[] notifyDeletingComplete(String command, byte[] body, boolean replayedCommand) {
+//    String[] parts = command.split(":");
+//    String dbName = parts[5];
+//    common.getSchemaReadLock(dbName).lock();
+//    try {
+//      return repartitioner.notifyDeletingComplete(command, body);
+//    }
+//    finally {
+//      common.getSchemaReadLock(dbName).unlock();
+//    }
+//  }
 
-  public byte[] isDeletingComplete(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
-    common.getSchemaReadLock(dbName).lock();
-    try {
-      return repartitioner.isDeletingComplete(command, body);
-    }
-    finally {
-      common.getSchemaReadLock(dbName).unlock();
-    }
-  }
-
-  public byte[] notifyRepartitioningComplete(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
-    common.getSchemaReadLock(dbName).lock();
-    try {
-      return repartitioner.notifyRepartitioningComplete(command, body);
-    }
-    finally {
-      common.getSchemaReadLock(dbName).unlock();
-    }
-  }
-
-  public byte[] notifyDeletingComplete(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
-    common.getSchemaReadLock(dbName).lock();
-    try {
-      return repartitioner.notifyDeletingComplete(command, body);
-    }
-    finally {
-      common.getSchemaReadLock(dbName).unlock();
-    }
-  }
-
-  public byte[] beginRebalance(String command, byte[] body, boolean replayedCommand) {
+  public byte[] beginRebalance(ComObject cobj, boolean replayedCommand) {
 
     //schema lock below
-    return repartitioner.beginRebalance(command, body);
+    return repartitioner.beginRebalance(cobj);
   }
 
-  public byte[] getKeyAtOffset(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] getKeyAtOffset(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return repartitioner.getKeyAtOffset(command, body);
+      return repartitioner.getKeyAtOffset(cobj);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
     }
   }
 
-  public byte[] getPartitionSize(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] getPartitionSize(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return repartitioner.getPartitionSize(command, body);
+      return repartitioner.getPartitionSize(cobj);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
     }
   }
 
-  public byte[] doRebalanceOrderedIndex(final String command, final byte[] body, boolean replayedCommand) {
-    return repartitioner.doRebalanceOrderedIndex(command, body);
+  public byte[] doRebalanceOrderedIndex(ComObject cobj, boolean replayedCommand) {
+    return repartitioner.doRebalanceOrderedIndex(cobj);
   }
 
-  public byte[] rebalanceOrderedIndex(String command, byte[] body, boolean replayedCommand) {
+  public byte[] rebalanceOrderedIndex(ComObject cobj, boolean replayedCommand) {
     //schema lock below
-    return repartitioner.rebalanceOrderedIndex(command, body);
+    return repartitioner.rebalanceOrderedIndex(cobj);
   }
 
-  public byte[] moveIndexEntries(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] moveIndexEntries(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return repartitioner.moveIndexEntries(command, body);
+      return repartitioner.moveIndexEntries(cobj);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
@@ -4261,20 +4291,20 @@ public class DatabaseServer {
     return null;
   }
 
-  public byte[] createTable(String command, byte[] body, boolean replayedCommand) {
-    return schemaManager.createTable(command, body, replayedCommand);
+  public byte[] createTable(ComObject cobj, boolean replayedCommand) {
+    return schemaManager.createTable(cobj, replayedCommand);
   }
 
-  public byte[] createTableSlave(String command, byte[] body, boolean replayedCommand) {
-    return schemaManager.createTableSlave(command, body, replayedCommand);
+  public byte[] createTableSlave(ComObject cobj, boolean replayedCommand) {
+    return schemaManager.createTableSlave(cobj, replayedCommand);
   }
 
-  public byte[] dropTable(String command, byte[] body, boolean replayedCommand) {
-    return schemaManager.dropTable(command, body, replayedCommand);
+  public byte[] dropTable(ComObject cobj, boolean replayedCommand) {
+    return schemaManager.dropTable(cobj, replayedCommand);
   }
 
-  public byte[] createDatabase(String command, byte[] body, boolean replayedCommand) {
-    return schemaManager.createDatabase(command, body, replayedCommand);
+  public byte[] createDatabase(ComObject cobj, boolean replayedCommand) {
+    return schemaManager.createDatabase(cobj, replayedCommand);
   }
 
   public enum ResultType {
@@ -4295,97 +4325,90 @@ public class DatabaseServer {
 
   }
 
-  public byte[] addColumn(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] addColumn(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaWriteLock(dbName).lock();
     try {
-      return schemaManager.addColumn(command, body);
+      return schemaManager.addColumn(cobj);
     }
     finally {
       common.getSchemaWriteLock(dbName).unlock();
     }
   }
 
-  public byte[] dropColumn(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] dropColumn(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaWriteLock(dbName).lock();
     try {
-      return schemaManager.dropColumn(command, body);
+      return schemaManager.dropColumn(cobj);
     }
     finally {
       common.getSchemaWriteLock(dbName).unlock();
     }
   }
 
-  public byte[] dropIndexSlave(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] dropIndexSlave(ComObject cobj, boolean replayedCommand) {
+
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaWriteLock(dbName).lock();
     try {
-      return schemaManager.dropIndexSlave(command, body);
+      return schemaManager.dropIndexSlave(cobj);
     }
     finally {
       common.getSchemaWriteLock(dbName).unlock();
     }
   }
 
-  public byte[] dropIndex(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] dropIndex(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaWriteLock(dbName).lock();
     try {
-      return schemaManager.dropIndex(command, body);
+      return schemaManager.dropIndex(cobj);
     }
     finally {
       common.getSchemaWriteLock(dbName).unlock();
     }
   }
 
-  public byte[] createIndexSlave(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] createIndexSlave(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaWriteLock(dbName).lock();
     try {
-      return schemaManager.createIndexSlave(command, body);
+      return schemaManager.createIndexSlave(cobj);
     }
     finally {
       common.getSchemaWriteLock(dbName).unlock();
     }
   }
 
-  public byte[] doPopulateIndex(final String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
-    return updateManager.doPopulateIndex(command, body);
+  public byte[] doPopulateIndex(ComObject cobj, boolean replayedCommand) {
+    return updateManager.doPopulateIndex(cobj);
   }
 
-  public byte[] populateIndex(final String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+  public byte[] populateIndex(ComObject cobj, boolean replayedCommand) {
+
 //    common.getSchemaReadLock(dbName).lock();
 //    try {
-    return updateManager.populateIndex(command, body);
+    return updateManager.populateIndex(cobj);
 //    }
 //    finally {
 //      common.getSchemaReadLock(dbName).unlock();
 //    }
   }
 
-  public byte[] createIndex(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    int serializationVersion = Integer.valueOf(parts[3]);
-    String dbName = parts[5];
+  public byte[] createIndex(ComObject cobj, boolean replayedCommand) {
+    long serializationVersion = cobj.getLong(ComObject.Tag.serializationVersion);
+    String dbName = cobj.getString(ComObject.Tag.dbName);
     List<String> createdIndices = null;
     AtomicReference<String> table = new AtomicReference<>();
     common.getSchemaWriteLock(dbName).lock();
     try {
-      if (getShard() == 0 && getReplica() == 0 && command.contains(":slave:")) {
+      String masterSlave = cobj.getString(ComObject.Tag.masterSlave);
+      if (getShard() == 0 && getReplica() == 0 && masterSlave.equals("slave")) {
         return null;
       }
 
-      createdIndices = schemaManager.createIndex(command, body, replayedCommand, table);
+      createdIndices = schemaManager.createIndex(cobj, replayedCommand, table);
     }
     finally {
       common.getSchemaWriteLock(dbName).unlock();
@@ -4394,28 +4417,23 @@ public class DatabaseServer {
     try {
       if (createdIndices != null) {
         for (String currIndexName : createdIndices) {
-          command = "DatabaseServer:populateIndex:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:" +
-              dbName + ":" + table.get() + ":" + currIndexName;
-          AtomicReference<String> selectedHost = new AtomicReference<>();
+          String command = "DatabaseServer:ComObject:populateIndex:";
+          cobj = new ComObject();
+          cobj.put(ComObject.Tag.dbName, dbName);
+          cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+          cobj.put(ComObject.Tag.tableName, table.get());
+          cobj.put(ComObject.Tag.indexName, currIndexName);
+          cobj.put(ComObject.Tag.method, "populateIndex");
           for (int i = 0; i < getShardCount(); i++) {
-            for (int j = 0; j < getReplicationFactor(); j++) {
-              if (i == 0 && j == 0) {
-                getUpdateManager().populateIndex(command, null);
-              }
-              else {
-                getDatabaseClient().send(null, i, j, command, null, DatabaseClient.Replica.def);
-              }
-            }
+            getDatabaseClient().send(null, i, 0, command, cobj.serialize(), DatabaseClient.Replica.def);
           }
         }
       }
 
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      DataOutputStream out = new DataOutputStream(bytesOut);
-      getCommon().serializeSchema(out, serializationVersion);
-      out.close();
+      ComObject retObj = new ComObject();
+      retObj.put(ComObject.Tag.schemaBytes, getCommon().serializeSchema(serializationVersion));
 
-      return bytesOut.toByteArray();
+      return retObj.serialize();
     }
     catch (Exception e) {
       throw new DatabaseException(e);

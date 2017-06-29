@@ -1,6 +1,7 @@
 package com.sonicbase.query.impl;
 
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.ComObject;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.Record;
 import com.sonicbase.common.SchemaOutOfSyncException;
@@ -192,19 +193,21 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
                 throw new Exception("No shards selected for query");
               }
 
-              String command = "DatabaseServer:updateRecord:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-                  client.getCommon().getSchemaVersion() + ":" + dbName + ":" + tableName + ":" +
-                  indexSchema.getName() + ":" + client.isExplicitTrans() + ":" + client.isCommitting() + ":" + client.getTransactionId();
-              ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-              DataOutputStream out = new DataOutputStream(bytesOut);
-              DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-              out.write(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), newPrimaryKey));
-              byte[] bytes = record.serialize(client.getCommon());
-              out.writeInt(bytes.length);
-              out.write(bytes);
-              out.close();
+              String command = "DatabaseServer:ComObject:updateRecord:";
 
-              client.send(null, selectedShards.get(0), rand.nextLong(), command, bytesOut.toByteArray(), DatabaseClient.Replica.def);
+              ComObject cobj = new ComObject();
+              cobj.put(ComObject.Tag.dbName, dbName);
+              cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+              cobj.put(ComObject.Tag.method, "updateRecord");
+              cobj.put(ComObject.Tag.tableName, tableName);
+              cobj.put(ComObject.Tag.indexName, indexSchema.getName());
+              cobj.put(ComObject.Tag.isExcpliciteTrans, client.isExplicitTrans());
+              cobj.put(ComObject.Tag.isCommitting, client.isCommitting());
+              cobj.put(ComObject.Tag.transactionId, client.getTransactionId());
+              cobj.put(ComObject.Tag.primaryKeyBytes, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), newPrimaryKey));
+              cobj.put(ComObject.Tag.bytes, record.serialize(client.getCommon()));
+
+              client.send(null, selectedShards.get(0), rand.nextLong(), command, cobj.serialize(), DatabaseClient.Replica.def);
 
               //update keys
 

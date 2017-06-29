@@ -123,7 +123,15 @@ public class DatabaseCommon {
     }
   }
 
-  public void serializeSchema(DataOutputStream out, int serializationVersionNumber) throws IOException {
+  public byte[] serializeSchema(long serializationVersionNumber) throws IOException {
+    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+    DataOutputStream out = new DataOutputStream(bytesOut);
+    serializeSchema(out, serializationVersionNumber);
+    out.close();
+    return bytesOut.toByteArray();
+  }
+
+  public void serializeSchema(DataOutputStream out, long serializationVersionNumber) throws IOException {
     DataUtil.writeVLong(out, serializationVersionNumber);
     out.writeInt(this.schemaVersion);
     if (serializationVersionNumber >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION_21) {
@@ -172,6 +180,11 @@ public class DatabaseCommon {
 
   public void serializeSchema(String dbName, DataOutputStream out) {
     schema.get(dbName).serialize(out);
+  }
+
+  public void deserializeSchema(byte[] bytes) {
+    DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
+    deserializeSchema(in);
   }
 
   public void deserializeSchema(DataInputStream in) {
@@ -223,6 +236,10 @@ public class DatabaseCommon {
       }
     }
     return 0;
+  }
+
+  public static Object[] deserializeKey(TableSchema tableSchema, byte[] bytes) throws EOFException {
+    return deserializeKey(tableSchema, new DataInputStream(new ByteArrayInputStream(bytes)));
   }
 
   public static Object[] deserializeKey(TableSchema tableSchema, DataInputStream in) throws EOFException {
@@ -825,7 +842,7 @@ public class DatabaseCommon {
     createSchemaLocks(dbName);
   }
 
-  public byte[] serializeConfig(int serializationVersionNumber) throws IOException {
+  public byte[] serializeConfig(long serializationVersionNumber) throws IOException {
     ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
     DataOutputStream out = new DataOutputStream(bytesOut);
     DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);

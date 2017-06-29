@@ -2,6 +2,8 @@ package com.sonicbase.query.impl;
 
 import com.codahale.metrics.Timer;
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.ComArray;
+import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Record;
 import com.sonicbase.common.SchemaOutOfSyncException;
 import com.sonicbase.query.*;
@@ -88,6 +90,19 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     this.orderByExpressions = list;
   }
 
+  public byte[] serialize() {
+    try {
+      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+      DataOutputStream out = new DataOutputStream(bytesOut);
+      serialize(out);
+      out.close();
+      return bytesOut.toByteArray();
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
   public void serialize(DataOutputStream out) {
     try {
       out.writeUTF(fromTable);
@@ -132,6 +147,11 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     catch (IOException e) {
       throw new DatabaseException(e);
     }
+  }
+
+  public void deserialize(byte[] bytes, String dbName) {
+    DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
+    deserialize(in, dbName);
   }
 
   public void deserialize(DataInputStream in, String dbName) {
@@ -724,29 +744,26 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
   private ExpressionImpl.NextReturn serverSelect(String dbName, boolean serverSort, String[] tableNames) throws Exception {
     while (true) {
       try {
-        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-        DataOutputStream out = new DataOutputStream(bytesOut);
-        DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-        out.writeBoolean(serverSort);
-
-        serialize(out);
-
-        out.close();
+        ComObject cobj = new ComObject();
+        cobj.put(ComObject.Tag.selectStatement, serialize());
+        cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+        cobj.put(ComObject.Tag.count, ReadManager.SELECT_PAGE_SIZE);
+        cobj.put(ComObject.Tag.method, "serverSelect");
+        cobj.put(ComObject.Tag.dbName, dbName);
 
         int previousSchemaVersion = client.getCommon().getSchemaVersion();
-        String command = "DatabaseServer:serverSelect:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-            client.getCommon().getSchemaVersion() + ":" + dbName + ":" + ReadManager.SELECT_PAGE_SIZE;
+        String command = "DatabaseServer:ComObject:serverSelect:";
 
-        byte[] recordRet = client.send(null, Math.abs(ThreadLocalRandom.current().nextInt() % client.getShardCount()), Math.abs(ThreadLocalRandom.current().nextLong()), command, bytesOut.toByteArray(), DatabaseClient.Replica.def);
+        byte[] recordRet = client.send(null, Math.abs(ThreadLocalRandom.current().nextInt() % client.getShardCount()),
+            Math.abs(ThreadLocalRandom.current().nextLong()), command, cobj.serialize(), DatabaseClient.Replica.def);
         if (previousSchemaVersion < client.getCommon().getSchemaVersion()) {
           throw new SchemaOutOfSyncException();
         }
 
-        DataInputStream in = new DataInputStream(new ByteArrayInputStream(recordRet));
-        long serializationVersion = DataUtil.readVLong(in);
-        deserialize(in, dbName);
+        ComObject retObj = new ComObject(recordRet);
+        byte[] selectBytes = retObj.getByteArray(ComObject.Tag.selectStatement);
+        deserialize(selectBytes, dbName);
 
-        DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
 
         TableSchema[] tableSchemas = new TableSchema[tableNames.length];
         for (int i = 0; i < tableNames.length; i++) {
@@ -762,19 +779,18 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
             }
           }
         }
-        int recordCount = (int) DataUtil.readVLong(in, resultLength);
-        Object[][][] retKeys = new Object[recordCount][][];
-        Record[][] currRetRecords = new Record[recordCount][];
-        for (int k = 0; k < recordCount; k++) {
+        ComArray tableRecords = retObj.getArray(ComObject.Tag.tableRecords);
+        Object[][][] retKeys = new Object[tableRecords == null ? 0 : tableRecords.getArray().size()][][];
+        Record[][] currRetRecords = new Record[tableRecords == null ? 0 : tableRecords.getArray().size()][];
+        for (int k = 0; k < currRetRecords.length; k++) {
           currRetRecords[k] = new Record[tableNames.length];
           retKeys[k] = new Object[tableNames.length][];
+          ComArray records = (ComArray)tableRecords.getArray().get(k);
           for (int j = 0; j < tableNames.length; j++) {
-            if (in.readBoolean()) {
+            byte [] recordBytes = (byte[])records.getArray().get(j);
+            if (recordBytes != null) {
               Record record = new Record(tableSchemas[j]);
-              int len = (int)DataUtil.readVLong(in, resultLength); //len
-              byte[] bytes = new byte[len];
-              in.readFully(bytes);
-              record.deserialize(dbName, client.getCommon(), bytes, null, true);
+              record.deserialize(dbName, client.getCommon(), recordBytes, null, true);
               currRetRecords[k][j] = record;
 
               Object[] key = new Object[primaryKeyFields.length];
@@ -786,7 +802,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                 retKeys[k][j] = key;
               }
 
-              recordCache.put(tableNames[j], key, new ExpressionImpl.CachedRecord(record, bytes));
+              recordCache.put(tableNames[j], key, new ExpressionImpl.CachedRecord(record, recordBytes));
             }
           }
 
@@ -894,55 +910,39 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
           int previousSchemaVersion = client.getCommon().getSchemaVersion();
           int shardCount = client.getShardCount();
           for (int shard = 0; shard < shardCount; shard++) {
-            ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-            DataOutputStream out = new DataOutputStream(bytesOut);
-            DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+            ComObject cobj = new ComObject();
+            cobj.put(ComObject.Tag.serializationVersion, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
             if (expression instanceof AllRecordsExpressionImpl) {
               expression = null;
             }
-            if (expression == null) {
-              out.writeBoolean(false);
-            }
-            else {
-              out.writeBoolean(true);
-              ExpressionImpl.serializeExpression(expression, out);
+            if (expression != null) {
+              cobj.put(ComObject.Tag.expression, ExpressionImpl.serializeExpression(expression));
             }
 
-            if (getParms() == null) {
-              out.writeBoolean(false);
-            }
-            else {
-              out.writeBoolean(true);
-              getParms().serialize(out);
+            if (getParms() != null) {
+              cobj.put(ComObject.Tag.parms, getParms().serialize());
             }
 
-            if (this.countTable == null) {
-              out.writeBoolean(false);
-            }
-            else {
-              out.writeBoolean(true);
-              out.writeUTF(this.countTable);
+            if (this.countTable != null) {
+              cobj.put(ComObject.Tag.countTableName, this.countTable);
             }
 
-            if (this.countColumn == null) {
-              out.writeBoolean(false);
-            }
-            else {
-              out.writeBoolean(true);
-              out.writeUTF(this.countColumn);
+            if (this.countColumn != null) {
+              cobj.put(ComObject.Tag.countColumn, this.countColumn);
             }
 
-            out.close();
+            cobj.put(ComObject.Tag.dbName, dbName);
+            cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+            cobj.put(ComObject.Tag.method, "countRecords");
+            cobj.put(ComObject.Tag.tableName, fromTable);
 
-            String command = "DatabaseServer:countRecords:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-                client.getCommon().getSchemaVersion() + ":" + dbName + ":" + fromTable;
-            byte[] lookupRet = client.send(null, shard, 0, command, bytesOut.toByteArray(), DatabaseClient.Replica.def);
+            String command = "DatabaseServer:ComObject:countRecords:";
+            byte[] lookupRet = client.send(null, shard, 0, command, cobj.serialize(), DatabaseClient.Replica.def);
             if (previousSchemaVersion < client.getCommon().getSchemaVersion()) {
               throw new SchemaOutOfSyncException();
             }
-            DataInputStream in = new DataInputStream(new ByteArrayInputStream(lookupRet));
-            long serialiationVersion = DataUtil.readVLong(in);
-            long currCount = in.readLong();
+            ComObject retObj = new ComObject(lookupRet);
+            long currCount = retObj.getLong(ComObject.Tag.countLong);
             count += currCount;
           }
           break;

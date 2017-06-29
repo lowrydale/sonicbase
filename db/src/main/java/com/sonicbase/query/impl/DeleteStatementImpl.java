@@ -1,6 +1,7 @@
 package com.sonicbase.query.impl;
 
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.ComObject;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.Record;
 import com.sonicbase.common.SchemaOutOfSyncException;
@@ -105,29 +106,27 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
                 throw new Exception("No shards selected for query");
               }
 
-              ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-              DataOutputStream out = new DataOutputStream(bytesOut);
+              ComObject cobj = new ComObject();
+              cobj.put(ComObject.Tag.serializationVersion, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+              cobj.put(ComObject.Tag.keyBytes, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), entry[0]));
+              cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+              cobj.put(ComObject.Tag.dbName, dbName);
+              cobj.put(ComObject.Tag.tableName, tableName);
+              cobj.put(ComObject.Tag.indexName, indexSchema.getName());
+              cobj.put(ComObject.Tag.method, "deleteRecord");
+              String command = "DatabaseServer:ComObject:deleteRecord:";
+              client.send("DatabaseServer:deleteRecord", selectedShards.get(0), rand.nextLong(), command, cobj.serialize(), DatabaseClient.Replica.def);
 
-              DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-              out.write(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), entry[0]));
-
-              out.close();
-
-              String command = "DatabaseServer:deleteRecord:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-                  client.getCommon().getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + indexSchema.getName();
-              client.send("DatabaseServer:deleteRecord", selectedShards.get(0), rand.nextLong(), command, bytesOut.toByteArray(), DatabaseClient.Replica.def);
-
-              command = "DatabaseServer:deleteIndexEntry:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-                  client.getCommon().getSchemaVersion() + ":" + dbName + ":" + tableSchema.getName();
-              bytesOut = new ByteArrayOutputStream();
-              out = new DataOutputStream(bytesOut);
-              DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+              command = "DatabaseServer:ComObject:deleteIndexEntry:";
+              cobj = new ComObject();
+              cobj.put(ComObject.Tag.dbName, dbName);
+              cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+              cobj.put(ComObject.Tag.tableName, tableName);
+              cobj.put(ComObject.Tag.method, "deleteIndexEntry");
               byte[] bytes = record.serialize(client.getCommon());
-              out.writeInt(bytes.length);
-              out.write(bytes);
-              out.close();
+              cobj.put(ComObject.Tag.recordBytes, bytes);
 
-              client.sendToAllShards("DatabaseServer:deleteIndexEntry", rand.nextLong(), command, bytesOut.toByteArray(), DatabaseClient.Replica.def);
+              client.sendToAllShards(null, rand.nextLong(), command, cobj.serialize(), DatabaseClient.Replica.def);
               countDeleted++;
             }
           }

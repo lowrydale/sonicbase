@@ -1,9 +1,7 @@
 package com.sonicbase.query.impl;
 
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.*;
 
 public class OrderByExpressionImpl {
   private String tableName;
@@ -19,6 +17,14 @@ public class OrderByExpressionImpl {
     this.isAscending = isAscending;
   }
 
+  public byte[] serialize() throws IOException {
+    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+    DataOutputStream out = new DataOutputStream(bytesOut);
+    serialize(out);
+    out.close();
+    return bytesOut.toByteArray();
+  }
+
   public void serialize(DataOutputStream out) throws IOException {
     if (tableName == null) {
       out.writeInt(0);
@@ -29,6 +35,11 @@ public class OrderByExpressionImpl {
     }
     out.writeUTF(columnName);
     out.writeBoolean(isAscending);
+  }
+
+  public void deserialize(byte[] bytes) throws IOException {
+    DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
+    deserialize(in);
   }
 
   public void deserialize(DataInputStream in) throws IOException {

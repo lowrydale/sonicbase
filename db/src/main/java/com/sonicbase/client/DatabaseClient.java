@@ -300,15 +300,27 @@ public class DatabaseClient {
       op.statement.execute(dbName, explain);
     }
     */
+     while (true) {
+      try {
+        ComObject cobj = new ComObject();
+        cobj.put(ComObject.Tag.dbName, dbName);
+        cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+        cobj.put(ComObject.Tag.method, "commit");
+        cobj.put(ComObject.Tag.transactionId, transactionId.get());
+        String command = "DatabaseServer:ComObject:commit:";
+        sendToAllShards(null, 0, command, cobj.serialize(), DatabaseClient.Replica.def);
 
-    String command = "DatabaseServer:commit:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-        common.getSchemaVersion() + ":" + dbName + ":" + transactionId.get();
-    sendToAllShards(null, 0, command, null, DatabaseClient.Replica.def);
+        isExplicitTrans.set(false);
+        transactionOps.set(null);
+        isCommitting.set(false);
+        transactionId.set(null);
 
-    isExplicitTrans.set(false);
-    transactionOps.set(null);
-    isCommitting.set(false);
-    transactionId.set(null);
+        break;
+      }
+      catch (SchemaOutOfSyncException e) {
+        continue;
+      }
+     }
 
 
 
@@ -316,9 +328,13 @@ public class DatabaseClient {
 
   public void rollback(String dbName) {
 
-    String command = "DatabaseServer:rollback:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-        common.getSchemaVersion() + ":" + dbName + ":" + transactionId.get();
-    sendToAllShards(null, 0, command, null, DatabaseClient.Replica.def);
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.dbName, dbName);
+    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+    cobj.put(ComObject.Tag.method, "rollback");
+    cobj.put(ComObject.Tag.transactionId, transactionId.get());
+    String command = "DatabaseServer:ComObject:rollback:";
+    sendToAllShards(null, 0, command, cobj.serialize(), DatabaseClient.Replica.def);
 
     isExplicitTrans.set(false);
     transactionOps.set(null);
@@ -333,10 +349,14 @@ public class DatabaseClient {
   public void createDatabase(String dbName) {
     dbName = dbName.toLowerCase();
 
-    String command = "DatabaseServer:createDatabase:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-        common.getSchemaVersion() + ":" + dbName + ":master";
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.dbName, dbName);
+    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+    cobj.put(ComObject.Tag.method, "createDatabase");
+    cobj.put(ComObject.Tag.masterSlave, "master");
+    String command = "DatabaseServer:ComObject:createDatabase:";
 
-    sendToMaster(command, null);
+    sendToMaster(command, cobj.serialize());
   }
 
   public String debugRecord(String dbName, String tableName, String indexName, String key) {
@@ -440,8 +460,7 @@ public class DatabaseClient {
           }
 
           String dbName = batch.get().get(0).dbName;
-          final String command = "DatabaseServer:batchInsertIndexEntryByKeyWithRecord:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION +
-              ":" + common.getSchemaVersion() + ":" + dbName;
+          final String command = "DatabaseServer:ComObject:batchInsertIndexEntryByKeyWithRecord:";
 
           final List<List<PreparedInsert>> withRecordProcessed = new ArrayList<>();
           final List<List<PreparedInsert>> processed = new ArrayList<>();
@@ -449,6 +468,8 @@ public class DatabaseClient {
           final List<DataOutputStream> withRecordOut = new ArrayList<>();
           final List<ByteArrayOutputStream> bytesOut = new ArrayList<>();
           final List<DataOutputStream> out = new ArrayList<>();
+          final List<ComObject> cobjs1 = new ArrayList<>();
+          final List<ComObject> cobjs2 = new ArrayList<>();
           for (int i = 0; i < getShardCount(); i++) {
             ByteArrayOutputStream bOut = new ByteArrayOutputStream();
             withRecordBytesOut.add(bOut);
@@ -458,16 +479,32 @@ public class DatabaseClient {
             out.add(new DataOutputStream(bOut));
             withRecordProcessed.add(new ArrayList<PreparedInsert>());
             processed.add(new ArrayList<PreparedInsert>());
+
+            final ComObject cobj1 = new ComObject();
+            cobj1.put(ComObject.Tag.dbName, dbName);
+            cobj1.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+            cobj1.put(ComObject.Tag.method, "batchInsertIndexEntryByKeyWithRecord");
+            cobj1.putArray(ComObject.Tag.insertObjects, ComObject.Type.objectType);
+            cobjs1.add(cobj1);
+
+            final ComObject cobj2 = new ComObject();
+            cobj2.put(ComObject.Tag.dbName, dbName);
+            cobj2.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+            cobj2.put(ComObject.Tag.method, "batchInsertIndexEntryByKey");
+            cobj2.putArray(ComObject.Tag.insertObjects, ComObject.Type.objectType);
+            cobjs2.add(cobj2);
+
           }
           synchronized (mutex) {
             for (PreparedInsert insert : withRecordPrepared) {
-              serializeInsertKeyWithRecord(withRecordOut.get(insert.keyInfo.shard), insert.dbName, insert.tableName,
-                  insert.keyInfo, insert.record);
+              ComObject obj = serializeInsertKeyWithRecord(insert.dbName, insert.tableName, insert.keyInfo, insert.record);
+              cobjs1.get(insert.keyInfo.shard).getArray(ComObject.Tag.insertObjects).getArray().add(obj);
               withRecordProcessed.get(insert.keyInfo.shard).add(insert);
             }
             for (PreparedInsert insert : prepared) {
-              serializeInsertKey(out.get(insert.keyInfo.shard), insert.dbName, insert.tableName, insert.keyInfo,
+              ComObject obj = serializeInsertKey(insert.dbName, insert.tableName, insert.keyInfo,
                   insert.primaryKeyIndexName, insert.primaryKey);
+              cobjs2.get(insert.keyInfo.shard).getArray(ComObject.Tag.insertObjects).getArray().add(obj);
               processed.get(insert.keyInfo.shard).add(insert);
             }
           }
@@ -479,12 +516,15 @@ public class DatabaseClient {
             futures.add(executor.submit(new Callable() {
               @Override
               public Object call() throws Exception {
-                ByteArrayOutputStream currBytes = withRecordBytesOut.get(offset);
-                byte[] bytes = currBytes.toByteArray();
-                if (bytes == null || bytes.length == 0) {
+//                ByteArrayOutputStream currBytes = withRecordBytesOut.get(offset);
+//                byte[] bytes = currBytes.toByteArray();
+//                if (bytes == null || bytes.length == 0) {
+//                  return null;
+//                }
+                if (cobjs1.get(offset).getArray(ComObject.Tag.insertObjects).getArray().size() == 0) {
                   return null;
                 }
-                byte[] ret = send(null, offset, 0, command, bytes, DatabaseClient.Replica.def);
+                byte[] ret = send(null, offset, 0, command, cobjs1.get(offset).serialize(), DatabaseClient.Replica.def);
                 if (ret == null) {
                   throw new FailedToInsertException("No response for key insert");
                 }
@@ -493,9 +533,8 @@ public class DatabaseClient {
                     withRecordPrepared.remove(insert);
                   }
                 }
-                DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
-                long serializationVersion = DataUtil.readVLong(in);
-                int retVal = in.readInt();
+                ComObject retObj = new ComObject(ret);
+                int retVal = retObj.getInt(ComObject.Tag.count);
                 totalCount.addAndGet(retVal);
                 //if (retVal != 1) {
                 //  throw new FailedToInsertException("Incorrect response from server: value=" + retVal);
@@ -507,8 +546,7 @@ public class DatabaseClient {
           for (Future future : futures) {
             future.get();
           }
-          final String command2 = "DatabaseServer:batchInsertIndexEntryByKey:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION +
-              ":" + common.getSchemaVersion() + ":" + dbName;
+          final String command2 = "DatabaseServer:ComObject:batchInsertIndexEntryByKey:";
 
           futures = new ArrayList<>();
           for (int i = 0; i < bytesOut.size(); i++) {
@@ -516,12 +554,15 @@ public class DatabaseClient {
             futures.add(executor.submit(new Callable() {
               @Override
               public Object call() throws Exception {
-                ByteArrayOutputStream currBytes = bytesOut.get(offset);
-                byte[] bytes = currBytes.toByteArray();
-                if (bytes == null || bytes.length == 0) {
+//                ByteArrayOutputStream currBytes = bytesOut.get(offset);
+//                byte[] bytes = currBytes.toByteArray();
+//                if (bytes == null || bytes.length == 0) {
+//                  return null;
+//                }
+                if (cobjs2.get(offset).getArray(ComObject.Tag.insertObjects).getArray().size() == 0) {
                   return null;
                 }
-                send(null, offset, rand.nextLong(), command2, bytes, DatabaseClient.Replica.def);
+                send(null, offset, rand.nextLong(), command2, cobjs2.get(offset).serialize(), DatabaseClient.Replica.def);
 
                 for (PreparedInsert insert : processed.get(offset)) {
                   prepared.remove(insert);
@@ -751,7 +792,11 @@ public class DatabaseClient {
       }
       return ret;
     }
+    catch (SchemaOutOfSyncException e) {
+      throw e;
+    }
     catch (InterruptedException | ExecutionException | TimeoutException e) {
+      handleSchemaOutOfSyncException(command, e);
       throw new DatabaseException(e);
     }
     finally {
@@ -862,10 +907,12 @@ public class DatabaseClient {
       }
       synchronized (this) {
         Integer serverVersion = null;
-        int pos = msg.indexOf("currVer:");
-        if (pos != -1) {
-          int pos2 = msg.indexOf(":", pos + "currVer:".length());
-          serverVersion = Integer.valueOf(msg.substring(pos + "currVer:".length(), pos2));
+        if (msg != null) {
+          int pos = msg.indexOf("currVer:");
+          if (pos != -1) {
+            int pos2 = msg.indexOf(":", pos + "currVer:".length());
+            serverVersion = Integer.valueOf(msg.substring(pos + "currVer:".length(), pos2));
+          }
         }
 
         if (serverVersion == null || serverVersion > common.getSchemaVersion()) {
@@ -916,6 +963,8 @@ public class DatabaseClient {
       int pos = localCommand.indexOf(":");
       int pos2 = localCommand.indexOf(":", pos + 1);
       String verb = localCommand.substring(pos + 1, pos2);
+      int pos3 = localCommand.indexOf(":", pos2 + 1);
+      String verb2 = localCommand.substring(pos2 + 1, pos3);
 
       byte[] ret = null;
       for (int attempt = 0; attempt < 1; attempt++) {
@@ -996,7 +1045,7 @@ public class DatabaseClient {
           else if (replica == Replica.specified) {
             DatabaseServer dbserver = getLocalDbServer(shard, (int) auth_user);
             if (!ignoreDeath && replicas[(int)auth_user].dead) {
-              if (writeVerbs.contains(verb)) {
+              if (writeVerbs.contains(verb) || writeVerbs.contains(verb2)) {
                 ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
                 DataOutputStream out = new DataOutputStream(bytesOut);
                 out.writeUTF(localCommand);
@@ -1038,7 +1087,7 @@ public class DatabaseClient {
             }
           }
           else if (replica == Replica.def) {
-            if (write_verbs.contains(verb)) {
+            if (write_verbs.contains(verb) || write_verbs.contains(verb2)) {
               int masterReplica = common.getServersConfig().getShards()[shard].getMasterReplica();
               //int successCount = 0;
               if (!ignoreDeath && replicas[masterReplica].dead) {
@@ -1261,9 +1310,64 @@ public class DatabaseClient {
 
   private AtomicLong nextRecordId = new AtomicLong();
 
+  public boolean isBackupComplete() {
+    try {
+      String command = "DatabaseServer:isEntireBackupComplete:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+          common.getSchemaVersion() + ":__none__";
+      byte[] ret = send(null, 0, 0, command, null, DatabaseClient.Replica.master);
+      DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
+      return in.readBoolean();
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public boolean isRestoreComplete() {
+    try {
+      String command = "DatabaseServer:isEntireRestoreComplete:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+          common.getSchemaVersion() + ":__none__";
+      byte[] ret = send(null, 0, 0, command, null, DatabaseClient.Replica.master);
+      DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
+      return in.readBoolean();
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public void startRestore(String subDir) {
+    try {
+      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+      DataOutputStream out = new DataOutputStream(bytesOut);
+      out.writeUTF(subDir);
+      out.close();
+
+      String command = "DatabaseServer:startRestore:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
+          common.getSchemaVersion() + ":__none__";
+      byte[] ret = send(null, 0, 0, command, bytesOut.toByteArray(), DatabaseClient.Replica.master);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public void startBackup() {
+    String command = "DatabaseServer:startBackup:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION  + ":" +
+        common.getSchemaVersion() + ":__none__";
+    byte[] ret = send(null, 0, 0, command, null, DatabaseClient.Replica.master);
+  }
+
   public void doCreateIndex(String dbName, CreateIndexStatementImpl statement) throws IOException {
-    String command = "DatabaseServer:createIndex:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-        common.getSchemaVersion() + ":" + dbName + ":master:" + statement.getTableName() + ":" + statement.getName() + ":" + statement.isUnique();
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.dbName, dbName);
+    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+    cobj.put(ComObject.Tag.method, "createIndex");
+    cobj.put(ComObject.Tag.masterSlave, "master");
+    cobj.put(ComObject.Tag.tableName, statement.getTableName());
+    cobj.put(ComObject.Tag.indexName, statement.getName());
+    cobj.put(ComObject.Tag.isUnique, statement.isUnique());
+    String command = "DatabaseServer:ComObject:createIndex:";
     StringBuilder builder = new StringBuilder();
     boolean first = true;
     for (String field : statement.getColumns()) {
@@ -1273,11 +1377,13 @@ public class DatabaseClient {
       first = false;
       builder.append(field);
     }
-    command = command + ":" + builder.toString();
+    //command = command + ":" + builder.toString();
 
-    byte[] ret = sendToMaster(command, null);
-    DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
-    common.deserializeSchema(in);
+    cobj.put(ComObject.Tag.fieldsStr, builder.toString());
+
+    byte[] ret = sendToMaster(command, cobj.serialize());
+    ComObject retObj = new ComObject(ret);
+    common.deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
   }
 
 
@@ -1773,9 +1879,9 @@ public class DatabaseClient {
 
   private Object doAlter(String dbName, ParameterHandler parms, Alter statement) throws IOException {
     String operation = statement.getOperation();
-    String tableName = statement.getTable().getName();
+    String tableName = statement.getTable().getName().toLowerCase();
     ColDataType type = statement.getDataType();
-    String columnName = statement.getColumnName();
+    String columnName = statement.getColumnName().toLowerCase();
 
     if (operation.equalsIgnoreCase("add")) {
       doAddColumn(dbName, tableName, columnName, type);
@@ -1788,21 +1894,33 @@ public class DatabaseClient {
 
   private void doDropColumn(String dbName, String tableName, String columnName) throws IOException {
 
-    String command = "DatabaseServer:dropColumn:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-        common.getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + columnName + ":master";
-    byte[] ret = sendToMaster(command, null);
-    DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
-    common.deserializeSchema(in);
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.dbName, dbName);
+    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+    cobj.put(ComObject.Tag.tableName, tableName);
+    cobj.put(ComObject.Tag.columnName, columnName);
+    cobj.put(ComObject.Tag.method, "dropColumn");
+    cobj.put(ComObject.Tag.masterSlave, "master");
+    String command = "DatabaseServer:ComObject:dropColumn:";
+    byte[] ret = sendToMaster(command, cobj.serialize());
+    ComObject retObj = new ComObject(ret);
+    common.deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
   }
 
   private void doAddColumn(String dbName, String tableName, String columnName, ColDataType type) throws IOException {
 
-    String command = "DatabaseServer:addColumn:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-        common.getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + columnName + ":" + type.getDataType() +
-        ":master";
-    byte[] ret = sendToMaster(command, null);
-    DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
-    common.deserializeSchema(in);
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.dbName, dbName);
+    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+    cobj.put(ComObject.Tag.method, "addColumn");
+    cobj.put(ComObject.Tag.tableName, tableName);
+    cobj.put(ComObject.Tag.columnName, columnName);
+    cobj.put(ComObject.Tag.dataType, type.getDataType());
+    cobj.put(ComObject.Tag.masterSlave, "master");
+    String command = "DatabaseServer:ComObject:addColumn:";
+    byte[] ret = sendToMaster(command, cobj.serialize());
+    ComObject retObj = new ComObject(ret);
+    common.deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
   }
 
   private Object doDrop(String dbName, Statement statement) throws IOException {
@@ -1811,21 +1929,33 @@ public class DatabaseClient {
       String table = drop.getName().getName().toLowerCase();
       doTruncateTable(dbName, table);
 
-      String command = "DatabaseServer:dropTable:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-          common.getSchemaVersion() + ":" + dbName + ":" + table + ":master";
-      byte[] ret = sendToMaster(command, null);
-      DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
-      common.deserializeSchema(in);
+      ComObject cobj = new ComObject();
+      cobj.put(ComObject.Tag.dbName, dbName);
+      cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+      cobj.put(ComObject.Tag.method, "dropTable");
+      cobj.put(ComObject.Tag.masterSlave, "master");
+      cobj.put(ComObject.Tag.tableName, table);
+      String command = "DatabaseServer:ComObject:dropTable:";
+      byte[] ret = sendToMaster(command, cobj.serialize());
+      ComObject retObj = new ComObject(ret);
+      byte[] bytes = retObj.getByteArray(ComObject.Tag.schemaBytes);
+      common.deserializeSchema(bytes);
     }
     else if (drop.getType().equalsIgnoreCase("index")) {
       String indexName = drop.getName().getName().toLowerCase();
       String tableName = drop.getName().getSchemaName().toLowerCase();
 
-      String command = "DatabaseServer:dropIndex:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-          common.getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + indexName + ":master";
-      byte[] ret = send(null, 0, 0, command, null, DatabaseClient.Replica.master);
-      DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
-      common.deserializeSchema(in);
+      ComObject cobj = new ComObject();
+      cobj.put(ComObject.Tag.dbName, dbName);
+      cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+      cobj.put(ComObject.Tag.method, "dropIndex");
+      cobj.put(ComObject.Tag.tableName, tableName);
+      cobj.put(ComObject.Tag.indexName, indexName);
+      cobj.put(ComObject.Tag.masterSlave, "master");
+      String command = "DatabaseServer:ComObject:dropIndex:";
+      byte[] ret = send(null, 0, 0, command, cobj.serialize(), DatabaseClient.Replica.master);
+      ComObject retObj = new ComObject(ret);
+      common.deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
     }
     return 1;
   }
@@ -1841,17 +1971,22 @@ public class DatabaseClient {
 
   private void doTruncateTable(String dbName, String table) {
 
-    String command = "DatabaseServer:truncateTable:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-        common.getSchemaVersion() + ":" + dbName + ":" + table + ":secondary";
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.dbName, dbName);
+    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+    cobj.put(ComObject.Tag.method, "truncateTable");
+    cobj.put(ComObject.Tag.tableName, table);
+    cobj.put(ComObject.Tag.phase, "secondary");
+    String command = "DatabaseServer:ComObject:truncateTable:";
 
     Random rand = new Random(System.currentTimeMillis());
-    sendToAllShards(null, rand.nextLong(), command, null, Replica.def);
+    sendToAllShards(null, rand.nextLong(), command, cobj.serialize(), Replica.def);
 
-    command = "DatabaseServer:truncateTable:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-        common.getSchemaVersion() + ":" + dbName + ":" + table + ":primary";
+    cobj.put(ComObject.Tag.phase, "primary");
+    command = "DatabaseServer:ComObject:truncateTable:";
 
     rand = new Random(System.currentTimeMillis());
-    sendToAllShards(null, rand.nextLong(), command, null, Replica.def);
+    sendToAllShards(null, rand.nextLong(), command, cobj.serialize(), Replica.def);
   }
 
   private Object doCreateIndex(String dbName, CreateIndex stmt) throws IOException {
@@ -1954,17 +2089,18 @@ public class DatabaseClient {
 
   public int doCreateTable(String dbName, CreateTableStatementImpl createTableStatement) {
     try {
-      String command = "DatabaseServer:createTable:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-          common.getSchemaVersion() + ":" + dbName + ":master:query0";
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-      createTableStatement.serialize(out);
-      out.close();
+      String command = "DatabaseServer:ComObject:createTable:";
 
-      byte[] ret = sendToMaster(command, bytesOut.toByteArray());
-      DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
-      common.deserializeSchema(in);
+      ComObject cobj = new ComObject();
+      cobj.put(ComObject.Tag.dbName, dbName);
+      cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+      cobj.put(ComObject.Tag.method, "createTable");
+      cobj.put(ComObject.Tag.masterSlave, "master");
+      cobj.put(ComObject.Tag.createTableStatement, createTableStatement.serialize());
+
+      byte[] ret = sendToMaster(command, cobj.serialize());
+      ComObject retObj = new ComObject(ret);
+      common.deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
 
       return 1;
     }
@@ -2007,36 +2143,37 @@ public class DatabaseClient {
 
   public void insertKey(String dbName, String tableName, KeyInfo keyInfo, String primaryKeyIndexName, Object[] primaryKey) {
     try {
-      String command = "DatabaseServer:insertIndexEntryByKey:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-          common.getSchemaVersion() + ":" + dbName;
+      String command = "DatabaseServer:ComObject:insertIndexEntryByKey:";
 
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      DataOutputStream out = new DataOutputStream(bytesOut);
-      serializeInsertKey(out, dbName, tableName, keyInfo, primaryKeyIndexName, primaryKey);
-      out.close();
+      ComObject cobj = serializeInsertKey(dbName, tableName, keyInfo, primaryKeyIndexName, primaryKey);
 
-      send("DatabaseServer:insertIndexEntryByKey", keyInfo.shard, rand.nextLong(), command, bytesOut.toByteArray(), DatabaseClient.Replica.def);
+      cobj.put(ComObject.Tag.dbName, dbName);
+      cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+      cobj.put(ComObject.Tag.method, "insertIndexEntryByKey");
+      send("DatabaseServer:insertIndexEntryByKey", keyInfo.shard, rand.nextLong(), command, cobj.serialize(), DatabaseClient.Replica.def);
     }
     catch (IOException e) {
       throw new DatabaseException(e);
     }
   }
 
-  private void serializeInsertKey(DataOutputStream out, String dbName, String tableName, KeyInfo keyInfo,
-                                  String primaryKeyIndexName, Object[] primaryKey) throws IOException {
-    DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-    out.writeUTF(tableName);
-    out.writeUTF(keyInfo.indexSchema.getKey());
-    out.writeBoolean(isExplicitTrans());
-    out.writeBoolean(isCommitting());
-    DataUtil.writeVLong(out, getTransactionId());
+  private ComObject serializeInsertKey(String dbName, String tableName, KeyInfo keyInfo,
+                                    String primaryKeyIndexName, Object[] primaryKey) throws IOException {
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.serializationVersion, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+    cobj.put(ComObject.Tag.dbName, dbName);
+    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+    cobj.put(ComObject.Tag.tableName, tableName);
+    cobj.put(ComObject.Tag.indexName, keyInfo.indexSchema.getKey());
+    cobj.put(ComObject.Tag.isExcpliciteTrans, isExplicitTrans());
+    cobj.put(ComObject.Tag.isCommitting, isCommitting());
+    cobj.put(ComObject.Tag.transactionId, getTransactionId());
     byte[] keyBytes = DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), keyInfo.indexSchema.getKey(), keyInfo.key);
-    DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-    DataUtil.writeVLong(out, keyBytes.length, resultLength);
-    out.write(keyBytes);
+    cobj.put(ComObject.Tag.keyBytes, keyBytes);
     byte[] primaryKeyBytes = DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), primaryKeyIndexName, primaryKey);
-    DataUtil.writeVLong(out, primaryKeyBytes.length, resultLength);
-    out.write(primaryKeyBytes);
+    cobj.put(ComObject.Tag.primaryKeyBytes, primaryKeyBytes);
+
+    return cobj;
   }
 
   class FailedToInsertException extends RuntimeException {
@@ -2047,25 +2184,23 @@ public class DatabaseClient {
 
   public void insertKeyWithRecord(String dbName, String tableName, KeyInfo keyInfo, Record record) {
     try {
-      String command = "DatabaseServer:insertIndexEntryByKeyWithRecord:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION +
-          ":" + common.getSchemaVersion() + ":" + dbName;
+      String command = "DatabaseServer:ComObject:insertIndexEntryByKeyWithRecord:";
 
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      DataOutputStream out = new DataOutputStream(bytesOut);
-      serializeInsertKeyWithRecord(out, dbName, tableName, keyInfo, record);
-      out.close();
+      ComObject cobj = serializeInsertKeyWithRecord(dbName, tableName, keyInfo, record);
+      cobj.put(ComObject.Tag.dbName, dbName);
+      cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+      cobj.put(ComObject.Tag.method, "insertIndexEntryByKeyWithRecord");
 
       int replicaCount = getReplicaCount();
       Exception lastException = null;
       //for (int i = 0; i < replicaCount; i++) {
       try {
-        byte[] ret = send("DatabaseServer:insertIndexEntryByKeyWithRecord", keyInfo.shard, 0, command, bytesOut.toByteArray(), DatabaseClient.Replica.def);
+        byte[] ret = send(null, keyInfo.shard, 0, command, cobj.serialize(), DatabaseClient.Replica.def);
         if (ret == null) {
           throw new FailedToInsertException("No response for key insert");
         }
-        DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
-        long serializationVersion = DataUtil.readVLong(in);
-        int retVal = in.readInt();
+        ComObject retObj = new ComObject(ret);
+        int retVal = retObj.getInt(ComObject.Tag.count);
         if (retVal != 1) {
           throw new FailedToInsertException("Incorrect response from server: value=" + retVal);
         }
@@ -2086,38 +2221,43 @@ public class DatabaseClient {
     }
   }
 
-  private void serializeInsertKeyWithRecord(DataOutputStream out, String dbName, String tableName,
+  private ComObject serializeInsertKeyWithRecord(String dbName, String tableName,
                                             KeyInfo keyInfo, Record record) throws IOException {
-    DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-    out.writeUTF(tableName);
-    out.writeUTF(keyInfo.indexSchema.getKey());
-    DataUtil.writeVLong(out, record.getId());
-    out.writeBoolean(isExplicitTrans());
-    out.writeBoolean(isCommitting());
-    DataUtil.writeVLong(out, getTransactionId());
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.serializationVersion, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+    cobj.put(ComObject.Tag.dbName, dbName);
+    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+    cobj.put(ComObject.Tag.tableName, tableName);
+    cobj.put(ComObject.Tag.indexName, keyInfo.indexSchema.getKey());
+    cobj.put(ComObject.Tag.id, record.getId());
+    cobj.put(ComObject.Tag.isExcpliciteTrans, isExplicitTrans());
+    cobj.put(ComObject.Tag.isCommitting, isCommitting());
+    cobj.put(ComObject.Tag.transactionId, getTransactionId());
     byte[] recordBytes = record.serialize(common);
-    out.writeInt(recordBytes.length);
-    out.write(recordBytes);
-    out.write(DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), keyInfo.indexSchema.getKey(), keyInfo.key));
+    cobj.put(ComObject.Tag.recordBytes, recordBytes);
+    cobj.put(ComObject.Tag.keyBytes, DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), keyInfo.indexSchema.getKey(), keyInfo.key));
+
+    return cobj;
   }
 
   public void deleteKey(String dbName, String tableName, KeyInfo keyInfo, String primaryKeyIndexName, Object[] primaryKey) {
-    try {
-      String command = "DatabaseServer:deleteIndexEntryByKey:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-          common.getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + keyInfo.indexSchema.getKey() +
-          ":" + primaryKeyIndexName + ":" + isExplicitTrans() + ":" + isCommitting() + ":" + getTransactionId();
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-      out.write(DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), keyInfo.indexSchema.getKey(), keyInfo.key));
-      out.write(DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), primaryKeyIndexName, primaryKey));
-      out.close();
+    String command = "DatabaseServer:ComObject:deleteIndexEntryByKey:";
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.dbName, dbName);
+    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+    cobj.put(ComObject.Tag.method, "deleteIndexEntryByKey");
+    cobj.put(ComObject.Tag.tableName, tableName);
+    cobj.put(ComObject.Tag.indexName, keyInfo.indexSchema.getKey());
+    cobj.put(ComObject.Tag.primaryKeyIndexName, primaryKeyIndexName);
+    cobj.put(ComObject.Tag.isExcpliciteTrans, isExplicitTrans());
+    cobj.put(ComObject.Tag.isCommitting, isCommitting());
+    cobj.put(ComObject.Tag.transactionId, getTransactionId());
 
-      send("DatabaseServer:deleteIndexEntryByKey", keyInfo.shard, rand.nextLong(), command, bytesOut.toByteArray(), DatabaseClient.Replica.def);
-    }
-    catch (IOException e) {
-      throw new DatabaseException(e);
-    }
+    cobj.put(ComObject.Tag.serializationVersion, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+    cobj.put(ComObject.Tag.keyBytes, DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), keyInfo.indexSchema.getKey(), keyInfo.key));
+    cobj.put(ComObject.Tag.primaryKeyBytes, DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), primaryKeyIndexName, primaryKey));
+
+    send("DatabaseServer:deleteIndexEntryByKey", keyInfo.shard, rand.nextLong(), command, cobj.serialize(), DatabaseClient.Replica.def);
   }
 
   public void populateOrderedKeyInfo(
@@ -3001,17 +3141,14 @@ public class DatabaseClient {
   }
 
   public boolean isRepartitioningComplete(String dbName) {
-    try {
-      String command = "DatabaseServer:isRepartitioningComplete:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-          common.getSchemaVersion() + ":" + dbName;
-      byte[] bytes = sendToMaster(command, null);
-      DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
-      long serializationVersion = DataUtil.readVLong(in);
-      return in.readBoolean();
-    }
-    catch (IOException e) {
-      throw new DatabaseException(e);
-    }
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.dbName, dbName);
+    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+    cobj.put(ComObject.Tag.method, "isRepartitioningComplete");
+    String command = "DatabaseServer:ComObject:isRepartitioningComplete:";
+    byte[] bytes = sendToMaster(command, cobj.serialize());
+    ComObject retObj = new ComObject(bytes);
+    return retObj.getBoolean(ComObject.Tag.finished);
   }
 
   public long getPartitionSize(String dbName, int shard, String tableName, String indexName) {
@@ -3019,17 +3156,16 @@ public class DatabaseClient {
   }
 
   public long getPartitionSize(String dbName, int shard, int replica, String tableName, String indexName) {
-    try {
-      String command = "DatabaseServer:getPartitionSize:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-          common.getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + indexName;
-      byte[] bytes = send(null, shard, replica, command, null, DatabaseClient.Replica.specified);
-      DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
-      long serializationVersion = DataUtil.readVLong(in);
-      return in.readLong();
-    }
-    catch (IOException e) {
-      throw new DatabaseException(e);
-    }
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.dbName, dbName);
+    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+    cobj.put(ComObject.Tag.tableName, tableName);
+    cobj.put(ComObject.Tag.indexName, indexName);
+    cobj.put(ComObject.Tag.method, "getPartitionSize");
+    String command = "DatabaseServer:ComObject:getPartitionSize:";
+    byte[] bytes = send(null, shard, replica, command, cobj.serialize(), DatabaseClient.Replica.specified);
+    ComObject retObj = new ComObject(bytes);
+    return retObj.getLong(ComObject.Tag.size);
   }
 
 
@@ -3172,8 +3308,12 @@ public class DatabaseClient {
   }
 
   public void beginRebalance(String dbName, String tableName, String indexName) {
-    String command = "DatabaseServer:beginRebalance:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-        common.getSchemaVersion() + ":" + dbName + ":" + tableName + ":" + indexName;
-    sendToMaster(command, null);
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.dbName, dbName);
+    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+    cobj.put(ComObject.Tag.method, "beginRebalance");
+    cobj.put(ComObject.Tag.force, false);
+    String command = "DatabaseServer:ComObject:beginRebalance:";
+    sendToMaster(command, cobj.serialize());
   }
 }

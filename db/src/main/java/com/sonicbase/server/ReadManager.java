@@ -1,10 +1,7 @@
 package com.sonicbase.server;
 
 import com.codahale.metrics.MetricRegistry;
-import com.sonicbase.common.DatabaseCommon;
-import com.sonicbase.common.Logger;
-import com.sonicbase.common.Record;
-import com.sonicbase.common.SchemaOutOfSyncException;
+import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.BinaryExpression;
@@ -21,6 +18,8 @@ import java.io.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.yaml.snakeyaml.tokens.Token.ID.Tag;
 
 /**
  * Responsible for
@@ -81,123 +80,108 @@ public class ReadManager {
 
   public static final int SELECT_PAGE_SIZE = 30000;
 
-  public byte[] countRecords(String command, byte[] body) {
-    try {
-      if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
-        try {
-          Thread.sleep(10);
-        }
-        catch (InterruptedException e) {
-          throw new DatabaseException(e);
-        }
+  public byte[] countRecords(ComObject cobj) {
+    if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
+      try {
+        Thread.sleep(10);
       }
+      catch (InterruptedException e) {
+        throw new DatabaseException(e);
+      }
+    }
 
-      String[] parts = command.split(":");
-      String dbName = parts[5];
-      int schemaVersion = Integer.valueOf(parts[4]);
-      if (schemaVersion < server.getSchemaVersion()) {
-        throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
-      }
-      String fromTable = parts[6];
+    String dbName = cobj.getString(ComObject.Tag.dbName);
+    int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
+    if (schemaVersion < server.getSchemaVersion()) {
+      throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
+    }
+    String fromTable = cobj.getString(ComObject.Tag.tableName);
 
-      Expression expression = null;
-      DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
-      long serializationVersion = DataUtil.readVLong(in);
-      if (in.readBoolean()) {
-        expression = ExpressionImpl.deserializeExpression(in);
-      }
-      ParameterHandler parms = null;
-      if (in.readBoolean()) {
-        parms = new ParameterHandler();
-        parms.deserialize(in);
-      }
-      if (in.readBoolean()) {
-        in.readUTF();
-      }
-      String countColumn = null;
-      if (in.readBoolean()) {
-        countColumn = in.readUTF();
-      }
+    byte[] expressionBytes = cobj.getByteArray(ComObject.Tag.expression);
+    Expression expression = null;
+    if (expressionBytes != null) {
+      expression = ExpressionImpl.deserializeExpression(expressionBytes);
+    }
+    byte[] parmsBytes = cobj.getByteArray(ComObject.Tag.parms);
+    ParameterHandler parms = null;
+    if (parmsBytes != null) {
+      parms = new ParameterHandler();
+      parms.deserialize(parmsBytes);
+    }
+    String countColumn = cobj.getString(ComObject.Tag.countColumn);
 
-      long count = 0;
-      String primaryKeyIndex = null;
-      for (Map.Entry<String, IndexSchema> entry : server.getCommon().getTables(dbName).get(fromTable).getIndexes().entrySet()) {
-        if (entry.getValue().isPrimaryKey()) {
-          primaryKeyIndex = entry.getValue().getName();
+    long count = 0;
+    String primaryKeyIndex = null;
+    for (Map.Entry<String, IndexSchema> entry : server.getCommon().getTables(dbName).get(fromTable).getIndexes().entrySet()) {
+      if (entry.getValue().isPrimaryKey()) {
+        primaryKeyIndex = entry.getValue().getName();
+        break;
+      }
+    }
+    TableSchema tableSchema = server.getCommon().getTables(dbName).get(fromTable);
+    Index index = server.getIndices(dbName).getIndices().get(fromTable).get(primaryKeyIndex);
+
+    int countColumnOffset = 0;
+    if (countColumn != null) {
+      for (int i = 0; i < tableSchema.getFields().size(); i++) {
+        FieldSchema field = tableSchema.getFields().get(i);
+        if (field.getName().equals(countColumn)) {
+          countColumnOffset = i;
           break;
         }
       }
-      TableSchema tableSchema = server.getCommon().getTables(dbName).get(fromTable);
-      Index index = server.getIndices(dbName).getIndices().get(fromTable).get(primaryKeyIndex);
+    }
 
-      int countColumnOffset = 0;
-      if (countColumn != null) {
-        for (int i = 0; i < tableSchema.getFields().size(); i++) {
-          FieldSchema field = tableSchema.getFields().get(i);
-          if (field.getName().equals(countColumn)) {
-            countColumnOffset = i;
-            break;
+    if (countColumn == null && expression == null) {
+      count = index.size();
+    }
+    else {
+      Map.Entry<Object[], Object> entry = index.firstEntry();
+      while (true) {
+        if (entry == null) {
+          break;
+        }
+        byte[][] records = null;
+        synchronized (index.getMutex(entry.getKey())) {
+          if (entry.getValue() instanceof Long) {
+            entry.setValue(index.get(entry.getKey()));
+          }
+          if (entry.getValue() != null) {
+            records = server.fromUnsafeToRecords(entry.getValue());
           }
         }
-      }
-
-      if (countColumn == null && expression == null) {
-        count = index.size();
-      }
-      else {
-        Map.Entry<Object[], Object> entry = index.firstEntry();
-        while (true) {
-          if (entry == null) {
-            break;
-          }
-          byte[][] records = null;
-          synchronized (index.getMutex(entry.getKey())) {
-            if (entry.getValue() instanceof Long) {
-              entry.setValue(index.get(entry.getKey()));
-            }
-            if (entry.getValue() != null) {
-              records = server.fromUnsafeToRecords(entry.getValue());
+        for (byte[] bytes : records) {
+          Record record = new Record(tableSchema);
+          record.deserialize(dbName, server.getCommon(), bytes, null, true);
+          boolean pass = true;
+          if (countColumn != null) {
+            if (record.getFields()[countColumnOffset] == null) {
+              pass = false;
             }
           }
-          for (byte[] bytes : records) {
-            Record record = new Record(tableSchema);
-            record.deserialize(dbName, server.getCommon(), bytes, null, true);
-            boolean pass = true;
-            if (countColumn != null) {
-              if (record.getFields()[countColumnOffset] == null) {
-                pass = false;
-              }
+          if (pass) {
+            if (expression == null) {
+              count++;
             }
-            if (pass) {
-              if (expression == null) {
+            else {
+              pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
+              if (pass) {
                 count++;
               }
-              else {
-                pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
-                if (pass) {
-                  count++;
-                }
-              }
             }
           }
-          entry = index.higherEntry(entry.getKey());
         }
+        entry = index.higherEntry(entry.getKey());
       }
-
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-      out.writeLong(count);
-
-      out.close();
-      return bytesOut.toByteArray();
     }
-    catch (IOException e) {
-      throw new DatabaseException(e);
-    }
+
+
+    ComObject retObj = new ComObject();
+    retObj.put(ComObject.Tag.countLong, count);
+    return retObj.serialize();
   }
 
-  public byte[] batchIndexLookup(String command, byte[] body) {
+  public byte[] batchIndexLookup(ComObject cobj) {
     try {
       if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
         try {
@@ -208,17 +192,15 @@ public class ReadManager {
         }
       }
 
-      String[] parts = command.split(":");
-      String dbName = parts[5];
-      int schemaVersion = Integer.valueOf(parts[4]);
+      String dbName = cobj.getString(ComObject.Tag.dbName);
+      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
       if (schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
       }
-      int count = Integer.valueOf(parts[6]);
-      DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
-      long serializationVersion = DataUtil.readVLong(in);
-      String tableName = in.readUTF();
-      String indexName = in.readUTF();
+      int count = cobj.getInt(ComObject.Tag.count);
+      long serializationVersion = cobj.getLong(ComObject.Tag.serializationVersion);
+      String tableName = cobj.getString(ComObject.Tag.tableName);
+      String indexName = cobj.getString(ComObject.Tag.indexName);
 
       TableSchema tableSchema = server.getCommon().getSchema(dbName).getTables().get(tableName);
       IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
@@ -227,19 +209,19 @@ public class ReadManager {
       Index index = server.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexName);
       Boolean ascending = null;
 
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+      ComObject retObj = new ComObject();
+      retObj.put(ComObject.Tag.serializationVersion, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
 
-      BinaryExpression.Operator leftOperator = BinaryExpression.Operator.getOperator(in.readInt());
+      int leftOperatorId = cobj.getInt(ComObject.Tag.leftOperator);
+      BinaryExpression.Operator leftOperator = BinaryExpression.Operator.getOperator(leftOperatorId);
 
-      Set<Integer> columnOffsets = getSimpleColumnOffsets(in, resultLength, tableName, tableSchema);
-
-      int keyCount = (int) DataUtil.readVLong(in, resultLength);
-      boolean singleValue = in.readBoolean();
-      if (singleValue) {
-        in.readInt(); //type
+      ComArray cOffsets = cobj.getArray(ComObject.Tag.columnOffsets);
+      Set<Integer> columnOffsets = new HashSet<>();
+      for (Object obj : cOffsets.getArray()) {
+        columnOffsets.add((Integer)obj);
       }
+
+      boolean singleValue = cobj.getBoolean(ComObject.Tag.singleValue);
 
       IndexSchema primaryKeyIndexSchema = null;
       Index primaryKeyIndex = null;
@@ -252,15 +234,18 @@ public class ReadManager {
 
       //out.writeInt(SNAPSHOT_SERIALIZATION_VERSION);
 
-      DataUtil.writeVLong(out, keyCount, resultLength);
-      for (int i = 0; i < keyCount; i++) {
-        int offset = (int) DataUtil.readVLong(in, resultLength);
+      ComArray keys = cobj.getArray(ComObject.Tag.keys);
+      ComArray retKeysArray = retObj.putArray(ComObject.Tag.retKeys, ComObject.Type.objectType);
+      for (Object keyObj : keys.getArray()) {
+        ComObject key = (ComObject)keyObj;
+        int offset = key.getInt(ComObject.Tag.offset);
         Object[] leftKey = null;
         if (singleValue) {
-          leftKey = new Object[]{DataUtil.readVLong(in, resultLength)};
+          leftKey = new Object[]{key.getLong(ComObject.Tag.longKey)};
         }
         else {
-          leftKey = DatabaseCommon.deserializeKey(tableSchema, in);
+          byte[] keyBytes = key.getByteArray(ComObject.Tag.keyBytes);
+          leftKey = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
         }
 
         Counter[] counters = null;
@@ -288,19 +273,19 @@ public class ReadManager {
 //          retKeys.clear();
         }
 
-
-        DataUtil.writeVLong(out, offset, resultLength);
-        DataUtil.writeVLong(out, retKeys.size(), resultLength);
-        for (byte[] key : retKeys) {
-          DataUtil.writeVLong(out, key.length, resultLength);
-          out.write(key);
+        ComObject retEntry = new ComObject();
+        retKeysArray.add(retEntry);
+        retEntry.put(ComObject.Tag.offset, offset);
+        retEntry.put(ComObject.Tag.keyCount, retKeys.size());
+        ComArray keysArray = retEntry.putArray(ComObject.Tag.keys, ComObject.Type.byteArrayType);
+        for (byte[] currKey : retKeys) {
+          keysArray.add(currKey);
         }
-        DataUtil.writeVLong(out, retRecords.size(), resultLength);
+        ComArray retRecordsArray = retEntry.putArray(ComObject.Tag.records, ComObject.Type.byteArrayType);
         for (int j = 0; j < retRecords.size(); j++) {
           Record record = retRecords.get(j);
           byte[] bytes = record.serialize(server.getCommon());
-          DataUtil.writeVLong(out, bytes.length, resultLength);
-          out.write(bytes);
+          retRecordsArray.add(bytes);
         }
       }
 
@@ -308,7 +293,7 @@ public class ReadManager {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
       }
 
-      return bytesOut.toByteArray();
+      return retObj.serialize();
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -362,7 +347,7 @@ public class ReadManager {
   private ConcurrentHashMap<Long, PreparedIndexLookup> preparedIndexLookups = new ConcurrentHashMap<>();
 
   private AtomicInteger lookupCount = new AtomicInteger();
-  public byte[] indexLookup(String dbName, DataInputStream in) {
+  public byte[] indexLookup(ComObject cobj) {
     //Timer.Context context = INDEX_LOOKUP_STATS.time();
     try {
 
@@ -375,7 +360,7 @@ public class ReadManager {
         }
       }
 
-      int schemaVersion = in.readInt();
+      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
       if (schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
       }
@@ -386,10 +371,10 @@ public class ReadManager {
         }
       }
 
-      long serializationVersion = DataUtil.readVLong(in);
+      long serializationVersion = cobj.getLong(ComObject.Tag.serializationVersion);
       DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-      long preparedId = DataUtil.readVLong(in);
-      boolean isPrepared = in.readBoolean();
+      long preparedId = cobj.getLong(ComObject.Tag.preparedId);
+      boolean isPrepared = cobj.getBoolean(ComObject.Tag.isPrepared);
 
       PreparedIndexLookup prepared = null;
       if (isPrepared) {
@@ -408,12 +393,12 @@ public class ReadManager {
         count = prepared.count;
       }
       else {
-        prepared.count = count = in.readInt();
+        prepared.count = count = cobj.getInt(ComObject.Tag.count);
       }
-      boolean isExplicitTrans = in.readBoolean();
-      boolean isCommitting = in.readBoolean();
-      long transactionId = DataUtil.readVLong(in, resultLength);
-      long viewVersion = DataUtil.readVLong(in, resultLength);
+      boolean isExplicitTrans = cobj.getBoolean(ComObject.Tag.isExcpliciteTrans);
+      boolean isCommitting = cobj.getBoolean(ComObject.Tag.isCommitting);
+      long transactionId = cobj.getLong(ComObject.Tag.transactionId);
+      long viewVersion = cobj.getLong(ComObject.Tag.viewVersion);
 
       int tableId = 0;
       int indexId = 0;
@@ -424,31 +409,34 @@ public class ReadManager {
         forceSelectOnServer = prepared.forceSelectOnServer;
       }
       else {
-        prepared.tableId = tableId = (int) (long) DataUtil.readVLong(in, resultLength);
-        prepared.indexId = indexId = (int) (long) DataUtil.readVLong(in, resultLength);
-        prepared.forceSelectOnServer = forceSelectOnServer = in.readBoolean();
+        prepared.tableId = tableId = cobj.getInt(ComObject.Tag.tableId);
+        prepared.indexId = indexId = cobj.getInt(ComObject.Tag.indexId);
+        prepared.forceSelectOnServer = forceSelectOnServer = cobj.getBoolean(ComObject.Tag.forceSelectOnServer);
       }
       ParameterHandler parms = null;
-      if (in.readBoolean()) {
+      byte[] parmBytes = cobj.getByteArray(ComObject.Tag.parms);
+      if (parmBytes != null) {
         parms = new ParameterHandler();
-        parms.deserialize(in);
+        parms.deserialize(parmBytes);
       }
       boolean evaluateExpression;
       if (isPrepared) {
         evaluateExpression = prepared.evaluateExpression;
       }
       else {
-        prepared.evaluateExpression = evaluateExpression = in.readBoolean();
+        prepared.evaluateExpression = evaluateExpression = cobj.getBoolean(ComObject.Tag.evaluateExpression);
       }
       Expression expression = null;
       if (isPrepared) {
         expression = prepared.expression;
       }
       else {
-        if (in.readBoolean()) {
-          prepared.expression = expression = ExpressionImpl.deserializeExpression(in);
+        byte[] expressionBytes = cobj.getByteArray(ComObject.Tag.expression);
+        if (expressionBytes != null) {
+          prepared.expression = expression = ExpressionImpl.deserializeExpression(expressionBytes);
         }
       }
+      String dbName = cobj.getString(ComObject.Tag.dbName);
       String tableName = null;
       String indexName = null;
       TableSchema tableSchema = null;
@@ -478,39 +466,43 @@ public class ReadManager {
         orderByExpressions = prepared.orderByExpressions;
       }
       else {
-        //int srcCount = in.readInt();
-        int srcCount = (int) DataUtil.readVLong(in, resultLength);
         prepared.orderByExpressions = orderByExpressions = new ArrayList<>();
-        for (int i = 0; i < srcCount; i++) {
-          OrderByExpressionImpl orderByExpression = new OrderByExpressionImpl();
-          orderByExpression.deserialize(in);
-          orderByExpressions.add(orderByExpression);
+        ComArray array = cobj.getArray(ComObject.Tag.orderByExpressions);
+        if (array != null) {
+          for (Object entry : array.getArray()) {
+            OrderByExpressionImpl orderByExpression = new OrderByExpressionImpl();
+            orderByExpression.deserialize((byte[]) entry);
+            orderByExpressions.add(orderByExpression);
+          }
         }
       }
+      byte[] leftBytes = cobj.getByteArray(ComObject.Tag.leftKey);
       Object[] leftKey = null;
-      if (in.readBoolean()) {
-        leftKey = DatabaseCommon.deserializeKey(tableSchema, in);
+      if (leftBytes != null) {
+        leftKey = DatabaseCommon.deserializeKey(tableSchema, leftBytes);
       }
+      byte[] originalLeftBytes = cobj.getByteArray(ComObject.Tag.originalLeftKey);
       Object[] originalLeftKey = null;
-      if (in.readBoolean()) {
-        originalLeftKey = DatabaseCommon.deserializeKey(tableSchema, in);
+      if (originalLeftBytes != null) {
+        originalLeftKey = DatabaseCommon.deserializeKey(tableSchema, originalLeftBytes);
       }
       //BinaryExpression.Operator leftOperator = BinaryExpression.Operator.getOperator(in.readInt());
-      BinaryExpression.Operator leftOperator = BinaryExpression.Operator.getOperator((int) (long) DataUtil.readVLong(in, resultLength));
+      BinaryExpression.Operator leftOperator = BinaryExpression.Operator.getOperator(cobj.getInt(ComObject.Tag.leftOperator));
 
       BinaryExpression.Operator rightOperator = null;
+      byte[] rightBytes = cobj.getByteArray(ComObject.Tag.rightKey);
+      byte[] originalRightBytes = cobj.getByteArray(ComObject.Tag.originalRightKey);
       Object[] originalRightKey = null;
       Object[] rightKey = null;
-      if (in.readBoolean()) {
-        if (in.readBoolean()) {
-          rightKey = DatabaseCommon.deserializeKey(tableSchema, in);
-        }
-        if (in.readBoolean()) {
-          originalRightKey = DatabaseCommon.deserializeKey(tableSchema, in);
-        }
+      if (rightBytes != null) {
+        rightKey = DatabaseCommon.deserializeKey(tableSchema, rightBytes);
+      }
+      if (originalRightBytes != null) {
+        originalRightKey = DatabaseCommon.deserializeKey(tableSchema, originalRightBytes);
+      }
 
-        //      rightOperator = BinaryExpression.Operator.getOperator(in.readInt());
-        rightOperator = BinaryExpression.Operator.getOperator((int) (long) DataUtil.readVLong(in, resultLength));
+      if (cobj.getInt(ComObject.Tag.rightOperator) != null) {
+        rightOperator = BinaryExpression.Operator.getOperator(cobj.getInt(ComObject.Tag.rightOperator));
       }
 
       Set<Integer> columnOffsets = null;
@@ -518,23 +510,28 @@ public class ReadManager {
         columnOffsets = prepared.columnOffsets;
       }
       else {
-        prepared.columnOffsets = columnOffsets = getSimpleColumnOffsets(in, resultLength, tableName, tableSchema);
-      }
-
-      Counter[] counters = null;
-      int counterCount = in.readInt();
-      if (counterCount > 0) {
-        counters = new Counter[counterCount];
-        for (int i = 0; i < counterCount; i++) {
-          counters[i] = new Counter();
-          counters[i].deserialize(in);
+        ComArray cOffsets = cobj.getArray(ComObject.Tag.columnOffsets);
+        prepared.columnOffsets = columnOffsets = new HashSet<>();
+        for (Object obj : cOffsets.getArray()) {
+          columnOffsets.add((Integer)obj);
         }
       }
 
+      Counter[] counters = null;
+      ComArray counterArray = cobj.getArray(ComObject.Tag.counters);
+      if (counterArray != null && counterArray.getArray().size() != 0) {
+        counters = new Counter[counterArray.getArray().size()];
+        for (int i = 0; i < counters.length; i++) {
+          counters[i] = new Counter();
+          counters[i].deserialize((byte[])counterArray.getArray().get(i));
+        }
+      }
+
+      byte[] groupContextBytes = cobj.getByteArray(ComObject.Tag.groupContext);
       GroupByContext groupContext = null;
-      if (in.readBoolean()) {
+      if (groupContextBytes != null) {
         groupContext = new GroupByContext();
-        groupContext.deserialize(in, server.getCommon(), dbName);
+        groupContext.deserialize(groupContextBytes, server.getCommon(), dbName);
       }
 
       Index index = server.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexName);
@@ -599,60 +596,37 @@ public class ReadManager {
         }
       }
 
-      //}
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+      ComObject retObj = new ComObject();
       if (entry != null) {
-        out.writeBoolean(true);
-        out.write(DatabaseCommon.serializeKey(tableSchema, indexName, entry.getKey()));
+        retObj.put(ComObject.Tag.keyBytes, DatabaseCommon.serializeKey(tableSchema, indexName, entry.getKey()));
       }
-      else {
-        out.writeBoolean(false);
-      }
-      DataUtil.writeVLong(out, retKeys.size(), resultLength);
+      ComArray array = retObj.putArray(ComObject.Tag.keys, ComObject.Type.byteArrayType);
       for (byte[] key : retKeys) {
-        DataUtil.writeVLong(out, key.length, resultLength);
-        out.write(key);
+        array.add(key);
       }
-      DataUtil.writeVLong(out, retRecords.size(), resultLength);
-
+      array = retObj.putArray(ComObject.Tag.records, ComObject.Type.byteArrayType);
       for (int i = 0; i < retRecords.size(); i++) {
         Record record = retRecords.get(i);
         byte[] bytes = record.serialize(server.getCommon());
-        DataUtil.writeVLong(out, bytes.length, resultLength);
-        out.write(bytes);
+        array.add(bytes);
       }
 
-      if (counters == null) {
-        out.writeInt(0);
-      }
-      else {
-        out.writeInt(counters.length);
+      if (counters != null) {
+        array = retObj.putArray(ComObject.Tag.counters, ComObject.Type.byteArrayType);
         for (int i = 0; i < counters.length; i++) {
-          out.write(counters[i].serialize());
+          array.add(counters[i].serialize());
         }
       }
 
-      if (groupContext == null) {
-        out.writeBoolean(false);
+      if (groupContext != null) {
+        retObj.put(ComObject.Tag.groupContext, groupContext.serialize(server.getCommon()));
       }
-      else {
-        out.writeBoolean(true);
-        out.write(groupContext.serialize(server.getCommon()));
-      }
-
-      out.close();
-
-//      if (server.getShard() != 0 || server.getReplica() != 0) {
-//        server.getDatabaseClient().syncSchema();
-//      }
 
       if (schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
       }
 
-      return bytesOut.toByteArray();
+      return retObj.serialize();
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -695,9 +669,8 @@ public class ReadManager {
     return columnOffsets;
   }
 
-  public byte[] closeResultSet(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    long resultSetId = Long.valueOf(parts[5]);
+  public byte[] closeResultSet(ComObject cobj, boolean replayedCommand) {
+    long resultSetId = cobj.getLong(ComObject.Tag.resultSetId);
 
     DiskBasedResultSet resultSet = new DiskBasedResultSet(server, resultSetId);
     resultSet.delete();
@@ -705,17 +678,16 @@ public class ReadManager {
     return null;
   }
 
-  public byte[] serverSelectDelete(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
-    long id = Long.valueOf(parts[6]);
+  public byte[] serverSelectDelete(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
+    long id = cobj.getLong(ComObject.Tag.id);
 
     DiskBasedResultSet resultSet = new DiskBasedResultSet(server, id);
     resultSet.delete();
     return null;
   }
 
-  public byte[] serverSelect(String command, byte[] body) {
+  public byte[] serverSelect(ComObject cobj) {
     try {
       if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
         try {
@@ -726,20 +698,16 @@ public class ReadManager {
         }
       }
 
-      String[] parts = command.split(":");
-      String dbName = parts[5];
-      int schemaVersion = Integer.valueOf(parts[4]);
+      String dbName = cobj.getString(ComObject.Tag.dbName);
+      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
       if (schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
       }
-      int count = Integer.valueOf(parts[6]);
+      int count = cobj.getInt(ComObject.Tag.count);
 
-      DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
-      long serializationVersion = DataUtil.readVLong(in);
-      in.readBoolean();
-
+      byte[] selectBytes = cobj.getByteArray(ComObject.Tag.selectStatement);
       SelectStatementImpl select = new SelectStatementImpl(server.getDatabaseClient());
-      select.deserialize(in, dbName);
+      select.deserialize(selectBytes, dbName);
       select.setIsOnServer(true);
 
       select.setServerSelectPageNumber(select.getServerSelectPageNumber() + 1);
@@ -757,41 +725,30 @@ public class ReadManager {
       }
       select.setServerSelectResultSetId(diskResults.getResultSetId());
       byte[][][] records = diskResults.nextPage(select.getServerSelectPageNumber(), count);
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-      select.setIsOnServer(false);
-      select.serialize(out);
 
-      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-      if (records == null) {
-        DataUtil.writeVLong(out, 0, resultLength);
-      }
-      else {
-        DataUtil.writeVLong(out, records.length, resultLength);
+      ComObject retObj = new ComObject();
+      select.setIsOnServer(false);
+      retObj.put(ComObject.Tag.selectStatement, select.serialize());
+
+      if (records != null) {
+        ComArray tableArray = retObj.putArray(ComObject.Tag.tableRecords, ComObject.Type.arrayType);
         for (byte[][] tableRecords : records) {
+          ComArray recordArray = tableArray.addArray(ComObject.Tag.records, ComObject.Type.byteArrayType);
+
           for (byte[] record : tableRecords) {
-            if (record == null) {
-              out.writeBoolean(false);
-            }
-            else {
-              out.writeBoolean(true);
-              DataUtil.writeVLong(out, record.length, resultLength);
-              out.write(record);
-            }
+            recordArray.add(record);
           }
         }
       }
-      out.close();
 
-      return bytesOut.toByteArray();
+      return retObj.serialize();
     }
     catch (IOException e) {
       throw new DatabaseException(e);
     }
   }
 
-  public byte[] indexLookupExpression(String command, byte[] body) {
+  public byte[] indexLookupExpression(ComObject cobj) {
     try {
       if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
         try {
@@ -802,29 +759,25 @@ public class ReadManager {
         }
       }
 
-      String[] parts = command.split(":");
-      String dbName = parts[5];
-      int schemaVersion = Integer.valueOf(parts[4]);
+
+      String dbName = cobj.getString(ComObject.Tag.dbName);
+      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
       if (schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
       }
-      int count = Integer.valueOf(parts[6]);
+      int count = cobj.getInt(ComObject.Tag.count);
 
-      DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
-      long serializationVersion = DataUtil.readVLong(in);
-      //    String tableName = in.readUTF();
-      //    String indexName = in.readUTF();
-      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-      int tableId = (int) (long) DataUtil.readVLong(in, resultLength);
-      //    int indexId = (int) (long) DataUtil.readVLong(in, resultLength);
+      int tableId = cobj.getInt(ComObject.Tag.tableId);
+      byte[] parmBytes = cobj.getByteArray(ComObject.Tag.parms);
       ParameterHandler parms = null;
-      if (in.readBoolean()) {
+      if (parmBytes != null) {
         parms = new ParameterHandler();
-        parms.deserialize(in);
+        parms.deserialize(parmBytes);
       }
+      byte[] expressionBytes = cobj.getByteArray(ComObject.Tag.expression);
       Expression expression = null;
-      if (in.readBoolean()) {
-        expression = ExpressionImpl.deserializeExpression(in);
+      if (expressionBytes != null) {
+        expression = ExpressionImpl.deserializeExpression(expressionBytes);
       }
       String tableName = null;
       String indexName = null;
@@ -845,38 +798,46 @@ public class ReadManager {
         throw e;
       }
       //int srcCount = in.readInt();
-      int srcCount = (int) DataUtil.readVLong(in, resultLength);
+      ComArray orderByArray = cobj.getArray(ComObject.Tag.orderByExpressions);
       List<OrderByExpressionImpl> orderByExpressions = new ArrayList<>();
-      for (int i = 0; i < srcCount; i++) {
-        OrderByExpressionImpl orderByExpression = new OrderByExpressionImpl();
-        orderByExpression.deserialize(in);
-        orderByExpressions.add(orderByExpression);
+      if (orderByArray != null) {
+        for (int i = 0; i < orderByArray.getArray().size(); i++) {
+          OrderByExpressionImpl orderByExpression = new OrderByExpressionImpl();
+          orderByExpression.deserialize((byte[])orderByArray.getArray().get(i));
+          orderByExpressions.add(orderByExpression);
+        }
       }
 
       TableSchema tableSchema = server.getCommon().getSchema(dbName).getTables().get(tableName);
       IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
 
+      byte[] leftKeyBytes = cobj.getByteArray(ComObject.Tag.leftKey);
       Object[] leftKey = null;
-      if (in.readBoolean()) {
-        leftKey = DatabaseCommon.deserializeKey(tableSchema, in);
+      if (leftKeyBytes != null) {
+        leftKey = DatabaseCommon.deserializeKey(tableSchema, leftKeyBytes);
       }
 
-      Set<Integer> columnOffsets = getSimpleColumnOffsets(in, resultLength, tableName, tableSchema);
+      ComArray cOffsets = cobj.getArray(ComObject.Tag.columnOffsets);
+      Set<Integer> columnOffsets = new HashSet<>();
+      for (Object obj : cOffsets.getArray()) {
+        columnOffsets.add((Integer)obj);
+      }
 
+      ComArray countersArray = cobj.getArray(ComObject.Tag.counters);
       Counter[] counters = null;
-      int counterCount = in.readInt();
-      if (counterCount > 0) {
-        counters = new Counter[counterCount];
-        for (int i = 0; i < counterCount; i++) {
+      if (countersArray != null) {
+        counters = new Counter[countersArray.getArray().size()];
+        for (int i = 0; i < counters.length; i++) {
           counters[i] = new Counter();
-          counters[i].deserialize(in);
+          counters[i].deserialize((byte[])countersArray.getArray().get(i));
         }
       }
 
+      byte[] groupBytes = cobj.getByteArray(ComObject.Tag.groupContext);
       GroupByContext groupByContext = null;
-      if (in.readBoolean()) {
+      if (groupBytes != null) {
         groupByContext = new GroupByContext();
-        groupByContext.deserialize(in, server.getCommon(), dbName);
+        groupByContext.deserialize(groupBytes, server.getCommon(), dbName);
       }
 
       Index index = server.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexName);
@@ -903,53 +864,37 @@ public class ReadManager {
         //entry = doIndexLookupExpression(count, indexSchema, columnOffsets, index, leftKey, ascending, retKeys);
       }
       //}
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+      ComObject retObj = new ComObject();
       if (entry != null) {
-        out.writeBoolean(true);
-        out.write(DatabaseCommon.serializeKey(tableSchema, indexName, entry.getKey()));
-      }
-      else {
-        out.writeBoolean(false);
-      }
-      DataUtil.writeVLong(out, retKeys.size(), resultLength);
-      for (byte[] key : retKeys) {
-        DataUtil.writeVLong(out, key.length, resultLength);
-        out.write(key);
-      }
-      DataUtil.writeVLong(out, retRecords.size(), resultLength);
-      for (Record record : retRecords) {
-        byte[] bytes = record.serialize(server.getCommon());
-        DataUtil.writeVLong(out, bytes.length, resultLength);
-        out.write(bytes);
+        retObj.put(ComObject.Tag.keyBytes, DatabaseCommon.serializeKey(tableSchema, indexName, entry.getKey()));
       }
 
-      if (counters == null) {
-        out.writeInt(0);
+      ComArray keys = retObj.putArray(ComObject.Tag.keys, ComObject.Type.byteArrayType);
+      for (byte[] key : retKeys) {
+        keys.add(key);
       }
-      else {
-        out.writeInt(counters.length);
+      ComArray records = retObj.putArray(ComObject.Tag.records, ComObject.Type.byteArrayType);
+      for (Record record : retRecords) {
+        byte[] bytes = record.serialize(server.getCommon());
+        records.add(bytes);
+      }
+
+      if (counters != null) {
+        countersArray = retObj.putArray(ComObject.Tag.counters, ComObject.Type.byteArrayType);
         for (int i = 0; i < counters.length; i++) {
-          out.write(counters[i].serialize());
+          countersArray.add(counters[i].serialize());
         }
       }
 
-      if (groupByContext == null) {
-        out.writeBoolean(false);
+      if (groupByContext != null) {
+        retObj.put(ComObject.Tag.groupContext, groupByContext.serialize(server.getCommon()));
       }
-      else {
-        out.writeBoolean(true);
-        out.write(groupByContext.serialize(server.getCommon()));
-      }
-
-      out.close();
 
       if (schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
       }
 
-      return bytesOut.toByteArray();
+      return retObj.serialize();
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -1872,15 +1817,14 @@ public class ReadManager {
     }
   }
 
-  public byte[] evaluateCounter(String command, byte[] body) {
+  public byte[] evaluateCounter(ComObject cobj) {
 
-    String[] parts = command.split(":");
-    String dbName = parts[5];
+    String dbName = cobj.getString(ComObject.Tag.dbName);
 
-    DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
     Counter counter = new Counter();
     try {
-      counter.deserialize(in);
+      byte[] counterBytes = cobj.getByteArray(ComObject.Tag.counter);
+      counter.deserialize(counterBytes);
 
       String tableName = counter.getTableName();
       String columnName = counter.getColumnName();
@@ -1938,7 +1882,9 @@ public class ReadManager {
           }
         }
       }
-      return counter.serialize();
+      ComObject retObj = new ComObject();
+      retObj.put(ComObject.Tag.counter, counter.serialize());
+      return retObj.serialize();
     }
     catch (IOException e) {
       throw new DatabaseException(e);

@@ -6,10 +6,7 @@ import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.DataUtil;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -117,6 +114,11 @@ public class GroupByContext {
       });
       groupCounters.put(key, map);
     } return map;
+  }
+
+  public void deserialize(byte[] bytes, DatabaseCommon common, String dbName) throws IOException {
+    DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
+    deserialize(in, common, dbName);
   }
 
   public void deserialize(DataInputStream in, DatabaseCommon common, String dbName) throws IOException {

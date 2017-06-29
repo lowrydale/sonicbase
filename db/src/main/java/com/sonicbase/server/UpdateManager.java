@@ -1,10 +1,7 @@
 package com.sonicbase.server;
 
 import com.sonicbase.client.DatabaseClient;
-import com.sonicbase.common.DatabaseCommon;
-import com.sonicbase.common.Logger;
-import com.sonicbase.common.Record;
-import com.sonicbase.common.SchemaOutOfSyncException;
+import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
 import com.sonicbase.index.Repartitioner;
 import com.sonicbase.query.BinaryExpression;
@@ -13,7 +10,6 @@ import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.DataUtil;
-import org.hsqldb.Database;
 
 import java.io.*;
 import java.util.*;
@@ -41,83 +37,74 @@ public class UpdateManager {
     this.logger = new Logger(databaseServer.getDatabaseClient());
   }
 
-  public byte[] deleteIndexEntry(String command, byte[] body, boolean replayedCommand) {
-    try {
-      String[] parts = command.split(":");
-      String dbName = parts[5];
-      String tableName = parts[6];
-      int schemaVersion = Integer.valueOf(parts[4]);
-      if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
-        throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
+  public byte[] deleteIndexEntry(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
+    String tableName = cobj.getString(ComObject.Tag.tableName);
+    int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
+    if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
+      throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
+    }
+
+    TableSchema tableSchema = server.getCommon().getSchema(dbName).getTables().get(tableName);
+    Record record = new Record(tableSchema);
+    byte[] recordBytes = cobj.getByteArray(ComObject.Tag.recordBytes);
+    long serializationVersion = cobj.getLong(ComObject.Tag.serializationVersion);
+    record.deserialize(dbName, server.getCommon(), recordBytes, null);
+    List<FieldSchema> fieldSchemas = tableSchema.getFields();
+
+    for (Map.Entry<String, IndexSchema> indexSchema : tableSchema.getIndices().entrySet()) {
+      String[] fields = indexSchema.getValue().getFields();
+      boolean shouldIndex = true;
+      for (int i = 0; i < fields.length; i++) {
+        boolean found = false;
+        for (int j = 0; j < fieldSchemas.size(); j++) {
+          if (fields[i].equals(fieldSchemas.get(j).getName())) {
+            if (record.getFields()[j] != null) {
+              found = true;
+              break;
+            }
+          }
+        }
+        if (!found) {
+          shouldIndex = false;
+          break;
+        }
       }
-
-      TableSchema tableSchema = server.getCommon().getSchema(dbName).getTables().get(tableName);
-      Record record = new Record(tableSchema);
-      DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
-      long serializationVersion = DataUtil.readVLong(in);
-      int len = in.readInt();
-      byte[] bytes = new byte[len];
-      in.readFully(bytes);
-      record.deserialize(dbName, server.getCommon(), bytes, null);
-      List<FieldSchema> fieldSchemas = tableSchema.getFields();
-
-      for (Map.Entry<String, IndexSchema> indexSchema : tableSchema.getIndices().entrySet()) {
-        String[] fields = indexSchema.getValue().getFields();
-        boolean shouldIndex = true;
-        for (int i = 0; i < fields.length; i++) {
-          boolean found = false;
+      if (shouldIndex) {
+        String[] indexFields = indexSchema.getValue().getFields();
+        Object[] key = new Object[indexFields.length];
+        for (int i = 0; i < key.length; i++) {
           for (int j = 0; j < fieldSchemas.size(); j++) {
-            if (fields[i].equals(fieldSchemas.get(j).getName())) {
-              if (record.getFields()[j] != null) {
-                found = true;
-                break;
-              }
+            if (fieldSchemas.get(j).getName().equals(indexFields[i])) {
+              key[i] = record.getFields()[j];
             }
           }
-          if (!found) {
-            shouldIndex = false;
-            break;
-          }
         }
-        if (shouldIndex) {
-          String[] indexFields = indexSchema.getValue().getFields();
-          Object[] key = new Object[indexFields.length];
-          for (int i = 0; i < key.length; i++) {
-            for (int j = 0; j < fieldSchemas.size(); j++) {
-              if (fieldSchemas.get(j).getName().equals(indexFields[i])) {
-                key[i] = record.getFields()[j];
-              }
-            }
-          }
-          Index index = server.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexSchema.getKey());
-          //synchronized (index.getMutex(key)) {
-          Object obj = index.remove(key);
-          if (obj == null) {
-            continue;
-          }
-          server.freeUnsafeIds(obj);
-          //}
+        Index index = server.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexSchema.getKey());
+        //synchronized (index.getMutex(key)) {
+        Object obj = index.remove(key);
+        if (obj == null) {
+          continue;
         }
+        server.freeUnsafeIds(obj);
+        //}
       }
-
-      return null;
     }
-    catch (IOException e) {
-      throw new DatabaseException(e);
-    }
-  }
 
-  public byte[] populateIndex(String command, byte[] body) {
-    command = command.replace(":populateIndex:", ":doPopulateIndex:");
-    server.getLongRunningCommands().addCommand(server.getLongRunningCommands().createSingleCommand(command, body));
     return null;
   }
 
-  public byte[] doPopulateIndex(final String command, byte[] body) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
-    String tableName = parts[6];
-    String indexName = parts[7];
+  public byte[] populateIndex(ComObject cobj) {
+    String command = "DatabaseServer:ComObject:doPopulateIndex:";
+    cobj.put(ComObject.Tag.method, "doPopulateIndex");
+    server.getLongRunningCommands().addCommand(server.getLongRunningCommands().createSingleCommand(command, cobj.serialize()));
+    return null;
+  }
+
+  public byte[] doPopulateIndex(ComObject cobj) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
+    String tableName = cobj.getString(ComObject.Tag.tableName);
+    String indexName = cobj.getString(ComObject.Tag.indexName);
 
     TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
     String primaryKeyIndexName = null;
@@ -186,43 +173,43 @@ public class UpdateManager {
     return null;
   }
 
-  public byte[] deleteIndexEntryByKey(String command, byte[] body, boolean replayedCommand) {
+  public byte[] deleteIndexEntryByKey(ComObject cobj, boolean replayedCommand) {
     AtomicBoolean isExplicitTrans = new AtomicBoolean();
     AtomicLong transactionId = new AtomicLong();
-    byte[] ret = doDeleteIndexEntryByKey(command, body, replayedCommand, isExplicitTrans, transactionId, false);
+    byte[] ret = doDeleteIndexEntryByKey(cobj, replayedCommand, isExplicitTrans, transactionId, false);
     if (isExplicitTrans.get()) {
       Transaction trans = server.getTransactionManager().getTransaction(transactionId.get());
-      trans.addOperation(delete, command, body, replayedCommand);
+      String command = "DatabaseServer:ComObject:deleteIndexEntryByKey:";
+      trans.addOperation(delete, command, cobj.serialize(), replayedCommand);
     }
     return ret;
   }
 
-  public byte[] doDeleteIndexEntryByKey(String command, byte[] body, boolean replayedCommand,
+  public byte[] doDeleteIndexEntryByKey(ComObject cobj, boolean replayedCommand,
                                         AtomicBoolean isExplicitTransRet, AtomicLong transactionIdRet, boolean isCommitting) {
     try {
-      String[] parts = command.split(":");
-      String dbName = parts[5];
-      int schemaVersion = Integer.valueOf(parts[4]);
+      String dbName = cobj.getString(ComObject.Tag.dbName);
+      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
       if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
-      String tableName = parts[6];
-      String indexName = parts[7];
-      String primaryKeyIndexName = parts[8];
-      boolean isExplicitTrans = Boolean.valueOf(parts[9]);
+      String tableName = cobj.getString(ComObject.Tag.tableName);
+      String indexName = cobj.getString(ComObject.Tag.indexName);
+      String primaryKeyIndexName = cobj.getString(ComObject.Tag.primaryKeyIndexName);
+      boolean isExplicitTrans = cobj.getBoolean(ComObject.Tag.isExcpliciteTrans);
       //boolean isCommitting = Boolean.valueOf(parts[9]);
-      long transactionId = Long.valueOf(parts[11]);
+      long transactionId = cobj.getLong(ComObject.Tag.transactionId);
       if (isExplicitTrans && isExplicitTransRet != null) {
         isExplicitTransRet.set(true);
         transactionIdRet.set(transactionId);
       }
 
       TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
-      ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
-      DataInputStream in = new DataInputStream(bytesIn);
-      long serializationVersion = DataUtil.readVLong(in);
-      Object[] key = DatabaseCommon.deserializeKey(tableSchema, in);
-      Object[] primaryKey = DatabaseCommon.deserializeKey(tableSchema, in);
+      long serializationVersion = cobj.getLong(ComObject.Tag.serializationVersion);
+      byte[] keyBytes = cobj.getByteArray(ComObject.Tag.keyBytes);
+      byte[] primaryKeyBytes = cobj.getByteArray(ComObject.Tag.primaryKeyBytes);
+      Object[] key = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
+      Object[] primaryKey = DatabaseCommon.deserializeKey(tableSchema, primaryKeyBytes);
 
       AtomicBoolean shouldExecute = new AtomicBoolean();
       AtomicBoolean shouldDeleteLock = new AtomicBoolean();
@@ -243,48 +230,41 @@ public class UpdateManager {
     }
   }
 
-  public byte[] batchInsertIndexEntryByKey(String command, byte[] body, boolean replayedCommand) {
-    ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
-    DataInputStream in = new DataInputStream(bytesIn);
+  public byte[] batchInsertIndexEntryByKey(ComObject cobj, boolean replayedCommand) {
     AtomicBoolean isExplicitTrans = new AtomicBoolean();
     AtomicLong transactionId = new AtomicLong();
     int count = 0;
     try {
-      while (true) {
-        doInsertIndexEntryByKey(command, in, replayedCommand, isExplicitTrans, transactionId, false);
+      ComArray array = cobj.getArray(ComObject.Tag.insertObjects);
+      for (int i = 0; i < array.getArray().size(); i++) {
+        ComObject innerObj = (ComObject) array.getArray().get(i);
+        doInsertIndexEntryByKey(innerObj, replayedCommand, isExplicitTrans, transactionId, false);
         count++;
       }
-    }
-    catch (EOFException e) {
-      //expected
       if (isExplicitTrans.get()) {
         Transaction trans = server.getTransactionManager().getTransaction(transactionId.get());
-        trans.addOperation(batchInsert, command, body, replayedCommand);
+        String command = "DatabaseServer:ComObject:batchInsertIndexEntryByKey:";
+        trans.addOperation(batchInsert, command, cobj.serialize(), replayedCommand);
       }
     }
-    try {
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-      out.writeInt(count);
-      out.close();
-      return bytesOut.toByteArray();
-    }
-    catch (IOException e) {
+    catch (Exception e) {
       throw new DatabaseException(e);
     }
+
+    ComObject retObj = new ComObject();
+    retObj.put(ComObject.Tag.count, count);
+    return retObj.serialize();
   }
 
-  public byte[] insertIndexEntryByKey(String command, byte[] body, boolean replayedCommand) {
-    ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
-    DataInputStream in = new DataInputStream(bytesIn);
+  public byte[] insertIndexEntryByKey(ComObject cobj, boolean replayedCommand) {
     AtomicBoolean isExplicitTrans = new AtomicBoolean();
     AtomicLong transactionId = new AtomicLong();
     try {
-      byte[] ret = doInsertIndexEntryByKey(command, in, replayedCommand, isExplicitTrans, transactionId, false);
+      byte[] ret = doInsertIndexEntryByKey(cobj, replayedCommand, isExplicitTrans, transactionId, false);
       if (isExplicitTrans.get()) {
         Transaction trans = server.getTransactionManager().getTransaction(transactionId.get());
-        trans.addOperation(insert, command, body, replayedCommand);
+        String command = "DatabaseServer:ComObject:insertIndexEntryByKey:";
+        trans.addOperation(insert, command, cobj.serialize(), replayedCommand);
       }
       return ret;
     }
@@ -293,7 +273,7 @@ public class UpdateManager {
     }
   }
 
-  public byte[] doInsertIndexEntryByKey(String command, DataInputStream in, boolean replayedCommand,
+  public byte[] doInsertIndexEntryByKey(ComObject cobj, boolean replayedCommand,
                                         AtomicBoolean isExplicitTransRet, AtomicLong transactionIdRet,
                                         boolean isCommitting) throws EOFException {
     try {
@@ -301,37 +281,33 @@ public class UpdateManager {
         throw new DatabaseException("Above max memory threshold. Further inserts are not allowed");
       }
 
-      String[] parts = command.split(":");
-      String dbName = parts[5];
-      int schemaVersion = Integer.valueOf(parts[4]);
+      String dbName = cobj.getString(ComObject.Tag.dbName);
+      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
       if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
-      long serializationVersion = DataUtil.readVLong(in);
 
-      String tableName = in.readUTF();
-      String indexName = in.readUTF();
-      boolean isExplicitTrans = in.readBoolean();
-      /*boolean isCommitting =*/
-      in.readBoolean();
-      long transactionId = DataUtil.readVLong(in);
+      long serializationVersion = cobj.getLong(ComObject.Tag.serializationVersion);
+
+      String tableName = cobj.getString(ComObject.Tag.tableName);
+      String indexName = cobj.getString(ComObject.Tag.indexName);
+      boolean isExplicitTrans = cobj.getBoolean(ComObject.Tag.isExcpliciteTrans);
+
+      long transactionId = cobj.getLong(ComObject.Tag.transactionId);
       if (isExplicitTrans && isExplicitTransRet != null) {
         isExplicitTransRet.set(true);
         transactionIdRet.set(transactionId);
       }
 
       TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
-      int len = (int) DataUtil.readVLong(in);
-      Object[] key = DatabaseCommon.deserializeKey(tableSchema, in);
-      len = (int) DataUtil.readVLong(in);
-      byte[] primaryKeyBytes = new byte[len];
-      in.readFully(primaryKeyBytes);
+      Object[] key = DatabaseCommon.deserializeKey(tableSchema, cobj.getByteArray(ComObject.Tag.keyBytes));
+      byte[] primaryKeyBytes = cobj.getByteArray(ComObject.Tag.primaryKeyBytes);
       IndexSchema indexSchema = tableSchema.getIndexes().get(indexName);
 
 
       Index index = server.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexName);
 
-      Object[] primaryKey = DatabaseCommon.deserializeKey(tableSchema, new DataInputStream(new ByteArrayInputStream(primaryKeyBytes)));
+      Object[] primaryKey = DatabaseCommon.deserializeKey(tableSchema, primaryKeyBytes);
 
       AtomicBoolean shouldExecute = new AtomicBoolean();
       AtomicBoolean shouldDeleteLock = new AtomicBoolean();
@@ -382,25 +358,24 @@ public class UpdateManager {
 
   private AtomicLong insertCount = new AtomicLong();
 
-  public byte[] batchInsertIndexEntryByKeyWithRecord(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    int schemaVersion = Integer.valueOf(parts[4]);
+  public byte[] batchInsertIndexEntryByKeyWithRecord(ComObject cobj, boolean replayedCommand) {
+    int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
     if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
       throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
     }
 
-    ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
-    DataInputStream in = new DataInputStream(bytesIn);
     int count = 0;
     AtomicLong transactionId = new AtomicLong();
     AtomicBoolean isExplicitTrans = new AtomicBoolean();
     try {
-      while (true) {
-        synchronized (server.getBatchRepartCount()) {
+      ComArray array = cobj.getArray(ComObject.Tag.insertObjects);
+      for (int i = 0; i < array.getArray().size(); i++) {
+         synchronized (server.getBatchRepartCount()) {
 //          while (server.getBatchRepartCount().get() != 0) {
 //            Thread.sleep(10);
 //          }
-          doInsertIndexEntryByKeyWithRecord(command, in, replayedCommand, transactionId, isExplicitTrans, false);
+          ComObject innerObj = (ComObject)array.getArray().get(i);
+          doInsertIndexEntryByKeyWithRecord(innerObj, replayedCommand, transactionId, isExplicitTrans, false);
           count++;
           //if (insertCount.incrementAndGet() % 5000 == 0) {
           while (server.isThrottleInsert()) {
@@ -409,40 +384,32 @@ public class UpdateManager {
           //}
         }
       }
+      if (isExplicitTrans.get()) {
+        Transaction trans = server.getTransactionManager().getTransaction(transactionId.get());
+        String command = "DatabaseServer:ComObject:batchInsertIndexEntryByKeyWithRecord:";
+        trans.addOperation(batchInsertWithRecord, command, cobj.serialize(), replayedCommand);
+      }
     }
     catch (InterruptedException e) {
       //ignore
     }
-    catch (EOFException e) {
-      //expected
-      if (isExplicitTrans.get()) {
-        Transaction trans = server.getTransactionManager().getTransaction(transactionId.get());
-        trans.addOperation(batchInsertWithRecord, command, body, replayedCommand);
-      }
-    }
-    try {
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-      out.writeInt(count);
-      out.close();
-      return bytesOut.toByteArray();
-    }
-    catch (IOException e) {
+    catch (Exception e) {
       throw new DatabaseException(e);
     }
+    ComObject retObj = new ComObject();
+    retObj.put(ComObject.Tag.count, count);
+    return retObj.serialize();
   }
 
-  public byte[] insertIndexEntryByKeyWithRecord(String command, byte[] body, boolean replayedCommand) {
-    ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
-    DataInputStream in = new DataInputStream(bytesIn);
+  public byte[] insertIndexEntryByKeyWithRecord(ComObject cobj, boolean replayedCommand) {
     try {
       AtomicBoolean isExplicitTrans = new AtomicBoolean();
       AtomicLong transactionId = new AtomicLong();
-      byte[] ret = doInsertIndexEntryByKeyWithRecord(command, in, replayedCommand, transactionId, isExplicitTrans, false);
+      byte[] ret = doInsertIndexEntryByKeyWithRecord(cobj, replayedCommand, transactionId, isExplicitTrans, false);
       if (isExplicitTrans.get()) {
         Transaction trans = server.getTransactionManager().getTransaction(transactionId.get());
-        trans.addOperation(insertWithRecord, command, body, replayedCommand);
+        String command = "DatabaseServer:ComObject:insertIndexEntryByKeyWithRecord:";
+        trans.addOperation(insertWithRecord, command, cobj.serialize(), replayedCommand);
       }
       //if (insertCount.incrementAndGet() % 5000 == 0) {
       if (server.isThrottleInsert()) {
@@ -456,7 +423,7 @@ public class UpdateManager {
     }
   }
 
-  public byte[] doInsertIndexEntryByKeyWithRecord(String command, DataInputStream in,
+  public byte[] doInsertIndexEntryByKeyWithRecord(ComObject cobj,
                                                   boolean replayedCommand, AtomicLong transactionIdRet,
                                                   AtomicBoolean isExpliciteTransRet, boolean isCommitting) throws EOFException {
     try {
@@ -464,31 +431,26 @@ public class UpdateManager {
         throw new DatabaseException("Above max memory threshold. Further inserts are not allowed");
       }
 
-      String[] parts = command.split(":");
-      String dbName = parts[5];
-      int schemaVersion = Integer.valueOf(parts[4]);
+      String dbName = cobj.getString(ComObject.Tag.dbName);
+      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
       if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
-      long serializationVersion = DataUtil.readVLong(in);
 
-      String tableName = in.readUTF();
-      String indexName = in.readUTF();
-      long id = DataUtil.readVLong(in);
-      boolean isExplicitTrans = in.readBoolean();
-      /*boolean isCommitting =*/
-      in.readBoolean();
-      long transactionId = DataUtil.readVLong(in);
+      String tableName = cobj.getString(ComObject.Tag.tableName);
+      String indexName = cobj.getString(ComObject.Tag.indexName);
+      long id = cobj.getLong(ComObject.Tag.id);
+      boolean isExplicitTrans = cobj.getBoolean(ComObject.Tag.isExcpliciteTrans);
+      long transactionId = cobj.getLong(ComObject.Tag.transactionId);
       if (isExplicitTrans && isExpliciteTransRet != null) {
         isExpliciteTransRet.set(true);
         transactionIdRet.set(transactionId);
       }
 
       TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
-      int len = in.readInt();
-      byte[] recordBytes = new byte[len];
-      in.readFully(recordBytes);
-      Object[] primaryKey = DatabaseCommon.deserializeKey(tableSchema, in);
+      byte[] recordBytes = cobj.getByteArray(ComObject.Tag.recordBytes);
+      byte[] keyBytes = cobj.getByteArray(ComObject.Tag.keyBytes);
+      Object[] primaryKey = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
 
       AtomicBoolean shouldExecute = new AtomicBoolean();
       AtomicBoolean shouldDeleteLock = new AtomicBoolean();
@@ -570,12 +532,9 @@ public class UpdateManager {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
 
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-      out.writeInt(1);
-      out.close();
-      return bytesOut.toByteArray();
+      ComObject retObj = new ComObject();
+      retObj.put(ComObject.Tag.count, 1);
+      return retObj.serialize();
     }
     catch (EOFException e) {
       throw e;
@@ -585,14 +544,13 @@ public class UpdateManager {
     }
   }
 
-  public byte[] rollback(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
-    int schemaVersion = Integer.valueOf(parts[4]);
+  public byte[] rollback(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
+    int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
     if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
       throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
     }
-    long transactionId = Long.valueOf(parts[6]);
+    long transactionId = cobj.getLong(ComObject.Tag.transactionId);
 
     Transaction trans = server.getTransactionManager().getTransaction(transactionId);
     ConcurrentHashMap<String, ConcurrentSkipListMap<Object[], RecordLock>> tableLocks = server.getTransactionManager().getLocks(dbName);
@@ -607,48 +565,57 @@ public class UpdateManager {
     return null;
   }
 
-  public byte[] commit(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
-    int schemaVersion = Integer.valueOf(parts[4]);
+  public byte[] commit(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
+    int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
     if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
       throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
     }
-    long transactionId = Long.valueOf(parts[6]);
+    long transactionId = cobj.getLong(ComObject.Tag.transactionId);
 
     Transaction trans = server.getTransactionManager().getTransaction(transactionId);
     if (trans != null) {
       List<TransactionManager.Operation> ops = trans.getOperations();
       for (Operation op : ops) {
-        DataInputStream in = new DataInputStream(new ByteArrayInputStream(op.getBody()));
+        byte[] opBody = op.getBody();
+        DataInputStream in = new DataInputStream(new ByteArrayInputStream(opBody));
         try {
           switch (op.getType()) {
             case insert:
-              doInsertIndexEntryByKey(op.getCommand(), in, op.getReplayed(), null, null, true);
+              doInsertIndexEntryByKey(new ComObject(opBody), op.getReplayed(), null, null, true);
               break;
             case batchInsert:
-              while (true) {
-                doInsertIndexEntryByKey(command, in, replayedCommand, null, null, true);
+              cobj = new ComObject(opBody);
+              ComArray array = cobj.getArray(ComObject.Tag.insertObjects);
+              for (int i = 0; i < array.getArray().size(); i++) {
+                ComObject innerObj = (ComObject)array.getArray().get(i);
+                doInsertIndexEntryByKey(innerObj, replayedCommand, null, null, true);
               }
-              //break;
+              break;
             case insertWithRecord:
-              doInsertIndexEntryByKeyWithRecord(op.getCommand(), in, op.getReplayed(), null, null, true);
+              doInsertIndexEntryByKeyWithRecord(new ComObject(opBody), op.getReplayed(), null, null, true);
               break;
             case batchInsertWithRecord:
-              while (true) {
-                doInsertIndexEntryByKeyWithRecord(op.getCommand(), in, op.getReplayed(), null, null, true);
+              cobj = new ComObject(opBody);
+              array = cobj.getArray(ComObject.Tag.insertObjects);
+              for (int i = 0; i < array.getArray().size(); i++) {
+                ComObject innerObj = (ComObject) array.getArray().get(i);
+                doInsertIndexEntryByKeyWithRecord(innerObj, op.getReplayed(), null, null, true);
               }
-              //break;
+              break;
             case update:
-              doUpdateRecord(op.getCommand(), op.getBody(), op.getReplayed(), null, null, true);
+              doUpdateRecord(new ComObject(op.getBody()), op.getReplayed(), null, null, true);
               break;
             case delete:
-              doDeleteIndexEntryByKey(op.getCommand(), op.getBody(), op.getReplayed(), null, null, true);
+              doDeleteIndexEntryByKey(new ComObject(op.getBody()), op.getReplayed(), null, null, true);
               break;
           }
         }
         catch (EOFException e) {
           //expected
+        }
+        catch (Exception e) {
+          throw new DatabaseException(e);
         }
       }
       server.getTransactionManager().getTransactions().remove(transactionId);
@@ -656,32 +623,32 @@ public class UpdateManager {
     return null;
   }
 
-  public byte[] updateRecord(String command, byte[] body, boolean replayedCommand) {
+  public byte[] updateRecord(ComObject cobj, boolean replayedCommand) {
 
     AtomicBoolean isExplicitTrans = new AtomicBoolean();
     AtomicLong transactionId = new AtomicLong();
-    byte[] ret = doUpdateRecord(command, body, replayedCommand, isExplicitTrans, transactionId, false);
+    byte[] ret = doUpdateRecord(cobj, replayedCommand, isExplicitTrans, transactionId, false);
     if (isExplicitTrans.get()) {
       Transaction trans = server.getTransactionManager().getTransaction(transactionId.get());
-      trans.addOperation(update, command, body, replayedCommand);
+      String command = "DatabaseServer:ComObject:upateRecord:";
+      trans.addOperation(update, command, cobj.serialize(), replayedCommand);
     }
     return ret;
   }
 
-  public byte[] doUpdateRecord(String command, byte[] body, boolean replayedCommand,
+  public byte[] doUpdateRecord(ComObject cobj, boolean replayedCommand,
                                AtomicBoolean isExplicitTransRet, AtomicLong transactionIdRet, boolean isCommitting) {
     try {
-      String[] parts = command.split(":");
-      String dbName = parts[5];
-      int schemaVersion = Integer.valueOf(parts[4]);
+      String dbName = cobj.getString(ComObject.Tag.dbName);
+      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
       if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
-      String tableName = parts[6];
-      String indexName = parts[7];
-      boolean isExplicitTrans = Boolean.valueOf(parts[8]);
+      String tableName = cobj.getString(ComObject.Tag.tableName);
+      String indexName = cobj.getString(ComObject.Tag.indexName);
+      boolean isExplicitTrans = cobj.getBoolean(ComObject.Tag.isExcpliciteTrans);
       //boolean isCommitting = Boolean.valueOf(parts[9]);
-      long transactionId = Long.valueOf(parts[10]);
+      long transactionId = cobj.getLong(ComObject.Tag.transactionId);
 
       if (isExplicitTrans && isExplicitTransRet != null) {
         isExplicitTransRet.set(true);
@@ -689,13 +656,9 @@ public class UpdateManager {
       }
 
       TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
-      DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
-      long serializationVersion = DataUtil.readVLong(in);
-      Object[] primaryKey = DatabaseCommon.deserializeKey(tableSchema, in);
-      int len = in.readInt();
-      byte[] bytes = new byte[len];
-      in.read(bytes);
-
+      byte[] primaryKeyBytes = cobj.getByteArray(ComObject.Tag.primaryKeyBytes);
+      Object[] primaryKey = DatabaseCommon.deserializeKey(tableSchema, primaryKeyBytes);
+      byte[] bytes = cobj.getByteArray(ComObject.Tag.bytes);
 
       AtomicBoolean shouldExecute = new AtomicBoolean();
       AtomicBoolean shouldDeleteLock = new AtomicBoolean();
@@ -960,22 +923,19 @@ public class UpdateManager {
   //    }
   //  }
 
-  public byte[] deleteRecord(String command, byte[] body, boolean replayedCommand) {
+  public byte[] deleteRecord(ComObject cobj, boolean replayedCommand) {
     try {
-      String[] parts = command.split(":");
-      String dbName = parts[5];
-      String tableName = parts[6];
-      String indexName = parts[7];
-      int schemaVersion = Integer.valueOf(parts[4]);
+      String dbName = cobj.getString(ComObject.Tag.dbName);
+      String tableName = cobj.getString(ComObject.Tag.tableName);
+      String indexName = cobj.getString(ComObject.Tag.indexName);
+      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
       if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
 
-      DataInputStream in = new DataInputStream(new ByteArrayInputStream(body));
-      long serializationVersion = DataUtil.readVLong(in);
-
       TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
-      Object[] key = DatabaseCommon.deserializeKey(tableSchema, in);
+      byte[] keyBytes = cobj.getByteArray(ComObject.Tag.keyBytes);
+      Object[] key = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
 
       Index index = server.getIndices(dbName).getIndices().get(tableName).get(indexName);
       //synchronized (index.getMutex(key)) {
@@ -992,15 +952,14 @@ public class UpdateManager {
     }
   }
 
-  public byte[] truncateTable(String command, byte[] body, boolean replayedCommand) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
-    int schemaVersion = Integer.valueOf(parts[4]);
+  public byte[] truncateTable(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
+    int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
     if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
       throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
     }
-    String table = parts[6];
-    String phase = parts[7];
+    String table = cobj.getString(ComObject.Tag.tableName);
+    String phase = cobj.getString(ComObject.Tag.phase);
     TableSchema tableSchema = server.getCommon().getTables(dbName).get(table);
     for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
       Index index = server.getIndices(dbName).getIndices().get(table).get(entry.getKey());

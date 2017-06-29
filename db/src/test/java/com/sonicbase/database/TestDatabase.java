@@ -274,6 +274,15 @@ public class TestDatabase {
       //    assertEquals(dbServers[1].getLogManager().getCountLogged(), commandCount);
       //    assertEquals(dbServers[1].getCommandCount(), commandCount * 2);
 
+      client.startBackup();
+      while (true) {
+        Thread.sleep(1000);
+        if (client.isBackupComplete()) {
+          break;
+        }
+      }
+
+
       executor.shutdownNow();
     }
     catch (Exception e) {
@@ -1779,6 +1788,7 @@ public class TestDatabase {
   @Test
   public void testBatchInsert() throws SQLException, InterruptedException {
 
+    client.syncSchema();
     conn.setAutoCommit(false);
     PreparedStatement stmt = conn.prepareStatement("insert into persons (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
     for (int i = 0; i < 10; i++) {

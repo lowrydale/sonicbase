@@ -1,9 +1,7 @@
 package com.sonicbase.query.impl;
 
 import com.sonicbase.client.DatabaseClient;
-import com.sonicbase.common.DatabaseCommon;
-import com.sonicbase.common.Record;
-import com.sonicbase.common.SchemaOutOfSyncException;
+import com.sonicbase.common.*;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.ResultSet;
@@ -600,10 +598,14 @@ public class ResultSetImpl implements ResultSet {
   public void close() throws Exception {
 
     if (selectStatement != null && selectStatement.isServerSelect()) {
-      String command = "DatabaseServer:serverSelectDelete:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-          databaseClient.getCommon().getSchemaVersion() + ":" + dbName + ":" + selectStatement.getServerSelectResultSetId();
+      ComObject cobj = new ComObject();
+      cobj.put(ComObject.Tag.dbName, dbName);
+      cobj.put(ComObject.Tag.schemaVersion, databaseClient.getCommon().getSchemaVersion());
+      cobj.put(ComObject.Tag.method, "serverSelectDelete");
+      cobj.put(ComObject.Tag.id, selectStatement.getServerSelectResultSetId());
+      String command = "DatabaseServer:ComObject:serverSelectDelete:";
 
-      byte[] recordRet = databaseClient.send(null, selectStatement.getServerSelectShardNumber(), selectStatement.getServerSelectReplicaNumber(), command, null, DatabaseClient.Replica.specified);
+      byte[] recordRet = databaseClient.send(null, selectStatement.getServerSelectShardNumber(), selectStatement.getServerSelectReplicaNumber(), command, cobj.serialize(), DatabaseClient.Replica.specified);
 
     }
 
@@ -1621,29 +1623,24 @@ public class ResultSetImpl implements ResultSet {
 
     while (true) {
       try {
-        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-        DataOutputStream out = new DataOutputStream(bytesOut);
-        DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
 
-        out.writeBoolean(true);
+        ComObject cobj = new ComObject();
+        cobj.put(ComObject.Tag.selectStatement, selectStatement.serialize());
+        cobj.put(ComObject.Tag.schemaVersion, databaseClient.getCommon().getSchemaVersion());
+        cobj.put(ComObject.Tag.dbName, dbName);
+        cobj.put(ComObject.Tag.count, ReadManager.SELECT_PAGE_SIZE);
+        cobj.put(ComObject.Tag.method, "serverSelect");
 
-        selectStatement.serialize(out);
+        String command = "DatabaseServer:ComObject:serverSelect:";
 
-        out.close();
-
-        String command = "DatabaseServer:serverSelect:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-            databaseClient.getCommon().getSchemaVersion() + ":" + dbName + ":" + ReadManager.SELECT_PAGE_SIZE;
-
-        byte[] recordRet = databaseClient.send(null, selectStatement.getServerSelectShardNumber(), selectStatement.getServerSelectReplicaNumber(), command, bytesOut.toByteArray(), DatabaseClient.Replica.specified);
+        byte[] recordRet = databaseClient.send(null, selectStatement.getServerSelectShardNumber(),
+            selectStatement.getServerSelectReplicaNumber(), command, cobj.serialize(), DatabaseClient.Replica.specified);
         if (previousSchemaVersion < databaseClient.getCommon().getSchemaVersion()) {
           throw new SchemaOutOfSyncException();
         }
 
-        DataInputStream in = new DataInputStream(new ByteArrayInputStream(recordRet));
-        long serialiationVersion = DataUtil.readVLong(in);
-        selectStatement.deserialize(in, dbName);
-
-        DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+        ComObject retObj = new ComObject(recordRet);
+        selectStatement.deserialize(retObj.getByteArray(ComObject.Tag.selectStatement), dbName);
 
         String[] tableNames = selectStatement.getTableNames();
         TableSchema[] tableSchemas = new TableSchema[tableNames.length];
@@ -1667,18 +1664,18 @@ public class ResultSetImpl implements ResultSet {
           recordCache.getRecordsForTable().clear();
         }
 
-        int recordCount = (int) DataUtil.readVLong(in, resultLength);
+        ComArray tablesArray = retObj.getArray(ComObject.Tag.tableRecords);
+        int recordCount = tablesArray == null ? 0 : tablesArray.getArray().size();
         Object[][][] retKeys = new Object[recordCount][][];
         Record[][] currRetRecords = new Record[recordCount][];
         for (int k = 0; k < recordCount; k++) {
           currRetRecords[k] = new Record[tableNames.length];
           retKeys[k] = new Object[tableNames.length][];
+          ComArray records = (ComArray)tablesArray.getArray().get(k);
           for (int j = 0; j < tableNames.length; j++) {
-            if (in.readBoolean()) {
+            byte[] bytes = (byte[])records.getArray().get(j);
+            if (bytes != null) {
               Record record = new Record(tableSchemas[j]);
-              int len = (int)DataUtil.readVLong(in, resultLength);//len
-              byte[] bytes = new byte[len];
-              in.readFully(bytes);
               record.deserialize(dbName, databaseClient.getCommon(), bytes, null, true);
               currRetRecords[k][j] = record;
 
@@ -1708,9 +1705,6 @@ public class ResultSetImpl implements ResultSet {
         readRecords = readRecords(ret);
         currPos = 0;
         break;
-      }
-      catch (IOException e) {
-        throw new DatabaseException(e);
       }
       catch (SchemaOutOfSyncException e) {
         continue;

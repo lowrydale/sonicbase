@@ -8,9 +8,7 @@ import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.server.SnapshotManager;
 import com.sonicbase.util.DataUtil;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -71,6 +69,14 @@ public class CreateTableStatementImpl implements CreateTableStatement {
     }
   }
 
+  public byte[] serialize() throws IOException {
+    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+    DataOutputStream out = new DataOutputStream(bytesOut);
+    serialize(out);
+    out.close();
+    return bytesOut.toByteArray();
+  }
+
   public void serialize(DataOutputStream out) {
     try {
       DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
@@ -87,6 +93,11 @@ public class CreateTableStatementImpl implements CreateTableStatement {
     catch (IOException e) {
       throw new DatabaseException(e);
     }
+  }
+
+  public void deserialize(byte[] bytes) {
+    DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
+    deserialize(in);
   }
 
   public void deserialize(DataInputStream in) {

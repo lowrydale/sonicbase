@@ -3,9 +3,7 @@ package com.sonicbase.query.impl;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
 import com.sonicbase.client.DatabaseClient;
-import com.sonicbase.common.DatabaseCommon;
-import com.sonicbase.common.Record;
-import com.sonicbase.common.SchemaOutOfSyncException;
+import com.sonicbase.common.*;
 import com.sonicbase.index.Repartitioner;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.BinaryExpression;
@@ -25,6 +23,7 @@ import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.singletonList;
@@ -140,9 +139,12 @@ public abstract class ExpressionImpl implements Expression {
   }
 
   public static void evaluateCounter(DatabaseCommon common, DatabaseClient client, String dbName, Counter counter) throws IOException {
-    byte[] bytes = counter.serialize();
-    String command = "DatabaseServer:evaluateCounter:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-        common.getSchemaVersion() + ":" + dbName;
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.counter, counter.serialize());
+    cobj.put(ComObject.Tag.dbName, dbName);
+    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+    cobj.put(ComObject.Tag.method, "evaluateCounter");
+    String command = "DatabaseServer:ComObject:evaluateCounter:";
 
     String batchKey = "DatabaseServer:evaluateCounter";
 
@@ -150,10 +152,11 @@ public abstract class ExpressionImpl implements Expression {
     int shardCount = common.getServersConfig().getShardCount();
     int replicaCount = common.getServersConfig().getShards()[0].getReplicas().length;
     for (int i = 0; i < shardCount; i++) {
-      byte[] ret = client.send(batchKey, i, 0, command, bytes, DatabaseClient.Replica.def);
-      DataInputStream in = new DataInputStream(new ByteArrayInputStream(ret));
+      byte[] ret = client.send(batchKey, i, 0, command, cobj.serialize(), DatabaseClient.Replica.def);
+      ComObject retObj = new ComObject(ret);
       Counter retCounter = new Counter();
-      retCounter.deserialize(in);
+      byte[] counterBytes = retObj.getByteArray(ComObject.Tag.counter);
+      retCounter.deserialize(counterBytes);
       if (lastCounter != null) {
         Long maxLong = retCounter.getMaxLong();
         Long lastMaxLong = lastCounter.getMaxLong();
@@ -322,6 +325,19 @@ public abstract class ExpressionImpl implements Expression {
 
   public abstract ColumnImpl getPrimaryColumn();
 
+  public static byte[] serializeExpression(ExpressionImpl expression) {
+    try {
+      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+      DataOutputStream out = new DataOutputStream(bytesOut);
+      serializeExpression(expression, out);
+      out.close();
+      return bytesOut.toByteArray();
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
   public static void serializeExpression(ExpressionImpl expression, DataOutputStream out) {
     try {
       out.writeInt(expression.getType().getId());
@@ -330,6 +346,10 @@ public abstract class ExpressionImpl implements Expression {
     catch (IOException e) {
       throw new DatabaseException(e);
     }
+  }
+
+  public static ExpressionImpl deserializeExpression(byte[] bytes) {
+    return deserializeExpression(new DataInputStream(new ByteArrayInputStream(bytes)));
   }
 
   public static ExpressionImpl deserializeExpression(DataInputStream in) {
@@ -1027,90 +1047,90 @@ public abstract class ExpressionImpl implements Expression {
           @Override
           public BatchLookupReturn call() {
             try {
-              ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-              DataOutputStream out = new DataOutputStream(bytesOut);
-              DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-              out.writeUTF(tableSchema.getName());
-              out.writeUTF(indexSchema.getKey());
-              out.writeInt(operator.getId());
+              ComObject cobj = new ComObject();
+              cobj.put(ComObject.Tag.serializationVersion, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+              cobj.put(ComObject.Tag.tableName, tableSchema.getName());
+              cobj.put(ComObject.Tag.indexName, indexSchema.getKey());
+              cobj.put(ComObject.Tag.leftOperator, operator.getId());
 
               DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-              writeColumns(tableSchema, columns, out, resultLength);
+
+              ComArray columnArray = cobj.putArray(ComObject.Tag.columnOffsets, ComObject.Type.intType);
+              writeColumns(tableSchema, columns, columnArray);
 
               int subCount = srcValues.size(); //(offset == (threadCount - 1) ? srcValues.size() - ((threadCount - 1) * srcValues.size() / threadCount) : srcValues.size() / threadCount);
-              DataUtil.writeVLong(out, subCount, resultLength);
 
               boolean writingLongs = false;
               if (srcValues.size() > 0 && srcValues.get(0).getValue().length == 1) {
                 Object value = srcValues.get(0).getValue()[0];
                 if (value instanceof Long) {
-                  out.writeBoolean(true);
-                  out.writeInt(DataType.Type.BIGINT.getValue());
+                  cobj.put(ComObject.Tag.singleValue, true);
                   writingLongs = true;
                 }
                 else {
-                  out.writeBoolean(false);
+                  cobj.put(ComObject.Tag.singleValue, false);
                   writingLongs = false;
                   //throw new DatabaseException("not supported");
                 }
               }
               else {
-                out.writeBoolean(false);
+                cobj.put(ComObject.Tag.singleValue, false);
               }
 
+              ComArray keys = cobj.putArray(ComObject.Tag.keys, ComObject.Type.objectType);
               int k = 0; ///(offset * srcValues.size() / threadCount);
               for (; k < /*((offset * srcValues.size() / threadCount) + */subCount; k++) {
+                ComObject key = new ComObject();
+                keys.add(key);
+
                 IdEntry entry = srcValues.get(k);
-                DataUtil.writeVLong(out, entry.getOffset(), resultLength);
+                key.put(ComObject.Tag.offset, entry.getOffset());
                 if (writingLongs) {
-                  DataUtil.writeVLong(out, (long) entry.getValue()[0], resultLength);
+                  key.put(ComObject.Tag.longKey, (long) entry.getValue()[0]);
                 }
                 else {
-                  out.write(DatabaseCommon.serializeKey(tableSchema, indexSchema.getKey(), entry.getValue()));
+                  key.put(ComObject.Tag.keyBytes, DatabaseCommon.serializeKey(tableSchema, indexSchema.getKey(), entry.getValue()));
                 }
               }
 
-              out.close();
-
-
-              String command = "DatabaseServer:batchIndexLookup:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-                  common.getSchemaVersion() + ":" + dbName + ":" + count;
-              byte[] lookupRet = client.send(null, shard, -1, command, bytesOut.toByteArray(), DatabaseClient.Replica.def);
+              cobj.put(ComObject.Tag.dbName, dbName);
+              cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+              cobj.put(ComObject.Tag.count, count);
+              cobj.put(ComObject.Tag.method, "batchIndexLookup");
+              String command = "DatabaseServer:ComObject:batchIndexLookup:";
+              byte[] lookupRet = client.send(null, shard, -1, command, cobj.serialize(), DatabaseClient.Replica.def);
               if (previousSchemaVersion < common.getSchemaVersion()) {
                 throw new SchemaOutOfSyncException();
               }
               AtomicInteger serializedSchemaVersion = null;
               Record headerRecord = null;
-              ByteArrayInputStream bytes = new ByteArrayInputStream(lookupRet);
-              DataInputStream in = new DataInputStream(bytes);
-              long serializationVersion = DataUtil.readVLong(in);
+//              ByteArrayInputStream bytes = new ByteArrayInputStream(lookupRet);
+//              DataInputStream in = new DataInputStream(bytes);
+              ComObject retObj = new ComObject(lookupRet);
+              long serializationVersion = retObj.getLong(ComObject.Tag.serializationVersion);
               Map<Integer, Object[][]> retKeys = new HashMap<>();
               Map<Integer, Record[]> retRecords = new HashMap<>();
-              int count = (int) DataUtil.readVLong(in, resultLength);
-              for (int i = 0; i < count; i++) {
-                int offset = (int) DataUtil.readVLong(in, resultLength);
-                int idCount = (int) DataUtil.readVLong(in, resultLength);
+              ComArray retKeysArray = retObj.getArray(ComObject.Tag.retKeys);
+              for (Object entryObj : retKeysArray.getArray()) {
+                ComObject retEntryObj = (ComObject)entryObj;
+                int offset = retEntryObj.getInt(ComObject.Tag.offset);
+                ComArray keysArray = retEntryObj.getArray(ComObject.Tag.keys);
                 Object[][] ids = null;
-                if (idCount != 0) {
-                  ids = new Object[idCount][];
+                if (keysArray.getArray().size() != 0) {
+                  ids = new Object[keysArray.getArray().size()][];
                   for (int j = 0; j < ids.length; j++) {
-                    int len = (int) DataUtil.readVLong(in, resultLength);
-                    byte[] keyBytes = new byte[len];
-                    in.readFully(keyBytes);
-                    DataInputStream keyIn = new DataInputStream(new ByteArrayInputStream(keyBytes));
-                    ids[j] = DatabaseCommon.deserializeKey(tableSchema, keyIn);
+                    byte[] keyBytes = (byte[])keysArray.getArray().get(j);
+                    ids[j] = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
                   }
                   aggregateKeys(retKeys, offset, ids);
                 }
 
-                int recordCount = (int) DataUtil.readVLong(in, resultLength);
-                if (recordCount != 0) {
-                  Record[] records = new Record[recordCount];
+                ComArray recordsArray = retEntryObj.getArray(ComObject.Tag.records);
+                if (recordsArray.getArray().size() != 0) {
+                  Record[] records = new Record[recordsArray.getArray().size()];
 
-                  for (int l = 0; l < recordCount; l++) {
-                    int len = (int) DataUtil.readVLong(in, resultLength);
-                    byte[] recordBytes = new byte[len];
-                    in.readFully(recordBytes);
+                  for (int l = 0; l < records.length; l++) {
+                    byte[] recordBytes = (byte[])recordsArray.getArray().get(l);
                     records[l] = new Record(dbName, common, recordBytes);
                   }
 
@@ -1448,126 +1468,82 @@ public abstract class ExpressionImpl implements Expression {
 
             //TableSchema.Partition[] partitions = indexSchema.getValue().getCurrPartitions();
             Random rand = new Random(System.currentTimeMillis());
-            ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-            DataOutputStream out = new DataOutputStream(bytesOut);
-            out.writeUTF(dbName);
-            out.writeInt(common.getSchemaVersion());
-            DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-            DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+            ComObject cobj = new ComObject();
+            cobj.put(ComObject.Tag.dbName, dbName);
+            cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
 
-            DataUtil.writeVLong(out, preparedId);
-            out.writeBoolean(isPrepared);
+            cobj.put(ComObject.Tag.preparedId, preparedId);
+            cobj.put(ComObject.Tag.isPrepared, isPrepared);
 
             if (!isPrepared) {
-              out.writeInt(count);
+              cobj.put(ComObject.Tag.count, count);
             }
-            out.writeBoolean(client.isExplicitTrans());
-            out.writeBoolean(client.isCommitting());
-            DataUtil.writeVLong(out, client.getTransactionId(), resultLength);
-            DataUtil.writeVLong(out, viewVersion, resultLength);
+            cobj.put(ComObject.Tag.isExcpliciteTrans, client.isExplicitTrans());
+            cobj.put(ComObject.Tag.isCommitting, client.isCommitting());
+            cobj.put(ComObject.Tag.transactionId, client.getTransactionId());
+            cobj.put(ComObject.Tag.viewVersion, viewVersion);
 
             if (!isPrepared) {
-              DataUtil.writeVLong(out, tableSchema.getTableId(), resultLength);
-              DataUtil.writeVLong(out, indexSchema.getIndexId(), resultLength);
-              out.writeBoolean(forceSelectOnServer);
+              cobj.put(ComObject.Tag.tableId, tableSchema.getTableId());
+              cobj.put(ComObject.Tag.indexId, indexSchema.getIndexId());
+              cobj.put(ComObject.Tag.forceSelectOnServer, forceSelectOnServer);
             }
-            if (/*!evaluateExpression ||*/ parms == null) {
-              out.writeBoolean(false);
-            }
-            else {
-              out.writeBoolean(true);
-              parms.serialize(out);
+            if (parms != null) {
+              byte[] bytes = parms.serialize();
+              cobj.put(ComObject.Tag.parms, bytes);
             }
             if (!isPrepared) {
-              out.writeBoolean(evaluateExpression);
-              if (/*!evaluateExpression ||*/ expression == null) {
-                out.writeBoolean(false);
+              cobj.put(ComObject.Tag.evaluateExpression, evaluateExpression);
+              if (expression != null) {
+                byte[] bytes = ExpressionImpl.serializeExpression((ExpressionImpl) expression);
+                cobj.put(ComObject.Tag.expression, bytes);
               }
-              else {
-                out.writeBoolean(true);
-                ExpressionImpl.serializeExpression((ExpressionImpl) expression, out);
-              }
-              //          out.writeUTF(tableSchema.getName());
-              //          out.writeUTF(indexSchema.getKey());
-              if (orderByExpressions == null) {
-                DataUtil.writeVLong(out, 0, resultLength);
-                //out.writeInt(0);
-              }
-              else {
-                //out.writeInt(orderByExpressions.size());
-                DataUtil.writeVLong(out, orderByExpressions.size(), resultLength);
+              if (orderByExpressions != null) {
+                ComArray array = cobj.putArray(ComObject.Tag.orderByExpressions, ComObject.Type.byteArrayType);
                 for (int j = 0; j < orderByExpressions.size(); j++) {
                   OrderByExpressionImpl orderByExpression = orderByExpressions.get(j);
-                  orderByExpression.serialize(out);
+                  byte[] bytes = orderByExpression.serialize();
+                  array.add(bytes);
                 }
               }
             }
 
-            if (localLeftValue == null) {
-              out.writeBoolean(false);
+            if (localLeftValue != null) {
+              cobj.put(ComObject.Tag.leftKey, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), localLeftValue));
             }
-            else {
-              out.writeBoolean(true);
-              out.write(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), localLeftValue));
+            if (originalLeftValue != null) {
+              cobj.put(ComObject.Tag.originalLeftKey, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), originalLeftValue));
             }
-            if (originalLeftValue == null) {
-              out.writeBoolean(false);
-            }
-            else {
-              out.writeBoolean(true);
-              out.write(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), originalLeftValue));
-            }
-            DataUtil.writeVLong(out, leftOperator.getId(), resultLength);
-            //out.writeInt(leftOperator.getId());
+            cobj.put(ComObject.Tag.leftOperator, leftOperator.getId());
 
             if (rightOperator != null) {
-              out.writeBoolean(true);
-              if (rightValue == null) {
-                out.writeBoolean(false);
-              }
-              else {
-                out.writeBoolean(true);
-                out.write(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), rightValue));
+              if (rightValue != null) {
+                cobj.put(ComObject.Tag.rightKey, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), rightValue));
               }
 
-              if (originalRightValue == null) {
-                out.writeBoolean(false);
-              }
-              else {
-                out.writeBoolean(true);
-                out.write(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), originalRightValue));
+              if (originalRightValue != null) {
+                cobj.put(ComObject.Tag.originalRightKey, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), originalRightValue));
               }
 
               //out.writeInt(rightOperator.getId());
-              DataUtil.writeVLong(out, rightOperator.getId(), resultLength);
-            }
-            else {
-              out.writeBoolean(false);
+              cobj.put(ComObject.Tag.rightOperator, rightOperator.getId());
             }
 
             if (!isPrepared) {
-              writeColumns(tableSchema, columns, out, resultLength);
+              ComArray columnArray = cobj.putArray(ComObject.Tag.columnOffsets, ComObject.Type.intType);
+              writeColumns(tableSchema, columns, columnArray);
             }
 
-            if (counters == null) {
-              out.writeInt(0);
-            }
-            else {
-              out.writeInt(counters.length);
+            if (counters != null) {
+              ComArray array = cobj.putArray(ComObject.Tag.counters, ComObject.Type.byteArrayType);
               for (int i = 0; i < counters.length; i++) {
-                out.write(counters[i].serialize());
+                array.add(counters[i].serialize());
               }
             }
 
-            if (groupByContext == null) {
-              out.writeBoolean(false);
+            if (groupByContext != null) {
+              cobj.put(ComObject.Tag.groupContext, groupByContext.serialize(client.getCommon()));
             }
-            else {
-              out.writeBoolean(true);
-              out.write(groupByContext.serialize(client.getCommon()));
-            }
-
-            out.close();
 
             List<Integer> replicas = singletonList(replica);
             if (debug) {
@@ -1576,17 +1552,14 @@ public abstract class ExpressionImpl implements Expression {
               replicas.add(1);
             }
 
-            String command = "DatabaseServer:indexLookup:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-                common.getSchemaVersion() + ":" + dbName + ":" + rand.nextLong();
-            byte[] bytes = bytesOut.toByteArray();
 
-            String batchKey = null;
-            if (leftOperator == BinaryExpression.Operator.equal && rightOperator == null) {
-              batchKey = "DatabaseServer:indexLookup:" + tableSchema.getName() + ":" + indexSchema.getName();
-            }
+            cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+            cobj.put(ComObject.Tag.dbName, dbName);
+            cobj.put(ComObject.Tag.method, "indexLookup");
+            String command = "DatabaseServer:ComObject:indexLookup:";
 
             //Timer.Context ctx = INDEX_LOOKUP_SEND_STATS.time();
-            byte[] lookupRet = client.send(batchKey, localShard, 0, command, bytes, DatabaseClient.Replica.def);
+            byte[] lookupRet = client.send(null, localShard, 0, command, cobj.serialize(), DatabaseClient.Replica.def);
             //ctx.stop();
 
             prepared.serversPrepared[localShard][replica] = true;
@@ -1595,20 +1568,15 @@ public abstract class ExpressionImpl implements Expression {
             if (previousSchemaVersion < common.getSchemaVersion()) {
               throw new SchemaOutOfSyncException();
             }
-            ByteArrayInputStream bytes2 = new ByteArrayInputStream(lookupRet);
-            DataInputStream in = new DataInputStream(bytes2);
-            long serializationVersion = DataUtil.readVLong(in);
-            //nextKey = null;
-            if (in.readBoolean()) {
-              Object[] retKey = DatabaseCommon.deserializeKey(tableSchema, in);
+            ComObject retObj = new ComObject(lookupRet);
+            byte[] keyBytes = retObj.getByteArray(ComObject.Tag.keyBytes);
+            if (keyBytes != null) {
+              Object[] retKey = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
               nextKey = retKey;
             }
             else {
               nextKey = null;
             }
-            //          else {
-            //            localLeftValue = null;
-            //          }
             for (int i = 0; i < selectedShards.size(); i++) {
               if (localShard == selectedShards.get(i)) {
                 if (nextKey == null && i >= selectedShards.size() - 1) {
@@ -1625,7 +1593,6 @@ public abstract class ExpressionImpl implements Expression {
                 }
               }
             }
-            int retCount = (int) DataUtil.readVLong(in, resultLength);
             //              if (retCount != 0 || nextKey != null) {
             //                localLeftValue = nextKey;
             //              }
@@ -1637,14 +1604,12 @@ public abstract class ExpressionImpl implements Expression {
             }
 
             Object[][][] currRetKeys = null;
-            if (retCount != 0) {
-              currRetKeys = new Object[retCount][][];
-              for (int k = 0; k < retCount; k++) {
-                int len = (int) DataUtil.readVLong(in, resultLength);
-                byte[] keyBytes = new byte[len];
-                in.readFully(keyBytes);
-                DataInputStream keyIn = new DataInputStream(new ByteArrayInputStream(keyBytes));
-                Object[] key = DatabaseCommon.deserializeKey(common.getTables(dbName).get(tableSchema.getName()), keyIn);
+            ComArray keys = retObj.getArray(ComObject.Tag.keys);
+            if (keys != null) {
+              currRetKeys = new Object[keys.getArray().size()][][];
+              for (int k = 0; k < keys.getArray().size(); k++) {
+                keyBytes = (byte[])keys.getArray().get(k);
+                Object[] key = DatabaseCommon.deserializeKey(common.getTables(dbName).get(tableSchema.getName()), keyBytes);
                 currRetKeys[k] = new Object[][]{key};
                 if (debug) {
                   System.out.println("hit key: shard=" + calledShard + ", replica=" + replica);
@@ -1652,13 +1617,11 @@ public abstract class ExpressionImpl implements Expression {
               }
             }
 
-            int recordCount = (int) DataUtil.readVLong(in, resultLength);
-            Record[] currRetRecords = new Record[recordCount];
-            if (recordCount > 0) {
-              for (int k = 0; k < recordCount; k++) {
-                int len = (int) DataUtil.readVLong(in, resultLength);
-                byte[] recordBytes = new byte[len];
-                in.readFully(recordBytes);
+            ComArray records = retObj.getArray(ComObject.Tag.records);
+            Record[] currRetRecords = new Record[records == null ? 0 : records.getArray().size()];
+            if (currRetRecords.length > 0) {
+              for (int k = 0; k < currRetRecords.length; k++) {
+                byte[] recordBytes = (byte[])records.getArray().get(k);
                 currRetRecords[k] = new Record(dbName, client.getCommon(), recordBytes);
                 if (debug) {
                   System.out.println("hit record: shard=" + calledShard + ", replica=" + replica);
@@ -1673,18 +1636,19 @@ public abstract class ExpressionImpl implements Expression {
 
 
             Counter[] retCounters = null;
-            int counterCount = in.readInt();
-            if (counterCount > 0) {
-              retCounters = new Counter[counterCount];
-              for (int i = 0; i < counterCount; i++) {
+            ComArray countersArray = retObj.getArray(ComObject.Tag.counters);
+            if (countersArray != null) {
+              retCounters = new Counter[countersArray.getArray().size()];
+              for (int i = 0; i < retCounters.length; i++) {
                 retCounters[i] = new Counter();
-                retCounters[i].deserialize(in);
+                retCounters[i].deserialize((byte[])countersArray.getArray().get(i));
               }
               System.arraycopy(retCounters, 0, counters, 0, Math.min(counters.length, retCounters.length));
             }
 
-            if (in.readBoolean()) {
-              groupByContext.deserialize(in, client.getCommon(), dbName);
+            byte[] groupBytes = retObj.getByteArray(ComObject.Tag.groupContext);
+            if (groupBytes != null) {
+              groupByContext.deserialize(groupBytes, client.getCommon(), dbName);
             }
 
             if (/*originalShard != -1 ||*/localShard == -1 || localShard == -2 || (retKeys != null && retKeys.length >= count) || (recordRet != null && recordRet.length >= count)) {
@@ -1803,6 +1767,21 @@ public abstract class ExpressionImpl implements Expression {
     }
   }
 
+  private static void writeColumns(
+      TableSchema tableSchema, List<ColumnImpl> columns, ComArray array) throws IOException {
+    if (columns != null) {
+      for (ColumnImpl column : columns) {
+        if (column.getTableName() == null || column.getTableName().equals(tableSchema.getName())) {
+          Integer offset = tableSchema.getFieldOffset(column.getColumnName());
+          if (offset == null) {
+            continue;
+          }
+          array.add(offset);
+        }
+      }
+    }
+  }
+
   public static SelectContextImpl tableScan(
       String dbName, DatabaseClient client, int count, TableSchema tableSchema, List<OrderByExpressionImpl> orderByExpressions,
       ExpressionImpl expression, ParameterHandler parms, List<ColumnImpl> columns, int shard, Object[] nextKey,
@@ -1841,43 +1820,25 @@ public abstract class ExpressionImpl implements Expression {
       byte[][] recordRet = null;
 
       while (nextShard != -2 && (retKeys == null || retKeys.length < count)) {
-        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-        DataOutputStream out = new DataOutputStream(bytesOut);
-        DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-        DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-        DataUtil.writeVLong(out, tableSchema.getTableId(), resultLength);
+        ComObject cobj = new ComObject();
+        cobj.put(ComObject.Tag.tableId, tableSchema.getTableId());
         //DataUtil.writeVLong(out, indexSchema == null ? -1 : indexSchema.getIndexId(), resultLength);
-        if (parms == null) {
-          out.writeBoolean(false);
+        if (parms != null) {
+          cobj.put(ComObject.Tag.parms, parms.serialize());
         }
-        else {
-          out.writeBoolean(true);
-          parms.serialize(out);
+        if (expression != null) {
+          cobj.put(ComObject.Tag.expression, ExpressionImpl.serializeExpression((ExpressionImpl) expression));
         }
-        if (expression == null) {
-          out.writeBoolean(false);
-        }
-        else {
-          out.writeBoolean(true);
-          ExpressionImpl.serializeExpression((ExpressionImpl) expression, out);
-        }
-        if (orderByExpressions == null) {
-          DataUtil.writeVLong(out, 0, resultLength);
-        }
-        else {
-          DataUtil.writeVLong(out, orderByExpressions.size(), resultLength);
+        if (orderByExpressions != null) {
+          ComArray array = cobj.putArray(ComObject.Tag.orderByExpressions, ComObject.Type.byteArrayType);
           for (int j = 0; j < orderByExpressions.size(); j++) {
             OrderByExpressionImpl orderByExpression = orderByExpressions.get(j);
-            orderByExpression.serialize(out);
+            array.add(orderByExpression.serialize());
           }
         }
 
-        if (localNextKey == null) {
-          out.writeBoolean(false);
-        }
-        else {
-          out.writeBoolean(true);
-          out.write(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), localNextKey));
+        if (localNextKey != null) {
+          cobj.put(ComObject.Tag.leftKey, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), localNextKey));
         }
 
         for (IndexSchema schema : tableSchema.getIndexes().values()) {
@@ -1896,41 +1857,35 @@ public abstract class ExpressionImpl implements Expression {
           }
         }
 
-        writeColumns(tableSchema, columns, out, resultLength);
+        ComArray columnArray = cobj.putArray(ComObject.Tag.columnOffsets, ComObject.Type.intType);
+        writeColumns(tableSchema, columns, columnArray);
 
-        if (counters == null) {
-          out.writeInt(0);
-        }
-        else {
-          out.writeInt(counters.length);
+
+        if (counters != null) {
+          ComArray array = cobj.putArray(ComObject.Tag.counters, ComObject.Type.byteArrayType);
           for (int i = 0; i < counters.length; i++) {
-            out.write(counters[i].serialize());
+            array.add(counters[i].serialize());
           }
         }
 
-        if (groupByContext == null) {
-          out.writeBoolean(false);
+        if (groupByContext != null) {
+          cobj.put(ComObject.Tag.groupContext, groupByContext.serialize(client.getCommon()));
         }
-        else {
-          out.writeBoolean(true);
-          out.write(groupByContext.serialize(client.getCommon()));
-        }
-
-        out.close();
-
-        String command = "DatabaseServer:indexLookupExpression:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-            common.getSchemaVersion() + ":" + dbName + ":" + count;
-        byte[] lookupRet = client.send(null, localShard, 0, command, bytesOut.toByteArray(), DatabaseClient.Replica.def);
+        cobj.put(ComObject.Tag.count, count);
+        cobj.put(ComObject.Tag.dbName, dbName);
+        cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+        cobj.put(ComObject.Tag.method, "indexLookupExpression");
+        String command = "DatabaseServer:ComObject:indexLookupExpression:";
+        byte[] lookupRet = client.send(null, localShard, 0, command, cobj.serialize(), DatabaseClient.Replica.def);
         if (previousSchemaVersion < common.getSchemaVersion()) {
           throw new SchemaOutOfSyncException();
         }
-        ByteArrayInputStream bytes = new ByteArrayInputStream(lookupRet);
-        DataInputStream in = new DataInputStream(bytes);
-        long serializationVersion = DataUtil.readVLong(in);
+        ComObject retObj = new ComObject(lookupRet);
 
         localNextKey = null;
-        if (in.readBoolean()) {
-          Object[] retKey = DatabaseCommon.deserializeKey(tableSchema, in);
+        byte[] keyBytes = cobj.getByteArray(ComObject.Tag.keyBytes);
+        if (keyBytes != null) {
+          Object[] retKey = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
           localNextKey = retKey;
           // nextShard = shard;
         }
@@ -1944,43 +1899,40 @@ public abstract class ExpressionImpl implements Expression {
           }
         }
 
-        int retCount = (int) DataUtil.readVLong(in, resultLength);
-
+        ComArray keyArray = retObj.getArray(ComObject.Tag.keys);
         Object[][][] currRetKeys = null;
-        if (retCount != 0) {
-          currRetKeys = new Object[retCount][][];
-          for (int k = 0; k < retCount; k++) {
-            int len = (int) DataUtil.readVLong(in, resultLength);
-            byte[] keyBytes = new byte[len];
-            in.readFully(keyBytes);
-            DataInputStream keyIn = new DataInputStream(new ByteArrayInputStream(keyBytes));
-            Object[] key = DatabaseCommon.deserializeKey(common.getTables(dbName).get(tableSchema.getName()), keyIn);
+        if (keyArray != null) {
+          currRetKeys = new Object[keyArray.getArray().size()][][];
+          for (int k = 0; k < currRetKeys.length; k++) {
+            keyBytes = (byte[])keyArray.getArray().get(k);
+            Object[] key = DatabaseCommon.deserializeKey(common.getTables(dbName).get(tableSchema.getName()), keyBytes);
             currRetKeys[k] = new Object[][]{key};
           }
         }
 
-        int recordCount = (int) DataUtil.readVLong(in, resultLength);
+        ComArray recordArray = retObj.getArray(ComObject.Tag.records);
+        int recordCount = recordArray == null ? 0 : recordArray.getArray().size();
         byte[][] currRetRecords = new byte[recordCount][];
         for (int k = 0; k < recordCount; k++) {
-          int len = (int) DataUtil.readVLong(in, resultLength);
-          byte[] recordBytes = new byte[len];
-          in.readFully(recordBytes);
+          byte[] recordBytes = (byte[])recordArray.getArray().get(k);
           currRetRecords[k] = recordBytes;
         }
 
         Counter[] retCounters = null;
-        int counterCount = in.readInt();
-        if (counterCount > 0) {
-          retCounters = new Counter[counterCount];
-          for (int i = 0; i < counterCount; i++) {
+        ComArray countersArray = retObj.getArray(ComObject.Tag.counters);
+        if (countersArray != null) {
+          retCounters = new Counter[countersArray.getArray().size()];
+          for (int i = 0; i < countersArray.getArray().size(); i++) {
             retCounters[i] = new Counter();
-            retCounters[i].deserialize(in);
+            byte[] counterBytes = (byte[])countersArray.getArray().get(i);
+            retCounters[i].deserialize(counterBytes);
           }
           System.arraycopy(retCounters, 0, counters, 0, Math.min(counters.length, retCounters.length));
         }
 
-        if (in.readBoolean()) {
-          groupByContext.deserialize(in, client.getCommon(), dbName);
+        byte[] groupBytes = retObj.getByteArray(ComObject.Tag.groupContext);
+        if (groupBytes != null) {
+          groupByContext.deserialize(groupBytes, client.getCommon(), dbName);
         }
 
         recordRet = aggregateResults(recordRet, currRetRecords);

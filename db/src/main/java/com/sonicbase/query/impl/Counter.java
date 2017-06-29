@@ -2,10 +2,7 @@ package com.sonicbase.query.impl;
 
 import com.sonicbase.schema.DataType;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.math.BigDecimal;
 
 /**
@@ -188,6 +185,11 @@ public class Counter {
     out.close();
 
     return bytesOut.toByteArray();
+  }
+
+  public void deserialize(byte[] bytes) throws IOException {
+    DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
+    deserialize(in);
   }
 
   public void deserialize(DataInputStream in) throws IOException {

@@ -97,7 +97,7 @@ public class ReadManager {
     }
     String fromTable = cobj.getString(ComObject.Tag.tableName);
 
-    byte[] expressionBytes = cobj.getByteArray(ComObject.Tag.expression);
+    byte[] expressionBytes = cobj.getByteArray(ComObject.Tag.legacyExpression);
     Expression expression = null;
     if (expressionBytes != null) {
       expression = ExpressionImpl.deserializeExpression(expressionBytes);
@@ -431,7 +431,7 @@ public class ReadManager {
         expression = prepared.expression;
       }
       else {
-        byte[] expressionBytes = cobj.getByteArray(ComObject.Tag.expression);
+        byte[] expressionBytes = cobj.getByteArray(ComObject.Tag.legacyExpression);
         if (expressionBytes != null) {
           prepared.expression = expression = ExpressionImpl.deserializeExpression(expressionBytes);
         }
@@ -527,7 +527,7 @@ public class ReadManager {
         }
       }
 
-      byte[] groupContextBytes = cobj.getByteArray(ComObject.Tag.groupContext);
+      byte[] groupContextBytes = cobj.getByteArray(ComObject.Tag.legacyGroupContext);
       GroupByContext groupContext = null;
       if (groupContextBytes != null) {
         groupContext = new GroupByContext();
@@ -619,7 +619,7 @@ public class ReadManager {
       }
 
       if (groupContext != null) {
-        retObj.put(ComObject.Tag.groupContext, groupContext.serialize(server.getCommon()));
+        retObj.put(ComObject.Tag.legacyGroupContext, groupContext.serialize(server.getCommon()));
       }
 
       if (schemaVersion < server.getSchemaVersion()) {
@@ -705,7 +705,7 @@ public class ReadManager {
       }
       int count = cobj.getInt(ComObject.Tag.count);
 
-      byte[] selectBytes = cobj.getByteArray(ComObject.Tag.selectStatement);
+      byte[] selectBytes = cobj.getByteArray(ComObject.Tag.legacySelectStatement);
       SelectStatementImpl select = new SelectStatementImpl(server.getDatabaseClient());
       select.deserialize(selectBytes, dbName);
       select.setIsOnServer(true);
@@ -728,7 +728,7 @@ public class ReadManager {
 
       ComObject retObj = new ComObject();
       select.setIsOnServer(false);
-      retObj.put(ComObject.Tag.selectStatement, select.serialize());
+      retObj.put(ComObject.Tag.legacySelectStatement, select.serialize());
 
       if (records != null) {
         ComArray tableArray = retObj.putArray(ComObject.Tag.tableRecords, ComObject.Type.arrayType);
@@ -774,7 +774,7 @@ public class ReadManager {
         parms = new ParameterHandler();
         parms.deserialize(parmBytes);
       }
-      byte[] expressionBytes = cobj.getByteArray(ComObject.Tag.expression);
+      byte[] expressionBytes = cobj.getByteArray(ComObject.Tag.legacyExpression);
       Expression expression = null;
       if (expressionBytes != null) {
         expression = ExpressionImpl.deserializeExpression(expressionBytes);
@@ -833,7 +833,7 @@ public class ReadManager {
         }
       }
 
-      byte[] groupBytes = cobj.getByteArray(ComObject.Tag.groupContext);
+      byte[] groupBytes = cobj.getByteArray(ComObject.Tag.legacyGroupContext);
       GroupByContext groupByContext = null;
       if (groupBytes != null) {
         groupByContext = new GroupByContext();
@@ -887,7 +887,7 @@ public class ReadManager {
       }
 
       if (groupByContext != null) {
-        retObj.put(ComObject.Tag.groupContext, groupByContext.serialize(server.getCommon()));
+        retObj.put(ComObject.Tag.legacyGroupContext, groupByContext.serialize(server.getCommon()));
       }
 
       if (schemaVersion < server.getSchemaVersion()) {
@@ -1823,7 +1823,7 @@ public class ReadManager {
 
     Counter counter = new Counter();
     try {
-      byte[] counterBytes = cobj.getByteArray(ComObject.Tag.counter);
+      byte[] counterBytes = cobj.getByteArray(ComObject.Tag.legacyCounter);
       counter.deserialize(counterBytes);
 
       String tableName = counter.getTableName();
@@ -1883,7 +1883,7 @@ public class ReadManager {
         }
       }
       ComObject retObj = new ComObject();
-      retObj.put(ComObject.Tag.counter, counter.serialize());
+      retObj.put(ComObject.Tag.legacyCounter, counter.serialize());
       return retObj.serialize();
     }
     catch (IOException e) {

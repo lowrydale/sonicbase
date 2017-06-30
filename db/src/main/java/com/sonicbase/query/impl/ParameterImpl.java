@@ -42,6 +42,11 @@ public class ParameterImpl extends ExpressionImpl {
     return "parm(" + String.valueOf(parmOffset) + ")";
   }
 
+  /**
+   * ###############################
+   * DON"T MODIFY THIS SERIALIZATION
+   * ###############################
+   */
   @Override
   public void serialize(DataOutputStream out) {
     try {
@@ -53,6 +58,11 @@ public class ParameterImpl extends ExpressionImpl {
     }
   }
 
+  /**
+   * ###############################
+   * DON"T MODIFY THIS SERIALIZATION
+   * ###############################
+   */
   public void deserialize(DataInputStream in) {
     try {
       super.deserialize(in);

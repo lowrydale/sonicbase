@@ -1,5 +1,6 @@
 package com.sonicbase.database;
 
+import com.sonicbase.common.ComObject;
 import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.server.LongRunningCommands;
 import com.sonicbase.server.SnapshotManager;
@@ -79,7 +80,11 @@ public class TestLongRunningCommands {
 
     assertEquals(server.getLongRunningCommands().getCommandCount(), 0);
 
-    server.getLongRunningCommands().addCommand(server.getLongRunningCommands().createSingleCommand("DatabaseServer:block:1:1:test:20", null));
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.dbName, "__none__");
+    cobj.put(ComObject.Tag.schemaVersion, 1);
+    cobj.put(ComObject.Tag.method, "block");
+    server.getLongRunningCommands().addCommand(server.getLongRunningCommands().createSingleCommand("DatabaseServer:ComObject:block:", cobj.serialize()));
 
     Thread.sleep(1000);
 

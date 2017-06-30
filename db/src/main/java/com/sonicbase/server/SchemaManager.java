@@ -122,7 +122,7 @@ public class SchemaManager {
           server.getCommon().getServersConfig().getShards()[0].getMasterReplica() == server.getReplica() && cobj.getBoolean(ComObject.Tag.slave) != null) {
         return null;
       }
-
+      System.out.println("Create database: shard=" + server.getShard() + ", replica=" + server.getReplica());
       String dbName = cobj.getString(ComObject.Tag.dbName);
       String masterSlave = cobj.getString(ComObject.Tag.masterSlave);
       dbName = dbName.toLowerCase();
@@ -131,9 +131,9 @@ public class SchemaManager {
         return null;
       }
 
-      if (null != server.getCommon().getSchema(dbName)) {
-        throw new DatabaseException("Database already exists: name=" + dbName);
-      }
+//      if (null != server.getCommon().getSchema(dbName)) {
+//        throw new DatabaseException("Database already exists: name=" + dbName);
+//      }
 
       logger.info("Create database: shard=" + server.getShard() + ", replica=" + server.getReplica() + ", name=" + dbName);
       File dir = new File(server.getDataDir(), "snapshot/" + server.getShard() + "/" + server.getReplica() + "/" + dbName);
@@ -163,7 +163,9 @@ public class SchemaManager {
 
   public byte[] dropTable(ComObject cobj, boolean replayedCommand) {
     String masterSlave = cobj.getString(ComObject.Tag.masterSlave);
-    if (server.getShard() == 0 && server.getReplica() == 0 && masterSlave.equals("slave")) {
+    if (server.getShard() == 0 &&
+        server.getCommon().getServersConfig().getShards()[0].getMasterReplica() == server.getReplica() &&
+        masterSlave.equals("slave")) {
       return null;
     }
     try {
@@ -204,7 +206,9 @@ public class SchemaManager {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     String masterSlave = cobj.getString(ComObject.Tag.masterSlave);
 
-    if (server.getShard() == 0 && server.getReplica() == 0 && masterSlave.equals("slave")) {
+    if (server.getShard() == 0 &&
+        server.getCommon().getServersConfig().getShards()[0].getMasterReplica() == server.getReplica() &&
+        masterSlave.equals("slave")) {
       return null;
     }
 
@@ -231,7 +235,9 @@ public class SchemaManager {
   public byte[] createTable(ComObject cobj, boolean replayedCommand) {
     try {
       String masterSlave = cobj.getString(ComObject.Tag.masterSlave);
-      if (server.getShard() == 0 && server.getReplica() == 0 && masterSlave.equals("slave")) {
+      if (server.getShard() == 0 &&
+          server.getCommon().getServersConfig().getShards()[0].getMasterReplica() == server.getReplica() &&
+          masterSlave.equals("slave")) {
         return null;
       }
       long serializationVersionNumber = cobj.getLong(ComObject.Tag.serializationVersion);
@@ -396,7 +402,9 @@ public class SchemaManager {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     String masterSlave = cobj.getString(ComObject.Tag.masterSlave);
 
-    if (server.getShard() == 0 && server.getReplica() == 0 && masterSlave.equals("slave")) {
+    if (server.getShard() == 0 &&
+        server.getCommon().getServersConfig().getShards()[0].getMasterReplica() == server.getReplica() &&
+        masterSlave.equals("slave")) {
       return null;
     }
 
@@ -463,9 +471,9 @@ public class SchemaManager {
 
         for (int i = 0; i < server.getShardCount(); i++) {
           for (int j = 0; j < server.getReplicationFactor(); j++) {
-            if (i == 0 && j == 0) {
-              continue;
-            }
+//            if (i == 0 && server.getCommon().getServersConfig().getShards()[0].getMasterReplica() == j) {
+//              continue;
+//            }
             String command = "DatabaseServer:ComObject:createIndexSlave:";
             server.getDatabaseClient().send(null, i, j, command, slaveBody, DatabaseClient.Replica.specified);
           }
@@ -483,7 +491,9 @@ public class SchemaManager {
      String dbName = cobj.getString(ComObject.Tag.dbName);
      String masterSlave = cobj.getString(ComObject.Tag.masterSlave);
 
-     if (server.getShard() == 0 && server.getReplica() == 0 && masterSlave.equals("slave")) {
+     if (server.getShard() == 0 &&
+         server.getCommon().getServersConfig().getShards()[0].getMasterReplica() == server.getReplica() &&
+         masterSlave.equals("slave")) {
        return null;
      }
 
@@ -502,7 +512,9 @@ public class SchemaManager {
   public byte[] dropIndex(ComObject cobj) {
       try {
         String masterSlave = cobj.getString(ComObject.Tag.masterSlave);
-        if (server.getShard() == 0 && server.getReplica() == 0 && masterSlave.equals("slave")) {
+        if (server.getShard() == 0 &&
+            server.getCommon().getServersConfig().getShards()[0].getMasterReplica() == server.getReplica() &&
+            masterSlave.equals("slave")) {
           return null;
         }
 
@@ -548,9 +560,9 @@ public class SchemaManager {
 
         for (int i = 0; i < server.getShardCount(); i++) {
           for (int j = 0; j < server.getReplicationFactor(); j++) {
-            if (i == 0 && j == 0) {
-              continue;
-            }
+//            if (i == 0 && server.getCommon().getServersConfig().getShards()[0].getMasterReplica() == j) {
+//              continue;
+//            }
             String command = "DatabaseServer:ComObject:dropIndexSlave:";
             server.getDatabaseClient().send(null, i, j, command, slaveBytes, DatabaseClient.Replica.specified);
           }

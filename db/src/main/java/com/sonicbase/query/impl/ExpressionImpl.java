@@ -140,7 +140,7 @@ public abstract class ExpressionImpl implements Expression {
 
   public static void evaluateCounter(DatabaseCommon common, DatabaseClient client, String dbName, Counter counter) throws IOException {
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.counter, counter.serialize());
+    cobj.put(ComObject.Tag.legacyCounter, counter.serialize());
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
     cobj.put(ComObject.Tag.method, "evaluateCounter");
@@ -155,7 +155,7 @@ public abstract class ExpressionImpl implements Expression {
       byte[] ret = client.send(batchKey, i, 0, command, cobj.serialize(), DatabaseClient.Replica.def);
       ComObject retObj = new ComObject(ret);
       Counter retCounter = new Counter();
-      byte[] counterBytes = retObj.getByteArray(ComObject.Tag.counter);
+      byte[] counterBytes = retObj.getByteArray(ComObject.Tag.legacyCounter);
       retCounter.deserialize(counterBytes);
       if (lastCounter != null) {
         Long maxLong = retCounter.getMaxLong();
@@ -301,6 +301,11 @@ public abstract class ExpressionImpl implements Expression {
 
   abstract public Type getType();
 
+  /**
+   * ###############################
+   * DON"T MODIFY THIS SERIALIZATION
+   * ###############################
+   */
   public void deserialize(DataInputStream in) {
     try {
       nextShard = in.readInt();
@@ -337,7 +342,11 @@ public abstract class ExpressionImpl implements Expression {
       throw new DatabaseException(e);
     }
   }
-
+  /**
+   * ###############################
+   * DON"T MODIFY THIS SERIALIZATION
+   * ###############################
+   */
   public static void serializeExpression(ExpressionImpl expression, DataOutputStream out) {
     try {
       out.writeInt(expression.getType().getId());
@@ -352,6 +361,11 @@ public abstract class ExpressionImpl implements Expression {
     return deserializeExpression(new DataInputStream(new ByteArrayInputStream(bytes)));
   }
 
+  /**
+   * ###############################
+   * DON"T MODIFY THIS SERIALIZATION
+   * ###############################
+   */
   public static ExpressionImpl deserializeExpression(DataInputStream in) {
     try {
       int type = in.readInt();
@@ -1259,10 +1273,14 @@ public abstract class ExpressionImpl implements Expression {
                       prepared.getValue().lastTimeUsed < System.currentTimeMillis() - 15 * 60 * 1000) {
                 preparedIndexLookups.remove(prepared.getKey());
 
-                String command = "DatabaseServer:expirePreparedStatement:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION +
-                    ":" + client.getCommon().getSchemaVersion() + ":null:" + prepared.getValue().preparedId;
+                ComObject cobj = new ComObject();
+                cobj.put(ComObject.Tag.dbName, "__none__");
+                cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+                cobj.put(ComObject.Tag.method, "expirePreparedStatement");
+                cobj.put(ComObject.Tag.preparedId, prepared.getValue().preparedId);
+                String command = "DatabaseServer:ComObject:expirePreparedStatement:";
 
-                client.sendToAllShards(null, 0, command, null, DatabaseClient.Replica.def);
+                client.sendToAllShards(null, 0, command, cobj.serialize(), DatabaseClient.Replica.def);
               }
             }
             Thread.sleep(10 * 1000);
@@ -1496,7 +1514,7 @@ public abstract class ExpressionImpl implements Expression {
               cobj.put(ComObject.Tag.evaluateExpression, evaluateExpression);
               if (expression != null) {
                 byte[] bytes = ExpressionImpl.serializeExpression((ExpressionImpl) expression);
-                cobj.put(ComObject.Tag.expression, bytes);
+                cobj.put(ComObject.Tag.legacyExpression, bytes);
               }
               if (orderByExpressions != null) {
                 ComArray array = cobj.putArray(ComObject.Tag.orderByExpressions, ComObject.Type.byteArrayType);
@@ -1542,7 +1560,7 @@ public abstract class ExpressionImpl implements Expression {
             }
 
             if (groupByContext != null) {
-              cobj.put(ComObject.Tag.groupContext, groupByContext.serialize(client.getCommon()));
+              cobj.put(ComObject.Tag.legacyGroupContext, groupByContext.serialize(client.getCommon()));
             }
 
             List<Integer> replicas = singletonList(replica);
@@ -1646,7 +1664,7 @@ public abstract class ExpressionImpl implements Expression {
               System.arraycopy(retCounters, 0, counters, 0, Math.min(counters.length, retCounters.length));
             }
 
-            byte[] groupBytes = retObj.getByteArray(ComObject.Tag.groupContext);
+            byte[] groupBytes = retObj.getByteArray(ComObject.Tag.legacyGroupContext);
             if (groupBytes != null) {
               groupByContext.deserialize(groupBytes, client.getCommon(), dbName);
             }
@@ -1827,7 +1845,7 @@ public abstract class ExpressionImpl implements Expression {
           cobj.put(ComObject.Tag.parms, parms.serialize());
         }
         if (expression != null) {
-          cobj.put(ComObject.Tag.expression, ExpressionImpl.serializeExpression((ExpressionImpl) expression));
+          cobj.put(ComObject.Tag.legacyExpression, ExpressionImpl.serializeExpression((ExpressionImpl) expression));
         }
         if (orderByExpressions != null) {
           ComArray array = cobj.putArray(ComObject.Tag.orderByExpressions, ComObject.Type.byteArrayType);
@@ -1869,7 +1887,7 @@ public abstract class ExpressionImpl implements Expression {
         }
 
         if (groupByContext != null) {
-          cobj.put(ComObject.Tag.groupContext, groupByContext.serialize(client.getCommon()));
+          cobj.put(ComObject.Tag.legacyGroupContext, groupByContext.serialize(client.getCommon()));
         }
         cobj.put(ComObject.Tag.count, count);
         cobj.put(ComObject.Tag.dbName, dbName);
@@ -1930,7 +1948,7 @@ public abstract class ExpressionImpl implements Expression {
           System.arraycopy(retCounters, 0, counters, 0, Math.min(counters.length, retCounters.length));
         }
 
-        byte[] groupBytes = retObj.getByteArray(ComObject.Tag.groupContext);
+        byte[] groupBytes = retObj.getByteArray(ComObject.Tag.legacyGroupContext);
         if (groupBytes != null) {
           groupByContext.deserialize(groupBytes, client.getCommon(), dbName);
         }

@@ -74,6 +74,11 @@ public class ColumnImpl extends ExpressionImpl {
     return alias;
   }
 
+  /**
+   * ###############################
+   * DON"T MODIFY THIS SERIALIZATION
+   * ###############################
+   */
   @Override
   public void serialize(DataOutputStream out) {
     try {
@@ -97,6 +102,11 @@ public class ColumnImpl extends ExpressionImpl {
     return ExpressionImpl.Type.column;
   }
 
+  /**
+   * ###############################
+   * DON"T MODIFY THIS SERIALIZATION
+   * ###############################
+   */
   @Override
   public void deserialize(DataInputStream in) {
     try {

@@ -1,10 +1,13 @@
 package com.sonicbase.server;
 
+import com.sonicbase.common.AWSClient;
 import com.sonicbase.common.Logger;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.util.DataUtil;
+import org.apache.commons.io.FileUtils;
 
 import java.io.*;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,7 +31,7 @@ public class LongRunningCommands {
   public void load() {
     try {
       synchronized (this) {
-        File file = new File(server.getDataDir(), "lrc/" + server.getShard() + "/" + server.getReplica());
+        File file = getReplicaRoot();
         file.mkdirs();
         int version = getHighestSafeSnapshotVersion(file);
         if (version == -1) {
@@ -49,7 +52,7 @@ public class LongRunningCommands {
   public void save() {
     try {
       synchronized (this) {
-        File file = new File(server.getDataDir(), "lrc/" + server.getShard() + "/" + server.getReplica());
+        File file = getReplicaRoot();
         file.mkdirs();
         int version = getHighestSafeSnapshotVersion(file);
         version++;
@@ -62,11 +65,38 @@ public class LongRunningCommands {
 
         File newFile = new File(server.getDataDir(), "lrc/" + server.getShard() + "/" + server.getReplica() + "/" + String.valueOf(version));
         file.renameTo(newFile);
+
+        deleteOldFiles();
       }
     }
     catch (Exception e) {
       throw new DatabaseException(e);
     }
+  }
+
+  private void deleteOldFiles() throws IOException, InterruptedException, ParseException {
+    File dataRootDir = getReplicaRoot();
+    dataRootDir.mkdirs();
+    int highestSnapshot = getHighestSafeSnapshotVersion(dataRootDir);
+
+    for (String fileStr : dataRootDir.list()) {
+      int fileNum = -1;
+      try {
+        fileNum = Integer.valueOf(fileStr);
+      }
+      catch (Exception t) {
+        //expected numeric format problems
+      }
+      if (fileStr.contains("in-process") || (fileNum != -1 && fileNum < (highestSnapshot - 1))) {
+        File currFile = new File(dataRootDir, fileStr);
+        logger.info("Deleting file: " + currFile.getAbsolutePath());
+        currFile.delete();
+      }
+    }
+  }
+
+  private File getReplicaRoot() {
+    return new File(server.getDataDir(), "lrc/" + server.getShard() + "/" + server.getReplica());
   }
 
   private int getHighestSafeSnapshotVersion(File dataRootDir) {
@@ -118,6 +148,60 @@ public class LongRunningCommands {
 
   public SingleCommand createSingleCommand(String command, byte[] body) {
     return new SingleCommand(this, command, body);
+  }
+
+  public void backupFileSystem(String directory, String subDirectory) {
+    try {
+      File dir = getReplicaRoot();
+      File destDir = new File(directory, subDirectory + "/lrc/" + server.getShard() + "/0");
+      if (dir.exists()) {
+        FileUtils.copyDirectory(dir, destDir);
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public void restoreFileSystem(String directory, String subDirectory) {
+    try {
+      File destDir = getReplicaRoot();
+      if (destDir.exists()) {
+        FileUtils.deleteDirectory(destDir);
+      }
+      destDir.mkdirs();
+      File srcDir = new File(directory, subDirectory + "/lrc/" + server.getShard() + "/0");
+      if (srcDir.exists()) {
+        FileUtils.copyDirectory(srcDir, destDir);
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public void restoreAWS(String bucket, String prefix, String subDirectory) {
+    try {
+      AWSClient awsClient = server.getAWSClient();
+      File destDir = getReplicaRoot();
+      subDirectory += "/lrc/" + server.getShard() + "/0";
+
+      FileUtils.deleteDirectory(destDir);
+      destDir.mkdirs();
+
+      awsClient.downloadDirectory(bucket, prefix, subDirectory, destDir);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public void backupAWS(String bucket, String prefix, String subDirectory) {
+    AWSClient awsClient = server.getAWSClient();
+    File srcDir = getReplicaRoot();
+    subDirectory += "/lrc/" + server.getShard() + "/0";
+
+    awsClient.uploadDirectory(bucket, prefix, subDirectory, srcDir);
   }
 
   public static class SingleCommand {

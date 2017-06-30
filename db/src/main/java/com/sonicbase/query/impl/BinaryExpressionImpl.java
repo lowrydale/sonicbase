@@ -1032,6 +1032,11 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     return rightExpression;
   }
 
+  /**
+   * ###############################
+   * DON"T MODIFY THIS SERIALIZATION
+   * ###############################
+   */
   public void deserialize(DataInputStream in) {
     try {
       super.deserialize(in);
@@ -1050,6 +1055,11 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     }
   }
 
+  /**
+   * ###############################
+   * DON"T MODIFY THIS SERIALIZATION
+   * ###############################
+   */
   public void serialize(DataOutputStream out) {
     try {
       super.serialize(out);

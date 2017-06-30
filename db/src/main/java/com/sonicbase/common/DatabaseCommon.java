@@ -851,6 +851,10 @@ public class DatabaseCommon {
     return bytesOut.toByteArray();
   }
 
+  public void deserializeConfig(byte[] bytes) throws IOException {
+    deserializeConfig(new DataInputStream(new ByteArrayInputStream(bytes)));
+  }
+
   public void deserializeConfig(DataInputStream in) throws IOException {
     long serializationVersion = DataUtil.readVLong(in);
     serversConfig = new DatabaseServer.ServersConfig(in, serializationVersion);

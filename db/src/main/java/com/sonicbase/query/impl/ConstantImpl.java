@@ -62,6 +62,11 @@ public class ConstantImpl extends ExpressionImpl {
     this.sqlType = sqlType;
   }
 
+  /**
+   * ###############################
+   * DON"T MODIFY THIS SERIALIZATION
+   * ###############################
+   */
   public void deserialize(DataInputStream in) {
     try {
       super.deserialize(in);
@@ -110,6 +115,11 @@ public class ConstantImpl extends ExpressionImpl {
 
   }
 
+  /**
+   * ###############################
+   * DON"T MODIFY THIS SERIALIZATION
+   * ###############################
+   */
   @Override
   public void serialize(DataOutputStream out) {
     try {

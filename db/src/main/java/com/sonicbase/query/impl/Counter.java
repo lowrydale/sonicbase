@@ -156,6 +156,11 @@ public class Counter {
     return doubleCount != null;
   }
 
+  /**
+   * ###############################
+   * DON"T MODIFY THIS SERIALIZATION
+   * ###############################
+   */
   public byte[] serialize() throws IOException {
     ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
     DataOutputStream out = new DataOutputStream(bytesOut);
@@ -192,6 +197,11 @@ public class Counter {
     deserialize(in);
   }
 
+  /**
+   * ###############################
+   * DON"T MODIFY THIS SERIALIZATION
+   * ###############################
+   */
   public void deserialize(DataInputStream in) throws IOException {
     tableName = in.readUTF();
     columnName = in.readUTF();

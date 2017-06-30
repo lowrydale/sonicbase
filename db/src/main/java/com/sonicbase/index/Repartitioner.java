@@ -1208,7 +1208,7 @@ public class Repartitioner extends Thread {
               moveProcessor.await();
               moveProcessor.shutdown();
             }
-            databaseServer.getDeleteManager().saveDeletes(dbName, tableName, indexName, keysToDelete);
+            //databaseServer.getDeleteManager().saveDeletes(dbName, tableName, indexName, keysToDelete);
             deleteRecordsOnOtherReplicas(dbName, tableName, indexName, keysToDelete);
             executor.shutdownNow();
             logger.info("doRebalanceOrderedIndex finished: table=" + tableName + ", index=" + indexName + ", countVisited=" + countVisited.get() +
@@ -1256,9 +1256,9 @@ public class Repartitioner extends Thread {
       ThreadPoolExecutor executor = new ThreadPoolExecutor(replicaCount - 1, replicaCount - 1, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
       for (int i = 0; i < replicaCount; i++) {
         final int replica = i;
-        if (replica == databaseServer.getReplica()) {
-          continue;
-        }
+//        if (replica == databaseServer.getReplica()) {
+//          continue;
+//        }
         futures.add(executor.submit(new Callable(){
           @Override
           public Object call() throws Exception {

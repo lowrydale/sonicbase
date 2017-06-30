@@ -38,6 +38,11 @@ public class ParenthesisImpl extends ExpressionImpl {
 
   }
 
+  /**
+   * ###############################
+   * DON"T MODIFY THIS SERIALIZATION
+   * ###############################
+   */
   @Override
   public void serialize(DataOutputStream out) {
     try {
@@ -56,6 +61,11 @@ public class ParenthesisImpl extends ExpressionImpl {
     return ExpressionImpl.Type.parenthesis;
   }
 
+  /**
+   * ###############################
+   * DON"T MODIFY THIS SERIALIZATION
+   * ###############################
+   */
   @Override
   public void deserialize(DataInputStream in) {
     try {

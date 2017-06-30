@@ -38,6 +38,11 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
     return "<all>";
   }
 
+  /**
+   * ###############################
+   * DON"T MODIFY THIS SERIALIZATION
+   * ###############################
+   */
   @Override
   public void serialize(DataOutputStream out) {
     try {
@@ -49,6 +54,11 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
     }
   }
 
+  /**
+   * ###############################
+   * DON"T MODIFY THIS SERIALIZATION
+   * ###############################
+   */
   @Override
   public void deserialize(DataInputStream in) {
     try {

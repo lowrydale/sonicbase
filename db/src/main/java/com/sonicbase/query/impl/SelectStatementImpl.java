@@ -103,6 +103,11 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     }
   }
 
+  /**
+   * ###############################
+   * DON"T MODIFY THIS SERIALIZATION
+   * ###############################
+   */
   public void serialize(DataOutputStream out) {
     try {
       out.writeUTF(fromTable);
@@ -154,6 +159,11 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     deserialize(in, dbName);
   }
 
+  /**
+   * ###############################
+   * DON"T MODIFY THIS SERIALIZATION
+   * ###############################
+   */
   public void deserialize(DataInputStream in, String dbName) {
     try {
       fromTable = in.readUTF();
@@ -745,7 +755,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     while (true) {
       try {
         ComObject cobj = new ComObject();
-        cobj.put(ComObject.Tag.selectStatement, serialize());
+        cobj.put(ComObject.Tag.legacySelectStatement, serialize());
         cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
         cobj.put(ComObject.Tag.count, ReadManager.SELECT_PAGE_SIZE);
         cobj.put(ComObject.Tag.method, "serverSelect");
@@ -761,7 +771,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
         }
 
         ComObject retObj = new ComObject(recordRet);
-        byte[] selectBytes = retObj.getByteArray(ComObject.Tag.selectStatement);
+        byte[] selectBytes = retObj.getByteArray(ComObject.Tag.legacySelectStatement);
         deserialize(selectBytes, dbName);
 
 
@@ -916,7 +926,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
               expression = null;
             }
             if (expression != null) {
-              cobj.put(ComObject.Tag.expression, ExpressionImpl.serializeExpression(expression));
+              cobj.put(ComObject.Tag.legacyExpression, ExpressionImpl.serializeExpression(expression));
             }
 
             if (getParms() != null) {
@@ -1666,6 +1676,11 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
 
     }
 
+    /**
+     * ###############################
+     * DON"T MODIFY THIS SERIALIZATION
+     * ###############################
+     */
     public void serialize(DataOutputStream out) {
       try {
         out.writeInt(type.ordinal());
@@ -1677,6 +1692,11 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       }
     }
 
+    /**
+     * ###############################
+     * DON"T MODIFY THIS SERIALIZATION
+     * ###############################
+     */
     public void deserialize(DataInputStream in) {
       try {
         int typeOrd = in.readInt();

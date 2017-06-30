@@ -1625,7 +1625,7 @@ public class ResultSetImpl implements ResultSet {
       try {
 
         ComObject cobj = new ComObject();
-        cobj.put(ComObject.Tag.selectStatement, selectStatement.serialize());
+        cobj.put(ComObject.Tag.legacySelectStatement, selectStatement.serialize());
         cobj.put(ComObject.Tag.schemaVersion, databaseClient.getCommon().getSchemaVersion());
         cobj.put(ComObject.Tag.dbName, dbName);
         cobj.put(ComObject.Tag.count, ReadManager.SELECT_PAGE_SIZE);
@@ -1640,7 +1640,7 @@ public class ResultSetImpl implements ResultSet {
         }
 
         ComObject retObj = new ComObject(recordRet);
-        selectStatement.deserialize(retObj.getByteArray(ComObject.Tag.selectStatement), dbName);
+        selectStatement.deserialize(retObj.getByteArray(ComObject.Tag.legacySelectStatement), dbName);
 
         String[] tableNames = selectStatement.getTableNames();
         TableSchema[] tableSchemas = new TableSchema[tableNames.length];

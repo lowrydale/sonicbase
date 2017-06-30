@@ -1,6 +1,7 @@
 package com.sonicbase.database;
 
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.ComObject;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.query.impl.ColumnImpl;
 import com.sonicbase.schema.IndexSchema;
@@ -252,8 +253,11 @@ public class TestFailover {
       assertTrue(client.getCommon().getServersConfig().getShards()[1].getReplicas()[1].isDead());
       assertFalse(client.getCommon().getServersConfig().getShards()[1].getReplicas()[0].isDead());
 
-      client.send(null, 1, 1, "DatabaseServer:testWrite:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-              1 + ":__none__", null, DatabaseClient.Replica.specified);
+      ComObject cobj = new ComObject();
+      cobj.put(ComObject.Tag.dbName, "__none__");
+      cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+      cobj.put(ComObject.Tag.method, "testWrite");
+      client.send(null, 1, 1, "DatabaseServer:ComObject.testWrite:", cobj.serialize(), DatabaseClient.Replica.specified);
 
       assertTrue(dbServers[1][0].getLogManager().hasLogsForPeer(1));
 

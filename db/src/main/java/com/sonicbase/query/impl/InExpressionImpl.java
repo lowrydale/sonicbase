@@ -109,6 +109,11 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
     leftExpression.setColumns(columns);
   }
 
+  /**
+   * ###############################
+   * DON"T MODIFY THIS SERIALIZATION
+   * ###############################
+   */
   @Override
   public void serialize(DataOutputStream out) {
     try {
@@ -131,6 +136,11 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
     return ExpressionImpl.Type.inExpression;
   }
 
+  /**
+   * ###############################
+   * DON"T MODIFY THIS SERIALIZATION
+   * ###############################
+   */
   @Override
   public void deserialize(DataInputStream in) {
     try {

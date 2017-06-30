@@ -10,6 +10,8 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.math.BigDecimal;
+import java.sql.Types;
 import java.util.Iterator;
 
 import static com.sonicbase.common.ComObject.Type.*;
@@ -37,7 +39,15 @@ public class ComObject {
     booleanType(3),
     byteArrayType(4),
     arrayType(5),
-    objectType(6);
+    objectType(6),
+    tinyIntType(7),
+    smallIntType(8),
+    floatType(9),
+    doubleType(10),
+    bigDecimalType(11),
+    dateType(12),
+    timeType(13),
+    timeStampType(14);
 
     final int tag;
 
@@ -73,7 +83,7 @@ public class ComObject {
     isCommitting(11, booleanType),
     primaryKeyBytes(12, byteArrayType),
     bytes(13, byteArrayType),
-    expression(14, byteArrayType),
+    legacyExpression(14, byteArrayType),
     parms(15, byteArrayType),
     countColumn(16, stringType),
     countTableName(17, stringType),
@@ -104,10 +114,10 @@ public class ComObject {
     originalRightKey(42, byteArrayType),
     rightOperator(43, intType),
     counters(44, arrayType),
-    groupContext(45, byteArrayType),
-    selectStatement(46, byteArrayType),
+    legacyGroupContext(45, byteArrayType),
+    legacySelectStatement(46, byteArrayType),
     tableRecords(47, arrayType),
-    counter(48, byteArrayType),
+    legacyCounter(48, byteArrayType),
     slave(49, booleanType),
     masterSlave(50, stringType),
     finished(51, booleanType),
@@ -128,13 +138,50 @@ public class ComObject {
     isUnique(66, booleanType),
     fieldsStr(67, stringType),
     resultSetId(68, longType),
-    countLong(69, longType);
+    countLong(69, longType),
+    requestedMasterShard(70, intType),
+    requestedMasterReplica(71, intType),
+    selectedMasteReplica(72, intType),
+    electedMaster(73, intType),
+    replica(74, intType),
+    directory(75, stringType),
+    subDirectory(76, stringType),
+    bucket(77, stringType),
+    prefix(78, stringType),
+    isComplete(79, booleanType),
+    shared(80, booleanType),
+    maxBackupCount(81, intType),
+    filename(82, stringType),
+    fileContent(83, stringType),
+    isClient(84, booleanType),
+    host(85, stringType),
+    message(86, stringType),
+    exception(87, stringType),
+    resGig(88, doubleType),
+    cpu(89, doubleType),
+    javaMemMin(90, doubleType),
+    javaMemMax(91, doubleType),
+    avgRecRate(92, doubleType),
+    avgTransRate(93, doubleType),
+    diskAvail(94, stringType),
+    port(95, intType),
+    dbNames(96, arrayType),
+    serversConfig(97, byteArrayType),
+    status(98, stringType),
+    sequenceNumber(99, longType),
+    configBytes(100, byteArrayType),
+    highestId(101, longType),
+    nextId(102, longType),
+    maxId(103, longType),
+    binaryFileContent(104, byteArrayType);
 
     public final int tag;
 
     Tag(int tag, Type type) {
       this.tag = tag;
-      tagsByTag.put(tag, new DynamicTag(tag, typesByTag.get(type.tag)));
+      if (tagsByTag.put(tag, new DynamicTag(tag, typesByTag.get(type.tag))) != null) {
+        throw new DatabaseException("Duplicate tag in ComObject: id=" + tag);
+      }
     }
   }
 
@@ -143,7 +190,12 @@ public class ComObject {
   }
 
   public ComObject(byte[] bytes) {
-    deserialize(bytes);
+    DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
+    deserialize(in);
+  }
+
+  public ComObject(DataInputStream in) {
+    deserialize(in);
   }
 
   private Int2ObjectOpenHashMap map = new Int2ObjectOpenHashMap();
@@ -153,6 +205,14 @@ public class ComObject {
   }
 
   public void put(Tag tag, int value) {
+    map.put(tag.tag, (Object)value);
+  }
+
+  public void put(Tag tag, float value) {
+    map.put(tag.tag, (Object)value);
+  }
+
+  public void put(Tag tag, double value) {
     map.put(tag.tag, (Object)value);
   }
 
@@ -176,6 +236,14 @@ public class ComObject {
     return (Integer)map.get(tag.tag);
   }
 
+  public Float getFloat(Tag tag) {
+    return (Float)map.get(tag.tag);
+  }
+
+  public Double getDouble(Tag tag) {
+    return (Double)map.get(tag.tag);
+  }
+
   public String getString(Tag tag) {
     return (String)map.get(tag.tag);
   }
@@ -186,6 +254,17 @@ public class ComObject {
 
   public byte[] getByteArray(Tag tag) {
     return (byte[])map.get(tag.tag);
+  }
+
+  public ComObject getObject(Tag tag) {
+    return (ComObject)map.get(tag.tag);
+  }
+
+  public ComObject putObject(Tag tag) {
+    ComObject cobj = new ComObject();
+    cobj.remove(Tag.serializationVersion);
+    map.put(tag.tag, cobj);
+    return cobj;
   }
 
   public ComArray putArray(Tag tag, Type nestedType) {
@@ -203,9 +282,12 @@ public class ComObject {
   }
 
   public void deserialize(byte[] bytes) {
+    deserialize(new DataInputStream(new ByteArrayInputStream(bytes)));
+  }
+
+  public void deserialize(DataInputStream in) {
     try {
       map.clear();
-      DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
       int count = (int) DataUtil.readVLong(in);
       for (int i = 0; i < count; i++) {
         int tag = (int)DataUtil.readVLong(in);
@@ -221,7 +303,7 @@ public class ComObject {
         }
         else if (type.tag == stringType.tag) {
           int len = (int)DataUtil.readVLong(in);
-          bytes = new byte[len];
+          byte[] bytes = new byte[len];
           in.readFully(bytes);
           value = new String(bytes, "utf-8");
         }
@@ -230,13 +312,48 @@ public class ComObject {
         }
         else if (type.tag == byteArrayType.tag) {
           int len = (int)DataUtil.readVLong(in);
-          bytes = new byte[len];
+          byte[] bytes = new byte[len];
           in.readFully(bytes);
           value = bytes;
         }
         else if (type.tag == arrayType.tag) {
           value = new ComArray(in);
         }
+        else if (type.tag == objectType.tag) {
+          value = new ComObject(in);
+        }
+        else if (type.tag == tinyIntType.tag) {
+          value = in.read();
+        }
+        else if (type.tag == smallIntType.tag) {
+          value = in.readShort();
+        }
+        else if (type.tag == floatType.tag) {
+          value = in.readFloat();
+        }
+        else if (type.tag == doubleType.tag) {
+          value = in.readDouble();
+        }
+        else if (type.tag == bigDecimalType.tag) {
+          int len = (int)DataUtil.readVLong(in);
+          byte[] bytes = new byte[len];
+          in.readFully(bytes);
+          String str = new String(bytes, "utf-8");
+          value = new java.math.BigDecimal(str);
+        }
+        else if (type.tag == dateType.tag) {
+          java.sql.Date date = new java.sql.Date(DataUtil.readVLong(in));
+          value = date;
+        }
+        else if (type.tag == timeType.tag) {
+          java.sql.Time time = new java.sql.Time(DataUtil.readVLong(in));
+          value = time;
+        }
+        else if (type.tag == timeStampType.tag) {
+          java.sql.Timestamp timestamp = new java.sql.Timestamp(DataUtil.readVLong(in));
+          value = timestamp;
+        }
+
         else {
           throw new DatabaseException("Don't know how to deserialize type: type=" + type.tag);
         }
@@ -290,6 +407,35 @@ public class ComObject {
         }
         else if (tagObj.type.tag == arrayType.tag) {
           ((ComArray)value).serialize(out);
+        }
+        else if (tagObj.type.tag == objectType.tag) {
+          out.write(((ComObject)value).serialize());
+        }
+        else if (tagObj.type.tag == tinyIntType.tag) {
+          out.write((byte)value);
+        }
+        else if (tagObj.type.tag == smallIntType.tag) {
+          out.writeShort((short)value);
+        }
+        else if (tagObj.type.tag == floatType.tag) {
+          out.writeFloat((float)value);
+        }
+        else if (tagObj.type.tag == doubleType.tag) {
+          out.writeDouble((double)value);
+        }
+        else if (tagObj.type.tag == bigDecimalType.tag) {
+          byte[] bytes = ((BigDecimal) value).toPlainString().getBytes("utf-8");
+          DataUtil.writeVLong(out, bytes.length);
+          out.write(bytes);
+        }
+        else if (tagObj.type.tag == dateType.tag) {
+          DataUtil.writeVLong(out, ((java.sql.Date)value).getTime());
+        }
+        else if (tagObj.type.tag == timeType.tag) {
+          DataUtil.writeVLong(out, ((java.sql.Time)value).getTime());
+        }
+        else if (tagObj.type.tag == timeStampType.tag) {
+          DataUtil.writeVLong(out, ((java.sql.Timestamp)value).getTime());
         }
       }
 

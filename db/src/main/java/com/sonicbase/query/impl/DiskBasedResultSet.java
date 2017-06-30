@@ -204,7 +204,8 @@ public class DiskBasedResultSet {
     synchronized (this) {
       String str = ISO8601.fromDate(new Date(System.currentTimeMillis()));
       File timeFile = new File(file, "time-accessed.txt");
-      try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(timeFile)))) {
+      file.mkdirs();
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(timeFile)))) {
         writer.write(str);
       }
       catch (IOException e) {

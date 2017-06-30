@@ -1,6 +1,7 @@
 package com.sonicbase.database;
 
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.ComObject;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.jdbcdriver.ParameterHandler;
@@ -55,6 +56,7 @@ public class TestDatabase {
       array.add(DatabaseServer.FOUR_SERVER_LICENSE);
 
       FileUtils.deleteDirectory(new File("/data/database"));
+      FileUtils.deleteDirectory(new File("/data/db-backup"));
 
       DatabaseServer.getServers().clear();
 
@@ -260,17 +262,18 @@ public class TestDatabase {
       count = client.getPartitionSize("test", 1, "children", "_1_socialsecuritynumber");
       assertEquals(count, 6);
 
-      dbServers[0].enableSnapshot(false);
-      dbServers[1].enableSnapshot(false);
+//      dbServers[0].enableSnapshot(false);
+//      dbServers[1].enableSnapshot(false);
+//
+//      dbServers[0].runSnapshot();
+//      dbServers[0].recoverFromSnapshot();
+//      dbServers[0].getSnapshotManager().lockSnapshot("test");
+//      dbServers[0].getSnapshotManager().unlockSnapshot(1);
+//
+//      long commandCount = dbServers[1].getCommandCount();
+//      dbServers[1].purgeMemory();
+//      dbServers[1].replayLogs();
 
-      dbServers[0].runSnapshot();
-      dbServers[0].recoverFromSnapshot();
-      dbServers[0].getSnapshotManager().lockSnapshot("test");
-      dbServers[0].getSnapshotManager().unlockSnapshot(1);
-
-      long commandCount = dbServers[1].getCommandCount();
-      dbServers[1].purgeMemory();
-      dbServers[1].replayLogs();
       //    assertEquals(dbServers[1].getLogManager().getCountLogged(), commandCount);
       //    assertEquals(dbServers[1].getCommandCount(), commandCount * 2);
 
@@ -282,6 +285,25 @@ public class TestDatabase {
         }
       }
 
+      File file = new File("/data/db-backup");
+      File[] dirs = file.listFiles();
+
+      client.startRestore(dirs[0].getName());
+      while (true) {
+        Thread.sleep(1000);
+        if (client.isRestoreComplete()) {
+          break;
+        }
+      }
+
+      Thread.sleep(10000);
+
+      ComObject cobj = new ComObject();
+      cobj.put(ComObject.Tag.dbName, "test");
+      cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+      cobj.put(ComObject.Tag.method, "forceDeletes");
+      String command = "DatabaseServer:ComObject:forceDeletes:";
+      client.sendToAllShards(null, 0, command, cobj.serialize(), DatabaseClient.Replica.all);
 
       executor.shutdownNow();
     }
@@ -1257,7 +1279,7 @@ public class TestDatabase {
 //    assertTrue(found.contains(4L));
   }
 
-  @Test
+  @Test(enabled=true)
   public void serverSort() throws SQLException {
 
     PreparedStatement stmt = conn.prepareStatement("select persons.id, socialsecuritynumber as s " +

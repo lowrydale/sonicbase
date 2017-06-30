@@ -37,26 +37,19 @@ public class Logger {
                 continue;
               }
 
-              ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-              DataOutputStream out = new DataOutputStream(bytesOut);
-              out.writeBoolean(isClient);
-              out.writeUTF(hostName);
-              out.writeUTF(error.msg);
-              if (error.e == null) {
-                out.writeBoolean(false);
-              }
-              else {
-                out.writeBoolean(true);
+              ComObject cobj = new ComObject();
+              cobj.put(ComObject.Tag.dbName, "__none__");
+              cobj.put(ComObject.Tag.schemaVersion, error.client.getCommon().getSchemaVersion());
+              cobj.put(ComObject.Tag.method, "logError");
+              cobj.put(ComObject.Tag.isClient, isClient);
+              cobj.put(ComObject.Tag.host, hostName);
+              cobj.put(ComObject.Tag.message, error.msg);
+              if (error.e != null) {
                 String exception = ExceptionUtils.getFullStackTrace(error.e);
-                out.writeUTF(exception);
+                cobj.put(ComObject.Tag.exception, exception);
               }
-              out.close();
-              byte[] body = bytesOut.toByteArray();
-
-              String command = "DatabaseServer:logError:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-                  error.client.getCommon().getSchemaVersion();
-              byte[] ret = error.client.sendToMaster(command, body);
-
+              String command = "DatabaseServer:ComObject:logError:";
+              byte[] ret = error.client.sendToMaster(command, cobj.serialize());
             }
             catch (InterruptedException e) {
               break;

@@ -487,7 +487,9 @@ public class SnapshotManager {
   public void enableSnapshot(boolean enable) {
     this.enableSnapshot = enable;
     if (!enable) {
-      snapshotThread.interrupt();
+      if (snapshotThread != null) {
+        snapshotThread.interrupt();
+      }
     }
     else {
       if (snapshotThread == null) {
@@ -514,11 +516,13 @@ public class SnapshotManager {
   public void backupFileSystem(String directory, String subDirectory) {
     try {
       File file = new File(directory, subDirectory);
-      file = new File(file, SNAPSHOT_STR + server.getShard() + "/" + server.getReplica());
+      file = new File(file, SNAPSHOT_STR + server.getShard() + "/0");
       FileUtils.deleteDirectory(file);
       file.mkdirs();
 
-      FileUtils.copyDirectory(getSnapshotReplicaDir(), file);
+      if (getSnapshotReplicaDir().exists()) {
+        FileUtils.copyDirectory(getSnapshotReplicaDir(), file);
+      }
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -528,9 +532,16 @@ public class SnapshotManager {
   public void restoreFileSystem(String directory, String subDirectory) {
     try {
       File file = new File(directory, subDirectory);
-      file = new File(file, SNAPSHOT_STR + server.getShard() + "/" + server.getReplica());
+      file = new File(file, SNAPSHOT_STR + server.getShard() + "/0");
 
-      FileUtils.copyDirectory(file, getSnapshotReplicaDir());
+      if (getSnapshotReplicaDir().exists()) {
+        FileUtils.deleteDirectory(getSnapshotReplicaDir());
+      }
+      getSnapshotReplicaDir().mkdirs();
+
+      if (file.exists()) {
+        FileUtils.copyDirectory(file, getSnapshotReplicaDir());
+      }
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -540,17 +551,25 @@ public class SnapshotManager {
   public void backupAWS(String bucket, String prefix, String subDirectory) {
     AWSClient awsClient = server.getAWSClient();
     File srcDir = getSnapshotReplicaDir();
-    subDirectory += "/" + SNAPSHOT_STR + server.getShard() + "/" + server.getReplica();
+    subDirectory += "/" + SNAPSHOT_STR + server.getShard() + "/0";
 
     awsClient.uploadDirectory(bucket, prefix, subDirectory, srcDir);
   }
 
   public void restoreAWS(String bucket, String prefix, String subDirectory) {
-    AWSClient awsClient = server.getAWSClient();
-    File destDir = getSnapshotReplicaDir();
-    subDirectory += "/" + SNAPSHOT_STR + server.getShard() + "/" + server.getReplica();
+    try {
+      AWSClient awsClient = server.getAWSClient();
+      File destDir = getSnapshotReplicaDir();
+      subDirectory += "/" + SNAPSHOT_STR + server.getShard() + "/0";
 
-    awsClient.downloadDirectory(bucket, prefix, subDirectory, destDir);
+      FileUtils.deleteDirectory(getSnapshotReplicaDir());
+      getSnapshotReplicaDir().mkdirs();
+
+      awsClient.downloadDirectory(bucket, prefix, subDirectory, destDir);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
   }
 
   private class ByteCounterStream extends InputStream {

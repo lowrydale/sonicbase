@@ -7,6 +7,14 @@
   "indexEntrySize" : 60,
   "maxJavaHeap": "50%",
   "maxProcessMemory": "90%",
+  "backup" : {
+    "type" : "fileSystem",
+    "directory": "/data/db-backup",
+    "period": "daily",
+    "time": "23:00",
+    "maxBackupCount": 10,
+    "sharedDirectory": true
+  },
   "shards" : [
     {
       "replicas": [

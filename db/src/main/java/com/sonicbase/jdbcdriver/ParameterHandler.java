@@ -1,7 +1,9 @@
 package com.sonicbase.jdbcdriver;
 
 
+import com.sonicbase.common.ComObject;
 import com.sonicbase.query.DatabaseException;
+import com.sonicbase.util.DataUtil;
 import com.sonicbase.util.StreamUtils;
 
 import java.io.*;
@@ -321,7 +323,13 @@ public class ParameterHandler {
     out.writeInt(count);
     for (int i = 1; i < count + 1; i++) {
       Parameter.ParameterBase parm = currParmsByIndex.get(i);
-      parm.serialize(out, true);
+      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+      DataOutputStream parmOut = new DataOutputStream(bytesOut);
+      parm.serialize(parmOut, true);
+      parmOut.close();
+      byte[] bytes = bytesOut.toByteArray();
+      DataUtil.writeVLong(out, bytes.length);
+      out.write(bytes);
     }
   }
 
@@ -334,55 +342,59 @@ public class ParameterHandler {
     try {
       int count = in.readInt();
       for (int i = 0; i < count; i++) {
-        int sqlType = in.readInt();
+        int len = (int)DataUtil.readVLong(in);
+        byte[] bytes = new byte[len];
+        in.readFully(bytes);
+        DataInputStream innerIn = new DataInputStream(new ByteArrayInputStream(bytes));
+        int sqlType = innerIn.readInt();
         switch (sqlType) {
           case Types.NCLOB:
-            currParmsByIndex.put(i + 1, Parameter.NClob.deserialize(in));
+            currParmsByIndex.put(i + 1, Parameter.NClob.deserialize(innerIn));
             break;
           case Types.CLOB:
-            currParmsByIndex.put(i + 1, Parameter.Clob.deserialize(in));
+            currParmsByIndex.put(i + 1, Parameter.Clob.deserialize(innerIn));
             break;
           case Types.VARCHAR:
-            currParmsByIndex.put(i + 1, Parameter.String.deserialize(in));
+            currParmsByIndex.put(i + 1, Parameter.String.deserialize(innerIn));
             break;
           case Types.VARBINARY:
-            currParmsByIndex.put(i + 1, Parameter.Bytes.deserialize(in));
+            currParmsByIndex.put(i + 1, Parameter.Bytes.deserialize(innerIn));
             break;
           case Types.NUMERIC:
-            currParmsByIndex.put(i + 1, Parameter.BigDecimal.deserialize(in));
+            currParmsByIndex.put(i + 1, Parameter.BigDecimal.deserialize(innerIn));
             break;
           case Types.INTEGER:
           case Types.DECIMAL:
-            currParmsByIndex.put(i + 1, Parameter.Int.deserialize(in));
+            currParmsByIndex.put(i + 1, Parameter.Int.deserialize(innerIn));
             break;
           case Types.BIGINT:
-            currParmsByIndex.put(i + 1, Parameter.Long.deserialize(in));
+            currParmsByIndex.put(i + 1, Parameter.Long.deserialize(innerIn));
             break;
           case Types.TINYINT:
-            currParmsByIndex.put(i + 1, Parameter.Byte.deserialize(in));
+            currParmsByIndex.put(i + 1, Parameter.Byte.deserialize(innerIn));
             break;
           case Types.SMALLINT:
           case Types.CHAR:
-            currParmsByIndex.put(i + 1, Parameter.Short.deserialize(in));
+            currParmsByIndex.put(i + 1, Parameter.Short.deserialize(innerIn));
             break;
           case Types.REAL:
           case Types.FLOAT:
-            currParmsByIndex.put(i + 1, Parameter.Float.deserialize(in));
+            currParmsByIndex.put(i + 1, Parameter.Float.deserialize(innerIn));
             break;
           case Types.DOUBLE:
-            currParmsByIndex.put(i + 1, Parameter.Double.deserialize(in));
+            currParmsByIndex.put(i + 1, Parameter.Double.deserialize(innerIn));
             break;
           case Types.BOOLEAN:
-            currParmsByIndex.put(i + 1, Parameter.Boolean.deserialize(in));
+            currParmsByIndex.put(i + 1, Parameter.Boolean.deserialize(innerIn));
             break;
           case Types.DATE:
-            currParmsByIndex.put(i + 1, Parameter.Date.deserialize(in));
+            currParmsByIndex.put(i + 1, Parameter.Date.deserialize(innerIn));
             break;
           case Types.TIME:
-            currParmsByIndex.put(i + 1, Parameter.Time.deserialize(in));
+            currParmsByIndex.put(i + 1, Parameter.Time.deserialize(innerIn));
             break;
           case Types.TIMESTAMP:
-            currParmsByIndex.put(i + 1, Parameter.Timestamp.deserialize(in));
+            currParmsByIndex.put(i + 1, Parameter.Timestamp.deserialize(innerIn));
             break;
         }
       }

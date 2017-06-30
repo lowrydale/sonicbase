@@ -2,6 +2,7 @@ package com.sonicbase.server;
 
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.AWSClient;
+import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Logger;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.util.DataUtil;
@@ -111,10 +112,9 @@ public class LogManager {
     }
   }
 
-  public byte[] setMaxSequenceNum(String command, byte[] body) {
+  public byte[] setMaxSequenceNum(ComObject cobj) {
     try {
-      String[] parts = command.split(":");
-      long sequenceNum = Long.valueOf(parts[6]);
+      long sequenceNum = cobj.getLong(ComObject.Tag.sequenceNumber);
 
       maxAllocatedLogSequenceNumber.set(sequenceNum);
       File file = new File(databaseServer.getDataDir(), "logSequenceNum/" + databaseServer.getShard() + "/" + databaseServer.getReplica() + "/logSequenceNum.txt");
@@ -148,9 +148,13 @@ public class LogManager {
     for (int replica = 0; replica < server.getReplicationFactor(); replica++) {
       if (replica != server.getReplica()) {
         try {
-          String command = "DatabaseServer:setMaxSequenceNum:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-              server.getCommon().getSchemaVersion() + ":__none__:" + maxAllocatedLogSequenceNumber.get();
-          server.getClient().send(null, server.getShard(), replica, command, null, DatabaseClient.Replica.specified, true);
+          ComObject cobj = new ComObject();
+          cobj.put(ComObject.Tag.dbName, "__none__");
+          cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
+          cobj.put(ComObject.Tag.method, "setMaxSequenceNum");
+          cobj.put(ComObject.Tag.sequenceNumber, maxAllocatedLogSequenceNumber.get());
+          String command = "DatabaseServer:ComObject:setMaxSequenceNum:";
+          server.getClient().send(null, server.getShard(), replica, command, cobj.serialize(), DatabaseClient.Replica.specified, true);
         }
         catch (Exception e) {
           logger.error("Error setting maxSequenceNum: shard=" + server.getShard() + ", replica=" + replica);
@@ -225,7 +229,8 @@ public class LogManager {
           }
           sliceFiles.add(line);
         }
-        File destDir = new File(directory, subDirectory);
+        File destDir = new File(directory, subDirectory + "/queue/" + server.getShard() + "/0/self");
+        destDir.mkdirs();
         for (File file : files) {
           if (sliceFiles.contains(file.getAbsolutePath())) {
             File destFile = new File(destDir, file.getName());
@@ -241,10 +246,17 @@ public class LogManager {
 
   public void restoreFileSystem(String directory, String subDirectory) {
     try {
-      File destDir = getLogReplicaDir();
-      File srcDir = new File(directory, subDirectory);
+      File destDir = new File(getLogReplicaDir(), "self");
+      File srcDir = new File(directory, subDirectory + "/queue/" + server.getShard() + "/0/self");
 
-      FileUtils.copyDirectory(srcDir, destDir);
+      if (destDir.exists()) {
+        FileUtils.deleteDirectory(destDir);
+      }
+      destDir.mkdirs();
+
+      if (srcDir.exists()) {
+        FileUtils.copyDirectory(srcDir, destDir);
+      }
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -254,17 +266,25 @@ public class LogManager {
   public void backupAWS(String bucket, String prefix, String subDirectory) {
     AWSClient awsClient = server.getAWSClient();
     File srcDir = getLogReplicaDir();
-    subDirectory += "/queue/" + server.getShard() + "/" + server.getReplica();
+    subDirectory += "/queue/" + server.getShard() + "/0";
 
     awsClient.uploadDirectory(bucket, prefix, subDirectory, srcDir);
   }
 
   public void restoreAWS(String bucket, String prefix, String subDirectory) {
-    AWSClient awsClient = server.getAWSClient();
-    File destDir = getLogReplicaDir();
-    subDirectory += "/queue/" + server.getShard() + "/" + server.getReplica();
+    try {
+      AWSClient awsClient = server.getAWSClient();
+      File destDir = getLogReplicaDir();
+      subDirectory += "/queue/" + server.getShard() + "/0";
 
-    awsClient.downloadDirectory(bucket, prefix, subDirectory, destDir);
+      FileUtils.deleteDirectory(destDir);
+      destDir.mkdirs();
+
+      awsClient.downloadDirectory(bucket, prefix, subDirectory, destDir);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
   }
 
   public void sendLogsToPeer(int replicaNum) {
@@ -274,16 +294,14 @@ public class LogManager {
       if (files != null) {
         for (File file : files) {
           byte[] bytes = StreamUtils.inputStreamToBytes(new BufferedInputStream(new FileInputStream(file)));
-          ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-          DataOutputStream out = new DataOutputStream(bytesOut);
-          out.writeInt(server.getReplica());
-          out.writeUTF(file.getName());
-          out.writeInt(bytes.length);
-          out.write(bytes);
-          out.close();
-          String command = "DatabaseServer:sendQueueFile:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-              server.getCommon().getSchemaVersion() + ":__none__";
-          client.send(null, server.getShard(), replicaNum, command, bytesOut.toByteArray(), DatabaseClient.Replica.specified, true);
+          ComObject cobj = new ComObject();
+          cobj.put(ComObject.Tag.dbName, "__none__");
+          cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
+          cobj.put(ComObject.Tag.method, "sendQueueFile");
+          cobj.put(ComObject.Tag.binaryFileContent, bytes);
+          cobj.put(ComObject.Tag.replica, server.getReplica());
+          String command = "DatabaseServer:ComObject:sendQueueFile:";
+          client.send(null, server.getShard(), replicaNum, command, cobj.serialize(), DatabaseClient.Replica.specified, true);
         }
         deletePeerLogs(replicaNum);
       }
@@ -495,9 +513,13 @@ public class LogManager {
       for (int replica = 0; replica < server.getReplicationFactor(); replica++) {
         if (replica != server.getReplica()) {
           try {
-            String command = "DatabaseServer:sendLogsToPeer:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":" +
-                server.getCommon().getSchemaVersion() + ":__none__:" + server.getReplica();
-            server.getClient().send(null, server.getShard(), replica, command, null, DatabaseClient.Replica.specified);
+            ComObject cobj = new ComObject();
+            cobj.put(ComObject.Tag.dbName, "__none__");
+            cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
+            cobj.put(ComObject.Tag.method, "sendLogsToPeer");
+            cobj.put(ComObject.Tag.replica, server.getReplica());
+            String command = "DatabaseServer:ComObject:sendLogsToPeer:";
+            server.getClient().send(null, server.getShard(), replica, command, cobj.serialize(), DatabaseClient.Replica.specified);
           }
           catch (Exception e) {
             logger.error("Error getting logs from peer: replica=" + replica, e);
@@ -594,7 +616,6 @@ public class LogManager {
       in.readFully(commandBuffer);
       String command = new String(commandBuffer, UTF8_STR);
       String[] parts = command.split(":");
-      String dbName = parts[5];
       StringBuilder builder = new StringBuilder();
       for (int i = 0; i < parts.length; i++) {
         if (i != 0) {

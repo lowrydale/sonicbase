@@ -38,7 +38,8 @@
         Rolling restarts can be invoked when more that one replica is configured. To do the rolling restart,
         Sonicbase stops the first replica. Then Sonicbase starts the first replica. When the first replica is completely
         started, the next replica is stopped then started. And so forth. This should ensure that there is no interruption
-        of service while starting the cluster. The command to restart the cluster is "restart cluster".
+        of service while starting the cluster. The command to restart the cluster is "restart cluster". If no
+        servers are running you should do a normal start by typing in the admin client "start cluster".
 
 </div>
 </div>

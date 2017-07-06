@@ -173,7 +173,8 @@ public class ComObject {
     highestId(101, longType),
     nextId(102, longType),
     maxId(103, longType),
-    binaryFileContent(104, byteArrayType);
+    binaryFileContent(104, byteArrayType),
+    type(105, stringType);
 
     public final int tag;
 
@@ -186,7 +187,7 @@ public class ComObject {
   }
 
   public ComObject() {
-    put(ComObject.Tag.serializationVersion, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+    put(ComObject.Tag.serializationVersion, (long)SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
   }
 
   public ComObject(byte[] bytes) {

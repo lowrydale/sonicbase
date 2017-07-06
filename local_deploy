@@ -12,8 +12,7 @@ rsync -vlLt --exclude sonicbase-*shaded.jar db/target/sonicbase-*.jar $HOME/soni
 #mvn dependency:copy-dependencies -DoutputDirectory=$HOME/sonicbase/lib
 #rsync -rvlLt repo/linux64/* $HOME/sonicbase/lib/linux64
 
-rsync -rvlLt db/target/classes/config/config-1-local.json $HOME/sonicbase/config
-rsync -rvlLt db/target/classes/config/config-license-server.json $HOME/sonicbase/config
+rsync -rvlLt db/target/classes/config/config-*.json $HOME/sonicbase/config
 rsync -rvlLt $HOME/sonicbase-config/* $HOME/sonicbase/config
 rsync -rvlLt get-distribution $HOME/sonicbase/bin
 rsync -rvlLt get-df $HOME/sonicbase/bin

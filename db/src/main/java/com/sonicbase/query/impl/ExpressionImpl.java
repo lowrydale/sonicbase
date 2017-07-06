@@ -1467,7 +1467,7 @@ public abstract class ExpressionImpl implements Expression {
           String preparedKeyStr = preparedKey.toString();
           PreparedIndexLookup prepared = null;
           synchronized (preparedIndexLookups) {
-            prepared = preparedIndexLookups.get(preparedKeyStr);
+            //prepared = preparedIndexLookups.get(preparedKeyStr);
             if (prepared == null) {
               prepared = new PreparedIndexLookup();
               prepared.preparedId = client.allocateId(dbName);
@@ -1744,13 +1744,22 @@ public abstract class ExpressionImpl implements Expression {
     }
   }
 
-  private static boolean handlePreparedNotFound(Exception e) {
+  private static boolean handlePreparedNotFound(Throwable e) {
     int index = ExceptionUtils.indexOfThrowable(e, PreparedIndexLookupNotFoundException.class);
     if (-1 != index) {
       return true;
     }
-    else if (e.getMessage() != null && e.getMessage().contains("PreparedIndexLookupNotFoundException")) {
-      return true;
+    while (true) {
+      if (e.getMessage() == null) {
+        break;
+      }
+      if (e.getMessage().contains("PreparedIndexLookupNotFoundException")) {
+        return true;
+      }
+      e = e.getCause();
+      if (e == null) {
+        break;
+      }
     }
     return false;
   }

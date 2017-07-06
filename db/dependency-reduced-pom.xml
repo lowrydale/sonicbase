@@ -2,11 +2,11 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <parent>
     <artifactId>sonicbase-root</artifactId>
-    <groupId>com.lowryengineering</groupId>
+    <groupId>com.sonicbase</groupId>
     <version>0.9.2.2</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
-  <groupId>com.lowryengineering</groupId>
+  <groupId>com.sonicbase</groupId>
   <artifactId>sonicbase</artifactId>
   <name>sonicbase</name>
   <version>0.9.2.2</version>
@@ -14,6 +14,26 @@
   <build>
     <pluginManagement>
       <plugins>
+        <plugin>
+          <artifactId>maven-shade-plugin</artifactId>
+          <version>3.0.0</version>
+          <executions>
+            <execution>
+              <phase>package</phase>
+              <goals>
+                <goal>shade</goal>
+              </goals>
+              <configuration>
+                <minimizeJar>true</minimizeJar>
+                <artifactSet>
+                  <excludes>
+                    <exclude>com.sonicbase:sonicbase</exclude>
+                  </excludes>
+                </artifactSet>
+              </configuration>
+            </execution>
+          </executions>
+        </plugin>
         <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
           <version>2.3.2</version>

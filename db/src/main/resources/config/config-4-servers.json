@@ -1,6 +1,6 @@
 {
   "dataDirectory": "/data/database",
-  "installDirectory": "$HOME/database",
+  "installDirectory": "$HOME/test-sonicbase",
   "partitionCountForRecordIndex" : 10000,
   "subPartitionsForIdIndex" : 10,
   "initialIndexSize" : 10000000,

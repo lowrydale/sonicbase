@@ -151,14 +151,16 @@ public class DeleteManager {
     File srcDir = getReplicaRoot();
     subDirectory += "/deletes/" + databaseServer.getShard() + "/0";
 
-    awsClient.uploadDirectory(bucket, prefix, subDirectory, srcDir);
+    if (srcDir.exists()) {
+      awsClient.uploadDirectory(bucket, prefix, subDirectory, srcDir);
+    }
   }
 
   public void restoreAWS(String bucket, String prefix, String subDirectory) {
     try {
       AWSClient awsClient = databaseServer.getAWSClient();
       File destDir = getReplicaRoot();
-      subDirectory += "/deletes/" + databaseServer.getShard() + "/0";
+      subDirectory += "/deletes/" + databaseServer.getShard() + "/" + databaseServer.getReplica();
 
       FileUtils.deleteDirectory(destDir);
       destDir.mkdirs();

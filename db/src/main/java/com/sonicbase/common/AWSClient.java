@@ -5,9 +5,7 @@ import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.services.clouddirectory.model.DeleteObjectRequest;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
-import com.amazonaws.services.s3.model.ListObjectsV2Request;
-import com.amazonaws.services.s3.model.ListObjectsV2Result;
-import com.amazonaws.services.s3.model.S3ObjectSummary;
+import com.amazonaws.services.s3.model.*;
 import com.amazonaws.services.s3.transfer.MultipleFileDownload;
 import com.amazonaws.services.s3.transfer.MultipleFileUpload;
 import com.amazonaws.services.s3.transfer.TransferManager;
@@ -15,6 +13,7 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.util.JsonDict;
 import com.sonicbase.util.StreamUtils;
+import org.apache.commons.io.FileUtils;
 
 import java.io.*;
 import java.util.*;
@@ -103,25 +102,20 @@ public class AWSClient {
   public void deleteDirectory(String bucket, String prefix) {
     AmazonS3 s3client = getS3Client();
     try {
-      try {
-        final ListObjectsV2Request req = new ListObjectsV2Request().withBucketName(bucket).withPrefix(prefix);
-        ListObjectsV2Result result;
-        do {
-          result = s3client.listObjectsV2(req);
+      final ListObjectsV2Request req = new ListObjectsV2Request().withBucketName(bucket).withPrefix(prefix);
+      ListObjectsV2Result result;
+      do {
+        result = s3client.listObjectsV2(req);
 
-          for (S3ObjectSummary objectSummary :
-              result.getObjectSummaries()) {
-            String key = objectSummary.getKey();
+        for (S3ObjectSummary objectSummary :
+            result.getObjectSummaries()) {
+          String key = objectSummary.getKey();
 
-            s3client.deleteObject(bucket, key);
-          }
-          req.setContinuationToken(result.getNextContinuationToken());
+          s3client.deleteObject(bucket, key);
         }
-        while (result.isTruncated() == true);
+        req.setContinuationToken(result.getNextContinuationToken());
       }
-      catch (Exception e) {
-        throw new DatabaseException(e);
-      }
+      while (result.isTruncated() == true);
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -131,37 +125,138 @@ public class AWSClient {
   public void uploadDirectory(String bucket, String prefix, final String path, final File srcFile) {
     TransferManager transferManager = getTransferManager();
     try {
-      MultipleFileUpload xfer = transferManager.uploadDirectory(bucket,
-          prefix + path, srcFile, true);
+      MultipleFileUpload xfer = transferManager.uploadDirectory(bucket, prefix + "/" + path, srcFile, true);
       xfer.waitForCompletion();
+//      File[] files = srcFile.listFiles();
+//      if (files != null) {
+//        for (File file : files) {
+//          if (file.isDirectory()) {
+//            uploadDirectory(bucket, prefix, path + "/" + file.getName(), file);
+//          }
+//          else {
+//            uploadFile(bucket, prefix, path, file);
+//          }
+//        }
+//      }
     }
     catch (Exception e) {
       throw new DatabaseException(e);
     }
     finally {
       transferManager.shutdownNow();
+    }
+  }
+
+  public void uploadFile(String bucket, String prefix, final String path, final File srcFile) {
+    AmazonS3 s3client = getS3Client();
+    try {
+      s3client.putObject(new PutObjectRequest(
+          bucket, prefix + "/" + path + "/" + srcFile.getName(), srcFile));
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public void downloadFile(String bucket, String prefix, String path, File destFile) {
+    AmazonS3 s3client = getS3Client();
+    try {
+      S3Object object = s3client.getObject(
+          new GetObjectRequest(bucket, prefix + "/" + path + "/" + destFile.getName()));
+      destFile.getParentFile().mkdirs();
+      try (InputStream objectData = object.getObjectContent();
+            BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(destFile))) {
+        StreamUtils.copyStream(objectData, out);
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public void downloadFile(String bucket, String key, File destFile) {
+    AmazonS3 s3client = getS3Client();
+    try {
+      S3Object object = s3client.getObject(
+          new GetObjectRequest(bucket, key));
+      destFile.getParentFile().mkdirs();
+      try (InputStream objectData = object.getObjectContent();
+           BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(destFile))) {
+        StreamUtils.copyStream(objectData, out);
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
     }
   }
 
   public void downloadDirectory(String bucket, String prefix, String subDirectory, File destDir) {
     TransferManager transferManager = getTransferManager();
+    AmazonS3 s3client = getS3Client();
+    if (prefix.charAt(0) == '/') {
+      prefix = prefix.substring(1);
+    }
     try {
-      MultipleFileDownload xfer = transferManager.downloadDirectory(
-          bucket, prefix + subDirectory, destDir);
-      // loop with Transfer.isDone()
-      xfer.waitForCompletion();
+      final ListObjectsV2Request req = new ListObjectsV2Request().withBucketName(bucket).withPrefix(prefix + "/" + subDirectory);
+      ListObjectsV2Result result;
+      do {
+        result = s3client.listObjectsV2(req);
+
+        for (S3ObjectSummary objectSummary :
+            result.getObjectSummaries()) {
+          String key = objectSummary.getKey();
+
+          if (key.charAt(0) == '/') {
+            key = key.substring(1);
+          }
+          File destFile = new File(destDir, key.substring((prefix + "/" + subDirectory).length()));
+          destFile.getParentFile().mkdirs();
+          downloadFile(bucket, key, destFile);
+        }
+        req.setContinuationToken(result.getNextContinuationToken());
+      }
+      while (result.isTruncated() == true);
     }
     catch (Exception e) {
+      e.printStackTrace();
       throw new DatabaseException(e);
     }
-    finally {
-      transferManager.shutdownNow();
-    }
+
+
+//
+//    try {
+//      MultipleFileDownload xfer = transferManager.downloadDirectory(
+//          bucket, prefix + "/" + subDirectory, destDir);
+//      // loop with Transfer.isDone()
+//      File tmpDir = new File(destDir, prefix + "/" + subDirectory);
+//      File[] files = tmpDir.listFiles();
+//      if (files != null) {
+//        for (File file : files) {
+//          file.renameTo(new File(destDir, file.getName()));
+//        }
+//      }
+//      xfer.waitForCompletion();
+//      int pos = prefix.indexOf("/", 1);
+//      if (pos != -1) {
+//        prefix = prefix.substring(0, pos);
+//      }
+//      File dir = new File(destDir, prefix);
+//      FileUtils.deleteDirectory(dir);
+//    }
+//    catch (Exception e) {
+//      throw new DatabaseException(e);
+//    }
+//    finally {
+//      transferManager.shutdownNow();
+//    }
   }
 
   public List<String> listDirectSubdirectories(String bucket, String prefix) {
+    if (prefix.startsWith("/")) {
+      prefix = prefix.substring(1);
+    }
 
-    List<String> dirs = new ArrayList<>();
+    Set<String> dirs = new HashSet<>();
     AmazonS3 s3client = getS3Client();
     try {
       final ListObjectsV2Request req = new ListObjectsV2Request().withBucketName(bucket).withPrefix(prefix);
@@ -175,11 +270,15 @@ public class AWSClient {
           if (key.charAt(0) == '/') {
             key = key.substring(1);
           }
+          key = key.substring(prefix.length());
+          if (key.charAt(0) == '/') {
+            key = key.substring(1);
+          }
           int pos = key.indexOf("/");
           if (pos != -1) {
             key = key.substring(0, pos);
+            dirs.add(key);
           }
-          dirs.add(key);
         }
         req.setContinuationToken(result.getNextContinuationToken());
       }

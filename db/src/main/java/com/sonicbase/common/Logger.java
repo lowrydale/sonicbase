@@ -116,8 +116,8 @@ public class Logger {
         queue.put(new Error(databaseClient, msg, e));
       }
     }
-    catch (InterruptedException e1) {
-      throw new DatabaseException(e1);
+    catch (Exception e1) {
+      logger.error(msg, e);
     }
   }
 

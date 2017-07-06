@@ -201,6 +201,7 @@ public class TestFailover {
   public void testInsert() throws SQLException, InterruptedException {
     Thread.sleep(4000);
 
+    DatabaseServer.initDeathOverride(2, 2);
     DatabaseServer.deathOverride[1][1] = true;
     try {
       Thread.sleep(4000);
@@ -244,6 +245,7 @@ public class TestFailover {
   public void testSpecifiedServer() throws SQLException, InterruptedException {
     Thread.sleep(4000);
 
+    DatabaseServer.initDeathOverride(2, 2);
     DatabaseServer.deathOverride[1][1] = true;
     try {
       Thread.sleep(4000);
@@ -278,6 +280,7 @@ public class TestFailover {
   public void testAllDead() throws SQLException, InterruptedException {
     Thread.sleep(4000);
 
+    DatabaseServer.initDeathOverride(2, 2);
     DatabaseServer.deathOverride[1][1] = true;
     DatabaseServer.deathOverride[1][0] = true;
     try {
@@ -315,6 +318,7 @@ public class TestFailover {
   public void testMasterDeath() throws SQLException, InterruptedException {
     Thread.sleep(4000);
 
+    DatabaseServer.initDeathOverride(2, 2);
     DatabaseServer.deathOverride[1][0] = true;
     try {
       Thread.sleep(4000);
@@ -354,6 +358,7 @@ public class TestFailover {
   @Test
   public void testMainMasterDeath() throws InterruptedException, SQLException {
     Thread.sleep(4000);
+    DatabaseServer.initDeathOverride(2, 2);
     DatabaseServer.deathOverride[0][0] = true;
     try {
       Thread.sleep(4000);

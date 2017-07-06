@@ -1061,6 +1061,17 @@ public class Repartitioner extends Thread {
     }
   }
 
+  public byte[] stopRepartitioning(final ComObject cobj) {
+    if (moveProcessors != null) {
+      for (MoveProcessor processor : moveProcessors) {
+        processor.shutdown();
+      }
+    }
+    return null;
+  }
+
+  private MoveProcessor[] moveProcessors = null;
+
   public byte[] doRebalanceOrderedIndex(final ComObject cobj) {
     try {
       final String dbName = cobj.getString(ComObject.Tag.dbName);
@@ -1095,7 +1106,7 @@ public class Repartitioner extends Thread {
           final ThreadPoolExecutor executor = new ThreadPoolExecutor(16, 16, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
           final AtomicInteger countSubmitted = new AtomicInteger();
           final AtomicInteger countFinished = new AtomicInteger();
-          final MoveProcessor[] moveProcessors = new MoveProcessor[databaseServer.getShardCount()];
+          moveProcessors = new MoveProcessor[databaseServer.getShardCount()];
           for (int i = 0; i < moveProcessors.length; i++) {
             moveProcessors[i] = new MoveProcessor(dbName, tableName, indexName, indexSchema.isPrimaryKey(), index, keysToDelete, i);
             moveProcessors[i].start();

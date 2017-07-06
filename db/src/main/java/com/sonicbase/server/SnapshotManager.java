@@ -572,6 +572,9 @@ public class SnapshotManager {
     }
   }
 
+  public void abortSnapshot() {
+  }
+
   private class ByteCounterStream extends InputStream {
     private final FileInputStream stream;
     private final AtomicLong finishedBytes;

@@ -18,6 +18,7 @@ import net.jpountz.lz4.LZ4Compressor;
 import net.jpountz.lz4.LZ4Factory;
 import net.jpountz.lz4.LZ4FastDecompressor;
 import org.apache.commons.cli.*;
+import org.codehaus.plexus.util.ExceptionUtils;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -859,6 +860,7 @@ public class NettyServer {
 
         final DatabaseServer databaseServer = new DatabaseServer();
         final AtomicBoolean isRunning = new AtomicBoolean(false);
+
         databaseServer.setConfig(config, cluster, host, port, isRunning, gclog, xmx, false);
         databaseServer.setRole(role);
 
@@ -886,12 +888,28 @@ public class NettyServer {
             }
             catch (Exception e) {
               logger.error("Error starting server", e);
+              File file = new File(System.getProperty("user.home"), "startupError.txt");
+              try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
+                e.printStackTrace();
+                writer.write(ExceptionUtils.getFullStackTrace(e));
+              }
+              catch (IOException e1) {
+                e1.printStackTrace();
+              }
             }
           }
         });
         thread.start();
       }
       catch (Exception e) {
+        File file = new File(System.getProperty("user.home"), "startupError.txt");
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
+          e.printStackTrace();
+          writer.write(ExceptionUtils.getFullStackTrace(e));
+        }
+        catch (IOException e1) {
+          e1.printStackTrace();
+        }
         logger.error("Error recovering snapshot", e);
         System.exit(1);
       }
@@ -905,6 +923,14 @@ public class NettyServer {
             NettyServer.this.run();
           }
           catch (Exception e) {
+            File file = new File(System.getProperty("user.home"), "startupError.txt");
+            try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
+              e.printStackTrace();
+              writer.write(ExceptionUtils.getFullStackTrace(e));
+            }
+            catch (IOException e1) {
+              e1.printStackTrace();
+            }
             logger.error("Error starting netty server", e);
           }
         }
@@ -918,6 +944,14 @@ public class NettyServer {
       logger.info("joined netty thread");
     }
     catch (Exception e) {
+      File file = new File(System.getProperty("user.home"), "startupError.txt");
+      try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
+        e.printStackTrace();
+        writer.write(ExceptionUtils.getFullStackTrace(e));
+      }
+      catch (IOException e1) {
+        e1.printStackTrace();
+      }
       logger.error("Error starting server", e);
       throw new com.sonicbase.query.DatabaseException(e);
     }

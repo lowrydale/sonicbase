@@ -1,10 +1,7 @@
 package com.sonicbase.server;
 
 import com.sonicbase.client.DatabaseClient;
-import com.sonicbase.common.ComArray;
-import com.sonicbase.common.ComObject;
-import com.sonicbase.common.Logger;
-import com.sonicbase.common.SchemaOutOfSyncException;
+import com.sonicbase.common.*;
 import com.sonicbase.index.Indices;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.CreateTableStatementImpl;
@@ -262,14 +259,14 @@ public class SchemaManager {
         tableName = createTableStatement.getTablename();
         if (replayedCommand) {
           logger.info("replayedCommand: table=" + tableName + ", tableCount=" + server.getCommon().getTables(dbName).size());
-          if (server.getCommon().getTables(dbName).containsKey(tableName.toLowerCase())) {
-            ComObject retObj = new ComObject();
-            retObj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(serializationVersionNumber));
-
-            return retObj.serialize();
-          }
+//          if (server.getCommon().getTables(dbName).containsKey(tableName.toLowerCase())) {
+//            ComObject retObj = new ComObject();
+//            retObj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(serializationVersionNumber));
+//
+//            return retObj.serialize();
+//          }
         }
-        if (server.getCommon().getTables(dbName).containsKey(tableName.toLowerCase())) {
+        if (!replayedCommand && server.getCommon().getTables(dbName).containsKey(tableName.toLowerCase())) {
           throw new DatabaseException("Table already exists: name=" + tableName);
         }
 
@@ -304,7 +301,7 @@ public class SchemaManager {
         server.getCommon().getSchemaWriteLock(dbName).unlock();
       }
 
-      if (masterSlave.equals("master")) {
+      if (!replayedCommand && masterSlave.equals("master")) {
         Random rand = new Random(System.currentTimeMillis());
         for (int i = 0; i < server.getShardCount(); i++) {
           //        if (i == shard) {
@@ -408,8 +405,12 @@ public class SchemaManager {
       return null;
     }
 
-    server.getCommon().deserializeSchema(cobj.getByteArray(ComObject.Tag.schemaBytes));
-    server.getCommon().saveSchema(server.getDataDir());
+    DatabaseCommon tmpCommon = new DatabaseCommon();
+    tmpCommon.deserializeSchema(cobj.getByteArray(ComObject.Tag.schemaBytes));
+    if (tmpCommon.getSchemaVersion() > server.getCommon().getSchemaVersion()) {
+      server.getCommon().deserializeSchema(cobj.getByteArray(ComObject.Tag.schemaBytes));
+      server.getCommon().saveSchema(server.getDataDir());
+    }
 
     String tableName = cobj.getString(ComObject.Tag.tableName);
     TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
@@ -425,13 +426,14 @@ public class SchemaManager {
     return null;
   }
 
-  public List<String> createIndex(ComObject cobj, boolean replayedCommand, AtomicReference<String> table) {
+  public byte[] createIndex(ComObject cobj, boolean replayedCommand) {
     try {
       int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
       String dbName = cobj.getString(ComObject.Tag.dbName);
       if (schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
       }
+      AtomicReference<String> table = new AtomicReference<>();
       String masterSlave = cobj.getString(ComObject.Tag.masterSlave);
       table.set(cobj.getString(ComObject.Tag.tableName));
       String indexName = cobj.getString(ComObject.Tag.indexName);
@@ -439,21 +441,30 @@ public class SchemaManager {
       String fieldsStr = cobj.getString(ComObject.Tag.fieldsStr);
       String[] fields = fieldsStr.split(",");
 
-      if (replayedCommand) {
-        logger.info("replayedCommand: createIndex, table=" + table.get() + ", index=" + indexName);
-        if (server.getCommon().getTables(dbName).get(table.get()).getIndexes().containsKey(indexName.toLowerCase())) {
-//          ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-//          DataOutputStream out = new DataOutputStream(bytesOut);
-//          server.getCommon().serializeSchema(out, serializationVersionNumber);
-//          out.close();
+      List<String> createdIndices = null;
 
-          return null;
+      server.getCommon().getSchemaWriteLock(dbName).lock();
+      try {
+
+        if (replayedCommand) {
+          logger.info("replayedCommand: createIndex, table=" + table.get() + ", index=" + indexName);
+          if (server.getCommon().getTables(dbName).get(table.get()).getIndexes().containsKey(indexName.toLowerCase())) {
+  //          ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+  //          DataOutputStream out = new DataOutputStream(bytesOut);
+  //          server.getCommon().serializeSchema(out, serializationVersionNumber);
+  //          out.close();
+
+            //return null;
+          }
         }
+
+        createdIndices = createIndex(dbName, table.get(), indexName, isUnique, fields);
+      }
+      finally {
+        server.getCommon().getSchemaWriteLock(dbName).unlock();
       }
 
-      List<String> createdIndices = createIndex(dbName, table.get(), indexName, isUnique, fields);
-
-      if (masterSlave.equals("master")) {
+      if (!replayedCommand && masterSlave.equals("master")) {
 
         cobj = new ComObject();
         cobj.put(ComObject.Tag.dbName, dbName);
@@ -470,16 +481,31 @@ public class SchemaManager {
         byte[] slaveBody = cobj.serialize();
 
         for (int i = 0; i < server.getShardCount(); i++) {
-          for (int j = 0; j < server.getReplicationFactor(); j++) {
-//            if (i == 0 && server.getCommon().getServersConfig().getShards()[0].getMasterReplica() == j) {
-//              continue;
-//            }
-            String command = "DatabaseServer:ComObject:createIndexSlave:";
-            server.getDatabaseClient().send(null, i, j, command, slaveBody, DatabaseClient.Replica.specified);
+          String command = "DatabaseServer:ComObject:createIndexSlave:";
+          server.getDatabaseClient().send(null, i, 0, command, slaveBody, DatabaseClient.Replica.def);
+        }
+      }
+
+      if (!replayedCommand && createdIndices != null) {
+        for (String currIndexName : createdIndices) {
+          String command = "DatabaseServer:ComObject:populateIndex:";
+          cobj = new ComObject();
+          cobj.put(ComObject.Tag.dbName, dbName);
+          cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
+          cobj.put(ComObject.Tag.tableName, table.get());
+          cobj.put(ComObject.Tag.indexName, currIndexName);
+          cobj.put(ComObject.Tag.method, "populateIndex");
+          for (int i = 0; i < server.getShardCount(); i++) {
+            server.getDatabaseClient().send(null, i, 0, command, cobj.serialize(), DatabaseClient.Replica.def);
           }
         }
       }
-      return createdIndices;
+
+      ComObject retObj = new ComObject();
+      retObj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(cobj.getLong(ComObject.Tag.serializationVersion)));
+
+
+      return retObj.serialize();
     }
     catch (IOException e) {
       throw new DatabaseException(e);

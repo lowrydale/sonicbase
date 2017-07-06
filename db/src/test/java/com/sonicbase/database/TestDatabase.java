@@ -262,10 +262,10 @@ public class TestDatabase {
       count = client.getPartitionSize("test", 1, "children", "_1_socialsecuritynumber");
       assertEquals(count, 6);
 
-//      dbServers[0].enableSnapshot(false);
-//      dbServers[1].enableSnapshot(false);
-//
-//      dbServers[0].runSnapshot();
+      dbServers[0].enableSnapshot(false);
+     // dbServers[1].enableSnapshot(false);
+
+      dbServers[0].runSnapshot();
 //      dbServers[0].recoverFromSnapshot();
 //      dbServers[0].getSnapshotManager().lockSnapshot("test");
 //      dbServers[0].getSnapshotManager().unlockSnapshot(1);
@@ -277,6 +277,21 @@ public class TestDatabase {
       //    assertEquals(dbServers[1].getLogManager().getCountLogged(), commandCount);
       //    assertEquals(dbServers[1].getCommandCount(), commandCount * 2);
 
+      //Thread.sleep(10000);
+
+      JsonDict backupConfig = new JsonDict("{\n" +
+          "    \"type\" : \"AWS\",\n" +
+          "    \"bucket\": \"sonicbase-test-backup\",\n" +
+          "    \"prefix\": \"backups\",\n" +
+          "    \"period\": \"daily\",\n" +
+          "    \"time\": \"23:00\",\n" +
+          "    \"maxBackupCount\": 10\n" +
+          "  }");
+
+      for (DatabaseServer dbServer : dbServers) {
+        dbServer.setBackupConfig(backupConfig);
+      }
+
       client.startBackup();
       while (true) {
         Thread.sleep(1000);
@@ -285,10 +300,20 @@ public class TestDatabase {
         }
       }
 
+      ComObject cobj = new ComObject();
+      cobj.put(ComObject.Tag.dbName, "__none__");
+      cobj.put(ComObject.Tag.method, "getLastBackupDir");
+      cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+      String command = "DatabaseServer:ComObject:getLastBackupDir:";
+      byte[] ret = client.send(null, 0, 0, command, cobj.serialize(), DatabaseClient.Replica.master);
+      ComObject retObj = new ComObject(ret);
+      String dir = retObj.getString(ComObject.Tag.directory);
+
+
       File file = new File("/data/db-backup");
       File[] dirs = file.listFiles();
 
-      client.startRestore(dirs[0].getName());
+      client.startRestore(dir);
       while (true) {
         Thread.sleep(1000);
         if (client.isRestoreComplete()) {
@@ -296,13 +321,46 @@ public class TestDatabase {
         }
       }
 
+//      backupConfig = new JsonDict("{\n" +
+//          "    \"type\" : \"fileSystem\",\n" +
+//          "    \"directory\": \"/data/db-backup\",\n" +
+//          "    \"period\": \"daily\",\n" +
+//          "    \"time\": \"23:00\",\n" +
+//          "    \"maxBackupCount\": 10,\n" +
+//          "    \"sharedDirectory\": true\n" +
+//          "  }");
+//
+//      for (DatabaseServer dbServer : dbServers) {
+//        dbServer.setBackupConfig(backupConfig);
+//      }
+//
+//      client.startBackup();
+//      while (true) {
+//        Thread.sleep(1000);
+//        if (client.isBackupComplete()) {
+//          break;
+//        }
+//      }
+//
+//      File file = new File("/data/db-backup");
+//      File[] dirs = file.listFiles();
+//
+//      client.startRestore(dirs[0].getName());
+//      while (true) {
+//        Thread.sleep(1000);
+//        if (client.isRestoreComplete()) {
+//          break;
+//        }
+//      }
+//
+
       Thread.sleep(10000);
 
-      ComObject cobj = new ComObject();
+      cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "test");
       cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
       cobj.put(ComObject.Tag.method, "forceDeletes");
-      String command = "DatabaseServer:ComObject:forceDeletes:";
+      command = "DatabaseServer:ComObject:forceDeletes:";
       client.sendToAllShards(null, 0, command, cobj.serialize(), DatabaseClient.Replica.all);
 
       executor.shutdownNow();

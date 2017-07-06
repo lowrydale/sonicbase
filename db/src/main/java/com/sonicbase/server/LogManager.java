@@ -322,12 +322,12 @@ public class LogManager {
     System.out.println("SlicePoint=" + logSlicePoint);
     try {
       File srcDir = new File(getLogReplicaDir(), "self");
-      String destDir = subDirectory + "/queue/" + server.getShard() + "/" + server.getReplica() + "/self";
+      String destDir = subDirectory + "/queue/" + server.getShard() + "/0/self";
       backupLogDirToAWS(awsClient, logSlicePoint, bucket, prefix, destDir, srcDir);
 
       for (int replica = 0; replica < server.getReplicationFactor(); replica++) {
         srcDir = new File(getLogReplicaDir(), "peer-" + replica);
-        destDir = subDirectory + "/queue/" + server.getShard() + "/" + server.getReplica() + "/peer-" + replica;
+        destDir = subDirectory + "/queue/" + server.getShard() + "/0/peer-" + replica;
         backupLogDirToAWS(awsClient, logSlicePoint, bucket, prefix, destDir, srcDir);
       }
     }

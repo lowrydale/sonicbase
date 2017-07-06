@@ -934,7 +934,7 @@ public class DatabaseServer {
     AWSClient awsClient = getAWSClient();
     File srcDir = new File(getDataDir(), dirName + "/" + shard + "/" + replica);
     if (srcDir.exists()) {
-      subDirectory += "/" + dirName + "/" + shard + "/" + replica;
+      subDirectory += "/" + dirName + "/" + shard + "/0";
 
       awsClient.uploadDirectory(bucket, prefix, subDirectory, srcDir);
     }
@@ -1111,7 +1111,7 @@ public class DatabaseServer {
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
       cobj.put(ComObject.Tag.method, "prepareForBackup");
       String command = "DatabaseServer:ComObject:prepareForBackup:";
-      byte[][] ret = getDatabaseClient().sendToAllShards(null, 0, command, cobj.serialize(), DatabaseClient.Replica.all);
+      byte[][] ret = getDatabaseClient().sendToAllShards(null, 0, command, cobj.serialize(), DatabaseClient.Replica.master);
       logger.info("Backup Master - prepareForBackup - finished");
 
       String subDirectory = ISO8601.to8601String(new Date(System.currentTimeMillis()));
@@ -1137,7 +1137,7 @@ public class DatabaseServer {
         docobj.put(ComObject.Tag.bucket, bucket);
         docobj.put(ComObject.Tag.prefix, prefix);
         command = "DatabaseServer:ComObject:doBackupAWS:";
-        ret = getDatabaseClient().sendToAllShards(null, 0, command, docobj.serialize(), DatabaseClient.Replica.all);
+        ret = getDatabaseClient().sendToAllShards(null, 0, command, docobj.serialize(), DatabaseClient.Replica.master);
 
         logger.info("Backup Master - doBackupAWS - end");
       }
@@ -1219,7 +1219,7 @@ public class DatabaseServer {
       fcobj.put(ComObject.Tag.type, type);
       fcobj.put(ComObject.Tag.maxBackupCount, maxBackupCount);
       command = "DatabaseServer:ComObject:finishBackup:";
-      ret = getDatabaseClient().sendToAllShards(null, 0, command, fcobj.serialize(), DatabaseClient.Replica.all);
+      ret = getDatabaseClient().sendToAllShards(null, 0, command, fcobj.serialize(), DatabaseClient.Replica.master);
 
       logger.info("Backup Master - finishBackup - finished");
     }
@@ -1360,7 +1360,7 @@ public class DatabaseServer {
     try {
       AWSClient awsClient = getAWSClient();
       File destDir = new File(getDataDir(), dirName + "/" + shard + "/" + replica);
-      subDirectory += "/" + dirName + "/" + shard + "/" + replica;
+      subDirectory += "/" + dirName + "/" + shard + "/0";
 
       FileUtils.deleteDirectory(destDir);
       destDir.mkdirs();

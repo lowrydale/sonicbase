@@ -160,7 +160,7 @@ public class DeleteManager {
     try {
       AWSClient awsClient = databaseServer.getAWSClient();
       File destDir = getReplicaRoot();
-      subDirectory += "/deletes/" + databaseServer.getShard() + "/" + databaseServer.getReplica();
+      subDirectory += "/deletes/" + databaseServer.getShard() + "/0";
 
       FileUtils.deleteDirectory(destDir);
       destDir.mkdirs();

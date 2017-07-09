@@ -4,6 +4,7 @@ import com.sonicbase.common.AWSClient;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.Logger;
 import com.sonicbase.index.Index;
+import com.sonicbase.index.Indices;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
@@ -160,6 +161,8 @@ public class SnapshotManager {
 
       final AtomicLong recoveredCount = new AtomicLong();
       recoveredCount.set(0);
+
+      server.getIndices().put(dbName, new Indices());
 
       Map<String, TableSchema> tables = server.getCommon().getTables(dbName);
       for (Map.Entry<String, TableSchema> schema : tables.entrySet()) {
@@ -513,6 +516,30 @@ public class SnapshotManager {
     }
   }
 
+  public void backupFileSystemSchema(String directory, String subDirectory) {
+    try {
+      File file = new File(directory, subDirectory);
+      file = new File(file, SNAPSHOT_STR + server.getShard() + "/0/schema.bin");
+      file.getParentFile().mkdirs();
+
+      File sourceFile = new File(getSnapshotReplicaDir(), "schema.bin");
+      FileUtils.copyFile(sourceFile, file);
+
+
+      file = new File(directory, subDirectory);
+      file = new File(file, SNAPSHOT_STR + server.getShard() + "/0/config.bin");
+      file.getParentFile().mkdirs();
+
+      sourceFile = new File(getSnapshotReplicaDir(), "config.bin");
+      if (sourceFile.exists()) {
+        FileUtils.copyFile(sourceFile, file);
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
   public void backupFileSystem(String directory, String subDirectory) {
     try {
       File file = new File(directory, subDirectory);
@@ -548,6 +575,20 @@ public class SnapshotManager {
     }
   }
 
+  public void backupAWSSchema(String bucket, String prefix, String subDirectory) {
+    AWSClient awsClient = server.getAWSClient();
+    File srcFile = new File(getSnapshotReplicaDir(), "schema.bin");
+    subDirectory += "/" + SNAPSHOT_STR + server.getShard() + "/0";
+
+    awsClient.uploadFile(bucket, prefix, subDirectory, srcFile);
+
+    srcFile = new File(getSnapshotReplicaDir(), "config.bin");
+
+    if (srcFile.exists()) {
+      awsClient.uploadFile(bucket, prefix, subDirectory, srcFile);
+    }
+  }
+
   public void backupAWS(String bucket, String prefix, String subDirectory) {
     AWSClient awsClient = server.getAWSClient();
     File srcDir = getSnapshotReplicaDir();
@@ -573,6 +614,25 @@ public class SnapshotManager {
   }
 
   public void abortSnapshot() {
+  }
+
+  public void getFilesForCurrentSnapshot(List<String> files) {
+    File replicaDir = getSnapshotReplicaDir();
+    getFilesFromDirectory(replicaDir, files);
+  }
+
+  private void getFilesFromDirectory(File dir, List<String> files) {
+    File[] currFiles = dir.listFiles();
+    if (currFiles != null) {
+      for (File file : currFiles) {
+        if (file.isDirectory()) {
+          getFilesFromDirectory(file, files);
+        }
+        else {
+          files.add(file.getAbsolutePath());
+        }
+      }
+    }
   }
 
   private class ByteCounterStream extends InputStream {

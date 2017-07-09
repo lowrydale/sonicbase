@@ -17,6 +17,7 @@ import org.apache.commons.io.FileUtils;
 
 import java.io.*;
 import java.util.*;
+import java.util.concurrent.*;
 
 import static java.util.Arrays.asList;
 
@@ -34,6 +35,8 @@ public class AWSClient {
     this.logger = new Logger(client);
 
   }
+
+  private ThreadPoolExecutor executor = new ThreadPoolExecutor(8, 8, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
   public TransferManager getTransferManager() {
     File installDir = getInstallDir();
@@ -123,38 +126,57 @@ public class AWSClient {
   }
 
   public void uploadDirectory(String bucket, String prefix, final String path, final File srcFile) {
-    TransferManager transferManager = getTransferManager();
-    try {
-      MultipleFileUpload xfer = transferManager.uploadDirectory(bucket, prefix + "/" + path, srcFile, true);
-      xfer.waitForCompletion();
-//      File[] files = srcFile.listFiles();
-//      if (files != null) {
-//        for (File file : files) {
-//          if (file.isDirectory()) {
-//            uploadDirectory(bucket, prefix, path + "/" + file.getName(), file);
-//          }
-//          else {
-//            uploadFile(bucket, prefix, path, file);
-//          }
-//        }
-//      }
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-    finally {
-      transferManager.shutdownNow();
+    for (int i = 0; i < 10; i++) {
+      TransferManager transferManager = getTransferManager();
+      try {
+        MultipleFileUpload xfer = transferManager.uploadDirectory(bucket, prefix + "/" + path, srcFile, true);
+        xfer.waitForCompletion();
+        //      File[] files = srcFile.listFiles();
+        //      if (files != null) {
+        //        for (File file : files) {
+        //          if (file.isDirectory()) {
+        //            uploadDirectory(bucket, prefix, path + "/" + file.getName(), file);
+        //          }
+        //          else {
+        //            uploadFile(bucket, prefix, path, file);
+        //          }
+        //        }
+        //      }
+        break;
+      }
+      catch (Exception e) {
+        logger.error("Error uploading directory: srcDir=" + srcFile.getAbsolutePath(), e);
+        if (i == 9) {
+          throw new DatabaseException(e);
+        }
+      }
+      finally {
+        transferManager.shutdownNow();
+      }
+
     }
   }
 
   public void uploadFile(String bucket, String prefix, final String path, final File srcFile) {
     AmazonS3 s3client = getS3Client();
-    try {
-      s3client.putObject(new PutObjectRequest(
-          bucket, prefix + "/" + path + "/" + srcFile.getName(), srcFile));
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
+    for (int i = 0; i < 10; i++) {
+      try {
+        s3client.putObject(new PutObjectRequest(
+            bucket, prefix + "/" + path + "/" + srcFile.getName(), srcFile));
+        break;
+      }
+      catch (Exception e) {
+        logger.error("Error uploading file: srcFile=" + srcFile.getAbsolutePath(), e);
+        if (i == 9) {
+          throw new DatabaseException(e);
+        }
+        try {
+          Thread.sleep(2000);
+        }
+        catch (InterruptedException e1) {
+          throw new DatabaseException(e1);
+        }
+      }
     }
   }
 
@@ -190,12 +212,13 @@ public class AWSClient {
     }
   }
 
-  public void downloadDirectory(String bucket, String prefix, String subDirectory, File destDir) {
+  public void downloadDirectory(final String bucket, String prefix, String subDirectory, File destDir) {
     TransferManager transferManager = getTransferManager();
     AmazonS3 s3client = getS3Client();
     if (prefix.charAt(0) == '/') {
       prefix = prefix.substring(1);
     }
+    List<Future> futures = new ArrayList<>();
     try {
       final ListObjectsV2Request req = new ListObjectsV2Request().withBucketName(bucket).withPrefix(prefix + "/" + subDirectory);
       ListObjectsV2Result result;
@@ -209,21 +232,51 @@ public class AWSClient {
           if (key.charAt(0) == '/') {
             key = key.substring(1);
           }
-          File destFile = new File(destDir, key.substring((prefix + "/" + subDirectory).length()));
+          final String finalKey = key;
+          final File destFile = new File(destDir, key.substring((prefix + "/" + subDirectory).length()));
           destFile.getParentFile().mkdirs();
-          downloadFile(bucket, key, destFile);
+          futures.add(executor.submit(new Runnable(){
+            @Override
+            public void run() {
+              try {
+                for (int i = 0; i < 10; i++) {
+                  try {
+                    downloadFile(bucket, finalKey, destFile);
+                    break;
+                  }
+                  catch (Exception e) {
+                    logger.error("Error downloading file: key=" + finalKey, e);
+                    if (i == 9) {
+                      throw new DatabaseException(e);
+                    }
+                    Thread.sleep(2000);
+                  }
+                }
+              }
+              catch (Exception e) {
+                logger.error("Error downloading file", e);
+              }
+            }
+          }));
+
         }
         req.setContinuationToken(result.getNextContinuationToken());
       }
       while (result.isTruncated() == true);
     }
     catch (Exception e) {
-      e.printStackTrace();
       throw new DatabaseException(e);
     }
 
+    for (Future future : futures) {
+      try {
+        future.get();
+      }
+      catch (Exception e) {
+        throw new DatabaseException(e);
+      }
+    }
 
-//
 //    try {
 //      MultipleFileDownload xfer = transferManager.downloadDirectory(
 //          bucket, prefix + "/" + subDirectory, destDir);

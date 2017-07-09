@@ -174,7 +174,9 @@ public class ComObject {
     nextId(102, longType),
     maxId(103, longType),
     binaryFileContent(104, byteArrayType),
-    type(105, stringType);
+    type(105, stringType),
+    filenames(106, arrayType),
+    haveProLicense(107, booleanType);
 
     public final int tag;
 

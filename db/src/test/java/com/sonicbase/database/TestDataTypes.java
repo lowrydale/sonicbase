@@ -61,7 +61,7 @@ public class TestDataTypes {
     }
 
     for (DatabaseServer server : dbServers) {
-      server.disableRepartitioner();
+      server.shutdownRepartitioner();
     }
 
     Class.forName("com.sonicbase.jdbcdriver.Driver");

@@ -37,7 +37,7 @@ public class TestLongRunningCommands {
     DatabaseServer server = new DatabaseServer();
     server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true), null, true);
     server.disableLogProcessor();
-    server.disableRepartitioner();
+    server.shutdownRepartitioner();
 
     LongRunningCommands.SingleCommand command = server.getLongRunningCommands().createSingleCommand("DatabaseServer:echo:1:" +
         SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:test:10", null);
@@ -93,7 +93,7 @@ public class TestLongRunningCommands {
     server = new DatabaseServer();
     server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true), null, true);
     server.disableLogProcessor();
-    server.disableRepartitioner();
+    server.shutdownRepartitioner();
 
     Thread.sleep(1000);
 

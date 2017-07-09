@@ -1,9 +1,9 @@
 {
   "installDirectory": "$HOME/sonicbase",
-  "user": "ubuntu",
+  "user": "ec2-user",
   "server": {
-    "publicAddress": "localhost",
-    "privateAddress": "localhost",
+    "publicAddress": "10.0.0.6",
+    "privateAddress": "10.0.0.6",
     "port": 8443
   }
 }

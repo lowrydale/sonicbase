@@ -9,6 +9,10 @@ public class DeadServerException extends RuntimeException {
 
   }
 
+  public DeadServerException(String msg) {
+    super(msg);
+  }
+
   public DeadServerException(Throwable t) {
     super(t);
   }

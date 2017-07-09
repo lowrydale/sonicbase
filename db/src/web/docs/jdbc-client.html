@@ -68,9 +68,11 @@ Include the following line before creating a connection:<br/>
 <br/>
 <br/>
 Connect to the database with the following code:<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;Connection conn = DriverManager.getConnection("jdbc:sonicbase:&lt;address&gt;:9010/&lt;database name&gt;");<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;Connection conn = DriverManager.getConnection("jdbc:sonicbase:&lt;address-0&gt;:&lt;port-0&gt;,&lt;address-1&gt;:&lt;port-1&gt;&lt;address-n&gt;:&lt;port-n&gt;/&lt;database name&gt;");<br/>
 <br/>
-"address" should be the ip address of the first server in the config file.
+"address-0" thru "address-n" should be the ip addresses of all the replicas of shard 0. Enter all the replicas
+        of the first shard configured in the config file for this cluster. Note that each address/port combination
+        is separated by a comma. For the free version, only one replica may be specified.
 
 
 </div>

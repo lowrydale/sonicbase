@@ -226,7 +226,6 @@ public class LogManager {
 
   public void backupFileSystem(String directory, String subDirectory, String logSlicePoint) {
     try {
-      System.out.println("LogSicePoint-FileSys=" + logSlicePoint);
       File srcDir = new File(getLogReplicaDir(), "self");
       File destDir = new File(directory, subDirectory + "/queue/" + server.getShard() + "/0/self");
       backupLogDir(logSlicePoint, destDir, srcDir);
@@ -278,11 +277,7 @@ public class LogManager {
       }
       for (File file : files) {
         if (sliceFiles.contains(file.getAbsolutePath())) {
-          System.out.println("Backing up file: " + file.getAbsolutePath());
           awsClient.uploadFile(bucket, prefix, destDir, file);
-        }
-        else {
-          System.out.println("Not backing file: " + file.getAbsolutePath());
         }
       }
     }
@@ -319,7 +314,6 @@ public class LogManager {
 
   public void backupAWS(String bucket, String prefix, String subDirectory, String logSlicePoint) {
     AWSClient awsClient = server.getAWSClient();
-    System.out.println("SlicePoint=" + logSlicePoint);
     try {
       File srcDir = new File(getLogReplicaDir(), "self");
       String destDir = subDirectory + "/queue/" + server.getShard() + "/0/self";

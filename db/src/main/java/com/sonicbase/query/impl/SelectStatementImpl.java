@@ -1261,6 +1261,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                     allExpression.setClient(client);
                     allExpression.setRecordCache(recordCache);
                     allExpression.setDbName(dbName);
+                    allExpression.setColumns(getSelectColumns());
                     allExpression.setOrderByExpressions(expression.getOrderByExpressions());
                     ids = allExpression.next(pageSize / threadCount, explain);
                     if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
@@ -1285,6 +1286,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                     allExpression.setClient(client);
                     allExpression.setRecordCache(recordCache);
                     allExpression.setDbName(dbName);
+                    allExpression.setColumns(getSelectColumns());
                     allExpression.setOrderByExpressions(expression.getOrderByExpressions());
                     ids = allExpression.next(pageSize / threadCount, explain);
                     if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {

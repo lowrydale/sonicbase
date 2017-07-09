@@ -114,6 +114,7 @@ public class DatabaseCommon {
           serializeSchema(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
         }
 
+
         loadSchema(dataDir);
         logger.info("Saved schema - postLoad: dir=" + dataRoot);
       }

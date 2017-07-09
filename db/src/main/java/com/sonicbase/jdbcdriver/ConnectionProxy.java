@@ -44,9 +44,8 @@ public class ConnectionProxy implements Connection {
     initGlobalContext();
     try {
       String[] outerParts = url.split("/");
-      String[] parts = outerParts[0].split(":");
-      String host = parts[2];
-      int port = Integer.valueOf(parts[3]);
+      String hostsStr = outerParts[0].substring("jdbc:sonicbase:".length());
+      String[] hosts = hostsStr.split(",");
       String db = null;
       if (outerParts.length > 1) {
         db = outerParts[1];
@@ -56,7 +55,7 @@ public class ConnectionProxy implements Connection {
         if (databaseClient != null) {
           databaseClient.shutdown();
         }
-        databaseClient = new DatabaseClient(host, port, -1, -1, true);
+        databaseClient = new DatabaseClient(hosts, -1, -1, true);
         Logger.setIsClient(true);
         Logger.setReady();
       }

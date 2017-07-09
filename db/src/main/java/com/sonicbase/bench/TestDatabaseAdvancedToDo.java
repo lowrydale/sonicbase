@@ -66,7 +66,7 @@ public class TestDatabaseAdvancedToDo {
     }
 
     for (DatabaseServer server : dbServers) {
-      server.disableRepartitioner();
+      server.shutdownRepartitioner();
     }
 
     DatabaseClient client = new DatabaseClient("localhost", 9010, -1, -1, true);

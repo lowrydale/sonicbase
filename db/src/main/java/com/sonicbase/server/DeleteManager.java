@@ -201,4 +201,14 @@ public class DeleteManager {
       throw new DatabaseException(e);
     }
   }
+
+  public void getFiles(List<String> files) {
+    File dir = getReplicaRoot();
+    File[] currFiles = dir.listFiles();
+    if (currFiles != null) {
+      for (File file : currFiles) {
+        files.add(file.getAbsolutePath());
+      }
+    }
+  }
 }

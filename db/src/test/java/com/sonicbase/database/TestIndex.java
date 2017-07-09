@@ -29,7 +29,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static java.util.Arrays.asList;
 import static org.testng.Assert.assertEquals;
-import static sun.security.jca.ProviderList.newList;
 
 /**
  * Responsible for
@@ -77,7 +76,7 @@ public class TestIndex {
         }
 
         for (DatabaseServer server : dbServers) {
-          server.disableRepartitioner();
+          server.shutdownRepartitioner();
         }
     Class.forName("com.sonicbase.jdbcdriver.Driver");
 

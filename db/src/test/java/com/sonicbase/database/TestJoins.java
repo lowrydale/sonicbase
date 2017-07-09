@@ -67,7 +67,7 @@ public class TestJoins {
     }
 
     for (DatabaseServer server : dbServers) {
-      server.disableRepartitioner();
+      server.shutdownRepartitioner();
     }
 
     Class.forName("com.sonicbase.jdbcdriver.Driver");
@@ -144,17 +144,17 @@ public class TestJoins {
       ids.add((long) (i + 100));
     }
 
-//    client.beginRebalance("test", "persons", "_1__primarykey");
-//
-//    while (true) {
-//      if (client.isRepartitioningComplete("test")) {
-//        break;
-//      }
-//      Thread.sleep(1000);
-//    }
-//
-//    assertEquals(client.getPartitionSize("test", 0, "persons", "_1__primarykey"), 9);
-//    assertEquals(client.getPartitionSize("test", 1, "persons", "_1__primarykey"), 11);
+    client.beginRebalance("test", "persons", "_1__primarykey");
+
+    while (true) {
+      if (client.isRepartitioningComplete("test")) {
+        break;
+      }
+      Thread.sleep(1000);
+    }
+
+    assertEquals(client.getPartitionSize("test", 0, "persons", "_1__primarykey"), 9);
+    assertEquals(client.getPartitionSize("test", 1, "persons", "_1__primarykey"), 11);
 
 //    assertEquals(client.getPartitionSize(2, "persons", "_1__primarykey"), 9);
 //    assertEquals(client.getPartitionSize(3, "persons", "_1__primarykey"), 8);
@@ -205,10 +205,10 @@ public class TestJoins {
 
     for (int i = 109; i >= 100; i--) {
       ret.next();
-//      assertEquals(ret.getLong("id"), i);
-//      assertEquals(ret.getString("membershipname"), null);
       System.out.println(ret.getLong("id"));
       System.out.println(ret.getString("membershipname"));
+      assertEquals(ret.getLong("id"), i);
+      assertEquals(ret.getString("membershipname"), null);
     }
 
     for (int i = 9; i >= 0; i--) {
@@ -236,6 +236,8 @@ public class TestJoins {
         ret.next();
         assertEquals(ret.getLong("personid"), i);
         assertEquals(ret.getString("membershipname"), "membership-" + j);
+        System.out.println(ret.getLong("personid"));
+        System.out.println(ret.getString("membershipname"));
         if (i < 2) {
           assertEquals(ret.getLong("id"), i);
         }

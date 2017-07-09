@@ -878,9 +878,6 @@ public class NettyServer {
               logger.info("applying queues");
               databaseServer.getLogManager().applyQueues();
 
-              logger.info("starting repartitioner");
-              databaseServer.startRepartitioner();
-
               logger.info("running snapshot loop");
               databaseServer.getSnapshotManager().runSnapshotLoop();
 

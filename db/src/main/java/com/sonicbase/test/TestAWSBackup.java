@@ -11,7 +11,6 @@ import com.sonicbase.util.JsonDict;
 import com.sonicbase.util.StreamUtils;
 
 import org.apache.commons.io.FileUtils;
-import org.testng.annotations.BeforeClass;
 
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -79,7 +78,7 @@ public class TestAWSBackup {
       }
 
       for (DatabaseServer server : dbServers) {
-        server.disableRepartitioner();
+        server.shutdownRepartitioner();
       }
 
       //DatabaseClient client = new DatabaseClient("localhost", 9010, true);

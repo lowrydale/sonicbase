@@ -119,6 +119,20 @@ describe<br/>
         <h1>Reconfigure Cluster</h1>
         To reconfigure the cluster based on the current config file, type "reconfigure cluster". This needs
         to be done, for example, if you change the addresses of your servers.
+            <h1>Reload Server</h1>
+            To reload a server from a peer, type "reload server &lt;shard&gt; &lt;replica&gt;, where shard
+            and replica specify the server you wish to reload. You would need to take this action in the
+            case you are replacing a bad server or disk where the database resides.
+            <h1>Reload Server Status</h1>
+            To get the status of a server reload, type "reload server status &lt;shard&gt; &lt;replica&gt;, where shard
+            and replica specify the server you are reloading. Returns "complete" or "running" depending on the state of the reload.
+            <h1>Reload Replica</h1>
+            To reload a replica from its peers, type "reload replica &lt;replica&gt;, where
+            replica specifies the replica you wish to reload. You would need to take this action in the
+            case you are adding a new replica.
+            <h1>Reload Replica Status</h1>
+            To get the status of a replica reload, type "reload replica status &lt;replica&gt;, where
+            replica specifies the replica you are reloading. Returns "complete" or "running" depending on the state of the reload.
 </div>
 </div>
 </body>

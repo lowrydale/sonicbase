@@ -119,7 +119,6 @@ public class SchemaManager {
           server.getCommon().getServersConfig().getShards()[0].getMasterReplica() == server.getReplica() && cobj.getBoolean(ComObject.Tag.slave) != null) {
         return null;
       }
-      System.out.println("Create database: shard=" + server.getShard() + ", replica=" + server.getReplica());
       String dbName = cobj.getString(ComObject.Tag.dbName);
       String masterSlave = cobj.getString(ComObject.Tag.masterSlave);
       dbName = dbName.toLowerCase();

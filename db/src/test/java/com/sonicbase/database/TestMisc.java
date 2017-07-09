@@ -65,7 +65,7 @@ public class TestMisc {
     }
 
     for (DatabaseServer server : dbServers) {
-      server.disableRepartitioner();
+      server.shutdownRepartitioner();
     }
 
     //DatabaseClient client = new DatabaseClient("localhost", 9010, true);

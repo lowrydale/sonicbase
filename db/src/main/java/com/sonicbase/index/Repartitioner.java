@@ -357,7 +357,6 @@ public class Repartitioner extends Thread {
         isRepartitioningIndex.set(false);
       }
       catch (Exception e) {
-        e.printStackTrace();
         logger.error("Error repartitioning", e);
       }
       finally {
@@ -2189,11 +2188,20 @@ public class Repartitioner extends Thread {
       if (config.hasKey("clientIsPrivate")) {
         isInternal = config.getBoolean("clientIsPrivate");
       }
+
       DatabaseServer.ServersConfig newConfig = new DatabaseServer.ServersConfig(databaseServer.getCluster(), config.getArray("shards"),
           config.getArray("shards").getDict(0).getArray("replicas").size(), isInternal);
       DatabaseServer.Shard[] newShards = newConfig.getShards();
 
-      common.setServersConfig(newConfig);
+      synchronized (common) {
+        for (int i = 0; i < databaseServer.getShardCount(); i++) {
+          newShards[i].setMasterReplica(common.getServersConfig().getShards()[i].getMasterReplica());
+          for (int j = 0; j < databaseServer.getReplicationFactor(); j++) {
+            newShards[i].getReplicas()[j].setDead(common.getServersConfig().getShards()[i].getReplicas()[j].isDead());
+          }
+        }
+        common.setServersConfig(newConfig);
+      }
       common.saveServersConfig(databaseServer.getDataDir());
       logger.info("Repartitioner: shardCount=" + newShards.length);
       databaseServer.setShardCount(newShards.length);

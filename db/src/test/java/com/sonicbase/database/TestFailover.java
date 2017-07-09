@@ -6,8 +6,6 @@ import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.query.impl.ColumnImpl;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.server.DatabaseServer;
-import com.sonicbase.server.SnapshotManager;
-import com.sonicbase.socket.DeadServerException;
 import com.sonicbase.util.JsonArray;
 import com.sonicbase.util.JsonDict;
 import com.sonicbase.util.StreamUtils;
@@ -81,7 +79,7 @@ public class TestFailover {
 
       for (DatabaseServer[] server : dbServers) {
         for (DatabaseServer replica : server) {
-          replica.disableRepartitioner();
+          replica.shutdownRepartitioner();
         }
       }
 
@@ -89,13 +87,13 @@ public class TestFailover {
 
       Class.forName("com.sonicbase.jdbcdriver.Driver");
 
-      conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000", "user", "password");
+      conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9010,127.0.0.1:9060", "user", "password");
 
       ((ConnectionProxy) conn).getDatabaseClient().createDatabase("test");
 
       conn.close();
 
-      conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/test", "user", "password");
+      conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9010,127.0.0.1:9060/test", "user", "password");
 
       client = ((ConnectionProxy) conn).getDatabaseClient();
 
@@ -259,7 +257,7 @@ public class TestFailover {
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
       cobj.put(ComObject.Tag.method, "testWrite");
-      client.send(null, 1, 1, "DatabaseServer:ComObject.testWrite:", cobj.serialize(), DatabaseClient.Replica.specified);
+      client.send(null, 1, 1, "DatabaseServer:ComObject:testWrite:", cobj.serialize(), DatabaseClient.Replica.specified);
 
       assertTrue(dbServers[1][0].getLogManager().hasLogsForPeer(1));
 

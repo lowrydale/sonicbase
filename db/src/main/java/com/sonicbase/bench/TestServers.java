@@ -28,7 +28,7 @@ public class TestServers {
         try {
           dbServers[0].startServer(new String[]{"-port", String.valueOf(9010 + (50 * 0)), "-host", "localhost",
               "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "4-bench", "-shard", String.valueOf(0)}, "db/src/main/resources/config/config-4-bench.json", true);
-          //dbServers[0].getDatabaseServer().disableRepartitioner();
+          //dbServers[0].getDatabaseServer().shutdownRepartitioner();
         }
         catch (Exception e) {
           e.printStackTrace();
@@ -54,7 +54,7 @@ public class TestServers {
             dbServers[shard].startServer(new String[]{"-port", String.valueOf(9010 + (50 * shard)), "-host", "localhost",
                 "-mport", String.valueOf(9010), "-mhost", "localhost",
                 "-shard", String.valueOf(shard), "-cluster", "4-bench"}, "db/src/main/resources/config/config-4-bench.json", true);
-            //dbServers[shard].getDatabaseServer().disableRepartitioner();
+            //dbServers[shard].getDatabaseServer().shutdownRepartitioner();
           }
           catch (Exception e) {
             e.printStackTrace();

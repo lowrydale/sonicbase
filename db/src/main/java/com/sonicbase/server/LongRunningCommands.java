@@ -204,6 +204,16 @@ public class LongRunningCommands {
     awsClient.uploadDirectory(bucket, prefix, subDirectory, srcDir);
   }
 
+  public void getFiles(List<String> files) {
+    File dir = getReplicaRoot();
+    File[] currFiles = dir.listFiles();
+    if (currFiles != null) {
+      for (File file : currFiles) {
+        files.add(file.getAbsolutePath());
+      }
+    }
+  }
+
   public static class SingleCommand {
     final LongRunningCommands longRunningCommands;
     String command;

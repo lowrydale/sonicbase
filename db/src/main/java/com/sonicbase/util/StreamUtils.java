@@ -1,5 +1,7 @@
 package com.sonicbase.util;
 
+import org.apache.commons.io.IOUtils;
+
 import java.io.*;
 
 /**
@@ -51,28 +53,7 @@ public class StreamUtils {
   private static final int DEFAULT_BUFFER_SIZE = 8192;
 
   public static void copyStream(InputStream inStream, OutputStream outStream) throws IOException {
-    int bufferSize;
-    try {
-      bufferSize = Math.max(DEFAULT_BUFFER_SIZE, inStream.available());
-    }
-    catch (IOException e) {
-      // this happens with new FileInputStream(new File("/proc/meminfo")).available() for instance
-      bufferSize = DEFAULT_BUFFER_SIZE;
-    }
-    copyStream(inStream, outStream, bufferSize);
-  }
-
-  public static void copyStream(InputStream inStream, OutputStream outStream, int bufferSize) throws IOException {
-    final byte[] buffer = new byte[bufferSize];
-    while (true) {
-      final int read = inStream.read(buffer);
-      if (read == -1) {
-        break;
-      }
-      outStream.write(buffer, 0, read);
-    }
-    inStream.close();
-    outStream.close();
+    IOUtils.copy(inStream, outStream);
   }
 
   public static byte[] inputStreamToBytes(InputStream in) throws IOException {

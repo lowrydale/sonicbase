@@ -49,13 +49,14 @@ public class Logger {
                 cobj.put(ComObject.Tag.exception, exception);
               }
               String command = "DatabaseServer:ComObject:logError:";
-              byte[] ret = error.client.sendToMaster(command, cobj.serialize());
+              int masterReplica = error.client.getCommon().getServersConfig().getShards()[0].getMasterReplica();
+              byte[] ret = error.client.send(null, 0, masterReplica, command, cobj.serialize(), DatabaseClient.Replica.specified, true);
             }
             catch (InterruptedException e) {
               break;
             }
             catch (Exception e) {
-              logger.error("Error sending error to master", e);
+              logger.error("Error sending error to master");
             }
           }
         }

@@ -52,7 +52,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import static org.quartz.CronScheduleBuilder.cronSchedule;
 import static org.quartz.JobBuilder.newJob;
 import static org.quartz.TriggerBuilder.newTrigger;
-import static org.yaml.snakeyaml.tokens.Token.ID.Tag;
 
 
 /**
@@ -109,6 +108,7 @@ public class DatabaseServer {
   private boolean doingRestore;
   private JsonDict backupConfig;
   private static Object restoreAwsMutex = new Object();
+  private boolean dead;
 
   @SuppressWarnings("restriction")
   private static Unsafe getUnsafe() {
@@ -354,13 +354,13 @@ public class DatabaseServer {
     return testWriteCallCount.get();
   }
 
-  final int[] monitorShards = {0, 0, 0};
-  final int[] monitorReplicas = {0, 1, 2};
-
   private void startMasterMonitor() {
     Thread thread = new Thread(new Runnable() {
       @Override
       public void run() {
+        final int[] monitorShards = {0, 0, 0};
+        final int[] monitorReplicas = {0, 1, 2};
+
         JsonArray shards = config.getArray("shards");
         JsonArray replicas = shards.getDict(0).getArray("replicas");
         if (replicas.size() < 3) {
@@ -381,19 +381,24 @@ public class DatabaseServer {
             Thread masterThread = new Thread(new Runnable() {
               @Override
               public void run() {
-                try {
-                  electNewMaster(shard, -1, monitorShards, monitorReplicas);
-                }
-                catch (Exception e) {
-                  throw new DatabaseException(e);
+                while (true) {
+                  try {
+                    Thread.sleep(2000);
+                    if (electNewMaster(shard, -1, monitorShards, monitorReplicas)) {
+                      break;
+                    }
+                  }
+                  catch (Exception e) {
+                    logger.error("Error electing master: shard=" + shard, e);
+                  }
                 }
                 while (true) {
                   try {
-                    Thread.sleep(deathOverride == null ? 5000 : 50);
+                    Thread.sleep(deathOverride == null ? 2000 : 50);
 
                     final int masterReplica = common.getServersConfig().getShards()[shard].getMasterReplica();
                     final AtomicBoolean isHealthy = new AtomicBoolean(false);
-                    checkHealthOfServer(shard, masterReplica, isHealthy);
+                    checkHealthOfServer(shard, masterReplica, isHealthy, false);
 
                     if (!isHealthy.get()) {
                       electNewMaster(shard, masterReplica, monitorShards, monitorReplicas);
@@ -413,22 +418,23 @@ public class DatabaseServer {
     thread.start();
   }
 
-  private void electNewMaster(int shard, int oldMasterReplica, int[] monitorShards, int[] monitorReplicas) throws InterruptedException, IOException {
+  private boolean electNewMaster(int shard, int oldMasterReplica, int[] monitorShards, int[] monitorReplicas) throws InterruptedException, IOException {
     int electedMaster = -1;
     boolean isFirst = false;
     int nextMonitor = -1;
     logger.info("electNewMaster - begin: shard=" + shard + ", oldMasterReplica=" + oldMasterReplica);
     for (int i = 0; i < monitorShards.length; i++) {
-      if (common.getServersConfig().getShards()[monitorShards[i]].getReplicas()[monitorReplicas[i]].dead) {
-        continue;
-      }
       if (monitorShards[i] == this.shard && monitorReplicas[i] == this.replica) {
         isFirst = true;
         continue;
       }
-      if (!common.getServersConfig().getShards()[monitorShards[i]].getReplicas()[monitorReplicas[i]].dead) {
-        nextMonitor = i;
+      final AtomicBoolean isHealthy = new AtomicBoolean(false);
+      checkHealthOfServer(monitorShards[i], monitorReplicas[i], isHealthy, false);
+      if (!isHealthy.get()) {
+        continue;
       }
+      nextMonitor = i;
+      break;
 //      // let the lowest monitor initiate the election
 //      if (monitorShards[i] != 0 || monitorReplicas[i] != oldMasterReplica) {
 //        if (monitorShards[i] != shard || monitorReplicas[i] != replica) {
@@ -440,9 +446,13 @@ public class DatabaseServer {
 //      }
     }
     if (!isFirst) {
-      return;
+      logger.info("ElectNewMaster !isFirst");
+      return isFirst;
     }
-    if (nextMonitor != -1) {
+    if (nextMonitor == -1) {
+      logger.error("ElectNewMaster nextMonitor==-1");
+    }
+    else {
       outer:
       while (true) {
         for (int j = 0; j < replicationFactor; j++) {
@@ -452,7 +462,12 @@ public class DatabaseServer {
           Thread.sleep(deathOverride == null ? 2000 : 50);
 
           AtomicBoolean isHealthy = new AtomicBoolean();
-          checkHealthOfServer(shard, j, isHealthy);
+          if (shard == this.shard && replica == this.replica) {
+            isHealthy.set(true);
+          }
+          else {
+            checkHealthOfServer(shard, j, isHealthy, false);
+          }
           if (isHealthy.get()) {
             try {
               ComObject cobj = new ComObject();
@@ -508,7 +523,7 @@ public class DatabaseServer {
             command = "DatabaseServer:ComObject:promoteToMaster:1:";
 
             getDatabaseClient().send(null, shard, electedMaster, command, cobj.serialize(), DatabaseClient.Replica.specified);
-            break;
+            return true;
           }
         }
         catch (Exception e) {
@@ -517,6 +532,7 @@ public class DatabaseServer {
         }
       }
     }
+    return false;
   }
 
   public byte[] electNewMaster(ComObject cobj, boolean replayedCommand) throws InterruptedException, IOException {
@@ -524,7 +540,7 @@ public class DatabaseServer {
     int requestedMasterReplica = cobj.getInt(ComObject.Tag.requestedMasterReplica);
 
     final AtomicBoolean isHealthy = new AtomicBoolean(false);
-    checkHealthOfServer(requestedMasterShard, requestedMasterReplica, isHealthy);
+    checkHealthOfServer(requestedMasterShard, requestedMasterReplica, isHealthy, false);
     if (!isHealthy.get()) {
       logger.info("candidate master is unhealthy, rejecting: shard=" + requestedMasterShard + ", replica=" + requestedMasterReplica);
       requestedMasterReplica = -1;
@@ -545,7 +561,11 @@ public class DatabaseServer {
       if (shard == 0) {
         shutdownDeathMonitor();
 
+        logger.info("starting death monitor");
         startDeathMonitor();
+
+        logger.info("starting repartitioner");
+        startRepartitioner();
       }
       return null;
     }
@@ -556,6 +576,7 @@ public class DatabaseServer {
 
   private void shutdownDeathMonitor() {
     synchronized (deathMonitorMutex) {
+      logger.info("Stopping death monitor");
       shutdownDeathMonitor = true;
       try {
         if (deathMonitorThreads != null) {
@@ -569,6 +590,10 @@ public class DatabaseServer {
       catch (Exception e) {
         logger.error("Error shutting down death monitor", e);
       }
+      if (deathReportThread != null) {
+        deathReportThread.interrupt();
+      }
+      deathReportThread = null;
       deathMonitorThreads = null;
     }
   }
@@ -576,9 +601,34 @@ public class DatabaseServer {
   private Thread[][] deathMonitorThreads = null;
   boolean shutdownDeathMonitor = false;
   private Object deathMonitorMutex = new Object();
+  private Thread deathReportThread = null;
 
   private void startDeathMonitor() {
     synchronized (deathMonitorMutex) {
+
+      deathReportThread = new Thread(new Runnable() {
+        @Override
+        public void run() {
+          while (true) {
+            try {
+              Thread.sleep(10000);
+              StringBuilder builder = new StringBuilder();
+              for (int i = 0; i < shardCount; i++) {
+                for (int j = 0; j < replicationFactor; j++) {
+                  builder.append("[").append(i).append(",").append(j).append("=");
+                  builder.append(common.getServersConfig().getShards()[i].getReplicas()[j].dead ? "dead" : "alive").append("]");
+                }
+              }
+              logger.info("Death status=" + builder.toString());
+            }
+            catch (Exception e) {
+              logger.error("Error in death reporting thread", e);
+            }
+          }
+        }
+      }, "Death Reporting Thread");
+      deathReportThread.start();
+
       shutdownDeathMonitor = false;
       logger.info("Starting death monitor");
       deathMonitorThreads = new Thread[shardCount][];
@@ -594,7 +644,7 @@ public class DatabaseServer {
                 try {
                   Thread.sleep(deathOverride == null ? 2000 : 50);
                   AtomicBoolean isHealthy = new AtomicBoolean();
-                  checkHealthOfServer(shard, replica, isHealthy);
+                  checkHealthOfServer(shard, replica, isHealthy, true);
                   boolean wasDead = common.getServersConfig().getShards()[shard].getReplicas()[replica].dead;
                   boolean changed = false;
                   if (wasDead && isHealthy.get()) {
@@ -612,20 +662,22 @@ public class DatabaseServer {
 
                     getDatabaseClient().send(null, shard, replica, command, cobj.serialize(), DatabaseClient.Replica.specified, true);
                   }
-                  if (wasDead && isHealthy.get()) {
-                    common.getServersConfig().getShards()[shard].getReplicas()[replica].dead = false;
-                    changed = true;
+                  synchronized (common) {
+                    if (wasDead && isHealthy.get()) {
+                      common.getServersConfig().getShards()[shard].getReplicas()[replica].dead = false;
+                      changed = true;
+                    }
+                    else if (!wasDead && !isHealthy.get()) {
+                      common.getServersConfig().getShards()[shard].getReplicas()[replica].dead = true;
+                      changed = true;
+                    }
                   }
-                  else if (!wasDead && !isHealthy.get()) {
-                    common.getServersConfig().getShards()[shard].getReplicas()[replica].dead = true;
-                    changed = true;
-                  }
-                  getSchemaFromPossibleMaster();
-                  if (DatabaseServer.this.shard == 0 &&
-                      common.getServersConfig().getShards()[0].getMasterReplica() != DatabaseServer.this.replica) {
+                  if (isNoLongerMaster()) {
+                    logger.info("No longer master. Shutting down resources");
                     shutdownDeathMonitor();
+                    shutdownRepartitioner();
                   }
-                  if (changed) {
+                  else if (changed) {
                     logger.info("server health changed: shard=" + shard + ", replica=" + replica + ", isHealthy=" + isHealthy.get());
                     common.saveSchema(getDataDir());
                     pushSchema();
@@ -639,7 +691,7 @@ public class DatabaseServer {
                 }
               }
             }
-          });
+          }, "Death Monitor Thread: shard=" + i + ", replica=" + j);
           deathMonitorThreads[i][j].start();
         }
       }
@@ -657,7 +709,8 @@ public class DatabaseServer {
     return null;
   }
 
-  private void checkHealthOfServer(final int shard, final int replica, final AtomicBoolean isHealthy) throws InterruptedException {
+  private void checkHealthOfServer(final int shard, final int replica, final AtomicBoolean isHealthy, final boolean ignoreDeath) throws InterruptedException {
+
     if (deathOverride != null) {
       isHealthy.set(!deathOverride[shard][replica]);
       return;
@@ -674,15 +727,17 @@ public class DatabaseServer {
           cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
           cobj.put(ComObject.Tag.method, "healthCheck");
           String command = "DatabaseServer:ComObject:healthCheck:";
-         byte[] bytes = getDatabaseClient().send(null, shard, replica, command, cobj.serialize(), DatabaseClient.Replica.specified, true);
-         ComObject retObj = new ComObject(bytes);
-         if (retObj.getString(ComObject.Tag.status).equals("{\"status\" : \"ok\"}")) {
+          byte[] bytes = getDatabaseClient().send(null, shard, replica, command, cobj.serialize(), DatabaseClient.Replica.specified, true);
+          ComObject retObj = new ComObject(bytes);
+          if (retObj.getString(ComObject.Tag.status).equals("{\"status\" : \"ok\"}")) {
             isHealthy.set(true);
           }
-          finished.set(true);
         }
         catch (Exception e) {
           logger.error("Error checking health of server: shard=" + shard + ", replica=" + replica);
+        }
+        finally {
+          finished.set(true);
         }
       }
     });
@@ -727,6 +782,16 @@ public class DatabaseServer {
    * make sure you're really still the master before making death decisions
    */
   public void getSchemaFromPossibleMaster() {
+    final int[] monitorShards = {0, 0, 0};
+    final int[] monitorReplicas = {0, 1, 2};
+
+    JsonArray shards = config.getArray("shards");
+    JsonArray replicas = shards.getDict(0).getArray("replicas");
+    if (replicas.size() < 3) {
+      monitorShards[2] = 1;
+      monitorReplicas[2] = 0;
+    }
+
     int[] masterAccordingToOther = new int[]{-1, -1};
     int otherCount = 0;
     for (int i = 0; i < monitorShards.length; i++) {
@@ -740,7 +805,7 @@ public class DatabaseServer {
       String command = "DatabaseServer:ComObject:getSchema:";
       try {
 
-        byte[] ret = getClient().send(null, monitorShards[i], monitorReplicas[i], command, cobj.serialize(), DatabaseClient.Replica.specified);
+        byte[] ret = getClient().send(null, monitorShards[i], monitorReplicas[i], command, cobj.serialize(), DatabaseClient.Replica.specified, true);
         DatabaseCommon tempCommon = new DatabaseCommon();
         ComObject retObj = new ComObject(ret);
         tempCommon.deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
@@ -756,6 +821,55 @@ public class DatabaseServer {
       }
     }
     return;
+  }
+
+  public boolean isNoLongerMaster() {
+
+    final int[] monitorShards = {0, 0, 0};
+    final int[] monitorReplicas = {0, 1, 2};
+
+    JsonArray shards = config.getArray("shards");
+    JsonArray replicas = shards.getDict(0).getArray("replicas");
+    if (replicas.size() < 3) {
+      monitorShards[2] = 1;
+      monitorReplicas[2] = 0;
+    }
+
+    int countAgree = 0;
+    int countDisagree = 0;
+    for (int i = 0; i < monitorShards.length; i++) {
+      try {
+        AtomicBoolean isHealthy = new AtomicBoolean();
+        checkHealthOfServer(monitorShards[i], monitorReplicas[i], isHealthy, true);
+
+        if (isHealthy.get()) {
+          ComObject cobj = new ComObject();
+          cobj.put(ComObject.Tag.dbName, "__none__");
+          cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+          cobj.put(ComObject.Tag.method, "getSchema");
+          String command = "DatabaseServer:ComObject:getSchema:";
+
+          byte[] ret = getClient().send(null, monitorShards[i], monitorReplicas[i], command, cobj.serialize(), DatabaseClient.Replica.specified, true);
+          DatabaseCommon tempCommon = new DatabaseCommon();
+          ComObject retObj = new ComObject(ret);
+          tempCommon.deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
+          int masterReplica = tempCommon.getServersConfig().getShards()[0].getMasterReplica();
+          if (masterReplica == this.replica) {
+            countAgree++;
+          }
+          else {
+            countDisagree++;
+          }
+        }
+      }
+      catch (Exception e) {
+        logger.error("Error checking if master", e);
+      }
+    }
+    if (countAgree < countDisagree) {
+      return true;
+    }
+    return false;
   }
 
   private static class NullX509TrustManager implements X509TrustManager {
@@ -786,8 +900,9 @@ public class DatabaseServer {
       common.saveSchema(dataDir);
       return;
     }
-    haveProLicense = false;
+    haveProLicense = true;
 
+    final AtomicBoolean haventSet = new AtomicBoolean(true);
 //    if (usingMultipleReplicas) {
 //      throw new InsufficientLicense("You must have a pro license to use multiple replicas");
 //    }
@@ -799,6 +914,11 @@ public class DatabaseServer {
     }
     catch (Exception e) {
       logger.error("Error initializing license validator", e);
+      common.setHaveProLicense(false);
+      common.saveSchema(dataDir);
+      DatabaseServer.this.haveProLicense = false;
+      disableNow = true;
+      haventSet.set(false);
       return;
     }
     JsonDict config = new JsonDict(json);
@@ -824,15 +944,24 @@ public class DatabaseServer {
             DatabaseServer.this.disableNow = dict.getBoolean("disableNow");
 
             logger.info("lastHaveProLicense=" + lastHaveProLicense.get() + ", haveProLicense=" + haveProLicense);
-            if (lastHaveProLicense.get() != haveProLicense) {
+            if (haventSet.get() || lastHaveProLicense.get() != haveProLicense) {
               common.setHaveProLicense(haveProLicense);
               common.saveSchema(dataDir);
               lastHaveProLicense.set(haveProLicense);
+              haventSet.set(true);
               logger.info("Saving schema with haveProLicense=" + haveProLicense);
             }
           }
           catch (Exception e) {
             logger.error("license server not found");
+            if (haventSet.get() || lastHaveProLicense.get() != false) {
+              common.setHaveProLicense(false);
+              common.saveSchema(dataDir);
+              DatabaseServer.this.haveProLicense = false;
+              lastHaveProLicense.set(false);
+              haventSet.set(false);
+              disableNow = true;
+            }
             errorLogger.debug("License server not found", e);
           }
           try {
@@ -875,6 +1004,9 @@ public class DatabaseServer {
           deleteManager.backupFileSystem(directory, subDirectory);
           longRunningCommands.backupFileSystem(directory, subDirectory);
           snapshotManager.backupFileSystem(directory, subDirectory);
+          synchronized (common) {
+            snapshotManager.backupFileSystemSchema(directory, subDirectory);
+          }
           logManager.backupFileSystem(directory, subDirectory, logSlicePoint);
 
           isBackupComplete = true;
@@ -916,6 +1048,9 @@ public class DatabaseServer {
           deleteManager.backupAWS(bucket, prefix, subDirectory);
           longRunningCommands.backupAWS(bucket, prefix, subDirectory);
           snapshotManager.backupAWS(bucket, prefix, subDirectory);
+          synchronized (common) {
+            snapshotManager.backupAWSSchema(bucket, prefix, subDirectory);
+          }
           logManager.backupAWS(bucket, prefix, subDirectory, logSlicePoint);
 
           isBackupComplete = true;
@@ -1015,9 +1150,13 @@ public class DatabaseServer {
 
   public byte[] startBackup(ComObject cobj, boolean replayedCommand) {
 
+    if (!common.haveProLicense()) {
+      throw new InsufficientLicense("You must have a pro license to start a backup");
+    }
+
     final boolean wasDoingBackup = doingBackup;
     doingBackup = true;
-    Thread thread = new Thread(new Runnable(){
+    Thread thread = new Thread(new Runnable() {
       @Override
       public void run() {
         try {
@@ -1088,6 +1227,7 @@ public class DatabaseServer {
   }
 
   private String lastBackupDir;
+
   public byte[] getLastBackupDir(ComObject cobj, boolean replayedCommand) {
     ComObject retObj = new ComObject();
     if (lastBackupDir != null) {
@@ -1098,7 +1238,7 @@ public class DatabaseServer {
 
   public void doBackup() {
     try {
-      disableRepartitioner();
+      shutdownRepartitioner();
       finalBackupException = null;
       doingBackup = true;
 
@@ -1170,10 +1310,17 @@ public class DatabaseServer {
         boolean finished = false;
         outer:
         for (int shard = 0; shard < shardCount; shard++) {
-          byte[] currRet = getDatabaseClient().send(null, shard, 0, command, iscobj.serialize(), DatabaseClient.Replica.master);
-          ComObject retObj = new ComObject(currRet);
-          finished = retObj.getBoolean(ComObject.Tag.isComplete);
-          if (!finished) {
+          try {
+            byte[] currRet = getDatabaseClient().send(null, shard, 0, command, iscobj.serialize(), DatabaseClient.Replica.master);
+            ComObject retObj = new ComObject(currRet);
+            finished = retObj.getBoolean(ComObject.Tag.isComplete);
+            if (!finished) {
+              break outer;
+            }
+          }
+          catch (Exception e) {
+            finished = false;
+            logger.error("Error checking if backup complete: shard=" + shard);
             break outer;
           }
         }
@@ -1193,15 +1340,20 @@ public class DatabaseServer {
         shared = false;
       }
       if (maxBackupCount != null) {
-        // delete old backups
-        if (type.equals("AWS")) {
-          shared = true;
-          doDeleteAWSBackups(bucket, prefix, maxBackupCount);
-        }
-        else if (type.equals("fileSystem")) {
-          if (shared) {
-            doDeleteFileSystemBackups(directory, maxBackupCount);
+        try {
+          // delete old backups
+          if (type.equals("AWS")) {
+            shared = true;
+            doDeleteAWSBackups(bucket, prefix, maxBackupCount);
           }
+          else if (type.equals("fileSystem")) {
+            if (shared) {
+              doDeleteFileSystemBackups(directory, maxBackupCount);
+            }
+          }
+        }
+        catch (Exception e) {
+          logger.error("Error deleting old backups", e);
         }
       }
       logger.info("Backup Master - delete old backups - finished");
@@ -1225,6 +1377,7 @@ public class DatabaseServer {
     }
     catch (Exception e) {
       finalBackupException = e;
+      logger.error("Error performing backup", e);
       throw new DatabaseException(e);
     }
     finally {
@@ -1330,19 +1483,19 @@ public class DatabaseServer {
       public void run() {
         try {
           //synchronized (restoreAwsMutex) {
-            String subDirectory = cobj.getString(ComObject.Tag.subDirectory);
-            String bucket = cobj.getString(ComObject.Tag.bucket);
-            String prefix = cobj.getString(ComObject.Tag.prefix);
+          String subDirectory = cobj.getString(ComObject.Tag.subDirectory);
+          String bucket = cobj.getString(ComObject.Tag.bucket);
+          String prefix = cobj.getString(ComObject.Tag.prefix);
 
-            restoreAWSSingleDir(bucket, prefix, subDirectory, "logSequenceNum");
-            restoreAWSSingleDir(bucket, prefix, subDirectory, "nextRecordId");
-            deleteManager.restoreAWS(bucket, prefix, subDirectory);
-            longRunningCommands.restoreAWS(bucket, prefix, subDirectory);
-            snapshotManager.restoreAWS(bucket, prefix, subDirectory);
-            common.loadSchema(getDataDir());
-            logManager.restoreAWS(bucket, prefix, subDirectory);
+          restoreAWSSingleDir(bucket, prefix, subDirectory, "logSequenceNum");
+          restoreAWSSingleDir(bucket, prefix, subDirectory, "nextRecordId");
+          deleteManager.restoreAWS(bucket, prefix, subDirectory);
+          longRunningCommands.restoreAWS(bucket, prefix, subDirectory);
+          snapshotManager.restoreAWS(bucket, prefix, subDirectory);
+          common.loadSchema(getDataDir());
+          logManager.restoreAWS(bucket, prefix, subDirectory);
 
-            isRestoreComplete = true;
+          isRestoreComplete = true;
           //}
         }
         catch (Exception e) {
@@ -1389,6 +1542,7 @@ public class DatabaseServer {
 
   public byte[] finishRestore(ComObject cobj, boolean replayedCommand) {
     try {
+      common.loadSchema(getDataDir());
       for (String dbName : getDbNames(getDataDir())) {
         getSnapshotManager().recoverFromSnapshot(dbName);
       }
@@ -1396,8 +1550,6 @@ public class DatabaseServer {
       snapshotManager.enableSnapshot(true);
       isRunning.set(true);
       isRestoreComplete = false;
-      System.out.println("Finished restore: shard=" + shard + ", replica=" + replica);
-
       return null;
     }
     catch (Exception e) {
@@ -1421,6 +1573,9 @@ public class DatabaseServer {
   }
 
   public byte[] startRestore(final ComObject cobj, boolean replayedCommand) {
+    if (!common.haveProLicense()) {
+      throw new InsufficientLicense("You must have a pro license to start a restore");
+    }
     doingRestore = true;
     Thread thread = new Thread(new Runnable() {
       @Override
@@ -1435,7 +1590,7 @@ public class DatabaseServer {
         }
       }
     });
-    thread.run();
+    thread.start();
     return null;
   }
 
@@ -1444,7 +1599,7 @@ public class DatabaseServer {
 
   private void doRestore(String subDirectory) {
     try {
-      disableRepartitioner();
+      shutdownRepartitioner();
       finalRestoreException = null;
       doingRestore = true;
       // delete snapshots and logs
@@ -1503,10 +1658,17 @@ public class DatabaseServer {
         outer:
         for (int shard = 0; shard < shardCount; shard++) {
           for (int replica = 0; replica < replicationFactor; replica++) {
-            byte[] currRet = getDatabaseClient().send(null, shard, replica, command, bytes, DatabaseClient.Replica.specified);
-            ComObject retObj = new ComObject(currRet);
-            finished = retObj.getBoolean(ComObject.Tag.isComplete);
-            if (!finished) {
+            try {
+              byte[] currRet = getDatabaseClient().send(null, shard, replica, command, bytes, DatabaseClient.Replica.specified);
+              ComObject retObj = new ComObject(currRet);
+              finished = retObj.getBoolean(ComObject.Tag.isComplete);
+              if (!finished) {
+                break outer;
+              }
+            }
+            catch (Exception e) {
+              logger.error("Error checking if restore is complete", e);
+              finished = false;
               break outer;
             }
           }
@@ -1514,6 +1676,7 @@ public class DatabaseServer {
         if (finished) {
           break;
         }
+        Thread.sleep(2000);
       }
 
       cobj = new ComObject();
@@ -1527,7 +1690,7 @@ public class DatabaseServer {
     }
     catch (Exception e) {
       finalRestoreException = e;
-      e.printStackTrace();
+      logger.error("Error restoring backup", e);
       throw new DatabaseException(e);
     }
     finally {
@@ -1792,6 +1955,10 @@ public class DatabaseServer {
 
     public boolean isDead() {
       return dead;
+    }
+
+    public void setDead(boolean dead) {
+      this.dead = dead;
     }
   }
 
@@ -2891,7 +3058,8 @@ public class DatabaseServer {
     }
   }
 
-  private static byte[] encryptF(String input, Key pkey, Cipher c) throws InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
+  private static byte[] encryptF(String input, Key pkey, Cipher c) throws
+      InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
 
     c.init(Cipher.ENCRYPT_MODE, pkey);
 
@@ -2919,7 +3087,7 @@ public class DatabaseServer {
     ComObject retObj = new ComObject(ret);
     ComArray array = retObj.getArray(ComObject.Tag.dbNames);
     for (int i = 0; i < array.getArray().size(); i++) {
-      String dbName = (String)array.getArray().get(i);
+      String dbName = (String) array.getArray().get(i);
       File file = new File(dataDir, "snapshot/" + shard + "/" + replica + "/" + dbName);
       file.mkdirs();
       logger.info("Received database name: name=" + dbName);
@@ -2961,7 +3129,7 @@ public class DatabaseServer {
   }
 
   public void startRepartitioner() {
-    if (shard == 0 && replica == 0) {
+    if (shard == 0 && replica == common.getServersConfig().getShards()[0].getMasterReplica()) {
       repartitioner.start();
     }
   }
@@ -3030,7 +3198,7 @@ public class DatabaseServer {
     logManager.enableLogProcessor(false);
   }
 
-  public void disableRepartitioner() {
+  public void shutdownRepartitioner() {
     repartitioner.interrupt();
     String command = "DatabaseServer:ComObject:stopRepartitioning:";
     ComObject cobj = new ComObject();
@@ -3057,13 +3225,9 @@ public class DatabaseServer {
   }
 
   public void pushSchema() {
-    //common.saveSchema(dataDir);
-
     for (int i = 0; i < shardCount; i++) {
-
-
       for (int j = 0; j < replicationFactor; j++) {
-        if (i == 0 && j == 0) {
+        if (shard == 0 && replica == common.getServersConfig().getShards()[0].getMasterReplica()) {
           continue;
         }
         try {
@@ -3080,6 +3244,180 @@ public class DatabaseServer {
         }
       }
     }
+  }
+
+  public byte[] prepareSourceForServerReload(ComObject cobj, boolean replayedCommand) {
+    try {
+      List<String> files = new ArrayList<>();
+
+      snapshotManager.enableSnapshot(false);
+      logSlicePoint = logManager.sliceLogs(true);
+
+      BufferedReader reader = new BufferedReader(new StringReader(logSlicePoint));
+      while (true) {
+        String line = reader.readLine();
+        if (line == null) {
+          break;
+        }
+        files.add(line);
+      }
+      snapshotManager.getFilesForCurrentSnapshot(files);
+
+      File file = new File(getDataDir(), "logSequenceNum/" + shard + "/" + replica + "/logSequenceNum.txt");
+      if (file.exists()) {
+        files.add(file.getAbsolutePath());
+      }
+      file = new File(getDataDir(), "nextRecordId/" + shard + "/" + replica + "/nextRecorId.txt");
+      if (file.exists()) {
+        files.add(file.getAbsolutePath());
+      }
+
+      deleteManager.getFiles(files);
+      longRunningCommands.getFiles(files);
+
+      ComObject retObj = new ComObject();
+      ComArray array = retObj.putArray(ComObject.Tag.filenames, ComObject.Type.stringType);
+      for (String filename : files) {
+        array.add(filename);
+      }
+      return retObj.serialize();
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public byte[] finishServerReloadForSource(ComObject cobj, boolean replayedCommand) {
+
+    snapshotManager.enableSnapshot(true);
+
+    return null;
+  }
+
+
+  public byte[] isServerReloadFinished(ComObject cobj, boolean replayedCommand) {
+    ComObject retObj = new ComObject();
+    retObj.put(ComObject.Tag.isComplete, !isServerRoloadRunning);
+
+    return retObj.serialize();
+  }
+
+  private boolean isServerRoloadRunning = false;
+
+  public byte[] reloadServer(ComObject cobj, boolean replayedCommand) {
+    Thread thread = new Thread(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          isServerRoloadRunning = true;
+          isRunning.set(false);
+          snapshotManager.enableSnapshot(false);
+          Thread.sleep(5000);
+          snapshotManager.deleteSnapshots();
+
+          File file = new File(getDataDir(), "result-sets");
+          FileUtils.deleteDirectory(file);
+
+          logManager.deleteLogs();
+
+          String command = "DatabaseServer:ComObject:prepareSourceForServerReload:";
+          ComObject rcobj = new ComObject();
+          rcobj.put(ComObject.Tag.dbName, "__none__");
+          rcobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+          rcobj.put(ComObject.Tag.method, "prepareSourceForServerReload");
+          byte[] bytes = getClient().send(null, shard, 0, command, rcobj.serialize(), DatabaseClient.Replica.master);
+          ComObject retObj = new ComObject(bytes);
+          ComArray files = retObj.getArray(ComObject.Tag.filenames);
+
+          downloadFilesForReload(files);
+
+          common.loadSchema(getDataDir());
+          for (String dbName : getDbNames(getDataDir())) {
+            getSnapshotManager().recoverFromSnapshot(dbName);
+          }
+          getLogManager().applyQueues();
+          snapshotManager.enableSnapshot(true);
+          isRunning.set(true);
+        }
+        catch (Exception e) {
+          throw new DatabaseException(e);
+        }
+        finally {
+          String command = "DatabaseServer:ComObject:finishServerReloadForSource:";
+          ComObject rcobj = new ComObject();
+          rcobj.put(ComObject.Tag.dbName, "__none__");
+          rcobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+          rcobj.put(ComObject.Tag.method, "finishServerReloadForSource");
+          byte[] bytes = getClient().send(null, shard, 0, command, rcobj.serialize(), DatabaseClient.Replica.master);
+
+          isServerRoloadRunning = false;
+        }
+      }
+    });
+    thread.start();
+
+    return null;
+  }
+
+  public byte[] getDatabaseFile(ComObject cobj, boolean replayedCommand) {
+    try {
+      String filename = cobj.getString(ComObject.Tag.filename);
+      File file = new File(filename);
+      BufferedInputStream in = new BufferedInputStream(new FileInputStream(file));
+      byte[] bytes = StreamUtils.inputStreamToBytes(in);
+      ComObject retObj = new ComObject();
+      retObj.put(ComObject.Tag.binaryFileContent, bytes);
+
+      return retObj.serialize();
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  private void downloadFilesForReload(ComArray files) {
+    for (Object obj : files.getArray()) {
+      String filename = (String) obj;
+      try {
+
+        ComObject cobj = new ComObject();
+        cobj.put(ComObject.Tag.dbName, "__none__");
+        cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+        cobj.put(ComObject.Tag.method, "getDatabaseFile");
+        cobj.put(ComObject.Tag.filename, filename);
+        String command = "DatabaseServer:ComObject:getDatabaseFile:";
+        byte[] bytes = getClient().send(null, shard, 0, command, cobj.serialize(), DatabaseClient.Replica.master);
+        ComObject retObj = new ComObject(bytes);
+        byte[] content = retObj.getByteArray(ComObject.Tag.binaryFileContent);
+
+        filename = fixReplica("deletes", filename);
+        filename = fixReplica("lrc", filename);
+        filename = fixReplica("snapshot", filename);
+        filename = fixReplica("queue", filename);
+        filename = fixReplica("nextRecordId", filename);
+        filename = fixReplica("logSequenceNum", filename);
+
+        File file = new File(filename);
+        file.getParentFile().mkdirs();
+        file.delete();
+        try (BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(file))) {
+          out.write(content);
+        }
+      }
+      catch (Exception e) {
+        logger.error("Error copying file from source server for reloadServer: file=" + filename, e);
+      }
+    }
+  }
+
+  private String fixReplica(String dir, String filename) {
+    String prefix = dir + File.separator + shard + File.separator;
+    int pos = filename.indexOf(prefix);
+    if (pos != -1) {
+      int pos2 = filename.indexOf(File.separator, pos + prefix.length());
+      filename = filename.substring(0, pos + prefix.length()) + replica + filename.substring(pos2);
+    }
+    return filename;
   }
 
   public byte[] updateServersConfig(ComObject cobj, boolean replayedCommand) {
@@ -3103,7 +3441,7 @@ public class DatabaseServer {
   public void pushServersConfig() {
     for (int i = 0; i < shardCount; i++) {
       for (int j = 0; j < replicationFactor; j++) {
-        if (i == 0 && j == 0) {
+        if (shard == 0 && replica == common.getServersConfig().getShards()[0].getMasterReplica()) {
           continue;
         }
         try {
@@ -3441,6 +3779,7 @@ public class DatabaseServer {
   private static Set<String> priorityCommands = new HashSet<>();
 
   static {
+    priorityCommands.add("logError");
     priorityCommands.add("setMaxRecordId");
     priorityCommands.add("setMaxSequenceNum");
     priorityCommands.add("sendQueueFile");
@@ -3468,6 +3807,7 @@ public class DatabaseServer {
     priorityCommands.add("sendLogsToPeer");
     priorityCommands.add("isEntireRestoreComplete");
     priorityCommands.add("isEntireBackupComplete");
+    priorityCommands.add("isServerReloadFinished");
     //priorityCommands.add("doPopulateIndex");
   }
 
@@ -3492,7 +3832,8 @@ public class DatabaseServer {
     }
   }
 
-  public List<Response> dont_use_handleCommands(List<NettyServer.Request> requests, final boolean replayedCommand, boolean enableQueuing) throws IOException {
+  public List<Response> dont_use_handleCommands(List<NettyServer.Request> requests, final boolean replayedCommand,
+                                                boolean enableQueuing) throws IOException {
     List<Response> retList = new ArrayList<>();
     try {
       if (shutdown) {
@@ -3623,7 +3964,9 @@ public class DatabaseServer {
       }
 
       if (disableNow && usingMultipleReplicas) {
-        throw new LicenseOutOfComplianceException("Licenses out of compliance");
+        if (!methodStr.equals("healthCheckPriority") && !methodStr.equals("getConfig") && !methodStr.equals("getSchema")) {
+          throw new LicenseOutOfComplianceException("Licenses out of compliance");
+        }
       }
 
 //      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
@@ -3680,7 +4023,6 @@ public class DatabaseServer {
           }
         }
         catch (Exception e) {
-          e.printStackTrace();
           boolean schemaOutOfSync = false;
           int index = ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class);
           if (-1 != index) {
@@ -3698,7 +4040,7 @@ public class DatabaseServer {
 
         Shard currShard = common.getServersConfig().getShards()[shard];
         int masterReplica = currShard.getMasterReplica();
-        if (replica == masterReplica) {
+        if (!replayedCommand && replica == masterReplica) {
           if (command.contains("xx_repl_xx")) {
             if (DatabaseClient.getWriteVerbs().contains(methodStr)) {
               command += ":xx_sn_xx=" + logRequest.getSequenceNumbers()[0];
@@ -3769,12 +4111,14 @@ public class DatabaseServer {
   public byte[] healthCheck(ComObject cobj, boolean replayedCommand) {
     ComObject retObj = new ComObject();
     retObj.put(ComObject.Tag.status, "{\"status\" : \"ok\"}");
+    retObj.put(ComObject.Tag.haveProLicense, haveProLicense);
     return retObj.serialize();
   }
 
   public byte[] healthCheckPriority(ComObject cobj, boolean replayedCommand) {
     ComObject retObj = new ComObject();
     retObj.put(ComObject.Tag.status, "{\"status\" : \"ok\"}");
+    retObj.put(ComObject.Tag.haveProLicense, haveProLicense);
     return retObj.serialize();
   }
 
@@ -4057,11 +4401,21 @@ public class DatabaseServer {
     cobj.put(ComObject.Tag.maxId, maxId);
     command = "DatabaseServer:ComObject:setMaxRecordId:";
 
-    getDatabaseClient().send(null, 0, 0, command, cobj.serialize(), DatabaseClient.Replica.def, true);
+    for (int replica = 0; replica < replicationFactor; replica++) {
+      if (replica == this.replica) {
+        continue;
+      }
+      try {
+        getDatabaseClient().send(null, 0, replica, command, cobj.serialize(), DatabaseClient.Replica.specified, true);
+      }
+      catch (Exception e) {
+        logger.error("Error pushing maxRecordId: replica=" + replica, e);
+      }
+    }
   }
 
   public byte[] setMaxRecordId(ComObject cobj, boolean replayedCommand) {
-    if (replica == common.getServersConfig().getShards()[0].getMasterReplica()) {
+    if (shard == 0 && replica == common.getServersConfig().getShards()[0].getMasterReplica()) {
       return null;
     }
 //    String dbName = cobj.getString(ComObject.Tag.dbName);

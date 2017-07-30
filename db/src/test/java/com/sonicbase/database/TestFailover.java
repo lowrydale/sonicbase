@@ -257,7 +257,7 @@ public class TestFailover {
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
       cobj.put(ComObject.Tag.method, "testWrite");
-      client.send(null, 1, 1, "DatabaseServer:ComObject:testWrite:", cobj.serialize(), DatabaseClient.Replica.specified);
+      client.send(null, 1, 1, "DatabaseServer:ComObject:testWrite:", cobj, DatabaseClient.Replica.specified);
 
       assertTrue(dbServers[1][0].getLogManager().hasLogsForPeer(1));
 
@@ -274,7 +274,7 @@ public class TestFailover {
     assertEquals(dbServers[1][1].getTestWriteCallCount(), 1);
   }
 
-  @Test
+  @Test(enabled=false)
   public void testAllDead() throws SQLException, InterruptedException {
     Thread.sleep(4000);
 

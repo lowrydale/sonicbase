@@ -31,8 +31,9 @@ public class Logger {
         @Override
         public void run() {
           while (true) {
+            Error error = null;
             try {
-              Error error = queue.poll(30000, TimeUnit.MILLISECONDS);
+              error = queue.poll(30000, TimeUnit.MILLISECONDS);
               if (error == null) {
                 continue;
               }
@@ -50,13 +51,14 @@ public class Logger {
               }
               String command = "DatabaseServer:ComObject:logError:";
               int masterReplica = error.client.getCommon().getServersConfig().getShards()[0].getMasterReplica();
-              byte[] ret = error.client.send(null, 0, masterReplica, command, cobj.serialize(), DatabaseClient.Replica.specified, true);
+              byte[] ret = error.client.send(null, 0, masterReplica, command, cobj, DatabaseClient.Replica.specified, true);
             }
             catch (InterruptedException e) {
               break;
             }
             catch (Exception e) {
-              logger.error("Error sending error to master");
+              error.client.syncSchema();
+              logger.error("Error sending error to master: error=" + error.e);
             }
           }
         }
@@ -68,6 +70,9 @@ public class Logger {
     }
   }
 
+  private int shard = -1;
+  private int replica = -1;
+
   public Logger(final DatabaseClient databaseClient) {
     try {
       this.databaseClient = databaseClient;
@@ -75,6 +80,12 @@ public class Logger {
     catch (Exception e) {
       throw new DatabaseException(e);
     }
+  }
+
+  public Logger(DatabaseClient databaseClient, int shard, int replica) {
+    this.databaseClient = databaseClient;
+    this.shard = shard;
+    this.replica = replica;
   }
 
   public static void setReady() {
@@ -98,23 +109,48 @@ public class Logger {
   }
 
   public void info(String msg) {
-    logger.info(msg);
+    if (shard != -1) {
+      logger.info("shard=" + shard + ", replica=" + replica + " " + msg);
+    }
+    else {
+      logger.info(msg);
+    }
   }
 
   public void warn(String msg) {
-    logger.warn(msg);
+    if (shard != -1) {
+      logger.warn("shard=" + shard + ", replica=" + replica + " " + msg);
+    }
+    else {
+      logger.warn(msg);
+    }
   }
 
   public void error(String msg, Throwable e) {
     try {
       if (e == null) {
-        logger.error(msg);
+        if (shard != -1) {
+          logger.error("shard=" + shard + ", replica=" + replica + " " + msg);
+        }
+        else {
+          logger.error(msg);
+        }
       }
       else {
-        logger.error(msg, e);
+        if (shard != -1) {
+          logger.error("shard=" + shard + ", replica=" + replica + " " + msg, e);
+        }
+        else {
+          logger.error(msg, e);
+        }
       }
       if (ready) {
-        queue.put(new Error(databaseClient, msg, e));
+        if (shard != -1) {
+          queue.put(new Error(databaseClient, "shard=" + shard + ", replica=" + replica + " " + msg, e));
+        }
+        else {
+          queue.put(new Error(databaseClient, msg, e));
+        }
       }
     }
     catch (Exception e1) {
@@ -129,7 +165,12 @@ public class Logger {
   public void sendErrorToServer(String msg, Throwable e) {
     try {
       if (ready) {
-        queue.put(new Error(databaseClient, msg, e));
+        if (shard != -1) {
+          queue.put(new Error(databaseClient, "shard=" + shard + ", replica=" + replica + " " + msg, e));
+        }
+        else {
+          queue.put(new Error(databaseClient, msg, e));
+        }
       }
     }
     catch (InterruptedException e1) {

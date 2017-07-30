@@ -19,6 +19,7 @@ import static com.sonicbase.common.ComObject.Type.*;
 /**
  * Created by lowryda on 6/24/17.
  */
+@ExcludeRename
 public class ComObject {
 
   static Int2ObjectOpenHashMap<DynamicType> typesByTag = new Int2ObjectOpenHashMap<>();
@@ -96,7 +97,7 @@ public class ComObject {
     longKey(24, longType),
     records(25, arrayType),
     retKeys(26, arrayType),
-    schemaVersion(27, intType),
+    schemaVersion(27, longType),
     preparedId(28, longType),
     isPrepared(29, booleanType),
     count(30, intType),
@@ -176,7 +177,14 @@ public class ComObject {
     binaryFileContent(104, byteArrayType),
     type(105, stringType),
     filenames(106, arrayType),
-    haveProLicense(107, booleanType);
+    haveProLicense(107, booleanType),
+    files(108, arrayType),
+    sequence0(109, longType),
+    sequence1(110, longType),
+    percentComplete(111, doubleType),
+    stage(112, stringType),
+    error(113, booleanType),
+    command(114, stringType);
 
     public final int tag;
 

@@ -605,7 +605,8 @@ public class ResultSetImpl implements ResultSet {
       cobj.put(ComObject.Tag.id, selectStatement.getServerSelectResultSetId());
       String command = "DatabaseServer:ComObject:serverSelectDelete:";
 
-      byte[] recordRet = databaseClient.send(null, selectStatement.getServerSelectShardNumber(), selectStatement.getServerSelectReplicaNumber(), command, cobj.serialize(), DatabaseClient.Replica.specified);
+      byte[] recordRet = databaseClient.send(null, selectStatement.getServerSelectShardNumber(),
+          selectStatement.getServerSelectReplicaNumber(), command, cobj, DatabaseClient.Replica.specified);
 
     }
 
@@ -1619,11 +1620,8 @@ public class ResultSetImpl implements ResultSet {
   }
 
   private void getMoreServerResults(SelectStatementImpl selectStatement) {
-    int previousSchemaVersion = databaseClient.getCommon().getSchemaVersion();
-
     while (true) {
       try {
-
         ComObject cobj = new ComObject();
         cobj.put(ComObject.Tag.legacySelectStatement, selectStatement.serialize());
         cobj.put(ComObject.Tag.schemaVersion, databaseClient.getCommon().getSchemaVersion());
@@ -1634,10 +1632,7 @@ public class ResultSetImpl implements ResultSet {
         String command = "DatabaseServer:ComObject:serverSelect:";
 
         byte[] recordRet = databaseClient.send(null, selectStatement.getServerSelectShardNumber(),
-            selectStatement.getServerSelectReplicaNumber(), command, cobj.serialize(), DatabaseClient.Replica.specified);
-        if (previousSchemaVersion < databaseClient.getCommon().getSchemaVersion()) {
-          throw new SchemaOutOfSyncException();
-        }
+            selectStatement.getServerSelectReplicaNumber(), command, cobj, DatabaseClient.Replica.specified);
 
         ComObject retObj = new ComObject(recordRet);
         selectStatement.deserialize(retObj.getByteArray(ComObject.Tag.legacySelectStatement), dbName);

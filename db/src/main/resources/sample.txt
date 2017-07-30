@@ -1,281 +1,1894 @@
-ved 35 bytes  59,581,608.00 bytes/sec
-total size is 89,350,474  speedup is 1.00
-Dale-Lowry-MacBook-Pro:sonicbase-bench lowryda$ mvn dependency:tree
+Dale-Lowry-MacBook-Pro:sonicbase lowryda$ ./local_deploy 
 [INFO] Scanning for projects...
-[INFO] ------------------------------------------------------------------------
-[INFO] Reactor Build Order:
-[INFO] 
-[INFO] sonicbase-cli
-[INFO] cli
+[WARNING] 
+[WARNING] Some problems were encountered while building the effective model for com.sonicbase:sonicbase-core-unobfuscated:jar:0.9.2.2
+[WARNING] 'dependencies.dependency.systemPath' for com.yguard:obfuscation:jar should use a variable instead of a hard-coded path /Users/lowryda/tools/yguard-2.6/lib/ObfuscationAnnotation.jar @ line 70, column 25
+[WARNING] 'dependencies.dependency.(groupId:artifactId:type:classifier)' must be unique: commons-io:commons-io:jar -> duplicate declaration of version 2.5 @ line 85, column 21
+[WARNING] 
+[WARNING] It is highly recommended to fix these problems because they threaten the stability of your build.
+[WARNING] 
+[WARNING] For this reason, future Maven versions might no longer support building such malformed projects.
+[WARNING] 
 [INFO]                                                                         
 [INFO] ------------------------------------------------------------------------
-[INFO] Building sonicbase-cli 0.9.2.2
+[INFO] Building sonicbase-core 0.9.2.2
 [INFO] ------------------------------------------------------------------------
 [INFO] 
-[INFO] --- maven-dependency-plugin:2.8:tree (default-cli) @ sonicbase-cli ---
-[INFO] com.sonicbase:sonicbase-cli:pom:0.9.2.2
-[INFO]                                                                         
-[INFO] ------------------------------------------------------------------------
-[INFO] Building cli 0.9.2.2
-[INFO] ------------------------------------------------------------------------
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ sonicbase-core-unobfuscated ---
+[INFO] Deleting /Users/lowryda/Dropbox/git/sonicbase/db/target
 [INFO] 
-[INFO] --- maven-dependency-plugin:2.8:tree (default-cli) @ sonicbase-misc ---
-[INFO] com.sonicbase:sonicbase-misc:jar:0.9.2.2
-[INFO] +- com.sonicbase:sonicbase:jar:0.9.2.2:provided
-[INFO] +- com.amazonaws:aws-java-sdk:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-pinpoint:jar:1.11.109:compile
-[INFO] |  |  \- com.amazonaws:jmespath-java:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-xray:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-opsworkscm:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-support:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-simpledb:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-servicecatalog:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-servermigration:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-simpleworkflow:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-storagegateway:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-route53:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-s3:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-importexport:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-sts:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-sqs:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-rds:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-redshift:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-elasticbeanstalk:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-glacier:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-iam:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-datapipeline:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-elasticloadbalancing:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-elasticloadbalancingv2:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-emr:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-elasticache:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-elastictranscoder:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-ec2:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-dynamodb:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-sns:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-budgets:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-cloudtrail:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-cloudwatch:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-logs:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-events:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-cognitoidentity:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-cognitosync:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-directconnect:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-cloudformation:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-cloudfront:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-clouddirectory:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-kinesis:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-opsworks:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-ses:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-autoscaling:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-cloudsearch:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-cloudwatchmetrics:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-codedeploy:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-codepipeline:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-kms:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-config:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-lambda:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-ecs:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-ecr:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-cloudhsm:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-ssm:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-workspaces:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-machinelearning:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-directory:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-efs:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-codecommit:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-devicefarm:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-elasticsearch:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-waf:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-marketplacecommerceanalytics:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-inspector:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-iot:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-api-gateway:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-acm:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-gamelift:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-dms:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-marketplacemeteringservice:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-cognitoidp:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-discovery:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-applicationautoscaling:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-snowball:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-rekognition:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-polly:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-lightsail:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-stepfunctions:jar:1.11.109:compile
-[INFO] |  |  \- com.jayway.jsonpath:json-path:jar:2.2.0:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-health:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-costandusagereport:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-codebuild:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-appstream:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-shield:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-batch:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-lex:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-mechanicalturkrequester:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-organizations:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-workdocs:jar:1.11.109:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-core:jar:1.11.109:compile
-[INFO] |  |  +- software.amazon.ion:ion-java:jar:1.0.2:compile
-[INFO] |  |  +- com.fasterxml.jackson.core:jackson-databind:jar:2.6.6:compile
-[INFO] |  |  |  +- com.fasterxml.jackson.core:jackson-annotations:jar:2.6.0:compile
-[INFO] |  |  |  \- com.fasterxml.jackson.core:jackson-core:jar:2.6.6:compile
-[INFO] |  |  +- com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:jar:2.6.6:compile
-[INFO] |  |  \- joda-time:joda-time:jar:2.8.1:compile
-[INFO] |  +- com.amazonaws:aws-java-sdk-models:jar:1.11.109:compile
-[INFO] |  \- com.amazonaws:aws-java-sdk-swf-libraries:jar:1.11.22:compile
-[INFO] +- jline:jline:jar:0.9.9:compile
-[INFO] |  \- junit:junit:jar:3.8.1:compile
-[INFO] +- org.apache.commons:commons-crypto:jar:1.0.0:compile
-[INFO] |  \- net.java.dev.jna:jna:jar:4.2.2:compile
-[INFO] +- commons-io:commons-io:jar:2.5:compile
-[INFO] +- org.apache.maven.plugin-tools:maven-plugin-annotations:jar:3.2:provided
-[INFO] |  \- org.apache.maven:maven-artifact:jar:3.0:provided
-[INFO] |     \- org.codehaus.plexus:plexus-utils:jar:2.0.4:provided
-[INFO] +- org.apache.commons:commons-lang3:jar:3.3.2:compile
-[INFO] +- org.slf4j:slf4j-log4j12:jar:1.7.5:compile
-[INFO] |  +- org.slf4j:slf4j-api:jar:1.7.5:compile
-[INFO] |  \- log4j:log4j:jar:1.2.17:compile
-[INFO] +- org.testng:testng:jar:6.8:provided
-[INFO] |  +- org.beanshell:bsh:jar:2.0b4:provided
-[INFO] |  +- com.beust:jcommander:jar:1.27:provided
-[INFO] |  \- org.yaml:snakeyaml:jar:1.6:provided
-[INFO] +- com.google.code.gson:gson:jar:2.2.3:compile
-[INFO] +- com.github.jsqlparser:jsqlparser:jar:0.9.5:compile
-[INFO] +- it.unimi.dsi:fastutil:jar:7.0.2:compile
-[INFO] +- com.mashape.unirest:unirest-java:jar:1.4.9:compile
-[INFO] |  +- org.apache.httpcomponents:httpclient:jar:4.5.2:compile
-[INFO] |  |  +- org.apache.httpcomponents:httpcore:jar:4.4.4:compile
-[INFO] |  |  \- commons-codec:commons-codec:jar:1.9:compile
-[INFO] |  +- org.apache.httpcomponents:httpasyncclient:jar:4.1.1:compile
-[INFO] |  |  \- org.apache.httpcomponents:httpcore-nio:jar:4.4.4:compile
-[INFO] |  +- org.apache.httpcomponents:httpmime:jar:4.5.2:compile
-[INFO] |  \- org.json:json:jar:20160212:compile
-[INFO] +- org.eclipse.jetty:jetty-server:jar:9.4.2.v20170220:compile
-[INFO] |  +- javax.servlet:javax.servlet-api:jar:3.1.0:compile
-[INFO] |  +- org.eclipse.jetty:jetty-http:jar:9.4.2.v20170220:compile
-[INFO] |  |  \- org.eclipse.jetty:jetty-util:jar:9.4.2.v20170220:compile
-[INFO] |  \- org.eclipse.jetty:jetty-io:jar:9.4.2.v20170220:compile
-[INFO] +- commons-configuration:commons-configuration:jar:1.6:compile
-[INFO] |  +- commons-collections:commons-collections:jar:3.2.1:compile
-[INFO] |  +- commons-lang:commons-lang:jar:2.4:compile
-[INFO] |  +- commons-logging:commons-logging:jar:1.1.1:compile
-[INFO] |  +- commons-digester:commons-digester:jar:1.8:compile
-[INFO] |  |  \- commons-beanutils:commons-beanutils:jar:1.7.0:compile
-[INFO] |  \- commons-beanutils:commons-beanutils-core:jar:1.8.0:compile
-[INFO] +- io.netty:netty-all:jar:4.1.1.Final:compile
-[INFO] +- commons-cli:commons-cli:jar:1.3.1:compile
-[INFO] \- com.codahale.metrics:metrics-core:jar:3.0.2:compile
-[INFO] ------------------------------------------------------------------------
-[INFO] Reactor Summary:
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ sonicbase-core-unobfuscated ---
+[WARNING] Using platform encoding (UTF-8 actually) to copy filtered resources, i.e. build is platform dependent!
+[INFO] Copying 23 resources
 [INFO] 
-[INFO] sonicbase-cli ...................................... SUCCESS [  1.324 s]
-[INFO] cli ................................................ SUCCESS [  0.472 s]
+[INFO] --- maven-compiler-plugin:2.3.2:compile (default-compile) @ sonicbase-core-unobfuscated ---
+[WARNING] File encoding has not been set, using platform encoding UTF-8, i.e. build is platform dependent!
+[INFO] Compiling 98 source files to /Users/lowryda/Dropbox/git/sonicbase/db/target/classes
+[WARNING] /Users/lowryda/Dropbox/git/sonicbase/db/src/main/java/com/sonicbase/server/DatabaseServer.java:[26,15] Unsafe is internal proprietary API and may be removed in a future release
+[WARNING] /Users/lowryda/Dropbox/git/sonicbase/db/src/main/java/com/sonicbase/server/DatabaseServer.java:[116,17] Unsafe is internal proprietary API and may be removed in a future release
+[WARNING] /Users/lowryda/Dropbox/git/sonicbase/db/src/main/java/com/sonicbase/server/DatabaseServer.java:[119,37] Unsafe is internal proprietary API and may be removed in a future release
+[WARNING] /Users/lowryda/Dropbox/git/sonicbase/db/src/main/java/com/sonicbase/server/DatabaseServer.java:[121,14] Unsafe is internal proprietary API and may be removed in a future release
+[WARNING] /Users/lowryda/Dropbox/git/sonicbase/db/src/main/java/com/sonicbase/server/DatabaseServer.java:[131,10] Unsafe is internal proprietary API and may be removed in a future release
+[WARNING] /Users/lowryda/Dropbox/git/sonicbase/db/src/main/java/com/sonicbase/server/DatabaseServer.java:[2270,20] VMManagement is internal proprietary API and may be removed in a future release
+[WARNING] /Users/lowryda/Dropbox/git/sonicbase/db/src/main/java/com/sonicbase/server/DatabaseServer.java:[2271,25] VMManagement is internal proprietary API and may be removed in a future release
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ sonicbase-core-unobfuscated ---
+[WARNING] Using platform encoding (UTF-8 actually) to copy filtered resources, i.e. build is platform dependent!
+[INFO] skip non existing resourceDirectory /Users/lowryda/Dropbox/git/sonicbase/db/src/test/resources
+[INFO] 
+[INFO] --- maven-compiler-plugin:2.3.2:testCompile (default-testCompile) @ sonicbase-core-unobfuscated ---
+[WARNING] File encoding has not been set, using platform encoding UTF-8, i.e. build is platform dependent!
+[INFO] Compiling 16 source files to /Users/lowryda/Dropbox/git/sonicbase/db/target/test-classes
+[INFO] 
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ sonicbase-core-unobfuscated ---
+[INFO] Tests are skipped.
+[INFO] 
+[INFO] --- maven-jar-plugin:2.3.2:jar (default-jar) @ sonicbase-core-unobfuscated ---
+[INFO] Building jar: /Users/lowryda/Dropbox/git/sonicbase/db/target/sonicbase-core-unobfuscated-0.9.2.2.jar
+[INFO] 
+[INFO] --- maven-install-plugin:2.4:install (default-install) @ sonicbase-core-unobfuscated ---
+[INFO] Installing /Users/lowryda/Dropbox/git/sonicbase/db/target/sonicbase-core-unobfuscated-0.9.2.2.jar to /Users/lowryda/.m2/repository/com/sonicbase/sonicbase-core-unobfuscated/0.9.2.2/sonicbase-core-unobfuscated-0.9.2.2.jar
+[INFO] Installing /Users/lowryda/Dropbox/git/sonicbase/db/pom.xml to /Users/lowryda/.m2/repository/com/sonicbase/sonicbase-core-unobfuscated/0.9.2.2/sonicbase-core-unobfuscated-0.9.2.2.pom
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD SUCCESS
 [INFO] ------------------------------------------------------------------------
-[INFO] Total time: 2.106 s
-[INFO] Finished at: 2017-06-15T13:08:01-06:00
-[INFO] Final Memory: 14M/309M
+[INFO] Total time: 28.614 s
+[INFO] Finished at: 2017-07-26T19:59:11-06:00
+[INFO] Final Memory: 49M/299M
 [INFO] ------------------------------------------------------------------------
-Dale-Lowry-MacBook-Pro:sonicbase-bench lowryda$ 
-Dale-Lowry-MacBook-Pro:sonicbase-bench lowryda$ cd ../sonicbase
-Dale-Lowry-MacBook-Pro:sonicbase lowryda$ mvn dependency:tree
+ProGuard, version 5.3.3
+Reading program jar [/Users/lowryda/Dropbox/git/sonicbase/db/target/sonicbase-core-unobfuscated-0.9.2.2.jar]
+Reading library jar [/Library/Java/JavaVirtualMachines/jdk1.8.0_121.jdk/Contents/Home/jre/lib/rt.jar]
+Note: com.sonicbase.bench.TestTransactions: can't find dynamically referenced class com.mysql.jdbc.Driver
+Note: com.sonicbase.server.DatabaseServer accesses a declared field 'jvm' dynamically
+Note: com.sonicbase.server.DatabaseServer accesses a declared method 'getProcessId()' dynamically
+      Maybe this is library method 'sun.management.jdp.JdpJmxPacket { java.lang.String getProcessId(); }'
+Note: there were 1 unresolved dynamic references to classes or interfaces.
+      You should check if you need to specify additional program jars.
+      (http://proguard.sourceforge.net/manual/troubleshooting.html#dynamicalclass)
+Note: there were 2 accesses to class members by means of introspection.
+      You should consider explicitly keeping the mentioned class members
+      (using '-keep' or '-keepclassmembers').
+      (http://proguard.sourceforge.net/manual/troubleshooting.html#dynamicalclassmember)
+Preparing output jar [/Users/lowryda/Dropbox/git/sonicbase/db/target/sonicbase-core-0.9.2.2.jar]
+  Copying resources from program jar [/Users/lowryda/Dropbox/git/sonicbase/db/target/sonicbase-core-unobfuscated-0.9.2.2.jar]
 [INFO] Scanning for projects...
+[WARNING] 
+[WARNING] Some problems were encountered while building the effective model for com.sonicbase:sonicbase-core-unobfuscated:jar:0.9.2.2
+[WARNING] 'dependencies.dependency.systemPath' for com.yguard:obfuscation:jar should use a variable instead of a hard-coded path /Users/lowryda/tools/yguard-2.6/lib/ObfuscationAnnotation.jar @ line 70, column 25
+[WARNING] 'dependencies.dependency.(groupId:artifactId:type:classifier)' must be unique: commons-io:commons-io:jar -> duplicate declaration of version 2.5 @ line 85, column 21
+[WARNING] 
+[WARNING] Some problems were encountered while building the effective model for com.sonicbase:sonicbase:jar:0.9.2.2
+[WARNING] 'dependencies.dependency.(groupId:artifactId:type:classifier)' must be unique: commons-io:commons-io:jar -> duplicate declaration of version 2.5 @ line 90, column 21
+[WARNING] 
+[WARNING] It is highly recommended to fix these problems because they threaten the stability of your build.
+[WARNING] 
+[WARNING] For this reason, future Maven versions might no longer support building such malformed projects.
+[WARNING] 
 [INFO] ------------------------------------------------------------------------
 [INFO] Reactor Build Order:
 [INFO] 
 [INFO] sonicbase-root
+[INFO] sonicbase-core
 [INFO] sonicbase
 [INFO]                                                                         
 [INFO] ------------------------------------------------------------------------
 [INFO] Building sonicbase-root 0.9.2.2
 [INFO] ------------------------------------------------------------------------
 [INFO] 
-[INFO] --- maven-dependency-plugin:2.8:tree (default-cli) @ sonicbase-root ---
-[INFO] com.lowryengineering:sonicbase-root:pom:0.9.2.2
+[INFO] --- maven-install-plugin:2.4:install-file (default-cli) @ sonicbase-root ---
+[INFO] Installing /Users/lowryda/Dropbox/git/sonicbase/db/target/sonicbase-core-0.9.2.2.jar to /Users/lowryda/.m2/repository/com/sonicbase/sonicbase-core/0.9.2.2/sonicbase-core-0.9.2.2.jar
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary:
+[INFO] 
+[INFO] sonicbase-root ..................................... SUCCESS [  0.251 s]
+[INFO] sonicbase-core ..................................... SKIPPED
+[INFO] sonicbase .......................................... SKIPPED
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time: 0.521 s
+[INFO] Finished at: 2017-07-26T19:59:19-06:00
+[INFO] Final Memory: 7M/245M
+[INFO] ------------------------------------------------------------------------
+[INFO] Scanning for projects...
+[WARNING] 
+[WARNING] Some problems were encountered while building the effective model for com.sonicbase:sonicbase:jar:0.9.2.2
+[WARNING] 'dependencies.dependency.(groupId:artifactId:type:classifier)' must be unique: commons-io:commons-io:jar -> duplicate declaration of version 2.5 @ line 90, column 21
+[WARNING] 
+[WARNING] It is highly recommended to fix these problems because they threaten the stability of your build.
+[WARNING] 
+[WARNING] For this reason, future Maven versions might no longer support building such malformed projects.
+[WARNING] 
 [INFO]                                                                         
 [INFO] ------------------------------------------------------------------------
 [INFO] Building sonicbase 0.9.2.2
 [INFO] ------------------------------------------------------------------------
 [INFO] 
-[INFO] --- maven-dependency-plugin:2.8:tree (default-cli) @ sonicbase ---
-[INFO] com.lowryengineering:sonicbase:jar:0.9.2.2
-[INFO] +- com.mashape.unirest:unirest-java:jar:1.4.9:compile
-[INFO] |  +- org.apache.httpcomponents:httpclient:jar:4.5.2:compile
-[INFO] |  |  +- org.apache.httpcomponents:httpcore:jar:4.4.4:compile
-[INFO] |  |  \- commons-codec:commons-codec:jar:1.9:compile
-[INFO] |  +- org.apache.httpcomponents:httpasyncclient:jar:4.1.1:compile
-[INFO] |  |  \- org.apache.httpcomponents:httpcore-nio:jar:4.4.4:compile
-[INFO] |  +- org.apache.httpcomponents:httpmime:jar:4.5.2:compile
-[INFO] |  \- org.json:json:jar:20160212:compile
-[INFO] +- commons-io:commons-io:jar:2.5:compile
-[INFO] +- net.jpountz.lz4:lz4:jar:1.3.0:compile
-[INFO] +- org.apache.commons:commons-crypto:jar:1.0.0:compile
-[INFO] |  \- net.java.dev.jna:jna:jar:4.2.2:compile
-[INFO] +- org.apache.maven.plugin-tools:maven-plugin-annotations:jar:3.2:provided
-[INFO] |  \- org.apache.maven:maven-artifact:jar:3.0:provided
-[INFO] |     \- org.codehaus.plexus:plexus-utils:jar:2.0.4:provided
-[INFO] +- org.apache.commons:commons-lang3:jar:3.3.2:compile
-[INFO] +- log4j:log4j:jar:1.2.17:compile
-[INFO] +- org.testng:testng:jar:6.8:provided
-[INFO] |  +- junit:junit:jar:4.10:compile
-[INFO] |  |  \- org.hamcrest:hamcrest-core:jar:1.1:compile
-[INFO] |  +- org.beanshell:bsh:jar:2.0b4:provided
-[INFO] |  +- com.beust:jcommander:jar:1.27:provided
-[INFO] |  \- org.yaml:snakeyaml:jar:1.6:provided
-[INFO] +- com.google.code.gson:gson:jar:2.2.3:compile
-[INFO] +- com.github.jsqlparser:jsqlparser:jar:0.9.5:compile
-[INFO] +- it.unimi.dsi:fastutil:jar:7.0.2:compile
-[INFO] +- commons-configuration:commons-configuration:jar:1.6:compile
-[INFO] |  +- commons-collections:commons-collections:jar:3.2.1:compile
-[INFO] |  +- commons-lang:commons-lang:jar:2.4:compile
-[INFO] |  +- commons-logging:commons-logging:jar:1.1.1:compile
-[INFO] |  +- commons-digester:commons-digester:jar:1.8:compile
-[INFO] |  |  \- commons-beanutils:commons-beanutils:jar:1.7.0:compile
-[INFO] |  \- commons-beanutils:commons-beanutils-core:jar:1.8.0:compile
-[INFO] +- org.anarres.lzo:lzo-hadoop:jar:1.0.5:compile
-[INFO] |  +- org.apache.hadoop:hadoop-core:jar:1.2.1:compile
-[INFO] |  |  +- xmlenc:xmlenc:jar:0.52:compile
-[INFO] |  |  +- com.sun.jersey:jersey-core:jar:1.8:compile
-[INFO] |  |  +- com.sun.jersey:jersey-json:jar:1.8:compile
-[INFO] |  |  |  +- org.codehaus.jettison:jettison:jar:1.1:compile
-[INFO] |  |  |  |  \- stax:stax-api:jar:1.0.1:compile
-[INFO] |  |  |  +- com.sun.xml.bind:jaxb-impl:jar:2.2.3-1:compile
-[INFO] |  |  |  |  \- javax.xml.bind:jaxb-api:jar:2.2.2:compile
-[INFO] |  |  |  |     +- javax.xml.stream:stax-api:jar:1.0-2:compile
-[INFO] |  |  |  |     \- javax.activation:activation:jar:1.1:compile
-[INFO] |  |  |  +- org.codehaus.jackson:jackson-core-asl:jar:1.7.1:compile
-[INFO] |  |  |  +- org.codehaus.jackson:jackson-jaxrs:jar:1.7.1:compile
-[INFO] |  |  |  \- org.codehaus.jackson:jackson-xc:jar:1.7.1:compile
-[INFO] |  |  +- com.sun.jersey:jersey-server:jar:1.8:compile
-[INFO] |  |  |  \- asm:asm:jar:3.1:compile
-[INFO] |  |  +- commons-httpclient:commons-httpclient:jar:3.0.1:compile
-[INFO] |  |  +- org.apache.commons:commons-math:jar:2.1:compile
-[INFO] |  |  +- commons-net:commons-net:jar:1.4.1:compile
-[INFO] |  |  +- org.mortbay.jetty:jetty:jar:6.1.26:compile
-[INFO] |  |  |  \- org.mortbay.jetty:servlet-api:jar:2.5-20081211:compile
-[INFO] |  |  +- org.mortbay.jetty:jetty-util:jar:6.1.26:compile
-[INFO] |  |  +- tomcat:jasper-runtime:jar:5.5.12:compile
-[INFO] |  |  +- tomcat:jasper-compiler:jar:5.5.12:compile
-[INFO] |  |  +- org.mortbay.jetty:jsp-api-2.1:jar:6.1.14:compile
-[INFO] |  |  |  \- org.mortbay.jetty:servlet-api-2.5:jar:6.1.14:compile
-[INFO] |  |  +- org.mortbay.jetty:jsp-2.1:jar:6.1.14:compile
-[INFO] |  |  |  \- ant:ant:jar:1.6.5:compile
-[INFO] |  |  +- commons-el:commons-el:jar:1.0:compile
-[INFO] |  |  +- net.java.dev.jets3t:jets3t:jar:0.6.1:compile
-[INFO] |  |  +- hsqldb:hsqldb:jar:1.8.0.10:compile
-[INFO] |  |  +- oro:oro:jar:2.0.8:compile
-[INFO] |  |  +- org.eclipse.jdt:core:jar:3.1.1:compile
-[INFO] |  |  \- org.codehaus.jackson:jackson-mapper-asl:jar:1.8.8:compile
-[INFO] |  +- org.anarres.lzo:lzo-core:jar:1.0.5:compile
-[INFO] |  \- com.google.code.findbugs:annotations:jar:2.0.3:compile
-[INFO] +- io.netty:netty-all:jar:4.1.9.Final:compile
-[INFO] +- commons-cli:commons-cli:jar:1.3.1:compile
-[INFO] \- com.codahale.metrics:metrics-core:jar:3.0.2:compile
-[INFO]    \- org.slf4j:slf4j-api:jar:1.7.5:compile
-[INFO] ------------------------------------------------------------------------
-[INFO] Reactor Summary:
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ sonicbase ---
+[WARNING] Using platform encoding (UTF-8 actually) to copy filtered resources, i.e. build is platform dependent!
+[INFO] Copying 0 resource
 [INFO] 
-[INFO] sonicbase-root ..................................... SUCCESS [  0.542 s]
-[INFO] sonicbase .......................................... SUCCESS [  0.377 s]
-[INFO] ------------------------------------------------------------------------
-[INFO] BUILD SUCCESS
+[INFO] --- maven-compiler-plugin:2.3.2:compile (default-compile) @ sonicbase ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO] 
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ sonicbase ---
+[WARNING] Using platform encoding (UTF-8 actually) to copy filtered resources, i.e. build is platform dependent!
+[INFO] skip non existing resourceDirectory /Users/lowryda/Dropbox/git/sonicbase/sonicbase/src/test/resources
+[INFO] 
+[INFO] --- maven-compiler-plugin:2.3.2:testCompile (default-testCompile) @ sonicbase ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO] 
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ sonicbase ---
+[INFO] Tests are skipped.
+[INFO] 
+[INFO] --- maven-jar-plugin:2.3.2:jar (default-jar) @ sonicbase ---
+[INFO] 
+[INFO] --- maven-shade-plugin:3.0.0:shade (default-cli) @ sonicbase ---
+[INFO] Including com.sonicbase:sonicbase-core:jar:0.9.2.2 in the shaded jar.
+[INFO] Including commons-io:commons-io:jar:2.5 in the shaded jar.
+[INFO] Including com.mashape.unirest:unirest-java:jar:1.4.9 in the shaded jar.
+[INFO] Including org.apache.httpcomponents:httpclient:jar:4.5.2 in the shaded jar.
+[INFO] Including org.apache.httpcomponents:httpcore:jar:4.4.4 in the shaded jar.
+[INFO] Including commons-codec:commons-codec:jar:1.9 in the shaded jar.
+[INFO] Including org.apache.httpcomponents:httpasyncclient:jar:4.1.1 in the shaded jar.
+[INFO] Including org.apache.httpcomponents:httpcore-nio:jar:4.4.4 in the shaded jar.
+[INFO] Including org.apache.httpcomponents:httpmime:jar:4.5.2 in the shaded jar.
+[INFO] Including org.json:json:jar:20160212 in the shaded jar.
+[INFO] Including net.jpountz.lz4:lz4:jar:1.3.0 in the shaded jar.
+[INFO] Including org.apache.commons:commons-crypto:jar:1.0.0 in the shaded jar.
+[INFO] Including net.java.dev.jna:jna:jar:4.2.2 in the shaded jar.
+[INFO] Including org.apache.commons:commons-lang3:jar:3.3.2 in the shaded jar.
+[INFO] Including log4j:log4j:jar:1.2.17 in the shaded jar.
+[INFO] Including junit:junit:jar:4.10 in the shaded jar.
+[INFO] Including org.hamcrest:hamcrest-core:jar:1.1 in the shaded jar.
+[INFO] Including com.google.code.gson:gson:jar:2.2.3 in the shaded jar.
+[INFO] Including com.github.jsqlparser:jsqlparser:jar:0.9.5 in the shaded jar.
+[INFO] Including org.quartz-scheduler:quartz:jar:2.2.1 in the shaded jar.
+[INFO] Including c3p0:c3p0:jar:0.9.1.1 in the shaded jar.
+[INFO] Including org.slf4j:slf4j-api:jar:1.6.6 in the shaded jar.
+[INFO] Including org.quartz-scheduler:quartz-jobs:jar:2.2.1 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-pinpoint:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:jmespath-java:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-xray:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-opsworkscm:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-support:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-simpledb:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-servicecatalog:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-servermigration:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-simpleworkflow:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-storagegateway:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-route53:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-s3:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-importexport:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-sts:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-sqs:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-rds:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-redshift:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-elasticbeanstalk:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-glacier:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-iam:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-datapipeline:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-elasticloadbalancing:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-elasticloadbalancingv2:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-emr:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-elasticache:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-elastictranscoder:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-ec2:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-dynamodb:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-sns:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-budgets:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-cloudtrail:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-cloudwatch:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-logs:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-events:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-cognitoidentity:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-cognitosync:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-directconnect:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-cloudformation:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-cloudfront:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-clouddirectory:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-kinesis:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-opsworks:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-ses:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-autoscaling:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-cloudsearch:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-cloudwatchmetrics:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-codedeploy:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-codepipeline:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-kms:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-config:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-lambda:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-ecs:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-ecr:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-cloudhsm:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-ssm:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-workspaces:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-machinelearning:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-directory:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-efs:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-codecommit:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-devicefarm:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-elasticsearch:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-waf:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-marketplacecommerceanalytics:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-inspector:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-iot:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-api-gateway:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-acm:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-gamelift:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-dms:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-marketplacemeteringservice:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-cognitoidp:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-discovery:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-applicationautoscaling:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-snowball:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-rekognition:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-polly:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-lightsail:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-stepfunctions:jar:1.11.109 in the shaded jar.
+[INFO] Including com.jayway.jsonpath:json-path:jar:2.2.0 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-health:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-costandusagereport:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-codebuild:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-appstream:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-shield:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-batch:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-lex:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-mechanicalturkrequester:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-organizations:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-workdocs:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-core:jar:1.11.109 in the shaded jar.
+[INFO] Including software.amazon.ion:ion-java:jar:1.0.2 in the shaded jar.
+[INFO] Including com.fasterxml.jackson.core:jackson-databind:jar:2.6.6 in the shaded jar.
+[INFO] Including com.fasterxml.jackson.core:jackson-annotations:jar:2.6.0 in the shaded jar.
+[INFO] Including com.fasterxml.jackson.core:jackson-core:jar:2.6.6 in the shaded jar.
+[INFO] Including com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:jar:2.6.6 in the shaded jar.
+[INFO] Including joda-time:joda-time:jar:2.8.1 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-models:jar:1.11.109 in the shaded jar.
+[INFO] Including com.amazonaws:aws-java-sdk-swf-libraries:jar:1.11.22 in the shaded jar.
+[INFO] Including it.unimi.dsi:fastutil:jar:7.0.2 in the shaded jar.
+[INFO] Including com.google.http-client:google-http-client:jar:1.17.0-rc in the shaded jar.
+[INFO] Including com.google.code.findbugs:jsr305:jar:1.3.9 in the shaded jar.
+[INFO] Including commons-configuration:commons-configuration:jar:1.6 in the shaded jar.
+[INFO] Including commons-collections:commons-collections:jar:3.2.1 in the shaded jar.
+[INFO] Including commons-lang:commons-lang:jar:2.4 in the shaded jar.
+[INFO] Including commons-logging:commons-logging:jar:1.1.1 in the shaded jar.
+[INFO] Including commons-digester:commons-digester:jar:1.8 in the shaded jar.
+[INFO] Including commons-beanutils:commons-beanutils:jar:1.7.0 in the shaded jar.
+[INFO] Including commons-beanutils:commons-beanutils-core:jar:1.8.0 in the shaded jar.
+[INFO] Including org.anarres.lzo:lzo-hadoop:jar:1.0.5 in the shaded jar.
+[INFO] Including org.apache.hadoop:hadoop-core:jar:1.2.1 in the shaded jar.
+[INFO] Including xmlenc:xmlenc:jar:0.52 in the shaded jar.
+[INFO] Including com.sun.jersey:jersey-core:jar:1.8 in the shaded jar.
+[INFO] Including com.sun.jersey:jersey-json:jar:1.8 in the shaded jar.
+[INFO] Including org.codehaus.jettison:jettison:jar:1.1 in the shaded jar.
+[INFO] Including stax:stax-api:jar:1.0.1 in the shaded jar.
+[INFO] Including com.sun.xml.bind:jaxb-impl:jar:2.2.3-1 in the shaded jar.
+[INFO] Including javax.xml.bind:jaxb-api:jar:2.2.2 in the shaded jar.
+[INFO] Including javax.xml.stream:stax-api:jar:1.0-2 in the shaded jar.
+[INFO] Including javax.activation:activation:jar:1.1 in the shaded jar.
+[INFO] Including org.codehaus.jackson:jackson-core-asl:jar:1.7.1 in the shaded jar.
+[INFO] Including org.codehaus.jackson:jackson-jaxrs:jar:1.7.1 in the shaded jar.
+[INFO] Including org.codehaus.jackson:jackson-xc:jar:1.7.1 in the shaded jar.
+[INFO] Including com.sun.jersey:jersey-server:jar:1.8 in the shaded jar.
+[INFO] Including asm:asm:jar:3.1 in the shaded jar.
+[INFO] Including commons-httpclient:commons-httpclient:jar:3.0.1 in the shaded jar.
+[INFO] Including org.apache.commons:commons-math:jar:2.1 in the shaded jar.
+[INFO] Including commons-net:commons-net:jar:1.4.1 in the shaded jar.
+[INFO] Including org.mortbay.jetty:jetty:jar:6.1.26 in the shaded jar.
+[INFO] Including org.mortbay.jetty:jetty-util:jar:6.1.26 in the shaded jar.
+[INFO] Including tomcat:jasper-runtime:jar:5.5.12 in the shaded jar.
+[INFO] Including tomcat:jasper-compiler:jar:5.5.12 in the shaded jar.
+[INFO] Including org.mortbay.jetty:jsp-api-2.1:jar:6.1.14 in the shaded jar.
+[INFO] Including org.mortbay.jetty:jsp-2.1:jar:6.1.14 in the shaded jar.
+[INFO] Including ant:ant:jar:1.6.5 in the shaded jar.
+[INFO] Including commons-el:commons-el:jar:1.0 in the shaded jar.
+[INFO] Including net.java.dev.jets3t:jets3t:jar:0.6.1 in the shaded jar.
+[INFO] Including hsqldb:hsqldb:jar:1.8.0.10 in the shaded jar.
+[INFO] Including oro:oro:jar:2.0.8 in the shaded jar.
+[INFO] Including org.eclipse.jdt:core:jar:3.1.1 in the shaded jar.
+[INFO] Including org.codehaus.jackson:jackson-mapper-asl:jar:1.8.8 in the shaded jar.
+[INFO] Including org.anarres.lzo:lzo-core:jar:1.0.5 in the shaded jar.
+[INFO] Including com.google.code.findbugs:annotations:jar:2.0.3 in the shaded jar.
+[INFO] Including io.netty:netty-all:jar:4.1.9.Final in the shaded jar.
+[INFO] Including commons-cli:commons-cli:jar:1.3.1 in the shaded jar.
+[INFO] Including com.codahale.metrics:metrics-core:jar:3.0.2 in the shaded jar.
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-codepipeline-1.11.109.jar define 327 overlapping classes: 
+[WARNING]   - com.amazonaws.services.codepipeline.model.transform.CurrentRevisionMarshaller
+[WARNING]   - com.amazonaws.services.codepipeline.model.transform.PipelineContextJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.codepipeline.model.InvalidActionDeclarationException
+[WARNING]   - com.amazonaws.services.codepipeline.model.transform.PutJobFailureResultRequestMarshaller
+[WARNING]   - com.amazonaws.services.codepipeline.model.InputArtifact
+[WARNING]   - com.amazonaws.services.codepipeline.model.ActionExecution
+[WARNING]   - com.amazonaws.services.codepipeline.model.transform.PutJobSuccessResultRequestMarshaller
+[WARNING]   - com.amazonaws.services.codepipeline.model.transform.GetPipelineRequestMarshaller
+[WARNING]   - com.amazonaws.services.codepipeline.model.transform.GetJobDetailsRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.codepipeline.model.CreatePipelineRequest
+[WARNING]   - 317 more...
+[WARNING] aws-java-sdk-directory-1.11.109.jar, sonicbase-0.9.2.2.jar define 319 overlapping classes: 
+[WARNING]   - com.amazonaws.services.directory.model.transform.DisableRadiusRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.directory.model.DisableSsoResult
+[WARNING]   - com.amazonaws.services.directory.model.transform.DeleteSnapshotRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.directory.model.transform.ListTagsForResourceRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.directory.model.ReplicationScope
+[WARNING]   - com.amazonaws.services.directory.model.transform.DeleteSnapshotRequestMarshaller
+[WARNING]   - com.amazonaws.services.directory.model.Snapshot
+[WARNING]   - com.amazonaws.services.directory.AWSDirectoryServiceAsyncClient$8
+[WARNING]   - com.amazonaws.services.directory.model.transform.RestoreFromSnapshotRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.directory.model.DisableRadiusResult
+[WARNING]   - 309 more...
+[WARNING] sonicbase-0.9.2.2.jar, commons-lang3-3.3.2.jar define 217 overlapping classes: 
+[WARNING]   - org.apache.commons.lang3.time.StopWatch$State$1
+[WARNING]   - org.apache.commons.lang3.SerializationUtils
+[WARNING]   - org.apache.commons.lang3.time.FastDatePrinter$TwentyFourHourField
+[WARNING]   - org.apache.commons.lang3.LocaleUtils
+[WARNING]   - org.apache.commons.lang3.concurrent.ConcurrentException
+[WARNING]   - org.apache.commons.lang3.CharRange
+[WARNING]   - org.apache.commons.lang3.builder.IDKey
+[WARNING]   - org.apache.commons.lang3.reflect.TypeUtils
+[WARNING]   - org.apache.commons.lang3.ArrayUtils
+[WARNING]   - org.apache.commons.lang3.text.FormattableUtils
+[WARNING]   - 207 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-workspaces-1.11.109.jar define 158 overlapping classes: 
+[WARNING]   - com.amazonaws.services.workspaces.model.transform.WorkspacePropertiesMarshaller
+[WARNING]   - com.amazonaws.services.workspaces.model.UnsupportedWorkspaceConfigurationException
+[WARNING]   - com.amazonaws.services.workspaces.model.StopWorkspacesRequest
+[WARNING]   - com.amazonaws.services.workspaces.model.transform.RebuildRequestMarshaller
+[WARNING]   - com.amazonaws.services.workspaces.model.transform.WorkspaceRequestMarshaller
+[WARNING]   - com.amazonaws.services.workspaces.model.transform.RebuildRequestJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.workspaces.AmazonWorkspacesAsyncClient$3
+[WARNING]   - com.amazonaws.services.workspaces.model.transform.CreateTagsRequestMarshaller
+[WARNING]   - com.amazonaws.services.workspaces.model.transform.DescribeWorkspaceDirectoriesRequestMarshaller
+[WARNING]   - com.amazonaws.services.workspaces.model.InvalidResourceStateException
+[WARNING]   - 148 more...
+[WARNING] sonicbase-0.9.2.2.jar, ant-1.6.5.jar define 576 overlapping classes: 
+[WARNING]   - org.apache.tools.ant.taskdefs.WhichResource
+[WARNING]   - org.apache.tools.ant.types.selectors.PresentSelector
+[WARNING]   - org.apache.tools.ant.taskdefs.Touch$DateFormatFactory
+[WARNING]   - org.apache.tools.ant.util.facade.FacadeTaskHelper
+[WARNING]   - org.apache.tools.ant.helper.DefaultExecutor
+[WARNING]   - org.apache.tools.ant.DefaultLogger
+[WARNING]   - org.apache.tools.ant.taskdefs.Javadoc$DocletParam
+[WARNING]   - org.apache.tools.ant.types.selectors.SelectorScanner
+[WARNING]   - org.apache.tools.ant.types.PatternSet$NameEntry
+[WARNING]   - org.apache.tools.ant.taskdefs.Nice
+[WARNING]   - 566 more...
+[WARNING] sonicbase-0.9.2.2.jar, jmespath-java-1.11.109.jar define 28 overlapping classes: 
+[WARNING]   - com.amazonaws.jmespath.NumericComparator
+[WARNING]   - com.amazonaws.jmespath.JmesPathProjection
+[WARNING]   - com.amazonaws.jmespath.JmesPathMultiSelectList
+[WARNING]   - com.amazonaws.jmespath.JmesPathValueProjection
+[WARNING]   - com.amazonaws.jmespath.InvalidTypeException
+[WARNING]   - com.amazonaws.jmespath.JmesPathSubExpression
+[WARNING]   - com.amazonaws.jmespath.JmesPathFunction
+[WARNING]   - com.amazonaws.jmespath.JmesPathIdentity
+[WARNING]   - com.amazonaws.jmespath.JmesPathLiteral
+[WARNING]   - com.amazonaws.jmespath.JmesPathField
+[WARNING]   - 18 more...
+[WARNING] sonicbase-0.9.2.2.jar, ion-java-1.0.2.jar define 336 overlapping classes: 
+[WARNING]   - software.amazon.ion.impl.IonReaderTextRawTokensX$ProhibitedCharacters$1
+[WARNING]   - software.amazon.ion.impl.lite.IonDatagramLite$1
+[WARNING]   - software.amazon.ion.impl.IonReaderTextRawTokensX$1
+[WARNING]   - software.amazon.ion.impl.PrivateSymtabExtendsCache
+[WARNING]   - software.amazon.ion.impl.lite.IonValueLite
+[WARNING]   - software.amazon.ion.impl.bin.AbstractIonWriter
+[WARNING]   - software.amazon.ion.system.IonBinaryWriterBuilder
+[WARNING]   - software.amazon.ion.impl.PrivateScalarConversions$ValueVariant
+[WARNING]   - software.amazon.ion.SpanProvider
+[WARNING]   - software.amazon.ion.impl.bin.IonManagedBinaryWriter$UserState
+[WARNING]   - 326 more...
+[WARNING] sonicbase-0.9.2.2.jar, jna-4.2.2.jar define 107 overlapping classes: 
+[WARNING]   - com.sun.jna.Callback$UncaughtExceptionHandler
+[WARNING]   - com.sun.jna.Native$4
+[WARNING]   - com.sun.jna.ptr.ShortByReference
+[WARNING]   - com.sun.jna.Pointer
+[WARNING]   - com.sun.jna.VarArgsChecker$RealVarArgsChecker
+[WARNING]   - com.sun.jna.Structure$FFIType$size_t
+[WARNING]   - com.sun.jna.Memory$SharedMemory
+[WARNING]   - com.sun.jna.Native$7
+[WARNING]   - com.sun.jna.Native$ffi_callback
+[WARNING]   - com.sun.jna.Native$Buffers
+[WARNING]   - 97 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-emr-1.11.109.jar define 455 overlapping classes: 
+[WARNING]   - com.amazonaws.services.elasticmapreduce.model.transform.ClusterMarshaller
+[WARNING]   - com.amazonaws.services.elasticmapreduce.model.ListInstanceFleetsRequest
+[WARNING]   - com.amazonaws.services.elasticmapreduce.model.transform.VolumeSpecificationJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.elasticmapreduce.model.transform.BootstrapActionDetailJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.elasticmapreduce.model.transform.CancelStepsInfoMarshaller
+[WARNING]   - com.amazonaws.services.elasticmapreduce.model.transform.TagMarshaller
+[WARNING]   - com.amazonaws.services.elasticmapreduce.spi.security.TLSArtifacts
+[WARNING]   - com.amazonaws.services.elasticmapreduce.model.InstanceGroupDetail
+[WARNING]   - com.amazonaws.services.elasticmapreduce.model.VolumeSpecification
+[WARNING]   - com.amazonaws.services.elasticmapreduce.model.transform.InstanceFleetTimelineJsonUnmarshaller
+[WARNING]   - 445 more...
+[WARNING] sonicbase-0.9.2.2.jar, jackson-databind-2.6.6.jar define 563 overlapping classes: 
+[WARNING]   - com.fasterxml.jackson.databind.BeanDescription
+[WARNING]   - com.fasterxml.jackson.databind.deser.impl.BeanAsArrayBuilderDeserializer
+[WARNING]   - com.fasterxml.jackson.databind.SerializerProvider
+[WARNING]   - com.fasterxml.jackson.databind.introspect.AnnotatedMethodMap
+[WARNING]   - com.fasterxml.jackson.databind.ser.std.StaticListSerializerBase
+[WARNING]   - com.fasterxml.jackson.databind.ser.std.NumberSerializers$ShortSerializer
+[WARNING]   - com.fasterxml.jackson.databind.ser.BeanSerializerFactory
+[WARNING]   - com.fasterxml.jackson.databind.jsonFormatVisitors.JsonMapFormatVisitor
+[WARNING]   - com.fasterxml.jackson.databind.jsonFormatVisitors.JsonFormatTypes
+[WARNING]   - com.fasterxml.jackson.databind.deser.impl.MethodProperty
+[WARNING]   - 553 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-api-gateway-1.11.109.jar define 723 overlapping classes: 
+[WARNING]   - com.amazonaws.services.apigateway.AmazonApiGatewayAsyncClient$8
+[WARNING]   - com.amazonaws.services.apigateway.model.Authorizer
+[WARNING]   - com.amazonaws.services.apigateway.model.GetModelsRequest
+[WARNING]   - com.amazonaws.services.apigateway.model.QuotaSettings
+[WARNING]   - com.amazonaws.services.apigateway.model.CreateStageRequest
+[WARNING]   - com.amazonaws.services.apigateway.AmazonApiGatewayAsyncClient$18
+[WARNING]   - com.amazonaws.services.apigateway.model.transform.IntegrationResponseJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.apigateway.model.transform.GetStagesRequestMarshaller
+[WARNING]   - com.amazonaws.services.apigateway.AmazonApiGatewayAsyncClient$58
+[WARNING]   - com.amazonaws.services.apigateway.model.Deployment
+[WARNING]   - 713 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-rds-1.11.109.jar define 639 overlapping classes: 
+[WARNING]   - com.amazonaws.services.rds.model.DomainNotFoundException
+[WARNING]   - com.amazonaws.services.rds.model.CreateDBSubnetGroupRequest
+[WARNING]   - com.amazonaws.services.rds.model.OrderableDBInstanceOption
+[WARNING]   - com.amazonaws.services.rds.model.DescribeAccountAttributesResult
+[WARNING]   - com.amazonaws.services.rds.model.transform.SubnetStaxUnmarshaller
+[WARNING]   - com.amazonaws.services.rds.model.ListTagsForResourceResult
+[WARNING]   - com.amazonaws.services.rds.model.ModifyDBClusterSnapshotAttributeRequest
+[WARNING]   - com.amazonaws.services.rds.waiters.DBInstanceAvailable$IsIncompatiblerestoreMatcher
+[WARNING]   - com.amazonaws.services.rds.model.transform.ReservedDBInstanceQuotaExceededExceptionUnmarshaller
+[WARNING]   - com.amazonaws.services.rds.model.transform.AddSourceIdentifierToSubscriptionRequestMarshaller
+[WARNING]   - 629 more...
+[WARNING] aws-java-sdk-devicefarm-1.11.109.jar, sonicbase-0.9.2.2.jar define 425 overlapping classes: 
+[WARNING]   - com.amazonaws.services.devicefarm.model.transform.UpdateProjectRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.devicefarm.model.transform.CountersMarshaller
+[WARNING]   - com.amazonaws.services.devicefarm.model.transform.StopRemoteAccessSessionRequestMarshaller
+[WARNING]   - com.amazonaws.services.devicefarm.model.transform.GetAccountSettingsRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.devicefarm.model.ListUploadsResult
+[WARNING]   - com.amazonaws.services.devicefarm.model.transform.CreateNetworkProfileRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.devicefarm.model.transform.CreateUploadResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.devicefarm.model.BillingMethod
+[WARNING]   - com.amazonaws.services.devicefarm.model.DeleteDevicePoolResult
+[WARNING]   - com.amazonaws.services.devicefarm.model.transform.RecurringChargeMarshaller
+[WARNING]   - 415 more...
+[WARNING] sonicbase-0.9.2.2.jar, c3p0-0.9.1.1.jar define 382 overlapping classes: 
+[WARNING]   - com.mchange.v2.resourcepool.CannotAcquireResourceException
+[WARNING]   - com.mchange.v2.debug.ThreadNameStackTraceRecorder
+[WARNING]   - com.mchange.v2.codegen.bean.SimplePropertyBeanGenerator
+[WARNING]   - com.mchange.v2.management.ManagementUtils$1
+[WARNING]   - com.mchange.v2.codegen.bean.PropertyReferenceableExtension
+[WARNING]   - com.mchange.v2.lang.ThreadUtils
+[WARNING]   - com.mchange.v2.c3p0.impl.NewProxyDatabaseMetaData
+[WARNING]   - com.mchange.v2.holders.SynchronizedIntHolder
+[WARNING]   - com.mchange.v1.identicator.IdHashKey
+[WARNING]   - com.mchange.v2.c3p0.impl.NewPooledConnection
+[WARNING]   - 372 more...
+[WARNING] sonicbase-0.9.2.2.jar, jets3t-0.6.1.jar define 153 overlapping classes: 
+[WARNING]   - org.jets3t.service.acl.GroupGrantee
+[WARNING]   - org.jets3t.service.model.BaseS3Object
+[WARNING]   - org.jets3t.service.utils.ByteFormatter
+[WARNING]   - org.jets3t.service.multithread.CreateObjectsEvent
+[WARNING]   - org.jets3t.service.multithread.DownloadPackage
+[WARNING]   - org.jets3t.service.impl.soap.axis._2006_03_01.CreateBucketResult
+[WARNING]   - org.jets3t.service.model.S3Owner
+[WARNING]   - org.jets3t.service.model.S3BucketLoggingStatus
+[WARNING]   - org.jets3t.service.impl.rest.httpclient.RestS3Service$1
+[WARNING]   - org.jets3t.service.impl.soap.axis._2006_03_01.Permission
+[WARNING]   - 143 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-costandusagereport-1.11.109.jar define 40 overlapping classes: 
+[WARNING]   - com.amazonaws.services.costandusagereport.AWSCostAndUsageReportAsync
+[WARNING]   - com.amazonaws.services.costandusagereport.model.PutReportDefinitionRequest
+[WARNING]   - com.amazonaws.services.costandusagereport.AbstractAWSCostAndUsageReport
+[WARNING]   - com.amazonaws.services.costandusagereport.AWSCostAndUsageReportClient
+[WARNING]   - com.amazonaws.services.costandusagereport.AWSCostAndUsageReportAsyncClient$3
+[WARNING]   - com.amazonaws.services.costandusagereport.model.transform.PutReportDefinitionRequestMarshaller
+[WARNING]   - com.amazonaws.services.costandusagereport.model.TimeUnit
+[WARNING]   - com.amazonaws.services.costandusagereport.AWSCostAndUsageReportClientBuilder
+[WARNING]   - com.amazonaws.services.costandusagereport.model.PutReportDefinitionResult
+[WARNING]   - com.amazonaws.services.costandusagereport.model.transform.DescribeReportDefinitionsRequestMarshaller
+[WARNING]   - 30 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-sqs-1.11.109.jar define 181 overlapping classes: 
+[WARNING]   - com.amazonaws.services.sqs.model.transform.SendMessageResultStaxUnmarshaller
+[WARNING]   - com.amazonaws.services.sqs.model.ListDeadLetterSourceQueuesResult
+[WARNING]   - com.amazonaws.services.sqs.model.transform.DeleteMessageRequestMarshaller
+[WARNING]   - com.amazonaws.services.sqs.AmazonSQSAsyncClientBuilder
+[WARNING]   - com.amazonaws.services.sqs.AmazonSQSAsyncClient$10
+[WARNING]   - com.amazonaws.services.sqs.buffered.ReceiveQueueBuffer
+[WARNING]   - com.amazonaws.services.sqs.model.transform.SendMessageBatchRequestEntryStaxUnmarshaller$MessageAttributesMapEntryUnmarshaller
+[WARNING]   - com.amazonaws.services.sqs.model.BatchRequestTooLongException
+[WARNING]   - com.amazonaws.services.sqs.AmazonSQSAsync
+[WARNING]   - com.amazonaws.services.sqs.model.MessageNotInflightException
+[WARNING]   - 171 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-codedeploy-1.11.109.jar define 438 overlapping classes: 
+[WARNING]   - com.amazonaws.services.codedeploy.model.transform.DiagnosticsJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.codedeploy.model.transform.ListApplicationRevisionsRequestMarshaller
+[WARNING]   - com.amazonaws.services.codedeploy.model.InvalidIamSessionArnException
+[WARNING]   - com.amazonaws.services.codedeploy.model.transform.DeploymentOverviewMarshaller
+[WARNING]   - com.amazonaws.services.codedeploy.model.IamUserArnRequiredException
+[WARNING]   - com.amazonaws.services.codedeploy.model.TriggerConfig
+[WARNING]   - com.amazonaws.services.codedeploy.model.BatchGetDeploymentInstancesResult
+[WARNING]   - com.amazonaws.services.codedeploy.model.TagLimitExceededException
+[WARNING]   - com.amazonaws.services.codedeploy.model.InvalidOperationException
+[WARNING]   - com.amazonaws.services.codedeploy.model.transform.CreateDeploymentConfigRequestProtocolMarshaller
+[WARNING]   - 428 more...
+[WARNING] sonicbase-0.9.2.2.jar, junit-4.10.jar define 231 overlapping classes: 
+[WARNING]   - org.junit.AfterClass
+[WARNING]   - org.junit.experimental.theories.Theories$TheoryAnchor$1$1
+[WARNING]   - org.junit.runners.ParentRunner
+[WARNING]   - org.junit.rules.Timeout
+[WARNING]   - org.junit.experimental.max.MaxHistory$RememberingListener
+[WARNING]   - org.junit.Before
+[WARNING]   - org.junit.package-info
+[WARNING]   - org.junit.internal.runners.MethodRoadie$1$1
+[WARNING]   - org.junit.runners.model.NoGenericTypeParametersValidator
+[WARNING]   - org.junit.runner.Result$1
+[WARNING]   - 221 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-appstream-1.11.109.jar define 171 overlapping classes: 
+[WARNING]   - com.amazonaws.services.appstream.model.transform.DescribeSessionsRequestMarshaller
+[WARNING]   - com.amazonaws.services.appstream.model.CreateFleetRequest
+[WARNING]   - com.amazonaws.services.appstream.model.DescribeStacksResult
+[WARNING]   - com.amazonaws.services.appstream.waiters.DescribeFleetsFunction
+[WARNING]   - com.amazonaws.services.appstream.model.transform.DescribeFleetsResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.appstream.model.transform.DescribeStacksRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.appstream.AmazonAppStreamAsyncClient$1
+[WARNING]   - com.amazonaws.services.appstream.waiters.FleetStarted
+[WARNING]   - com.amazonaws.services.appstream.model.transform.StopFleetResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.appstream.model.transform.SessionMarshaller
+[WARNING]   - 161 more...
+[WARNING] sonicbase-0.9.2.2.jar, commons-crypto-1.0.0.jar define 46 overlapping classes: 
+[WARNING]   - org.apache.commons.crypto.stream.PositionedCryptoInputStream
+[WARNING]   - org.apache.commons.crypto.cipher.OpenSsl
+[WARNING]   - org.apache.commons.crypto.random.CryptoRandomFactory$RandomProvider
+[WARNING]   - org.apache.commons.crypto.cipher.OpenSsl$AlgorithmMode
+[WARNING]   - org.apache.commons.crypto.utils.Utils$DefaultPropertiesHolder
+[WARNING]   - org.apache.commons.crypto.Crypto
+[WARNING]   - org.apache.commons.crypto.cipher.OpenSsl$Transform
+[WARNING]   - org.apache.commons.crypto.OpenSslInfoNative
+[WARNING]   - org.apache.commons.crypto.stream.CtrCryptoOutputStream
+[WARNING]   - org.apache.commons.crypto.jna.OpenSslNativeJna
+[WARNING]   - 36 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-waf-1.11.109.jar define 615 overlapping classes: 
+[WARNING]   - com.amazonaws.services.waf.model.waf.transform.CreateByteMatchSetRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.waf.model.waf_regional.transform.UpdateWebACLRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.waf.model.waf.transform.DeleteXssMatchSetResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.waf.model.GetSqlInjectionMatchSetRequest
+[WARNING]   - com.amazonaws.services.waf.model.waf.transform.IPSetDescriptorMarshaller
+[WARNING]   - com.amazonaws.services.waf.model.waf.transform.ListSizeConstraintSetsResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.waf.model.waf.transform.SizeConstraintSetJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.waf.model.Predicate
+[WARNING]   - com.amazonaws.services.waf.AWSWAFRegionalClientBuilder
+[WARNING]   - com.amazonaws.services.waf.AWSWAFAsyncClient$17
+[WARNING]   - 605 more...
+[WARNING] commons-beanutils-1.7.0.jar, sonicbase-0.9.2.2.jar, commons-beanutils-core-1.8.0.jar define 82 overlapping classes: 
+[WARNING]   - org.apache.commons.beanutils.ConvertUtilsBean
+[WARNING]   - org.apache.commons.beanutils.converters.SqlTimeConverter
+[WARNING]   - org.apache.commons.beanutils.Converter
+[WARNING]   - org.apache.commons.beanutils.converters.FloatArrayConverter
+[WARNING]   - org.apache.commons.beanutils.NestedNullException
+[WARNING]   - org.apache.commons.beanutils.ConvertingWrapDynaBean
+[WARNING]   - org.apache.commons.beanutils.converters.LongArrayConverter
+[WARNING]   - org.apache.commons.beanutils.converters.SqlDateConverter
+[WARNING]   - org.apache.commons.beanutils.converters.BooleanArrayConverter
+[WARNING]   - org.apache.commons.beanutils.converters.StringConverter
+[WARNING]   - 72 more...
+[WARNING] sonicbase-0.9.2.2.jar, json-20160212.jar define 18 overlapping classes: 
+[WARNING]   - org.json.JSONString
+[WARNING]   - org.json.HTTPTokener
+[WARNING]   - org.json.HTTP
+[WARNING]   - org.json.JSONObject
+[WARNING]   - org.json.JSONStringer
+[WARNING]   - org.json.JSONObject$Null
+[WARNING]   - org.json.CookieList
+[WARNING]   - org.json.JSONTokener
+[WARNING]   - org.json.Cookie
+[WARNING]   - org.json.Property
+[WARNING]   - 8 more...
+[WARNING] sonicbase-0.9.2.2.jar, commons-net-1.4.1.jar define 126 overlapping classes: 
+[WARNING]   - org.apache.commons.net.telnet.SimpleOptionHandler
+[WARNING]   - org.apache.commons.net.ftp.parser.FTPFileEntryParserFactory
+[WARNING]   - org.apache.commons.net.DefaultDatagramSocketFactory
+[WARNING]   - org.apache.commons.net.ftp.parser.ConfigurableFTPFileEntryParserImpl
+[WARNING]   - org.apache.commons.net.ntp.NTPUDPClient
+[WARNING]   - org.apache.commons.net.tftp.TFTP
+[WARNING]   - org.apache.commons.net.ftp.FTPClient
+[WARNING]   - org.apache.commons.net.telnet.Telnet
+[WARNING]   - org.apache.commons.net.nntp.ArticlePointer
+[WARNING]   - org.apache.commons.net.ProtocolCommandSupport
+[WARNING]   - 116 more...
+[WARNING] sonicbase-0.9.2.2.jar, hadoop-core-1.2.1.jar define 2128 overlapping classes: 
+[WARNING]   - org.apache.hadoop.mapred.pipes.PipesPartitioner
+[WARNING]   - org.apache.hadoop.mapred.lib.InputSampler$SplitSampler
+[WARNING]   - org.apache.hadoop.mapred.JobClient$SplitComparator
+[WARNING]   - org.apache.hadoop.io.compress.DecompressorStream
+[WARNING]   - org.apache.hadoop.metrics.spi.AbstractMetricsContext
+[WARNING]   - org.apache.hadoop.hdfs.server.namenode.FsckServlet
+[WARNING]   - org.apache.hadoop.record.XmlRecordInput$Value
+[WARNING]   - org.apache.hadoop.util.HeapSort
+[WARNING]   - org.apache.hadoop.metrics.ganglia.GangliaContext31
+[WARNING]   - org.apache.hadoop.hdfs.web.resources.UriFsPathParam
+[WARNING]   - 2118 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-ec2-1.11.109.jar define 1782 overlapping classes: 
+[WARNING]   - com.amazonaws.services.ec2.model.transform.DescribeImportImageTasksRequestMarshaller
+[WARNING]   - com.amazonaws.services.ec2.waiters.DescribeBundleTasksFunction
+[WARNING]   - com.amazonaws.services.ec2.model.EnableVpcClassicLinkDnsSupportRequest
+[WARNING]   - com.amazonaws.services.ec2.waiters.SpotInstanceRequestFulfilled$IsScheduleexpiredMatcher
+[WARNING]   - com.amazonaws.services.ec2.waiters.ExportTaskCompleted$IsCompletedMatcher
+[WARNING]   - com.amazonaws.services.ec2.AmazonEC2AsyncClient$146
+[WARNING]   - com.amazonaws.services.ec2.model.UnsuccessfulItem
+[WARNING]   - com.amazonaws.services.ec2.model.transform.PlacementGroupStaxUnmarshaller
+[WARNING]   - com.amazonaws.services.ec2.model.NetworkInterfaceAttachmentChanges
+[WARNING]   - com.amazonaws.services.ec2.waiters.DescribeVpcPeeringConnectionsFunction
+[WARNING]   - 1772 more...
+[WARNING] sonicbase-0.9.2.2.jar, jackson-jaxrs-1.7.1.jar define 8 overlapping classes: 
+[WARNING]   - org.codehaus.jackson.jaxrs.package-info
+[WARNING]   - org.codehaus.jackson.jaxrs.MapperConfigurator$1
+[WARNING]   - org.codehaus.jackson.jaxrs.JsonMappingExceptionMapper
+[WARNING]   - org.codehaus.jackson.jaxrs.Annotations
+[WARNING]   - org.codehaus.jackson.jaxrs.MapperConfigurator
+[WARNING]   - org.codehaus.jackson.jaxrs.JsonParseExceptionMapper
+[WARNING]   - org.codehaus.jackson.jaxrs.JacksonJaxbJsonProvider
+[WARNING]   - org.codehaus.jackson.jaxrs.JacksonJsonProvider
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-marketplacemeteringservice-1.11.109.jar define 44 overlapping classes: 
+[WARNING]   - com.amazonaws.services.marketplacemetering.model.transform.UsageRecordMarshaller
+[WARNING]   - com.amazonaws.services.marketplacemetering.model.transform.MeterUsageRequestMarshaller
+[WARNING]   - com.amazonaws.services.marketplacemetering.model.InvalidEndpointRegionException
+[WARNING]   - com.amazonaws.services.marketplacemetering.model.AWSMarketplaceMeteringException
+[WARNING]   - com.amazonaws.services.marketplacemetering.model.MeterUsageRequest
+[WARNING]   - com.amazonaws.services.marketplacemetering.model.UsageRecord
+[WARNING]   - com.amazonaws.services.marketplacemetering.AWSMarketplaceMeteringClientBuilder
+[WARNING]   - com.amazonaws.services.marketplacemetering.model.BatchMeterUsageRequest
+[WARNING]   - com.amazonaws.services.marketplacemetering.AWSMarketplaceMeteringAsyncClient$2
+[WARNING]   - com.amazonaws.services.marketplacemetering.AbstractAWSMarketplaceMeteringAsync
+[WARNING]   - 34 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-servicecatalog-1.11.109.jar define 354 overlapping classes: 
+[WARNING]   - com.amazonaws.services.servicecatalog.model.transform.PortfolioDetailJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.servicecatalog.model.transform.DeletePortfolioShareResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.servicecatalog.model.DescribeProvisioningArtifactRequest
+[WARNING]   - com.amazonaws.services.servicecatalog.model.UpdateProvisionedProductResult
+[WARNING]   - com.amazonaws.services.servicecatalog.model.transform.CreateProvisioningArtifactRequestMarshaller
+[WARNING]   - com.amazonaws.services.servicecatalog.model.transform.DescribeProductViewResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.servicecatalog.model.ProvisionProductRequest
+[WARNING]   - com.amazonaws.services.servicecatalog.model.transform.AssociatePrincipalWithPortfolioRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.servicecatalog.model.DeleteProvisioningArtifactResult
+[WARNING]   - com.amazonaws.services.servicecatalog.model.transform.ListPrincipalsForPortfolioResultJsonUnmarshaller
+[WARNING]   - 344 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-gamelift-1.11.109.jar define 405 overlapping classes: 
+[WARNING]   - com.amazonaws.services.gamelift.model.GameSessionQueue
+[WARNING]   - com.amazonaws.services.gamelift.model.CreatePlayerSessionsRequest
+[WARNING]   - com.amazonaws.services.gamelift.model.CreateGameSessionRequest
+[WARNING]   - com.amazonaws.services.gamelift.AmazonGameLiftAsyncClient$44
+[WARNING]   - com.amazonaws.services.gamelift.model.LimitExceededException
+[WARNING]   - com.amazonaws.services.gamelift.model.transform.DeleteScalingPolicyRequestMarshaller
+[WARNING]   - com.amazonaws.services.gamelift.model.DescribePlayerSessionsRequest
+[WARNING]   - com.amazonaws.services.gamelift.model.transform.ScalingPolicyJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.gamelift.model.FleetStatus
+[WARNING]   - com.amazonaws.services.gamelift.model.transform.PlayerLatencyJsonUnmarshaller
+[WARNING]   - 395 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-cognitosync-1.11.109.jar define 149 overlapping classes: 
+[WARNING]   - com.amazonaws.services.cognitosync.AbstractAmazonCognitoSyncAsync
+[WARNING]   - com.amazonaws.services.cognitosync.model.transform.UpdateRecordsRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.cognitosync.model.transform.UnsubscribeFromDatasetRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.cognitosync.model.transform.IdentityPoolUsageMarshaller
+[WARNING]   - com.amazonaws.services.cognitosync.model.UpdateRecordsResult
+[WARNING]   - com.amazonaws.services.cognitosync.model.Record
+[WARNING]   - com.amazonaws.services.cognitosync.model.transform.CognitoStreamsJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.cognitosync.model.transform.GetCognitoEventsResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.cognitosync.model.InvalidLambdaFunctionOutputException
+[WARNING]   - com.amazonaws.services.cognitosync.model.transform.SetCognitoEventsRequestMarshaller
+[WARNING]   - 139 more...
+[WARNING] jettison-1.1.jar, sonicbase-0.9.2.2.jar define 40 overlapping classes: 
+[WARNING]   - org.codehaus.jettison.json.JSONException
+[WARNING]   - org.codehaus.jettison.badgerfish.BadgerFishXMLInputFactory
+[WARNING]   - org.codehaus.jettison.json.JSONObject
+[WARNING]   - org.codehaus.jettison.badgerfish.BadgerFishConvention
+[WARNING]   - org.codehaus.jettison.mapped.MappedXMLOutputFactory
+[WARNING]   - org.codehaus.jettison.json.JSONObject$1
+[WARNING]   - org.codehaus.jettison.mapped.NullNamespaceContext
+[WARNING]   - org.codehaus.jettison.AbstractXMLEventWriter
+[WARNING]   - org.codehaus.jettison.badgerfish.BadgerFishDOMDocumentParser
+[WARNING]   - org.codehaus.jettison.json.JSONWriter
+[WARNING]   - 30 more...
+[WARNING] aws-java-sdk-cognitoidentity-1.11.109.jar, sonicbase-0.9.2.2.jar define 156 overlapping classes: 
+[WARNING]   - com.amazonaws.services.cognitoidentity.model.InternalErrorException
+[WARNING]   - com.amazonaws.services.cognitoidentity.model.UnlinkDeveloperIdentityResult
+[WARNING]   - com.amazonaws.services.cognitoidentity.model.DescribeIdentityPoolResult
+[WARNING]   - com.amazonaws.services.cognitoidentity.model.transform.LookupDeveloperIdentityResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.cognitoidentity.model.CreateIdentityPoolRequest
+[WARNING]   - com.amazonaws.services.cognitoidentity.model.transform.RoleMappingJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.cognitoidentity.AmazonCognitoIdentityAsyncClient$17
+[WARNING]   - com.amazonaws.services.cognitoidentity.model.transform.MappingRuleMarshaller
+[WARNING]   - com.amazonaws.services.cognitoidentity.model.transform.IdentityDescriptionJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.cognitoidentity.model.IdentityPoolShortDescription
+[WARNING]   - 146 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-swf-libraries-1.11.22.jar define 372 overlapping classes: 
+[WARNING]   - com.amazonaws.services.simpleworkflow.flow.annotations.WorkflowRegistrationOptions
+[WARNING]   - com.amazonaws.services.simpleworkflow.flow.junit.AsyncAssert$4
+[WARNING]   - com.amazonaws.services.simpleworkflow.flow.ActivityExecutionContext
+[WARNING]   - com.amazonaws.services.simpleworkflow.flow.generic.ActivityImplementation
+[WARNING]   - com.amazonaws.services.simpleworkflow.flow.core.Task
+[WARNING]   - com.amazonaws.services.simpleworkflow.flow.core.AndPromise$AndPromiseCallback
+[WARNING]   - com.amazonaws.services.simpleworkflow.flow.ActivityExecutionContextProviderImpl
+[WARNING]   - com.amazonaws.services.simpleworkflow.flow.worker.GenericWorker$ExecutorThreadFactory
+[WARNING]   - com.amazonaws.services.simpleworkflow.flow.test.TestGenericWorkflowClient$StartChildWorkflowReplyImpl
+[WARNING]   - com.amazonaws.services.simpleworkflow.flow.worker.GenericWorkflowClientImpl$4
+[WARNING]   - 362 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-mechanicalturkrequester-1.11.109.jar define 311 overlapping classes: 
+[WARNING]   - com.amazonaws.services.mturk.model.HITStatus
+[WARNING]   - com.amazonaws.services.mturk.model.transform.CreateHITRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.mturk.model.transform.QualificationJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.mturk.model.transform.QualificationRequirementJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.mturk.model.ReviewableHITStatus
+[WARNING]   - com.amazonaws.services.mturk.model.GetAssignmentResult
+[WARNING]   - com.amazonaws.services.mturk.AmazonMTurkAsyncClient$12
+[WARNING]   - com.amazonaws.services.mturk.AmazonMTurkAsyncClient$32
+[WARNING]   - com.amazonaws.services.mturk.model.transform.UpdateExpirationForHITRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.mturk.model.UpdateQualificationTypeRequest
+[WARNING]   - 301 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-opsworkscm-1.11.109.jar define 125 overlapping classes: 
+[WARNING]   - com.amazonaws.services.opsworkscm.model.transform.CreateBackupRequestMarshaller
+[WARNING]   - com.amazonaws.services.opsworkscm.AWSOpsWorksCMAsyncClient
+[WARNING]   - com.amazonaws.services.opsworkscm.model.transform.CreateBackupResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.opsworkscm.model.CreateBackupResult
+[WARNING]   - com.amazonaws.services.opsworkscm.model.transform.DeleteBackupResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.opsworkscm.model.NodeAssociationStatus
+[WARNING]   - com.amazonaws.services.opsworkscm.model.InvalidNextTokenException
+[WARNING]   - com.amazonaws.services.opsworkscm.model.transform.ServerJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.opsworkscm.AWSOpsWorksCMAsyncClient$8
+[WARNING]   - com.amazonaws.services.opsworkscm.model.transform.DisassociateNodeResultJsonUnmarshaller
+[WARNING]   - 115 more...
+[WARNING] aws-java-sdk-lex-1.11.109.jar, sonicbase-0.9.2.2.jar define 34 overlapping classes: 
+[WARNING]   - com.amazonaws.services.lexruntime.AmazonLexRuntimeAsyncClient$1
+[WARNING]   - com.amazonaws.services.lexruntime.model.transform.PostTextRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.lexruntime.model.ContentType
+[WARNING]   - com.amazonaws.services.lexruntime.model.transform.ResponseCardJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.lexruntime.model.DialogState
+[WARNING]   - com.amazonaws.services.lexruntime.model.ResponseCard
+[WARNING]   - com.amazonaws.services.lexruntime.model.BadGatewayException
+[WARNING]   - com.amazonaws.services.lexruntime.model.GenericAttachment
+[WARNING]   - com.amazonaws.services.lexruntime.model.transform.GenericAttachmentJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.lexruntime.model.LimitExceededException
+[WARNING]   - 24 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-core-1.11.109.jar define 745 overlapping classes: 
+[WARNING]   - com.amazonaws.protocol.json.internal.SimpleTypeJsonMarshallers$9
+[WARNING]   - com.amazonaws.util.Classes
+[WARNING]   - com.amazonaws.waiters.WaiterUnrecoverableException
+[WARNING]   - com.amazonaws.auth.BasicSessionCredentials
+[WARNING]   - com.amazonaws.auth.policy.Condition
+[WARNING]   - com.amazonaws.util.UriResourcePathUtils
+[WARNING]   - com.amazonaws.auth.policy.conditions.DateCondition$DateComparisonType
+[WARNING]   - com.amazonaws.http.SdkHttpMetadata
+[WARNING]   - com.amazonaws.internal.SdkFunction
+[WARNING]   - com.amazonaws.SDKGlobalTime
+[WARNING]   - 735 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-efs-1.11.109.jar define 107 overlapping classes: 
+[WARNING]   - com.amazonaws.services.elasticfilesystem.model.DeleteFileSystemResult
+[WARNING]   - com.amazonaws.services.elasticfilesystem.model.transform.DescribeMountTargetSecurityGroupsRequestMarshaller
+[WARNING]   - com.amazonaws.services.elasticfilesystem.model.transform.FileSystemDescriptionMarshaller
+[WARNING]   - com.amazonaws.services.elasticfilesystem.model.CreateMountTargetRequest
+[WARNING]   - com.amazonaws.services.elasticfilesystem.model.CreateFileSystemResult
+[WARNING]   - com.amazonaws.services.elasticfilesystem.model.transform.CreateFileSystemRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.elasticfilesystem.model.MountTargetConflictException
+[WARNING]   - com.amazonaws.services.elasticfilesystem.AmazonElasticFileSystemAsyncClient$7
+[WARNING]   - com.amazonaws.services.elasticfilesystem.model.transform.DescribeTagsRequestMarshaller
+[WARNING]   - com.amazonaws.services.elasticfilesystem.AmazonElasticFileSystemClient
+[WARNING]   - 97 more...
+[WARNING] aws-java-sdk-config-1.11.109.jar, sonicbase-0.9.2.2.jar define 282 overlapping classes: 
+[WARNING]   - com.amazonaws.services.config.model.transform.ComplianceMarshaller
+[WARNING]   - com.amazonaws.services.config.model.StartConfigurationRecorderRequest
+[WARNING]   - com.amazonaws.services.config.AmazonConfigAsyncClient$22
+[WARNING]   - com.amazonaws.services.config.model.transform.DescribeConfigurationRecorderStatusRequestMarshaller
+[WARNING]   - com.amazonaws.services.config.model.DeleteConfigurationRecorderRequest
+[WARNING]   - com.amazonaws.services.config.model.transform.ComplianceByConfigRuleMarshaller
+[WARNING]   - com.amazonaws.services.config.model.DescribeConfigRuleEvaluationStatusResult
+[WARNING]   - com.amazonaws.services.config.model.transform.ComplianceByResourceMarshaller
+[WARNING]   - com.amazonaws.services.config.model.transform.DescribeDeliveryChannelStatusResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.config.model.MaxNumberOfConfigurationRecordersExceededException
+[WARNING]   - 272 more...
+[WARNING] sonicbase-0.9.2.2.jar, hamcrest-core-1.1.jar, junit-4.10.jar define 21 overlapping classes: 
+[WARNING]   - org.hamcrest.internal.SelfDescribingValue
+[WARNING]   - org.hamcrest.Description
+[WARNING]   - org.hamcrest.CoreMatchers
+[WARNING]   - org.hamcrest.core.AllOf
+[WARNING]   - org.hamcrest.SelfDescribing
+[WARNING]   - org.hamcrest.BaseDescription
+[WARNING]   - org.hamcrest.core.IsSame
+[WARNING]   - org.hamcrest.Factory
+[WARNING]   - org.hamcrest.core.DescribedAs
+[WARNING]   - org.hamcrest.internal.ArrayIterator
+[WARNING]   - 11 more...
+[WARNING] sonicbase-0.9.2.2.jar, oro-2.0.8.jar define 62 overlapping classes: 
+[WARNING]   - org.apache.oro.text.perl.MalformedPerl5PatternException
+[WARNING]   - org.apache.oro.text.regex.Perl5Pattern
+[WARNING]   - org.apache.oro.io.RegexFilenameFilter
+[WARNING]   - org.apache.oro.util.Cache
+[WARNING]   - org.apache.oro.text.GenericPatternCache
+[WARNING]   - org.apache.oro.text.awk.DFAState
+[WARNING]   - org.apache.oro.text.regex.StringSubstitution
+[WARNING]   - org.apache.oro.text.awk.AwkCompiler
+[WARNING]   - org.apache.oro.text.PatternCacheLRU
+[WARNING]   - org.apache.oro.text.regex.Substitution
+[WARNING]   - 52 more...
+[WARNING] sonicbase-0.9.2.2.jar, jetty-6.1.26.jar define 237 overlapping classes: 
+[WARNING]   - org.mortbay.jetty.servlet.AbstractSessionManager
+[WARNING]   - org.mortbay.jetty.Request
+[WARNING]   - org.mortbay.io.nio.SelectChannelEndPoint
+[WARNING]   - org.mortbay.io.RuntimeIOException
+[WARNING]   - org.mortbay.jetty.handler.MovedContextHandler$1
+[WARNING]   - org.mortbay.jetty.servlet.AbstractSessionManager$SessionIf
+[WARNING]   - org.mortbay.jetty.nio.SelectChannelConnector$1
+[WARNING]   - org.mortbay.io.nio.SelectorManager$SelectSet
+[WARNING]   - org.mortbay.jetty.servlet.ServletHolder$SingleThreadedWrapper
+[WARNING]   - org.mortbay.jetty.HandlerContainer
+[WARNING]   - 227 more...
+[WARNING] sonicbase-0.9.2.2.jar, commons-collections-3.2.1.jar define 448 overlapping classes: 
+[WARNING]   - org.apache.commons.collections.map.AbstractLinkedMap$LinkMapIterator
+[WARNING]   - org.apache.commons.collections.bidimap.TreeBidiMap$Node
+[WARNING]   - org.apache.commons.collections.comparators.TransformingComparator
+[WARNING]   - org.apache.commons.collections.iterators.AbstractListIteratorDecorator
+[WARNING]   - org.apache.commons.collections.bag.AbstractMapBag$BagIterator
+[WARNING]   - org.apache.commons.collections.map.AbstractReferenceMap$ReferenceKeySetIterator
+[WARNING]   - org.apache.commons.collections.DoubleOrderedMap$3$1
+[WARNING]   - org.apache.commons.collections.StaticBucketMap
+[WARNING]   - org.apache.commons.collections.comparators.ComparatorChain
+[WARNING]   - org.apache.commons.collections.ReferenceMap$1
+[WARNING]   - 438 more...
+[WARNING] sonicbase-0.9.2.2.jar, commons-configuration-1.6.jar define 165 overlapping classes: 
+[WARNING]   - org.apache.commons.configuration.tree.xpath.ConfigurationNodePointerFactory
+[WARNING]   - org.apache.commons.configuration.plist.PropertyListConfiguration$1
+[WARNING]   - org.apache.commons.configuration.plist.XMLPropertyListConfiguration$XMLPropertyListHandler
+[WARNING]   - org.apache.commons.configuration.tree.ExpressionEngine
+[WARNING]   - org.apache.commons.configuration.ConfigurationFactory$ConfigurationBuilder
+[WARNING]   - org.apache.commons.configuration.Configuration
+[WARNING]   - org.apache.commons.configuration.ConfigurationMap$ConfigurationSet$ConfigurationSetIterator
+[WARNING]   - org.apache.commons.configuration.MultiFileHierarchicalConfiguration
+[WARNING]   - org.apache.commons.configuration.BaseConfiguration
+[WARNING]   - org.apache.commons.configuration.DynamicCombinedConfiguration$1
+[WARNING]   - 155 more...
+[WARNING] sonicbase-0.9.2.2.jar, jasper-runtime-5.5.12.jar, jsp-2.1-6.1.14.jar define 43 overlapping classes: 
+[WARNING]   - org.apache.jasper.runtime.PerThreadTagHandlerPool$1
+[WARNING]   - org.apache.jasper.runtime.JspFactoryImpl$PrivilegedGetPageContext
+[WARNING]   - org.apache.jasper.runtime.PageContextImpl$4
+[WARNING]   - org.apache.jasper.runtime.JspSourceDependent
+[WARNING]   - org.apache.jasper.runtime.JspRuntimeLibrary$PrivilegedIntrospectHelper
+[WARNING]   - org.apache.jasper.runtime.PageContextImpl$2
+[WARNING]   - org.apache.jasper.Constants
+[WARNING]   - org.apache.jasper.runtime.ProtectedFunctionMapper$2
+[WARNING]   - org.apache.jasper.runtime.PageContextImpl
+[WARNING]   - org.apache.jasper.runtime.PageContextImpl$11
+[WARNING]   - 33 more...
+[WARNING] google-http-client-1.17.0-rc.jar, sonicbase-0.9.2.2.jar define 208 overlapping classes: 
+[WARNING]   - com.google.api.client.http.InputStreamContent
+[WARNING]   - com.google.api.client.util.Charsets
+[WARNING]   - com.google.api.client.http.HttpStatusCodes
+[WARNING]   - com.google.api.client.repackaged.org.apache.commons.codec.binary.Base64
+[WARNING]   - com.google.api.client.util.BackOff$2
+[WARNING]   - com.google.api.client.http.EmptyContent
+[WARNING]   - com.google.api.client.http.HttpExecuteInterceptor
+[WARNING]   - com.google.api.client.repackaged.org.apache.commons.codec.DecoderException
+[WARNING]   - com.google.api.client.testing.util.MockBackOff
+[WARNING]   - com.google.api.client.http.apache.ApacheHttpRequest
+[WARNING]   - 198 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-snowball-1.11.109.jar define 169 overlapping classes: 
+[WARNING]   - com.amazonaws.services.snowball.model.transform.GetJobManifestResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.snowball.model.transform.S3ResourceMarshaller
+[WARNING]   - com.amazonaws.services.snowball.model.InvalidResourceException
+[WARNING]   - com.amazonaws.services.snowball.model.SnowballType
+[WARNING]   - com.amazonaws.services.snowball.model.JobState
+[WARNING]   - com.amazonaws.services.snowball.AmazonSnowballAsyncClient$10
+[WARNING]   - com.amazonaws.services.snowball.model.Shipment
+[WARNING]   - com.amazonaws.services.snowball.model.transform.DescribeAddressRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.snowball.model.Notification
+[WARNING]   - com.amazonaws.services.snowball.model.ListJobsRequest
+[WARNING]   - 159 more...
+[WARNING] sonicbase-0.9.2.2.jar, jasper-compiler-5.5.12.jar define 36 overlapping classes: 
+[WARNING]   - org.apache.jasper.tagplugins.jstl.core.If
+[WARNING]   - org.apache.jasper.tagplugins.jstl.core.When
+[WARNING]   - org.apache.jasper.compiler.Generator$2ParamVisitor
+[WARNING]   - org.apache.jasper.compiler.Generator$1ScriptingVarVisitor
+[WARNING]   - org.apache.jasper.compiler.JspConfig$JspPropertyGroup
+[WARNING]   - org.apache.jasper.tagplugins.jstl.core.Import
+[WARNING]   - org.apache.jasper.compiler.AntCompiler
+[WARNING]   - org.apache.jasper.tagplugins.jstl.core.Choose
+[WARNING]   - org.apache.jasper.tagplugins.jstl.core.Otherwise
+[WARNING]   - org.apache.jasper.compiler.SmapUtil$1
+[WARNING]   - 26 more...
+[WARNING] sonicbase-0.9.2.2.jar, commons-io-2.5.jar define 123 overlapping classes: 
+[WARNING]   - org.apache.commons.io.FileCleaningTracker
+[WARNING]   - org.apache.commons.io.comparator.SizeFileComparator
+[WARNING]   - org.apache.commons.io.input.CloseShieldInputStream
+[WARNING]   - org.apache.commons.io.filefilter.EmptyFileFilter
+[WARNING]   - org.apache.commons.io.monitor.FileEntry
+[WARNING]   - org.apache.commons.io.output.ThresholdingOutputStream
+[WARNING]   - org.apache.commons.io.input.TailerListener
+[WARNING]   - org.apache.commons.io.IOExceptionWithCause
+[WARNING]   - org.apache.commons.io.filefilter.NotFileFilter
+[WARNING]   - org.apache.commons.io.comparator.PathFileComparator
+[WARNING]   - 113 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-workdocs-1.11.109.jar define 261 overlapping classes: 
+[WARNING]   - com.amazonaws.services.workdocs.model.transform.AbortDocumentVersionUploadRequestMarshaller
+[WARNING]   - com.amazonaws.services.workdocs.AmazonWorkDocsAsyncClient$19
+[WARNING]   - com.amazonaws.services.workdocs.model.UnauthorizedOperationException
+[WARNING]   - com.amazonaws.services.workdocs.model.InitiateDocumentVersionUploadRequest
+[WARNING]   - com.amazonaws.services.workdocs.model.InitiateDocumentVersionUploadResult
+[WARNING]   - com.amazonaws.services.workdocs.model.GetDocumentVersionRequest
+[WARNING]   - com.amazonaws.services.workdocs.model.IllegalUserStateException
+[WARNING]   - com.amazonaws.services.workdocs.AmazonWorkDocsAsyncClient$6
+[WARNING]   - com.amazonaws.services.workdocs.AbstractAmazonWorkDocs
+[WARNING]   - com.amazonaws.services.workdocs.model.transform.DeleteFolderRequestMarshaller
+[WARNING]   - 251 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-applicationautoscaling-1.11.109.jar define 83 overlapping classes: 
+[WARNING]   - com.amazonaws.services.applicationautoscaling.model.transform.RegisterScalableTargetResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.applicationautoscaling.model.transform.DeregisterScalableTargetRequestMarshaller
+[WARNING]   - com.amazonaws.services.applicationautoscaling.model.transform.DeleteScalingPolicyRequestMarshaller
+[WARNING]   - com.amazonaws.services.applicationautoscaling.model.transform.AlarmMarshaller
+[WARNING]   - com.amazonaws.services.applicationautoscaling.model.DeregisterScalableTargetResult
+[WARNING]   - com.amazonaws.services.applicationautoscaling.AWSApplicationAutoScaling
+[WARNING]   - com.amazonaws.services.applicationautoscaling.model.transform.AlarmJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.applicationautoscaling.AWSApplicationAutoScalingAsyncClient$4
+[WARNING]   - com.amazonaws.services.applicationautoscaling.model.DescribeScalingActivitiesRequest
+[WARNING]   - com.amazonaws.services.applicationautoscaling.AWSApplicationAutoScalingAsyncClient$7
+[WARNING]   - 73 more...
+[WARNING] commons-beanutils-1.7.0.jar, sonicbase-0.9.2.2.jar, commons-collections-3.2.1.jar, commons-beanutils-core-1.8.0.jar define 10 overlapping classes: 
+[WARNING]   - org.apache.commons.collections.FastHashMap$EntrySet
+[WARNING]   - org.apache.commons.collections.FastHashMap$KeySet
+[WARNING]   - org.apache.commons.collections.ArrayStack
+[WARNING]   - org.apache.commons.collections.FastHashMap$CollectionView$CollectionViewIterator
+[WARNING]   - org.apache.commons.collections.FastHashMap$Values
+[WARNING]   - org.apache.commons.collections.FastHashMap$CollectionView
+[WARNING]   - org.apache.commons.collections.FastHashMap$1
+[WARNING]   - org.apache.commons.collections.Buffer
+[WARNING]   - org.apache.commons.collections.FastHashMap
+[WARNING]   - org.apache.commons.collections.BufferUnderflowException
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-pinpoint-1.11.109.jar define 357 overlapping classes: 
+[WARNING]   - com.amazonaws.services.pinpoint.model.GetCampaignsResult
+[WARNING]   - com.amazonaws.services.pinpoint.model.transform.GetCampaignVersionResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.pinpoint.model.transform.UpdateCampaignResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.pinpoint.model.transform.DeleteApnsChannelRequestMarshaller
+[WARNING]   - com.amazonaws.services.pinpoint.model.transform.CreateSegmentResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.pinpoint.model.GetCampaignVersionsRequest
+[WARNING]   - com.amazonaws.services.pinpoint.model.transform.UpdateApplicationSettingsRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.pinpoint.model.UpdateApplicationSettingsRequest
+[WARNING]   - com.amazonaws.services.pinpoint.model.transform.CampaignsResponseMarshaller
+[WARNING]   - com.amazonaws.services.pinpoint.model.transform.EndpointBatchItemMarshaller
+[WARNING]   - 347 more...
+[WARNING] aws-java-sdk-iam-1.11.109.jar, sonicbase-0.9.2.2.jar define 739 overlapping classes: 
+[WARNING]   - com.amazonaws.services.identitymanagement.model.UpdateOpenIDConnectProviderThumbprintResult
+[WARNING]   - com.amazonaws.services.identitymanagement.model.transform.PutGroupPolicyRequestMarshaller
+[WARNING]   - com.amazonaws.services.identitymanagement.model.ListUsersResult
+[WARNING]   - com.amazonaws.services.identitymanagement.model.DeleteAccessKeyRequest
+[WARNING]   - com.amazonaws.services.identitymanagement.model.GetContextKeysForCustomPolicyRequest
+[WARNING]   - com.amazonaws.services.identitymanagement.model.transform.DuplicateCertificateExceptionUnmarshaller
+[WARNING]   - com.amazonaws.services.identitymanagement.model.transform.InvalidInputExceptionUnmarshaller
+[WARNING]   - com.amazonaws.services.identitymanagement.model.transform.InstanceProfileStaxUnmarshaller
+[WARNING]   - com.amazonaws.services.identitymanagement.model.ResyncMFADeviceRequest
+[WARNING]   - com.amazonaws.services.identitymanagement.model.transform.ListGroupsForUserResultStaxUnmarshaller
+[WARNING]   - 729 more...
+[WARNING] sonicbase-0.9.2.2.jar, asm-3.1.jar define 23 overlapping classes: 
+[WARNING]   - org.objectweb.asm.Type
+[WARNING]   - org.objectweb.asm.AnnotationVisitor
+[WARNING]   - org.objectweb.asm.MethodVisitor
+[WARNING]   - org.objectweb.asm.Attribute
+[WARNING]   - org.objectweb.asm.FieldWriter
+[WARNING]   - org.objectweb.asm.signature.SignatureWriter
+[WARNING]   - org.objectweb.asm.MethodWriter
+[WARNING]   - org.objectweb.asm.Edge
+[WARNING]   - org.objectweb.asm.Handler
+[WARNING]   - org.objectweb.asm.ByteVector
+[WARNING]   - 13 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-elasticache-1.11.109.jar define 344 overlapping classes: 
+[WARNING]   - com.amazonaws.services.elasticache.model.DescribeCacheParametersRequest
+[WARNING]   - com.amazonaws.services.elasticache.model.NodeGroupMember
+[WARNING]   - com.amazonaws.services.elasticache.model.transform.CacheParameterGroupAlreadyExistsExceptionUnmarshaller
+[WARNING]   - com.amazonaws.services.elasticache.model.PendingAutomaticFailoverStatus
+[WARNING]   - com.amazonaws.services.elasticache.AmazonElastiCacheAsyncClient$21
+[WARNING]   - com.amazonaws.services.elasticache.model.InvalidParameterCombinationException
+[WARNING]   - com.amazonaws.services.elasticache.AmazonElastiCacheAsyncClient$1
+[WARNING]   - com.amazonaws.services.elasticache.model.transform.CreateReplicationGroupRequestMarshaller
+[WARNING]   - com.amazonaws.services.elasticache.model.transform.ReplicationGroupAlreadyExistsExceptionUnmarshaller
+[WARNING]   - com.amazonaws.services.elasticache.model.transform.CacheEngineVersionStaxUnmarshaller
+[WARNING]   - 334 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-kms-1.11.109.jar define 267 overlapping classes: 
+[WARNING]   - com.amazonaws.services.kms.model.transform.GenerateDataKeyWithoutPlaintextResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.kms.model.transform.AliasListEntryJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.kms.model.KeyState
+[WARNING]   - com.amazonaws.services.kms.model.CancelKeyDeletionResult
+[WARNING]   - com.amazonaws.services.kms.model.KMSInvalidStateException
+[WARNING]   - com.amazonaws.services.kms.model.transform.ListResourceTagsRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.kms.AWSKMSAsyncClient$16
+[WARNING]   - com.amazonaws.services.kms.model.CreateKeyResult
+[WARNING]   - com.amazonaws.services.kms.model.transform.GrantListEntryJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.kms.AWSKMSAsyncClient$6
+[WARNING]   - 257 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-iot-1.11.109.jar define 517 overlapping classes: 
+[WARNING]   - com.amazonaws.services.iot.model.transform.LoggingOptionsPayloadMarshaller
+[WARNING]   - com.amazonaws.services.iot.model.GetPolicyRequest
+[WARNING]   - com.amazonaws.services.iot.model.ListPolicyVersionsResult
+[WARNING]   - com.amazonaws.services.iot.model.CreateThingResult
+[WARNING]   - com.amazonaws.services.iot.model.transform.ListCACertificatesRequestMarshaller
+[WARNING]   - com.amazonaws.services.iot.model.transform.RegisterCACertificateResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.iot.AWSIot
+[WARNING]   - com.amazonaws.services.iot.model.transform.DeletePolicyResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.iot.model.transform.SetLoggingOptionsRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.iot.model.transform.ListPrincipalThingsRequestMarshaller
+[WARNING]   - 507 more...
+[WARNING] aws-java-sdk-inspector-1.11.109.jar, sonicbase-0.9.2.2.jar define 304 overlapping classes: 
+[WARNING]   - com.amazonaws.services.inspector.model.transform.DescribeFindingsRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.inspector.model.AddAttributesToFindingsResult
+[WARNING]   - com.amazonaws.services.inspector.model.transform.ResourceGroupJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.inspector.AmazonInspectorClientBuilder
+[WARNING]   - com.amazonaws.services.inspector.model.transform.CreateAssessmentTargetRequestMarshaller
+[WARNING]   - com.amazonaws.services.inspector.model.transform.RegisterCrossAccountAccessRoleRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.inspector.AmazonInspectorAsyncClient$5
+[WARNING]   - com.amazonaws.services.inspector.model.SetTagsForResourceRequest
+[WARNING]   - com.amazonaws.services.inspector.model.InspectorServiceAttributes
+[WARNING]   - com.amazonaws.services.inspector.AmazonInspector
+[WARNING]   - 294 more...
+[WARNING] sonicbase-0.9.2.2.jar, joda-time-2.8.1.jar define 246 overlapping classes: 
+[WARNING]   - org.joda.time.field.RemainderDateTimeField
+[WARNING]   - org.joda.time.convert.ReadableDurationConverter
+[WARNING]   - org.joda.time.convert.ReadableIntervalConverter
+[WARNING]   - org.joda.time.field.SkipUndoDateTimeField
+[WARNING]   - org.joda.time.format.DateTimeFormatterBuilder$TimeZoneName
+[WARNING]   - org.joda.time.tz.DateTimeZoneBuilder$RuleSet
+[WARNING]   - org.joda.time.chrono.BasicDayOfMonthDateTimeField
+[WARNING]   - org.joda.time.Duration
+[WARNING]   - org.joda.time.field.OffsetDateTimeField
+[WARNING]   - org.joda.time.format.ISODateTimeFormat
+[WARNING]   - 236 more...
+[WARNING] sonicbase-0.9.2.2.jar, netty-all-4.1.9.Final.jar define 2337 overlapping classes: 
+[WARNING]   - io.netty.handler.codec.http.multipart.InterfaceHttpData$HttpDataType
+[WARNING]   - io.netty.resolver.dns.InflightNameResolver$1
+[WARNING]   - io.netty.channel.AbstractChannel$AbstractUnsafe$8
+[WARNING]   - io.netty.handler.codec.smtp.DefaultSmtpRequest
+[WARNING]   - io.netty.handler.codec.redis.RedisMessage
+[WARNING]   - io.netty.handler.codec.memcache.binary.BinaryMemcacheResponse
+[WARNING]   - io.netty.handler.timeout.IdleStateHandler
+[WARNING]   - io.netty.buffer.FixedCompositeByteBuf$Component
+[WARNING]   - io.netty.handler.codec.http.HttpHeaders
+[WARNING]   - io.netty.handler.codec.http2.Http2ClientUpgradeCodec
+[WARNING]   - 2327 more...
+[WARNING] sonicbase-0.9.2.2.jar, jackson-mapper-asl-1.8.8.jar define 432 overlapping classes: 
+[WARNING]   - org.codehaus.jackson.map.ext.DOMSerializer
+[WARNING]   - org.codehaus.jackson.node.POJONode
+[WARNING]   - org.codehaus.jackson.map.ext.JodaDeserializers$LocalDateDeserializer
+[WARNING]   - org.codehaus.jackson.map.ser.StdSerializers$UtilDateSerializer
+[WARNING]   - org.codehaus.jackson.map.deser.StdDeserializer$TokenBufferDeserializer
+[WARNING]   - org.codehaus.jackson.map.util.StdDateFormat
+[WARNING]   - org.codehaus.jackson.map.KeyDeserializer
+[WARNING]   - org.codehaus.jackson.map.ser.AnyGetterWriter
+[WARNING]   - org.codehaus.jackson.map.introspect.NopAnnotationIntrospector
+[WARNING]   - org.codehaus.jackson.map.deser.ArrayDeserializers$ArrayDeser
+[WARNING]   - 422 more...
+[WARNING] sonicbase-0.9.2.2.jar, httpmime-4.5.2.jar define 23 overlapping classes: 
+[WARNING]   - org.apache.http.entity.mime.FormBodyPart
+[WARNING]   - org.apache.http.entity.mime.MultipartEntity
+[WARNING]   - org.apache.http.entity.mime.content.FileBody
+[WARNING]   - org.apache.http.entity.mime.MultipartFormEntity
+[WARNING]   - org.apache.http.entity.mime.HttpMultipart
+[WARNING]   - org.apache.http.entity.mime.content.ContentBody
+[WARNING]   - org.apache.http.entity.mime.content.AbstractContentBody
+[WARNING]   - org.apache.http.entity.mime.content.ByteArrayBody
+[WARNING]   - org.apache.http.entity.mime.HttpRFC6532Multipart
+[WARNING]   - org.apache.http.entity.mime.HttpStrictMultipart
+[WARNING]   - 13 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-batch-1.11.109.jar define 166 overlapping classes: 
+[WARNING]   - com.amazonaws.services.batch.model.transform.CancelJobResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.batch.model.transform.CreateComputeEnvironmentRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.batch.model.CEState
+[WARNING]   - com.amazonaws.services.batch.model.DescribeJobsRequest
+[WARNING]   - com.amazonaws.services.batch.model.ClientException
+[WARNING]   - com.amazonaws.services.batch.AWSBatchAsyncClient$2
+[WARNING]   - com.amazonaws.services.batch.AWSBatchAsyncClient$12
+[WARNING]   - com.amazonaws.services.batch.AWSBatchAsyncClient$15
+[WARNING]   - com.amazonaws.services.batch.model.DeleteComputeEnvironmentRequest
+[WARNING]   - com.amazonaws.services.batch.model.transform.MountPointJsonUnmarshaller
+[WARNING]   - 156 more...
+[WARNING] sonicbase-0.9.2.2.jar, jsqlparser-0.9.5.jar define 199 overlapping classes: 
+[WARNING]   - net.sf.jsqlparser.statement.select.OrderByVisitorAdapter
+[WARNING]   - net.sf.jsqlparser.expression.operators.relational.RegExpMatchOperator$1
+[WARNING]   - net.sf.jsqlparser.expression.operators.arithmetic.Concat
+[WARNING]   - net.sf.jsqlparser.statement.execute.Execute
+[WARNING]   - net.sf.jsqlparser.expression.JdbcParameter
+[WARNING]   - net.sf.jsqlparser.statement.select.SubJoin
+[WARNING]   - net.sf.jsqlparser.expression.ExpressionVisitor
+[WARNING]   - net.sf.jsqlparser.util.deparser.CreateIndexDeParser
+[WARNING]   - net.sf.jsqlparser.parser.Node
+[WARNING]   - net.sf.jsqlparser.expression.UserVariable
+[WARNING]   - 189 more...
+[WARNING] aws-java-sdk-cloudfront-1.11.109.jar, sonicbase-0.9.2.2.jar define 404 overlapping classes: 
+[WARNING]   - com.amazonaws.services.cloudfront.AmazonCloudFrontAsyncClient$10
+[WARNING]   - com.amazonaws.services.cloudfront.model.transform.InconsistentQuantitiesExceptionUnmarshaller
+[WARNING]   - com.amazonaws.services.cloudfront.model.transform.ListDistributionsRequestMarshaller
+[WARNING]   - com.amazonaws.services.cloudfront.model.transform.CustomErrorResponseStaxUnmarshaller
+[WARNING]   - com.amazonaws.services.cloudfront.model.TooManyStreamingDistributionCNAMEsException
+[WARNING]   - com.amazonaws.services.cloudfront.model.TooManyCloudFrontOriginAccessIdentitiesException
+[WARNING]   - com.amazonaws.services.cloudfront.model.transform.InvalidGeoRestrictionParameterExceptionUnmarshaller
+[WARNING]   - com.amazonaws.services.cloudfront.AmazonCloudFrontAsyncClient$3
+[WARNING]   - com.amazonaws.services.cloudfront.model.transform.DeleteStreamingDistributionResultStaxUnmarshaller
+[WARNING]   - com.amazonaws.services.cloudfront.model.transform.StreamingDistributionNotDisabledExceptionUnmarshaller
+[WARNING]   - 394 more...
+[WARNING] sonicbase-0.9.2.2.jar, core-3.1.1.jar define 1256 overlapping classes: 
+[WARNING]   - org.eclipse.jdt.internal.core.Assert
+[WARNING]   - org.eclipse.jdt.internal.core.search.matching.TypeParameterLocator
+[WARNING]   - org.eclipse.jdt.core.IImportContainer
+[WARNING]   - org.eclipse.jdt.internal.core.SearchableEnvironmentRequestor
+[WARNING]   - org.eclipse.jdt.internal.core.search.processing.JobManager$1$ProgressJob
+[WARNING]   - org.eclipse.jdt.internal.codeassist.select.SelectionOnQualifiedAllocationExpression
+[WARNING]   - org.eclipse.jdt.internal.core.search.matching.VariablePattern
+[WARNING]   - org.eclipse.jdt.core.IClassFile
+[WARNING]   - org.eclipse.jdt.core.IClasspathAttribute
+[WARNING]   - org.eclipse.jdt.internal.compiler.ast.JavadocSingleNameReference
+[WARNING]   - 1246 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-xray-1.11.109.jar define 104 overlapping classes: 
+[WARNING]   - com.amazonaws.services.xray.model.AnnotationValue
+[WARNING]   - com.amazonaws.services.xray.AWSXRayAsyncClient$6
+[WARNING]   - com.amazonaws.services.xray.AWSXRayAsyncClientBuilder
+[WARNING]   - com.amazonaws.services.xray.AWSXRayAsyncClient$3
+[WARNING]   - com.amazonaws.services.xray.model.transform.EdgeJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.xray.AWSXRayClient
+[WARNING]   - com.amazonaws.services.xray.model.Trace
+[WARNING]   - com.amazonaws.services.xray.model.transform.UnprocessedTraceSegmentMarshaller
+[WARNING]   - com.amazonaws.services.xray.model.transform.ServiceStatisticsJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.xray.model.transform.GetServiceGraphRequestProtocolMarshaller
+[WARNING]   - 94 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-shield-1.11.109.jar define 103 overlapping classes: 
+[WARNING]   - com.amazonaws.services.shield.AWSShieldAsyncClient$7
+[WARNING]   - com.amazonaws.services.shield.model.InvalidResourceException
+[WARNING]   - com.amazonaws.services.shield.model.transform.AttackDetailMarshaller
+[WARNING]   - com.amazonaws.services.shield.model.transform.MitigationJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.shield.model.transform.DeleteSubscriptionRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.shield.model.AttackSummary
+[WARNING]   - com.amazonaws.services.shield.model.LimitsExceededException
+[WARNING]   - com.amazonaws.services.shield.model.transform.ListProtectionsResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.shield.model.SummarizedCounter
+[WARNING]   - com.amazonaws.services.shield.model.transform.SubscriptionMarshaller
+[WARNING]   - 93 more...
+[WARNING] sonicbase-0.9.2.2.jar, jackson-dataformat-cbor-2.6.6.jar define 10 overlapping classes: 
+[WARNING]   - com.fasterxml.jackson.dataformat.cbor.CBORGenerator
+[WARNING]   - com.fasterxml.jackson.dataformat.cbor.CBORReadContext
+[WARNING]   - com.fasterxml.jackson.dataformat.cbor.CBORParserBootstrapper
+[WARNING]   - com.fasterxml.jackson.dataformat.cbor.CBORConstants
+[WARNING]   - com.fasterxml.jackson.dataformat.cbor.CBORParser
+[WARNING]   - com.fasterxml.jackson.dataformat.cbor.CBORParser$Feature
+[WARNING]   - com.fasterxml.jackson.dataformat.cbor.CBORParser$1
+[WARNING]   - com.fasterxml.jackson.dataformat.cbor.CBORGenerator$Feature
+[WARNING]   - com.fasterxml.jackson.dataformat.cbor.PackageVersion
+[WARNING]   - com.fasterxml.jackson.dataformat.cbor.CBORFactory
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-importexport-1.11.109.jar define 84 overlapping classes: 
+[WARNING]   - com.amazonaws.services.importexport.model.InvalidManifestFieldException
+[WARNING]   - com.amazonaws.services.importexport.model.UnableToCancelJobIdException
+[WARNING]   - com.amazonaws.services.importexport.AmazonImportExportAsyncClient$6
+[WARNING]   - com.amazonaws.services.importexport.model.UnableToUpdateJobIdException
+[WARNING]   - com.amazonaws.services.importexport.model.transform.MissingCustomsExceptionUnmarshaller
+[WARNING]   - com.amazonaws.services.importexport.model.transform.CancelJobRequestMarshaller
+[WARNING]   - com.amazonaws.services.importexport.model.InvalidVersionException
+[WARNING]   - com.amazonaws.services.importexport.model.transform.CreateJobQuotaExceededExceptionUnmarshaller
+[WARNING]   - com.amazonaws.services.importexport.model.transform.GetStatusResultStaxUnmarshaller
+[WARNING]   - com.amazonaws.services.importexport.model.transform.JobStaxUnmarshaller
+[WARNING]   - 74 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-lightsail-1.11.109.jar define 375 overlapping classes: 
+[WARNING]   - com.amazonaws.services.lightsail.model.transform.CreateInstanceSnapshotRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.lightsail.model.AmazonLightsailException
+[WARNING]   - com.amazonaws.services.lightsail.model.transform.GetBlueprintsResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.lightsail.model.transform.DetachStaticIpRequestMarshaller
+[WARNING]   - com.amazonaws.services.lightsail.model.transform.InstanceHardwareJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.lightsail.model.KeyPair
+[WARNING]   - com.amazonaws.services.lightsail.model.transform.GetStaticIpRequestMarshaller
+[WARNING]   - com.amazonaws.services.lightsail.model.transform.GetInstanceSnapshotsRequestMarshaller
+[WARNING]   - com.amazonaws.services.lightsail.model.transform.CreateInstancesFromSnapshotRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.lightsail.model.CreateKeyPairResult
+[WARNING]   - 365 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-codebuild-1.11.109.jar define 138 overlapping classes: 
+[WARNING]   - com.amazonaws.services.codebuild.model.transform.BatchGetProjectsResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.codebuild.model.DeleteProjectRequest
+[WARNING]   - com.amazonaws.services.codebuild.model.transform.BuildPhaseMarshaller
+[WARNING]   - com.amazonaws.services.codebuild.model.transform.DeleteProjectResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.codebuild.model.transform.CreateProjectRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.codebuild.model.transform.ListBuildsForProjectRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.codebuild.model.CreateProjectRequest
+[WARNING]   - com.amazonaws.services.codebuild.model.transform.BuildJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.codebuild.AWSCodeBuildAsyncClient
+[WARNING]   - com.amazonaws.services.codebuild.model.transform.SourceAuthMarshaller
+[WARNING]   - 128 more...
+[WARNING] sonicbase-0.9.2.2.jar, httpclient-4.5.2.jar define 463 overlapping classes: 
+[WARNING]   - org.apache.http.impl.cookie.RFC2109Spec
+[WARNING]   - org.apache.http.impl.execchain.MainClientExec
+[WARNING]   - org.apache.http.conn.routing.RouteInfo$TunnelType
+[WARNING]   - org.apache.http.client.methods.HttpGet
+[WARNING]   - org.apache.http.impl.cookie.BrowserCompatSpecFactory
+[WARNING]   - org.apache.http.impl.client.HttpAuthenticator
+[WARNING]   - org.apache.http.conn.ManagedClientConnection
+[WARNING]   - org.apache.http.client.protocol.RequestAuthCache
+[WARNING]   - org.apache.http.conn.params.ConnConnectionParamBean
+[WARNING]   - org.apache.http.impl.client.IdleConnectionEvictor
+[WARNING]   - 453 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-ssm-1.11.109.jar define 797 overlapping classes: 
+[WARNING]   - com.amazonaws.services.simplesystemsmanagement.model.DescribeMaintenanceWindowExecutionTasksRequest
+[WARNING]   - com.amazonaws.services.simplesystemsmanagement.model.PutParameterResult
+[WARNING]   - com.amazonaws.services.simplesystemsmanagement.model.transform.ResultAttributeMarshaller
+[WARNING]   - com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagementAsyncClient$49
+[WARNING]   - com.amazonaws.services.simplesystemsmanagement.model.DescribeMaintenanceWindowTasksResult
+[WARNING]   - com.amazonaws.services.simplesystemsmanagement.model.transform.InventoryFilterJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.simplesystemsmanagement.model.transform.DeleteDocumentRequestMarshaller
+[WARNING]   - com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagementAsyncClient$36
+[WARNING]   - com.amazonaws.services.simplesystemsmanagement.model.TotalSizeLimitExceededException
+[WARNING]   - com.amazonaws.services.simplesystemsmanagement.model.transform.ParameterHistoryMarshaller
+[WARNING]   - 787 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-support-1.11.109.jar define 150 overlapping classes: 
+[WARNING]   - com.amazonaws.services.support.model.TrustedAdvisorCategorySpecificSummary
+[WARNING]   - com.amazonaws.services.support.model.transform.DescribeAttachmentRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.support.model.transform.ResolveCaseRequestMarshaller
+[WARNING]   - com.amazonaws.services.support.model.transform.TrustedAdvisorCheckSummaryMarshaller
+[WARNING]   - com.amazonaws.services.support.model.DescribeTrustedAdvisorCheckSummariesRequest
+[WARNING]   - com.amazonaws.services.support.AWSSupportAsyncClient$7
+[WARNING]   - com.amazonaws.services.support.model.transform.CreateCaseResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.support.model.transform.DescribeTrustedAdvisorCheckSummariesResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.support.model.transform.DescribeTrustedAdvisorCheckSummariesRequestMarshaller
+[WARNING]   - com.amazonaws.services.support.model.DescribeTrustedAdvisorCheckResultResult
+[WARNING]   - 140 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-simpleworkflow-1.11.109.jar define 462 overlapping classes: 
+[WARNING]   - com.amazonaws.services.simpleworkflow.model.transform.WorkflowExecutionCompletedEventAttributesJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.simpleworkflow.model.transform.TaskListMarshaller
+[WARNING]   - com.amazonaws.services.simpleworkflow.model.transform.DecisionTaskTimedOutEventAttributesMarshaller
+[WARNING]   - com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflowAsyncClient$13
+[WARNING]   - com.amazonaws.services.simpleworkflow.model.transform.CloseStatusFilterMarshaller
+[WARNING]   - com.amazonaws.services.simpleworkflow.model.transform.DecisionTaskCompletedEventAttributesJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.simpleworkflow.model.transform.WorkflowExecutionFailedEventAttributesJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.simpleworkflow.model.DecisionTaskTimedOutEventAttributes
+[WARNING]   - com.amazonaws.services.simpleworkflow.model.transform.DomainConfigurationMarshaller
+[WARNING]   - com.amazonaws.services.simpleworkflow.model.transform.DecisionTaskStartedEventAttributesJsonUnmarshaller
+[WARNING]   - 452 more...
+[WARNING] sonicbase-0.9.2.2.jar, stax-api-1.0-2.jar, stax-api-1.0.1.jar define 37 overlapping classes: 
+[WARNING]   - javax.xml.stream.XMLEventReader
+[WARNING]   - javax.xml.stream.StreamFilter
+[WARNING]   - javax.xml.stream.FactoryFinder$ClassLoaderFinderConcrete
+[WARNING]   - javax.xml.stream.util.StreamReaderDelegate
+[WARNING]   - javax.xml.stream.events.StartDocument
+[WARNING]   - javax.xml.stream.EventFilter
+[WARNING]   - javax.xml.stream.XMLEventWriter
+[WARNING]   - javax.xml.stream.XMLStreamConstants
+[WARNING]   - javax.xml.stream.events.EntityDeclaration
+[WARNING]   - javax.xml.stream.events.ProcessingInstruction
+[WARNING]   - 27 more...
+[WARNING] sonicbase-0.9.2.2.jar, jersey-json-1.8.jar define 92 overlapping classes: 
+[WARNING]   - com.sun.jersey.json.impl.reader.StartElementEvent
+[WARNING]   - com.sun.jersey.json.impl.provider.entity.JSONWithPaddingProvider
+[WARNING]   - com.sun.jersey.api.json.JSONConfiguration$Builder
+[WARNING]   - com.sun.jersey.json.impl.provider.entity.JSONRootElementProvider
+[WARNING]   - com.sun.jersey.json.impl.writer.JsonXmlStreamWriter$DummyWriterAdapter
+[WARNING]   - com.sun.jersey.json.impl.reader.JsonXmlStreamReader$LaState
+[WARNING]   - com.sun.jersey.api.json.JSONJAXBContext
+[WARNING]   - com.sun.jersey.api.json.JSONUnmarshaller
+[WARNING]   - com.sun.jersey.json.impl.provider.entity.JSONListElementProvider$General
+[WARNING]   - com.sun.jersey.json.impl.reader.Jackson2StaxReader$1
+[WARNING]   - 82 more...
+[WARNING] sonicbase-0.9.2.2.jar, jasper-runtime-5.5.12.jar define 2 overlapping classes: 
+[WARNING]   - org.apache.jasper.runtime.PageContextImpl$13
+[WARNING]   - org.apache.jasper.runtime.PageContextImpl$12
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-dms-1.11.109.jar define 279 overlapping classes: 
+[WARNING]   - com.amazonaws.services.databasemigrationservice.AWSDatabaseMigrationServiceAsyncClient$1
+[WARNING]   - com.amazonaws.services.databasemigrationservice.model.transform.DescribeRefreshSchemasStatusResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.databasemigrationservice.model.SupportedEndpointType
+[WARNING]   - com.amazonaws.services.databasemigrationservice.model.ResourceNotFoundException
+[WARNING]   - com.amazonaws.services.databasemigrationservice.model.AddTagsToResourceRequest
+[WARNING]   - com.amazonaws.services.databasemigrationservice.model.transform.ReplicationSubnetGroupJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.databasemigrationservice.model.StartReplicationTaskResult
+[WARNING]   - com.amazonaws.services.databasemigrationservice.model.transform.ReplicationInstanceJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.databasemigrationservice.model.transform.DescribeEndpointTypesRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.databasemigrationservice.model.InvalidSubnetException
+[WARNING]   - 269 more...
+[WARNING] sonicbase-0.9.2.2.jar, jasper-compiler-5.5.12.jar, jsp-2.1-6.1.14.jar define 143 overlapping classes: 
+[WARNING]   - org.apache.jasper.compiler.Node$Nodes
+[WARNING]   - org.apache.jasper.compiler.tagplugin.TagPlugin
+[WARNING]   - org.apache.jasper.compiler.JspUtil
+[WARNING]   - org.apache.jasper.xmlparser.MyEntityResolver
+[WARNING]   - org.apache.jasper.compiler.Validator$TagExtraInfoVisitor
+[WARNING]   - org.apache.jasper.compiler.SmapStratum
+[WARNING]   - org.apache.jasper.compiler.SmapGenerator
+[WARNING]   - org.apache.jasper.compiler.tagplugin.TagPluginContext
+[WARNING]   - org.apache.jasper.compiler.JasperTagInfo
+[WARNING]   - org.apache.jasper.EmbeddedServletOptions
+[WARNING]   - 133 more...
+[WARNING] aws-java-sdk-cloudwatch-1.11.109.jar, sonicbase-0.9.2.2.jar define 107 overlapping classes: 
+[WARNING]   - com.amazonaws.services.cloudwatch.model.EnableAlarmActionsResult
+[WARNING]   - com.amazonaws.services.cloudwatch.model.InvalidFormatException
+[WARNING]   - com.amazonaws.services.cloudwatch.model.PutMetricDataResult
+[WARNING]   - com.amazonaws.services.cloudwatch.model.GetMetricStatisticsResult
+[WARNING]   - com.amazonaws.services.cloudwatch.AmazonCloudWatch
+[WARNING]   - com.amazonaws.services.cloudwatch.model.transform.MetricDatumStaxUnmarshaller
+[WARNING]   - com.amazonaws.services.cloudwatch.model.DescribeAlarmsResult
+[WARNING]   - com.amazonaws.services.cloudwatch.model.InvalidNextTokenException
+[WARNING]   - com.amazonaws.services.cloudwatch.AmazonCloudWatchAsyncClient$9
+[WARNING]   - com.amazonaws.services.cloudwatch.model.transform.InvalidParameterCombinationExceptionUnmarshaller
+[WARNING]   - 97 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-health-1.11.109.jar define 87 overlapping classes: 
+[WARNING]   - com.amazonaws.services.health.model.EntityFilter
+[WARNING]   - com.amazonaws.services.health.model.EventTypeCategory
+[WARNING]   - com.amazonaws.services.health.model.transform.DescribeEventDetailsRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.health.AWSHealthAsyncClient$3
+[WARNING]   - com.amazonaws.services.health.model.UnsupportedLocaleException
+[WARNING]   - com.amazonaws.services.health.model.transform.DescribeEventsResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.health.model.transform.EventAggregateMarshaller
+[WARNING]   - com.amazonaws.services.health.AbstractAWSHealthAsync
+[WARNING]   - com.amazonaws.services.health.model.transform.DescribeEventsRequestMarshaller
+[WARNING]   - com.amazonaws.services.health.model.transform.EntityFilterMarshaller
+[WARNING]   - 77 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-lambda-1.11.109.jar define 234 overlapping classes: 
+[WARNING]   - com.amazonaws.services.lambda.model.KMSInvalidStateException
+[WARNING]   - com.amazonaws.services.lambda.model.UnsupportedMediaTypeException
+[WARNING]   - com.amazonaws.services.lambda.model.transform.ListFunctionsRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.lambda.model.transform.CreateFunctionRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.lambda.model.VpcConfig
+[WARNING]   - com.amazonaws.services.lambda.AWSLambdaAsyncClient$20
+[WARNING]   - com.amazonaws.services.lambda.model.transform.UpdateEventSourceMappingResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.lambda.model.transform.VpcConfigResponseJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.lambda.model.DeleteEventSourceMappingRequest
+[WARNING]   - com.amazonaws.services.lambda.model.transform.PublishVersionResultJsonUnmarshaller
+[WARNING]   - 224 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-sns-1.11.109.jar define 200 overlapping classes: 
+[WARNING]   - com.amazonaws.services.sns.model.transform.GetSMSAttributesRequestMarshaller
+[WARNING]   - com.amazonaws.services.sns.model.GetSubscriptionAttributesResult
+[WARNING]   - com.amazonaws.services.sns.model.transform.EndpointStaxUnmarshaller
+[WARNING]   - com.amazonaws.services.sns.model.InternalErrorException
+[WARNING]   - com.amazonaws.services.sns.model.transform.MessageAttributeValueStaxUnmarshaller
+[WARNING]   - com.amazonaws.services.sns.model.SetPlatformApplicationAttributesResult
+[WARNING]   - com.amazonaws.services.sns.model.CreateTopicRequest
+[WARNING]   - com.amazonaws.services.sns.model.ListTopicsRequest
+[WARNING]   - com.amazonaws.services.sns.model.SubscribeResult
+[WARNING]   - com.amazonaws.services.sns.AmazonSNSAsyncClient$21
+[WARNING]   - 190 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-discovery-1.11.109.jar define 171 overlapping classes: 
+[WARNING]   - com.amazonaws.services.applicationdiscovery.model.transform.StartExportTaskResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.applicationdiscovery.model.transform.TagFilterMarshaller
+[WARNING]   - com.amazonaws.services.applicationdiscovery.model.ServerInternalErrorException
+[WARNING]   - com.amazonaws.services.applicationdiscovery.model.transform.DeleteApplicationsResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.applicationdiscovery.AWSApplicationDiscoveryClientBuilder
+[WARNING]   - com.amazonaws.services.applicationdiscovery.model.transform.CreateApplicationRequestMarshaller
+[WARNING]   - com.amazonaws.services.applicationdiscovery.model.transform.StartDataCollectionByAgentIdsResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.applicationdiscovery.model.transform.ListServerNeighborsResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.applicationdiscovery.model.DescribeTagsResult
+[WARNING]   - com.amazonaws.services.applicationdiscovery.AWSApplicationDiscoveryAsyncClient$5
+[WARNING]   - 161 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-kinesis-1.11.109.jar define 527 overlapping classes: 
+[WARNING]   - com.amazonaws.services.kinesisfirehose.model.transform.PutRecordResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.kinesis.AmazonKinesisAsyncClient$4
+[WARNING]   - com.amazonaws.services.kinesisfirehose.model.transform.ElasticsearchDestinationUpdateMarshaller
+[WARNING]   - com.amazonaws.services.kinesisfirehose.model.transform.ListDeliveryStreamsResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.kinesis.model.transform.IncreaseStreamRetentionPeriodRequestMarshaller
+[WARNING]   - com.amazonaws.services.kinesisanalytics.model.transform.DeleteApplicationReferenceDataSourceRequestMarshaller
+[WARNING]   - com.amazonaws.services.kinesis.model.AmazonKinesisException
+[WARNING]   - com.amazonaws.services.kinesisanalytics.model.transform.S3ReferenceDataSourceMarshaller
+[WARNING]   - com.amazonaws.services.kinesisfirehose.model.UpdateDestinationRequest
+[WARNING]   - com.amazonaws.services.kinesisfirehose.model.CreateDeliveryStreamResult
+[WARNING]   - 517 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-redshift-1.11.109.jar define 527 overlapping classes: 
+[WARNING]   - com.amazonaws.services.redshift.model.transform.InvalidSnapshotCopyGrantStateExceptionUnmarshaller
+[WARNING]   - com.amazonaws.services.redshift.model.ClusterSubnetGroup
+[WARNING]   - com.amazonaws.services.redshift.model.SnapshotCopyGrantNotFoundException
+[WARNING]   - com.amazonaws.services.redshift.model.transform.DefaultClusterParametersStaxUnmarshaller
+[WARNING]   - com.amazonaws.services.redshift.AmazonRedshiftAsyncClient$25
+[WARNING]   - com.amazonaws.services.redshift.model.transform.CopyClusterSnapshotRequestMarshaller
+[WARNING]   - com.amazonaws.services.redshift.AmazonRedshiftAsyncClient$3
+[WARNING]   - com.amazonaws.services.redshift.model.transform.SNSTopicArnNotFoundExceptionUnmarshaller
+[WARNING]   - com.amazonaws.services.redshift.model.ReservedNodeQuotaExceededException
+[WARNING]   - com.amazonaws.services.redshift.model.AvailabilityZone
+[WARNING]   - 517 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-stepfunctions-1.11.109.jar define 353 overlapping classes: 
+[WARNING]   - com.amazonaws.services.stepfunctions.model.SendTaskSuccessRequest
+[WARNING]   - com.amazonaws.services.stepfunctions.model.SendTaskFailureResult
+[WARNING]   - com.amazonaws.services.stepfunctions.model.transform.SendTaskSuccessRequestMarshaller
+[WARNING]   - com.amazonaws.services.stepfunctions.AWSStepFunctionsAsyncClient$10
+[WARNING]   - com.amazonaws.services.stepfunctions.builder.StateMachine$Builder
+[WARNING]   - com.amazonaws.services.stepfunctions.builder.conditions.AndCondition
+[WARNING]   - com.amazonaws.services.stepfunctions.builder.conditions.NumericLessThanOrEqualCondition$Builder
+[WARNING]   - com.amazonaws.services.stepfunctions.model.ActivityDoesNotExistException
+[WARNING]   - com.amazonaws.services.stepfunctions.model.InvalidExecutionInputException
+[WARNING]   - com.amazonaws.services.stepfunctions.AWSStepFunctionsAsyncClient$3
+[WARNING]   - 343 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-sts-1.11.109.jar define 86 overlapping classes: 
+[WARNING]   - com.amazonaws.services.securitytoken.model.transform.GetFederationTokenResultStaxUnmarshaller
+[WARNING]   - com.amazonaws.services.securitytoken.model.GetSessionTokenRequest
+[WARNING]   - com.amazonaws.services.securitytoken.AWSSecurityTokenServiceAsyncClient$4
+[WARNING]   - com.amazonaws.auth.STSSessionCredentialsProvider
+[WARNING]   - com.amazonaws.services.securitytoken.model.transform.GetSessionTokenRequestMarshaller
+[WARNING]   - com.amazonaws.services.securitytoken.model.transform.AssumeRoleResultStaxUnmarshaller
+[WARNING]   - com.amazonaws.auth.STSAssumeRoleSessionCredentialsProvider$Builder
+[WARNING]   - com.amazonaws.services.securitytoken.model.GetFederationTokenResult
+[WARNING]   - com.amazonaws.services.securitytoken.model.GetCallerIdentityRequest
+[WARNING]   - com.amazonaws.services.securitytoken.model.AssumeRoleWithWebIdentityRequest
+[WARNING]   - 76 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-budgets-1.11.109.jar define 124 overlapping classes: 
+[WARNING]   - com.amazonaws.services.budgets.AWSBudgetsAsyncClient$8
+[WARNING]   - com.amazonaws.services.budgets.model.DeleteBudgetRequest
+[WARNING]   - com.amazonaws.services.budgets.model.transform.UpdateBudgetRequestMarshaller
+[WARNING]   - com.amazonaws.services.budgets.model.Subscriber
+[WARNING]   - com.amazonaws.services.budgets.model.Spend
+[WARNING]   - com.amazonaws.services.budgets.model.CreateSubscriberResult
+[WARNING]   - com.amazonaws.services.budgets.AWSBudgetsAsyncClient$5
+[WARNING]   - com.amazonaws.services.budgets.model.CreateNotificationRequest
+[WARNING]   - com.amazonaws.services.budgets.model.DescribeBudgetsRequest
+[WARNING]   - com.amazonaws.services.budgets.model.CreateBudgetResult
+[WARNING]   - 114 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-elasticsearch-1.11.109.jar define 158 overlapping classes: 
+[WARNING]   - com.amazonaws.services.elasticsearch.model.ResourceNotFoundException
+[WARNING]   - com.amazonaws.services.elasticsearch.model.transform.DescribeElasticsearchDomainConfigResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.elasticsearch.model.transform.DescribeElasticsearchInstanceTypeLimitsResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.elasticsearch.AWSElasticsearchAsyncClient$12
+[WARNING]   - com.amazonaws.services.elasticsearch.model.transform.AddTagsResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.elasticsearch.model.transform.SnapshotOptionsStatusMarshaller
+[WARNING]   - com.amazonaws.services.elasticsearch.model.transform.CreateElasticsearchDomainRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.elasticsearch.model.transform.EBSOptionsJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.elasticsearch.model.transform.OptionStatusJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.elasticsearch.model.Tag
+[WARNING]   - 148 more...
+[WARNING] sonicbase-0.9.2.2.jar, metrics-core-3.0.2.jar define 79 overlapping classes: 
+[WARNING]   - com.codahale.metrics.JmxReporter$MetricTimeUnits
+[WARNING]   - com.codahale.metrics.JmxReporter$JmxGaugeMBean
+[WARNING]   - com.codahale.metrics.Striped64$1
+[WARNING]   - com.codahale.metrics.JmxReporter
+[WARNING]   - com.codahale.metrics.ScheduledReporter$1
+[WARNING]   - com.codahale.metrics.EWMA
+[WARNING]   - com.codahale.metrics.Gauge
+[WARNING]   - com.codahale.metrics.Counting
+[WARNING]   - com.codahale.metrics.MetricRegistry$MetricBuilder$1
+[WARNING]   - com.codahale.metrics.MetricFilter$1
+[WARNING]   - 69 more...
+[WARNING] sonicbase-0.9.2.2.jar, quartz-2.2.1.jar define 350 overlapping classes: 
+[WARNING]   - org.quartz.utils.counter.CounterManagerImpl
+[WARNING]   - org.quartz.simpl.SimpleThreadPool
+[WARNING]   - org.quartz.core.jmx.QuartzSchedulerMBean
+[WARNING]   - org.quartz.spi.JobStore
+[WARNING]   - org.quartz.impl.jdbcjobstore.DB2v8Delegate
+[WARNING]   - org.quartz.plugins.SchedulerPluginWithUserTransactionSupport
+[WARNING]   - org.quartz.commonj.WorkManagerThreadExecutor
+[WARNING]   - org.terracotta.quartz.AbstractTerracottaJobStore
+[WARNING]   - org.quartz.impl.jdbcjobstore.Semaphore
+[WARNING]   - org.quartz.spi.MutableTrigger
+[WARNING]   - 340 more...
+[WARNING] sonicbase-0.9.2.2.jar, jetty-util-6.1.26.jar define 105 overlapping classes: 
+[WARNING]   - org.mortbay.util.IO$1
+[WARNING]   - org.mortbay.component.Container$Relationship
+[WARNING]   - org.mortbay.util.ajax.JSON$Output
+[WARNING]   - org.mortbay.servlet.GzipFilter$GZIPResponseWrapper
+[WARNING]   - org.mortbay.log.Slf4jLog
+[WARNING]   - org.mortbay.util.ajax.JSON
+[WARNING]   - org.mortbay.log.Logger
+[WARNING]   - org.mortbay.util.Scanner$1
+[WARNING]   - org.mortbay.thread.QueuedThreadPool
+[WARNING]   - org.mortbay.log.StdErrLog
+[WARNING]   - 95 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-cloudtrail-1.11.109.jar define 156 overlapping classes: 
+[WARNING]   - com.amazonaws.services.cloudtrail.AbstractAWSCloudTrail
+[WARNING]   - com.amazonaws.services.cloudtrail.AWSCloudTrailClientBuilder
+[WARNING]   - com.amazonaws.services.cloudtrail.model.transform.PutEventSelectorsResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.cloudtrail.model.transform.StartLoggingResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.cloudtrail.model.transform.DataResourceMarshaller
+[WARNING]   - com.amazonaws.services.cloudtrail.model.transform.UpdateTrailResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.cloudtrail.model.transform.DescribeTrailsRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.cloudtrail.model.transform.ResourceMarshaller
+[WARNING]   - com.amazonaws.services.cloudtrail.AWSCloudTrailAsyncClient$5
+[WARNING]   - com.amazonaws.services.cloudtrail.model.transform.ListTagsResultJsonUnmarshaller
+[WARNING]   - 146 more...
+[WARNING] sonicbase-0.9.2.2.jar, commons-beanutils-core-1.8.0.jar define 26 overlapping classes: 
+[WARNING]   - org.apache.commons.beanutils.WeakFastHashMap$KeySet
+[WARNING]   - org.apache.commons.beanutils.WrapDynaClass$2
+[WARNING]   - org.apache.commons.beanutils.expression.Resolver
+[WARNING]   - org.apache.commons.beanutils.converters.DateTimeConverter
+[WARNING]   - org.apache.commons.beanutils.ConvertUtilsBean2
+[WARNING]   - org.apache.commons.beanutils.LazyDynaList
+[WARNING]   - org.apache.commons.beanutils.converters.AbstractConverter
+[WARNING]   - org.apache.commons.beanutils.expression.DefaultResolver
+[WARNING]   - org.apache.commons.beanutils.converters.DateConverter
+[WARNING]   - org.apache.commons.beanutils.WeakFastHashMap$CollectionView
+[WARNING]   - 16 more...
+[WARNING] sonicbase-0.9.2.2.jar, commons-codec-1.9.jar define 85 overlapping classes: 
+[WARNING]   - org.apache.commons.codec.language.Nysiis
+[WARNING]   - org.apache.commons.codec.language.bm.Rule$1
+[WARNING]   - org.apache.commons.codec.language.bm.Rule$RPattern
+[WARNING]   - org.apache.commons.codec.language.ColognePhonetic$CologneInputBuffer
+[WARNING]   - org.apache.commons.codec.language.bm.BeiderMorseEncoder
+[WARNING]   - org.apache.commons.codec.digest.UnixCrypt
+[WARNING]   - org.apache.commons.codec.language.Soundex
+[WARNING]   - org.apache.commons.codec.binary.BinaryCodec
+[WARNING]   - org.apache.commons.codec.language.bm.Languages$1
+[WARNING]   - org.apache.commons.codec.language.bm.PhoneticEngine$1
+[WARNING]   - 75 more...
+[WARNING] sonicbase-0.9.2.2.jar, activation-1.1.jar define 38 overlapping classes: 
+[WARNING]   - javax.activation.DataContentHandlerFactory
+[WARNING]   - javax.activation.ObjectDataContentHandler
+[WARNING]   - javax.activation.DataContentHandler
+[WARNING]   - com.sun.activation.registries.MimeTypeEntry
+[WARNING]   - com.sun.activation.viewers.TextViewer
+[WARNING]   - com.sun.activation.registries.LogSupport
+[WARNING]   - javax.activation.CommandObject
+[WARNING]   - javax.activation.SecuritySupport$2
+[WARNING]   - com.sun.activation.viewers.TextEditor
+[WARNING]   - com.sun.activation.viewers.ImageViewerCanvas
+[WARNING]   - 28 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-events-1.11.109.jar define 120 overlapping classes: 
+[WARNING]   - com.amazonaws.services.cloudwatchevents.model.transform.PutRuleResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.cloudwatchevents.model.DescribeRuleResult
+[WARNING]   - com.amazonaws.services.cloudwatchevents.AmazonCloudWatchEventsAsyncClient
+[WARNING]   - com.amazonaws.services.cloudwatchevents.model.transform.RuleJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.cloudwatchevents.model.EnableRuleResult
+[WARNING]   - com.amazonaws.services.cloudwatchevents.model.transform.EnableRuleResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.cloudwatchevents.model.transform.PutEventsRequestEntryJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.cloudwatchevents.model.ConcurrentModificationException
+[WARNING]   - com.amazonaws.services.cloudwatchevents.model.transform.RemoveTargetsRequestMarshaller
+[WARNING]   - com.amazonaws.services.cloudwatchevents.model.PutEventsRequest
+[WARNING]   - 110 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-elastictranscoder-1.11.109.jar define 217 overlapping classes: 
+[WARNING]   - com.amazonaws.services.elastictranscoder.model.transform.UpdatePipelineStatusResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.elastictranscoder.model.VideoParameters
+[WARNING]   - com.amazonaws.services.elastictranscoder.model.transform.UpdatePipelineNotificationsRequestMarshaller
+[WARNING]   - com.amazonaws.services.elastictranscoder.AmazonElasticTranscoderAsyncClient$13
+[WARNING]   - com.amazonaws.services.elastictranscoder.model.transform.CaptionFormatJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.elastictranscoder.model.CreatePipelineResult
+[WARNING]   - com.amazonaws.services.elastictranscoder.model.AudioParameters
+[WARNING]   - com.amazonaws.services.elastictranscoder.model.Notifications
+[WARNING]   - com.amazonaws.services.elastictranscoder.model.CreateJobResult
+[WARNING]   - com.amazonaws.services.elastictranscoder.model.transform.JobOutputJsonUnmarshaller
+[WARNING]   - 207 more...
+[WARNING] sonicbase-0.9.2.2.jar, httpcore-4.4.4.jar define 254 overlapping classes: 
+[WARNING]   - org.apache.http.protocol.HttpRequestHandler
+[WARNING]   - org.apache.http.impl.io.ChunkedOutputStream
+[WARNING]   - org.apache.http.protocol.ChainBuilder
+[WARNING]   - org.apache.http.impl.entity.DisallowIdentityContentLengthStrategy
+[WARNING]   - org.apache.http.impl.ConnSupport
+[WARNING]   - org.apache.http.impl.io.DefaultHttpResponseParserFactory
+[WARNING]   - org.apache.http.HttpClientConnection
+[WARNING]   - org.apache.http.NameValuePair
+[WARNING]   - org.apache.http.protocol.HttpExpectationVerifier
+[WARNING]   - org.apache.http.protocol.UriPatternMatcher
+[WARNING]   - 244 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-storagegateway-1.11.109.jar define 440 overlapping classes: 
+[WARNING]   - com.amazonaws.services.storagegateway.model.transform.DescribeGatewayInformationResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.storagegateway.model.transform.CachediSCSIVolumeJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.storagegateway.model.ErrorCode
+[WARNING]   - com.amazonaws.services.storagegateway.AWSStorageGatewayAsyncClient$20
+[WARNING]   - com.amazonaws.services.storagegateway.model.DescribeChapCredentialsResult
+[WARNING]   - com.amazonaws.services.storagegateway.model.transform.ListVolumeRecoveryPointsRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.storagegateway.model.transform.DeleteSnapshotScheduleRequestMarshaller
+[WARNING]   - com.amazonaws.services.storagegateway.model.transform.TapeRecoveryPointInfoJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.storagegateway.model.transform.RemoveTagsFromResourceRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.storagegateway.model.transform.ListFileSharesResultJsonUnmarshaller
+[WARNING]   - 430 more...
+[WARNING] sonicbase-0.9.2.2.jar, lzo-core-1.0.5.jar define 33 overlapping classes: 
+[WARNING]   - org.anarres.lzo.LzoCompressor1x_999
+[WARNING]   - org.anarres.lzo.LzoLibrary
+[WARNING]   - org.anarres.lzo.AbstractLzoDecompressor
+[WARNING]   - org.anarres.lzo.LzoAlgorithm
+[WARNING]   - org.anarres.lzo.LzoDecompressor1z_safe
+[WARNING]   - org.anarres.lzo.LzoCompressor1y_1
+[WARNING]   - org.anarres.lzo.LzoOutputStream
+[WARNING]   - org.anarres.lzo.AbstractLzo2Compressor
+[WARNING]   - org.anarres.lzo.LzoInputStream
+[WARNING]   - org.anarres.lzo.AbstractLzoTransformer
+[WARNING]   - 23 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-s3-1.11.109.jar define 555 overlapping classes: 
+[WARNING]   - com.amazonaws.services.s3.internal.ServiceUtils$RetryableS3DownloadTask
+[WARNING]   - com.amazonaws.services.s3.event.S3EventNotification$S3Entity
+[WARNING]   - com.amazonaws.services.s3.transfer.internal.AbstractTransfer
+[WARNING]   - com.amazonaws.services.s3.model.CryptoConfiguration$1
+[WARNING]   - com.amazonaws.services.s3.event.S3EventNotification$S3EventNotificationRecord
+[WARNING]   - com.amazonaws.services.s3.transfer.model.CopyResult
+[WARNING]   - com.amazonaws.services.s3.metrics.S3ServiceMetric$S3ThroughputMetric
+[WARNING]   - com.amazonaws.services.s3.internal.crypto.AesCtr
+[WARNING]   - com.amazonaws.services.s3.model.lifecycle.LifecycleFilterPredicate
+[WARNING]   - com.amazonaws.services.s3.model.transform.Unmarshallers$BucketLocationUnmarshaller
+[WARNING]   - 545 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-acm-1.11.109.jar define 103 overlapping classes: 
+[WARNING]   - com.amazonaws.services.certificatemanager.model.transform.ListTagsForCertificateRequestMarshaller
+[WARNING]   - com.amazonaws.services.certificatemanager.model.ImportCertificateRequest
+[WARNING]   - com.amazonaws.services.certificatemanager.model.TooManyTagsException
+[WARNING]   - com.amazonaws.services.certificatemanager.AWSCertificateManagerAsyncClient$3
+[WARNING]   - com.amazonaws.services.certificatemanager.model.transform.RequestCertificateRequestMarshaller
+[WARNING]   - com.amazonaws.services.certificatemanager.model.CertificateStatus
+[WARNING]   - com.amazonaws.services.certificatemanager.model.DescribeCertificateResult
+[WARNING]   - com.amazonaws.services.certificatemanager.model.transform.RequestCertificateRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.certificatemanager.model.transform.DeleteCertificateResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.certificatemanager.model.transform.ResendValidationEmailRequestProtocolMarshaller
+[WARNING]   - 93 more...
+[WARNING] sonicbase-0.9.2.2.jar, jsp-2.1-6.1.14.jar define 398 overlapping classes: 
+[WARNING]   - org.apache.taglibs.standard.tag.common.core.WhenTagSupport
+[WARNING]   - org.apache.jasper.runtime.JspApplicationContextImpl
+[WARNING]   - org.apache.taglibs.standard.tag.common.core.ParamSupport$ParamManager
+[WARNING]   - org.apache.taglibs.standard.tag.rt.fmt.SetBundleTag
+[WARNING]   - org.apache.taglibs.standard.lang.jstl.BeanInfoManager
+[WARNING]   - com.sun.appserv.server.util.PreprocessorUtil
+[WARNING]   - com.sun.el.parser.AstGreaterThan
+[WARNING]   - com.sun.appserv.util.cache.CacheListener
+[WARNING]   - org.apache.taglibs.standard.tag.rt.core.WhenTag
+[WARNING]   - com.sun.el.parser.AstMinus
+[WARNING]   - 388 more...
+[WARNING] sonicbase-0.9.2.2.jar, gson-2.2.3.jar define 155 overlapping classes: 
+[WARNING]   - com.google.gson.internal.bind.JsonTreeWriter
+[WARNING]   - com.google.gson.internal.Excluder
+[WARNING]   - com.google.gson.JsonDeserializationContext
+[WARNING]   - com.google.gson.FieldNamingPolicy$5
+[WARNING]   - com.google.gson.internal.$Gson$Types
+[WARNING]   - com.google.gson.internal.UnsafeAllocator$2
+[WARNING]   - com.google.gson.internal.bind.SqlDateTypeAdapter$1
+[WARNING]   - com.google.gson.FieldAttributes
+[WARNING]   - com.google.gson.internal.$Gson$Types$ParameterizedTypeImpl
+[WARNING]   - com.google.gson.internal.Primitives
+[WARNING]   - 145 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-logs-1.11.109.jar define 235 overlapping classes: 
+[WARNING]   - com.amazonaws.services.logs.model.DeleteDestinationResult
+[WARNING]   - com.amazonaws.services.logs.model.UntagLogGroupResult
+[WARNING]   - com.amazonaws.services.logs.AWSLogsAsyncClient$3
+[WARNING]   - com.amazonaws.services.logs.model.transform.PutRetentionPolicyResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.logs.model.CreateLogStreamResult
+[WARNING]   - com.amazonaws.services.logs.model.transform.FilterLogEventsRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.logs.model.transform.PutDestinationRequestMarshaller
+[WARNING]   - com.amazonaws.services.logs.model.CreateLogGroupResult
+[WARNING]   - com.amazonaws.services.logs.model.transform.InputLogEventMarshaller
+[WARNING]   - com.amazonaws.services.logs.AWSLogsAsyncClient
+[WARNING]   - 225 more...
+[WARNING] slf4j-api-1.6.6.jar, sonicbase-0.9.2.2.jar define 23 overlapping classes: 
+[WARNING]   - org.slf4j.ILoggerFactory
+[WARNING]   - org.slf4j.MDC
+[WARNING]   - org.slf4j.helpers.BasicMDCAdapter
+[WARNING]   - org.slf4j.spi.MDCAdapter
+[WARNING]   - org.slf4j.LoggerFactory
+[WARNING]   - org.slf4j.helpers.Util
+[WARNING]   - org.slf4j.helpers.NOPLogger
+[WARNING]   - org.slf4j.helpers.NOPLoggerFactory
+[WARNING]   - org.slf4j.helpers.SubstituteLoggerFactory
+[WARNING]   - org.slf4j.helpers.NamedLoggerBase
+[WARNING]   - 13 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-clouddirectory-1.11.109.jar define 482 overlapping classes: 
+[WARNING]   - com.amazonaws.services.clouddirectory.model.transform.BatchReadOperationMarshaller
+[WARNING]   - com.amazonaws.services.clouddirectory.model.transform.ListObjectParentsResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.clouddirectory.model.transform.GetDirectoryRequestMarshaller
+[WARNING]   - com.amazonaws.services.clouddirectory.model.transform.EnableDirectoryRequestMarshaller
+[WARNING]   - com.amazonaws.services.clouddirectory.model.transform.ListAttachedIndicesRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.clouddirectory.model.transform.DeleteObjectResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.clouddirectory.model.transform.AttachToIndexRequestMarshaller
+[WARNING]   - com.amazonaws.services.clouddirectory.AmazonCloudDirectoryAsyncClient$20
+[WARNING]   - com.amazonaws.services.clouddirectory.model.transform.BatchReadSuccessfulResponseMarshaller
+[WARNING]   - com.amazonaws.services.clouddirectory.model.transform.BatchDetachObjectResponseJsonUnmarshaller
+[WARNING]   - 472 more...
+[WARNING] commons-cli-1.3.1.jar, sonicbase-0.9.2.2.jar define 26 overlapping classes: 
+[WARNING]   - org.apache.commons.cli.HelpFormatter$OptionComparator
+[WARNING]   - org.apache.commons.cli.ParseException
+[WARNING]   - org.apache.commons.cli.OptionValidator
+[WARNING]   - org.apache.commons.cli.UnrecognizedOptionException
+[WARNING]   - org.apache.commons.cli.Parser
+[WARNING]   - org.apache.commons.cli.GnuParser
+[WARNING]   - org.apache.commons.cli.PatternOptionBuilder
+[WARNING]   - org.apache.commons.cli.Option
+[WARNING]   - org.apache.commons.cli.CommandLine
+[WARNING]   - org.apache.commons.cli.BasicParser
+[WARNING]   - 16 more...
+[WARNING] sonicbase-0.9.2.2.jar, xmlenc-0.52.jar define 11 overlapping classes: 
+[WARNING]   - org.znerd.xmlenc.XMLEventListenerStates
+[WARNING]   - org.znerd.xmlenc.StatefulXMLEventListener
+[WARNING]   - org.znerd.xmlenc.XMLEventListener
+[WARNING]   - org.znerd.xmlenc.InvalidXMLException
+[WARNING]   - org.znerd.xmlenc.LineBreak
+[WARNING]   - org.znerd.xmlenc.sax.SAXEventReceiver
+[WARNING]   - org.znerd.xmlenc.XMLOutputter
+[WARNING]   - org.znerd.xmlenc.XMLEventListenerState
+[WARNING]   - org.znerd.xmlenc.Library
+[WARNING]   - org.znerd.xmlenc.XMLChecker
+[WARNING]   - 1 more...
+[WARNING] sonicbase-0.9.2.2.jar, lz4-1.3.0.jar define 69 overlapping classes: 
+[WARNING]   - net.jpountz.xxhash.AbstractStreamingXXHash32Java
+[WARNING]   - net.jpountz.lz4.LZ4BlockInputStream
+[WARNING]   - net.jpountz.xxhash.XXHash32JNI
+[WARNING]   - net.jpountz.lz4.LZ4BlockOutputStream
+[WARNING]   - net.jpountz.lz4.LZ4JNI
+[WARNING]   - net.jpountz.lz4.LZ4JavaUnsafeFastDecompressor
+[WARNING]   - net.jpountz.lz4.LZ4SafeUtils
+[WARNING]   - net.jpountz.xxhash.StreamingXXHash32JNI$Factory
+[WARNING]   - net.jpountz.util.UnsafeUtils
+[WARNING]   - net.jpountz.lz4.LZ4HCJavaSafeCompressor$HashTable
+[WARNING]   - 59 more...
+[WARNING] sonicbase-0.9.2.2.jar, quartz-jobs-2.2.1.jar define 20 overlapping classes: 
+[WARNING]   - org.quartz.jobs.ee.jms.JmsHelper
+[WARNING]   - org.quartz.jobs.ee.jms.SendDestinationMessageJob
+[WARNING]   - org.quartz.jobs.DirectoryScanListener
+[WARNING]   - org.quartz.jobs.ee.ejb.EJBInvokerJob
+[WARNING]   - org.quartz.jobs.DirectoryScanJob$1
+[WARNING]   - org.quartz.jobs.NativeJob
+[WARNING]   - org.quartz.jobs.ee.jmx.JMXInvokerJob
+[WARNING]   - org.quartz.jobs.NoOpJob
+[WARNING]   - org.quartz.jobs.ee.mail.SendMailJob$1
+[WARNING]   - org.quartz.jobs.FileScanJob
+[WARNING]   - 10 more...
+[WARNING] sonicbase-0.9.2.2.jar, stax-api-1.0.1.jar define 3 overlapping classes: 
+[WARNING]   - javax.xml.namespace.NamespaceContext
+[WARNING]   - javax.xml.namespace.QName
+[WARNING]   - javax.xml.XMLConstants
+[WARNING] sonicbase-0.9.2.2.jar, jaxb-api-2.2.2.jar define 101 overlapping classes: 
+[WARNING]   - javax.xml.bind.annotation.XmlValue
+[WARNING]   - javax.xml.bind.annotation.XmlElement
+[WARNING]   - javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter
+[WARNING]   - javax.xml.bind.ContextFinder
+[WARNING]   - javax.xml.bind.annotation.XmlElementRefs
+[WARNING]   - javax.xml.bind.ParseConversionEvent
+[WARNING]   - javax.xml.bind.helpers.DefaultValidationEventHandler
+[WARNING]   - javax.xml.bind.annotation.XmlSchema
+[WARNING]   - javax.xml.bind.ValidationException
+[WARNING]   - javax.xml.bind.annotation.XmlElement$DEFAULT
+[WARNING]   - 91 more...
+[WARNING] sonicbase-0.9.2.2.jar, httpasyncclient-4.1.1.jar define 84 overlapping classes: 
+[WARNING]   - org.apache.http.impl.nio.client.InternalIOReactorExceptionHandler
+[WARNING]   - org.apache.http.nio.conn.ssl.SSLIOSessionStrategy
+[WARNING]   - org.apache.http.impl.nio.conn.LoggingIOSession
+[WARNING]   - org.apache.http.impl.nio.client.CloseableHttpAsyncClientBase$Status
+[WARNING]   - org.apache.http.impl.nio.conn.HttpNIOConnPoolFactory
+[WARNING]   - org.apache.http.nio.conn.ssl.SSLIOSessionStrategy$1
+[WARNING]   - org.apache.http.nio.conn.NHttpClientConnectionManager
+[WARNING]   - org.apache.http.impl.nio.client.InternalState
+[WARNING]   - org.apache.http.impl.nio.client.DefaultClientExchangeHandlerImpl
+[WARNING]   - org.apache.http.impl.nio.client.AbstractClientExchangeHandler
+[WARNING]   - 74 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-ecr-1.11.109.jar define 162 overlapping classes: 
+[WARNING]   - com.amazonaws.services.ecr.model.DescribeRepositoriesRequest
+[WARNING]   - com.amazonaws.services.ecr.model.ServerException
+[WARNING]   - com.amazonaws.services.ecr.model.transform.GetDownloadUrlForLayerRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.ecr.model.transform.CreateRepositoryResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.ecr.model.transform.DeleteRepositoryPolicyResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.ecr.AmazonECRAsyncClient$7
+[WARNING]   - com.amazonaws.services.ecr.model.ListImagesResult
+[WARNING]   - com.amazonaws.services.ecr.AmazonECRAsyncClient$11
+[WARNING]   - com.amazonaws.services.ecr.model.BatchCheckLayerAvailabilityResult
+[WARNING]   - com.amazonaws.services.ecr.model.transform.ImageFailureJsonUnmarshaller
+[WARNING]   - 152 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-directconnect-1.11.109.jar define 292 overlapping classes: 
+[WARNING]   - com.amazonaws.services.directconnect.model.transform.DeleteLagResultJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.directconnect.model.transform.LoaJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.directconnect.model.transform.CreatePublicVirtualInterfaceRequestMarshaller
+[WARNING]   - com.amazonaws.services.directconnect.model.UpdateLagResult
+[WARNING]   - com.amazonaws.services.directconnect.model.transform.CreateLagRequestMarshaller
+[WARNING]   - com.amazonaws.services.directconnect.model.DescribeTagsResult
+[WARNING]   - com.amazonaws.services.directconnect.model.DeleteInterconnectRequest
+[WARNING]   - com.amazonaws.services.directconnect.AmazonDirectConnectAsyncClient$37
+[WARNING]   - com.amazonaws.services.directconnect.model.transform.AssociateVirtualInterfaceRequestMarshaller
+[WARNING]   - com.amazonaws.services.directconnect.AmazonDirectConnectAsyncClient$17
+[WARNING]   - 282 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-cloudformation-1.11.109.jar define 230 overlapping classes: 
+[WARNING]   - com.amazonaws.services.cloudformation.model.GetTemplateSummaryRequest
+[WARNING]   - com.amazonaws.services.cloudformation.AmazonCloudFormationAsyncClient$9
+[WARNING]   - com.amazonaws.services.cloudformation.model.transform.DescribeStacksRequestMarshaller
+[WARNING]   - com.amazonaws.services.cloudformation.model.transform.SignalResourceResultStaxUnmarshaller
+[WARNING]   - com.amazonaws.services.cloudformation.model.ListExportsRequest
+[WARNING]   - com.amazonaws.services.cloudformation.model.DescribeStackEventsRequest
+[WARNING]   - com.amazonaws.services.cloudformation.model.DescribeStackResourceRequest
+[WARNING]   - com.amazonaws.services.cloudformation.model.ChangeSetSummary
+[WARNING]   - com.amazonaws.services.cloudformation.model.ListStackResourcesResult
+[WARNING]   - com.amazonaws.services.cloudformation.model.transform.ExecuteChangeSetResultStaxUnmarshaller
+[WARNING]   - 220 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-cloudhsm-1.11.109.jar define 139 overlapping classes: 
+[WARNING]   - com.amazonaws.services.cloudhsm.AWSCloudHSMAsyncClient$7
+[WARNING]   - com.amazonaws.services.cloudhsm.model.transform.ModifyHsmRequestMarshaller
+[WARNING]   - com.amazonaws.services.cloudhsm.model.transform.DescribeLunaClientRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.cloudhsm.model.transform.DescribeHapgRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.cloudhsm.model.transform.AddTagsToResourceRequestMarshaller
+[WARNING]   - com.amazonaws.services.cloudhsm.model.ListAvailableZonesRequest
+[WARNING]   - com.amazonaws.services.cloudhsm.model.HsmStatus
+[WARNING]   - com.amazonaws.services.cloudhsm.model.transform.DeleteHapgRequestProtocolMarshaller
+[WARNING]   - com.amazonaws.services.cloudhsm.model.transform.TagJsonUnmarshaller
+[WARNING]   - com.amazonaws.services.cloudhsm.AWSCloudHSMAsyncClientBuilder
+[WARNING]   - 129 more...
+[WARNING] sonicbase-0.9.2.2.jar, commons-el-1.0.jar define 68 overlapping classes: 
+[WARNING]   - org.apache.commons.el.parser.ELParserConstants
+[WARNING]   - org.apache.commons.el.parser.TokenMgrError
+[WARNING]   - org.apache.commons.el.ValueSuffix
+[WARNING]   - org.apache.commons.el.UnaryMinusOperator
+[WARNING]   - org.apache.commons.el.ImplicitObjects$3
+[WARNING]   - org.apache.commons.el.NotOperator
+[WARNING]   - org.apache.commons.el.parser.SimpleCharStream
+[WARNING]   - org.apache.commons.el.IntegerDivideOperator
+[WARNING]   - org.apache.commons.el.ImplicitObjects$7
+[WARNING]   - org.apache.commons.el.BeanInfoProperty
+[WARNING]   - 58 more...
+[WARNING] sonicbase-0.9.2.2.jar, annotations-2.0.3.jar define 29 overlapping classes: 
+[WARNING]   - edu.umd.cs.findbugs.annotations.Confidence
+[WARNING]   - edu.umd.cs.findbugs.annotations.CheckReturnValue
+[WARNING]   - edu.umd.cs.findbugs.annotations.package-info
+[WARNING]   - edu.umd.cs.findbugs.annotations.DischargesObligation
+[WARNING]   - edu.umd.cs.findbugs.annotations.ExpectWarning
+[WARNING]   - net.jcip.annotations.ThreadSafe
+[WARNING]   - edu.umd.cs.findbugs.annotations.DesireNoWarning
+[WARNING]   - edu.umd.cs.findbugs.annotations.DefaultAnnotationForParameters
+[WARNING]   - edu.umd.cs.findbugs.annotations.DesireWarning
+[WARNING]   - edu.umd.cs.findbugs.annotations.CheckForNull
+[WARNING]   - 19 more...
+[WARNING] sonicbase-0.9.2.2.jar, lzo-hadoop-1.0.5.jar define 25 overlapping classes: 
+[WARNING]   - org.anarres.lzo.hadoop.codec.LzopOutputStream
+[WARNING]   - com.hadoop.compression.lzo.LzopCodec
+[WARNING]   - com.hadoop.mapreduce.LzoSplitRecordReader
+[WARNING]   - org.anarres.lzo.hadoop.codec.LzoDecompressor$CompressionStrategy
+[WARNING]   - com.hadoop.mapreduce.LzoSplitInputFormat
+[WARNING]   - com.hadoop.compression.lzo.LzoIndex
+[WARNING]   - org.apache.hadoop.io.compress.LzoCodec
+[WARNING]   - com.hadoop.mapreduce.LzoIndexOutputFormat
+[WARNING]   - org.anarres.lzo.hadoop.codec.LzopInputStream
+[WARNING]   - org.anarres.lzo.hadoop.codec.LzoCompressor$CompressionStrategy
+[WARNING]   - 15 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-elasticbeanstalk-1.11.109.jar define 366 overlapping classes: 
+[WARNING]   - com.amazonaws.services.elasticbeanstalk.AWSElasticBeanstalkAsyncClient$7
+[WARNING]   - com.amazonaws.services.elasticbeanstalk.model.transform.ListAvailableSolutionStacksResultStaxUnmarshaller
+[WARNING]   - com.amazonaws.services.elasticbeanstalk.AWSElasticBeanstalkAsyncClient$23
+[WARNING]   - com.amazonaws.services.elasticbeanstalk.AWSElasticBeanstalkAsyncClient$16
+[WARNING]   - com.amazonaws.services.elasticbeanstalk.model.DescribeApplicationsResult
+[WARNING]   - com.amazonaws.services.elasticbeanstalk.AWSElasticBeanstalkAsyncClient$36
+[WARNING]   - com.amazonaws.services.elasticbeanstalk.model.S3Location
+[WARNING]   - com.amazonaws.services.elasticbeanstalk.model.transform.ListPlatformVersionsRequestMarshaller
+[WARNING]   - com.amazonaws.services.elasticbeanstalk.model.EnvironmentLink
+[WARNING]   - com.amazonaws.services.elasticbeanstalk.model.ConfigurationOptionSetting
+[WARNING]   - 356 more...
+[WARNING] sonicbase-0.9.2.2.jar, log4j-1.2.17.jar define 314 overlapping classes: 
+[WARNING]   - org.apache.log4j.or.sax.AttributesRenderer
+[WARNING]   - org.apache.log4j.pattern.MessagePatternConverter
+[WARNING]   - org.apache.log4j.chainsaw.ControlPanel$3
+[WARNING]   - org.apache.log4j.pattern.NameAbbreviator$DropElementAbbreviator
+[WARNING]   - org.apache.log4j.jmx.MethodUnion
+[WARNING]   - org.apache.log4j.lf5.viewer.LogTable
+[WARNING]   - org.apache.log4j.BasicConfigurator
+[WARNING]   - org.apache.log4j.rewrite.RewriteAppender
+[WARNING]   - org.apache.log4j.lf5.viewer.LogBrokerMonitor$22
+[WARNING]   - org.apache.log4j.pattern.LoggingEventPatternConverter
+[WARNING]   - 304 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-ses-1.11.109.jar define 380 overlapping classes: 
+[WARNING]   - com.amazonaws.services.simpleemail.model.CloudWatchDestination
+[WARNING]   - com.amazonaws.services.simpleemail.model.transform.VerifyEmailIdentityRequestMarshaller
+[WARNING]   - com.amazonaws.services.simpleemail.model.transform.ConfigurationSetDoesNotExistExceptionUnmarshaller
+[WARNING]   - com.amazonaws.services.simpleemail.model.transform.VerifyEmailAddressResultStaxUnmarshaller
+[WARNING]   - com.amazonaws.services.simpleemail.model.RuleSetDoesNotExistException
+[WARNING]   - com.amazonaws.services.simpleemail.model.CloneReceiptRuleSetRequest
+[WARNING]   - com.amazonaws.services.simpleemail.model.CreateReceiptRuleSetResult
+[WARNING]   - com.amazonaws.services.simpleemail.model.transform.SendEmailRequestMarshaller
+[WARNING]   - com.amazonaws.services.simpleemail.model.InvocationType
+[WARNING]   - com.amazonaws.services.simpleemail.model.transform.SetIdentityDkimEnabledResultStaxUnmarshaller
+[WARNING]   - 370 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-polly-1.11.109.jar define 77 overlapping classes: 
+[WARNING]   - com.amazonaws.services.polly.model.OutputFormat
+[WARNING]   - com.amazonaws.services.polly.model.LanguageCode
+[WARNING]   - com.amazonaws.services.polly.model.transform.LexiconAttributesMarshaller
+[WARNING]   - com.amazonaws.services.polly.model.MaxLexiconsNumberExceededException
+[WARNING]   - com.amazonaws.services.polly.model.transform.VoiceMarshaller
+[WARNING]   - com.amazonaws.services.polly.model.transform.PutLexiconRequestMarshaller
+[WARNING]   - com.amazonaws.services.polly.model.ListLexiconsResult
+[WARNING]   - com.amazonaws.services.polly.model.LexiconNotFoundException
+[WARNING]   - com.amazonaws.services.polly.model.Gender
+[WARNING]   - com.amazonaws.services.polly.model.LexiconSizeExceededException
+[WARNING]   - 67 more...
+[WARNING] sonicbase-0.9.2.2.jar, aws-java-sdk-simpledb-1.11.109.jar define 109 overlapping classes: 
+[WARNING]   - com.amazonaws.services.simpledb.model.ReplaceableItem
+[WARNING]   - com.amazonaws.services.simpledb.model.Item
+[WARNING]   - com.amazonaws.services.simpledb.model.transform.GetAttributesResultStaxUnmarshaller
+[WARNING]   - com.amazonaws.services.simpledb.model.transform.UpdateConditionStaxUnmarshaller
+[WARNING]   - com.amazonaws.services.simpledb.model.NumberSubmittedItemsExceededException
+[WARNING]   - com.amazonaws.services.simpledb.model.transform.SelectRequestMarshaller
+[WARNING]   - com.amazonaws.services.simpledb.model.transform.AttributeStaxUnmarshaller
+[WARNING]   - com.amazonaws.services.simpledb.model.transform.PutAttributesRequestMarshaller
+[WARNING]   - com.amazonaws.services.simpledb.model.transform.TooManyRequestedAttributesExceptionUnmarshaller
+[WARNING]   - com.amazonaws.services.simpledb.model.transform.InvalidQueryExpressionExceptionUnmarshaller
+[WARNING]   - 99 more...
+[WARNING] commons-digester-1.8.jar, sonicbase-0.9.2.2.jar define 100 overlapping classes: 
+[WARNING]   - org.apache.commons.digester.plugins.Declaration
+[WARNING]   - org.apache.comm

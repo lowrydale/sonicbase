@@ -5,12 +5,11 @@ import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.DataUtil;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * User: lowryda
@@ -24,7 +23,10 @@ public class Record {
   private long dbViewNumber;
   private long transId;
   private long dbViewFlags;
-  private AtomicInteger serializedSchemaVersion = new AtomicInteger();
+  private long sequence0;
+  private long sequence1;
+  private long sequence2;
+  private AtomicLong serializedSchemaVersion = new AtomicLong();
 
   public static long DB_VIEW_FLAG_DELETING = 0x1;
   public static long DB_VIEW_FLAG_ADDING = 0x2;
@@ -43,8 +45,8 @@ public class Record {
 
   public static long readFlags(byte[] bytes) {
     DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-    int byteOffset = 0;
-    int headerLen = (int)DataUtil.readVLong(bytes, byteOffset, resultLength);
+    int byteOffset = 0; //sequence numbers
+    //int headerLen = (int)DataUtil.readVLong(bytes, byteOffset, resultLength);
     byteOffset += resultLength.getLength();
 
     DataUtil.readVLong(bytes, byteOffset, resultLength);
@@ -60,12 +62,19 @@ public class Record {
     try {
       DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
       int byteOffset = 0;
-      int headerLen = (int)DataUtil.readVLong(bytes, byteOffset, resultLength);
+//      int headerLen = (int)DataUtil.readVLong(bytes, byteOffset, resultLength);
       byteOffset += resultLength.getLength();
-      if (!readHeader) {
-        byteOffset += headerLen;
-      }
-      else {
+//      if (!readHeader) {
+//        byteOffset += headerLen;
+//      }
+//      else {
+        DataInputStream sin = new DataInputStream(new ByteArrayInputStream(bytes, byteOffset, 8 * 3));
+        sequence0 = sin.readLong();
+        sequence1 = sin.readLong();
+        sequence2 = sin.readLong();
+        byteOffset += 8 * 3;
+
+
         id = DataUtil.readVLong(bytes, byteOffset, resultLength);
         byteOffset += resultLength.getLength();
         dbViewNumber = DataUtil.readVLong(bytes, byteOffset, resultLength);
@@ -74,7 +83,7 @@ public class Record {
         byteOffset += resultLength.getLength();
         transId = DataUtil.readVLong(bytes, byteOffset, resultLength);
         byteOffset += resultLength.getLength();
-      }
+//      }
       this.tableSchema = common.getTablesById(dbName).get((int) DataUtil.readVLong(bytes, byteOffset, resultLength));
       byteOffset += resultLength.getLength();
 
@@ -89,9 +98,10 @@ public class Record {
 
   public static long getTransId(byte[] bytes) {
     DataUtil.ResultLength resultLen = new DataUtil.ResultLength();
-    int offset = 0;
-    DataUtil.readVLong(bytes, offset, resultLen);
-    offset += resultLen.getLength();
+    int offset = 8 * 3; //sequence numbers
+
+//    DataUtil.readVLong(bytes, offset, resultLen);
+//    offset += resultLen.getLength();
     DataUtil.readVLong(bytes, offset, resultLen);
     offset += resultLen.getLength();
     DataUtil.readVLong(bytes, offset, resultLen);
@@ -103,9 +113,9 @@ public class Record {
 
   public static long getDbViewNumber(byte[] bytes) {
     DataUtil.ResultLength resultLen = new DataUtil.ResultLength();
-    int offset = 0;
-    DataUtil.readVLong(bytes, offset, resultLen);
-    offset += resultLen.getLength();
+    int offset = 8 * 3; //sequence numbers
+    //DataUtil.readVLong(bytes, offset, resultLen);
+    //offset += resultLen.getLength();
     DataUtil.readVLong(bytes, offset, resultLen);
     offset += resultLen.getLength();
     return DataUtil.readVLong(bytes, offset, resultLen);
@@ -113,9 +123,9 @@ public class Record {
 
   public static long getDbViewFlags(byte[] bytes) {
     DataUtil.ResultLength resultLen = new DataUtil.ResultLength();
-    int offset = 0;
-    DataUtil.readVLong(bytes, offset, resultLen);
-    offset += resultLen.getLength();
+    int offset = 8 * 3; //sequence numbers
+//    DataUtil.readVLong(bytes, offset, resultLen);
+//    offset += resultLen.getLength();
     DataUtil.readVLong(bytes, offset, resultLen);
     offset += resultLen.getLength();
     DataUtil.readVLong(bytes, offset, resultLen);
@@ -151,10 +161,38 @@ public class Record {
     this.transId = transId;
   }
 
+  public void setSequence0(long value) {
+    this.sequence0 = value;
+  }
+
+  public long getSequence0() {
+    return sequence0;
+  }
+
+  public void setSequence1(long value) {
+    this.sequence1 = value;
+  }
+
+  public long getSequence1() {
+    return sequence1;
+  }
+
+  public void setSequence2(long value) {
+    this.sequence2 = value;
+  }
+
+  public long getSequence2() {
+    return sequence2;
+  }
+
   public void snapshot(DataOutputStream out, DatabaseCommon common) throws IOException {
     DataUtil.ResultLength resultLen = new DataUtil.ResultLength();
     ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
     DataOutputStream headerOut = new DataOutputStream(bytesOut);
+
+    headerOut.writeLong(sequence0);
+    headerOut.writeLong(sequence1);
+    headerOut.writeLong(sequence2);
 
     DataUtil.writeVLong(headerOut, id, resultLen);
     DataUtil.writeVLong(headerOut, dbViewNumber, resultLen);
@@ -162,7 +200,7 @@ public class Record {
     DataUtil.writeVLong(headerOut, transId, resultLen);
     headerOut.close();
     byte[] bytes = bytesOut.toByteArray();
-    DataUtil.writeVLong(out, bytes.length);
+    //DataUtil.writeVLong(out, bytes.length);
     out.write(bytes);
     DataUtil.writeVLong(out, tableSchema.getTableId(), resultLen);
     DatabaseCommon.serializeFields(fields, out, tableSchema, common.getSchemaVersion(), true);
@@ -222,7 +260,7 @@ public class Record {
     return DataUtil.readVLong(record, 0, new DataUtil.ResultLength());
   }
 
-  public int getSerializedSchemaVersion() {
+  public long getSerializedSchemaVersion() {
     return serializedSchemaVersion.get();
   }
 }

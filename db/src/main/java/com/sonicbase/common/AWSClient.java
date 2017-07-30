@@ -1,25 +1,18 @@
 package com.sonicbase.common;
 
 import com.amazonaws.auth.BasicAWSCredentials;
-import com.amazonaws.auth.profile.ProfileCredentialsProvider;
-import com.amazonaws.services.clouddirectory.model.DeleteObjectRequest;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.*;
-import com.amazonaws.services.s3.transfer.MultipleFileDownload;
-import com.amazonaws.services.s3.transfer.MultipleFileUpload;
 import com.amazonaws.services.s3.transfer.TransferManager;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.util.JsonDict;
 import com.sonicbase.util.StreamUtils;
-import org.apache.commons.io.FileUtils;
 
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
-
-import static java.util.Arrays.asList;
 
 /**
  * Created by lowryda on 6/16/17.
@@ -41,7 +34,7 @@ public class AWSClient {
   public TransferManager getTransferManager() {
     File installDir = getInstallDir();
     String cluster = client.getCluster();
-    File keysFile = new File(installDir, "/keys/" + cluster +"-awskeys");
+    File keysFile = new File(installDir, "/keys/" + cluster + "-awskeys");
     if (!keysFile.exists()) {
       throw new DatabaseException(cluster + "-awskeys file not found");
     }
@@ -86,7 +79,7 @@ public class AWSClient {
   public AmazonS3 getS3Client() {
     File installDir = getInstallDir();
     String cluster = client.getCluster();
-    File keysFile = new File(installDir, "/keys/" + cluster +"-awskeys");
+    File keysFile = new File(installDir, "/keys/" + cluster + "-awskeys");
     if (!keysFile.exists()) {
       throw new DatabaseException(cluster + "-awskeys file not found");
     }
@@ -102,6 +95,7 @@ public class AWSClient {
       throw new DatabaseException(e);
     }
   }
+
   public void deleteDirectory(String bucket, String prefix) {
     AmazonS3 s3client = getS3Client();
     try {
@@ -125,36 +119,62 @@ public class AWSClient {
     }
   }
 
-  public void uploadDirectory(String bucket, String prefix, final String path, final File srcFile) {
-    for (int i = 0; i < 10; i++) {
-      TransferManager transferManager = getTransferManager();
-      try {
-        MultipleFileUpload xfer = transferManager.uploadDirectory(bucket, prefix + "/" + path, srcFile, true);
-        xfer.waitForCompletion();
-        //      File[] files = srcFile.listFiles();
-        //      if (files != null) {
-        //        for (File file : files) {
-        //          if (file.isDirectory()) {
-        //            uploadDirectory(bucket, prefix, path + "/" + file.getName(), file);
-        //          }
-        //          else {
-        //            uploadFile(bucket, prefix, path, file);
-        //          }
-        //        }
-        //      }
-        break;
-      }
-      catch (Exception e) {
-        logger.error("Error uploading directory: srcDir=" + srcFile.getAbsolutePath(), e);
-        if (i == 9) {
-          throw new DatabaseException(e);
+  public void uploadDirectory(final String bucket, final String prefix, final String path,
+                              final File srcDir) {
+//      TransferManager transferManager = getTransferManager();
+//        MultipleFileUpload xfer = transferManager.uploadDirectory(bucket, prefix + "/" + path, srcFile, true);
+//        xfer.waitForCompletion();
+    List<Future> futures = new ArrayList<>();
+    File[] files = srcDir.listFiles();
+    if (files != null) {
+      for (final File file : files) {
+        if (file.isDirectory()) {
+          uploadDirectory(bucket, prefix, path + "/" + file.getName(), file);
+        }
+        else {
+          futures.add(executor.submit(new Callable(){
+            @Override
+            public Object call() throws Exception {
+              for (int i = 0; i < 10; i++) {
+                try {
+                  uploadFile(bucket, prefix, path, file);
+                  break;
+                }
+                catch (Exception e) {
+                  logger.error("Error uploading file: srcDir=" + file.getAbsolutePath(), e);
+                  if (i == 9) {
+                    throw new DatabaseException(e);
+                  }
+                  try {
+                    Thread.sleep(2000);
+                  }
+                  catch (InterruptedException e1) {
+                    throw new DatabaseException(e1);
+                  }
+                }
+              }
+              return null;
+            }
+          }));
         }
       }
-      finally {
-        transferManager.shutdownNow();
-      }
-
     }
+    for (Future future : futures) {
+      try {
+        future.get();
+      }
+      catch (InterruptedException e) {
+        throw new DatabaseException(e);
+      }
+      catch (ExecutionException e) {
+        e.printStackTrace();
+      }
+    }
+//      finally {
+//        transferManager.shutdownNow();
+//      }
+
+
   }
 
   public void uploadFile(String bucket, String prefix, final String path, final File srcFile) {
@@ -187,7 +207,7 @@ public class AWSClient {
           new GetObjectRequest(bucket, prefix + "/" + path + "/" + destFile.getName()));
       destFile.getParentFile().mkdirs();
       try (InputStream objectData = object.getObjectContent();
-            BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(destFile))) {
+           BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(destFile))) {
         StreamUtils.copyStream(objectData, out);
       }
     }
@@ -205,6 +225,22 @@ public class AWSClient {
       try (InputStream objectData = object.getObjectContent();
            BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(destFile))) {
         StreamUtils.copyStream(objectData, out);
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public byte[] downloadBytes(String bucket, String key) {
+    AmazonS3 s3client = getS3Client();
+    try {
+      S3Object object = s3client.getObject(
+          new GetObjectRequest(bucket, key));
+      try (InputStream objectData = object.getObjectContent();
+           ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+        StreamUtils.copyStream(objectData, out);
+        return out.toByteArray();
       }
     }
     catch (Exception e) {
@@ -235,7 +271,7 @@ public class AWSClient {
           final String finalKey = key;
           final File destFile = new File(destDir, key.substring((prefix + "/" + subDirectory).length()));
           destFile.getParentFile().mkdirs();
-          futures.add(executor.submit(new Runnable(){
+          futures.add(executor.submit(new Runnable() {
             @Override
             public void run() {
               try {

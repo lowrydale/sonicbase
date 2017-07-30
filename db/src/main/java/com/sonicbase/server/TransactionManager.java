@@ -1,5 +1,6 @@
 package com.sonicbase.server;
 
+import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Record;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
@@ -124,7 +125,7 @@ public class TransactionManager {
     }
   }
 
-  byte[] abortTransaction(String command, byte[] body) {
+  ComObject abortTransaction(String command, byte[] body) {
     String[] parts = command.split(":");
     String dbName = parts[5];
     long transactionId = Long.valueOf(parts[6]);

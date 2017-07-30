@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -26,6 +27,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * Date: 9/30/14
  * Time: 11:08 PM
  */
+@ExcludeRename
 public class DatabaseCommon {
 
   private org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
@@ -38,7 +40,7 @@ public class DatabaseCommon {
   private Map<String, Lock> schemaReadLock = new ConcurrentHashMap<>();
   private Map<String, Lock> schemaWriteLock = new ConcurrentHashMap<>();
   private DatabaseServer.ServersConfig serversConfig;
-  private int schemaVersion;
+  private long schemaVersion;
   private boolean haveProLicense;
   private int[] masterReplicas;
   private boolean[][] deadNodes;
@@ -107,7 +109,8 @@ public class DatabaseCommon {
 
         schemaFile.getParentFile().mkdirs();
         try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(schemaFile)))) {
-          if (shard == 0 && replica == 0) {
+          if (getShard() == 0 &&
+              getServersConfig().getShards()[0].getMasterReplica() == getReplica()) {
             this.schemaVersion++;
             //          schema.get(dbName).incrementSchemaVersion();
           }
@@ -134,7 +137,7 @@ public class DatabaseCommon {
 
   public void serializeSchema(DataOutputStream out, long serializationVersionNumber) throws IOException {
     DataUtil.writeVLong(out, serializationVersionNumber);
-    out.writeInt(this.schemaVersion);
+    out.writeLong(this.schemaVersion);
     if (serializationVersionNumber >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION_21) {
       out.writeBoolean(haveProLicense);
     }
@@ -192,7 +195,7 @@ public class DatabaseCommon {
 
     try {
       long serializationVersion = DataUtil.readVLong(in);
-      this.schemaVersion = in.readInt();
+      this.schemaVersion = in.readLong();
       if (serializationVersion >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION_21) {
         this.haveProLicense = in.readBoolean();
       }
@@ -511,7 +514,7 @@ public class DatabaseCommon {
   }
 
   public static void serializeFields(
-      Object[] fields, DataOutputStream outerOut, TableSchema tableSchema, int schemaVersion, boolean serializeHeader) throws IOException {
+      Object[] fields, DataOutputStream outerOut, TableSchema tableSchema, long schemaVersion, boolean serializeHeader) throws IOException {
 
     ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
     DataOutputStream out = new DataOutputStream(bytesOut);
@@ -660,14 +663,15 @@ public class DatabaseCommon {
   }
 
   public static Object[] deserializeFields(
-      String dbName, DatabaseCommon common, byte[] bytes, int byteOffset, TableSchema tableSchema, int schemaVersion, Set<Integer> columns, AtomicInteger serializedSchemaVersion, boolean deserializeHeader) throws IOException {
+      String dbName, DatabaseCommon common, byte[] bytes, int byteOffset, TableSchema tableSchema, long schemaVersion,
+      Set<Integer> columns, AtomicLong serializedSchemaVersion, boolean deserializeHeader) throws IOException {
     DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
     List<FieldSchema> currFieldList = tableSchema.getFields();
     List<FieldSchema> serializedFieldList = null;
 //    if (deserializeHeader) {
       long serializationVersion = DataUtil.readVLong(bytes, byteOffset, resultLength);
       byteOffset += resultLength.getLength();
-      serializedSchemaVersion.set((int) DataUtil.readVLong(bytes, byteOffset, resultLength));
+      serializedSchemaVersion.set(DataUtil.readVLong(bytes, byteOffset, resultLength));
       byteOffset += resultLength.getLength();
       serializedFieldList = tableSchema.getFieldsForVersion(schemaVersion, serializedSchemaVersion.get());
      // int fieldCount = (int) DataUtil.readVLong(bytes, byteOffset, resultLength);
@@ -893,7 +897,7 @@ public class DatabaseCommon {
     }
   }
 
-  public int getSchemaVersion() {
+  public long getSchemaVersion() {
     return schemaVersion;
   }
 

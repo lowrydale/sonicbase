@@ -1,6 +1,7 @@
 package com.sonicbase.schema;
 
 import com.sonicbase.common.DatabaseCommon;
+import com.sonicbase.common.ExcludeRename;
 import com.sonicbase.util.DataUtil;
 
 import java.io.DataInputStream;
@@ -8,6 +9,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.*;
 
+@ExcludeRename
 public class TableSchema {
   private int version;
   private List<FieldSchema> fields = new ArrayList<FieldSchema>();
@@ -85,7 +87,7 @@ public class TableSchema {
     return comparators;
   }
 
-  public List<FieldSchema> getFieldsForVersion(int schemaVersion, long serializationVersion) {
+  public List<FieldSchema> getFieldsForVersion(long schemaVersion, long serializationVersion) {
     if (schemaVersion == serializationVersion || previousFields.size() == 0) {
       return fields;
     }
@@ -122,13 +124,13 @@ public class TableSchema {
   }
 
   class PreviousFields {
-    int schemaVersion;
+    long schemaVersion;
     List<FieldSchema> fields = new ArrayList<>();
   }
 
   List<PreviousFields> previousFields = new ArrayList<>();
 
-  public void saveFields(int schemaVersion) {
+  public void saveFields(long schemaVersion) {
     PreviousFields prev = new PreviousFields();
     prev.schemaVersion = schemaVersion;
     for (FieldSchema fieldSchema : fields) {
@@ -260,7 +262,7 @@ public class TableSchema {
     }
     out.writeInt(previousFields.size());
     for (PreviousFields prev : previousFields) {
-      out.writeInt(prev.schemaVersion);
+      out.writeLong(prev.schemaVersion);
       out.writeInt(prev.fields.size());
       for (FieldSchema fieldSchema : prev.fields) {
         fieldSchema.serialize(out);
@@ -334,7 +336,7 @@ public class TableSchema {
     int prevCount = in.readInt();
     for (int i = 0; i < prevCount; i++) {
       PreviousFields prev = new PreviousFields();
-      prev.schemaVersion = in.readInt();
+      prev.schemaVersion = in.readLong();
       prev.fields = new ArrayList<>();
       int count = in.readInt();
       for (int j = 0; j < count; j++) {

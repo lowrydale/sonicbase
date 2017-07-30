@@ -3,7 +3,7 @@ export SEARCH_HOME=$4
 #export MODE=yprof
 mkdir $4/logs
 
-if [ $1 == "10.0.0.134" ]
+if [ $5 == "4-dale" ]
 then
   export MODE=yprof
 fi

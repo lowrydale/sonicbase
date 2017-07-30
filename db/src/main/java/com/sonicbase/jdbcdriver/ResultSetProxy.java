@@ -1,5 +1,6 @@
 package com.sonicbase.jdbcdriver;
 
+import com.sonicbase.common.ExcludeRename;
 import com.sonicbase.query.impl.ResultSetImpl;
 import org.hsqldb.lib.StringInputStream;
 
@@ -31,6 +32,7 @@ public class ResultSetProxy implements java.sql.ResultSet {
   private ResultSetImpl resultSet;
   private boolean wasNull = false;
 
+  @ExcludeRename
   public enum FieldType {
     BIT("BIT", Types.BIT),
     TINYINT("TINYINT", Types.TINYINT),

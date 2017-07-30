@@ -92,7 +92,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     rightExpression.setDebug(debug);
   }
 
-  public void setViewVersion(int viewVersion) {
+  public void setViewVersion(long viewVersion) {
     super.setViewVersion(viewVersion);
     leftExpression.setViewVersion(viewVersion);
     rightExpression.setViewVersion(viewVersion);
@@ -885,7 +885,8 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
         }
       }
       else {
-        record = ExpressionImpl.doReadRecord(dbName, getClient(), isForceSelectOnServer(), getRecordCache(), id[0], getTableName(), getColumns(), getTopLevelExpression(), getParms(), getViewVersion(), debug);
+        record = ExpressionImpl.doReadRecord(dbName, getClient(), isForceSelectOnServer(), getRecordCache(), id[0],
+            getTableName(), getColumns(), getTopLevelExpression(), getParms(), getViewVersion(), debug);
         if (record != null) {
           retIds.add(id[0]);
         }

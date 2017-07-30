@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="project" default="yguard" basedir=".">
+    <target name="yguard">
+      <taskdef name="yguard"
+      classname="com.yworks.yguard.YGuardTask"
+      classpath="/Users/lowryda/tools/yguard-2.6/lib/yguard.jar"/>
+      <yguard>
+          <inoutpair in="db/target/sonicbase-core-unobfuscated-0.9.2.2.jar" out="db/target/sonicbase-core-0.9.2.2.jar"/>
+          <shrink logfile="shrink.log">
+
+              <keep>
+                  <class classes="private"
+                         methods="private" fields="private">
+                      <patternset>
+                          <exclude name="com.sonicbase.**.*"/>
+                      </patternset>
+                  </class>
+              </keep>
+          </shrink>
+          <rename mainclass="com.sonicbase.research.socket.NettyServer" logfile="obfuscate.log" annotationClass="com.sonicbase.common.ExcludeRename">
+          <keep>
+              <class classes="public"
+                     methods="public" fields="public">
+                  <patternset>
+                      <include name="com.sonicbase.jdbcdriver.Driver"/>
+                      <include name="com.sonicbase.client.ReconfigureResults"/>
+                      <include name="com.sonicbase.jdbcdriver.ConnectionProxy"/>
+                      <include name="com.sonicbase.jdbcdriver.ConnectionProxy$Replica"/>
+                      <include name="com.sonicbase.jdbcdriver.ResultSetProxy"/>
+                      <include name="com.sonicbase.common.MemUtil"/>
+                      <include name="com.sonicbase.common.ComObject"/>
+                      <include name="com.sonicbase.common.ComObject$$Tag"/>
+                      <include name="com.sonicbase.common.ComArray"/>
+                      <include name="com.sonicbase.schema.DataType"/>
+                      <include name="com.sonicbase.schema.FieldSchema"/>
+                      <include name="com.sonicbase.schema.TableSchema"/>
+                      <include name="com.sonicbase.schema.DataType$$Type"/>
+                      <include name="com.sonicbase.query.DatabaseException"/>
+                      <include name="com.sonicbase.common.LicenseOutOfComplianceException"/>
+                      <include name="com.sonicbase.server.CommandHandler"/>
+                      <include name="com.sonicbase.common.WindowsTerminal"/>
+                      <include name="com.sonicbase.query.impl.ResultSetImpl"/>
+                      <include name="com.sonicbase.util.ISO8601"/>
+                      <include name="com.sonicbase.util.JsonObject"/>
+                      <include name="com.sonicbase.util.JsonArray"/>
+                      <include name="com.sonicbase.util.StreamUtils"/>
+                  </patternset>
+              </class>
+
+          </keep>
+          </rename>
+      </yguard>
+    </target>
+</project>

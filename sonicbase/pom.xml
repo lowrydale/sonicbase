@@ -1,22 +1,42 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
-    <modelVersion>4.0.0</modelVersion>
-    <groupId>com.sonicbase</groupId>
-    <artifactId>sonicbase-core-unobfuscated</artifactId>
-    <packaging>jar</packaging>
-    <version>0.9.2.2</version>
-    <name>sonicbase-core</name>
-    <url>http://maven.apache.org</url>
-
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
-        <groupId>com.sonicbase</groupId>
         <artifactId>sonicbase-root</artifactId>
+        <groupId>com.sonicbase</groupId>
         <version>0.9.2.2</version>
     </parent>
+    <modelVersion>4.0.0</modelVersion>
+    <packaging>jar</packaging>
+    <version>0.9.2.2</version>
+    <name>sonicbase</name>
+    <artifactId>sonicbase</artifactId>
 
     <build>
         <pluginManagement>
             <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-shade-plugin</artifactId>
+                    <version>3.0.0</version>
+                    <executions>
+                        <execution>
+                            <phase>package</phase>
+                            <goals>
+                                <goal>shade</goal>
+                            </goals>
+                            <configuration>
+                                <minimizeJar>true</minimizeJar>
+                                <artifactSet>
+                                    <!--<excludes>-->
+                                        <!--<exclude>com.sonicbase:sonicbase-core</exclude>-->
+                                    <!--</excludes>-->
+                                </artifactSet>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
@@ -45,22 +65,14 @@
         </pluginManagement>
     </build>
 
-
-    <distributionManagement>
-        <site>
-            <id>maven-repository</id>
-            <name>http://repo2.maven.org/maven2/</name>
-            <url>http://repo2.maven.org/maven2/</url>
-        </site>
-
-        <repository>
-            <id>project.local</id>
-            <name>project</name>
-            <url>file:${project.basedir}/repo</url>
-        </repository>
-    </distributionManagement>
-
     <dependencies>
+        <dependency>
+            <groupId>com.sonicbase</groupId>
+            <artifactId>sonicbase-core</artifactId>
+            <version>0.9.2.2</version>
+            <!--<scope>system</scope>-->
+            <!--<systemPath>/Users/lowryda/Dropbox/git/sonicbase/db/target/sonicbase-core-0.9.2.2.jar</systemPath>-->
+        </dependency>
 
         <dependency>
             <groupId>commons-io</groupId>
@@ -226,20 +238,7 @@
             <version>3.0.2</version>
         </dependency>
 
+
     </dependencies>
-    <properties>
 
-        <maven-release-plugin.version>2.1</maven-release-plugin.version>
-        <versions-maven-plugin.version>1.2</versions-maven-plugin.version>
-        <sonar.core.codeCoveragePlugin>jacoco</sonar.core.codeCoveragePlugin>
-        <sonar.jacoco.reportPath>${project.basedir}/target/jacoco.exec</sonar.jacoco.reportPath>
-
-        <sonar.sources>${project.basedir}/src/main/java</sonar.sources>
-        <sonar.binaries>${project.basedir}/target/classes</sonar.binaries>
-        <sonar.tests>${project.basedir}/src/test/java</sonar.tests>
-        <sonar.dynamicAnalysis>reuseReports</sonar.dynamicAnalysis>
-        <sonar.junit.reportsPath>${project.basedir}/target/test-reports</sonar.junit.reportsPath>
-        <sonar.java.coveragePlugin>jacoco</sonar.java.coveragePlugin>
-
-    </properties>
 </project>

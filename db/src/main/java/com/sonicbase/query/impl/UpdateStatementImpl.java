@@ -98,7 +98,8 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
             Record record = cachedRecord == null ? null : cachedRecord.getRecord();
             if (record == null) {
               boolean forceSelectOnServer = false;
-              record = whereClause.doReadRecord(dbName, client, forceSelectOnServer, recordCache, entry[0], tableName, null, null, null, client.getCommon().getSchemaVersion(), false);
+              record = whereClause.doReadRecord(dbName, client, forceSelectOnServer, recordCache, entry[0], tableName,
+                  null, null, null, client.getCommon().getSchemaVersion(), false);
             }
 
             Object[] newPrimaryKey = new Object[entry.length];
@@ -207,7 +208,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
               cobj.put(ComObject.Tag.primaryKeyBytes, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), newPrimaryKey));
               cobj.put(ComObject.Tag.bytes, record.serialize(client.getCommon()));
 
-              client.send(null, selectedShards.get(0), rand.nextLong(), command, cobj.serialize(), DatabaseClient.Replica.def);
+              client.send(null, selectedShards.get(0), rand.nextLong(), command, cobj, DatabaseClient.Replica.def);
 
               //update keys
 

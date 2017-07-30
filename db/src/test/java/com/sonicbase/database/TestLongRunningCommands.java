@@ -1,6 +1,7 @@
 package com.sonicbase.database;
 
 import com.sonicbase.common.ComObject;
+import com.sonicbase.server.CommandHandler;
 import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.server.LongRunningCommands;
 import com.sonicbase.server.SnapshotManager;
@@ -58,7 +59,7 @@ public class TestLongRunningCommands {
         "DatabaseServer:echo:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:test:11", null));
 
     while (true) {
-      if (DatabaseServer.echoCount.get() == 11) {
+      if (CommandHandler.echoCount.get() == 11) {
         System.out.println("Echoed");
         break;
       }
@@ -82,13 +83,13 @@ public class TestLongRunningCommands {
 
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, "__none__");
-    cobj.put(ComObject.Tag.schemaVersion, 1);
+    cobj.put(ComObject.Tag.schemaVersion, 1L);
     cobj.put(ComObject.Tag.method, "block");
     server.getLongRunningCommands().addCommand(server.getLongRunningCommands().createSingleCommand("DatabaseServer:ComObject:block:", cobj.serialize()));
 
     Thread.sleep(1000);
 
-    int count = DatabaseServer.blockCount.get();
+    int count = CommandHandler.blockCount.get();
 
     server = new DatabaseServer();
     server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true), null, true);
@@ -97,7 +98,7 @@ public class TestLongRunningCommands {
 
     Thread.sleep(1000);
 
-    assertEquals(DatabaseServer.blockCount.get(), count + 1);
+    assertEquals(CommandHandler.blockCount.get(), count + 1);
 
   }
 }

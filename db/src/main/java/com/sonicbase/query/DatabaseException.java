@@ -1,5 +1,8 @@
 package com.sonicbase.query;
 
+import com.sonicbase.common.ExcludeRename;
+
+@ExcludeRename
 public class DatabaseException extends RuntimeException {
   public DatabaseException() {
   }

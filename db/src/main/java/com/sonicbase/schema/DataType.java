@@ -1,5 +1,6 @@
 package com.sonicbase.schema;
 
+import com.sonicbase.common.ExcludeRename;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.util.StreamUtils;
 
@@ -16,6 +17,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 
+@ExcludeRename
 public class DataType {
 
 

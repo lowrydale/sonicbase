@@ -1,6 +1,7 @@
 package com.sonicbase.database;
 
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.ComObject;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.index.Index;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
@@ -159,6 +160,13 @@ public class TestJoins {
 //    assertEquals(client.getPartitionSize(2, "persons", "_1__primarykey"), 9);
 //    assertEquals(client.getPartitionSize(3, "persons", "_1__primarykey"), 8);
 
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.dbName, "test");
+    cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+    cobj.put(ComObject.Tag.method, "forceDeletes");
+    String command = "DatabaseServer:ComObject:forceDeletes:";
+    client.sendToAllShards(null, 0, command, cobj, DatabaseClient.Replica.all);
+
     executor.shutdownNow();
   }
 
@@ -295,10 +303,10 @@ public class TestJoins {
     for (int i = 4; i >= 0; i--) {
       for (int j = 0; j < 10; j++) {
         ret.next();
-        //assertEquals(ret.getLong("id"), i);
-        //assertEquals(ret.getString("membershipname"), "membership-" + j);
         System.out.println("id=" + ret.getLong("id"));
         System.out.println("membershipName=" + ret.getString("membershipname"));
+        assertEquals(ret.getLong("id"), i);
+        assertEquals(ret.getString("membershipname"), "membership-" + j);
       }
     }
     assertFalse(ret.next());

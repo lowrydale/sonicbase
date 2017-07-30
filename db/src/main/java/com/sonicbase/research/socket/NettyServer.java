@@ -18,7 +18,7 @@ import net.jpountz.lz4.LZ4Compressor;
 import net.jpountz.lz4.LZ4Factory;
 import net.jpountz.lz4.LZ4FastDecompressor;
 import org.apache.commons.cli.*;
-import org.codehaus.plexus.util.ExceptionUtils;
+import org.apache.commons.lang.exception.ExceptionUtils;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -64,6 +64,8 @@ public class NettyServer {
     private byte[] body;
     public CountDownLatch latch = new CountDownLatch(1);
     private byte[] response;
+    private long sequence0;
+    private long sequence1;
 
     public String getCommand() {
       return command;
@@ -79,6 +81,14 @@ public class NettyServer {
 
     public void setBody(byte[] body) {
       this.body = body;
+    }
+
+    public long getSequence0() {
+      return sequence0;
+    }
+
+    public long getSequence1() {
+      return sequence1;
     }
   }
 
@@ -639,7 +649,7 @@ public class NettyServer {
     private List<DatabaseServer.Response> processRequests(List<Request> requests) throws IOException {
       List<DatabaseServer.Response> ret = new ArrayList<>();
       for (Request request : requests) {
-        byte[] retBody = getDatabaseServer().handleCommand(request.command, request.body, false, true);
+        byte[] retBody = getDatabaseServer().handleCommand(request.command, request.body, -1L, -1L, false, true);
         DatabaseServer.Response response = new DatabaseServer.Response(retBody);
         ret.add(response);
       }
@@ -661,7 +671,7 @@ public class NettyServer {
       byte[] ret = null;
 
       if (subSystem.equals("DatabaseServer")) {
-        ret = getDatabaseServer().handleCommand(actualCommand, body, false, true);
+        ret = getDatabaseServer().handleCommand(actualCommand, body, -1L, -1L, false, true);
       }
       //              else if (subSystem.equals("IdMapServer")) {
       //                respStr = NettyServer.getIdMapServer().handleCommand(command, jsonStr);
@@ -856,6 +866,7 @@ public class NettyServer {
 
 
       int port = Integer.valueOf(portStr);
+      Thread nettyThread = null;
       try {
 
         final DatabaseServer databaseServer = new DatabaseServer();
@@ -865,6 +876,28 @@ public class NettyServer {
         databaseServer.setRole(role);
 
         setDatabaseServer(databaseServer);
+
+        nettyThread = new Thread(new Runnable() {
+          @Override
+          public void run() {
+            try {
+              logger.info("starting netty server");
+              NettyServer.this.run();
+            }
+            catch (Exception e) {
+              File file = new File(System.getProperty("user.home"), "startupError.txt");
+              try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
+                e.printStackTrace();
+                writer.write(ExceptionUtils.getFullStackTrace(e));
+              }
+              catch (IOException e1) {
+                e1.printStackTrace();
+              }
+              logger.error("Error starting netty server", e);
+            }
+          }
+        });
+        nettyThread.start();
 
         Thread thread = new Thread(new Runnable(){
           @Override
@@ -912,27 +945,6 @@ public class NettyServer {
       }
 
 
-      Thread nettyThread = new Thread(new Runnable() {
-        @Override
-        public void run() {
-          try {
-            logger.info("starting netty server");
-            NettyServer.this.run();
-          }
-          catch (Exception e) {
-            File file = new File(System.getProperty("user.home"), "startupError.txt");
-            try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
-              e.printStackTrace();
-              writer.write(ExceptionUtils.getFullStackTrace(e));
-            }
-            catch (IOException e1) {
-              e1.printStackTrace();
-            }
-            logger.error("Error starting netty server", e);
-          }
-        }
-      });
-      nettyThread.start();
 
       Logger.setReady();
 

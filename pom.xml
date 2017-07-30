@@ -86,5 +86,6 @@
 
   <modules>
     <module>db</module>
+      <module>sonicbase</module>
   </modules>
 </project>

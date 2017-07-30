@@ -86,9 +86,17 @@ public class TestDatabase {
         future.get();
       }
 
+      DatabaseServer.initDeathOverride(2, 2);
+      DatabaseServer.deathOverride[0][0] = false;
+      DatabaseServer.deathOverride[0][1] = false;
+      DatabaseServer.deathOverride[1][0] = false;
+      DatabaseServer.deathOverride[1][1] = false;
+
       for (DatabaseServer server : dbServers) {
         server.shutdownRepartitioner();
       }
+
+      Thread.sleep(5000);
 
       //DatabaseClient client = new DatabaseClient("localhost", 9010, true);
 
@@ -206,8 +214,11 @@ public class TestDatabase {
       //    stmt.executeUpdate();
 
       while (true) {
-        byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().sendToMaster("DatabaseServer:areAllLongRunningCommandsComplete:1:test", null);
-        if (new String(bytes).equals("true")) {
+        ComObject cobj = new ComObject();
+        cobj.put(ComObject.Tag.method, "areAllLongRunningCommandsComplete");
+        byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().sendToMaster("DatabaseServer:ComObject:areAllLongRunningCommandsComplete:1:test", cobj);
+        ComObject retObj = new ComObject(bytes);
+        if (retObj.getBoolean(ComObject.Tag.isComplete)) {
           break;
         }
         Thread.sleep(1000);
@@ -251,6 +262,8 @@ public class TestDatabase {
         Thread.sleep(1000);
       }
 
+      //Thread.sleep(60000);
+
       assertEquals(client.getPartitionSize("test", 0, "persons", "_1__primarykey"), 9);
       assertEquals(client.getPartitionSize("test", 1, "persons", "_1__primarykey"), 11);
       long count = client.getPartitionSize("test", 0, "children", "_1__primarykey");
@@ -270,64 +283,24 @@ public class TestDatabase {
 //      dbServers[0].getSnapshotManager().lockSnapshot("test");
 //      dbServers[0].getSnapshotManager().unlockSnapshot(1);
 //
-//      long commandCount = dbServers[1].getCommandCount();
-//      dbServers[1].purgeMemory();
-//      dbServers[1].replayLogs();
+      long commandCount = dbServers[1].getCommandCount();
+//      dbServers[2].purgeMemory();
+//      dbServers[2].replayLogs();
+//      dbServers[3].purgeMemory();
+//      dbServers[3].replayLogs();
 
       //    assertEquals(dbServers[1].getLogManager().getCountLogged(), commandCount);
       //    assertEquals(dbServers[1].getCommandCount(), commandCount * 2);
 
       //Thread.sleep(10000);
 
-      JsonDict backupConfig = new JsonDict("{\n" +
-          "    \"type\" : \"AWS\",\n" +
-          "    \"bucket\": \"sonicbase-test-backup\",\n" +
-          "    \"prefix\": \"backups\",\n" +
-          "    \"period\": \"daily\",\n" +
-          "    \"time\": \"23:00\",\n" +
-          "    \"maxBackupCount\": 10\n" +
-          "  }");
-
-      for (DatabaseServer dbServer : dbServers) {
-        dbServer.setBackupConfig(backupConfig);
-      }
-
-      client.startBackup();
-      while (true) {
-        Thread.sleep(1000);
-        if (client.isBackupComplete()) {
-          break;
-        }
-      }
-
-      ComObject cobj = new ComObject();
-      cobj.put(ComObject.Tag.dbName, "__none__");
-      cobj.put(ComObject.Tag.method, "getLastBackupDir");
-      cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-      String command = "DatabaseServer:ComObject:getLastBackupDir:";
-      byte[] ret = client.send(null, 0, 0, command, cobj.serialize(), DatabaseClient.Replica.master);
-      ComObject retObj = new ComObject(ret);
-      String dir = retObj.getString(ComObject.Tag.directory);
-
-
-      File file = new File("/data/db-backup");
-      File[] dirs = file.listFiles();
-
-      client.startRestore(dir);
-      while (true) {
-        Thread.sleep(1000);
-        if (client.isRestoreComplete()) {
-          break;
-        }
-      }
-
-//      backupConfig = new JsonDict("{\n" +
-//          "    \"type\" : \"fileSystem\",\n" +
-//          "    \"directory\": \"/data/db-backup\",\n" +
+//      JsonDict backupConfig = new JsonDict("{\n" +
+//          "    \"type\" : \"AWS\",\n" +
+//          "    \"bucket\": \"sonicbase-test-backup\",\n" +
+//          "    \"prefix\": \"backups\",\n" +
 //          "    \"period\": \"daily\",\n" +
 //          "    \"time\": \"23:00\",\n" +
-//          "    \"maxBackupCount\": 10,\n" +
-//          "    \"sharedDirectory\": true\n" +
+//          "    \"maxBackupCount\": 10\n" +
 //          "  }");
 //
 //      for (DatabaseServer dbServer : dbServers) {
@@ -342,31 +315,73 @@ public class TestDatabase {
 //        }
 //      }
 //
+//      ComObject cobj = new ComObject();
+//      cobj.put(ComObject.Tag.dbName, "__none__");
+//      cobj.put(ComObject.Tag.method, "getLastBackupDir");
+//      cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+//      String command = "DatabaseServer:ComObject:getLastBackupDir:";
+//      byte[] ret = client.send(null, 0, 0, command, cobj.serialize(), DatabaseClient.Replica.master);
+//      ComObject retObj = new ComObject(ret);
+//      String dir = retObj.getString(ComObject.Tag.directory);
+//
+//
 //      File file = new File("/data/db-backup");
 //      File[] dirs = file.listFiles();
 //
-//      client.startRestore(dirs[0].getName());
+//      client.startRestore(dir);
 //      while (true) {
 //        Thread.sleep(1000);
 //        if (client.isRestoreComplete()) {
 //          break;
 //        }
 //      }
-//
 
-      Thread.sleep(10000);
+      JsonDict backupConfig = new JsonDict("{\n" +
+          "    \"type\" : \"fileSystem\",\n" +
+          "    \"directory\": \"/data/db-backup\",\n" +
+          "    \"period\": \"daily\",\n" +
+          "    \"time\": \"23:00\",\n" +
+          "    \"maxBackupCount\": 10,\n" +
+          "    \"sharedDirectory\": true\n" +
+          "  }");
 
-      cobj = new ComObject();
+      for (DatabaseServer dbServer : dbServers) {
+        dbServer.setBackupConfig(backupConfig);
+      }
+
+      client.startBackup();
+      while (true) {
+        Thread.sleep(1000);
+        if (client.isBackupComplete()) {
+          break;
+        }
+      }
+
+      File file = new File("/data/db-backup");
+      File[] dirs = file.listFiles();
+
+      client.startRestore(dirs[0].getName());
+      while (true) {
+        Thread.sleep(1000);
+        if (client.isRestoreComplete()) {
+          break;
+        }
+      }
+
+//      Thread.sleep(10000);
+
+      ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "test");
       cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
       cobj.put(ComObject.Tag.method, "forceDeletes");
-      command = "DatabaseServer:ComObject:forceDeletes:";
-      client.sendToAllShards(null, 0, command, cobj.serialize(), DatabaseClient.Replica.all);
+      String command = "DatabaseServer:ComObject:forceDeletes:";
+      client.sendToAllShards(null, 0, command, cobj, DatabaseClient.Replica.all);
 
       executor.shutdownNow();
     }
     catch (Exception e) {
       e.printStackTrace();
+      throw e;
     }
   }
 
@@ -1337,7 +1352,7 @@ public class TestDatabase {
 //    assertTrue(found.contains(4L));
   }
 
-  @Test(enabled=true)
+  @Test(enabled=false)
   public void serverSort() throws SQLException {
 
     PreparedStatement stmt = conn.prepareStatement("select persons.id, socialsecuritynumber as s " +

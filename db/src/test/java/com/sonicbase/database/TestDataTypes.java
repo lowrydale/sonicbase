@@ -819,7 +819,7 @@ public class TestDataTypes {
       fail();
     }
     catch (SQLException e) {
-      assertEquals(e.getCause().getMessage(), "java.sql.SQLException: value too long: field=id, width=16");
+      assertTrue(e.getCause().getMessage().contains("java.sql.SQLException: value too long: field=id, width=16"));
     }
 
     stmt = conn.prepareStatement("insert into width (id, id2, name) VALUES (?, ?, ?)");

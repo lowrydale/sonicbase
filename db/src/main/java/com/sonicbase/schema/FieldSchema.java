@@ -1,9 +1,12 @@
 package com.sonicbase.schema;
 
+import com.sonicbase.common.ExcludeRename;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
+@ExcludeRename
 public class FieldSchema {
   private String name;
   private DataType.Type type;

@@ -41,6 +41,7 @@ public class SnapshotManager {
   private ConcurrentHashMap<Integer, Integer> lockedSnapshots = new ConcurrentHashMap<Integer, Integer>();
   private boolean enableSnapshot = true;
   private boolean pauseSnapshotRolling;
+  private boolean isRecovering;
 
   public SnapshotManager(DatabaseServer databaseServer) {
     this.server = databaseServer;
@@ -140,13 +141,25 @@ public class SnapshotManager {
     totalBytes = 0;
     finishedBytes.set(0);
     errorRecovering = null;
-
+    isRecovering = true;
     try {
       server.purge(dbName);
 
       String dataRoot = getSnapshotRootDir(dbName);
       File dataRootDir = new File(dataRoot);
       dataRootDir.mkdirs();
+
+      server.getIndices().put(dbName, new Indices());
+
+      Map<String, TableSchema> tables = server.getCommon().getTables(dbName);
+      for (Map.Entry<String, TableSchema> schema : tables.entrySet()) {
+        logger.info("Deserialized table schema: table=" + schema.getKey());
+        for (Map.Entry<String, IndexSchema> index : schema.getValue().getIndices().entrySet()) {
+          logger.info("Deserialized index: table=" + schema.getKey() + INDEX_STR + index.getKey());
+          server.getSchemaManager().doCreateIndex(dbName, schema.getValue(), index.getKey(), index.getValue().getFields());
+        }
+      }
+
       int highestSnapshot = getHighestSafeSnapshotVersion(dataRootDir);
 
       if (highestSnapshot == -1) {
@@ -161,18 +174,6 @@ public class SnapshotManager {
 
       final AtomicLong recoveredCount = new AtomicLong();
       recoveredCount.set(0);
-
-      server.getIndices().put(dbName, new Indices());
-
-      Map<String, TableSchema> tables = server.getCommon().getTables(dbName);
-      for (Map.Entry<String, TableSchema> schema : tables.entrySet()) {
-        logger.info("Deserialized table schema: table=" + schema.getKey());
-        for (Map.Entry<String, IndexSchema> index : schema.getValue().getIndices().entrySet()) {
-          logger.info("Deserialized index: table=" + schema.getKey() + INDEX_STR + index.getKey());
-          server.getSchemaManager().doCreateIndex(dbName, schema.getValue(), index.getKey(), index.getValue().getFields());
-        }
-
-      }
 
       final long indexBegin = System.currentTimeMillis();
       recoveredCount.set(0);
@@ -291,6 +292,9 @@ public class SnapshotManager {
       errorRecovering = e;
       throw e;
     }
+    finally {
+      isRecovering = false;
+    }
   }
 
   private File getSnapshotReplicaDir() {
@@ -305,34 +309,32 @@ public class SnapshotManager {
     snapshotThread = new Thread(new Runnable(){
       @Override
       public void run() {
-        try {
-          while (true) {
-            try {
-              if (lastSnapshot != -1) {
-                long timeToWait = 30 * 1000 - (System.currentTimeMillis() - lastSnapshot);
-                if (timeToWait > 0) {
-                  Thread.sleep(timeToWait);
-                }
-              }
-              else {
-                Thread.sleep(10000);
-              }
-              while (!enableSnapshot) {
-                Thread.sleep(1000);
-              }
-
-              List<String> dbNames = server.getDbNames(server.getDataDir());
-              for (String dbName : dbNames) {
-                runSnapshot(dbName);
+        while (true) {
+          try {
+            if (lastSnapshot != -1) {
+              long timeToWait = 30 * 1000 - (System.currentTimeMillis() - lastSnapshot);
+              if (timeToWait > 0) {
+                Thread.sleep(timeToWait);
               }
             }
-            catch (Exception e) {
-              logger.error("Error creating snapshot", e);
+            else {
+              Thread.sleep(10000);
+            }
+            while (!enableSnapshot) {
+              Thread.sleep(1000);
+            }
+
+            List<String> dbNames = server.getDbNames(server.getDataDir());
+            for (String dbName : dbNames) {
+              runSnapshot(dbName);
             }
           }
-        }
-        finally {
-          snapshotThread = null;
+          catch (InterruptedException e) {
+            break;
+          }
+          catch (Exception e) {
+            logger.error("Error creating snapshot", e);
+          }
         }
       }
     });
@@ -476,7 +478,7 @@ public class SnapshotManager {
       catch (Exception t) {
         //expected numeric format problems
       }
-      if (dirStr.contains("in-process") || (dirNum != -1 && dirNum < (highestSnapshot - 1))) {
+      if (dirStr.contains("in-process") || (dirNum != -1 && dirNum < (highestSnapshot))) {
         if (!lockedSnapshots.containsKey(dirNum)) {
           File dir = new File(dataRootDir, dirStr);
           logger.info("Deleting snapshot: " + dir.getAbsolutePath());
@@ -489,15 +491,16 @@ public class SnapshotManager {
 
   public void enableSnapshot(boolean enable) {
     this.enableSnapshot = enable;
-    if (!enable) {
-      if (snapshotThread != null) {
-        snapshotThread.interrupt();
+    if (snapshotThread != null) {
+      snapshotThread.interrupt();
+      try {
+        snapshotThread.join();
+      }
+      catch (InterruptedException e) {
       }
     }
-    else {
-      if (snapshotThread == null) {
-        runSnapshotLoop();
-      }
+    if (enable) {
+      runSnapshotLoop();
     }
   }
 
@@ -633,6 +636,36 @@ public class SnapshotManager {
         }
       }
     }
+  }
+
+  public void deleteInProcessDirs() {
+    try {
+      File dir = getSnapshotReplicaDir();
+      doDeleteInProcessDirs(dir);
+    }
+    catch (Exception e) {
+
+    }
+  }
+
+  private void doDeleteInProcessDirs(File dir) throws IOException {
+    File[] files = dir.listFiles();
+    if (files != null) {
+      for (File file : files) {
+        if (file.isDirectory()) {
+          if (file.getName().contains("in-process")) {
+            FileUtils.deleteDirectory(file);
+          }
+          else {
+            doDeleteInProcessDirs(file);
+          }
+        }
+      }
+    }
+  }
+
+  public boolean isRecovering() {
+    return isRecovering;
   }
 
   private class ByteCounterStream extends InputStream {

@@ -44,7 +44,7 @@ public class DeleteManager {
         out.writeUTF(tableName);
         out.writeUTF(indexName);
         for (Object[] key : keysToDelete) {
-          DatabaseCommon.serializeKey(tableSchema, indexName, key);
+          out.write(DatabaseCommon.serializeKey(tableSchema, indexName, key));
         }
       }
     }
@@ -77,7 +77,7 @@ public class DeleteManager {
               while (true) {
                 Object[] key = null;
                 try {
-                  key = DatabaseCommon.deserializeKey(tableSchema, in);
+                   key = DatabaseCommon.deserializeKey(tableSchema, in);
                 }
                 catch (EOFException e) {
                   //expected
@@ -91,9 +91,11 @@ public class DeleteManager {
                     @Override
                     public Object call() throws Exception {
                       for (Object[] key : currBatch) {
-                        Object toFree = index.remove(key);
-                        if (toFree != null) {
-                          databaseServer.freeUnsafeIds(toFree);
+                        synchronized (index.getMutex(key)) {
+                          Object toFree = index.remove(key);
+                          if (toFree != null) {
+                            databaseServer.freeUnsafeIds(toFree);
+                          }
                         }
                       }
                       return null;
@@ -208,6 +210,19 @@ public class DeleteManager {
     if (currFiles != null) {
       for (File file : currFiles) {
         files.add(file.getAbsolutePath());
+      }
+    }
+  }
+
+  public void forceDeletes() {
+    File dir = getReplicaRoot();
+    if (dir.exists()) {
+      while (true) {
+        File[] files = dir.listFiles();
+        if (files == null || files.length == 0) {
+          return;
+        }
+        doDeletes();
       }
     }
   }

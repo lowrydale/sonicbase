@@ -7,10 +7,16 @@ package com.sonicbase.jdbcdriver;
  */
 
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.client.ReconfigureResults;
+import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Logger;
-import com.sonicbase.query.DatabaseException;
+import com.sonicbase.query.*;
+import com.sonicbase.schema.TableSchema;
 
 import java.sql.*;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -82,7 +88,88 @@ public class ConnectionProxy implements Connection {
     globalContextRefCount.incrementAndGet();
   }
 
-  protected void checkClosed() throws SQLException {
+  public boolean isBackupComplete() {
+    return databaseClient.isBackupComplete();
+  }
+
+  public boolean isRestoreComplete() {
+    return databaseClient.isRestoreComplete();
+  }
+
+  public void startBackup() {
+    databaseClient.startBackup();
+  }
+
+  public void startRestore(String subDir) {
+    databaseClient.startRestore(subDir);
+  }
+
+  public int getReplicaCount() {
+    return databaseClient.getReplicaCount();
+  }
+
+  public int getShardCount() {
+    return databaseClient.getShardCount();
+  }
+
+  public long getSchemaVersion() {
+    return databaseClient.getCommon().getSchemaVersion();
+  }
+
+  public static com.sonicbase.query.ResultSet describeLicenses() {
+    return DatabaseClient.describeLicenses();
+  }
+
+    public enum Replica {
+    primary(DatabaseClient.Replica.primary),
+    secondary(DatabaseClient.Replica.secondary),
+    all(DatabaseClient.Replica.all),
+    def(DatabaseClient.Replica.def),
+    specified(DatabaseClient.Replica.specified),
+    master(DatabaseClient.Replica.master);
+
+    private final DatabaseClient.Replica cliReplica;
+
+    Replica(DatabaseClient.Replica cliReplica) {
+      this.cliReplica = cliReplica;
+    }
+  }
+
+  public byte[] send(String batchKey,
+                     int shard, long auth_user, String command, ComObject body, Replica replica) {
+    return databaseClient.send(batchKey, shard, auth_user, command, body, replica.cliReplica);
+  }
+
+  public byte[] send(String batchKey,
+                     int shard, long auth_user, String command, ComObject body, Replica replica, boolean ignoreDeath) {
+    return databaseClient.send(batchKey, shard, auth_user, command, body, replica.cliReplica, ignoreDeath);
+  }
+
+  public int getMasterReplica(int shard) {
+    return databaseClient.getCommon().getServersConfig().getShards()[shard].getMasterReplica();
+  }
+
+  public Map<String, TableSchema> getTables(String dbName) {
+    return databaseClient.getCommon().getTables(dbName);
+  }
+
+  public String debugRecord(String dbName, String tableName, String indexName, String key) {
+    return databaseClient.debugRecord(dbName, tableName, indexName, key);
+  }
+
+  public ReconfigureResults reconfigureCluster() {
+    return databaseClient.reconfigureCluster();
+  }
+
+  public byte[] sendToMaster(String command, ComObject body) {
+    return databaseClient.sendToMaster(command, body);
+  }
+
+    public void syncSchema() {
+    databaseClient.syncSchema();
+  }
+
+    protected void checkClosed() throws SQLException {
       if (isClosed()) {
         throw new SQLException("This connection has been closed.");
       }

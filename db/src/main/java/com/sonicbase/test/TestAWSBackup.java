@@ -278,7 +278,7 @@ public class TestAWSBackup {
       cobj.put(ComObject.Tag.method, "getLastBackupDir");
       cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
       String command = "DatabaseServer:ComObject:getLastBackupDir:";
-      byte[] ret = client.send(null, 0, 0, command, cobj.serialize(), DatabaseClient.Replica.master);
+      byte[] ret = client.send(null, 0, 0, command, cobj, DatabaseClient.Replica.master);
       ComObject retObj = new ComObject(ret);
       String dir = retObj.getString(ComObject.Tag.directory);
 
@@ -308,7 +308,7 @@ public class TestAWSBackup {
       cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
       cobj.put(ComObject.Tag.method, "forceDeletes");
       command = "DatabaseServer:ComObject:forceDeletes:";
-      client.sendToAllShards(null, 0, command, cobj.serialize(), DatabaseClient.Replica.all);
+      client.sendToAllShards(null, 0, command, cobj, DatabaseClient.Replica.all);
 
       executor.shutdownNow();
     }

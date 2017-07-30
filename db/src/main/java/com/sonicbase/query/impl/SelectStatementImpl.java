@@ -761,11 +761,11 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
         cobj.put(ComObject.Tag.method, "serverSelect");
         cobj.put(ComObject.Tag.dbName, dbName);
 
-        int previousSchemaVersion = client.getCommon().getSchemaVersion();
+        long previousSchemaVersion = client.getCommon().getSchemaVersion();
         String command = "DatabaseServer:ComObject:serverSelect:";
 
         byte[] recordRet = client.send(null, Math.abs(ThreadLocalRandom.current().nextInt() % client.getShardCount()),
-            Math.abs(ThreadLocalRandom.current().nextLong()), command, cobj.serialize(), DatabaseClient.Replica.def);
+            Math.abs(ThreadLocalRandom.current().nextLong()), command, cobj, DatabaseClient.Replica.def);
         if (previousSchemaVersion < client.getCommon().getSchemaVersion()) {
           throw new SchemaOutOfSyncException();
         }
@@ -917,7 +917,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     else {
       while (true) {
         try {
-          int previousSchemaVersion = client.getCommon().getSchemaVersion();
+          long previousSchemaVersion = client.getCommon().getSchemaVersion();
           int shardCount = client.getShardCount();
           for (int shard = 0; shard < shardCount; shard++) {
             ComObject cobj = new ComObject();
@@ -947,7 +947,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
             cobj.put(ComObject.Tag.tableName, fromTable);
 
             String command = "DatabaseServer:ComObject:countRecords:";
-            byte[] lookupRet = client.send(null, shard, 0, command, cobj.serialize(), DatabaseClient.Replica.def);
+            byte[] lookupRet = client.send(null, shard, 0, command, cobj, DatabaseClient.Replica.def);
             if (previousSchemaVersion < client.getCommon().getSchemaVersion()) {
               throw new SchemaOutOfSyncException();
             }
@@ -1572,7 +1572,8 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
          explain.getBuilder().append("Evaluate join expression. Read join records: joinTable=" + rightTable.getName() + ", expression=" + expression.toString() + "\n");
        }
 
-      keys = ExpressionImpl.readRecords(dbName, client, pageSize, forceSelectOnServer, tableSchema, keysToRead, new String[]{rightColumn.get().getColumnName()}, columns, recordCache, expression.getViewVersion());
+      keys = ExpressionImpl.readRecords(dbName, client, pageSize, forceSelectOnServer, tableSchema, keysToRead,
+          new String[]{rightColumn.get().getColumnName()}, columns, recordCache, expression.getViewVersion());
 
 
       //todo: need to make sure this index is sharded with the primary key so we know they're on the same server
@@ -1587,7 +1588,8 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
             }
           }
 
-          keys = ExpressionImpl.readRecords(dbName, client, pageSize, forceSelectOnServer, tableSchema, keysToRead2, tableSchema.getPrimaryKey(), columns, recordCache, expression.getViewVersion());
+          keys = ExpressionImpl.readRecords(dbName, client, pageSize, forceSelectOnServer, tableSchema, keysToRead2,
+              tableSchema.getPrimaryKey(), columns, recordCache, expression.getViewVersion());
         }
       }
 

@@ -1,5 +1,6 @@
 package com.sonicbase.socket;
 
+import com.sonicbase.common.ComObject;
 import com.sonicbase.query.DatabaseException;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
@@ -57,26 +58,28 @@ public class DatabaseSocketClient {
           pool = new ArrayBlockingQueue<>(CONNECTION_COUNT);
           pools.put(host + ":" + port, pool);
         }
-        if (connectionCount.get() >= CONNECTION_COUNT) {
-          sock = pool.poll(20000, TimeUnit.MILLISECONDS);
-        }
-        else {
+//        if (connectionCount.get() >= CONNECTION_COUNT) {
+//          sock = pool.poll(20000, TimeUnit.MILLISECONDS);
+//          if (sock == null) {
+//            throw new DatabaseException("Pool returned null connection - max connections");
+//          }
+//        }
+//        else {
           sock = pool.poll(0, TimeUnit.MILLISECONDS);
           if (sock == null) {
             try {
               connectionCount.incrementAndGet();
-              logger.info("Adding connection: count=" + connectionCount.get());
               sock = new Connection(host, port);//new NioClient(host, port);
             }
             catch (Exception t) {
               throw new Exception("Error creating connection: host=" + host + ", port=" + port, t);
             }
           }
-        }
+        //}
         return sock;
       }
       catch (Exception t) {
-        logger.error("Error borrowing connection: host=" + host + ", port=" + port);
+        //logger.error("Error borrowing connection: host=" + host + ", port=" + port);
         //   t.printStackTrace();
         try {
           Thread.sleep(100);
@@ -602,7 +605,9 @@ public class DatabaseSocketClient {
           break;
         }
         catch (Exception e) {
-          sock.sock.close();//clientHandler.channel.close();
+          if (sock != null && sock.sock != null) {
+            sock.sock.close();//clientHandler.channel.close();
+          }
           connectionCount.decrementAndGet();
           shouldReturn = false;
           throw new DeadServerException(e);
@@ -751,7 +756,7 @@ public class DatabaseSocketClient {
     }
     catch (Exception e) {
       String[] parts = hostPort.split(":");
-      throw new DeadServerException("Server error: host=" + parts[0] + ", port=" + parts[1] + ", command=" + command, e);
+      throw new DatabaseException("Server error: host=" + parts[0] + ", port=" + parts[1] + ", command=" + command, e);
     }
   }
 

@@ -2,6 +2,7 @@ package com.sonicbase.server;
 
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.AWSClient;
+import com.sonicbase.common.ComArray;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Logger;
 import com.sonicbase.query.DatabaseException;
@@ -10,6 +11,7 @@ import com.sonicbase.util.ISO8601;
 import com.sonicbase.util.StreamUtils;
 import com.sonicbase.research.socket.NettyServer;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 
 import java.io.*;
 import java.text.ParseException;
@@ -112,7 +114,7 @@ public class LogManager {
     }
   }
 
-  public byte[] setMaxSequenceNum(ComObject cobj) {
+  public ComObject setMaxSequenceNum(ComObject cobj) {
     try {
       long sequenceNum = cobj.getLong(ComObject.Tag.sequenceNumber);
 
@@ -154,7 +156,7 @@ public class LogManager {
           cobj.put(ComObject.Tag.method, "setMaxSequenceNum");
           cobj.put(ComObject.Tag.sequenceNumber, maxAllocatedLogSequenceNumber.get());
           String command = "DatabaseServer:ComObject:setMaxSequenceNum:";
-          server.getClient().send(null, server.getShard(), replica, command, cobj.serialize(), DatabaseClient.Replica.specified, true);
+          server.getClient().send(null, server.getShard(), replica, command, cobj, DatabaseClient.Replica.specified, true);
         }
         catch (Exception e) {
           logger.error("Error setting maxSequenceNum: shard=" + server.getShard() + ", replica=" + replica);
@@ -346,40 +348,62 @@ public class LogManager {
     }
   }
 
-  public void sendLogsToPeer(int replicaNum) {
+  public ComObject getLogFile(ComObject cobj) {
     try {
-      DatabaseClient client = server.getClient();
-      File[] files = new File(getLogRoot() + "/peer-" + replicaNum).listFiles();
-      if (files != null) {
-        for (File file : files) {
-          byte[] bytes = StreamUtils.inputStreamToBytes(new BufferedInputStream(new FileInputStream(file)));
-          ComObject cobj = new ComObject();
-          cobj.put(ComObject.Tag.dbName, "__none__");
-          cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-          cobj.put(ComObject.Tag.method, "sendQueueFile");
-          cobj.put(ComObject.Tag.binaryFileContent, bytes);
-          cobj.put(ComObject.Tag.replica, server.getReplica());
-          String command = "DatabaseServer:ComObject:sendQueueFile:";
-          client.send(null, server.getShard(), replicaNum, command, cobj.serialize(), DatabaseClient.Replica.specified, true);
-        }
-        deletePeerLogs(replicaNum);
-      }
+      int replica = cobj.getInt(ComObject.Tag.replica);
+      String filename = cobj.getString(ComObject.Tag.filename);
+      File file = new File(getLogRoot() + "/peer-" + replica + "/" + filename);
+      InputStream in = new BufferedInputStream(new FileInputStream(file));
+      ByteArrayOutputStream out = new ByteArrayOutputStream();
+      IOUtils.copy(in, out);
+
+      ComObject retObj = new ComObject();
+      retObj.put(ComObject.Tag.binaryFileContent, out.toByteArray());
+
+      return retObj;
     }
     catch (Exception e) {
       throw new DatabaseException(e);
     }
   }
-  public void deletePeerLogs(int replicaNum) {
 
-    File[] files = new File(getLogRoot() + "/peer-" + replicaNum).listFiles();
-    if (files != null) {
-      for (File file : files) {
-        file.delete();
+  public ComObject deletePeerLogs(ComObject cobj) {
+    deletePeerLogs(cobj.getInt(ComObject.Tag.replica));
+    return null;
+  }
+
+  public ComObject sendLogsToPeer(int replicaNum) {
+    try {
+      ComObject retObj = new ComObject();
+      File[] files = new File(getLogRoot() + "/peer-" + replicaNum).listFiles();
+      if (files != null) {
+        ComArray fileNameArray = retObj.putArray(ComObject.Tag.filenames, ComObject.Type.stringType);
+        for (File file : files) {
+           fileNameArray.add(file.getName());
+        }
       }
+      return retObj;
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
     }
   }
 
-  public void logRequestForPeer(String command, byte[] body, int deadReplica) {
+  public void deletePeerLogs(int replicaNum) {
+    File dir = new File(getLogRoot() + "/peer-" + replicaNum);
+    logger.info("Deleting peer logs: dir=" + dir.getAbsolutePath());
+    File[] files = dir.listFiles();
+    int count = 0;
+    if (files != null) {
+      for (File file : files) {
+        file.delete();
+        count++;
+      }
+    }
+    logger.info("Deleted peer logs: count=" + count + ", dir=" + dir.getAbsolutePath());
+  }
+
+  public void logRequestForPeer(String command, byte[] body, long sequence0, long sequence1, int deadReplica) {
     startLoggingForPeer(deadReplica);
 
     try {
@@ -388,7 +412,8 @@ public class LogManager {
       byte[] buffer = command.getBytes(UTF8_STR);
 
       DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-      DataUtil.writeVLong(out, getNextSequencenNum(), resultLength);
+      DataUtil.writeVLong(out, sequence0, resultLength);
+      DataUtil.writeVLong(out, sequence1, resultLength);
       out.writeInt(buffer.length);
       out.write(buffer);
       out.writeInt(body == null ? 0 : body.length);
@@ -426,6 +451,19 @@ public class LogManager {
       return files.length > 0;
     }
     return false;
+  }
+
+  public double getPercentApplyQueuesComplete() {
+    long totalBytes = 0;
+    long readBytes = 0;
+    for (LogSource source : allCurrentSources) {
+      totalBytes += source.getTotalBytes();
+      readBytes += source.getBytesRead();
+    }
+    if (totalBytes == 0) {
+      return 0;
+    }
+    return (double)readBytes / (double)totalBytes;
   }
 
   private static class QueueEntry {
@@ -524,6 +562,12 @@ public class LogManager {
         if (writer != null) {
           writer.close();
         }
+        if (currFilename != null) {
+          File currFile = new File(currFilename);
+          if (currFile.length() == 0) {
+            currFile.delete();
+          }
+        }
         sliceFilename = currFilename;
         String directory = getLogRoot();
         currQueueTime = System.currentTimeMillis();
@@ -572,13 +616,7 @@ public class LogManager {
       for (int replica = 0; replica < server.getReplicationFactor(); replica++) {
         if (replica != server.getReplica()) {
           try {
-            ComObject cobj = new ComObject();
-            cobj.put(ComObject.Tag.dbName, "__none__");
-            cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-            cobj.put(ComObject.Tag.method, "sendLogsToPeer");
-            cobj.put(ComObject.Tag.replica, server.getReplica());
-            String command = "DatabaseServer:ComObject:sendLogsToPeer:";
-            server.getClient().send(null, server.getShard(), replica, command, cobj.serialize(), DatabaseClient.Replica.specified);
+            getLogsFromPeer(replica);
           }
           catch (Exception e) {
             logger.error("Error getting logs from peer: replica=" + replica, e);
@@ -600,17 +638,74 @@ public class LogManager {
     }
   }
 
+  public void getLogsFromPeer(int replica) {
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.dbName, "__none__");
+    cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
+    cobj.put(ComObject.Tag.method, "sendLogsToPeer");
+    cobj.put(ComObject.Tag.replica, server.getReplica());
+    String command = "DatabaseServer:ComObject:sendLogsToPeer:";
+    byte[] ret = server.getClient().send(null, server.getShard(), replica, command, cobj, DatabaseClient.Replica.specified);
+    ComObject retObj = new ComObject(ret);
+    ComArray filenames = retObj.getArray(ComObject.Tag.filenames);
+    if (filenames != null) {
+      for (int i = 0; i < filenames.getArray().size(); i++) {
+        String filename = (String) filenames.getArray().get(i);
+        cobj = new ComObject();
+        cobj.put(ComObject.Tag.dbName, "__none__");
+        cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
+        cobj.put(ComObject.Tag.method, "getLogFile");
+        cobj.put(ComObject.Tag.replica, server.getReplica());
+        cobj.put(ComObject.Tag.filename, filename);
+        command = "DatabaseServer:ComObject:getLogFile:";
+        ret = server.getClient().send(null, server.getShard(), replica, command, cobj, DatabaseClient.Replica.specified);
+        retObj = new ComObject(ret);
+        byte[] bytes = retObj.getByteArray(ComObject.Tag.binaryFileContent);
+
+        receiveExternalLog(replica, filename, bytes);
+        logger.info("Received log file: filename=" + filename + ", replica=" + replica);
+      }
+      cobj = new ComObject();
+      cobj.put(ComObject.Tag.dbName, "__none__");
+      cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
+      cobj.put(ComObject.Tag.method, "deletePeerLogs");
+      cobj.put(ComObject.Tag.replica, server.getReplica());
+      command = "DatabaseServer:ComObject:deletePeerLogs:";
+      ret = server.getClient().send(null, server.getShard(), replica, command, cobj, DatabaseClient.Replica.specified);
+
+    }
+  }
+
   private File getLogReplicaDir() {
     return new File(server.getDataDir(), "queue/" + server.getShard() + "/" + server.getReplica());
   }
 
+  class ByteCounterStream extends InputStream {
+    long count;
+    private final InputStream in;
+
+    public ByteCounterStream(InputStream in) {
+      this.in = in;
+    }
+    @Override
+    public int read() throws IOException {
+      count++;
+      return in.read();
+    }
+  }
+
   class LogSource {
+    private long totalBytes;
+    private String filename;
+    private ByteCounterStream counterStream;
     DataInputStream in;
-    long sequenceNumber;
+    long sequence1;
+    long sequence0;
     String command;
     byte[] buffer;
     List<NettyServer.Request> requests;
     DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+    public int offset;
 
     LogSource(File file) throws IOException {
       InputStream inputStream = null;
@@ -620,9 +715,19 @@ public class LogManager {
       else {
         inputStream = new BufferedInputStream(new FileInputStream(file));
       }
-      in = new DataInputStream(inputStream);
-
+      counterStream = new ByteCounterStream(inputStream);
+      in = new DataInputStream(counterStream);
+      filename = file.getAbsolutePath();
+      totalBytes = file.length();
       readNext();
+    }
+
+    public long getTotalBytes() {
+      return this.totalBytes;
+    }
+
+    public long getBytesRead() {
+      return counterStream.count;
     }
 
     boolean take() {
@@ -637,19 +742,24 @@ public class LogManager {
           NettyServer.Request request = readRequest();
           command = request.getCommand();
           buffer = request.getBody();
+          sequence0 = request.getSequence0();
+          sequence1 = request.getSequence1();
           requests = null;
         }
         else {
           requests = new ArrayList<>();
-          long lowestSequence = Long.MAX_VALUE;
+          long lowestSequence0 = Long.MAX_VALUE;
+          long lowestSequence1 = Long.MAX_VALUE;
           for (int i = 0; i < count; i++) {
             NettyServer.Request request = readRequest();
-            if (sequenceNumber < lowestSequence) {
-              lowestSequence = sequenceNumber;
+            if (sequence0 < lowestSequence1 && sequence1 < lowestSequence1) {
+              lowestSequence0 = sequence0;
+              lowestSequence1 = sequence1;
             }
             requests.add(request);
           }
-          sequenceNumber = lowestSequence;
+          sequence0 = lowestSequence0;
+          sequence1 = lowestSequence1;
           command = null;
           buffer = null;
         }
@@ -657,7 +767,8 @@ public class LogManager {
       catch (IOException e) {
         command = null;
         buffer = null;
-        sequenceNumber = -1;
+        sequence1 = -1;
+        sequence0 = -1;
         requests = null;
         try {
           in.close();
@@ -669,7 +780,8 @@ public class LogManager {
     }
 
     private NettyServer.Request readRequest() throws IOException {
-      sequenceNumber = DataUtil.readVLong(in, resultLength);
+      sequence0 = DataUtil.readVLong(in, resultLength);
+      sequence1 = DataUtil.readVLong(in, resultLength);
       int size = in.readInt();
       byte[] commandBuffer = new byte[size];
       in.readFully(commandBuffer);
@@ -734,7 +846,10 @@ public class LogManager {
     }
   }
 
+  private List<LogSource> allCurrentSources = new ArrayList<>();
+
   private void replayQueues(File dataRootDir, final String slicePoint, final boolean beforeSlice, boolean peerFiles) throws IOException {
+    allCurrentSources.clear();
     synchronized (logLock) {
       File[] files = dataRootDir.listFiles();
       if (files != null) {
@@ -759,32 +874,58 @@ public class LogManager {
             }
           }
           if (slicePoint == null) {
-            sources.add(new LogSource(file));
+            LogSource src = new LogSource(file);
+            sources.add(src);
+            allCurrentSources.add(src);
             continue;
           }
           if (beforeSlice) {
             if (sliceFiles.contains(file.getAbsolutePath())) {
-              sources.add(new LogSource(file));
+              LogSource src = new LogSource(file);
+              sources.add(src);
+              allCurrentSources.add(src);
             }
           }
 
           if (!beforeSlice) {
             if (!sliceFiles.contains(file.getAbsolutePath())) {
-              sources.add(new LogSource(file));
+              LogSource src = new LogSource(file);
+              sources.add(src);
+              allCurrentSources.add(src);
             }
           }
         }
         final long begin = System.currentTimeMillis();
         final AtomicLong lastLogged = new AtomicLong(System.currentTimeMillis());
+        final AtomicLong countBatched = new AtomicLong();
+        final AtomicLong batchCount = new AtomicLong();
+        final AtomicLong countSubmitted = new AtomicLong();
+        final AtomicLong countFinished = new AtomicLong();
         try {
           while (true) {
-            long minSeqenceNum = Long.MAX_VALUE;
+            long minSequence0 = Long.MAX_VALUE;
+            long minSequence1 = Long.MAX_VALUE;
             int minOffset = -1;
             for (int i = 0; i < sources.size(); i++) {
-              long seq = sources.get(i).sequenceNumber;
-              if (seq < minSeqenceNum) {
-                minSeqenceNum = seq;
-                minOffset = i;
+              if (sources.get(i).requests != null) {
+                if (sources.get(i).offset < sources.get(i).requests.size()) {
+                  long sequence0 = sources.get(i).requests.get(sources.get(i).offset).getSequence0();
+                  long sequence1 = sources.get(i).requests.get(sources.get(i).offset).getSequence1();
+                  if (sequence0 < minSequence0 && sequence1 < minSequence1) {
+                    minSequence0 = sequence0;
+                    minSequence1 = sequence1;
+                    minOffset = i;
+                  }
+                }
+              }
+              else {
+                long sequence0 = sources.get(i).sequence0;
+                long sequence1 = sources.get(i).sequence1;
+                if (sequence0 < minSequence0 && sequence1 < minSequence1) {
+                  minSequence0 = sequence0;
+                  minSequence1 = sequence1;
+                  minOffset = i;
+                }
               }
             }
             if (minOffset == -1) {
@@ -792,57 +933,97 @@ public class LogManager {
             }
             final LogSource minSource = sources.get(minOffset);
             try {
+              batchCount.incrementAndGet();
               if (minSource.requests != null) {
-                List<Future> futures = new ArrayList<>();
-                for (final NettyServer.Request request : minSource.requests) {
-                  futures.add(executor.submit(new Callable() {
-                    @Override
-                    public Object call() throws Exception {
+                final NettyServer.Request request = minSource.requests.get(minSource.offset++);
+                if (minSource.requests.size() <= minSource.offset) {
+                  minSource.offset = 0;
+                  if (!minSource.take()) {
+                    sources.remove(minOffset);
+                  }
+                }
+                  countBatched.incrementAndGet();
+                  countSubmitted.incrementAndGet();
+                  executor.submit(new Runnable() {
+                    public void run() {
                       try {
-                        server.handleCommand(request.getCommand(), request.getBody(), true, false);
+                        server.handleCommand(request.getCommand(), request.getBody(), request.getSequence0(),
+                            request.getSequence1(), true, false);
                         countProcessed.incrementAndGet();
                         if (System.currentTimeMillis() - lastLogged.get() > 2000) {
                           lastLogged.set(System.currentTimeMillis());
                           logger.info("applyQueues - progress: count=" + countProcessed.get() +
+                              ", countBatched=" + countBatched.get() +
+                              ", avgBatchSize=" + (countProcessed.get() / batchCount.get()) +
                               ", rate=" + (double) countProcessed.get() / (double) (System.currentTimeMillis() - begin) * 1000d);
                         }
                       }
                       catch (Exception e) {
                         logger.error("Error replaying command: command=" + minSource.command, e);
                       }
-                      return null;
+                      finally {
+                        countFinished.incrementAndGet();
+                      }
                     }
-                  }));
-                }
-                for (Future future : futures) {
-                  future.get();
-                }
+                  });
+
               }
               else {
-                server.handleCommand(minSource.command, minSource.buffer, true, false);
-                countProcessed.incrementAndGet();
-                if (System.currentTimeMillis() - lastLogged.get() > 2000) {
-                  lastLogged.set(System.currentTimeMillis());
-                  logger.info("applyQueues - progress: count=" + countProcessed.get() +
-                      ", rate=" + (double) countProcessed.get() / (double) (System.currentTimeMillis() - begin) * 1000d);
+                if (minSource.command == null) {
+                  sources.remove(minOffset);
+                  continue;
+                }
+
+                countSubmitted.incrementAndGet();
+                final String command = minSource.command;
+                final byte[] buffer = minSource.buffer;
+                final long sequence0 = minSource.sequence0;
+                final long sequence1 = minSource.sequence1;
+                executor.submit(new Runnable(){
+                  public void run () {
+                    try {
+                      server.handleCommand(command, buffer, sequence0, sequence1,true, false);
+                      countProcessed.incrementAndGet();
+                      if (System.currentTimeMillis() - lastLogged.get() > 2000) {
+                        lastLogged.set(System.currentTimeMillis());
+                        logger.info("applyQueues - progress: count=" + countProcessed.get() +
+                                 ", countBatched=" + countBatched.get() +
+                            ", avgBatchSize=" + (countProcessed.get() / batchCount.get()) +
+                            ", rate=" + (double) countProcessed.get() / (double) (System.currentTimeMillis() - begin) * 1000d);
+                      }
+                    }
+                    catch (Exception e) {
+                      logger.error("Error replaying command", e);
+                    }
+                    finally {
+                      countFinished.incrementAndGet();
+                    }
+                  }
+                });
+
+                if (!minSource.take()) {
+                  sources.remove(minOffset);
                 }
               }
             }
             catch (Exception t) {
               logger.error("Error replaying command: command=" + minSource.command, t);
             }
-            finally {
-              if (!minSource.take()) {
-                sources.remove(minOffset);
-              }
+          }
+          while (countSubmitted.get() > countFinished.get()) {
+            try {
+              Thread.sleep(100);
+            }
+            catch (InterruptedException e) {
+              throw new DatabaseException(e);
             }
           }
-
         }
         finally {
           logger.info("applyQueues - finished: count=" + countProcessed.get() +
               ", rate=" + (double) countProcessed.get() / (double) (System.currentTimeMillis() - begin) * 1000d);
 
+          allCurrentSources.clear();
           for (LogSource source : sources) {
             source.close();
           }
@@ -852,7 +1033,7 @@ public class LogManager {
     }
   }
 
-  public DatabaseServer.LogRequest logRequests(List<NettyServer.Request> requests, boolean enableQueuing) throws IOException, InterruptedException {
+  public DatabaseServer.LogRequest dont_use_logRequests(List<NettyServer.Request> requests, boolean enableQueuing) throws IOException, InterruptedException {
     if (enableQueuing) {
       DatabaseServer.LogRequest logRequest = new DatabaseServer.LogRequest(requests.size());
       List<byte[]> serializedCommands = new ArrayList<>();
@@ -877,7 +1058,8 @@ public class LogManager {
 
           DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
           long sequenceNumber = getNextSequencenNum();
-          logRequest.getSequenceNumbers()[i] = sequenceNumber;
+          logRequest.getSequences1()[i] = sequenceNumber;
+          DataUtil.writeVLong(out, System.currentTimeMillis(), resultLength);
           DataUtil.writeVLong(out, sequenceNumber, resultLength);
           out.writeInt(buffer.length);
           out.write(buffer);
@@ -902,7 +1084,8 @@ public class LogManager {
   }
 
 
-  public DatabaseServer.LogRequest logRequest(String command, byte[] body, boolean enableQueuing, String methodStr, Long existingSequenceNumber) {
+  public DatabaseServer.LogRequest logRequest(String command, byte[] body, boolean enableQueuing, String methodStr,
+                                              Long existingSequence0, Long existingSequence1) {
     DatabaseServer.LogRequest request = null;
     try {
       if (enableQueuing && DatabaseClient.getWriteVerbs().contains(methodStr)) {
@@ -912,21 +1095,31 @@ public class LogManager {
         byte[] buffer = command.getBytes(UTF8_STR);
 
         DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-        long sequenceNum = 0;
-        if (existingSequenceNumber != null) {
-          sequenceNum = existingSequenceNumber;
+        long sequence1 = 0;
+        long sequence0 = 0;
+        if (existingSequence0 != null) {
+          sequence0 = existingSequence0;
         }
         else {
-          sequenceNum = getNextSequencenNum();
+          sequence0 = System.currentTimeMillis();
         }
-        DataUtil.writeVLong(out, sequenceNum, resultLength);
+        if (existingSequence1 != null) {
+          sequence1 = existingSequence1;
+        }
+        else {
+          sequence1 = getNextSequencenNum();
+        }
+
+        DataUtil.writeVLong(out, sequence0, resultLength);
+        DataUtil.writeVLong(out, sequence1, resultLength);
         out.writeInt(buffer.length);
         out.write(buffer);
         out.writeInt(body == null ? 0 : body.length);
         if (body != null && body.length != 0) {
           out.write(body);
         }
-        request.getSequenceNumbers()[0] = sequenceNum;
+        request.getSequences0()[0] = sequence0;
+        request.getSequences1()[0] = sequence1;
         request.setBuffer(bytesOut.toByteArray());
         logRequests.put(request);
       }
@@ -948,13 +1141,22 @@ public class LogManager {
               if (name.contains("in-process")) {
                 continue;
               }
-              int pos = name.indexOf('-');
+
+              int pos = 0;
+              if (name.startsWith("peer-")) {
+                pos = name.indexOf('-', "peer-".length());  //skip 'peer'
+                pos = name.indexOf('-', pos + 1); //skip replica
+              }
+              else {
+                pos = name.indexOf('-');
+              }
+
               int pos2 = name.lastIndexOf('.');
               String dateStr = name.substring(pos + 1, pos2);
               dateStr = dateStr.replace('_', ':');
               Date fileDate = ISO8601.from8601String(dateStr).getTime();
               long fileTime = fileDate.getTime();
-              if (fileTime < lastSnapshot - (30 * 1000) && file.exists() && !file.delete()) {
+              if (fileTime < lastSnapshot - (60 * 1000) && file.exists() && !file.delete()) {
                 throw new DatabaseException("Error deleting file: file=" + file.getAbsolutePath());
               }
             }

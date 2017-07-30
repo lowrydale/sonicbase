@@ -80,7 +80,7 @@ public class ReadManager {
 
   public static final int SELECT_PAGE_SIZE = 30000;
 
-  public byte[] countRecords(ComObject cobj) {
+  public ComObject countRecords(ComObject cobj) {
     if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
       try {
         Thread.sleep(10);
@@ -91,7 +91,7 @@ public class ReadManager {
     }
 
     String dbName = cobj.getString(ComObject.Tag.dbName);
-    int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
+    long schemaVersion = cobj.getLong(ComObject.Tag.schemaVersion);
     if (schemaVersion < server.getSchemaVersion()) {
       throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
     }
@@ -178,10 +178,10 @@ public class ReadManager {
 
     ComObject retObj = new ComObject();
     retObj.put(ComObject.Tag.countLong, count);
-    return retObj.serialize();
+    return retObj;
   }
 
-  public byte[] batchIndexLookup(ComObject cobj) {
+  public ComObject batchIndexLookup(ComObject cobj) {
     try {
       if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
         try {
@@ -193,7 +193,7 @@ public class ReadManager {
       }
 
       String dbName = cobj.getString(ComObject.Tag.dbName);
-      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
+      long schemaVersion = cobj.getLong(ComObject.Tag.schemaVersion);
       if (schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
       }
@@ -293,7 +293,7 @@ public class ReadManager {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
       }
 
-      return retObj.serialize();
+      return retObj;
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -347,7 +347,7 @@ public class ReadManager {
   private ConcurrentHashMap<Long, PreparedIndexLookup> preparedIndexLookups = new ConcurrentHashMap<>();
 
   private AtomicInteger lookupCount = new AtomicInteger();
-  public byte[] indexLookup(ComObject cobj) {
+  public ComObject indexLookup(ComObject cobj) {
     //Timer.Context context = INDEX_LOOKUP_STATS.time();
     try {
 
@@ -360,7 +360,7 @@ public class ReadManager {
         }
       }
 
-      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
+      long schemaVersion = cobj.getLong(ComObject.Tag.schemaVersion);
       if (schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
       }
@@ -580,19 +580,27 @@ public class ReadManager {
 
       if (indexSchema.isPrimaryKey()) {
         if (rightOperator == null) {
-          entry = doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, parms, evaluateExpression, expression, columnOffsets, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, leftOperator, index, ascending, retKeys, retRecords, viewVersion, false, counters, groupContext);
+          entry = doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, parms, evaluateExpression, expression,
+              columnOffsets, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, leftOperator, index,
+              ascending, retKeys, retRecords, viewVersion, false, counters, groupContext);
         }
         else {
-          entry = doIndexLookupTwoKeys(dbName, count, tableSchema, indexSchema, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, columnOffsets, originalRightKey, rightKey, leftOperator, rightOperator, parms, evaluateExpression, expression, index, ascending, retKeys, retRecords, false, counters, groupContext);
+          entry = doIndexLookupTwoKeys(dbName, count, tableSchema, indexSchema, forceSelectOnServer, excludeKeys,
+              originalLeftKey, leftKey, columnOffsets, originalRightKey, rightKey, leftOperator, rightOperator, parms,
+              evaluateExpression, expression, index, ascending, retKeys, retRecords, false, counters, groupContext);
         }
         //todo: support rightOperator
       }
       else {
         if (rightOperator == null) {
-          entry = doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, parms, evaluateExpression, expression, columnOffsets, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, leftOperator, index, ascending, retKeys, retRecords, viewVersion, true, counters, groupContext);
+          entry = doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, parms, evaluateExpression, expression,
+              columnOffsets, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, leftOperator, index, ascending,
+              retKeys, retRecords, viewVersion, true, counters, groupContext);
         }
         else {
-          entry = doIndexLookupTwoKeys(dbName, count, tableSchema, indexSchema, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, columnOffsets, originalRightKey, rightKey, leftOperator, rightOperator, parms, evaluateExpression, expression, index, ascending, retKeys, retRecords, true, counters, groupContext);
+          entry = doIndexLookupTwoKeys(dbName, count, tableSchema, indexSchema, forceSelectOnServer, excludeKeys,
+              originalLeftKey, leftKey, columnOffsets, originalRightKey, rightKey, leftOperator, rightOperator, parms,
+              evaluateExpression, expression, index, ascending, retKeys, retRecords, true, counters, groupContext);
         }
       }
 
@@ -626,7 +634,7 @@ public class ReadManager {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
       }
 
-      return retObj.serialize();
+      return retObj;
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -669,7 +677,7 @@ public class ReadManager {
     return columnOffsets;
   }
 
-  public byte[] closeResultSet(ComObject cobj, boolean replayedCommand) {
+  public ComObject closeResultSet(ComObject cobj, boolean replayedCommand) {
     long resultSetId = cobj.getLong(ComObject.Tag.resultSetId);
 
     DiskBasedResultSet resultSet = new DiskBasedResultSet(server, resultSetId);
@@ -678,7 +686,7 @@ public class ReadManager {
     return null;
   }
 
-  public byte[] serverSelectDelete(ComObject cobj, boolean replayedCommand) {
+  public ComObject serverSelectDelete(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     long id = cobj.getLong(ComObject.Tag.id);
 
@@ -687,7 +695,7 @@ public class ReadManager {
     return null;
   }
 
-  public byte[] serverSelect(ComObject cobj) {
+  public ComObject serverSelect(ComObject cobj) {
     try {
       if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
         try {
@@ -699,7 +707,7 @@ public class ReadManager {
       }
 
       String dbName = cobj.getString(ComObject.Tag.dbName);
-      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
+      long schemaVersion = cobj.getLong(ComObject.Tag.schemaVersion);
       if (schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
       }
@@ -741,14 +749,14 @@ public class ReadManager {
         }
       }
 
-      return retObj.serialize();
+      return retObj;
     }
     catch (IOException e) {
       throw new DatabaseException(e);
     }
   }
 
-  public byte[] indexLookupExpression(ComObject cobj) {
+  public ComObject indexLookupExpression(ComObject cobj) {
     try {
       if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
         try {
@@ -761,7 +769,7 @@ public class ReadManager {
 
 
       String dbName = cobj.getString(ComObject.Tag.dbName);
-      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
+      long schemaVersion = cobj.getLong(ComObject.Tag.schemaVersion);
       if (schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
       }
@@ -894,7 +902,7 @@ public class ReadManager {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
       }
 
-      return retObj.serialize();
+      return retObj;
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -1742,7 +1750,11 @@ public class ReadManager {
     return records;
   }
 
-  private void handleRecord(String dbName, TableSchema tableSchema, IndexSchema indexSchema, long viewVersion, Index index, Object[] key, ParameterHandler parms, boolean evaluateExpresion, Expression expression, Set<Integer> columnOffsets, boolean forceSelectOnServer, List<byte[]> retKeys, List<Record> retRecords, boolean keys, Counter[] counters, GroupByContext groupContext, byte[][] records, byte[][] currKeys) {
+  private void handleRecord(String dbName, TableSchema tableSchema, IndexSchema indexSchema, long viewVersion,
+                            Index index, Object[] key, ParameterHandler parms, boolean evaluateExpresion,
+                            Expression expression, Set<Integer> columnOffsets, boolean forceSelectOnServer,
+                            List<byte[]> retKeys, List<Record> retRecords, boolean keys, Counter[] counters,
+                            GroupByContext groupContext, byte[][] records, byte[][] currKeys) {
     if (keys) {
       for (byte[] currKey : currKeys) {
         retKeys.add(currKey);
@@ -1817,7 +1829,7 @@ public class ReadManager {
     }
   }
 
-  public byte[] evaluateCounter(ComObject cobj) {
+  public ComObject evaluateCounter(ComObject cobj) {
 
     String dbName = cobj.getString(ComObject.Tag.dbName);
 
@@ -1884,7 +1896,7 @@ public class ReadManager {
       }
       ComObject retObj = new ComObject();
       retObj.put(ComObject.Tag.legacyCounter, counter.serialize());
-      return retObj.serialize();
+      return retObj;
     }
     catch (IOException e) {
       throw new DatabaseException(e);

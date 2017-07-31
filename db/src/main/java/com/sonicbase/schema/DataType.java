@@ -793,7 +793,7 @@ public class DataType {
 
   static Map<Integer, DataType.Type> types = new HashMap<>();
 
-  public static enum Type {
+  public enum Type {
     BIT(Types.BIT, booleanComparator, booleanConverter, null, null),
     TINYINT(Types.TINYINT, byteComparator, byteConverter, null, null),
     SMALLINT(Types.SMALLINT, shortComparator, shortConverter, null, null),

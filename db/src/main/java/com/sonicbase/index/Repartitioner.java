@@ -48,6 +48,7 @@ public class Repartitioner extends Thread {
   private String currIndexRepartitioning;
   private String currTableRepartitioning;
   private int minSizeForRepartition = 10000;
+  private boolean shutdown;
 
   public Repartitioner(DatabaseServer databaseServer, DatabaseCommon common) {
     super("Repartitioner Thread");
@@ -396,6 +397,7 @@ public class Repartitioner extends Thread {
       }
       catch (Exception e) {
         logger.error("Error repartitioning", e);
+        throw new DatabaseException(e);
       }
       finally {
         beginRepartitioningThread = null;
@@ -423,6 +425,12 @@ public class Repartitioner extends Thread {
     cobj.put(ComObject.Tag.method, "stopRepartitioning");
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
     databaseServer.getClient().sendToAllShards(null, 0, command, cobj, DatabaseClient.Replica.all);
+  }
+
+  public void shutdown() {
+    this.shutdown = true;
+    interrupt();
+
   }
 
   public interface GetKeyAtOffset {
@@ -2174,13 +2182,14 @@ public class Repartitioner extends Thread {
 
   @Override
   public void run() {
+    shutdown = false;
     try {
       Thread.sleep(15000);
     }
     catch (InterruptedException e) {
       return;
     }
-    while (true) {
+    while (!shutdown) {
       try {
         for (String dbName : databaseServer.getDbNames(databaseServer.getDataDir())) {
           ComObject cobj = new ComObject();
@@ -2193,7 +2202,13 @@ public class Repartitioner extends Thread {
         }
         Thread.sleep(2000);
       }
+      catch (InterruptedException e) {
+        break;
+      }
       catch (Exception t) {
+        if (-1 != ExceptionUtils.indexOfThrowable(t, InterruptedException.class)) {
+          break;
+        }
         logger.error("Error in master thread", t);
         try {
           Thread.sleep(10 * 1000);

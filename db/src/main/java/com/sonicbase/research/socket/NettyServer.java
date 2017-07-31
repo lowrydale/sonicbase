@@ -772,6 +772,13 @@ public class NettyServer {
     this.dlqServer = server;
   }
 
+  class MyChannelInitializer extends ChannelInitializer<SocketChannel> { // (4)
+
+    @Override
+    protected void initChannel(SocketChannel socketChannel) throws Exception {
+      socketChannel.pipeline().addLast(new ServerHandler());
+    }
+  }
   public void run() {
     EventLoopGroup bossGroup = new NioEventLoopGroup(); // (1)
     EventLoopGroup workerGroup = new NioEventLoopGroup(1024);
@@ -781,12 +788,7 @@ public class NettyServer {
       logger.info("creating group");
       b.group(bossGroup, workerGroup)
           .channel(NioServerSocketChannel.class) // (3)
-          .childHandler(new ChannelInitializer<SocketChannel>() { // (4)
-            @Override
-            public void initChannel(SocketChannel ch) {
-              ch.pipeline().addLast(new ServerHandler());
-            }
-          })
+          .childHandler(new MyChannelInitializer())
           .option(ChannelOption.SO_BACKLOG, 128)          // (5)
           .option(ChannelOption.TCP_NODELAY, true)
           .option(ChannelOption.SO_LINGER, 1000)

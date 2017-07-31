@@ -5,7 +5,7 @@
       classname="com.yworks.yguard.YGuardTask"
       classpath="/Users/lowryda/tools/yguard-2.6/lib/yguard.jar"/>
       <yguard>
-          <inoutpair in="db/target/sonicbase-core-unobfuscated-0.9.2.2.jar" out="db/target/sonicbase-core-0.9.2.2.jar"/>
+          <inoutpair in="db/target/sonicbase-core-unobfuscated-1.2.1.jar" out="db/target/sonicbase-core-1.2.1.jar"/>
           <shrink logfile="shrink.log">
 
               <keep>
@@ -19,6 +19,17 @@
           </shrink>
           <rename mainclass="com.sonicbase.research.socket.NettyServer" logfile="obfuscate.log" annotationClass="com.sonicbase.common.ExcludeRename">
           <keep>
+              <linenumbertable>
+                  <patternset id="CompanyPatternSet">
+                      <include name="com.sonicbase.**.*"/>
+                  </patternset>
+              </linenumbertable>
+              <sourcefile>
+                  <property name="mapping" value="y"/>
+                  <patternset>
+                      <include name="com.sonicbase.**.*"/>
+                  </patternset>
+              </sourcefile>
               <class classes="public"
                      methods="public" fields="public">
                   <patternset>
@@ -41,9 +52,10 @@
                       <include name="com.sonicbase.common.WindowsTerminal"/>
                       <include name="com.sonicbase.query.impl.ResultSetImpl"/>
                       <include name="com.sonicbase.util.ISO8601"/>
-                      <include name="com.sonicbase.util.JsonObject"/>
+                      <include name="com.sonicbase.util.JsonDict"/>
                       <include name="com.sonicbase.util.JsonArray"/>
                       <include name="com.sonicbase.util.StreamUtils"/>
+                      <include name="com.sonicbase.common.SchemaOutOfSyncException"/>
                   </patternset>
               </class>
 

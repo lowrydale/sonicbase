@@ -404,12 +404,16 @@ public class DatabaseServer {
             Thread masterThread = new Thread(new Runnable() {
               @Override
               public void run() {
-                try {
-                  Thread.sleep(2000);
-                  electNewMaster(shard, -1, monitorShards, monitorReplicas);
-                }
-                catch (Exception e) {
-                  logger.error("Error electing master: shard=" + shard, e);
+                while (true) {
+                  try {
+                    Thread.sleep(2000);
+                  if (electNewMaster(shard, -1, monitorShards, monitorReplicas)) {
+                      break;
+                    }
+                  }
+                  catch (Exception e) {
+                    logger.error("Error electing master: shard=" + shard, e);
+                  }
                 }
                 while (true) {
                   try {
@@ -3175,7 +3179,7 @@ public class DatabaseServer {
     shutdownRepartitioner();
 
     if (shard == 0 && replica == common.getServersConfig().getShards()[0].getMasterReplica()) {
-      repartitioner = new Repartitioner(this, common);
+      //repartitioner = new Repartitioner(this, common);
       repartitioner.start();
     }
   }
@@ -3248,7 +3252,7 @@ public class DatabaseServer {
     if (repartitioner == null) {
       return;
     }
-    repartitioner.interrupt();
+    repartitioner.shutdown();
     repartitioner.isRebalancing.set(false);
     repartitioner.stopShardsFromRepartitioning();
   }

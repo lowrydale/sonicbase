@@ -626,26 +626,27 @@ public class DatabaseClient {
         }
         catch (Exception e) {
           if (e.getCause() instanceof SchemaOutOfSyncException) {
-            for (PreparedInsert insert : withRecordPrepared) {
-              List<KeyInfo> keys = getKeys(common.getTables(insert.dbName).get(insert.tableSchema.getName()), insert.columnNames, insert.values, insert.id);
-              for (KeyInfo key : keys) {
-                if (key.indexSchema.getKey().equals(insert.indexName)) {
-                  insert.keyInfo.shard = key.shard;
-                  break;
+            synchronized (mutex) {
+              for (PreparedInsert insert : withRecordPrepared) {
+                List<KeyInfo> keys = getKeys(common.getTables(insert.dbName).get(insert.tableSchema.getName()), insert.columnNames, insert.values, insert.id);
+                for (KeyInfo key : keys) {
+                  if (key.indexSchema.getKey().equals(insert.indexName)) {
+                    insert.keyInfo.shard = key.shard;
+                    break;
+                  }
+                }
+              }
+
+              for (PreparedInsert insert : prepared) {
+                List<KeyInfo> keys = getKeys(common.getTables(insert.dbName).get(insert.tableSchema.getName()), insert.columnNames, insert.values, insert.id);
+                for (KeyInfo key : keys) {
+                  if (key.indexSchema.getKey().equals(insert.indexName)) {
+                    insert.keyInfo.shard = key.shard;
+                    break;
+                  }
                 }
               }
             }
-
-            for (PreparedInsert insert : prepared) {
-              List<KeyInfo> keys = getKeys(common.getTables(insert.dbName).get(insert.tableSchema.getName()), insert.columnNames, insert.values, insert.id);
-              for (KeyInfo key : keys) {
-                if (key.indexSchema.getKey().equals(insert.indexName)) {
-                  insert.keyInfo.shard = key.shard;
-                  break;
-                }
-              }
-            }
-
             continue;
           }
           throw new DatabaseException(e);
@@ -725,6 +726,9 @@ public class DatabaseClient {
 
     public byte[] do_send(String batchKey, String command, ComObject body) {
       return socketClient.do_send(batchKey, command, body.serialize(), hostPort);
+    }
+    public byte[] do_send(String batchKey, String command, byte[] body) {
+      return socketClient.do_send(batchKey, command, body, hostPort);
     }
   }
 
@@ -1193,6 +1197,7 @@ public class DatabaseClient {
             }
           }
           else if (replica == Replica.def) {
+            byte[] bytes = body.serialize();
             if (write_verbs.contains(verb) || write_verbs.contains(verb2)) {
               while (true) {
                 int masterReplica = common.getServersConfig().getShards()[shard].getMasterReplica();
@@ -1206,10 +1211,10 @@ public class DatabaseClient {
                   localCommand += ":xx_repl_xx" + masterReplica;
                   DatabaseServer dbserver = getLocalDbServer(shard, masterReplica);
                   if (dbserver != null) {
-                    ret = dbserver.handleCommand(localCommand, body.serialize(), false, true);
+                    ret = dbserver.handleCommand(localCommand, bytes, false, true);
                   }
                   else {
-                    ret = currReplica.do_send(batchKey, localCommand, body);
+                    ret = currReplica.do_send(batchKey, localCommand, bytes);
                   }
 
                   String newCommand = localCommand;
@@ -1235,20 +1240,20 @@ public class DatabaseClient {
                             masterReplica = common.getServersConfig().getShards()[shard].getMasterReplica();
                             dbserver = getLocalDbServer(shard, masterReplica);
                             if (dbserver != null) {
-                              dbserver.handleCommand(queueCommand, body.serialize(), false, true);
+                              dbserver.handleCommand(queueCommand, bytes, false, true);
                             }
                             else {
-                              replicas[masterReplica].do_send(null, queueCommand, body);
+                              replicas[masterReplica].do_send(null, queueCommand, bytes);
                             }
                             skip = true;
                           }
                         }
                         if (!skip) {
                           if (dbserver != null) {
-                            ret = dbserver.handleCommand(newCommand, body.serialize(), false, true);
+                            ret = dbserver.handleCommand(newCommand, bytes, false, true);
                           }
                           else {
-                            ret = currReplica.do_send(batchKey, newCommand, body);
+                            ret = currReplica.do_send(batchKey, newCommand, bytes);
                           }
                         }
                         break;

@@ -2,13 +2,13 @@ cd db
 mvn clean install -DskipTests
 cd ..
 
-#java -jar /Users/lowryda/tools/proguard5.3.3/lib/proguard.jar @myconfig.pro
-ant
+java -jar /Users/lowryda/tools/proguard5.3.3/lib/proguard.jar @myconfig.pro
+#ant
 
-mvn install:install-file -Dfile=/Users/lowryda/Dropbox/git/sonicbase/db/target/sonicbase-core-0.9.2.2.jar -DgroupId=com.sonicbase -DartifactId=sonicbase-core -Dversion=0.9.2.2 -Dpackaging=jar
+mvn install:install-file -Dfile=/Users/lowryda/Dropbox/git/sonicbase/db/target/sonicbase-core-1.2.1.jar -DgroupId=com.sonicbase -DartifactId=sonicbase-core -Dversion=1.2.1 -Dpackaging=jar
 
 cd sonicbase
 mvn clean package shade:shade -DskipTests
 cd ..
 
-mvn install:install-file -Dfile=/Users/lowryda/Dropbox/git/sonicbase/sonicbase/target/sonicbase-0.9.2.2.jar -DgroupId=com.sonicbase -DartifactId=sonicbase -Dversion=0.9.2.2 -Dpackaging=jar
+mvn install:install-file -Dfile=/Users/lowryda/Dropbox/git/sonicbase/sonicbase/target/sonicbase-1.2.1.jar -DgroupId=com.sonicbase -DartifactId=sonicbase -Dversion=1.2.1 -Dpackaging=jar

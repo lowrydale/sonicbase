@@ -71,6 +71,8 @@ public class TestJoins {
       server.shutdownRepartitioner();
     }
 
+    Thread.sleep(5000);
+
     Class.forName("com.sonicbase.jdbcdriver.Driver");
 
     conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000", "user", "password");
@@ -154,6 +156,10 @@ public class TestJoins {
       Thread.sleep(1000);
     }
 
+    for (DatabaseServer server : dbServers) {
+      server.shutdownRepartitioner();
+    }
+
     assertEquals(client.getPartitionSize("test", 0, "persons", "_1__primarykey"), 9);
     assertEquals(client.getPartitionSize("test", 1, "persons", "_1__primarykey"), 11);
 
@@ -165,7 +171,7 @@ public class TestJoins {
     cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
     cobj.put(ComObject.Tag.method, "forceDeletes");
     String command = "DatabaseServer:ComObject:forceDeletes:";
-    client.sendToAllShards(null, 0, command, cobj, DatabaseClient.Replica.all);
+    //client.sendToAllShards(null, 0, command, cobj, DatabaseClient.Replica.all);
 
     executor.shutdownNow();
   }

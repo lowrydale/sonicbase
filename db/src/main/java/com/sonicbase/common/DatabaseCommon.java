@@ -40,6 +40,9 @@ public class DatabaseCommon {
   private Map<String, Lock> schemaReadLock = new ConcurrentHashMap<>();
   private Map<String, Lock> schemaWriteLock = new ConcurrentHashMap<>();
   private DatabaseServer.ServersConfig serversConfig;
+  private ReadWriteLock internalReadWriteLock = new ReentrantReadWriteLock();
+  private Lock internalReadLock = internalReadWriteLock.readLock();
+  private Lock internalWriteLock = internalReadWriteLock.writeLock();
   private long schemaVersion;
   private boolean haveProLicense;
   private int[] masterReplicas;
@@ -67,7 +70,8 @@ public class DatabaseCommon {
 
   public void loadSchema(String dataDir) {
     try {
-      synchronized (this) {
+      internalWriteLock.lock();
+      try {
         String dataRoot = new File(dataDir, "snapshot/" + shard + "/" + replica).getAbsolutePath();
         File schemaFile = new File(dataRoot, "schema.bin");
         logger.info("Loading schema: file=" + schemaFile.getAbsolutePath());
@@ -79,6 +83,9 @@ public class DatabaseCommon {
         else {
           logger.info("No schema file found");
         }
+      }
+      finally {
+        internalWriteLock.unlock();
       }
       for (String dbName : schema.keySet()) {
         createSchemaLocks(dbName);
@@ -100,7 +107,7 @@ public class DatabaseCommon {
 
   public void saveSchema(String dataDir) {
     try {
-      synchronized (this) {
+      internalWriteLock.lock();
         String dataRoot = new File(dataDir, "snapshot/" + shard + "/" + replica).getAbsolutePath();
         File schemaFile = new File(dataRoot, "schema.bin");
         if (schemaFile.exists()) {
@@ -120,10 +127,13 @@ public class DatabaseCommon {
 
         loadSchema(dataDir);
         logger.info("Saved schema - postLoad: dir=" + dataRoot);
-      }
+
     }
     catch (IOException e) {
       throw new DatabaseException(e);
+    }
+    finally {
+      internalWriteLock.unlock();
     }
   }
 
@@ -149,7 +159,8 @@ public class DatabaseCommon {
       out.write(serializeConfig(serializationVersionNumber));
     }
     out.writeInt(schema.keySet().size());
-    synchronized (this) {
+    try {
+      internalReadLock.lock();
       for (String dbName : schema.keySet()) {
        // getSchemaReadLock(dbName).lock();
         try {
@@ -160,6 +171,9 @@ public class DatabaseCommon {
      //     getSchemaReadLock(dbName).unlock();
         }
       }
+    }
+    finally {
+      internalReadLock.unlock();
     }
   }
 
@@ -194,6 +208,7 @@ public class DatabaseCommon {
   public void deserializeSchema(DataInputStream in) {
 
     try {
+      internalWriteLock.lock();
       long serializationVersion = DataUtil.readVLong(in);
       this.schemaVersion = in.readLong();
       if (serializationVersion >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION_21) {
@@ -223,6 +238,9 @@ public class DatabaseCommon {
     }
     catch (IOException e) {
       throw new DatabaseException(e);
+    }
+    finally {
+      internalWriteLock.unlock();
     }
   }
 
@@ -865,25 +883,9 @@ public class DatabaseCommon {
     serversConfig = new DatabaseServer.ServersConfig(in, serializationVersion);
   }
 
-  public void loadServersConfig(String dataDir) throws IOException {
-    synchronized (this) {
-      String dataRoot = new File(dataDir, "snapshot/" + shard + "/" + replica).getAbsolutePath();
-      File configFile = new File(dataRoot, "config.bin");
-      if (configFile.exists()) {
-        try (DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(configFile)))) {
-          long serializationVersion = DataUtil.readVLong(in);
-          deserializeConfig(in);
-        }
-      }
-      else {
-        logger.info("No schema file found");
-      }
-    }
-
-  }
-
   public void saveServersConfig(String dataDir) throws IOException {
-    synchronized (this) {
+    try {
+      internalWriteLock.lock();
       String dataRoot = new File(dataDir, "snapshot/" + shard + "/" + replica ).getAbsolutePath();
       File configFile = new File(dataRoot, "config.bin");
       if (configFile.exists()) {
@@ -894,6 +896,9 @@ public class DatabaseCommon {
         DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
         out.write(serializeConfig(SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION));
       }
+    }
+    finally {
+      internalWriteLock.unlock();
     }
   }
 

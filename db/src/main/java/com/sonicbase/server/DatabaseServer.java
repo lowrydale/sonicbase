@@ -676,6 +676,13 @@ public class DatabaseServer {
                 }
               }
               logger.info("Death status=" + builder.toString());
+
+              if (isNoLongerMaster()) {
+                logger.info("No longer master. Shutting down resources");
+                shutdownDeathMonitor();
+                shutdownRepartitioner();
+                break;
+              }
             }
             catch (InterruptedException e) {
               break;
@@ -696,6 +703,9 @@ public class DatabaseServer {
         deathMonitorThreads[i] = new Thread[replicationFactor];
         for (int j = 0; j < replicationFactor; j++) {
           final int replica = j;
+          if (shard == this.shard && replica == this.replica) {
+            continue;
+          }
           deathMonitorThreads[i][j] = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -731,12 +741,7 @@ public class DatabaseServer {
                       changed = true;
                     }
                   }
-                  if (isNoLongerMaster()) {
-                    logger.info("No longer master. Shutting down resources");
-                    shutdownDeathMonitor();
-                    shutdownRepartitioner();
-                  }
-                  else if (changed) {
+                  if (changed) {
                     logger.info("server health changed: shard=" + shard + ", replica=" + replica + ", isHealthy=" + isHealthy.get());
                     common.saveSchema(getDataDir());
                     pushSchema();
@@ -746,7 +751,9 @@ public class DatabaseServer {
                   break;
                 }
                 catch (Exception e) {
-                  logger.error("Error in death monitor thread: shard=" + shard + ", replica=" + replica, e);
+                  if (!shutdownDeathMonitor) {
+                    logger.error("Error in death monitor thread: shard=" + shard + ", replica=" + replica, e);
+                  }
                 }
               }
             }
@@ -776,33 +783,42 @@ public class DatabaseServer {
     Thread checkThread = new Thread(new Runnable() {
       @Override
       public void run() {
-        Host host = common.getServersConfig().getShards()[shard].getReplicas()[replica];
-        boolean wasDead = host.dead;
-        try {
-          ComObject cobj = new ComObject();
-          cobj.put(ComObject.Tag.dbName, "__none__");
-          cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-          cobj.put(ComObject.Tag.method, "healthCheck");
-          String command = "DatabaseServer:ComObject:healthCheck:";
-          byte[] bytes = getDatabaseClient().send(null, shard, replica, command, cobj, DatabaseClient.Replica.specified, true);
-          ComObject retObj = new ComObject(bytes);
-          if (retObj.getString(ComObject.Tag.status).equals("{\"status\" : \"ok\"}")) {
-            isHealthy.set(true);
+        while (true) {
+          Host host = common.getServersConfig().getShards()[shard].getReplicas()[replica];
+          boolean wasDead = host.dead;
+          try {
+            ComObject cobj = new ComObject();
+            cobj.put(ComObject.Tag.dbName, "__none__");
+            cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+            cobj.put(ComObject.Tag.method, "healthCheck");
+            String command = "DatabaseServer:ComObject:healthCheck:";
+            byte[] bytes = getDatabaseClient().send(null, shard, replica, command, cobj, DatabaseClient.Replica.specified, true);
+            ComObject retObj = new ComObject(bytes);
+            if (retObj.getString(ComObject.Tag.status).equals("{\"status\" : \"ok\"}")) {
+              isHealthy.set(true);
+            }
+            break;
           }
-        }
-        catch (Exception e) {
-          int index = ExceptionUtils.indexOfThrowable(e, DeadServerException.class);
-          if (-1 != index) {
-            //if (!wasDead) {
+          catch (Exception e) {
+            int index = ExceptionUtils.indexOfThrowable(e, DeadServerException.class);
+            if (-1 != index) {
+              //if (!wasDead) {
               logger.error("Error checking health of server - dead server: shard=" + shard + ", replica=" + replica);
-            //}
+              //}
+            }
+            else {
+              logger.error("Error checking health of server: shard=" + shard + ", replica=" + replica, e);
+            }
+            try {
+              Thread.sleep(200);
+            }
+            catch (InterruptedException e1) {
+              break;
+            }
           }
-          else {
-            logger.error("Error checking health of server: shard=" + shard + ", replica=" + replica, e);
+          finally {
+            finished.set(true);
           }
-        }
-        finally {
-          finished.set(true);
         }
       }
     });
@@ -810,7 +826,7 @@ public class DatabaseServer {
 
     int i = 0;
     while (!finished.get()) {
-      Thread.sleep(deathOverride == null ? 100 : 20);
+      Thread.sleep(deathOverride == null ? 100 : 100);
       if (i++ > 50) {
         checkThread.interrupt();
         break;
@@ -888,7 +904,7 @@ public class DatabaseServer {
     return;
   }
 
-  public boolean isNoLongerMaster() {
+  public boolean isNoLongerMaster() throws InterruptedException {
 
     final int[] monitorShards = {0, 0, 0};
     final int[] monitorReplicas = {0, 1, 2};
@@ -927,8 +943,13 @@ public class DatabaseServer {
           }
         }
       }
+      catch (InterruptedException e) {
+        throw e;
+      }
       catch (Exception e) {
-        logger.error("Error checking if master", e);
+        if (!shutdownDeathMonitor) {
+          logger.error("Error checking if master", e);
+        }
       }
     }
     if (countAgree < countDisagree) {
@@ -3176,12 +3197,14 @@ public class DatabaseServer {
   }
 
   public void startRepartitioner() {
+    logger.info("startRepartitioner - begin");
     shutdownRepartitioner();
 
     if (shard == 0 && replica == common.getServersConfig().getShards()[0].getMasterReplica()) {
-      //repartitioner = new Repartitioner(this, common);
+      repartitioner = new Repartitioner(this, common);
       repartitioner.start();
     }
+    logger.info("startRepartitioner - end");
   }
 
   public int getReplica() {
@@ -3252,9 +3275,11 @@ public class DatabaseServer {
     if (repartitioner == null) {
       return;
     }
+    logger.info("Shutdown repartitioner - begin");
     repartitioner.shutdown();
     repartitioner.isRebalancing.set(false);
     repartitioner.stopShardsFromRepartitioning();
+    logger.info("Shutdown repartitioner - end");
   }
 
 

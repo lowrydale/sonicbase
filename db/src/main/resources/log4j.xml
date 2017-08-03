@@ -73,6 +73,11 @@
         <appender-ref ref="roll-client-errors" />
     </logger>
 
+    <logger name="io.netty.channel.nio.NioEventLoop" additivity="false">
+        <level value="fatal"/>
+        <appender-ref ref="roll" />
+    </logger>
+
     <root>
         <priority value="info" />
         <appender-ref ref="roll" />

@@ -57,7 +57,12 @@ public class Logger {
               break;
             }
             catch (Exception e) {
-              error.client.syncSchema();
+              try {
+                error.client.syncSchema();
+              }
+              catch (Exception e1) {
+                logger.error("Error getting schema", e1);
+              }
               logger.error("Error sending error to master: error=" + error.e);
             }
           }

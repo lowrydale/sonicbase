@@ -116,7 +116,7 @@ public class UpdateManager {
     Index primaryKeyIndex = server.getIndices().get(dbName).getIndices().get(tableName).get(primaryKeyIndexName);
     Map.Entry<Object[], Object> entry = primaryKeyIndex.firstEntry();
     while (entry != null) {
-    //  server.getCommon().getSchemaReadLock(dbName).lock();
+      //  server.getCommon().getSchemaReadLock(dbName).lock();
       try {
         synchronized (primaryKeyIndex.getMutex(entry.getKey())) {
           Object value = primaryKeyIndex.get(entry.getKey());
@@ -165,7 +165,7 @@ public class UpdateManager {
         }
       }
       finally {
-      //  server.getCommon().getSchemaReadLock(dbName).unlock();
+        //  server.getCommon().getSchemaReadLock(dbName).unlock();
       }
 
     }
@@ -185,7 +185,7 @@ public class UpdateManager {
   }
 
   public ComObject doDeleteIndexEntryByKey(ComObject cobj, boolean replayedCommand,
-                                        AtomicBoolean isExplicitTransRet, AtomicLong transactionIdRet, boolean isCommitting) {
+                                           AtomicBoolean isExplicitTransRet, AtomicLong transactionIdRet, boolean isCommitting) {
     try {
       String dbName = cobj.getString(ComObject.Tag.dbName);
       long schemaVersion = cobj.getLong(ComObject.Tag.schemaVersion);
@@ -273,8 +273,8 @@ public class UpdateManager {
   }
 
   public ComObject doInsertIndexEntryByKey(ComObject cobj, boolean replayedCommand,
-                                        AtomicBoolean isExplicitTransRet, AtomicLong transactionIdRet,
-                                        boolean isCommitting) throws EOFException {
+                                           AtomicBoolean isExplicitTransRet, AtomicLong transactionIdRet,
+                                           boolean isCommitting) throws EOFException {
     try {
       if (server.getAboveMemoryThreshold().get()) {
         throw new DatabaseException("Above max memory threshold. Further inserts are not allowed");
@@ -373,21 +373,34 @@ public class UpdateManager {
       ComArray array = cobj.getArray(ComObject.Tag.insertObjects);
       for (int i = 0; i < array.getArray().size(); i++) {
         //todo: may need to restore sync
+        if (server.getReplicationFactor() == 1) {
+          synchronized (server.getBatchRepartCount()) {
+            ComObject innerObj = (ComObject) array.getArray().get(i);
+            long sequence2 = i;
+            doInsertIndexEntryByKeyWithRecord(innerObj, sequence0, sequence1, sequence2, replayedCommand, transactionId, isExplicitTrans, false);
+            count++;
+          }
+//          while (server.isThrottleInsert()) {
+//            Thread.sleep(100);
+//          }
+        }
+        else {
 //         synchronized (server.getBatchRepartCount()) {
 //          while (server.getBatchRepartCount().get() != 0) {
 //            Thread.sleep(10);
 //          }
-          ComObject innerObj = (ComObject)array.getArray().get(i);
+          ComObject innerObj = (ComObject) array.getArray().get(i);
           long sequence2 = i;
           doInsertIndexEntryByKeyWithRecord(innerObj, sequence0, sequence1, sequence2, replayedCommand, transactionId, isExplicitTrans, false);
           count++;
           //if (insertCount.incrementAndGet() % 5000 == 0) {
-        //todo: may need to restore the throttle
+          //todo: may need to restore the throttle
 //          while (server.isThrottleInsert()) {
 //            Thread.sleep(100);
 //          }
           //}
-  //      }
+          //      }
+        }
       }
       if (isExplicitTrans.get()) {
         Transaction trans = server.getTransactionManager().getTransaction(transactionId.get());
@@ -432,8 +445,8 @@ public class UpdateManager {
   }
 
   public ComObject doInsertIndexEntryByKeyWithRecord(ComObject cobj,
-                                                  long sequence0, long sequence1, long sequence2, boolean replayedCommand, AtomicLong transactionIdRet,
-                                                  AtomicBoolean isExpliciteTransRet, boolean isCommitting) throws EOFException {
+                                                     long sequence0, long sequence1, long sequence2, boolean replayedCommand, AtomicLong transactionIdRet,
+                                                     AtomicBoolean isExpliciteTransRet, boolean isCommitting) throws EOFException {
     try {
       if (server.getAboveMemoryThreshold().get()) {
         throw new DatabaseException("Above max memory threshold. Further inserts are not allowed");
@@ -609,7 +622,7 @@ public class UpdateManager {
               cobj = new ComObject(opBody);
               ComArray array = cobj.getArray(ComObject.Tag.insertObjects);
               for (int i = 0; i < array.getArray().size(); i++) {
-                ComObject innerObj = (ComObject)array.getArray().get(i);
+                ComObject innerObj = (ComObject) array.getArray().get(i);
                 doInsertIndexEntryByKey(innerObj, replayedCommand, null, null, true);
               }
               break;
@@ -658,7 +671,7 @@ public class UpdateManager {
   }
 
   public ComObject doUpdateRecord(ComObject cobj, boolean replayedCommand,
-                               AtomicBoolean isExplicitTransRet, AtomicLong transactionIdRet, boolean isCommitting) {
+                                  AtomicBoolean isExplicitTransRet, AtomicLong transactionIdRet, boolean isCommitting) {
     try {
       String dbName = cobj.getString(ComObject.Tag.dbName);
       long schemaVersion = cobj.getLong(ComObject.Tag.schemaVersion);

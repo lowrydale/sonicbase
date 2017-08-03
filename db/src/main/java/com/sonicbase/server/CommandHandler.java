@@ -159,7 +159,8 @@ public class CommandHandler {
         try {
           String[] parts = command.split(":");
           int replica = Integer.valueOf(parts[6]);
-          logManager.logRequestForPeer(cobj.getString(ComObject.Tag.command), cobj.serialize(), System.currentTimeMillis(), logManager.getNextSequencenNum(), replica);
+          cobj = new ComObject(body);
+          logManager.logRequestForPeer(cobj.getString(ComObject.Tag.command), body, System.currentTimeMillis(), logManager.getNextSequencenNum(), replica);
           return null;
         }
         catch (Exception e) {
@@ -294,14 +295,19 @@ public class CommandHandler {
     int snPos = command.indexOf("xx_sn0_xx=");
     if (snPos != -1) {
       String sn = null;
-      int endPos = command.indexOf(":", snPos);
-      if (endPos == -1) {
-        sn = command.substring(snPos + "xx_sn0_xx=".length());
+      try {
+        int endPos = command.indexOf(":", snPos);
+        if (endPos == -1) {
+          sn = command.substring(snPos + "xx_sn0_xx=".length());
+        }
+        else {
+          sn = command.substring(snPos + "xx_sn0_xx=".length(), endPos);
+        }
+        existingSequenceNumber = Long.valueOf(sn);
       }
-      else {
-        sn = command.substring(snPos + "xx_sn0_xx=".length(), endPos);
+      catch (Exception e) {
+        logger.error("Error getting sequenceNum: command=" + command + ", error=" + e.getMessage());
       }
-      existingSequenceNumber = Long.valueOf(sn);
     }
     return existingSequenceNumber;
   }
@@ -310,15 +316,20 @@ public class CommandHandler {
     Long existingSequenceNumber = null;
     int snPos = command.indexOf("xx_sn1_xx=");
     if (snPos != -1) {
-      String sn = null;
-      int endPos = command.indexOf(":", snPos);
-      if (endPos == -1) {
-        sn = command.substring(snPos + "xx_sn1_xx=".length());
+      try {
+        String sn = null;
+        int endPos = command.indexOf(":", snPos);
+        if (endPos == -1) {
+          sn = command.substring(snPos + "xx_sn1_xx=".length());
+        }
+        else {
+          sn = command.substring(snPos + "xx_sn1_xx=".length(), endPos);
+        }
+        existingSequenceNumber = Long.valueOf(sn);
       }
-      else {
-        sn = command.substring(snPos + "xx_sn1_xx=".length(), endPos);
+      catch (Exception e) {
+        logger.error("Error getting sequenceNum: command=" + command + ", error=" + e.getMessage());
       }
-      existingSequenceNumber = Long.valueOf(sn);
     }
     return existingSequenceNumber;
   }

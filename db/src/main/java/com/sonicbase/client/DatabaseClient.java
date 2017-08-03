@@ -995,7 +995,7 @@ public class DatabaseClient {
 
         if (serverVersion == null || serverVersion > common.getSchemaVersion()) {
           //logger.info("Schema out of sync: currVersion=" + common.getSchemaVersion());
-          syncSchema();
+          syncSchema(serverVersion);
         }
       }
 
@@ -1028,7 +1028,6 @@ public class DatabaseClient {
       throw e3;
     }
     catch (Exception e1) {
-      localLogger.error("Error handling schema out of sync", e);
       throw new DatabaseException(e1);
     }
   }
@@ -1227,12 +1226,13 @@ public class DatabaseClient {
                     if (i == masterReplica) {
                       continue;
                     }
+                    boolean dead = currReplica.dead;
+                    currReplica = replicas[i];
+                    dbserver = getLocalDbServer(shard, i);
                     while (true) {
-                      try {
-                        currReplica = replicas[i];
-                        dbserver = getLocalDbServer(shard, i);
-                        boolean skip = false;
-                        if (!ignoreDeath && currReplica.dead) {
+                      boolean skip = false;
+                      if (!ignoreDeath && dead) {
+                        try {
                           if (writeVerbs.contains(verb) || writeVerbs.contains(verb2)) {
                             body.put(ComObject.Tag.command, newCommand);
                             String queueCommand = "DatabaseServer:queueForOtherServer:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__:" + (int) auth_user;
@@ -1240,15 +1240,25 @@ public class DatabaseClient {
                             masterReplica = common.getServersConfig().getShards()[shard].getMasterReplica();
                             dbserver = getLocalDbServer(shard, masterReplica);
                             if (dbserver != null) {
-                              dbserver.handleCommand(queueCommand, bytes, false, true);
+                              dbserver.handleCommand(queueCommand, body.serialize(), false, true);
                             }
                             else {
-                              replicas[masterReplica].do_send(null, queueCommand, bytes);
+                              replicas[masterReplica].do_send(null, queueCommand, body.serialize());
                             }
                             skip = true;
                           }
                         }
-                        if (!skip) {
+                        catch (Exception e) {
+                          if (e.getMessage().contains("SchemaOutOfSyncException")) {
+                            syncSchema();
+                            body.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+                            continue;
+                          }
+                          throw e;
+                        }
+                      }
+                      if (!skip) {
+                        try {
                           if (dbserver != null) {
                             ret = dbserver.handleCommand(newCommand, bytes, false, true);
                           }
@@ -1256,16 +1266,20 @@ public class DatabaseClient {
                             ret = currReplica.do_send(batchKey, newCommand, bytes);
                           }
                         }
-                        break;
-                      }
-                      catch (Exception e) {
-                        if (e.getMessage().contains("SchemaOutOfSyncException")) {
-                          syncSchema();
-                          body.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-                          continue;
+                        catch (Exception e) {
+                          if (e.getMessage().contains("SchemaOutOfSyncException")) {
+                            syncSchema();
+                            body.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+                            continue;
+                          }
+                          if (-1 != ExceptionUtils.indexOfThrowable(e, DeadServerException.class)) {
+                            dead = true;
+                            continue;
+                          }
+                          throw e;
                         }
-                        throw e;
                       }
+                      break;
                     }
                   }
                   return ret;
@@ -1949,9 +1963,9 @@ public class DatabaseClient {
       try {
         syncSchema();
 
-        if (!common.haveProLicense()) {
-          throw new InsufficientLicense("You must have a pro license to describe shards");
-        }
+//        if (!common.haveProLicense()) {
+//          throw new InsufficientLicense("You must have a pro license to describe shards");
+//        }
 
         StringBuilder ret = new StringBuilder();
 
@@ -3456,58 +3470,70 @@ public class DatabaseClient {
 //    }
 //  }
 
-  public void syncSchema() {
-    ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.dbName, "__none__");
-    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-    cobj.put(ComObject.Tag.method, "getSchema");
-    String command = "DatabaseServer:ComObject:getSchema:";
-    try {
+  private Object syncSchemaMutex = new Object();
 
-      byte[] ret = null;
-      try {
-        ret = sendToMaster(command, cobj);
-      }
-      catch (Exception e) {
-        logger.error("Error getting schema from master", e);
-      }
-      if (ret == null) {
-        int masterReplica = common.getServersConfig().getShards()[0].getMasterReplica();
-        for (int replica = 0; replica < getReplicaCount(); replica++) {
-          if (replica == masterReplica) {
-            continue;
-          }
-          if (common.getServersConfig().getShards()[0].getReplicas()[replica].isDead()) {
-            continue;
-          }
-          try {
-            ret = send(null, 0, replica, command, cobj, Replica.specified);
-            break;
-          }
-          catch (Exception e) {
-            logger.error("Error getting schema from replica: replica=" + replica, e);
-          }
-        }
-      }
-      if (ret == null) {
-        logger.error("Error getting schema from any replica");
-      }
-      else {
-        ComObject retObj = new ComObject(ret);
-        common.deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
-
-        DatabaseServer.ServersConfig serversConfig = common.getServersConfig();
-        for (int i = 0; i < serversConfig.getShards().length; i++) {
-          for (int j = 0; j < serversConfig.getShards()[0].getReplicas().length; j++) {
-            servers[i][j].dead = serversConfig.getShards()[i].getReplicas()[j].isDead();
-          }
-        }
-
-        logger.info("Schema received from server: currVer=" + common.getSchemaVersion());
+  public void syncSchema(long serverVersion) {
+    synchronized (syncSchemaMutex) {
+      if (serverVersion > common.getSchemaVersion()) {
+        syncSchema();
       }
     }
-    catch (Exception t) {
-      throw new DatabaseException(t);
+  }
+
+  public void syncSchema() {
+    synchronized (syncSchemaMutex) {
+      ComObject cobj = new ComObject();
+      cobj.put(ComObject.Tag.dbName, "__none__");
+      cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+      cobj.put(ComObject.Tag.method, "getSchema");
+      String command = "DatabaseServer:ComObject:getSchema:";
+      try {
+
+        byte[] ret = null;
+        try {
+          ret = sendToMaster(command, cobj);
+        }
+        catch (Exception e) {
+          logger.error("Error getting schema from master", e);
+        }
+        if (ret == null) {
+          int masterReplica = common.getServersConfig().getShards()[0].getMasterReplica();
+          for (int replica = 0; replica < getReplicaCount(); replica++) {
+            if (replica == masterReplica) {
+              continue;
+            }
+            if (common.getServersConfig().getShards()[0].getReplicas()[replica].isDead()) {
+              continue;
+            }
+            try {
+              ret = send(null, 0, replica, command, cobj, Replica.specified);
+              break;
+            }
+            catch (Exception e) {
+              logger.error("Error getting schema from replica: replica=" + replica, e);
+            }
+          }
+        }
+        if (ret == null) {
+          logger.error("Error getting schema from any replica");
+        }
+        else {
+          ComObject retObj = new ComObject(ret);
+          common.deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
+
+          DatabaseServer.ServersConfig serversConfig = common.getServersConfig();
+          for (int i = 0; i < serversConfig.getShards().length; i++) {
+            for (int j = 0; j < serversConfig.getShards()[0].getReplicas().length; j++) {
+              servers[i][j].dead = serversConfig.getShards()[i].getReplicas()[j].isDead();
+            }
+          }
+
+          logger.info("Schema received from server: currVer=" + common.getSchemaVersion());
+        }
+      }
+      catch (Exception t) {
+        throw new DatabaseException(t);
+      }
     }
   }
 

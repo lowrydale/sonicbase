@@ -54,7 +54,8 @@ The config file must be named "config-&lt;cluster name&gt;.json".
 &nbsp;&nbsp;&nbsp;&nbsp;"maxProcessMemoryTrigger": "90%",<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;"user": "ubuntu",<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;"clientIsPrivate": false,<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;"shards" : [<br/>
+     &nbsp;&nbsp;&nbsp;&nbsp;"minShardSizeForRebalance": 1000000,</br>
+     &nbsp;&nbsp;&nbsp;&nbsp;"shards" : [<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"replicas": [<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br/>
@@ -106,6 +107,9 @@ that no more than 90% of the memory be used.<br/>
   <b>clientIsPrivate</b> - set to true if the client machine is in the same private network as the servers. The client
   must be able to call the servers on the private addresses that are configured.<br/>
   <br/>
+     <b>minShardSizeForRebalance</b> the minimum average number of records for a shard of a table required before the
+     table will be rebalanced across all shards<br/>
+     <br/>
   <b>shards</b> - list of shards (servers)<br/>
 <br/>
   <b>replicas</b> - list of replicas. Only one replica can be configured in the free version<br/>

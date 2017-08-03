@@ -140,6 +140,14 @@ public class Repartitioner extends Thread {
           }
           long newPartitionSize = totalCount / databaseServer.getShardCount();
 
+          Long minSize = databaseServer.getConfig().getLong("minShardSizeForRebalance");
+          if (minSize == null) {
+            minSize = 1_000_000L;
+          }
+          if (newPartitionSize < minSize) {
+            return null;
+          }
+
           StringBuilder builder = new StringBuilder();
           for (int i = 0; i < databaseServer.getShardCount(); i++) {
             builder.append(",").append(currPartitionSizes[i]);
@@ -296,6 +304,7 @@ public class Repartitioner extends Thread {
             future.get();
           }
 
+          Map<Integer, Integer> countFailed = new HashMap<>();
           while (true) {
             boolean areAllComplete = true;
             for (int shard = 0; shard < databaseServer.getShardCount(); shard++) {
@@ -313,11 +322,15 @@ public class Repartitioner extends Thread {
                 }
               }
               catch (Exception e) {
-                try {
-                  stopShardsFromRepartitioning();
+                areAllComplete = false;
+                Integer count = countFailed.get(shard);
+                if (count == null) {
+                  count = 0;
                 }
-                catch (Exception e1) {
-                  logger.error("Error stopping shards from repartitioning", e1);
+                count++;
+                countFailed.put(shard, count);
+                if (count < 10) {
+                  break;
                 }
                 int i = ExceptionUtils.indexOfThrowable(e, DeadServerException.class);
                 if (i != -1) {
@@ -419,12 +432,23 @@ public class Repartitioner extends Thread {
   }
 
   public void stopShardsFromRepartitioning() {
+    logger.info("stopShardsFromRepartitioning - begin");
     String command = "DatabaseServer:ComObject:stopRepartitioning:";
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, "__none__");
     cobj.put(ComObject.Tag.method, "stopRepartitioning");
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-    databaseServer.getClient().sendToAllShards(null, 0, command, cobj, DatabaseClient.Replica.all);
+    for (int shard = 0; shard < databaseServer.getShardCount(); shard++) {
+      for (int replica = 0; replica < databaseServer.getReplicationFactor(); replica++) {
+        try {
+          databaseServer.getClient().send(null, shard, replica, command, cobj, DatabaseClient.Replica.specified);
+        }
+        catch (Exception e) {
+          logger.error("Error stopping repartitioning on server: shard=" + shard + ", replica=" + replica);
+        }
+      }
+    }
+    logger.info("stopShardsFromRepartitioning - end");
   }
 
   public void shutdown() {

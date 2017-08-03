@@ -1,6 +1,7 @@
 {
   "dataDirectory": "$HOME/db-data",
   "installDirectory": "$HOME/sonicbase",
+  "minShardSizeForRebalance": 1000000,
   "copmressRecords": false,
   "useUnsafe": true,
   "maxJavaHeap": "20%",

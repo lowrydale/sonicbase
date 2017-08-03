@@ -15,7 +15,9 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.ConnectException;
 import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
@@ -260,21 +262,36 @@ public class DatabaseSocketClient {
     private SocketChannel sock;
 
     public Connection(String host, int port) throws IOException {
-      this.count_called = 0;
-      this.sock = SocketChannel.open();
-      InetSocketAddress address = new InetSocketAddress(host, port);
-      this.sock.connect(address);
-      this.sock.configureBlocking(true);
+      for (int i = 0; i < 20; i++) {
+        try {
+          this.count_called = 0;
+          this.sock = SocketChannel.open();
+          InetSocketAddress address = new InetSocketAddress(host, port);
+          this.sock.connect(address);
+          this.sock.configureBlocking(true);
 
-//      this.sock = new Socket(host, port);
-      sock.socket().setSoLinger(true, 120);
-//
-      //sock.setSoLinger(false, 0);
-      sock.socket().setKeepAlive(true);
-      sock.socket().setReuseAddress(true);
-      sock.socket().setSoTimeout(100000000);
-      sock.socket().setTcpNoDelay(true);
-      sock.socket().setPerformancePreferences(0, 1, 0);
+          //      this.sock = new Socket(host, port);
+          sock.socket().setSoLinger(true, 120);
+          //
+          //sock.setSoLinger(false, 0);
+          sock.socket().setKeepAlive(true);
+          sock.socket().setReuseAddress(true);
+          sock.socket().setSoTimeout(100000000);
+          sock.socket().setTcpNoDelay(true);
+          sock.socket().setPerformancePreferences(0, 1, 0);
+        }
+        catch (ConnectException e) {
+          if (i == 19) {
+            throw new DatabaseException(e);
+          }
+          try {
+            Thread.sleep(1000 + (100 * (i + 1)));
+          }
+          catch (InterruptedException e1) {
+            throw new DatabaseException(e1);
+          }
+        }
+      }
     }
   }
 

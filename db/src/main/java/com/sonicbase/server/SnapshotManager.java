@@ -395,7 +395,7 @@ public class SnapshotManager {
               byte[][] records = null;
               synchronized (index.getMutex(key)) {
                 Object currValue = index.get(key);
-                if (currValue == null) {
+                if (currValue == null || currValue.equals(0L)) {
                   return false;
                 }
                 if (isPrimaryKey) {

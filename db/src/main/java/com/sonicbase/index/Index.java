@@ -224,7 +224,7 @@ public class Index {
     }
   }
 
-  public Object getMutex(Object[] key) {
+  public static int hashCode(Object[] key) {
     int hash = 1;
     for (int i = 0; i < key.length; i++) {
       if (key[i] == null) {
@@ -237,7 +237,11 @@ public class Index {
         hash = 31 * hash + key[i].hashCode();
       }
     }
-    return mutexes[Math.abs(hash) % mutexes.length];
+    return Math.abs(hash);
+  }
+
+  public Object getMutex(Object[] key) {
+    return mutexes[hashCode(key) % mutexes.length];
   }
 
   public void clear() {

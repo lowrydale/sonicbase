@@ -567,6 +567,9 @@ public class DatabaseClient {
                   }
                 }
                 ComObject retObj = new ComObject(ret);
+                if (retObj.getInt(ComObject.Tag.count) == null) {
+                  throw new DatabaseException("count not returned: obj=" + retObj.toString());
+                }
                 int retVal = retObj.getInt(ComObject.Tag.count);
                 totalCount.addAndGet(retVal);
                 //if (retVal != 1) {
@@ -1260,10 +1263,10 @@ public class DatabaseClient {
                       if (!skip) {
                         try {
                           if (dbserver != null) {
-                            ret = dbserver.handleCommand(newCommand, bytes, false, true);
+                            dbserver.handleCommand(newCommand, bytes, false, true);
                           }
                           else {
-                            ret = currReplica.do_send(batchKey, newCommand, bytes);
+                            currReplica.do_send(batchKey, newCommand, bytes);
                           }
                         }
                         catch (Exception e) {
@@ -1306,35 +1309,38 @@ public class DatabaseClient {
             else {
               Exception lastException = null;
               boolean success = false;
-              int offset = ThreadLocalRandom.current().nextInt(replicas.length);
-              for (long rand = offset; rand < offset + replicas.length; rand++) {
-                int replicaOffset = Math.abs((int) (rand % replicas.length));
-                if (!replicas[replicaOffset].dead) {
-                  try {
-                    DatabaseServer dbserver = getLocalDbServer(shard, replicaOffset);
-                    if (dbserver != null) {
-                      return dbserver.handleCommand(localCommand, body.serialize(), false, true);
-                    }
-                    else {
-                      return replicas[replicaOffset].do_send(batchKey, localCommand, body);
-                    }
-                    //success = true;
-                  }
-                  catch (Exception e) {
-                    Server currReplica = replicas[replicaOffset];
+              outer:
+              for (int i = 0; i < 10; i++) {
+                int offset = ThreadLocalRandom.current().nextInt(replicas.length);
+                for (long rand = offset; rand < offset + replicas.length; rand++) {
+                  int replicaOffset = Math.abs((int) (rand % replicas.length));
+                  if (i > 0 || !replicas[replicaOffset].dead) {
                     try {
-                      handleDeadServer(e, replicas[replicaOffset]);
-                      localCommand = handleSchemaOutOfSyncException(localCommand, e);
-                      //rand--;
-                      lastException = e;
+                      DatabaseServer dbserver = getLocalDbServer(shard, replicaOffset);
+                      if (dbserver != null) {
+                        return dbserver.handleCommand(localCommand, body.serialize(), false, true);
+                      }
+                      else {
+                        return replicas[replicaOffset].do_send(batchKey, localCommand, body);
+                      }
+                      //success = true;
                     }
-                    catch (SchemaOutOfSyncException s) {
-                      throw s;
-                    }
-                    catch (Exception t) {
-                      localLogger.error("Error synching schema", t);
-                      localLogger.error("Error sending request", e);
-                      lastException = t;
+                    catch (Exception e) {
+                      Server currReplica = replicas[replicaOffset];
+                      try {
+                        handleDeadServer(e, replicas[replicaOffset]);
+                        localCommand = handleSchemaOutOfSyncException(localCommand, e);
+                        //rand--;
+                        lastException = e;
+                      }
+                      catch (SchemaOutOfSyncException s) {
+                        throw s;
+                      }
+                      catch (Exception t) {
+                        localLogger.error("Error synching schema", t);
+                        localLogger.error("Error sending request", e);
+                        lastException = t;
+                      }
                     }
                   }
                 }

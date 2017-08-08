@@ -771,6 +771,10 @@ public class DatabaseSocketClient {
       }
       return null;
     }
+    catch (DeadServerException e) {
+      String[] parts = hostPort.split(":");
+      throw new DeadServerException("Server error: host=" + parts[0] + ", port=" + parts[1] + ", command=" + command, e);
+    }
     catch (Exception e) {
       String[] parts = hostPort.split(":");
       throw new DatabaseException("Server error: host=" + parts[0] + ", port=" + parts[1] + ", command=" + command, e);

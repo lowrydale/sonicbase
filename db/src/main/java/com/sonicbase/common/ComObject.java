@@ -13,6 +13,7 @@ import java.io.DataOutputStream;
 import java.math.BigDecimal;
 import java.sql.Types;
 import java.util.Iterator;
+import java.util.Map;
 
 import static com.sonicbase.common.ComObject.Type.*;
 
@@ -63,9 +64,11 @@ public class ComObject {
   public static class DynamicTag {
     private final int tag;
     private final DynamicType type;
+    private final Tag tagEnum;
 
-    public DynamicTag(int tag, DynamicType type) {
+    public DynamicTag(int tag, Tag tagEnum, DynamicType type) {
       this.tag = tag;
+      this.tagEnum = tagEnum;
       this.type = type;
     }
   }
@@ -190,10 +193,14 @@ public class ComObject {
 
     Tag(int tag, Type type) {
       this.tag = tag;
-      if (tagsByTag.put(tag, new DynamicTag(tag, typesByTag.get(type.tag))) != null) {
+      if (tagsByTag.put(tag, new DynamicTag(tag, this, typesByTag.get(type.tag))) != null) {
         throw new DatabaseException("Duplicate tag in ComObject: id=" + tag);
       }
     }
+  }
+
+  public static Tag getTag(int tag) {
+    return tagsByTag.get(tag).tagEnum;
   }
 
   public ComObject() {
@@ -210,6 +217,15 @@ public class ComObject {
   }
 
   private Int2ObjectOpenHashMap map = new Int2ObjectOpenHashMap();
+
+  public String toString() {
+    StringBuilder builder = new StringBuilder();
+    for (Object entry : map.entrySet()) {
+      Int2ObjectOpenHashMap.Entry<Object> entryObj = (Int2ObjectOpenHashMap.Entry<Object>) entry;
+      builder.append("[").append(ComObject.getTag( entryObj.getIntKey()).name()).append("=").append(entryObj.getValue()).append("]");
+    }
+    return builder.toString();
+  }
 
   public void put(Tag tag, long value) {
     map.put(tag.tag, (Object)value);

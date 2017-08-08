@@ -67,6 +67,13 @@ public class TestJoins {
       future.get();
     }
 
+    DatabaseServer.initDeathOverride(2, 2);
+    DatabaseServer.deathOverride[0][0] = false;
+    DatabaseServer.deathOverride[0][1] = false;
+    DatabaseServer.deathOverride[1][0] = false;
+    DatabaseServer.deathOverride[1][1] = false;
+
+
     for (DatabaseServer server : dbServers) {
       server.shutdownRepartitioner();
     }
@@ -118,7 +125,7 @@ public class TestJoins {
         stmt.setLong(2, (i + 100) % 3);
         stmt.setString(3, "membership-" + j);
         stmt.setLong(4, new long[]{1000, 2000}[j % 2]);
-        assertEquals(stmt.executeUpdate(), 1);
+        assertEquals(stmt.executeUpdate(), 1, "id=" + i);
       }
     }
 
@@ -147,21 +154,21 @@ public class TestJoins {
       ids.add((long) (i + 100));
     }
 
-    client.beginRebalance("test", "persons", "_1__primarykey");
-
-    while (true) {
-      if (client.isRepartitioningComplete("test")) {
-        break;
-      }
-      Thread.sleep(1000);
-    }
-
-    for (DatabaseServer server : dbServers) {
-      server.shutdownRepartitioner();
-    }
-
-    assertEquals(client.getPartitionSize("test", 0, "persons", "_1__primarykey"), 9);
-    assertEquals(client.getPartitionSize("test", 1, "persons", "_1__primarykey"), 11);
+//    client.beginRebalance("test", "persons", "_1__primarykey");
+//
+//    while (true) {
+//      if (client.isRepartitioningComplete("test")) {
+//        break;
+//      }
+//      Thread.sleep(1000);
+//    }
+//
+//    for (DatabaseServer server : dbServers) {
+//      server.shutdownRepartitioner();
+//    }
+//
+//    assertEquals(client.getPartitionSize("test", 0, "persons", "_1__primarykey"), 9);
+//    assertEquals(client.getPartitionSize("test", 1, "persons", "_1__primarykey"), 11);
 
 //    assertEquals(client.getPartitionSize(2, "persons", "_1__primarykey"), 9);
 //    assertEquals(client.getPartitionSize(3, "persons", "_1__primarykey"), 8);

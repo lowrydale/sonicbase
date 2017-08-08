@@ -19,8 +19,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.yaml.snakeyaml.tokens.Token.ID.Tag;
-
 /**
  * Responsible for
  */
@@ -78,7 +76,7 @@ public class ReadManager {
   }
 
 
-  public static final int SELECT_PAGE_SIZE = 30000;
+  public static final int SELECT_PAGE_SIZE = 1000;
 
   public ComObject countRecords(ComObject cobj) {
     if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
@@ -143,10 +141,10 @@ public class ReadManager {
         }
         byte[][] records = null;
         synchronized (index.getMutex(entry.getKey())) {
-          if (entry.getValue() instanceof Long) {
+          //if (entry.getValue() instanceof Long) {
             entry.setValue(index.get(entry.getKey()));
-          }
-          if (entry.getValue() != null) {
+          //}
+          if (entry.getValue() != null && !entry.getValue().equals(0L)) {
             records = server.fromUnsafeToRecords(entry.getValue());
           }
         }
@@ -252,7 +250,7 @@ public class ReadManager {
         GroupByContext groupContext = null;
 
         List<byte[]> retKeys = new ArrayList<>();
-        List<Record> retRecords = new ArrayList<>();
+        List<byte[]> retRecords = new ArrayList<>();
 
         boolean forceSelectOnServer = false;
         if (indexSchema.isPrimaryKey()) {
@@ -283,8 +281,7 @@ public class ReadManager {
         }
         ComArray retRecordsArray = retEntry.putArray(ComObject.Tag.records, ComObject.Type.byteArrayType);
         for (int j = 0; j < retRecords.size(); j++) {
-          Record record = retRecords.get(j);
-          byte[] bytes = record.serialize(server.getCommon());
+          byte[] bytes = retRecords.get(j);
           retRecordsArray.add(bytes);
         }
       }
@@ -549,7 +546,7 @@ public class ReadManager {
       }
 
       List<byte[]> retKeys = new ArrayList<>();
-      List<Record> retRecords = new ArrayList<>();
+      List<byte[]> retRecords = new ArrayList<>();
 
       List<Object[]> excludeKeys = new ArrayList<>();
 
@@ -571,7 +568,7 @@ public class ReadManager {
                   excludeKey[i] = record.getFields()[keyOffsets[i]];
                 }
                 excludeKeys.add(excludeKey);
-                retRecords.add(record);
+                retRecords.add(record.serialize(server.getCommon()));
               }
             }
           }
@@ -614,8 +611,7 @@ public class ReadManager {
       }
       array = retObj.putArray(ComObject.Tag.records, ComObject.Type.byteArrayType);
       for (int i = 0; i < retRecords.size(); i++) {
-        Record record = retRecords.get(i);
-        byte[] bytes = record.serialize(server.getCommon());
+        byte[] bytes = retRecords.get(i);
         array.add(bytes);
       }
 
@@ -862,7 +858,7 @@ public class ReadManager {
       }
 
       List<byte[]> retKeys = new ArrayList<>();
-      List<Record> retRecords = new ArrayList<>();
+      List<byte[]> retRecords = new ArrayList<>();
 
       if (tableSchema.getIndexes().get(indexName).isPrimaryKey()) {
         entry = doIndexLookupWithRecordsExpression(dbName, count, tableSchema, columnOffsets, parms, expression, index, leftKey,
@@ -882,9 +878,8 @@ public class ReadManager {
         keys.add(key);
       }
       ComArray records = retObj.putArray(ComObject.Tag.records, ComObject.Type.byteArrayType);
-      for (Record record : retRecords) {
-        byte[] bytes = record.serialize(server.getCommon());
-        records.add(bytes);
+      for (byte[] record : retRecords) {
+        records.add(record);
       }
 
       if (counters != null) {
@@ -912,7 +907,7 @@ public class ReadManager {
   private Map.Entry<Object[], Object> doIndexLookupWithRecordsExpression(
       String dbName, int count, TableSchema tableSchema, Set<Integer> columnOffsets, ParameterHandler parms,
       Expression expression,
-      Index index, Object[] leftKey, Boolean ascending, List<Record> ret, Counter[] counters, GroupByContext groupByContext) {
+      Index index, Object[] leftKey, Boolean ascending, List<byte[]> ret, Counter[] counters, GroupByContext groupByContext) {
 
     Map.Entry<Object[], Object> entry;
     if (ascending == null || ascending) {
@@ -938,31 +933,35 @@ public class ReadManager {
       boolean forceSelectOnServer = false;
       byte[][] records = null;
       synchronized (index.getMutex(entry.getKey())) {
-        if (entry.getValue() instanceof Long) {
+        //if (entry.getValue() instanceof Long) {
           entry.setValue(index.get(entry.getKey()));
-        }
-        if (entry.getValue() != null) {
+        //}
+        if (entry.getValue() != null && !entry.getValue().equals(0L)) {
           records = server.fromUnsafeToRecords(entry.getValue());
         }
       }
-      if (parms != null && expression != null) {
+      if (parms != null && expression != null && records != null) {
         for (byte[] bytes : records) {
           Record record = new Record(tableSchema);
           record.deserialize(dbName, server.getCommon(), bytes, null, true);
           boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
           if (pass) {
             byte[][] currRecords = new byte[][]{bytes};
-            Record[] retRecords = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, entry.getKey(), tableSchema, counters, groupByContext);
+            byte[][] currRet = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, entry.getKey(), tableSchema, counters, groupByContext);
             if (counters == null) {
-              ret.add(retRecords[0]);
+              for (byte[] currBytes : currRet) {
+                ret.add(currBytes);
+              }
             }
           }
         }
       }
       else {
-        Record[] retRecords = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, entry.getKey(), tableSchema, counters, groupByContext);
+        byte[][] retRecords = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, entry.getKey(), tableSchema, counters, groupByContext);
         if (counters == null) {
-          ret.addAll(Arrays.asList(retRecords));
+          for (byte[] currBytes : retRecords) {
+            ret.add(currBytes);
+          }
         }
       }
       if (ascending == null || ascending) {
@@ -995,7 +994,7 @@ public class ReadManager {
       Index index,
       Boolean ascending,
       List<byte[]> retKeys,
-      List<Record> retRecords,
+      List<byte[]> retRecords,
       boolean keys,
       Counter[] counters,
       GroupByContext groupContext) {
@@ -1138,10 +1137,10 @@ public class ReadManager {
         byte[][] currKeys = null;
         byte[][] records = null;
         synchronized (index.getMutex(entry.getKey())) {
-          if (entry.getValue() instanceof Long) {
+          //if (entry.getValue() instanceof Long) {
             entry.setValue(index.get(entry.getKey()));
-          }
-          if (entry.getValue() != null) {
+          //}
+          if (entry.getValue() != null && !entry.getValue().equals(0L)) {
             if (keys) {
               currKeys = server.fromUnsafeToKeys(entry.getValue());
             }
@@ -1163,9 +1162,11 @@ public class ReadManager {
               boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
               if (pass) {
                 byte[][] currRecords = new byte[][]{bytes};
-                Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, entry.getKey(), tableSchema, counters, groupContext);
+                byte[][] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, entry.getKey(), tableSchema, counters, groupContext);
                 if (counters == null) {
-                  retRecords.add(ret[0]);
+                  for (byte[] currBytes : ret) {
+                    retRecords.add(currBytes);
+                  }
                 }
               }
             }
@@ -1175,9 +1176,11 @@ public class ReadManager {
               logger.error("Records size: " + records.length);
             }
 
-            Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, entry.getKey(), tableSchema, counters, groupContext);
+            byte[][] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, entry.getKey(), tableSchema, counters, groupContext);
             if (counters == null) {
-              retRecords.addAll(Arrays.asList(ret));
+              for (byte[] currBytes : ret) {
+                retRecords.add(currBytes);
+              }
             }
           }
         }
@@ -1225,18 +1228,20 @@ public class ReadManager {
     return entry;
   }
 
-  private Record[] applySelectToResultRecords(String dbName, Set<Integer> columnOffsets, boolean forceSelectOnServer, byte[][] records, Object[] key,
+  private byte[][] applySelectToResultRecords(String dbName, Set<Integer> columnOffsets, boolean forceSelectOnServer, byte[][] records, Object[] key,
                                               TableSchema tableSchema, Counter[] counters, GroupByContext groupContext) {
     if (columnOffsets == null || columnOffsets.size() == 0) {
       columnOffsets = null;
     }
-    Record[] ret = new Record[records.length];
     for (int i = 0; i < records.length; i++) {
       byte[] recordBytes = records[i];
 
-      Record record = new Record(dbName, server.getCommon(), recordBytes, columnOffsets , false);
-
+      Record record = null;
+      if (counters != null || groupContext != null) {
+        record = new Record(dbName, server.getCommon(), recordBytes, columnOffsets, false);
+      }
       if (groupContext != null) {
+
         List<GroupByContext.FieldContext> fieldContexts = groupContext.getFieldContexts();
         Object[] groupValues = new Object[fieldContexts.size()];
         boolean isNull = true;
@@ -1263,11 +1268,11 @@ public class ReadManager {
         }
       }
 
-      count(counters, record);
-
-      ret[i] = record;
+      if (counters != null) {
+        count(counters, record);
+      }
     }
-    return ret;
+    return records;
   }
 
   private Map.Entry<Object[], Object> doIndexLookupOneKey(
@@ -1286,7 +1291,7 @@ public class ReadManager {
       Index index,
       Boolean ascending,
       List<byte[]> retKeys,
-      List<Record> retRecords,
+      List<byte[]> retRecords,
       long viewVersion,
       boolean keys,
       Counter[] counters,
@@ -1313,7 +1318,7 @@ public class ReadManager {
         Object value = null;
         synchronized (index.getMutex(originalKey)) {
           value = index.get(originalKey);
-          if (value != null) {
+          if (value != null && !value.equals(0L)) {
             if (keys) {
               currKeys = server.fromUnsafeToKeys(value);
             }
@@ -1360,10 +1365,10 @@ public class ReadManager {
             byte[][] records = null;
             byte[][] currKeys = null;
             synchronized (index.getMutex(entry.getKey())) {
-              if (value instanceof Long) {
+              //if (value instanceof Long) {
                 value = index.get(entry.getKey());
-              }
-              if (value != null) {
+              //}
+              if (value != null && !value.equals(0L)) {
                 if (keys) {
                   currKeys = server.fromUnsafeToKeys(value);
                 }
@@ -1585,18 +1590,18 @@ public class ReadManager {
           byte[][] currKeys = null;
           byte[][] records = null;
           synchronized (index.getMutex(currEntry.getKey())) {
-            if (currEntry.getValue() instanceof Long) {
+            //if (currEntry.getValue() instanceof Long) {
               currEntry.setValue(index.get(currEntry.getKey()));
-            }
+            //}
             if (keys) {
               Object unsafeAddress = currEntry.getValue();//index.get(entry.getKey());
-              if (unsafeAddress != null) {
+              if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
                 currKeys = server.fromUnsafeToKeys(unsafeAddress);
               }
             }
             else {
               Object unsafeAddress = currEntry.getValue();//index.get(entry.getKey());
-              if (unsafeAddress != null) {
+              if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
                 records = server.fromUnsafeToRecords(unsafeAddress);
               }
             }
@@ -1618,17 +1623,19 @@ public class ReadManager {
                   boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
                   if (pass) {
                     byte[][] currRecords = new byte[][]{bytes};
-                    if (currRecords != null && currRecords[0].length < 300 && (true || operator == BinaryExpression.Operator.equal) && groupContext == null && counters == null) {
-                      for (int i = 0; i < currRecords.length; i++) {
-                        retRecords.add(new Record(dbName, server.getCommon(), currRecords[i], columnOffsets , true));
-                      }
-                    }
-                    else {
-                      Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, null, tableSchema, counters, groupContext);
+//                    if (currRecords != null && currRecords[0].length < 300 && (true || operator == BinaryExpression.Operator.equal) && groupContext == null && counters == null) {
+//                      for (int i = 0; i < currRecords.length; i++) {
+//                        retRecords.add(new Record(dbName, server.getCommon(), currRecords[i], columnOffsets , true));
+//                      }
+//                    }
+//                    else {
+                      byte[][] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, null, tableSchema, counters, groupContext);
                       if (counters == null) {
-                        retRecords.add(ret[0]);
+                        for (byte[] currBytes : ret) {
+                          retRecords.add(currBytes);
+                        }
                       }
-                    }
+//                    }
                   }
                 }
               }
@@ -1637,17 +1644,19 @@ public class ReadManager {
                   logger.error("Records size: " + records.length);
                 }
                 if (records != null) {
-                  if (records[0].length < 300 && (true || operator == BinaryExpression.Operator.equal) && groupContext == null && counters == null) {
-                    for (int i = 0; i < records.length; i++) {
-                      retRecords.add(new Record(dbName, server.getCommon(), records[i], columnOffsets, true));
-                    }
-                  }
-                  else {
-                    Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, entry.getKey(), tableSchema, counters, groupContext);
+//                  if (records[0].length < 300 && (true || operator == BinaryExpression.Operator.equal) && groupContext == null && counters == null) {
+//                    for (int i = 0; i < records.length; i++) {
+//                      retRecords.add(new Record(dbName, server.getCommon(), records[i], columnOffsets, true));
+//                    }
+//                  }
+//                  else {
+                    byte[][] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, entry.getKey(), tableSchema, counters, groupContext);
                     if (counters == null) {
-                      retRecords.addAll(Arrays.asList(ret));
+                      for (byte[] currBytes : ret) {
+                        retRecords.add(currBytes);
+                      }
                     }
-                  }
+//                  }
                 }
               }
             }
@@ -1732,7 +1741,7 @@ public class ReadManager {
             else if ((dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
               synchronized (index.getMutex(key)) {
                 Object unsafeAddress = index.remove(key);
-                if (unsafeAddress != null) {
+                if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
                   server.freeUnsafeIds(unsafeAddress);
                 }
               }
@@ -1753,7 +1762,7 @@ public class ReadManager {
   private void handleRecord(String dbName, TableSchema tableSchema, IndexSchema indexSchema, long viewVersion,
                             Index index, Object[] key, ParameterHandler parms, boolean evaluateExpresion,
                             Expression expression, Set<Integer> columnOffsets, boolean forceSelectOnServer,
-                            List<byte[]> retKeys, List<Record> retRecords, boolean keys, Counter[] counters,
+                            List<byte[]> retKeys, List<byte[]> retRecords, boolean keys, Counter[] counters,
                             GroupByContext groupContext, byte[][] records, byte[][] currKeys) {
     if (keys) {
       for (byte[] currKey : currKeys) {
@@ -1782,7 +1791,7 @@ public class ReadManager {
           else if ((dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
             synchronized (index.getMutex(key)) {
               Object unsafeAddress = index.remove(key);
-              if (unsafeAddress != null) {
+              if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
                 server.freeUnsafeIds(unsafeAddress);
               }
             }
@@ -1804,17 +1813,21 @@ public class ReadManager {
             boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
             if (pass) {
               byte[][] currRecords = new byte[][]{bytes};
-              Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, null, tableSchema, counters, groupContext);
+              byte[][] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, null, tableSchema, counters, groupContext);
               if (counters == null) {
-                retRecords.add(ret[0]);
+                for (byte[] currBytes : ret) {
+                  retRecords.add(currBytes);
+                }
               }
             }
           }
         }
         else {
-          Record[] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, null, tableSchema, counters, groupContext);
+          byte[][] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, null, tableSchema, counters, groupContext);
           if (counters == null) {
-            retRecords.addAll(Arrays.asList(ret));
+            for (byte[] currBytes : ret) {
+              retRecords.add(currBytes);
+            }
           }
         }
       }
@@ -1853,10 +1866,10 @@ public class ReadManager {
         byte[][] records = null;
         synchronized (index.getMutex(entry.getKey())) {
           Object unsafeAddress = entry.getValue();
-          if (unsafeAddress instanceof Long) {
+          //if (unsafeAddress instanceof Long) {
             unsafeAddress = index.get(entry.getKey());
-          }
-          if (unsafeAddress != null) {
+          //}
+          if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
             records = server.fromUnsafeToRecords(unsafeAddress);
           }
         }
@@ -1876,10 +1889,10 @@ public class ReadManager {
         byte[][] records = null;
         synchronized (index.getMutex(entry.getKey())) {
           Object unsafeAddress = entry.getValue();
-          if (unsafeAddress instanceof Long) {
+          //if (unsafeAddress instanceof Long) {
             unsafeAddress = index.get(entry.getKey());
-          }
-          if (unsafeAddress != null) {
+          //}
+          if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
             records = server.fromUnsafeToRecords(unsafeAddress);
           }
         }

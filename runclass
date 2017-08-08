@@ -39,7 +39,7 @@ java_opts="$java_opts  -Dlogfilename=$_LOG4J_FILENAME_ -DerrorLogfilename=$_ERRO
 echo $java_opts
 
 #java_opts="$java_opts -showversion -server  -XX:+UseG1GC -verbose:gc -Xloggc:$_GC_"
-java_opts="$java_opts  -XX:PermSize=256m -XX:MaxPermSize=356m -XX:+CMSClassUnloadingEnabled -XX:+PrintGCDetails  -XX:-UseLargePagesIndividualAllocation"
+java_opts="$java_opts -XX:+CMSClassUnloadingEnabled -XX:+PrintGCDetails  -XX:-UseLargePagesIndividualAllocation"
 java_opts="$java_opts -XX:+HeapDumpOnOutOfMemoryError  -Djava.net.preferIPv4Stack=true"
 java_opts="$java_opts -XX:+PrintGCDetails -XX:+PrintGCTimeStamps "
 java_opts="$java_opts -XX:-OmitStackTraceInFastThrow -XX:-UseLoopPredicate"

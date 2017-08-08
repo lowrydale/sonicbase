@@ -606,7 +606,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
           expression.setReplica(replica);
         }
 
-        boolean sortWithIndex = expression.canSortWithIndex();
+        boolean sortWithIndex = true;//expression.canSortWithIndex();
         tableNames = new String[]{fromTable};
         if (joins.size() > 0) {
           tableNames = new String[joins.size() + 1];
@@ -614,7 +614,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
           for (int i = 0; i < tableNames.length - 1; i++) {
             tableNames[i + 1] = joins.get(i).rightFrom;
           }
-          sortWithIndex = false;
+          //sortWithIndex = true; //false;
         }
 
         boolean countDistinct = false;

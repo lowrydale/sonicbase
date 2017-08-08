@@ -1,13 +1,10 @@
 {
   "dataDirectory": "$HOME/db-data",
   "installDirectory": "$HOME/sonicbase",
-  "minShardSizeForRebalance": 1000000,
-  "copmressRecords": false,
-  "useUnsafe": true,
+  "compressRecords": false,
+  "useUnsafe": false,
   "maxJavaHeap": "20%",
-  "maxJavaHeapTrigger": "95%",
   "user": "ubuntu",
-  "maxProcessMemoryTrigger": "90%",
   "clientIsPrivate": false,
   "backup" : {
     "type" : "fileSystem",

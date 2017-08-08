@@ -23,6 +23,7 @@ public class DeleteManager {
   private final DatabaseServer databaseServer;
   private ThreadPoolExecutor executor;
   private Thread mainThread;
+  private ThreadPoolExecutor freeExecutor;
 
   public DeleteManager(DatabaseServer databaseServer) {
     this.databaseServer = databaseServer;
@@ -84,31 +85,36 @@ public class DeleteManager {
                   break;
                 }
                 batch.add(key);
-                if (batch.size() > 5000) {
+                if (batch.size() > 100_000) {
                   final List<Object[]> currBatch = batch;
                   batch = new ArrayList<>();
                   futures.add(executor.submit(new Callable() {
                     @Override
                     public Object call() throws Exception {
-                      for (Object[] key : currBatch) {
-                        synchronized (index.getMutex(key)) {
-                          Object toFree = index.remove(key);
+                      final List<Object> toFreeBatch = new ArrayList<>();
+                      for (Object[] currKey : currBatch) {
+                        synchronized (index.getMutex(currKey)) {
+                          Object toFree = index.remove(currKey);
                           if (toFree != null) {
-                            databaseServer.freeUnsafeIds(toFree);
+                            toFreeBatch.add(toFree);
                           }
                         }
                       }
+                      doFreeMemory(toFreeBatch);
                       return null;
                     }
                   }));
                 }
               }
+              final List<Object> toFreeBatch = new ArrayList<>();
               for (Object[] key : batch) {
                 Object toFree = index.remove(key);
+                //index.remove(key);
                 if (toFree != null) {
-                  databaseServer.freeUnsafeIds(toFree);
+                  toFreeBatch.add(toFree);
                 }
               }
+              doFreeMemory(toFreeBatch);
             }
 
             for (Future future : futures) {
@@ -124,19 +130,47 @@ public class DeleteManager {
     }
   }
 
+  private void doFreeMemory(final List<Object> toFreeBatch) {
+//    Timer timer = new Timer("Free memory");
+//    timer.schedule(new TimerTask(){
+//      @Override
+//      public void run() {
+//        //limit to 4 threads
+//        Future future = freeExecutor.submit(new Callable(){
+//          @Override
+//          public Object call() throws Exception {
+            for (Object obj : toFreeBatch) {
+              databaseServer.freeUnsafeIds(obj);
+            }
+//            return null;
+//          }
+//        });
+//        try {
+//          future.get();
+//        }
+//        catch (InterruptedException e) {
+//        }
+//        catch (ExecutionException e) {
+//          logger.error("Error deleting values", e);
+//        }
+//      }
+//    }, 30 * 1000);
+  }
+
   private File getReplicaRoot() {
     return new File(databaseServer.getDataDir(), "deletes/" + databaseServer.getShard() + "/" + databaseServer.getReplica() + "/");
   }
 
   public void start() {
     this.executor = new ThreadPoolExecutor(16, 16, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+    this.freeExecutor = new ThreadPoolExecutor(4, 4, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
     mainThread = new Thread(new Runnable() {
       @Override
       public void run() {
         while (true) {
           try {
-            Thread.sleep(10000);
+            Thread.sleep(1_000);
             doDeletes();
           }
           catch (Exception e) {

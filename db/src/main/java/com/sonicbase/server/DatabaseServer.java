@@ -14,6 +14,7 @@ import com.sonicbase.research.socket.NettyServer;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.socket.DeadServerException;
 import com.sonicbase.util.*;
+import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import net.jpountz.lz4.LZ4Compressor;
 import net.jpountz.lz4.LZ4Factory;
 import net.jpountz.lz4.LZ4FastDecompressor;
@@ -22,7 +23,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.ReversedLinesFileReader;
 import org.apache.commons.lang.exception.ExceptionUtils;
-import org.apache.log4j.*;
 import org.quartz.*;
 import org.quartz.impl.StdSchedulerFactory;
 import sun.misc.Unsafe;
@@ -114,6 +114,7 @@ public class DatabaseServer {
   private boolean dead;
   private boolean applyingQueuesAndInteractive;
   private CommandHandler commandHandler;
+  private AddressMap addressMap;
 
   @SuppressWarnings("restriction")
   private static Unsafe getUnsafe() {
@@ -201,6 +202,11 @@ public class DatabaseServer {
       final JsonDict config, String cluster, String host, int port,
       boolean unitTest, AtomicBoolean isRunning, boolean skipLicense, String gclog, String xmx, boolean overrideProLicense) {
 
+//    for (int i = 0; i < shardCount; i++) {
+//      for (int j = 0; j < replicationFactor; j++) {
+//        common.getServersConfig().getShards()[shard].getReplicas()[replica].dead = true;
+//      }
+//    }
 
     this.isRunning = isRunning;
     this.config = config;
@@ -210,6 +216,8 @@ public class DatabaseServer {
     this.gclog = gclog;
     this.xmx = xmx;
     this.overrideProLicense = overrideProLicense;
+
+    this.addressMap = new AddressMap();
 
     JsonDict databaseDict = config;
     this.dataDir = databaseDict.getString("dataDirectory");
@@ -404,12 +412,11 @@ public class DatabaseServer {
             Thread masterThread = new Thread(new Runnable() {
               @Override
               public void run() {
-                while (true) {
+                AtomicInteger nextMonitor = new AtomicInteger(-1);
+                while (nextMonitor.get() == -1) {
                   try {
                     Thread.sleep(2000);
-                  if (electNewMaster(shard, -1, monitorShards, monitorReplicas)) {
-                      break;
-                    }
+                    electNewMaster(shard, -1, monitorShards, monitorReplicas, nextMonitor);
                   }
                   catch (Exception e) {
                     logger.error("Error electing master: shard=" + shard, e);
@@ -417,18 +424,23 @@ public class DatabaseServer {
                 }
                 while (true) {
                   try {
-                    Thread.sleep(deathOverride == null ? 2000 : 50);
+                    Thread.sleep(deathOverride == null ? 2000 : 1000);
 
                     final int masterReplica = common.getServersConfig().getShards()[shard].getMasterReplica();
                     if (masterReplica == -1) {
-                      electNewMaster(shard, masterReplica, monitorShards, monitorReplicas);
+                      electNewMaster(shard, masterReplica, monitorShards, monitorReplicas, nextMonitor);
                     }
                     else {
                       final AtomicBoolean isHealthy = new AtomicBoolean(false);
-                      checkHealthOfServer(shard, masterReplica, isHealthy, false);
+                      for (int i = 0; i < 5; i++) {
+                        checkHealthOfServer(shard, masterReplica, isHealthy, true);
+                        if (isHealthy.get()) {
+                          break;
+                        }
+                      }
 
                       if (!isHealthy.get()) {
-                        electNewMaster(shard, masterReplica, monitorShards, monitorReplicas);
+                        electNewMaster(shard, masterReplica, monitorShards, monitorReplicas, nextMonitor);
                       }
                     }
                   }
@@ -446,10 +458,10 @@ public class DatabaseServer {
     thread.start();
   }
 
-  private boolean electNewMaster(int shard, int oldMasterReplica, int[] monitorShards, int[] monitorReplicas) throws InterruptedException, IOException {
+  private boolean electNewMaster(int shard, int oldMasterReplica, int[] monitorShards, int[] monitorReplicas, AtomicInteger nextMonitor) throws InterruptedException, IOException {
     int electedMaster = -1;
     boolean isFirst = false;
-    int nextMonitor = -1;
+    nextMonitor.set(-1);
     logger.info("electNewMaster - begin: shard=" + shard + ", oldMasterReplica=" + oldMasterReplica);
     for (int i = 0; i < monitorShards.length; i++) {
       if (monitorShards[i] == this.shard && monitorReplicas[i] == this.replica) {
@@ -457,11 +469,11 @@ public class DatabaseServer {
         continue;
       }
       final AtomicBoolean isHealthy = new AtomicBoolean(false);
-      checkHealthOfServer(monitorShards[i], monitorReplicas[i], isHealthy, false);
+      checkHealthOfServer(monitorShards[i], monitorReplicas[i], isHealthy, true);
       if (!isHealthy.get()) {
         continue;
       }
-      nextMonitor = i;
+      nextMonitor.set(i);
       break;
 //      // let the lowest monitor initiate the election
 //      if (monitorShards[i] != 0 || monitorReplicas[i] != oldMasterReplica) {
@@ -474,15 +486,15 @@ public class DatabaseServer {
 //      }
     }
     if (!isFirst) {
-      logger.info("ElectNewMaster !isFirst, nextMonitor=" + nextMonitor);
+      logger.info("ElectNewMaster shard=" + shard + ", !isFirst, nextMonitor=" + nextMonitor);
       return isFirst;
     }
-    if (nextMonitor == -1) {
-      logger.error("ElectNewMaster isFirst, nextMonitor==-1");
+    if (nextMonitor.get() == -1) {
+      logger.error("ElectNewMaster shard=" + shard + ", isFirst, nextMonitor==-1");
       Thread.sleep(5000);
     }
     else {
-      logger.error("ElectNewMaster, checking candidates");
+      logger.error("ElectNewMaster, shard=" + shard + ", checking candidates");
       outer:
       while (true) {
         for (int j = 0; j < replicationFactor; j++) {
@@ -500,7 +512,7 @@ public class DatabaseServer {
           }
           if (isHealthy.get()) {
             try {
-              logger.info("ElectNewMaster, electing new: nextMonitor=" + nextMonitor + ", shard=" + shard + ", replica=" + j);
+              logger.info("ElectNewMaster, electing new: nextMonitor=" + nextMonitor.get() + ", shard=" + shard + ", replica=" + j);
               ComObject cobj = new ComObject();
               cobj.put(ComObject.Tag.dbName, "__non__");
               cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
@@ -508,7 +520,7 @@ public class DatabaseServer {
               cobj.put(ComObject.Tag.requestedMasterShard, shard);
               cobj.put(ComObject.Tag.requestedMasterReplica, j);
               final String command = "DatabaseServer:ComObject:electNewMaster:";
-              byte[] bytes = getDatabaseClient().send(null, monitorShards[nextMonitor], monitorReplicas[nextMonitor],
+              byte[] bytes = getDatabaseClient().send(null, monitorShards[nextMonitor.get()], monitorReplicas[nextMonitor.get()],
                   command, cobj, DatabaseClient.Replica.specified);
               ComObject retObj = new ComObject(bytes);
               int otherServersElectedMaster = retObj.getInt(ComObject.Tag.selectedMasteReplica);
@@ -567,7 +579,7 @@ public class DatabaseServer {
   }
 
   public ComObject promoteEntireReplicaToMaster(ComObject cobj) {
-    int newReplica = cobj.getInt(ComObject.Tag.replica);
+    final int newReplica = cobj.getInt(ComObject.Tag.replica);
     for (int shard = 0; shard < shardCount; shard++) {
       logger.info("promoting to master: shard=" + shard + ", replica=" + newReplica);
       common.getServersConfig().getShards()[shard].setMasterReplica(newReplica);
@@ -576,16 +588,33 @@ public class DatabaseServer {
     common.saveSchema(getDataDir());
     pushSchema();
 
+    List<Future> futures = new ArrayList<>();
     for (int shard = 0; shard < shardCount; shard++) {
-      cobj = new ComObject();
-      cobj.put(ComObject.Tag.dbName, "__none__");
-      cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "promoteToMaster");
-      cobj.put(ComObject.Tag.shard, shard);
-      cobj.put(ComObject.Tag.electedMaster, newReplica);
-      String command = "DatabaseServer:ComObject:promoteToMaster:1:";
+      final int localShard = shard;
+      futures.add(getExecutor().submit(new Callable(){
+        @Override
+        public Object call() throws Exception {
+          ComObject cobj = new ComObject();
+          cobj.put(ComObject.Tag.dbName, "__none__");
+          cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+          cobj.put(ComObject.Tag.method, "promoteToMaster");
+          cobj.put(ComObject.Tag.shard, localShard);
+          cobj.put(ComObject.Tag.electedMaster, newReplica);
+          String command = "DatabaseServer:ComObject:promoteToMaster:1:";
 
-      getDatabaseClient().send(null, shard, newReplica, command, cobj, DatabaseClient.Replica.specified);
+          getDatabaseClient().send(null, localShard, newReplica, command, cobj, DatabaseClient.Replica.specified);
+          return null;
+        }
+      }));
+    }
+
+    for (Future future : futures) {
+      try {
+        future.get();
+      }
+      catch (Exception e) {
+        throw new DatabaseException(e);
+      }
     }
 
     return null;
@@ -704,6 +733,11 @@ public class DatabaseServer {
         for (int j = 0; j < replicationFactor; j++) {
           final int replica = j;
           if (shard == this.shard && replica == this.replica) {
+            boolean wasDead = common.getServersConfig().getShards()[shard].getReplicas()[replica].dead;
+            if (wasDead) {
+              AtomicBoolean isHealthy = new AtomicBoolean(true);
+              handleHealthChange(isHealthy, wasDead, true, shard, replica);
+            }
             continue;
           }
           deathMonitorThreads[i][j] = new Thread(new Runnable() {
@@ -711,9 +745,14 @@ public class DatabaseServer {
             public void run() {
               while (!shutdownDeathMonitor) {
                 try {
-                  Thread.sleep(deathOverride == null ? 1000 : 50);
+                  Thread.sleep(deathOverride == null ? 2000 : 50);
                   AtomicBoolean isHealthy = new AtomicBoolean();
-                  checkHealthOfServer(shard, replica, isHealthy, true);
+                  for (int i = 0; i < 5; i++) {
+                    checkHealthOfServer(shard, replica, isHealthy, true);
+                    if (isHealthy.get()) {
+                      break;
+                    }
+                  }
                   boolean wasDead = common.getServersConfig().getShards()[shard].getReplicas()[replica].dead;
                   boolean changed = false;
                   if (wasDead && isHealthy.get()) {
@@ -731,21 +770,7 @@ public class DatabaseServer {
 
                     getDatabaseClient().send(null, shard, replica, command, cobj, DatabaseClient.Replica.specified, true);
                   }
-                  synchronized (common) {
-                    if (wasDead && isHealthy.get()) {
-                      common.getServersConfig().getShards()[shard].getReplicas()[replica].dead = false;
-                      changed = true;
-                    }
-                    else if (!wasDead && !isHealthy.get()) {
-                      common.getServersConfig().getShards()[shard].getReplicas()[replica].dead = true;
-                      changed = true;
-                    }
-                  }
-                  if (changed) {
-                    logger.info("server health changed: shard=" + shard + ", replica=" + replica + ", isHealthy=" + isHealthy.get());
-                    common.saveSchema(getDataDir());
-                    pushSchema();
-                  }
+                  handleHealthChange(isHealthy, wasDead, changed, shard, replica);
                 }
                 catch (InterruptedException e) {
                   break;
@@ -764,6 +789,24 @@ public class DatabaseServer {
     }
   }
 
+  private void handleHealthChange(AtomicBoolean isHealthy, boolean wasDead, boolean changed, int shard, int replica) {
+    synchronized (common) {
+      if (wasDead && isHealthy.get()) {
+        common.getServersConfig().getShards()[shard].getReplicas()[replica].dead = false;
+        changed = true;
+      }
+      else if (!wasDead && !isHealthy.get()) {
+        common.getServersConfig().getShards()[shard].getReplicas()[replica].dead = true;
+        changed = true;
+      }
+    }
+    if (changed) {
+      logger.info("server health changed: shard=" + shard + ", replica=" + replica + ", isHealthy=" + isHealthy.get());
+      common.saveSchema(getDataDir());
+      pushSchema();
+    }
+  }
+
   private int replicaDeadForRestart = -1;
 
   private void checkHealthOfServer(final int shard, final int replica, final AtomicBoolean isHealthy, final boolean ignoreDeath) throws InterruptedException {
@@ -775,6 +818,11 @@ public class DatabaseServer {
 
     if (replicaDeadForRestart == replica) {
       isHealthy.set(false);
+      return;
+    }
+
+    if (shard == this.shard && replica == this.replica) {
+      isHealthy.set(true);
       return;
     }
 
@@ -2331,9 +2379,10 @@ public class DatabaseServer {
   private Double checkResidentMemory() {
     Double totalGig = null;
     String max = config.getString("maxProcessMemoryTrigger");
-    if (max == null) {
-      logger.info("Max process memory not set in config. Not enforcing max memory");
-    }
+    max = null; //disable for now
+//    if (max == null) {
+//      logger.info("Max process memory not set in config. Not enforcing max memory");
+//    }
 
     Double resGig = null;
     String secondToLastLine = null;
@@ -2939,6 +2988,7 @@ public class DatabaseServer {
     String line = null;
     try {
       String max = config.getString("maxJavaHeapTrigger");
+      max = null;//disable for now
       if (max == null) {
         logger.info("Max java heap trigger not set in config. Not enforcing max");
         return;
@@ -3244,7 +3294,12 @@ public class DatabaseServer {
   }
 
   public Indices getIndices(String dbName) {
-    return indexes.get(dbName);
+    Indices ret = indexes.get(dbName);
+    if (ret == null) {
+      ret = new Indices();
+      indexes.put(dbName, ret);
+    }
+    return ret;
   }
 
   public Map<String, Indices> getIndices() {
@@ -3544,9 +3599,95 @@ public class DatabaseServer {
     commandHandler.shutdown();
   }
 
+  private static class AddressMap {
+    private Long2LongOpenHashMap[] map = new Long2LongOpenHashMap[10_000];
+    private AtomicLong currOuterAddress = new AtomicLong();
+
+    public AddressMap() {
+      for (int i = 0; i < map.length; i++) {
+        map[i] = new Long2LongOpenHashMap();
+        map[i].defaultReturnValue(-1);
+      }
+    }
+
+    public Object getMutex(long outerAddress) {
+      return map[(int)(outerAddress % map.length)];
+    }
+
+    public long addAddress(long innerAddress) {
+      long outerAddress = currOuterAddress.incrementAndGet();
+      synchronized (getMutex(outerAddress)) {
+        map[(int)(outerAddress % map.length)].put(outerAddress, innerAddress);
+      }
+      return outerAddress;
+    }
+
+    public Long getAddress(long outerAddress) {
+      synchronized (getMutex(outerAddress)) {
+        long ret = map[(int)(outerAddress % map.length)].get(outerAddress);
+        if (ret == -1L) {
+          return null;
+        }
+        return ret;
+      }
+    }
+
+    public Long removeAddress(long outerAddress) {
+      synchronized (getMutex(outerAddress)) {
+        long ret = map[(int)(outerAddress % map.length)].remove(outerAddress);
+        if (ret == -1L) {
+          return null;
+        }
+        return ret;
+      }
+    }
+  }
+
   public Object toUnsafeFromRecords(byte[][] records) {
     if (!useUnsafe) {
-      return records;
+      try {
+        if (!compressRecords) {
+          return records;
+        }
+        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(bytesOut);
+        DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+        //out.writeInt(0);
+        out.writeInt(records.length);
+        for (byte[] record : records) {
+          DataUtil.writeVLong(out, record.length, resultLength);
+          out.write(record);
+        }
+        out.close();
+        byte[] bytes = bytesOut.toByteArray();
+        int origLen = -1;
+
+        if (compressRecords) {
+          origLen = bytes.length;
+
+
+          LZ4Compressor compressor = factory.highCompressor();//fastCompressor();
+          int maxCompressedLength = compressor.maxCompressedLength(bytes.length);
+          byte[] compressed = new byte[maxCompressedLength];
+          int compressedLength = compressor.compress(bytes, 0, bytes.length, compressed, 0, maxCompressedLength);
+          bytes = new byte[compressedLength + 8];
+          System.arraycopy(compressed, 0, bytes, 8, compressedLength);
+        }
+
+        bytesOut = new ByteArrayOutputStream();
+        out = new DataOutputStream(bytesOut);
+        out.writeInt(bytes.length);
+        out.writeInt(origLen);
+        out.close();
+        byte[] lenBuffer = bytesOut.toByteArray();
+
+        System.arraycopy(lenBuffer, 0, bytes, 0, lenBuffer.length);
+
+        return bytes;
+      }
+      catch (Exception e) {
+        throw new DatabaseException(e);
+      }
     }
     else {
       try {
@@ -3595,7 +3736,8 @@ public class DatabaseServer {
         for (int i = lenBuffer.length; i < lenBuffer.length + bytes.length; i++) {
           unsafe.putByte(address + i, bytes[i - lenBuffer.length]);
         }
-        return -1 * address;
+
+        return addressMap.addAddress(address);
       }
       catch (IOException e) {
         throw new DatabaseException(e);
@@ -3603,9 +3745,53 @@ public class DatabaseServer {
     }
   }
 
+  LZ4Factory factory = LZ4Factory.fastestInstance();
+
   public Object toUnsafeFromKeys(byte[][] records) {
     if (!useUnsafe) {
-      return records;
+      try {
+        if (!compressRecords) {
+          return records;
+        }
+        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(bytesOut);
+        DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+        //out.writeInt(0);
+        out.writeInt(records.length);
+        for (byte[] record : records) {
+          DataUtil.writeVLong(out, record.length, resultLength);
+          out.write(record);
+        }
+        out.close();
+        byte[] bytes = bytesOut.toByteArray();
+        int origLen = -1;
+
+        if (compressRecords) {
+          origLen = bytes.length;
+
+
+          LZ4Compressor compressor = factory.highCompressor();//fastCompressor();
+          int maxCompressedLength = compressor.maxCompressedLength(bytes.length);
+          byte[] compressed = new byte[maxCompressedLength];
+          int compressedLength = compressor.compress(bytes, 0, bytes.length, compressed, 0, maxCompressedLength);
+          bytes = new byte[compressedLength + 8];
+          System.arraycopy(compressed, 0, bytes, 8, compressedLength);
+        }
+
+        bytesOut = new ByteArrayOutputStream();
+        out = new DataOutputStream(bytesOut);
+        out.writeInt(bytes.length);
+        out.writeInt(origLen);
+        out.close();
+        byte[] lenBuffer = bytesOut.toByteArray();
+
+        System.arraycopy(lenBuffer, 0, bytes, 0, lenBuffer.length);
+
+        return bytes;
+      }
+      catch (Exception e) {
+        throw new DatabaseException(e);
+      }
     }
     else {
       try {
@@ -3624,8 +3810,6 @@ public class DatabaseServer {
 
         if (compressRecords) {
           origLen = bytes.length;
-
-          LZ4Factory factory = LZ4Factory.fastestInstance();
 
           LZ4Compressor compressor = factory.fastCompressor();
           int maxCompressedLength = compressor.maxCompressedLength(bytes.length);
@@ -3656,7 +3840,7 @@ public class DatabaseServer {
         for (int i = lenBuffer.length; i < lenBuffer.length + bytes.length; i++) {
           unsafe.putByte(address + i, bytes[i - lenBuffer.length]);
         }
-        return -1 * address;
+        return addressMap.addAddress(address);
       }
       catch (IOException e) {
         throw new DatabaseException(e);
@@ -3667,33 +3851,69 @@ public class DatabaseServer {
   public byte[][] fromUnsafeToRecords(Object obj) {
     try {
       if (obj instanceof Long) {
-        long address = (long) obj;
+        synchronized (addressMap.getMutex((long)obj)) {
+          Long address = addressMap.getAddress((long) obj);
+          if (address == null) {
+            return null;
+          }
 
-        address *= -1;
+          byte[] lenBuffer = new byte[8];
+          lenBuffer[0] = unsafe.getByte(address + 0);
+          lenBuffer[1] = unsafe.getByte(address + 1);
+          lenBuffer[2] = unsafe.getByte(address + 2);
+          lenBuffer[3] = unsafe.getByte(address + 3);
+          lenBuffer[4] = unsafe.getByte(address + 4);
+          lenBuffer[5] = unsafe.getByte(address + 5);
+          lenBuffer[6] = unsafe.getByte(address + 6);
+          lenBuffer[7] = unsafe.getByte(address + 7);
+          ByteArrayInputStream bytesIn = new ByteArrayInputStream(lenBuffer);
+          DataInputStream in = new DataInputStream(bytesIn);
+          int count = in.readInt();
+          int origLen = in.readInt();
+          byte[] bytes = new byte[count];
+          for (int i = 0; i < count; i++) {
+            bytes[i] = unsafe.getByte(address + i + 8);
+          }
+
+          if (origLen != -1) {
+            LZ4Factory factory = LZ4Factory.fastestInstance();
+
+            LZ4FastDecompressor decompressor = factory.fastDecompressor();
+            byte[] restored = new byte[origLen];
+            decompressor.decompress(bytes, 0, restored, 0, origLen);
+            bytes = restored;
+          }
+
+          in = new DataInputStream(new ByteArrayInputStream(bytes));
+          DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+          //in.readInt(); //byte count
+          //in.readInt(); //orig len
+          byte[][] ret = new byte[in.readInt()][];
+          for (int i = 0; i < ret.length; i++) {
+            int len = (int) DataUtil.readVLong(in, resultLength);
+            byte[] record = new byte[len];
+            in.readFully(record);
+            ret[i] = record;
+          }
+          return ret;
+        }
+      }
+      else {
+        if (!compressRecords) {
+          return (byte[][]) obj;
+        }
+        byte[] bytes = (byte[])obj;
         byte[] lenBuffer = new byte[8];
-        lenBuffer[0] = unsafe.getByte(address + 0);
-        lenBuffer[1] = unsafe.getByte(address + 1);
-        lenBuffer[2] = unsafe.getByte(address + 2);
-        lenBuffer[3] = unsafe.getByte(address + 3);
-        lenBuffer[4] = unsafe.getByte(address + 4);
-        lenBuffer[5] = unsafe.getByte(address + 5);
-        lenBuffer[6] = unsafe.getByte(address + 6);
-        lenBuffer[7] = unsafe.getByte(address + 7);
+        System.arraycopy(bytes, 0, lenBuffer, 0, lenBuffer.length);
         ByteArrayInputStream bytesIn = new ByteArrayInputStream(lenBuffer);
         DataInputStream in = new DataInputStream(bytesIn);
         int count = in.readInt();
         int origLen = in.readInt();
-        byte[] bytes = new byte[count];
-        for (int i = 0; i < count; i++) {
-          bytes[i] = unsafe.getByte(address + i + 8);
-        }
 
         if (origLen != -1) {
-          LZ4Factory factory = LZ4Factory.fastestInstance();
-
           LZ4FastDecompressor decompressor = factory.fastDecompressor();
           byte[] restored = new byte[origLen];
-          decompressor.decompress(bytes, 0, restored, 0, origLen);
+          decompressor.decompress(bytes, lenBuffer.length, restored, 0, origLen);
           bytes = restored;
         }
 
@@ -3709,9 +3929,6 @@ public class DatabaseServer {
           ret[i] = record;
         }
         return ret;
-      }
-      else {
-        return (byte[][]) obj;
       }
     }
     catch (IOException e) {
@@ -3722,33 +3939,71 @@ public class DatabaseServer {
   public byte[][] fromUnsafeToKeys(Object obj) {
     try {
       if (obj instanceof Long) {
-        long address = (long) obj;
+        synchronized (addressMap.getMutex((long)obj)) {
+          Long address = addressMap.getAddress((long) obj);
+          if (address == null) {
+            return null;
+          }
 
-        address *= -1;
+          byte[] lenBuffer = new byte[8];
+          lenBuffer[0] = unsafe.getByte(address + 0);
+          lenBuffer[1] = unsafe.getByte(address + 1);
+          lenBuffer[2] = unsafe.getByte(address + 2);
+          lenBuffer[3] = unsafe.getByte(address + 3);
+          lenBuffer[4] = unsafe.getByte(address + 4);
+          lenBuffer[5] = unsafe.getByte(address + 5);
+          lenBuffer[6] = unsafe.getByte(address + 6);
+          lenBuffer[7] = unsafe.getByte(address + 7);
+          ByteArrayInputStream bytesIn = new ByteArrayInputStream(lenBuffer);
+          DataInputStream in = new DataInputStream(bytesIn);
+          int count = in.readInt();
+          int origLen = in.readInt();
+          byte[] bytes = new byte[count];
+          for (int i = 0; i < count; i++) {
+            bytes[i] = unsafe.getByte(address + i + 8);
+          }
+
+          if (origLen != -1) {
+            LZ4Factory factory = LZ4Factory.fastestInstance();
+
+            LZ4FastDecompressor decompressor = factory.fastDecompressor();
+            byte[] restored = new byte[origLen];
+            decompressor.decompress(bytes, 0, restored, 0, origLen);
+            bytes = restored;
+          }
+
+          in = new DataInputStream(new ByteArrayInputStream(bytes));
+          DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+          //in.readInt(); //byte count
+          //in.readInt(); //orig len
+          byte[][] ret = new byte[in.readInt()][];
+          for (int i = 0; i < ret.length; i++) {
+            int len = (int) DataUtil.readVLong(in, resultLength);
+            byte[] record = new byte[len];
+            in.readFully(record);
+            ret[i] = record;
+          }
+          return ret;
+        }
+      }
+      else {
+        if (!compressRecords) {
+          return (byte[][]) obj;
+        }
+        byte[] bytes = (byte[])obj;
         byte[] lenBuffer = new byte[8];
-        lenBuffer[0] = unsafe.getByte(address + 0);
-        lenBuffer[1] = unsafe.getByte(address + 1);
-        lenBuffer[2] = unsafe.getByte(address + 2);
-        lenBuffer[3] = unsafe.getByte(address + 3);
-        lenBuffer[4] = unsafe.getByte(address + 4);
-        lenBuffer[5] = unsafe.getByte(address + 5);
-        lenBuffer[6] = unsafe.getByte(address + 6);
-        lenBuffer[7] = unsafe.getByte(address + 7);
+        System.arraycopy(bytes, 0, lenBuffer, 0, lenBuffer.length);
         ByteArrayInputStream bytesIn = new ByteArrayInputStream(lenBuffer);
         DataInputStream in = new DataInputStream(bytesIn);
         int count = in.readInt();
         int origLen = in.readInt();
-        byte[] bytes = new byte[count];
-        for (int i = 0; i < count; i++) {
-          bytes[i] = unsafe.getByte(address + i + 8);
-        }
 
         if (origLen != -1) {
           LZ4Factory factory = LZ4Factory.fastestInstance();
 
           LZ4FastDecompressor decompressor = factory.fastDecompressor();
           byte[] restored = new byte[origLen];
-          decompressor.decompress(bytes, 0, restored, 0, origLen);
+          decompressor.decompress(bytes, lenBuffer.length, restored, 0, origLen);
           bytes = restored;
         }
 
@@ -3765,9 +4020,6 @@ public class DatabaseServer {
         }
         return ret;
       }
-      else {
-        return (byte[][]) obj;
-      }
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -3776,11 +4028,13 @@ public class DatabaseServer {
 
   public void freeUnsafeIds(Object obj) {
     if (obj instanceof Long) {
-      long address = (long) obj;
-      if (address == 0) {
-        return;
+      synchronized (addressMap.getMutex((long)obj)) {
+        Long address = addressMap.removeAddress((long) obj);
+        if (address == null || address == 0) {
+          return;
+        }
+        unsafe.freeMemory(address);
       }
-      unsafe.freeMemory(-1 * address);
     }
   }
 

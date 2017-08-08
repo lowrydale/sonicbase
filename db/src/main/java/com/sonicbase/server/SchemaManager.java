@@ -115,10 +115,6 @@ public class SchemaManager {
 
   public ComObject createDatabase(ComObject cobj, boolean replayedCommand) {
     try {
-      if (server.getShard() == 0 &&
-          server.getCommon().getServersConfig().getShards()[0].getMasterReplica() == server.getReplica() && cobj.getBoolean(ComObject.Tag.slave) != null) {
-        return null;
-      }
       String dbName = cobj.getString(ComObject.Tag.dbName);
       String masterSlave = cobj.getString(ComObject.Tag.masterSlave);
       dbName = dbName.toLowerCase();
@@ -126,10 +122,6 @@ public class SchemaManager {
       if (replayedCommand && null != server.getCommon().getSchema(dbName)) {
         return null;
       }
-
-//      if (null != server.getCommon().getSchema(dbName)) {
-//        throw new DatabaseException("Database already exists: name=" + dbName);
-//      }
 
       logger.info("Create database: shard=" + server.getShard() + ", replica=" + server.getReplica() + ", name=" + dbName);
       File dir = new File(server.getDataDir(), "snapshot/" + server.getShard() + "/" + server.getReplica() + "/" + dbName);
@@ -141,11 +133,12 @@ public class SchemaManager {
       server.getCommon().addDatabase(dbName);
       server.getCommon().saveSchema(server.getDataDir());
 
-      if (cobj.getBoolean(ComObject.Tag.slave) == null) {
+      if (masterSlave.equals("master")) {
         for (int i = 0; i < server.getShardCount(); i++) {
           cobj.put(ComObject.Tag.slave, true);
           cobj.put(ComObject.Tag.masterSlave, "slave");
-          String command = "DatabaseServer:ComObject:createDatabase:";
+          cobj.put(ComObject.Tag.method, "createDatabaseSlave");
+          String command = "DatabaseServer:ComObject:createDatabaseSlave:";
           server.getDatabaseClient().send(null, i, 0, command, cobj, DatabaseClient.Replica.def);
         }
         server.pushSchema();
@@ -154,6 +147,31 @@ public class SchemaManager {
     finally {
 
     }
+    return null;
+  }
+
+  public ComObject createDatabaseSlave(ComObject cobj, boolean replayedCommand) {
+
+    String dbName = cobj.getString(ComObject.Tag.dbName);
+    String masterSlave = cobj.getString(ComObject.Tag.masterSlave);
+    dbName = dbName.toLowerCase();
+
+    if (server.getShard() == 0 &&
+        server.getCommon().getServersConfig().getShards()[0].getMasterReplica() == server.getReplica() &&
+        masterSlave.equals("slave")) {
+      return null;
+    }
+
+    logger.info("Create database: shard=" + server.getShard() + ", replica=" + server.getReplica() + ", name=" + dbName);
+    File dir = new File(server.getDataDir(), "snapshot/" + server.getShard() + "/" + server.getReplica() + "/" + dbName);
+    if (!dir.exists() && !dir.mkdirs()) {
+      throw new DatabaseException("Error creating database directory: dir=" + dir.getAbsolutePath());
+    }
+
+    server.getIndices().put(dbName, new Indices());
+    server.getCommon().addDatabase(dbName);
+    server.getCommon().saveSchema(server.getDataDir());
+
     return null;
   }
 

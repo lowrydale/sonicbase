@@ -48,13 +48,10 @@ The config file must be named "config-&lt;cluster name&gt;.json".
 &nbsp;&nbsp;&nbsp;&nbsp;"dataDirectory": "$HOME/db-data",<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;"installDirectory": "$HOME/database",<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;"compressRecords": false,<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;"useUnsafe": true,<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;"maxJavaHeap": "50%",<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;"maxJavaHeapTrigger": "90%",<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;"maxProcessMemoryTrigger": "90%",<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;"useUnsafe": false,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;"maxJavaHeap": "60%",<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;"user": "ubuntu",<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;"clientIsPrivate": false,<br/>
-     &nbsp;&nbsp;&nbsp;&nbsp;"minShardSizeForRebalance": 1000000,</br>
      &nbsp;&nbsp;&nbsp;&nbsp;"shards" : [<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"replicas": [<br/>
@@ -91,15 +88,7 @@ memory that is subject to garbase collection. Using this option slows down Sonic
 the number of records you can load into the database<br/>
 <br/>
   <b>maxJavaHeap</b> - maximum java heap size. Can be absolute (e.g., 50g, 1024m). It can also be a percentage
-of the machine total memory (e.g., 50%).<br/>
-<br/>
-  <b>maxJavaHeapTrigger</b> - amount of java heap above which SonicBase will start rejecting inserts. It can be absolute
-or a percentage. It is recommended that no more than 90% of the memory be used. You need to leave
-at least 5gig for SonicBase processing<br/>
-<br/>
-  <b>maxProcessMemoryTrigger</b> - maximum server memory footprint above which SonicBase will start rejecting inserts.
- It can be absolute or a percentage. It is recommended
-that no more than 90% of the memory be used.<br/>
+of the machine total memory (e.g., 60%).<br/>
 <br/>
   <b>user</b> - for Linux and Mac this must be set the the userid of the user you will be running the server as. For
   Windows you do not need to set this value.<br/>
@@ -107,9 +96,6 @@ that no more than 90% of the memory be used.<br/>
   <b>clientIsPrivate</b> - set to true if the client machine is in the same private network as the servers. The client
   must be able to call the servers on the private addresses that are configured.<br/>
   <br/>
-     <b>minShardSizeForRebalance</b> the minimum average number of records for a shard of a table required before the
-     table will be rebalanced across all shards<br/>
-     <br/>
   <b>shards</b> - list of shards (servers)<br/>
 <br/>
   <b>replicas</b> - list of replicas. Only one replica can be configured in the free version<br/>

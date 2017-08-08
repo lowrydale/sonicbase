@@ -120,42 +120,44 @@ public class UpdateManager {
       try {
         synchronized (primaryKeyIndex.getMutex(entry.getKey())) {
           Object value = primaryKeyIndex.get(entry.getKey());
-          byte[][] records = server.fromUnsafeToRecords(value);
-          for (int i = 0; i < records.length; i++) {
-            Record record = new Record(dbName, server.getCommon(), records[i]);
-            Object[] fields = record.getFields();
-            List<String> columnNames = new ArrayList<>();
-            List<Object> values = new ArrayList<>();
-            for (int j = 0; j < fields.length; j++) {
-              values.add(fields[j]);
-              columnNames.add(tableSchema.getFields().get(j).getName());
-            }
-
-            DatabaseClient.KeyInfo primaryKey = new DatabaseClient.KeyInfo();
-            tableSchema = server.getCommon().getTables(dbName).get(tableName);
-
-            long id = 0;
-            if (tableSchema.getFields().get(0).getName().equals("_id")) {
-              id = (long) record.getFields()[0];
-            }
-            List<DatabaseClient.KeyInfo> keys = server.getDatabaseClient().getKeys(tableSchema, columnNames, values, id);
-
-            for (final DatabaseClient.KeyInfo keyInfo : keys) {
-              if (keyInfo.getIndexSchema().getValue().isPrimaryKey()) {
-                primaryKey.setKey(keyInfo.getKey());
-                primaryKey.setIndexSchema(keyInfo.getIndexSchema());
-                break;
+          if (!value.equals(0L)) {
+            byte[][] records = server.fromUnsafeToRecords(value);
+            for (int i = 0; i < records.length; i++) {
+              Record record = new Record(dbName, server.getCommon(), records[i]);
+              Object[] fields = record.getFields();
+              List<String> columnNames = new ArrayList<>();
+              List<Object> values = new ArrayList<>();
+              for (int j = 0; j < fields.length; j++) {
+                values.add(fields[j]);
+                columnNames.add(tableSchema.getFields().get(j).getName());
               }
-            }
-            for (final DatabaseClient.KeyInfo keyInfo : keys) {
-              if (keyInfo.getIndexSchema().getKey().equals(indexName)) {
-                while (true) {
-                  try {
-                    server.getDatabaseClient().insertKey(dbName, tableName, keyInfo, primaryKeyIndexName, primaryKey.getKey());
-                    break;
-                  }
-                  catch (SchemaOutOfSyncException e) {
-                    continue;
+
+              DatabaseClient.KeyInfo primaryKey = new DatabaseClient.KeyInfo();
+              tableSchema = server.getCommon().getTables(dbName).get(tableName);
+
+              long id = 0;
+              if (tableSchema.getFields().get(0).getName().equals("_id")) {
+                id = (long) record.getFields()[0];
+              }
+              List<DatabaseClient.KeyInfo> keys = server.getDatabaseClient().getKeys(tableSchema, columnNames, values, id);
+
+              for (final DatabaseClient.KeyInfo keyInfo : keys) {
+                if (keyInfo.getIndexSchema().getValue().isPrimaryKey()) {
+                  primaryKey.setKey(keyInfo.getKey());
+                  primaryKey.setIndexSchema(keyInfo.getIndexSchema());
+                  break;
+                }
+              }
+              for (final DatabaseClient.KeyInfo keyInfo : keys) {
+                if (keyInfo.getIndexSchema().getKey().equals(indexName)) {
+                  while (true) {
+                    try {
+                      server.getDatabaseClient().insertKey(dbName, tableName, keyInfo, primaryKeyIndexName, primaryKey.getKey());
+                      break;
+                    }
+                    catch (SchemaOutOfSyncException e) {
+                      continue;
+                    }
                   }
                 }
               }

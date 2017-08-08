@@ -140,13 +140,13 @@ public class Repartitioner extends Thread {
           }
           long newPartitionSize = totalCount / databaseServer.getShardCount();
 
-          Long minSize = databaseServer.getConfig().getLong("minShardSizeForRebalance");
-          if (minSize == null) {
-            minSize = 1_000_000L;
-          }
-          if (newPartitionSize < minSize) {
-            return null;
-          }
+//          Long minSize = databaseServer.getConfig().getLong("minShardSizeForRebalance");
+//          if (minSize == null) {
+//            minSize = 1_000_000L;
+//          }
+//          if (newPartitionSize < minSize) {
+//            return null;
+//          }
 
           StringBuilder builder = new StringBuilder();
           for (int i = 0; i < databaseServer.getShardCount(); i++) {
@@ -433,19 +433,39 @@ public class Repartitioner extends Thread {
 
   public void stopShardsFromRepartitioning() {
     logger.info("stopShardsFromRepartitioning - begin");
-    String command = "DatabaseServer:ComObject:stopRepartitioning:";
-    ComObject cobj = new ComObject();
+    final String command = "DatabaseServer:ComObject:stopRepartitioning:";
+    final ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, "__none__");
     cobj.put(ComObject.Tag.method, "stopRepartitioning");
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+    List<Future> futures = new ArrayList<>();
     for (int shard = 0; shard < databaseServer.getShardCount(); shard++) {
       for (int replica = 0; replica < databaseServer.getReplicationFactor(); replica++) {
-        try {
-          databaseServer.getClient().send(null, shard, replica, command, cobj, DatabaseClient.Replica.specified);
-        }
-        catch (Exception e) {
-          logger.error("Error stopping repartitioning on server: shard=" + shard + ", replica=" + replica);
-        }
+        final int localShard = shard;
+        final int localReplica = replica;
+        futures.add(databaseServer.getExecutor().submit(new Callable(){
+          @Override
+          public Object call() throws Exception {
+            try {
+              databaseServer.getClient().send(null, localShard, localReplica, command, cobj, DatabaseClient.Replica.specified);
+            }
+            catch (Exception e) {
+              logger.error("Error stopping repartitioning on server: shard=" + localShard + ", replica=" + localReplica);
+            }
+            return null;
+          }
+        }));
+      }
+    }
+    for (Future future : futures) {
+      try {
+        future.get();
+      }
+      catch (InterruptedException e) {
+        throw new DatabaseException(e);
+      }
+      catch (ExecutionException e) {
+        e.printStackTrace();
       }
     }
     logger.info("stopShardsFromRepartitioning - end");
@@ -1093,7 +1113,7 @@ public class Repartitioner extends Thread {
                 @Override
                 public void run() {
                   try {
-                    List<Object> toFree = new ArrayList<>();
+                    final List<Object> toFree = new ArrayList<>();
                     long begin = System.currentTimeMillis();
                     moveIndexEntriesToShard(dbName, tableName, indexName, isPrimaryKey, shard, list);
                     for (MoveRequest request : list) {
@@ -1115,9 +1135,15 @@ public class Repartitioner extends Thread {
                     catch (InterruptedException e) {
                       throw new DatabaseException(e);
                     }
-                    for (Object obj : toFree) {
-                      databaseServer.freeUnsafeIds(obj);
-                    }
+//                    Timer timer = new Timer("Free memory");
+//                    timer.schedule(new TimerTask(){
+//                      @Override
+//                      public void run() {
+                        for (Object obj : toFree) {
+                          databaseServer.freeUnsafeIds(obj);
+                        }
+//                      }
+//                    }, 30 * 1000);
 
                     logger.info("moved entries: table=" + tableName + ", index=" + indexName + ", count=" + list.size() +
                         ", shard=" + shard + ", duration=" + (System.currentTimeMillis() - begin));
@@ -1413,7 +1439,7 @@ public class Repartitioner extends Thread {
       }
       databaseServer.getDeleteManager().saveDeletes(dbName, tableName, indexName, keysToDelete);
 
-      List<Object> toFree = new ArrayList<>();
+      final List<Object> toFree = new ArrayList<>();
       Index index = databaseServer.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
       for (Object[] key : keysToDelete) {
         synchronized (index.getMutex(key)) {
@@ -1443,9 +1469,15 @@ public class Repartitioner extends Thread {
           }
         }
       }
-      for (Object obj : toFree) {
-        databaseServer.freeUnsafeIds(obj);
-      }
+//      Timer timer = new Timer("Free memory");
+//      timer.schedule(new TimerTask(){
+//        @Override
+//        public void run() {
+          for (Object obj : toFree) {
+            databaseServer.freeUnsafeIds(obj);
+          }
+//        }
+//      }, 30 * 1000);
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -1461,7 +1493,7 @@ public class Repartitioner extends Thread {
       moveRequests.put(i, new ArrayList<MoveRequest>());
     }
 
-    List<Object> toFree = new ArrayList<>();
+    final List<Object> toFree = new ArrayList<>();
     for (MapEntry entry : toProcess) {
       try {
         byte[][] content = null;
@@ -1486,10 +1518,11 @@ public class Repartitioner extends Thread {
               if (indexSchema.isPrimaryKey()) {
                 byte[][] newContent = new byte[content.length][];
                 for (int i = 0; i < content.length; i++) {
-                  Record record = new Record(dbName, common, content[i]);
-                  record.setDbViewNumber(common.getSchemaVersion());
-                  record.setDbViewFlags(Record.DB_VIEW_FLAG_DELETING);
-                  newContent[i] = record.serialize(common);
+                  byte[] newBytes = new byte[content[i].length];
+                  System.arraycopy(content[i], 0, newBytes, 0, content[i].length);
+                  Record.setDbViewFlags(newBytes, Record.DB_VIEW_FLAG_DELETING);
+                  Record.setDbViewNumber(newBytes, common.getSchemaVersion());
+                  newContent[i] = newBytes;
                 }
                 toFree.add(entry.value);
                 //databaseServer.freeUnsafeIds(entry.value);
@@ -1506,8 +1539,8 @@ public class Repartitioner extends Thread {
           final List<MoveRequest> list = moveRequests.get(shard);
           boolean shouldDeleteNow = false;
           if (indexSchema.isPrimaryKey()) {
-            Record record = new Record(dbName, common, content[0]);
-            if (record.getDbViewFlags() == Record.DB_VIEW_FLAG_DELETING) {
+            long dbViewFlags = Record.getDbViewFlags(content[0]);
+            if (dbViewFlags == Record.DB_VIEW_FLAG_DELETING) {
               shouldDeleteNow = true;
             }
           }
@@ -1531,9 +1564,15 @@ public class Repartitioner extends Thread {
       throw new DatabaseException(e);
     }
 
-    for (Object obj : toFree) {
-      databaseServer.freeUnsafeIds(obj);
-    }
+//    Timer timer = new Timer("Free memory");
+//    timer.schedule(new TimerTask(){
+//      @Override
+//      public void run() {
+        for (Object obj : toFree) {
+          databaseServer.freeUnsafeIds(obj);
+        }
+//      }
+//    }, 30 * 1000);
 
     try {
       for (int i = 0; i < databaseServer.getShardCount(); i++) {
@@ -2329,8 +2368,17 @@ public class Repartitioner extends Thread {
         String primaryKeyIndex = null;
         List<String> primaryKeyGroupIndices = new ArrayList<>();
         List<String> otherIndices = new ArrayList<>();
+        TableSchema tableSchema = common.getTables(dbName).get(entry.getKey());
+        if (tableSchema == null) {
+          logger.error("beginRebalance, unknown table: name=" + entry.getKey());
+          continue;
+        }
         for (Map.Entry<String, IndexCounts> indexEntry : entry.getValue().indices.entrySet()) {
-          IndexSchema indexSchema = common.getTables(dbName).get(entry.getKey()).getIndices().get(indexEntry.getKey());
+          IndexSchema indexSchema = tableSchema.getIndices().get(indexEntry.getKey());
+          if (indexSchema == null) {
+            logger.error("beginRebalance, unknown index: table=" + entry.getKey() + ", index=" + indexEntry.getKey());
+            continue;
+          }
           if (indexSchema.isPrimaryKey()) {
             primaryKeyIndex = indexEntry.getKey();
           }

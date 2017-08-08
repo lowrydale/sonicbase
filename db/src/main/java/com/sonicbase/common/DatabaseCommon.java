@@ -49,23 +49,43 @@ public class DatabaseCommon {
   private boolean[][] deadNodes;
 
   public Lock getSchemaReadLock(String dbName) {
-    return schemaReadLock.get(dbName);
+    Lock ret = schemaReadLock.get(dbName);
+    if (ret == null) {
+      ReadWriteLock lock = new ReentrantReadWriteLock();
+      schemaReadWriteLock.put(dbName, lock);
+      schemaReadLock.put(dbName, lock.readLock());
+      schemaWriteLock.put(dbName, lock.writeLock());
+      ret = schemaReadLock.get(dbName);
+    }
+    return ret;
   }
 
   public Lock getSchemaWriteLock(String dbName) {
-    return schemaWriteLock.get(dbName);
+    Lock ret = schemaWriteLock.get(dbName);
+    if (ret == null) {
+      ReadWriteLock lock = new ReentrantReadWriteLock();
+      schemaReadWriteLock.put(dbName, lock);
+      schemaReadLock.put(dbName, lock.readLock());
+      schemaWriteLock.put(dbName, lock.writeLock());
+      ret = schemaWriteLock.get(dbName);
+    }
+    return ret;
   }
 
   public Schema getSchema(String dbName) {
-    return schema.get(dbName);
+
+    Schema retSchema = ensureSchemaExists(dbName);
+    return retSchema;
   }
 
   public Map<String, TableSchema> getTables(String dbName) {
-    return schema.get(dbName).getTables();
+    Schema retSchema = ensureSchemaExists(dbName);
+    return retSchema.getTables();
   }
 
   public Map<Integer, TableSchema> getTablesById(String dbName) {
-    return schema.get(dbName).getTablesById();
+    Schema retSchema = ensureSchemaExists(dbName);
+    return retSchema.getTablesById();
   }
 
   public void loadSchema(String dataDir) {
@@ -192,8 +212,18 @@ public class DatabaseCommon {
 
 
   public void addTable(String dbName, String dataDir, TableSchema schema) {
-    this.schema.get(dbName).addTable(schema);
+    Schema retSchema = ensureSchemaExists(dbName);
+    retSchema.addTable(schema);
     saveSchema(dataDir);
+  }
+
+  private Schema ensureSchemaExists(String dbName) {
+    Schema retSchema = this.schema.get(dbName);
+    if (retSchema == null) {
+      retSchema = new Schema();
+      this.schema.put(dbName, retSchema);
+    }
+    return retSchema;
   }
 
   public void serializeSchema(String dbName, DataOutputStream out) {

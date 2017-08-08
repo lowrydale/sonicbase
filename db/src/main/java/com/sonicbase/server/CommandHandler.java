@@ -176,7 +176,7 @@ public class CommandHandler {
       ComObject ret = null;
 
       if (!replayedCommand && !server.isRunning() && !priorityCommands.contains(methodStr)) {
-        throw new DatabaseException("Server not running: command=" + command);
+        throw new DeadServerException("Server not running: command=" + command);
       }
 
       List<ReplicaFuture> futures = new ArrayList<>();
@@ -187,42 +187,6 @@ public class CommandHandler {
       if (!server.onlyQueueCommands() || !enableQueuing) {
         DatabaseServer.Shard currShard = common.getServersConfig().getShards()[server.getShard()];
         int replPos = command.indexOf("xx_repl_xx");
-//        if (replPos != -1) {
-//          int sentMaster = -1;
-//          int replPos2 = command.indexOf(":", replPos);
-//          if (replPos2 != -1) {
-//            sentMaster = Integer.valueOf(command.substring(replPos + "xx_repl_xx".length(), replPos2));
-//          }
-//          else {
-//            sentMaster = Integer.valueOf(command.substring(replPos + "xx_repl_xx".length()));
-//          }
-//          if (!replayedCommand && replica == sentMaster) {
-//            if (DatabaseClient.getWriteVerbs().contains(methodStr)) {
-//              for (int i = 0; i < replicationFactor; i++) {
-//                final int currReplica = i;
-//                final String newCommand2 = newCommand.replaceAll("xx_repl_xx", "");
-//                if (i != replica) {
-//                  if (currShard.getReplicas()[i].dead) {
-//                    logManager.logRequestForPeer(newCommand2, body, sequence0, sequence1, i);
-//                  }
-//                  else {
-//                    ReplicaFuture future = new ReplicaFuture();
-//                    future.replica = i;
-//                    future.future = executor.submit(new Callable(){
-//                      @Override
-//                      public Object call() throws Exception {
-//                        client.get().send(null, shard, currReplica, newCommand2, body, DatabaseClient.Replica.specified);
-//                        return null;
-//                      }
-//                    });
-//                    futures.add(future);
-//                  }
-//                }
-//              }
-//            }
-//          }
-//        }
-
         try {
           if (cobj != null) {
             cobj.put(ComObject.Tag.sequence0, sequence0);
@@ -246,18 +210,18 @@ public class CommandHandler {
           }
         }
         catch (Exception e) {
-          boolean schemaOutOfSync = false;
-          int index = ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class);
-          if (-1 != index) {
-            schemaOutOfSync = true;
-          }
-          else if (e.getMessage() != null && e.getMessage().contains("SchemaOutOfSyncException")) {
-            schemaOutOfSync = true;
-          }
-
-          if (!schemaOutOfSync) {
-            logger.error("Error processing request", e);
-          }
+//          boolean schemaOutOfSync = false;
+//          int index = ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class);
+//          if (-1 != index) {
+//            schemaOutOfSync = true;
+//          }
+//          else if (e.getMessage() != null && e.getMessage().contains("SchemaOutOfSyncException")) {
+//            schemaOutOfSync = true;
+//          }
+//
+//          if (!schemaOutOfSync) {
+//            logger.error("Error processing request", e);
+//          }
           throw new DatabaseException(e);
         }
 
@@ -286,6 +250,16 @@ public class CommandHandler {
       return ret.serialize();
     }
     catch (InterruptedException e) {
+      throw new DatabaseException(e);
+    }
+    catch (DeadServerException e) {
+      throw e; //don't log
+    }
+    catch (Exception e) {
+      if (-1 != ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class)) {
+        throw new DatabaseException(e); //don't log
+      }
+      logger.error("Error handling command: command=" + command, e);
       throw new DatabaseException(e);
     }
   }
@@ -348,6 +322,10 @@ public class CommandHandler {
 
   public ComObject dropTable(ComObject cobj, boolean replayedCommand) {
     return schemaManager.dropTable(cobj, replayedCommand);
+  }
+
+  public ComObject createDatabaseSlave(ComObject cobj, boolean replayedCommand) {
+    return schemaManager.createDatabaseSlave(cobj, replayedCommand);
   }
 
   public ComObject createDatabase(ComObject cobj, boolean replayedCommand) {

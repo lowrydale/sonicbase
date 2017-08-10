@@ -12,8 +12,7 @@ import com.sonicbase.schema.TableSchema;
 
 import java.io.*;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -25,6 +24,7 @@ import static com.sonicbase.server.TransactionManager.OperationType.*;
  */
 public class UpdateManager {
 
+  private final ThreadPoolExecutor executor;
   private Logger logger;
 
 
@@ -34,6 +34,7 @@ public class UpdateManager {
   public UpdateManager(DatabaseServer databaseServer) {
     this.server = databaseServer;
     this.logger = new Logger(databaseServer.getDatabaseClient());
+    this.executor = new ThreadPoolExecutor(64, 64, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
   }
 
   public ComObject deleteIndexEntry(ComObject cobj, boolean replayedCommand) {
@@ -359,29 +360,44 @@ public class UpdateManager {
 
   private AtomicLong insertCount = new AtomicLong();
 
-  public ComObject batchInsertIndexEntryByKeyWithRecord(ComObject cobj, boolean replayedCommand) {
+  public ComObject batchInsertIndexEntryByKeyWithRecord(ComObject cobj, final boolean replayedCommand) {
     long schemaVersion = cobj.getLong(ComObject.Tag.schemaVersion);
     if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
       throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
     }
 
-    long sequence0 = cobj.getLong(ComObject.Tag.sequence0);
-    long sequence1 = cobj.getLong(ComObject.Tag.sequence1);
+    final long sequence0 = cobj.getLong(ComObject.Tag.sequence0);
+    final long sequence1 = cobj.getLong(ComObject.Tag.sequence1);
 
     int count = 0;
-    AtomicLong transactionId = new AtomicLong();
-    AtomicBoolean isExplicitTrans = new AtomicBoolean();
+    final AtomicLong transactionId = new AtomicLong();
+    final AtomicBoolean isExplicitTrans = new AtomicBoolean();
     try {
-      ComArray array = cobj.getArray(ComObject.Tag.insertObjects);
+      List<Future> futures = new ArrayList<>();
+      final ComArray array = cobj.getArray(ComObject.Tag.insertObjects);
       for (int i = 0; i < array.getArray().size(); i++) {
+        final int offset = i;
         //todo: may need to restore sync
         if (server.getReplicationFactor() == 1) {
-          synchronized (server.getBatchRepartCount()) {
-            ComObject innerObj = (ComObject) array.getArray().get(i);
-            long sequence2 = i;
-            doInsertIndexEntryByKeyWithRecord(innerObj, sequence0, sequence1, sequence2, replayedCommand, transactionId, isExplicitTrans, false);
-            count++;
+          if (replayedCommand) {
+            futures.add(executor.submit(new Callable() {
+              @Override
+              public Object call() throws Exception {
+                ComObject innerObj = (ComObject) array.getArray().get(offset);
+                long sequence2 = offset;
+                doInsertIndexEntryByKeyWithRecord(innerObj, sequence0, sequence1, sequence2, replayedCommand, transactionId, isExplicitTrans, false);
+                return null;
+              }
+            }));
           }
+          else {
+            synchronized (server.getBatchRepartCount()) {
+              ComObject innerObj = (ComObject) array.getArray().get(offset);
+              long sequence2 = offset;
+              doInsertIndexEntryByKeyWithRecord(innerObj, sequence0, sequence1, sequence2, replayedCommand, transactionId, isExplicitTrans, false);
+            }
+          }
+          count++;
 //          while (server.isThrottleInsert()) {
 //            Thread.sleep(100);
 //          }
@@ -391,9 +407,22 @@ public class UpdateManager {
 //          while (server.getBatchRepartCount().get() != 0) {
 //            Thread.sleep(10);
 //          }
-          ComObject innerObj = (ComObject) array.getArray().get(i);
-          long sequence2 = i;
-          doInsertIndexEntryByKeyWithRecord(innerObj, sequence0, sequence1, sequence2, replayedCommand, transactionId, isExplicitTrans, false);
+          if (replayedCommand) {
+            futures.add(executor.submit(new Callable() {
+              @Override
+              public Object call() throws Exception {
+                ComObject innerObj = (ComObject) array.getArray().get(offset);
+                long sequence2 = offset;
+                doInsertIndexEntryByKeyWithRecord(innerObj, sequence0, sequence1, sequence2, replayedCommand, transactionId, isExplicitTrans, false);
+                return null;
+              }
+            }));
+          }
+          else {
+            ComObject innerObj = (ComObject) array.getArray().get(offset);
+            long sequence2 = offset;
+            doInsertIndexEntryByKeyWithRecord(innerObj, sequence0, sequence1, sequence2, replayedCommand, transactionId, isExplicitTrans, false);
+          }
           count++;
           //if (insertCount.incrementAndGet() % 5000 == 0) {
           //todo: may need to restore the throttle
@@ -403,6 +432,9 @@ public class UpdateManager {
           //}
           //      }
         }
+      }
+      for (Future future : futures) {
+        future.get();
       }
       if (isExplicitTrans.get()) {
         Transaction trans = server.getTransactionManager().getTransaction(transactionId.get());

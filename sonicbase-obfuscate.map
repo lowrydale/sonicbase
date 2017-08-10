@@ -4697,37 +4697,60 @@ com.sonicbase.server.TransactionManager$Transaction -> com.sonicbase.server.j$d:
     101:101:java.util.List access$000(com.sonicbase.server.TransactionManager$Transaction) -> a
     101:101:long access$600(com.sonicbase.server.TransactionManager$Transaction) -> b
 com.sonicbase.server.UpdateManager -> com.sonicbase.server.k:
-    com.sonicbase.common.Logger logger -> a
-    java.lang.String CURR_VER_STR -> b
-    com.sonicbase.server.DatabaseServer server -> c
-    java.util.concurrent.atomic.AtomicLong insertCount -> d
-    34:360:void <init>(com.sonicbase.server.DatabaseServer) -> <init>
-    40:93:com.sonicbase.common.ComObject deleteIndexEntry(com.sonicbase.common.ComObject,boolean) -> a
-    97:100:com.sonicbase.common.ComObject populateIndex(com.sonicbase.common.ComObject) -> a
-    104:174:com.sonicbase.common.ComObject doPopulateIndex(com.sonicbase.common.ComObject) -> b
-    178:186:com.sonicbase.common.ComObject deleteIndexEntryByKey(com.sonicbase.common.ComObject,boolean) -> b
-    192:230:com.sonicbase.common.ComObject doDeleteIndexEntryByKey(com.sonicbase.common.ComObject,boolean,java.util.concurrent.atomic.AtomicBoolean,java.util.concurrent.atomic.AtomicLong,boolean) -> a
-    235:257:com.sonicbase.common.ComObject batchInsertIndexEntryByKey(com.sonicbase.common.ComObject,boolean) -> c
-    261:273:com.sonicbase.common.ComObject insertIndexEntryByKey(com.sonicbase.common.ComObject,boolean) -> d
-    281:356:com.sonicbase.common.ComObject doInsertIndexEntryByKey(com.sonicbase.common.ComObject,boolean,java.util.concurrent.atomic.AtomicBoolean,java.util.concurrent.atomic.AtomicLong,boolean) -> b
-    363:421:com.sonicbase.common.ComObject batchInsertIndexEntryByKeyWithRecord(com.sonicbase.common.ComObject,boolean) -> e
-    426:445:com.sonicbase.common.ComObject insertIndexEntryByKeyWithRecord(com.sonicbase.common.ComObject,boolean) -> f
-    453:576:com.sonicbase.common.ComObject doInsertIndexEntryByKeyWithRecord(com.sonicbase.common.ComObject,long,long,long,boolean,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicBoolean,boolean) -> a
-    581:598:com.sonicbase.common.ComObject rollback(com.sonicbase.common.ComObject,boolean) -> g
-    602:659:com.sonicbase.common.ComObject commit(com.sonicbase.common.ComObject,boolean) -> h
-    664:672:com.sonicbase.common.ComObject updateRecord(com.sonicbase.common.ComObject,boolean) -> i
-    678:750:com.sonicbase.common.ComObject doUpdateRecord(com.sonicbase.common.ComObject,boolean,java.util.concurrent.atomic.AtomicBoolean,java.util.concurrent.atomic.AtomicLong,boolean) -> c
-    756:757:void doInsertKey(long,byte[],java.lang.Object[],com.sonicbase.index.Index,java.lang.String,java.lang.String,boolean) -> a
-    763:768:void doInsertKey(java.lang.Object[],byte[],java.lang.String,com.sonicbase.index.Index,com.sonicbase.schema.IndexSchema) -> a
-    775:795:void doInsertKeys(java.util.List,com.sonicbase.index.Index,java.lang.String,com.sonicbase.schema.IndexSchema) -> a
-    801:838:void doActualInsertKey(java.lang.Object[],byte[],java.lang.String,com.sonicbase.index.Index,com.sonicbase.schema.IndexSchema) -> b
-    854:953:void doActualInsertKeyWithRecord(byte[],java.lang.Object[],com.sonicbase.index.Index,java.lang.String,java.lang.String,boolean) -> a
-    994:1017:com.sonicbase.common.ComObject deleteRecord(com.sonicbase.common.ComObject,boolean) -> j
-    1022:1067:com.sonicbase.common.ComObject truncateTable(com.sonicbase.common.ComObject,boolean) -> k
-    1094:1161:void doRemoveIndexEntryByKey(java.lang.String,com.sonicbase.schema.TableSchema,java.lang.String,java.lang.Object[],java.lang.String,java.lang.Object[]) -> a
+    java.util.concurrent.ThreadPoolExecutor executor -> a
+    com.sonicbase.common.Logger logger -> b
+    java.lang.String CURR_VER_STR -> c
+    com.sonicbase.server.DatabaseServer server -> d
+    java.util.concurrent.atomic.AtomicLong insertCount -> e
+    34:361:void <init>(com.sonicbase.server.DatabaseServer) -> <init>
+    41:94:com.sonicbase.common.ComObject deleteIndexEntry(com.sonicbase.common.ComObject,boolean) -> a
+    98:101:com.sonicbase.common.ComObject populateIndex(com.sonicbase.common.ComObject) -> a
+    105:175:com.sonicbase.common.ComObject doPopulateIndex(com.sonicbase.common.ComObject) -> b
+    179:187:com.sonicbase.common.ComObject deleteIndexEntryByKey(com.sonicbase.common.ComObject,boolean) -> b
+    193:231:com.sonicbase.common.ComObject doDeleteIndexEntryByKey(com.sonicbase.common.ComObject,boolean,java.util.concurrent.atomic.AtomicBoolean,java.util.concurrent.atomic.AtomicLong,boolean) -> a
+    236:258:com.sonicbase.common.ComObject batchInsertIndexEntryByKey(com.sonicbase.common.ComObject,boolean) -> c
+    262:274:com.sonicbase.common.ComObject insertIndexEntryByKey(com.sonicbase.common.ComObject,boolean) -> d
+    282:357:com.sonicbase.common.ComObject doInsertIndexEntryByKey(com.sonicbase.common.ComObject,boolean,java.util.concurrent.atomic.AtomicBoolean,java.util.concurrent.atomic.AtomicLong,boolean) -> b
+    364:453:com.sonicbase.common.ComObject batchInsertIndexEntryByKeyWithRecord(com.sonicbase.common.ComObject,boolean) -> e
+    458:477:com.sonicbase.common.ComObject insertIndexEntryByKeyWithRecord(com.sonicbase.common.ComObject,boolean) -> f
+    485:608:com.sonicbase.common.ComObject doInsertIndexEntryByKeyWithRecord(com.sonicbase.common.ComObject,long,long,long,boolean,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicBoolean,boolean) -> a
+    613:630:com.sonicbase.common.ComObject rollback(com.sonicbase.common.ComObject,boolean) -> g
+    634:691:com.sonicbase.common.ComObject commit(com.sonicbase.common.ComObject,boolean) -> h
+    696:704:com.sonicbase.common.ComObject updateRecord(com.sonicbase.common.ComObject,boolean) -> i
+    710:782:com.sonicbase.common.ComObject doUpdateRecord(com.sonicbase.common.ComObject,boolean,java.util.concurrent.atomic.AtomicBoolean,java.util.concurrent.atomic.AtomicLong,boolean) -> c
+    788:789:void doInsertKey(long,byte[],java.lang.Object[],com.sonicbase.index.Index,java.lang.String,java.lang.String,boolean) -> a
+    795:800:void doInsertKey(java.lang.Object[],byte[],java.lang.String,com.sonicbase.index.Index,com.sonicbase.schema.IndexSchema) -> a
+    807:827:void doInsertKeys(java.util.List,com.sonicbase.index.Index,java.lang.String,com.sonicbase.schema.IndexSchema) -> a
+    833:870:void doActualInsertKey(java.lang.Object[],byte[],java.lang.String,com.sonicbase.index.Index,com.sonicbase.schema.IndexSchema) -> b
+    886:985:void doActualInsertKeyWithRecord(byte[],java.lang.Object[],com.sonicbase.index.Index,java.lang.String,java.lang.String,boolean) -> a
+    1026:1049:com.sonicbase.common.ComObject deleteRecord(com.sonicbase.common.ComObject,boolean) -> j
+    1054:1099:com.sonicbase.common.ComObject truncateTable(com.sonicbase.common.ComObject,boolean) -> k
+    1126:1193:void doRemoveIndexEntryByKey(java.lang.String,com.sonicbase.schema.TableSchema,java.lang.String,java.lang.Object[],java.lang.String,java.lang.Object[]) -> a
 com.sonicbase.server.UpdateManager$1 -> com.sonicbase.server.k$1:
+    com.sonicbase.common.ComArray val$array -> a
+    int val$offset -> b
+    long val$sequence0 -> c
+    long val$sequence1 -> d
+    boolean val$replayedCommand -> e
+    java.util.concurrent.atomic.AtomicLong val$transactionId -> f
+    java.util.concurrent.atomic.AtomicBoolean val$isExplicitTrans -> g
+    com.sonicbase.server.UpdateManager this$0 -> h
+    383:383:void <init>(com.sonicbase.server.UpdateManager,com.sonicbase.common.ComArray,int,long,long,boolean,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicBoolean) -> <init>
+    386:389:java.lang.Object call() -> call
+com.sonicbase.server.UpdateManager$2 -> com.sonicbase.server.k$2:
+    com.sonicbase.common.ComArray val$array -> a
+    int val$offset -> b
+    long val$sequence0 -> c
+    long val$sequence1 -> d
+    boolean val$replayedCommand -> e
+    java.util.concurrent.atomic.AtomicLong val$transactionId -> f
+    java.util.concurrent.atomic.AtomicBoolean val$isExplicitTrans -> g
+    com.sonicbase.server.UpdateManager this$0 -> h
+    411:411:void <init>(com.sonicbase.server.UpdateManager,com.sonicbase.common.ComArray,int,long,long,boolean,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicBoolean) -> <init>
+    414:417:java.lang.Object call() -> call
+com.sonicbase.server.UpdateManager$3 -> com.sonicbase.server.k$3:
     int[] $SwitchMap$com$sonicbase$server$TransactionManager$OperationType -> a
-    619:619:void <clinit>() -> <clinit>
+    651:651:void <clinit>() -> <clinit>
 com.sonicbase.socket.DatabaseSocketClient -> com.sonicbase.c.a:
     int CONNECTION_COUNT -> d
     org.apache.log4j.Logger logger -> e

@@ -21,6 +21,15 @@
                 return;
             }
 
+            var radios = document.getElementsByName('site');
+            var site = "";
+            for (var i = 0, length = radios.length; i < length; i++) {
+                if (radios[i].checked) {
+                    site = radios[i].value;
+                    break;
+                }
+            }
+
             $.ajaxSetup({
                 error: function(xhr){
                     alert('Request Status: ' + xhr.status + ' Status Text: ' + xhr.statusText + ' ' + xhr.responseText);
@@ -37,7 +46,7 @@
                     "Accept":"application/text",
                     "Content-type":"application/json"
                 },   url:"/app/account/create?email=" + encodeURI(email) + "&password=" + encodeURI(password) +
-                            "&captchaResponse=" + encodeURI(captchaResponse),
+                            "&referringSite=" + site + "&captchaResponse=" + encodeURI(captchaResponse),
                 success:function(response){
                     createCookie("SBSessionId", response, COOKIE_LIFE);
                     window.location.href = "/app-static/licenses.html";
@@ -52,15 +61,12 @@
     </script>
 
     <script>
-        alert("here");
         var widgetId1;
     var onloadCallback = function() {
-        alert("callback");
         widgetId1 = grecaptcha.render('html_element', {
         'sitekey' : '6LeM4SUUAAAAAPLlOmkIeRMGZCSdVbmxibYPgPux',
         'theme' : 'light'
         });
-        alert("after");
     };
     </script>
 </head>
@@ -80,10 +86,7 @@
     </header>
 
     <div style="margin-left: 4em;">
-    <br/>
-        <br/>
-        <br/>
-        <br/>
+
     <form id="create-account-form" name="create-account-form" action="javascript:;">
     <table>
         <tr>
@@ -97,18 +100,33 @@
         <tr>
             <td align="right">Renter Password:</td>
             <td><input type="password" id="password2"></td>
+            <br/>
         </tr>
+
+        <tr><td>How did you hear<br/> about SonicBase?</td>
+            <td>
+            <input type="radio" name="site" value="google"> Google<br>
+            <input type="radio" name="site" value="bing"> Bing<br>
+            <input type="radio" name="site" value="facebook"> Facebook<br>
+            <input type="radio" name="site" value="other" checked> Other<br/>
+        </td></tr>
+
         <tr>
+            <br/><br/>
             <td></td><td><button type="button" onclick="createAccount(document.getElementById('create-account-form'))">Create Account</button></td>
         </tr>
     </table>
 
     </form>
+        <br/><br/>
         <div id="html_element"></div>
         <script src="https://www.google.com/recaptcha/api.js?onload=onloadCallback&render=explicit"
                 async defer>
         </script>
     </div>
+    <footer>
+        <script type="text/javascript" src="https://cdn.ywxi.net/js/1.js" async></script>
+    </footer>
 </div>
 </body>
 </html>

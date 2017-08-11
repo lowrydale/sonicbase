@@ -308,6 +308,10 @@ public class CommandHandler {
     return existingSequenceNumber;
   }
 
+  public ComObject licenseCheckin(ComObject cobj, boolean replayedCommand) {
+    return server.licenseCheckin(cobj);
+  }
+
   public ComObject areAllLongRunningCommandsComplete(ComObject cobj, boolean replayedCommand) {
     return server.areAllLongRunningCommandsComplete(cobj);
   }

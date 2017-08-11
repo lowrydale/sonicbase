@@ -187,7 +187,10 @@ public class ComObject {
     percentComplete(111, doubleType),
     stage(112, stringType),
     error(113, booleanType),
-    command(114, stringType);
+    command(114, stringType),
+    inCompliance(115, booleanType),
+    disableNow(116, booleanType),
+    coreCount(117, intType);
 
     public final int tag;
 

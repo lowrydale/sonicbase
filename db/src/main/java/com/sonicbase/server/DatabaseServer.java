@@ -115,6 +115,9 @@ public class DatabaseServer {
   private boolean applyingQueuesAndInteractive;
   private CommandHandler commandHandler;
   private AddressMap addressMap;
+  private boolean shutdownMasterValidatorThread = false;
+  private Thread masterLicenseValidatorThread;
+
 
   @SuppressWarnings("restriction")
   private static Unsafe getUnsafe() {
@@ -385,7 +388,35 @@ public class DatabaseServer {
     return commandHandler.getTestWriteCallCount();
   }
 
-    private void startMasterMonitor() {
+  private void startMasterMonitor() {
+    if (replicationFactor == 1) {
+      if (shard != 0) {
+        return;
+      }
+      Thread thread = new Thread(new Runnable(){
+        @Override
+        public void run() {
+          while (true) {
+            try {
+              promoteToMaster(null);
+              break;
+            }
+            catch (Exception e) {
+              logger.error("Error promoting to master", e);
+              try {
+                Thread.sleep(2000);
+              }
+              catch (InterruptedException e1) {
+                break;
+              }
+            }
+          }
+        }
+      });
+      thread.start();
+      return;
+    }
+
     Thread thread = new Thread(new Runnable() {
       @Override
       public void run() {
@@ -644,6 +675,9 @@ public class DatabaseServer {
       logManager.skipToMaxSequenceNumber();
 
       if (shard == 0) {
+        shutdownMasterLicenseValidator();
+        startMasterLicenseValidator();
+
         shutdownDeathMonitor();
 
         logger.info("starting death monitor");
@@ -706,8 +740,9 @@ public class DatabaseServer {
               }
               logger.info("Death status=" + builder.toString());
 
-              if (isNoLongerMaster()) {
+              if (replicationFactor > 1 && isNoLongerMaster()) {
                 logger.info("No longer master. Shutting down resources");
+                shutdownMasterLicenseValidator();
                 shutdownDeathMonitor();
                 shutdownRepartitioner();
                 break;
@@ -1054,6 +1089,120 @@ public class DatabaseServer {
     }
   }
 
+
+  private Map<Integer, Map<Integer, Integer>> numberOfCoresPerServer = new HashMap<>();
+
+  private void startMasterLicenseValidator() {
+
+    shutdownMasterValidatorThread = false;
+
+    if (overrideProLicense) {
+      logger.info("Overriding pro license");
+      haveProLicense = true;
+      common.setHaveProLicense(haveProLicense);
+      common.saveSchema(dataDir);
+      return;
+    }
+    haveProLicense = true;
+
+    final AtomicBoolean haventSet = new AtomicBoolean(true);
+//    if (usingMultipleReplicas) {
+//      throw new InsufficientLicense("You must have a pro license to use multiple replicas");
+//    }
+
+    final AtomicInteger licensePort = new AtomicInteger();
+    String json = null;
+    try {
+      json = StreamUtils.inputStreamToString(DatabaseServer.class.getResourceAsStream("/config-license-server.json"));
+    }
+    catch (Exception e) {
+      logger.error("Error initializing license validator", e);
+      common.setHaveProLicense(false);
+      common.saveSchema(dataDir);
+      DatabaseServer.this.haveProLicense = false;
+      disableNow = true;
+      haventSet.set(false);
+      return;
+    }
+    JsonDict config = new JsonDict(json);
+    licensePort.set(config.getDict("server").getInt("port"));
+    final String address = config.getDict("server").getString("privateAddress");
+
+    final AtomicBoolean lastHaveProLicense = new AtomicBoolean(haveProLicense);
+
+    masterLicenseValidatorThread = new Thread(new Runnable() {
+      @Override
+      public void run() {
+        while (!shutdownMasterValidatorThread) {
+          try {
+            int cores = 0;
+            synchronized (numberOfCoresPerServer) {
+              for (Map.Entry<Integer, Map<Integer, Integer>> shardEntry : numberOfCoresPerServer.entrySet()) {
+                for (Map.Entry<Integer, Integer> replicaEntry : shardEntry.getValue().entrySet()) {
+                  cores += replicaEntry.getValue();
+                }
+              }
+            }
+            HttpResponse response = DatabaseClient.restGet("https://" + address + ":" + licensePort.get() + "/license/checkIn?" +
+                "primaryAddress=" + common.getServersConfig().getShards()[0].getReplicas()[0].getPrivateAddress() +
+                "&primaryPort=" + common.getServersConfig().getShards()[0].getReplicas()[0].getPort() +
+                "&cluster=" + cluster + "&cores=" + cores);
+            String responseStr = StreamUtils.inputStreamToString(response.getContent());
+            logger.info("CheckIn response: " + responseStr);
+
+            JsonDict dict = new JsonDict(responseStr);
+
+            DatabaseServer.this.haveProLicense = dict.getBoolean("inCompliance");
+            DatabaseServer.this.disableNow = dict.getBoolean("disableNow");
+
+            logger.info("lastHaveProLicense=" + lastHaveProLicense.get() + ", haveProLicense=" + haveProLicense);
+            if (haventSet.get() || lastHaveProLicense.get() != haveProLicense) {
+              common.setHaveProLicense(haveProLicense);
+              common.saveSchema(dataDir);
+              lastHaveProLicense.set(haveProLicense);
+              haventSet.set(true);
+              logger.info("Saving schema with haveProLicense=" + haveProLicense);
+            }
+          }
+          catch (Exception e) {
+            logger.error("license server not found");
+            if (haventSet.get() || lastHaveProLicense.get() != false) {
+              common.setHaveProLicense(false);
+              common.saveSchema(dataDir);
+              DatabaseServer.this.haveProLicense = false;
+              lastHaveProLicense.set(false);
+              haventSet.set(false);
+              disableNow = true;
+            }
+            errorLogger.debug("License server not found", e);
+          }
+          try {
+            Thread.sleep(60 * 1000);
+          }
+          catch (InterruptedException e) {
+            logger.error("Error checking licenses", e);
+          }
+        }
+      }
+    });
+    masterLicenseValidatorThread.start();
+  }
+
+  private void shutdownMasterLicenseValidator() {
+    shutdownMasterValidatorThread = true;
+    if (masterLicenseValidatorThread != null) {
+      masterLicenseValidatorThread.interrupt();
+
+      try {
+        masterLicenseValidatorThread.join();
+        masterLicenseValidatorThread = null;
+      }
+      catch (InterruptedException e) {
+        throw new DatabaseException(e);
+      }
+    }
+  }
+
   private void startLicenseValidator() {
     if (overrideProLicense) {
       logger.info("Overriding pro license");
@@ -1095,15 +1244,20 @@ public class DatabaseServer {
         while (true) {
           try {
             int cores = Runtime.getRuntime().availableProcessors();
-            HttpResponse response = DatabaseClient.restGet("https://" + address + ":" + licensePort.get() + "/license/checkIn?" +
-                "address=" + DatabaseServer.this.host + "&port=" + DatabaseServer.this.port + "&cores=" + cores);
-            String responseStr = StreamUtils.inputStreamToString(response.getContent());
-            logger.info("CheckIn response: " + responseStr);
 
-            JsonDict dict = new JsonDict(responseStr);
+            ComObject cobj = new ComObject();
+            cobj.put(ComObject.Tag.dbName, "__none__");
+            cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+            cobj.put(ComObject.Tag.method, "licenseCheckin");
+            cobj.put(ComObject.Tag.shard, shard);
+            cobj.put(ComObject.Tag.replica, replica);
+            cobj.put(ComObject.Tag.coreCount, cores);
+            String command = "DatabaseServer:ComObject:licenseCheckin:";
+            byte[] ret = client.get().sendToMaster(command, cobj);
+            ComObject retObj = new ComObject(ret);
 
-            DatabaseServer.this.haveProLicense = dict.getBoolean("inCompliance");
-            DatabaseServer.this.disableNow = dict.getBoolean("disableNow");
+            DatabaseServer.this.haveProLicense = retObj.getBoolean(ComObject.Tag.inCompliance);
+            DatabaseServer.this.disableNow = retObj.getBoolean(ComObject.Tag.disableNow);
 
             logger.info("lastHaveProLicense=" + lastHaveProLicense.get() + ", haveProLicense=" + haveProLicense);
             if (haventSet.get() || lastHaveProLicense.get() != haveProLicense) {
@@ -1136,6 +1290,25 @@ public class DatabaseServer {
       }
     });
     thread.start();
+  }
+
+  public ComObject licenseCheckin(ComObject cobj) {
+    int shard = cobj.getInt(ComObject.Tag.shard);
+    int replica = cobj.getInt(ComObject.Tag.replica);
+    int cores = cobj.getInt(ComObject.Tag.coreCount);
+    synchronized (numberOfCoresPerServer) {
+      Map<Integer, Integer> replicaMap = numberOfCoresPerServer.get(shard);
+      if (replicaMap == null) {
+        replicaMap = new HashMap<>();
+        numberOfCoresPerServer.put(shard, replicaMap);
+      }
+      replicaMap.put(replica, cores);
+    }
+
+    ComObject retObj = new ComObject();
+    retObj.put(ComObject.Tag.inCompliance, this.haveProLicense);
+    retObj.put(ComObject.Tag.disableNow, this.disableNow);
+    return retObj;
   }
 
   public ComObject prepareForBackup(ComObject cobj) {

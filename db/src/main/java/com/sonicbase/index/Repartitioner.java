@@ -1390,7 +1390,8 @@ public class Repartitioner extends Thread {
 
       List<Future> futures = new ArrayList<>();
       int replicaCount = databaseServer.getReplicationFactor();
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(replicaCount - 1, replicaCount - 1, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+      ThreadPoolExecutor executor = new ThreadPoolExecutor(replicaCount == 1 ? 1 :replicaCount - 1,
+          replicaCount == 1 ? 1 : replicaCount - 1, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
       for (int i = 0; i < replicaCount; i++) {
         final int replica = i;
 //        if (replica == databaseServer.getReplica()) {

@@ -134,8 +134,12 @@ public class JsonDict {
     throw new DatabaseException("Unsupported datatype: " + ret.getClass().getName());
   }
 
-  public int getInt(String key) {
-    return (int)(long)getLong(key);
+  public Integer getInt(String key) {
+    Long l = getLong(key);
+    if (l == null) {
+      return null;
+    }
+    return (int)(long)l;
   }
 
   public Double getDouble(String key) {

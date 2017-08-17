@@ -52,7 +52,9 @@ public class LogManager {
     this.databaseServer = databaseServer;
     this.server = databaseServer;
     logger = new Logger(databaseServer.getDatabaseClient());
-    executor = new ThreadPoolExecutor(64, 64, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+    executor = new ThreadPoolExecutor(Runtime.getRuntime().availableProcessors() * 8,
+        Runtime.getRuntime().availableProcessors() * 8, 10000, TimeUnit.MILLISECONDS,
+        new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
     synchronized (this) {
       try {
@@ -645,34 +647,43 @@ public class LogManager {
     cobj.put(ComObject.Tag.method, "sendLogsToPeer");
     cobj.put(ComObject.Tag.replica, server.getReplica());
     String command = "DatabaseServer:ComObject:sendLogsToPeer:";
-    byte[] ret = server.getClient().send(null, server.getShard(), replica, command, cobj, DatabaseClient.Replica.specified);
-    ComObject retObj = new ComObject(ret);
-    ComArray filenames = retObj.getArray(ComObject.Tag.filenames);
-    if (filenames != null) {
-      for (int i = 0; i < filenames.getArray().size(); i++) {
-        String filename = (String) filenames.getArray().get(i);
+    AtomicBoolean isHealthy = new AtomicBoolean();
+    try {
+      server.checkHealthOfServer(server.getShard(), replica, isHealthy, false);
+    }
+    catch (InterruptedException e) {
+      return;
+    }
+    if (isHealthy.get()) {
+      byte[] ret = server.getClient().send(null, server.getShard(), replica, command, cobj, DatabaseClient.Replica.specified);
+      ComObject retObj = new ComObject(ret);
+      ComArray filenames = retObj.getArray(ComObject.Tag.filenames);
+      if (filenames != null) {
+        for (int i = 0; i < filenames.getArray().size(); i++) {
+          String filename = (String) filenames.getArray().get(i);
+          cobj = new ComObject();
+          cobj.put(ComObject.Tag.dbName, "__none__");
+          cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
+          cobj.put(ComObject.Tag.method, "getLogFile");
+          cobj.put(ComObject.Tag.replica, server.getReplica());
+          cobj.put(ComObject.Tag.filename, filename);
+          command = "DatabaseServer:ComObject:getLogFile:";
+          ret = server.getClient().send(null, server.getShard(), replica, command, cobj, DatabaseClient.Replica.specified);
+          retObj = new ComObject(ret);
+          byte[] bytes = retObj.getByteArray(ComObject.Tag.binaryFileContent);
+
+          receiveExternalLog(replica, filename, bytes);
+          logger.info("Received log file: filename=" + filename + ", replica=" + replica);
+        }
         cobj = new ComObject();
         cobj.put(ComObject.Tag.dbName, "__none__");
         cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-        cobj.put(ComObject.Tag.method, "getLogFile");
+        cobj.put(ComObject.Tag.method, "deletePeerLogs");
         cobj.put(ComObject.Tag.replica, server.getReplica());
-        cobj.put(ComObject.Tag.filename, filename);
-        command = "DatabaseServer:ComObject:getLogFile:";
+        command = "DatabaseServer:ComObject:deletePeerLogs:";
         ret = server.getClient().send(null, server.getShard(), replica, command, cobj, DatabaseClient.Replica.specified);
-        retObj = new ComObject(ret);
-        byte[] bytes = retObj.getByteArray(ComObject.Tag.binaryFileContent);
 
-        receiveExternalLog(replica, filename, bytes);
-        logger.info("Received log file: filename=" + filename + ", replica=" + replica);
       }
-      cobj = new ComObject();
-      cobj.put(ComObject.Tag.dbName, "__none__");
-      cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "deletePeerLogs");
-      cobj.put(ComObject.Tag.replica, server.getReplica());
-      command = "DatabaseServer:ComObject:deletePeerLogs:";
-      ret = server.getClient().send(null, server.getShard(), replica, command, cobj, DatabaseClient.Replica.specified);
-
     }
   }
 

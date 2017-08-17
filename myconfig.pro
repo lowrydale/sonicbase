@@ -34,6 +34,7 @@
 -keep public class com.sonicbase.server.CommandHandler
 -keep public class com.sonicbase.common.WindowsTerminal
 -keep public class com.sonicbase.query.impl.ResultSetImpl
+-keep public class com.sonicbase.query.ResultSet
 -keep public class com.sonicbase.util.ISO8601
 -keep public class com.sonicbase.util.JsonDict
 -keep public class com.sonicbase.util.JsonArray

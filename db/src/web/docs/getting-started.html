@@ -37,10 +37,12 @@
     <div style="margin-left: 4em;">
 
 <br/>
-In this tutorial we will walk you through the process of starting a cluster and inserting and reading from it.<br/>
+In this tutorial we will walk you through the process of starting a cluster and inserting into and reading from it.<br/>
 <br/>
 <h1>Download The Software</h1>
-Go to the <a href="../downloads.html">downloads</a> section of the SonicBase website and download the latest version.
+        <div class="mylink">
+Go to the <a href="javascript:parent.window.location.href='../downloads.html'">downloads</a> section of the SonicBase website and download the latest version.
+        </div>
 <h1>Unpack Package</h1>
 Type "tar -xzf sonicbase-&lt;version&gt;.tgz" in the parent directory where you want the software to go.
 <h1>Start Client</h1>
@@ -54,15 +56,27 @@ Go to the sonicbase/bin directory and type "./cli" for MacOS and Linux and "./cl
 <h1>Use Cluster</h1>
 In the client, type:<br/>
 &nbsp;&nbsp;use cluster 1-local<br/><br/>
-This will allow you to use the 1-local cluster. You can create other clusters by modifying the config in
-the sonicbase/config directory.
+        <div class="mylink">
+This will allow you to use the 1-local cluster. You can create other clusters by adding a config file for each cluster
+in the sonicbase/config directory. The name of the file must be "config-&lt;cluster name&gt;.json". See
+        <a href="config.html?framed=true">Configuration Files</a> for more detail.
+        </div>
+        <h1>Passwordless SSH</h1>
+        If your servers aren't local, for Linux and Mac you need to setup passwordless ssh between all your servers and the local machine before taking
+        the next steps.
+        <h1>Deploy Cluster</h1>
+        In the client, type:<br/>
+        &nbsp;&nbsp;deploy cluster<br/><br/>
+        If all your servers are local, you do not need to deploy the cluster. Note that this command is not available
+        in Windows. In Windows you need to manually copy the local install directory to each server in the location
+        specified by "installDirectory" in the config file.
 <h1>Start Cluster</h1>
 In the client, type:<br/>
 &nbsp;&nbsp;start cluster<br/><br/>
-This will start the cluster locally.
+This will start the cluster on the servers specified in the config file.
 <h1>Create Database</h1>
 In the client, type:<br/>
-&nbsp;&nbsp;create database db<br/>
+&nbsp;&nbsp;create database db<br/><br/>
 This will create the database named "db".
 <h1>Create Table</h1>
 In the client, type:<br/>
@@ -70,7 +84,7 @@ In the client, type:<br/>
 <h1>Insert Record</h1>
 In the client, type:<br/>
 &nbsp;&nbsp;insert into persons (name, age, ssn) VALUES ('bob', 22, '555-66-7777')<br/>
-<h1>Select Record</h1>
+<h1>Read Record</h1>
 In the client, type:<br/>
 &nbsp;&nbsp;select * from persons<br/>
 <br/>
@@ -90,7 +104,7 @@ class Test {<br/>
 &nbsp;&nbsp;}<br/>
 }<br/>
 <h1>Stop Cluster</h1>
-In the client, type:
+In the client, type:<br/>
 &nbsp;&nbsp;stop cluster
 </div>
 </div>

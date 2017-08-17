@@ -29,7 +29,9 @@ public class AWSClient {
 
   }
 
-  private ThreadPoolExecutor executor = new ThreadPoolExecutor(8, 8, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+  private ThreadPoolExecutor executor = new ThreadPoolExecutor(Runtime.getRuntime().availableProcessors(),
+      Runtime.getRuntime().availableProcessors(), 10000, TimeUnit.MILLISECONDS,
+      new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
   public TransferManager getTransferManager() {
     File installDir = getInstallDir();

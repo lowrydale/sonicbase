@@ -19,7 +19,6 @@ import com.sonicbase.server.ReadManager;
 import com.sonicbase.server.SnapshotManager;
 import com.sonicbase.socket.DatabaseSocketClient;
 import com.sonicbase.socket.DeadServerException;
-import com.sonicbase.util.DataUtil;
 import com.sonicbase.util.JsonArray;
 import com.sonicbase.util.JsonDict;
 import com.sonicbase.util.StreamUtils;
@@ -517,6 +516,11 @@ public class DatabaseClient {
             cobj1.put(ComObject.Tag.dbName, dbName);
             cobj1.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
             cobj1.put(ComObject.Tag.method, "batchInsertIndexEntryByKeyWithRecord");
+            cobj1.put(ComObject.Tag.isExcpliciteTrans, isExplicitTrans());
+            cobj1.put(ComObject.Tag.isCommitting, isCommitting());
+            cobj1.put(ComObject.Tag.transactionId, getTransactionId());
+            cobj1.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+
             cobj1.putArray(ComObject.Tag.insertObjects, ComObject.Type.objectType);
             cobjs1.add(cobj1);
 
@@ -524,24 +528,27 @@ public class DatabaseClient {
             cobj2.put(ComObject.Tag.dbName, dbName);
             cobj2.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
             cobj2.put(ComObject.Tag.method, "batchInsertIndexEntryByKey");
+            cobj2.put(ComObject.Tag.isExcpliciteTrans, isExplicitTrans());
+            cobj2.put(ComObject.Tag.isCommitting, isCommitting());
+            cobj2.put(ComObject.Tag.transactionId, getTransactionId());
+            cobj2.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
             cobj2.putArray(ComObject.Tag.insertObjects, ComObject.Type.objectType);
             cobjs2.add(cobj2);
 
           }
           synchronized (mutex) {
             for (PreparedInsert insert : withRecordPrepared) {
-              ComObject obj = serializeInsertKeyWithRecord(insert.dbName, insert.tableName, insert.keyInfo, insert.record);
+              ComObject obj = serializeInsertKeyWithRecord(insert.dbName, insert.tableId, insert.indexId, insert.tableName, insert.keyInfo, insert.record);
               cobjs1.get(insert.keyInfo.shard).getArray(ComObject.Tag.insertObjects).getArray().add(obj);
               withRecordProcessed.get(insert.keyInfo.shard).add(insert);
             }
             for (PreparedInsert insert : prepared) {
-              ComObject obj = serializeInsertKey(insert.dbName, insert.tableName, insert.keyInfo,
+              ComObject obj = serializeInsertKey(insert.dbName, insert.tableId, insert.indexId, insert.tableName, insert.keyInfo,
                   insert.primaryKeyIndexName, insert.primaryKey);
               cobjs2.get(insert.keyInfo.shard).getArray(ComObject.Tag.insertObjects).getArray().add(obj);
               processed.get(insert.keyInfo.shard).add(insert);
             }
           }
-
 
           List<Future> futures = new ArrayList<>();
           for (int i = 0; i < bytesOut.size(); i++) {
@@ -1257,6 +1264,14 @@ public class DatabaseClient {
                             body.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
                             continue;
                           }
+//
+//                          try {
+//                            localCommand = handleSchemaOutOfSyncException(localCommand, e);
+//                          }
+//                          catch (SchemaOutOfSyncException e1) {
+//                            body.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+//                            continue;
+//                          }
                           throw e;
                         }
                       }
@@ -1275,6 +1290,13 @@ public class DatabaseClient {
                             body.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
                             continue;
                           }
+//                          try {
+//                            localCommand = handleSchemaOutOfSyncException(localCommand, e);
+//                          }
+//                          catch (SchemaOutOfSyncException e1) {
+//                            body.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+//                            continue;
+//                          }
                           if (-1 != ExceptionUtils.indexOfThrowable(e, DeadServerException.class)) {
                             dead = true;
                             continue;
@@ -1748,6 +1770,9 @@ public class DatabaseClient {
     else if (parts[1].trim().equalsIgnoreCase("shards")) {
       return describeShards(dbName);
     }
+    else if (parts[1].trim().equalsIgnoreCase("repartitioner")) {
+      return describeRepartitioner(dbName);
+    }
     else if (parts[1].trim().equalsIgnoreCase("server") &&
         parts[2].trim().equalsIgnoreCase("stats")) {
       return describeServerStats(dbName);
@@ -1779,9 +1804,9 @@ public class DatabaseClient {
       builder.append("total allocated cores=" + dict.getInt("allocatedCores") + "\n");
       builder.append("in compliance=" + dict.getBoolean("inCompliance") + "\n");
       builder.append("disabling now=" + dict.getBoolean("disableNow") + "\n");
-      JsonArray servers = dict.getArray("servers");
+      JsonArray servers = dict.getArray("clusters");
       for (int i = 0; i < servers.size(); i++) {
-        builder.append(servers.getDict(i).getString("host") + "=" + servers.getDict(i).getInt("cores") + "\n");
+        builder.append(servers.getDict(i).getString("cluster") + "=" + servers.getDict(i).getInt("cores") + "\n");
       }
 
       String ret = builder.toString();
@@ -2052,6 +2077,56 @@ public class DatabaseClient {
         throw new DatabaseException(e);
       }
     }
+  }
+
+  class ShardState {
+    private int shard;
+    private long count;
+    public String exception;
+  }
+
+  public ResultSetImpl describeRepartitioner(String dbName) {
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.dbName, dbName);
+    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+    cobj.put(ComObject.Tag.method, "getRepartitionerState");
+    String command = "DatabaseServer:ComObject:getRepartitionerState:";
+    byte[] ret = sendToMaster(command, cobj);
+    ComObject retObj = new ComObject(ret);
+
+    StringBuilder builder = new StringBuilder();
+    String state = retObj.getString(ComObject.Tag.state);
+    builder.append("state=" + state).append("\n");
+    if (state.equals("rebalancing")) {
+      builder.append("table=").append(retObj.getString(ComObject.Tag.tableName)).append("\n");
+      builder.append("index=").append(retObj.getString(ComObject.Tag.indexName)).append("\n");
+      builder.append("shards:\n");
+      List<ShardState> shards = new ArrayList<>();
+      ComArray array = retObj.getArray(ComObject.Tag.shards);
+      for (int i = 0; i < array.getArray().size(); i++) {
+        ShardState shardState = new ShardState();
+        shardState.shard = ((ComObject)array.getArray().get(i)).getInt(ComObject.Tag.shard);
+        shardState.count = ((ComObject)array.getArray().get(i)).getLong(ComObject.Tag.countLong);
+        shardState.exception = ((ComObject)array.getArray().get(i)).getString(ComObject.Tag.exception);
+
+        shards.add(shardState);
+      }
+      Collections.sort(shards, new Comparator<ShardState>() {
+        @Override
+        public int compare(ShardState o1, ShardState o2) {
+          return Integer.compare(o1.shard, o2.shard);
+        }
+      });
+      for (ShardState shardState : shards) {
+        builder.append("shard " + shardState.shard + "=" + shardState.count).append("\n");
+        if (shardState.exception != null) {
+          builder.append(shardState.exception.substring(0, 300));
+        }
+      }
+    }
+    String retStr = builder.toString();
+    String[] lines = retStr.split("\\n");
+    return new ResultSetImpl(lines);
   }
 
   private StringBuilder doDescribeIndex(String dbName, String table, String index, StringBuilder builder) {
@@ -2392,11 +2467,18 @@ public class DatabaseClient {
     try {
       String command = "DatabaseServer:ComObject:insertIndexEntryByKey:";
 
-      ComObject cobj = serializeInsertKey(dbName, tableName, keyInfo, primaryKeyIndexName, primaryKey);
+      int tableId = common.getTables(dbName).get(tableName).getTableId();
+      int indexId = common.getTables(dbName).get(tableName).getIndexes().get(keyInfo.indexSchema.getKey()).getIndexId();
+      ComObject cobj = serializeInsertKey(dbName, tableId, indexId, tableName, keyInfo, primaryKeyIndexName, primaryKey);
 
       cobj.put(ComObject.Tag.dbName, dbName);
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
       cobj.put(ComObject.Tag.method, "insertIndexEntryByKey");
+      cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+      cobj.put(ComObject.Tag.isExcpliciteTrans, isExplicitTrans());
+      cobj.put(ComObject.Tag.isCommitting, isCommitting());
+      cobj.put(ComObject.Tag.transactionId, getTransactionId());
+
       send("DatabaseServer:insertIndexEntryByKey", keyInfo.shard, rand.nextLong(), command, cobj, DatabaseClient.Replica.def);
     }
     catch (IOException e) {
@@ -2404,17 +2486,19 @@ public class DatabaseClient {
     }
   }
 
-  private ComObject serializeInsertKey(String dbName, String tableName, KeyInfo keyInfo,
-                                    String primaryKeyIndexName, Object[] primaryKey) throws IOException {
+  private ComObject serializeInsertKey(String dbName, int tableId, int indexId, String tableName, KeyInfo keyInfo,
+                                       String primaryKeyIndexName, Object[] primaryKey) throws IOException {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.serializationVersion, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-    cobj.put(ComObject.Tag.dbName, dbName);
-    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-    cobj.put(ComObject.Tag.tableName, tableName);
-    cobj.put(ComObject.Tag.indexName, keyInfo.indexSchema.getKey());
-    cobj.put(ComObject.Tag.isExcpliciteTrans, isExplicitTrans());
-    cobj.put(ComObject.Tag.isCommitting, isCommitting());
-    cobj.put(ComObject.Tag.transactionId, getTransactionId());
+//    cobj.put(ComObject.Tag.dbName, dbName);
+//    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+    cobj.put(ComObject.Tag.tableId, tableId);
+    cobj.put(ComObject.Tag.indexId, indexId);
+//    cobj.put(ComObject.Tag.tableName, tableName);
+//    cobj.put(ComObject.Tag.indexName, keyInfo.indexSchema.getKey());
+//    cobj.put(ComObject.Tag.isExcpliciteTrans, isExplicitTrans());
+//    cobj.put(ComObject.Tag.isCommitting, isCommitting());
+//    cobj.put(ComObject.Tag.transactionId, getTransactionId());
     byte[] keyBytes = DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), keyInfo.indexSchema.getKey(), keyInfo.key);
     cobj.put(ComObject.Tag.keyBytes, keyBytes);
     byte[] primaryKeyBytes = DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), primaryKeyIndexName, primaryKey);
@@ -2433,10 +2517,16 @@ public class DatabaseClient {
     try {
       String command = "DatabaseServer:ComObject:insertIndexEntryByKeyWithRecord:";
 
-      ComObject cobj = serializeInsertKeyWithRecord(dbName, tableName, keyInfo, record);
+      int tableId = common.getTables(dbName).get(tableName).getTableId();
+      int indexId = common.getTables(dbName).get(tableName).getIndexes().get(keyInfo.indexSchema.getKey()).getIndexId();
+      ComObject cobj = serializeInsertKeyWithRecord(dbName, tableId, indexId, tableName, keyInfo, record);
       cobj.put(ComObject.Tag.dbName, dbName);
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
       cobj.put(ComObject.Tag.method, "insertIndexEntryByKeyWithRecord");
+      cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+      cobj.put(ComObject.Tag.isExcpliciteTrans, isExplicitTrans());
+      cobj.put(ComObject.Tag.isCommitting, isCommitting());
+      cobj.put(ComObject.Tag.transactionId, getTransactionId());
 
       int replicaCount = getReplicaCount();
       Exception lastException = null;
@@ -2468,18 +2558,20 @@ public class DatabaseClient {
     }
   }
 
-  private ComObject serializeInsertKeyWithRecord(String dbName, String tableName,
-                                            KeyInfo keyInfo, Record record) throws IOException {
+  private ComObject serializeInsertKeyWithRecord(String dbName, int tableId, int indexId, String tableName,
+                                                 KeyInfo keyInfo, Record record) throws IOException {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.serializationVersion, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-    cobj.put(ComObject.Tag.dbName, dbName);
-    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-    cobj.put(ComObject.Tag.tableName, tableName);
-    cobj.put(ComObject.Tag.indexName, keyInfo.indexSchema.getKey());
+//    cobj.put(ComObject.Tag.dbName, dbName);
+//    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+    cobj.put(ComObject.Tag.indexId, indexId);
+    cobj.put(ComObject.Tag.tableId, tableId);
+//    cobj.put(ComObject.Tag.tableName, tableName);
+//    cobj.put(ComObject.Tag.indexName, keyInfo.indexSchema.getKey());
     cobj.put(ComObject.Tag.id, record.getId());
-    cobj.put(ComObject.Tag.isExcpliciteTrans, isExplicitTrans());
-    cobj.put(ComObject.Tag.isCommitting, isCommitting());
-    cobj.put(ComObject.Tag.transactionId, getTransactionId());
+//    cobj.put(ComObject.Tag.isExcpliciteTrans, isExplicitTrans());
+//    cobj.put(ComObject.Tag.isCommitting, isCommitting());
+//    cobj.put(ComObject.Tag.transactionId, getTransactionId());
     byte[] recordBytes = record.serialize(common);
     cobj.put(ComObject.Tag.recordBytes, recordBytes);
     cobj.put(ComObject.Tag.keyBytes, DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), keyInfo.indexSchema.getKey(), keyInfo.key));
@@ -2621,6 +2713,8 @@ public class DatabaseClient {
 
   class PreparedInsert {
     String dbName;
+    int tableId;
+    int indexId;
     String tableName;
     KeyInfo keyInfo;
     Record record;
@@ -2647,6 +2741,7 @@ public class DatabaseClient {
     if (tableSchema == null) {
       throw new DatabaseException("Table does not exist: name=" + tableName);
     }
+    int tableId = tableSchema.getTableId();
 
     long id = 0;
     for (IndexSchema indexSchema : tableSchema.getIndexes().values()) {
@@ -2726,6 +2821,8 @@ public class DatabaseClient {
         insert.dbName = dbName;
         insert.keyInfo = keyInfo;
         insert.record = record;
+        insert.tableId = tableId;
+        insert.indexId = keyInfo.indexSchema.getValue().getIndexId();
         insert.tableName = tableName;
         insert.primaryKeyIndexName = primaryKey.indexSchema.getKey();
         insert.primaryKey = primaryKey.key;

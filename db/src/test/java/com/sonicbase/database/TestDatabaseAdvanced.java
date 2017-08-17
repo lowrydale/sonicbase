@@ -176,6 +176,8 @@ public class TestDatabaseAdvanced {
 //    assertEquals(client.getPartitionSize(2, "persons", "_1__primarykey"), 9);
 //    assertEquals(client.getPartitionSize(3, "persons", "_1__primarykey"), 8);
 
+    Thread.sleep(10000);
+
     executor.shutdownNow();
   }
 
@@ -802,14 +804,16 @@ public class TestDatabaseAdvanced {
     assertFalse(ret.next());
   }
 
-  @Test
+  @Test(invocationCount = 1)
   public void testColumnEqualsColumnAndIn() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id = id2 and id in (0, 1) order by id desc");
     ResultSet ret = stmt.executeQuery();
 
     ret.next();
+    System.out.println(ret.getLong("id"));
     assertEquals(ret.getLong("id"), 1);
     ret.next();
+    System.out.println(ret.getLong("id"));
     assertEquals(ret.getLong("id"), 0);
     assertFalse(ret.next());
   }

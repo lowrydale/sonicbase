@@ -46,7 +46,7 @@ The config file must be named "config-&lt;cluster name&gt;.json".
 <h1>Example</h1>
 {<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;"dataDirectory": "$HOME/db-data",<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;"installDirectory": "$HOME/database",<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;"installDirectory": "$HOME/sonicbase",<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;"compressRecords": false,<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;"useUnsafe": false,<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;"maxJavaHeap": "60%",<br/>
@@ -105,7 +105,7 @@ to the public address<br/>
   &nbsp;&nbsp;&nbsp;<b>publicAddress</b> - address the server can be accessed external to the cluster<br/>
   &nbsp;&nbsp;&nbsp;<b>port</b> - port for the server to listen on<br/>
 <br/>
-  <b>clients</b> - list of clients. These are servers where the client will run<br/>
+  <b>clients</b> - list of clients. These are servers where the client will run. You typically only need one client.<br/>
 <br/>
   &nbsp;&nbsp;&nbsp;<b>privateAddress</b> - address private to the cluster. If there is no private address, set this
 to the public address<br/>

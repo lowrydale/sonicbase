@@ -606,7 +606,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
           expression.setReplica(replica);
         }
 
-        boolean sortWithIndex = true;//expression.canSortWithIndex();
+        boolean sortWithIndex = expression.canSortWithIndex();
         tableNames = new String[]{fromTable};
         if (joins.size() > 0) {
           tableNames = new String[joins.size() + 1];

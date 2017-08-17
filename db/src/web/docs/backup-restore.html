@@ -37,11 +37,11 @@
 <h1>Configuration</h1>
         <h2>FileSystem Backup</h2>
         The following configuration is used for a filesystem backup. The backup directory can
-        be located on a a shared drive or be a local drive. If the directory is shared you must
+        be located on a shared drive or be a local drive. If the directory is shared you must
         specify this with the "sharedDirectory" setting.<br/>
         {<br/>
         &nbsp;&nbsp;&nbsp;&nbsp;"dataDirectory": "$HOME/db-data",<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;"installDirectory": "$HOME/database",<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;"installDirectory": "$HOME/sonicbase",<br/>
         &nbsp;&nbsp;&nbsp;&nbsp;...<br/>
         &nbsp;&nbsp;&nbsp;&nbsp;"backup": {<br/>
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"type": "fileSystem",<br/>
@@ -57,12 +57,12 @@
         the specified bucket and prefix.<br/>
         {<br/>
         &nbsp;&nbsp;&nbsp;&nbsp;"dataDirectory": "$HOME/db-data",<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;"installDirectory": "$HOME/database",<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;"installDirectory": "$HOME/sonicbase",<br/>
         &nbsp;&nbsp;&nbsp;&nbsp;...<br/>
         &nbsp;&nbsp;&nbsp;&nbsp;"backup": {<br/>
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"type": "AWS",<br/>
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"bucket": "bucket-name",<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"prefix": "backups,<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"prefix": "backups",<br/>
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"maxBackupCount": 10<br/>
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"cronSchedule": "0 0 * * *"<br/>
         &nbsp;&nbsp;&nbsp;&nbsp;}<br/>
@@ -78,8 +78,8 @@
         <h2>cronSchedule</h2>
         <div class="mylink">
         The cronSchedule setting allows you to specify when the backup starts. Specify a valid cron expression. To learn
-        more about cron visit <a href="https://en.wikipedia.org/wiki/Cron">Wikipedia</a> or
-        <a href="http://www.quartz-scheduler.org">Quartz</a>. If you don't specify a cronSchedule you may manually
+        more about cron visit <a target="_blank" href="https://en.wikipedia.org/wiki/Cron">Wikipedia</a> or
+        <a target="_blank" href="http://www.quartz-scheduler.org">Quartz</a>. If you don't specify a cronSchedule you may manually
         start a backup in the administration client by typing "start backup".
         </div>
 

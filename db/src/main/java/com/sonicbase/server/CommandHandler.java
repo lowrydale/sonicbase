@@ -35,7 +35,6 @@ public class CommandHandler {
   private final SchemaManager schemaManager;
   private final DatabaseServer server;
   private final DatabaseCommon common;
-  private Repartitioner repartitioner;
   private boolean shutdown;
   private AtomicInteger testWriteCallCount = new AtomicInteger();
 
@@ -99,6 +98,7 @@ public class CommandHandler {
     priorityCommands.add("isEntireRestoreComplete");
     priorityCommands.add("isEntireBackupComplete");
     priorityCommands.add("isServerReloadFinished");
+    priorityCommands.add("licenseCheckIn");
     //priorityCommands.add("doPopulateIndex");
   }
 
@@ -137,7 +137,8 @@ public class CommandHandler {
       }
 
       if (server.shouldDisableNow() && server.isUsingMultipleReplicas()) {
-        if (!methodStr.equals("healthCheckPriority") && !methodStr.equals("getConfig") && !methodStr.equals("getSchema")) {
+        if (!methodStr.equals("healthCheckPriority") && !methodStr.equals("getConfig") &&
+            !methodStr.equals("getSchema") && !methodStr.equals("getDbNames")) {
           throw new LicenseOutOfComplianceException("Licenses out of compliance");
         }
       }
@@ -392,11 +393,6 @@ public class CommandHandler {
     }
   }
 
-
-  public void setRepartitioner(Repartitioner repartitioner) {
-    this.repartitioner = repartitioner;
-  }
-
   public ComObject promoteEntireReplicaToMaster(ComObject cobj, boolean replayedCommand) {
     return server.promoteEntireReplicaToMaster(cobj);
   }
@@ -446,8 +442,12 @@ public class CommandHandler {
     return null;
   }
 
+  public ComObject getRepartitionerState(ComObject cobj, boolean replayedCommand) {
+    return server.getRepartitioner().getRepartitionerState(cobj);
+  }
+
   public ComObject isShardRepartitioningComplete(ComObject cobj, boolean replayedCommand) {
-    return repartitioner.isShardRepartitioningComplete(cobj, replayedCommand);
+    return server.getRepartitioner().isShardRepartitioningComplete(cobj, replayedCommand);
   }
 
   public ComObject prepareForBackup(ComObject cobj, boolean replayedCommand) {
@@ -1015,7 +1015,7 @@ public class CommandHandler {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return repartitioner.getIndexCounts(cobj);
+      return server.getRepartitioner().getIndexCounts(cobj);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
@@ -1032,7 +1032,7 @@ public class CommandHandler {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return repartitioner.deleteMovedRecords(cobj);
+      return server.getRepartitioner().deleteMovedRecords(cobj);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
@@ -1055,59 +1055,24 @@ public class CommandHandler {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return repartitioner.isRepartitioningComplete(cobj);
+      return server.getRepartitioner().isRepartitioningComplete(cobj);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
     }
   }
-
-//  public byte[] isDeletingComplete(String command, byte[] body, boolean replayedCommand) {
-//    String[] parts = command.split(":");
-//    String dbName = parts[5];
-//    common.getSchemaReadLock(dbName).lock();
-//    try {
-//      return repartitioner.isDeletingComplete(command, body);
-//    }
-//    finally {
-//      common.getSchemaReadLock(dbName).unlock();
-//    }
-//  }
-
-  public ComObject notifyRepartitioningComplete(ComObject cobj, boolean replayedCommand) {
-    String dbName = cobj.getString(ComObject.Tag.dbName);
-    common.getSchemaReadLock(dbName).lock();
-    try {
-      return repartitioner.notifyRepartitioningComplete(cobj);
-    }
-    finally {
-      common.getSchemaReadLock(dbName).unlock();
-    }
-  }
-//
-//  public byte[] notifyDeletingComplete(String command, byte[] body, boolean replayedCommand) {
-//    String[] parts = command.split(":");
-//    String dbName = parts[5];
-//    common.getSchemaReadLock(dbName).lock();
-//    try {
-//      return repartitioner.notifyDeletingComplete(command, body);
-//    }
-//    finally {
-//      common.getSchemaReadLock(dbName).unlock();
-//    }
-//  }
 
   public ComObject beginRebalance(ComObject cobj, boolean replayedCommand) {
 
     //schema lock below
-    return repartitioner.beginRebalance(cobj);
+    return server.getRepartitioner().beginRebalance(cobj);
   }
 
   public ComObject getKeyAtOffset(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return repartitioner.getKeyAtOffset(cobj);
+      return server.getRepartitioner().getKeyAtOffset(cobj);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
@@ -1118,7 +1083,7 @@ public class CommandHandler {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return repartitioner.getPartitionSize(cobj);
+      return server.getRepartitioner().getPartitionSize(cobj);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
@@ -1126,23 +1091,23 @@ public class CommandHandler {
   }
 
   public ComObject stopRepartitioning(ComObject cobj, boolean replayedCommand) {
-    return repartitioner.stopRepartitioning(cobj);
+    return server.getRepartitioner().stopRepartitioning(cobj);
   }
 
   public ComObject doRebalanceOrderedIndex(ComObject cobj, boolean replayedCommand) {
-    return repartitioner.doRebalanceOrderedIndex(cobj);
+    return server.getRepartitioner().doRebalanceOrderedIndex(cobj);
   }
 
   public ComObject rebalanceOrderedIndex(ComObject cobj, boolean replayedCommand) {
     //schema lock below
-    return repartitioner.rebalanceOrderedIndex(cobj);
+    return server.getRepartitioner().rebalanceOrderedIndex(cobj);
   }
 
   public ComObject moveIndexEntries(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return repartitioner.moveIndexEntries(cobj);
+      return server.getRepartitioner().moveIndexEntries(cobj);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();

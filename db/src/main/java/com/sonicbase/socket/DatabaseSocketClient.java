@@ -312,6 +312,10 @@ public class DatabaseSocketClient {
     public String hostPort;
     public DatabaseSocketClient socketClient;
 
+    public byte[] getResponse() {
+      return response;
+    }
+
     public void setCommand(String command) {
       this.command = command;
     }
@@ -440,10 +444,27 @@ public class DatabaseSocketClient {
     }
   }
 
-  private static void sendBatch(String host, int port, List<Request> requests) {
-    try {
-      while (true) {
+  private static AtomicLong totalCallCount = new AtomicLong();
+  private static AtomicLong callCount = new AtomicLong();
+  private static AtomicLong callDuration = new AtomicLong();
+  private static AtomicLong lastLogReset = new AtomicLong(System.currentTimeMillis());
 
+  public static void sendBatch(String host, int port, List<Request> requests) {
+    try {
+      long begin = System.currentTimeMillis();
+      //while (true) {
+      totalCallCount.incrementAndGet();
+        if (callCount.incrementAndGet() % 10000 == 0) {
+          logger.info("SocketClient stats: callCount=" + totalCallCount.get() + ", avgDuration=" +
+              (callDuration.get() / callCount.get()));
+          synchronized (lastLogReset) {
+            if (System.currentTimeMillis() - lastLogReset.get() > 4 * 60 * 1000) {
+              callDuration.set(0);
+              callCount.set(0);
+              lastLogReset.set(System.currentTimeMillis());
+            }
+          }
+        }
         ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
         byte[] intBuff = new byte[4];
         int requestCount = requests.size();
@@ -484,57 +505,47 @@ public class DatabaseSocketClient {
         try {
           //System.out.println("borrow: " + (end - begin) / 1000000f);
 
-          //OutputStream out = new BufferedOutputStream(sock.sock.getOutputStream());
-          ByteBuffer buf = ByteBuffer.wrap(intBuff);
-          sock.sock.write(buf);
-          //buf.release();
+          ByteArrayOutputStream sockBytes = new ByteArrayOutputStream();
+
+          sockBytes.write(intBuff);
+//          ByteBuffer buf = ByteBuffer.wrap(intBuff);
+//          sock.sock.write(buf);
           if (COMPRESS) {
             byte[] originalLenBuff = new byte[4];
             Util.writeRawLittleEndian32(originalBodyLen, originalLenBuff);
-            buf = ByteBuffer.wrap(originalLenBuff);
-            sock.sock.write(buf);
-            //buf.release();
+            //buf = ByteBuffer.wrap(originalLenBuff);
+            //sock.sock.write(buf);
+            sockBytes.write(originalLenBuff);
+
           }
-          CRC32 checksum = new CRC32();
-          checksum.update(body, 0, body.length);
-          long checksumValue = checksum.getValue();
+//          CRC32 checksum = new CRC32();
+//          checksum.update(body, 0, body.length);
+          long checksumValue = 0;//checksum.getValue();
           //checksumValue = Arrays.hashCode(body);
           byte[] longBuff = new byte[8];
 
           Util.writeRawLittleEndian64(checksumValue, longBuff);
-          buf = ByteBuffer.wrap(longBuff);
-          //buf.release();
-          sock.sock.write(buf);
+          //buf = ByteBuffer.wrap(longBuff);
+          //sock.sock.write(buf);
+          sockBytes.write(longBuff);
 
-          //sock.latch = new CountDownLatch(1);
-          //buf = Unpooled.wrappedBuffer(body);
-          //sock.sock.body = null;
-          //ChannelFuture future = sock.sock.write(ByteBuffer.wrap(body));
-          sock.sock.write(ByteBuffer.wrap(body));
-          //      //buf.release();
-          //      future.addListener(new GenericFutureListener<ChannelFuture>() {
-          //        @Override
-          //        public void operationComplete(ChannelFuture future) throws Exception {
-          //          if (!future.isSuccess()) {
-          //            System.err.print("write failed: ");
-          //            future.cause().printStackTrace(System.err);
-          //          }
-          //        }
-          //      });
-          //sock.channel.flush();
-          //InputStream in = new BufferedInputStream(sock.sock.getInputStream());
+          //sock.sock.write(ByteBuffer.wrap(body));
+          sockBytes.write(body);
+
+          sock.sock.write(ByteBuffer.wrap(sockBytes.toByteArray()));
+
           int totalRead = 0;
 
           int bodyLen = 0;
-          //while (true) {
           int nBytes = 0;
           //sock.clientHandler.await();
           //
           //     while (true) {
-          buf = ByteBuffer.allocate(intBuff.length - totalRead);
+          ByteBuffer buf = ByteBuffer.allocateDirect(intBuff.length - totalRead);
           while ((nBytes = nBytes = sock.sock.read(buf)) > 0) {
             buf.flip();
-            System.arraycopy(buf.array(), 0, intBuff, totalRead, nBytes);
+            buf.get(intBuff, totalRead, nBytes);
+            //System.arraycopy(buf.array(), 0, intBuff, totalRead, nBytes);
             buf.clear();
 
             totalRead += nBytes;
@@ -557,10 +568,11 @@ public class DatabaseSocketClient {
           byte[] responseBody = new byte[bodyLen];
           //while (true) {
           nBytes = 0;
-          buf = ByteBuffer.allocate(responseBody.length - totalRead);
-          while ((nBytes = nBytes = sock.sock.read(buf)) > 0) {
+          buf = ByteBuffer.allocateDirect(responseBody.length - totalRead);
+          while ((nBytes = sock.sock.read(buf)) > 0) {
             buf.flip();
-            System.arraycopy(buf.array(), 0, responseBody, totalRead, nBytes);
+            buf.get(responseBody, totalRead, nBytes);
+            //System.arraycopy(buf.array(), 0, responseBody, totalRead, nBytes);
             buf.clear();
 
             totalRead += nBytes;
@@ -582,15 +594,15 @@ public class DatabaseSocketClient {
           }
           long responseChecksum = Util.readRawLittleEndian64(responseBody, offset);
           offset += 8;
-          body = new byte[responseBody.length - offset];
-          System.arraycopy(responseBody, offset, body, 0, body.length);
+          //body = new byte[responseBody.length - offset];
+          //System.arraycopy(responseBody, offset, body, 0, body.length);
 
-          checksum = new CRC32();
-          checksum.update(body, 0, body.length);
-          checksumValue = checksum.getValue();
-          if (checksumValue != responseChecksum) {
-            throw new DatabaseException("Checksum mismatch");
-          }
+//          checksum = new CRC32();
+//          checksum.update(body, 0, body.length);
+          checksumValue = 0;//checksum.getValue();
+//          if (checksumValue != responseChecksum) {
+//            throw new DatabaseException("Checksum mismatch");
+//          }
 
           if (DatabaseSocketClient.COMPRESS) {
             if (DatabaseSocketClient.LZO_COMPRESSION) {
@@ -598,7 +610,7 @@ public class DatabaseSocketClient {
 
               LZ4FastDecompressor decompressor = factory.fastDecompressor();
               byte[] restored = new byte[originalBodyLen];
-              decompressor.decompress(body, 0, restored, 0, originalBodyLen);
+              decompressor.decompress(responseBody, offset, restored, 0, originalBodyLen);
               body = restored;
             } else {
               GZIPInputStream bodyIn = new GZIPInputStream(new ByteArrayInputStream(body));
@@ -619,7 +631,7 @@ public class DatabaseSocketClient {
               throw new DeadServerException(t);
             }
           }
-          break;
+        //  break;
         }
         catch (Exception e) {
           if (sock != null && sock.sock != null) {
@@ -634,7 +646,8 @@ public class DatabaseSocketClient {
             return_connection(sock, host, port);
           }
         }
-      }
+      //}
+      callDuration.addAndGet(System.currentTimeMillis() - begin);
     }
     catch (IOException e) {
       throw new DeadServerException(e);

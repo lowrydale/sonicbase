@@ -812,6 +812,8 @@ public class ReadManager {
         }
       }
 
+      long viewVersion = cobj.getLong(ComObject.Tag.viewVersion);
+
       TableSchema tableSchema = server.getCommon().getSchema(dbName).getTables().get(tableName);
       IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
 
@@ -861,7 +863,7 @@ public class ReadManager {
       List<byte[]> retRecords = new ArrayList<>();
 
       if (tableSchema.getIndexes().get(indexName).isPrimaryKey()) {
-        entry = doIndexLookupWithRecordsExpression(dbName, count, tableSchema, columnOffsets, parms, expression, index, leftKey,
+        entry = doIndexLookupWithRecordsExpression(dbName, viewVersion, count, tableSchema, indexSchema, columnOffsets, parms, expression, index, leftKey,
             ascending, retRecords, counters, groupByContext);
       }
       else {
@@ -905,7 +907,7 @@ public class ReadManager {
   }
 
   private Map.Entry<Object[], Object> doIndexLookupWithRecordsExpression(
-      String dbName, int count, TableSchema tableSchema, Set<Integer> columnOffsets, ParameterHandler parms,
+      String dbName, long viewVersion, int count, TableSchema tableSchema, IndexSchema indexSchema, Set<Integer> columnOffsets, ParameterHandler parms,
       Expression expression,
       Index index, Object[] leftKey, Boolean ascending, List<byte[]> ret, Counter[] counters, GroupByContext groupByContext) {
 
@@ -947,20 +949,27 @@ public class ReadManager {
           boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
           if (pass) {
             byte[][] currRecords = new byte[][]{bytes};
-            byte[][] currRet = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, entry.getKey(), tableSchema, counters, groupByContext);
-            if (counters == null) {
-              for (byte[] currBytes : currRet) {
-                ret.add(currBytes);
+            records = processViewFlags(dbName, tableSchema, indexSchema, index, viewVersion, entry.getKey(), records);
+            if (records != null) {
+
+              byte[][] currRet = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, entry.getKey(), tableSchema, counters, groupByContext);
+              if (counters == null) {
+                for (byte[] currBytes : currRet) {
+                  ret.add(currBytes);
+                }
               }
             }
           }
         }
       }
       else {
-        byte[][] retRecords = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, entry.getKey(), tableSchema, counters, groupByContext);
-        if (counters == null) {
-          for (byte[] currBytes : retRecords) {
-            ret.add(currBytes);
+        records = processViewFlags(dbName, tableSchema, indexSchema, index, viewVersion, entry.getKey(), records);
+        if (records != null) {
+          byte[][] retRecords = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, entry.getKey(), tableSchema, counters, groupByContext);
+          if (counters == null) {
+            for (byte[] currBytes : retRecords) {
+              ret.add(currBytes);
+            }
           }
         }
       }
@@ -1700,7 +1709,7 @@ public class ReadManager {
   private byte[][] processViewFlags(String dbName, TableSchema tableSchema, IndexSchema indexSchema, Index index,
                                     long viewVersion, Object[] key, byte[][] records) {
     if (records != null) {
-      if (server.getCommon().getTables(dbName).get(tableSchema.getName()).getIndices().get(indexSchema.getName()).getLastPartitions() != null) {
+      if (indexSchema == null || server.getCommon().getTables(dbName).get(tableSchema.getName()).getIndices().get(indexSchema.getName()).getLastPartitions() != null) {
         List<byte[]> remaining = new ArrayList<>();
         for (byte[] bytes : records) {
           long dbViewNum = Record.getDbViewNumber(bytes);

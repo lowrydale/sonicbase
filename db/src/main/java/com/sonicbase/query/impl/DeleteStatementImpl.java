@@ -55,6 +55,7 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
   public Object execute(String dbName, SelectStatementImpl.Explain explain) throws DatabaseException {
     while (true) {
       try {
+        expression.setViewVersion(client.getCommon().getSchemaVersion());
         expression.setTableName(tableName);
         expression.setClient(client);
         expression.setParms(getParms());
@@ -75,7 +76,7 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
         int countDeleted = 0;
         while (true) {
           ExpressionImpl.NextReturn ids = expression.next(explain);
-          if (ids == null) {
+          if (ids == null || ids.getIds() == null) {
             return countDeleted;
           }
 

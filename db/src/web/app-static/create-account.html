@@ -54,8 +54,14 @@
                 statusCode: {
                     409: function() {
                         alert('Email already in use');
+                    },
+                    500: function() {
+                        alert("Server error");
                     }
+                },
+                error : function(request,error) {
                 }
+
             });
         }
     </script>

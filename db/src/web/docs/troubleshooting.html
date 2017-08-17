@@ -43,6 +43,9 @@
 			Cancel the start and try again.
 		</li>
 		<li>
+			Ensure that the license server is running. If the license server is not running the cluster won't start.
+		</li>
+		<li>
 	If you don't need any of the data in the cluster, try purging the cluster first with the command "purge cluster".
 		</li>
 		<li>
@@ -54,9 +57,6 @@
 				and 9010.sysout.log
 		</li>
 	</lu>
-	<h1>Error Updating Schema</h1>
-	If you get an error adding a table or index indicating that the table or index already exists, finish making all your schema
-	changes even if they report errors. Then restart the cluster. Verify your schema changes are in tact by using the "describe table [tablename]" command.
 	<h1>Shards Get Out Of Balance</h1>
 	This shouldn't happen under normal circumstances. You can check for out of balance by using the "describe shards" command.
 	A shard would be considered significantly out of balance if it it 20% greater or 20% smaller than the other shards.

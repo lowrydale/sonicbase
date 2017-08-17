@@ -249,6 +249,9 @@ public class TestDatabase {
 
       assertEquals(ret.getCurrKeys().length, 4);
   */
+
+
+  //rebalance
       long size = client.getPartitionSize("test", 0, "children", "_1_socialsecuritynumber");
       assertEquals(size, 10);
 
@@ -357,6 +360,8 @@ public class TestDatabase {
         }
       }
 
+      Thread.sleep(5000);
+
       File file = new File("/data/db-backup");
       File[] dirs = file.listFiles();
 
@@ -370,13 +375,14 @@ public class TestDatabase {
 
 //      Thread.sleep(10000);
 
-      ComObject cobj = new ComObject();
-      cobj.put(ComObject.Tag.dbName, "test");
-      cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "forceDeletes");
-      String command = "DatabaseServer:ComObject:forceDeletes:";
-      client.sendToAllShards(null, 0, command, cobj, DatabaseClient.Replica.all);
+//      ComObject cobj = new ComObject();
+//      cobj.put(ComObject.Tag.dbName, "test");
+//      cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+//      cobj.put(ComObject.Tag.method, "forceDeletes");
+//      String command = "DatabaseServer:ComObject:forceDeletes:";
+//      client.sendToAllShards(null, 0, command, cobj, DatabaseClient.Replica.all);
 
+     // Thread.sleep(10000);
       executor.shutdownNow();
     }
     catch (Exception e) {
@@ -387,12 +393,12 @@ public class TestDatabase {
 
   @Test
   public void testSecondaryIndexWithNoKey() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("select * from children where socialsecuritynumber = '933-28-5'");
+    PreparedStatement stmt = conn.prepareStatement("select * from children where socialsecuritynumber = '933-28-4'");
     ResultSet ret = stmt.executeQuery();
     assertTrue(ret.next());
-    assertEquals(ret.getString("socialSecurityNumber"), "933-28-5");
+    assertEquals(ret.getString("socialSecurityNumber"), "933-28-4");
 
-    stmt = conn.prepareStatement("select * from children where socialsecuritynumber >= '933-28-0'");
+    stmt = conn.prepareStatement("select * from children where socialsecuritynumber >= '933-28-0' order by socialsecuritynumber asc");
     ret = stmt.executeQuery();
     assertTrue(ret.next());
     assertEquals(ret.getString("socialSecurityNumber"), "933-28-0");
@@ -810,6 +816,13 @@ public class TestDatabase {
     //test select with not in expression
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id = 5");
     ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    assertFalse(ret.next());
+
+    stmt = conn.prepareStatement("select * from persons where id = 5");
+    ret = stmt.executeQuery();
 
     ret.next();
     assertEquals(ret.getLong("id"), 5);
@@ -1460,7 +1473,7 @@ public class TestDatabase {
     assertFalse(ret.next());
   }
 
-  @Test
+  @Test(invocationCount = 1)
   public void testSecondaryIndex() throws SQLException {
 
     //test select on secondary index
@@ -1472,6 +1485,7 @@ public class TestDatabase {
       stmt = conn.prepareStatement("select * from persons where socialSecurityNumber=? order by id");
       stmt.setString(1, "933-28-" + i);
       ret = stmt.executeQuery();
+      System.out.println("checking: 993-28-" + i);
       assertTrue(ret.next());
 
       long retId = ret.getLong("id");

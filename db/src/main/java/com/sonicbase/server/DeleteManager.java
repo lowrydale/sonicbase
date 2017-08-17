@@ -44,6 +44,7 @@ public class DeleteManager {
         out.writeUTF(dbName);
         out.writeUTF(tableName);
         out.writeUTF(indexName);
+        out.writeLong(databaseServer.getCommon().getSchemaVersion() + 1);
         for (Object[] key : keysToDelete) {
           out.write(DatabaseCommon.serializeKey(tableSchema, indexName, key));
         }
@@ -73,6 +74,10 @@ public class DeleteManager {
               String tableName = in.readUTF();
               TableSchema tableSchema = databaseServer.getCommon().getTables(dbName).get(tableName);
               String indexName = in.readUTF();
+              long schemaVersionToDeleteAt = in.readLong();
+              if (schemaVersionToDeleteAt > databaseServer.getCommon().getSchemaVersion()) {
+                return;
+              }
               final Index index = databaseServer.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
               List<Object[]> batch = new ArrayList<>();
               while (true) {
@@ -162,7 +167,8 @@ public class DeleteManager {
   }
 
   public void start() {
-    this.executor = new ThreadPoolExecutor(16, 16, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+    this.executor = new ThreadPoolExecutor(Runtime.getRuntime().availableProcessors() * 2,
+        Runtime.getRuntime().availableProcessors() * 2, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
     this.freeExecutor = new ThreadPoolExecutor(4, 4, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
     mainThread = new Thread(new Runnable() {
@@ -170,7 +176,7 @@ public class DeleteManager {
       public void run() {
         while (true) {
           try {
-            Thread.sleep(1_000);
+            Thread.sleep(2_000);
             doDeletes();
           }
           catch (Exception e) {

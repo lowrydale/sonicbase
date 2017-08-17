@@ -53,6 +53,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
 
     while (true) {
       try {
+        whereClause.setViewVersion(client.getCommon().getSchemaVersion());
         whereClause.setTableName(tableName);
         whereClause.setClient(client);
         whereClause.setParms(getParms());

@@ -46,11 +46,14 @@ To build your config file type "build config" in the client.<br/>
         It is recommended that you instantiate the servers using the AWS api. You can then easily tag all your
         servers and clients with code like the following:<br/><br/>
 
-        CreateTagsRequest createTagsRequest_requests = new CreateTagsRequest();
-        createTagsRequest_requests.setResources(instanceIds);
-        createTagsRequest_requests.setTags(requestTags);
-
-        ec2.createTags(createTagsRequest_requests);
+        ArrayList<Tag> requestTags = new ArrayList<Tag>();<br/>
+        requestTags.add(new Tag("sonicbase-server, "my-cluster"));<br/>
+<br/>
+        CreateTagsRequest createTagsRequest_requests = new CreateTagsRequest();<br/>
+        createTagsRequest_requests.setResources(instanceIds);<br/>
+        createTagsRequest_requests.setTags(requestTags);<br/>
+<br/>
+        ec2.createTags(createTagsRequest_requests);<br/>
 
         <h1>Prerequisites</h1>
 In order for AWS integration to work you must have a file named "&lt;cluster&gt;-awskeys" located in the
@@ -61,7 +64,7 @@ The first line of the file is the aws access key. The second line of the file is
         <h1>Backup and Restore</h1>
 
         <div class="mylink">
-        In the Pro version you may backup and restore to AWS. See <a href="backup-restore.html">Backup and Restore</a>
+        In the Pro version you may backup and restore to AWS. See <a href="backup-restore.html?framed=true">Backup and Restore</a>
         for details.
         </div>
     </div>

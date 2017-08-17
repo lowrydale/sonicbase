@@ -190,7 +190,9 @@ public class ComObject {
     command(114, stringType),
     inCompliance(115, booleanType),
     disableNow(116, booleanType),
-    coreCount(117, intType);
+    coreCount(117, intType),
+    state(118, stringType),
+    shards(119, arrayType);
 
     public final int tag;
 

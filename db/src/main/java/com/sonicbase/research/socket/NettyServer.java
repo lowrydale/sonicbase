@@ -1,6 +1,7 @@
 package com.sonicbase.research.socket;
 
 import com.sonicbase.common.Logger;
+import com.sonicbase.query.DatabaseException;
 import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.socket.DatabaseSocketClient;
 import com.sonicbase.socket.Util;
@@ -25,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.CRC32;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -108,94 +110,99 @@ public class NettyServer {
   }
 
   public static byte[] sendResponse(byte[] intBuff, OutputStream to, byte[] body, int requestCount, ArrayList<byte[]> retBytes, ByteArrayOutputStream out) throws IOException {
-        CRC32 checksum;
-        long checksumValue;
-        Util.writeRawLittleEndian32(requestCount, intBuff);
-        out.write(intBuff);
-        for (byte[] bytes : retBytes) {
-          out.write(bytes);
-        }
-        out.close();
-        body = out.toByteArray();
-        int uncompressedSize = body.length;
-        if (DatabaseSocketClient.COMPRESS) {
-          if (DatabaseSocketClient.LZO_COMPRESSION) {
-            LZ4Factory factory = LZ4Factory.fastestInstance();
+    CRC32 checksum;
+    long checksumValue;
+    Util.writeRawLittleEndian32(requestCount, intBuff);
+    out.write(intBuff);
+    for (byte[] bytes : retBytes) {
+      out.write(bytes);
+    }
+    out.close();
+    body = out.toByteArray();
+    int uncompressedSize = body.length;
+    if (DatabaseSocketClient.COMPRESS) {
+      if (DatabaseSocketClient.LZO_COMPRESSION) {
+        LZ4Factory factory = LZ4Factory.fastestInstance();
 
-            LZ4Compressor compressor = factory.fastCompressor();
-            int maxCompressedLength = compressor.maxCompressedLength(body.length);
-            byte[] compressed = new byte[maxCompressedLength];
-            int compressedLength = compressor.compress(body, 0, body.length, compressed, 0, maxCompressedLength);
-            body = new byte[compressedLength];
-            System.arraycopy(compressed, 0, body, 0, compressedLength);
-          }
-          else {
-            ByteArrayOutputStream bodyBytesOut = new ByteArrayOutputStream();
-            GZIPOutputStream bodyOut = new GZIPOutputStream(bodyBytesOut);
-            bodyOut.write(body);
-            bodyOut.close();
-            body = bodyBytesOut.toByteArray();
-          }
-          Util.writeRawLittleEndian32(body.length + 12, intBuff);
-          to.write(intBuff);
-        }
-        else {
-          Util.writeRawLittleEndian32(body.length + 8, intBuff);
-          to.write(intBuff);
-        }
-
-        if (DatabaseSocketClient.COMPRESS) {
-          Util.writeRawLittleEndian32(uncompressedSize, intBuff);
-          to.write(intBuff);
-        }
-
-        checksum = new CRC32();
-        checksum.update(body, 0, body.length);
-        checksumValue = checksum.getValue();
-
-        byte[] longBuff = new byte[8];
-        Util.writeRawLittleEndian64(checksumValue, longBuff);
-        to.write(longBuff);
-
-        to.write(body);
-
-        to.flush();
-        return body;
+        LZ4Compressor compressor = factory.fastCompressor();
+        int maxCompressedLength = compressor.maxCompressedLength(body.length);
+        byte[] compressed = new byte[maxCompressedLength];
+        int compressedLength = compressor.compress(body, 0, body.length, compressed, 0, maxCompressedLength);
+        body = new byte[compressedLength];
+        System.arraycopy(compressed, 0, body, 0, compressedLength);
       }
+      else {
+        ByteArrayOutputStream bodyBytesOut = new ByteArrayOutputStream();
+        GZIPOutputStream bodyOut = new GZIPOutputStream(bodyBytesOut);
+        bodyOut.write(body);
+        bodyOut.close();
+        body = bodyBytesOut.toByteArray();
+      }
+      Util.writeRawLittleEndian32(body.length + 12, intBuff);
+      to.write(intBuff);
+    }
+    else {
+      Util.writeRawLittleEndian32(body.length + 8, intBuff);
+      to.write(intBuff);
+    }
+
+    if (DatabaseSocketClient.COMPRESS) {
+      Util.writeRawLittleEndian32(uncompressedSize, intBuff);
+      to.write(intBuff);
+    }
+
+//        checksum = new CRC32();
+//        checksum.update(body, 0, body.length);
+    checksumValue = 0;//checksum.getValue();
+
+    byte[] longBuff = new byte[8];
+    Util.writeRawLittleEndian64(checksumValue, longBuff);
+    to.write(longBuff);
+
+    to.write(body);
+
+    to.flush();
+    return body;
+  }
 
   public static Request deserializeRequest(InputStream from, byte[] intBuff) {
-      try {
-        from.read(intBuff);
-        int len = Util.readRawLittleEndian32(intBuff);
-        from.read(intBuff);
-        int bodyLen = Util.readRawLittleEndian32(intBuff);
+    try {
+      from.read(intBuff);
+      int len = Util.readRawLittleEndian32(intBuff);
+      from.read(intBuff);
+      int bodyLen = Util.readRawLittleEndian32(intBuff);
 
-        if (bodyLen > 1024 * 1024 * 1024) {
-          throw new com.sonicbase.query.DatabaseException("Invalid inner body length: " + bodyLen);
-        }
-        if (len > 1024 * 1024 * 1024) {
-          throw new com.sonicbase.query.DatabaseException("Invalid command length: " + len);
-        }
-        byte[] b = new byte[len];
-        from.read(b);
-        byte[] body = new byte[bodyLen];
-        if (bodyLen != 0) {
-          from.read(body);
-        }
-        else {
-          body = null;
-        }
+      if (bodyLen > 1024 * 1024 * 1024) {
+        throw new com.sonicbase.query.DatabaseException("Invalid inner body length: " + bodyLen);
+      }
+      if (len > 1024 * 1024 * 1024) {
+        throw new com.sonicbase.query.DatabaseException("Invalid command length: " + len);
+      }
+      byte[] b = new byte[len];
+      from.read(b);
+      byte[] body = new byte[bodyLen];
+      if (bodyLen != 0) {
+        from.read(body);
+      }
+      else {
+        body = null;
+      }
 
-        final String command = new String(b, 0, len, UTF8_STR);
-        Request request = new Request();
-        request.command = command;
-        request.body = body;
-        return request;
-      }
-      catch (IOException e) {
-        throw new com.sonicbase.query.DatabaseException(e);
-      }
-   }
+      final String command = new String(b, 0, len, UTF8_STR);
+      Request request = new Request();
+      request.command = command;
+      request.body = body;
+      return request;
+    }
+    catch (IOException e) {
+      throw new com.sonicbase.query.DatabaseException(e);
+    }
+  }
+
+  private AtomicLong totalCallCount = new AtomicLong();
+  private AtomicLong callCount = new AtomicLong();
+  private AtomicLong callDuration = new AtomicLong();
+  private AtomicLong lastLogReset = new AtomicLong();
 
   class ServerHandler extends ChannelInboundHandlerAdapter {
     private ByteBufAllocator alloc = PooledByteBufAllocator.DEFAULT;
@@ -207,6 +214,7 @@ public class NettyServer {
     private ByteBuf respBuffer = alloc.directBuffer(1024);
     private byte[] intBuff = new byte[4];
     private String command;
+    private List<ByteBuf> buffers = new ArrayList<>();
 
     public ServerHandler() {
     }
@@ -235,9 +243,24 @@ public class NettyServer {
     //  ctx.flush();
     //}
 
-
+    boolean oldWay = false;
 
     public void channelRead(ChannelHandlerContext ctx, Object msg) { // (2)
+
+      long begin = System.currentTimeMillis();
+
+      totalCallCount.incrementAndGet();
+      if (callCount.incrementAndGet() % 1000 == 0) {
+        logger.info("SocketServer stats: callCount=" + totalCallCount.get() + ", avgDuration=" +
+            (callDuration.get() / callCount.get()));
+        synchronized (lastLogReset) {
+          if (System.currentTimeMillis() - lastLogReset.get() > 4 * 60 * 1000) {
+            callDuration.set(0);
+            callCount.set(0);
+            lastLogReset.set(System.currentTimeMillis());
+          }
+        }
+      }
       ByteBuf m = null;
       String respStr = "";
       try {
@@ -246,35 +269,57 @@ public class NettyServer {
         }
         m = (ByteBuf) msg;
 
-        destBuff.writeBytes(m);
-        int readable = destBuff.readableBytes();
+        if (oldWay) {
+          destBuff.writeBytes(m);
+        }
+        else {
+          buffers.add(m);
+        }
+        //m.resetReaderIndex();
+        int readable = 0;
+        if (oldWay) {
+          readable = destBuff.readableBytes();
+        }
+        else {
+          readable = m.readableBytes();
+        }
         if (readState == ReadState.size) {
           //logger.info("Reading size");
           if (readable >= 4) {
             readState = ReadState.bytes;
 
-            byte[] intBuff = new byte[4];
-            destBuff.resetReaderIndex();
-            destBuff.readBytes(intBuff);
-            bodyLen = (((int) intBuff[0] & 0xff)) |
-                (((int) intBuff[1] & 0xff) << 8) |
-                (((int) intBuff[2] & 0xff) << 16) |
-                (((int) intBuff[3] & 0xff) << 24);
+            if (oldWay) {
+              byte[] intBuff = new byte[4];
+              destBuff.resetReaderIndex();
+              destBuff.readBytes(intBuff);
+              bodyLen = (((int) intBuff[0] & 0xff)) |
+                  (((int) intBuff[1] & 0xff) << 8) |
+                  (((int) intBuff[2] & 0xff) << 16) |
+                  (((int) intBuff[3] & 0xff) << 24);
+            }
+            else {
+              byte[] intBuff = new byte[4];
+              m.resetReaderIndex(); //destBuff.resetReaderIndex();
+              m.readBytes(intBuff);//destBuff.readBytes(intBuff);
+              bodyLen = (((int) intBuff[0] & 0xff)) |
+                  (((int) intBuff[1] & 0xff) << 8) |
+                  (((int) intBuff[2] & 0xff) << 16) |
+                  (((int) intBuff[3] & 0xff) << 24);
 
-//            if (len > 100000) {
-//              byte[] other = new byte[readable - 4];
-//              destBuff.getBytes(4, other);
-//              logger.error("Invalid length: len=" + len + ", Other bytes=" + new String(other));
-//              returnException(ctx, "Error", new Throwable("Invalid len=" + len));
-//              readState = ReadState.size;
-//              destBuff.clear();
-//              return;
-//  //            int index = destBuff.readerIndex();
-//  //            destBuff.readerIndex(index - 4);
-//            }
-            //destBuff = ctx.alloc().buffer(len);
-            //logger.info("Read size: len=" + len);
-
+              //            if (len > 100000) {
+              //              byte[] other = new byte[readable - 4];
+              //              destBuff.getBytes(4, other);
+              //              logger.error("Invalid length: len=" + len + ", Other bytes=" + new String(other));
+              //              returnException(ctx, "Error", new Throwable("Invalid len=" + len));
+              //              readState = ReadState.size;
+              //              destBuff.clear();
+              //              return;
+              //  //            int index = destBuff.readerIndex();
+              //  //            destBuff.readerIndex(index - 4);
+              //            }
+              //destBuff = ctx.alloc().buffer(len);
+              //logger.info("Read size: len=" + len);
+            }
           }
         }
 
@@ -286,44 +331,71 @@ public class NettyServer {
 //            destBuff.clear();
 //          }
 //          else {
-          readable = destBuff.readableBytes();
+          if (oldWay) {
+            readable = destBuff.readableBytes();
+          }
+          else {
+
+            readable = 0;
+            for (ByteBuf currBuf : buffers) {
+              readable += currBuf.readableBytes();
+            }
+          }
           if (readable >= len + bodyLen) {
+            //            logger.error("readable less than len+bodyLen: readable=" + readable +
+            //              ", len+bodyLen=" + (len+bodyLen));
+            //          }
+            //          else {
             readState = ReadState.size;
-
             try {
-              byte[] body = new byte[bodyLen];
-              destBuff.readBytes(body);
 
+              byte[] body = new byte[bodyLen];
+              if (oldWay) {
+                destBuff.readBytes(body);
+              }
+              else {
+                int bodyOffset = 0;
+                for (ByteBuf currBuf : buffers) {
+                  int len = currBuf.readableBytes();
+                  if (len > 0) {
+                    currBuf.readBytes(body, bodyOffset, len);
+                    bodyOffset += len;
+                  }
+                  currBuf.release();
+                }
+                buffers.clear();
+              }
               int origBodyLen = -1;
               int offset = 0;
               if (DatabaseSocketClient.COMPRESS) {
                 origBodyLen = Util.readRawLittleEndian32(body);
                 offset += 4;
               }
-              if (origBodyLen > 1024 * 1024 * 1024) {
-                throw new Exception("Invalid orig body length: " + origBodyLen);
-              }
+
               long sentChecksum = Util.readRawLittleEndian64(body, offset);
               offset += 8;
 
-              byte[] newBody = null;
+//              byte[] newBody = null;
+              offset = 0;
               if (DatabaseSocketClient.COMPRESS) {
-                newBody = new byte[bodyLen - 12];
+                //newBody = new byte[bodyLen - 12];
+                offset = 12;
               }
               else {
-                newBody = new byte[bodyLen - 8];
+                //newBody = new byte[bodyLen - 8];
+                offset = 8;
               }
-              System.arraycopy(body, offset, newBody, 0, newBody.length);
-              body = newBody;
+//              System.arraycopy(body, offset, newBody, 0, newBody.length);
+//              body = newBody;
 
-              CRC32 checksum = new CRC32();
-              checksum.update(body, 0, body.length);
-              long checksumValue = checksum.getValue();
+//              CRC32 checksum = new CRC32();
+//              checksum.update(body, 0, body.length);
+              long checksumValue = 0;//checksum.getValue();
               //checksumValue = Arrays.hashCode(body);
 
-              if (sentChecksum != checksumValue) {
-                throw new Exception("Checksum mismatch");
-              }
+//              if (sentChecksum != checksumValue) {
+//                throw new Exception("Checksum mismatch");
+//              }
               //System.out.println("origBodyLen=" + origBodyLen + ", len=" + bodyLen);
               if (DatabaseSocketClient.COMPRESS) {
                 if (DatabaseSocketClient.LZO_COMPRESSION) {
@@ -331,7 +403,7 @@ public class NettyServer {
 
                   LZ4FastDecompressor decompressor = factory.fastDecompressor();
                   byte[] restored = new byte[origBodyLen];
-                  decompressor.decompress(body, 0, restored, 0, origBodyLen);
+                  decompressor.decompress(body, offset, restored, 0, origBodyLen);
                   body = restored;
                 }
                 else {
@@ -459,10 +531,17 @@ public class NettyServer {
               logger.error("Error processing request", t);
               t.printStackTrace();
               readState = ReadState.size;
-              destBuff.clear();
+              buffers.clear();
+              if (oldWay) {
+                destBuff.clear();
+              }
+//              m.clear();
             }
             if (readState != ReadState.dlqSize) {
-              destBuff.clear();
+              if (oldWay) {
+                destBuff.clear();
+              }
+//              m.clear();
             }
           }
 //          }
@@ -540,6 +619,7 @@ public class NettyServer {
           }
         }
 
+        callDuration.addAndGet(System.currentTimeMillis() - begin);
         //      ctx.flush(); // (2)
         //      Systeuuu.out.println("Wrote to client");
         //ctx.close();
@@ -548,11 +628,16 @@ public class NettyServer {
         logger.error("Error: " + e.getMessage(), e);
         readState = ReadState.size;
         e.printStackTrace();
-        destBuff.clear();
+        if (oldWay) {
+          destBuff.clear();
+          m.clear();
+        }
       }
       finally {
-        if (m != null) {
-          m.release();
+        if (oldWay) {
+          if (m != null) {
+            m.release();
+          }
         }
       }
       //       ((ByteBuf)msg).release(); // (3)
@@ -604,8 +689,8 @@ public class NettyServer {
         return bytesOut.toByteArray();
       }
       catch (Exception t) {
-      //  System.out.println("Error processing request: error=" + t.getMessage());
-      //  t.printStackTrace();
+        //  System.out.println("Error processing request: error=" + t.getMessage());
+        //  t.printStackTrace();
         return returnException("exception: " + t.getMessage(), t);
       }
     }
@@ -740,7 +825,7 @@ public class NettyServer {
     return StreamUtils.inputStreamToBytes(in);
   }
 
-  public void setDatabaseServer(DatabaseServer databaseServer)  {
+  public void setDatabaseServer(DatabaseServer databaseServer) {
     this.databaseServer = databaseServer;
     logger = new Logger(databaseServer.getDatabaseClient());
     Logger.setIsClient(false);
@@ -779,9 +864,10 @@ public class NettyServer {
       socketChannel.pipeline().addLast(new ServerHandler());
     }
   }
+
   public void run() {
     EventLoopGroup bossGroup = new NioEventLoopGroup(); // (1)
-    EventLoopGroup workerGroup = new NioEventLoopGroup(1024);
+    EventLoopGroup workerGroup = new NioEventLoopGroup(Runtime.getRuntime().availableProcessors() * 128);
     try {
 
       ServerBootstrap b = new ServerBootstrap(); // (2)
@@ -821,7 +907,7 @@ public class NettyServer {
   }
 
   public void startServer(String[] args, String configPathPre, boolean skipLicense) {
-    for (String arg: args) {
+    for (String arg : args) {
       System.out.println("arg: " + arg);
     }
 
@@ -901,14 +987,14 @@ public class NettyServer {
         });
         nettyThread.start();
 
-        Thread thread = new Thread(new Runnable(){
+        Thread thread = new Thread(new Runnable() {
           @Override
           public void run() {
             try {
               //for (int i = 0; i < 10000000; i++) {
-                for (String dbName : databaseServer.getDbNames(databaseServer.getDataDir())) {
-                  databaseServer.getSnapshotManager().recoverFromSnapshot(dbName);
-                }
+              for (String dbName : databaseServer.getDbNames(databaseServer.getDataDir())) {
+                databaseServer.getSnapshotManager().recoverFromSnapshot(dbName);
+              }
               //}
               logger.info("applying queues");
               databaseServer.getLogManager().applyQueues();
@@ -945,7 +1031,6 @@ public class NettyServer {
         logger.error("Error recovering snapshot", e);
         System.exit(1);
       }
-
 
 
       Logger.setReady();

@@ -1319,7 +1319,10 @@ public abstract class ExpressionImpl implements Expression {
     while (true) {
       try {
         //todo: do we really want to change the view version?
-        viewVersion = common.getSchemaVersion();
+        if (viewVersion == 0) {
+          throw new DatabaseException("view version not set");
+          //viewVersion = common.getSchemaVersion();
+        }
         TableSchema tableSchema = common.getTables(dbName).get(tableName);
         IndexSchema indexSchema = tableSchema.getIndexes().get(indexName);
         int originalShard = shard;
@@ -1472,7 +1475,9 @@ public abstract class ExpressionImpl implements Expression {
           String preparedKeyStr = preparedKey.toString();
           PreparedIndexLookup prepared = null;
           synchronized (preparedIndexLookups) {
-            //prepared = preparedIndexLookups.get(preparedKeyStr);
+            if (leftOperator == BinaryExpression.Operator.equal && rightValue == null) {
+              prepared = preparedIndexLookups.get(preparedKeyStr);
+            }
             if (prepared == null) {
               prepared = new PreparedIndexLookup();
               prepared.preparedId = client.allocateId(dbName);
@@ -1817,7 +1822,7 @@ public abstract class ExpressionImpl implements Expression {
   }
 
   public static SelectContextImpl tableScan(
-      String dbName, DatabaseClient client, int count, TableSchema tableSchema, List<OrderByExpressionImpl> orderByExpressions,
+      String dbName, long viewVersion, DatabaseClient client, int count, TableSchema tableSchema, List<OrderByExpressionImpl> orderByExpressions,
       ExpressionImpl expression, ParameterHandler parms, List<ColumnImpl> columns, int shard, Object[] nextKey,
       RecordCache recordCache, Counter[] counters, GroupByContext groupByContext) {
     try {
@@ -1905,6 +1910,7 @@ public abstract class ExpressionImpl implements Expression {
         if (groupByContext != null) {
           cobj.put(ComObject.Tag.legacyGroupContext, groupByContext.serialize(client.getCommon()));
         }
+        cobj.put(ComObject.Tag.viewVersion, viewVersion);
         cobj.put(ComObject.Tag.count, count);
         cobj.put(ComObject.Tag.dbName, dbName);
         cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());

@@ -51,7 +51,7 @@ The name of the config file must follow "config-&lt;cluster name&gt;.json".
 <br/>
 <h1>Deploy Cluster</h1>
 To deploy the image to the servers in the cluster, type "deploy cluster". Note that you must setup passwordless
-ssh between all the servers. Deploy cluster is not supported for Windows.
+ssh between all the servers and between all the servers and the client. Deploy cluster is not supported for Windows.
 <br/>
 <h1>Start Cluster</h1>
 To start a cluster type "start cluster".
@@ -71,7 +71,7 @@ To purge a cluster type "purge cluster". This will purge and stop the cluster.
 You must create a database in order to insert data. Type "create database &lt;database name&gt;".
 <br/>
 <h1>Use a Database</h1>
-To use a database type "use database &lt;database name&gt;".
+To use a database type "use database &lt;database name&gt;" You must use a database in order to operate on it.
 <br/>
 <h1>SQL Commands Available</h1>
 The following sql commands may be entered in the client.<br/>
@@ -86,24 +86,24 @@ describe<br/>
         truncate<br/>
 
         <h1>Deploy License Server</h1>
-        See <a href="license-server.html">License Server</a>.
+        See <a href="license-server.html?framed=true">License Server</a>.
         <h1>Start License Server</h1>
-        See <a href="license-server.html">License Server</a>.
+        See <a href="license-server.html?framed=true">License Server</a>.
         <h1>Stop License Server</h1>
-        See <a href="license-server.html">License Server</a>.
+        See <a href="license-server.html?framed=true">License Server</a>.
         <h1>Describe Licenses</h1>
-        See <a href="license-server.html">License Server</a>.
+        See <a href="license-server.html?framed=true">License Server</a>.
         <h1>Restart Cluster</h1>
         To do a rolling restart of the cluster, type "restart cluster". This command is only available in
         the Pro version.
         <h1>Start Backup</h1>
-        See <a href="backup-restore.html">Backup and Restore</a>.
+        See <a href="backup-restore.html?framed=true">Backup and Restore</a>.
         <h1>Backup Status</h1>
-        See <a href="backup-restore.html">Backup and Restore</a>.
+        See <a href="backup-restore.html?framed=true">Backup and Restore</a>.
         <h1>Start Restore</h1>
-        See <a href="backup-restore.html">Backup and Restore</a>.
+        See <a href="backup-restore.html?framed=true">Backup and Restore</a>.
         <h1>Restore Status</h1>
-        See <a href="backup-restore.html">Backup and Restore</a>.
+        See <a href="backup-restore.html?framed=true">Backup and Restore</a>.
         <h1>Purge Install</h1>
         To purge the install directory across the cluster, type "purge install".
         <h1>Quit or Exit</h1>
@@ -113,9 +113,9 @@ describe<br/>
         <h1>Clear</h1>
         To clear the screen, type "clear".
         <h1>Gather Diagnostics</h1>
-        See <a href="diagnostics.html">Diagnostics</a>.
+        See <a href="diagnostics.html?framed=true">Diagnostics</a>.
         <h1>Build Config</h1>
-        See <a href="aws-integration.html">AWS Integration</a>.
+        See <a href="aws-integration.html?framed=true">AWS Integration</a>.
         <h1>Reconfigure Cluster</h1>
         To reconfigure the cluster based on the current config file, type "reconfigure cluster". This needs
         to be done, for example, if you change the addresses of your servers.

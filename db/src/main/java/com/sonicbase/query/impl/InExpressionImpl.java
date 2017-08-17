@@ -185,7 +185,7 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
       return new NextReturn(new String[]{getTableName()}, null);
     }
     if (isNot()) {
-      SelectContextImpl context = ExpressionImpl.tableScan(dbName, getClient(), count, getClient().getCommon().getTables(dbName).get(getTableName()),
+      SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count, getClient().getCommon().getTables(dbName).get(getTableName()),
            getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(), getRecordCache(), getCounters(), getGroupByContext());
        if (context != null) {
          setNextShard(context.getNextShard());

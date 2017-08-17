@@ -162,7 +162,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
           explain.getBuilder().append("Table scan: " + getTopLevelExpression().toString() + "\n");
         }
 
-        SelectContextImpl context = ExpressionImpl.tableScan(dbName, getClient(), count, getClient().getCommon().getTables(dbName).get(getTableName()),
+        SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count, getClient().getCommon().getTables(dbName).get(getTableName()),
             getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(), getRecordCache(), getCounters(), getGroupByContext());
         if (context != null) {
           setNextShard(context.getNextShard());
@@ -582,7 +582,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
       }
       else {
         String[] indexFields = getClient().getCommon().getTables(dbName).get(getTableName()).getIndices().get(indexName).getFields();
-        SelectContextImpl context = ExpressionImpl.tableScan(dbName, getClient(), count, getClient().getCommon().getTables(dbName).get(getTableName()),
+        SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count, getClient().getCommon().getTables(dbName).get(getTableName()),
             getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(), getRecordCache(), getCounters(), getGroupByContext());
         if (context != null) {
           setNextShard(context.getNextShard());
@@ -637,7 +637,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
           explain.appendSpaces();
           explain.getBuilder().append("Table scan: " + getTopLevelExpression().toString() + "\n");
         }
-        SelectContextImpl context = ExpressionImpl.tableScan(dbName, getClient(), count, getClient().getCommon().getTables(dbName).get(getTableName()),
+        SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count, getClient().getCommon().getTables(dbName).get(getTableName()),
             getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(), getRecordCache(), getCounters(), getGroupByContext());
         if (context != null) {
           setNextShard(context.getNextShard());
@@ -896,7 +896,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
 
   private NextReturn evaluateOrExpression(int count, SelectStatementImpl.Explain explain) {
     if (!leftExpression.canUseIndex() || !rightExpression.canUseIndex()) {
-      SelectContextImpl context = ExpressionImpl.tableScan(dbName, getClient(), count, getClient().getCommon().getTables(dbName).get(getTableName()),
+      SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count, getClient().getCommon().getTables(dbName).get(getTableName()),
           getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(), getRecordCache(), getCounters(), getGroupByContext());
       if (context != null) {
         setNextShard(context.getNextShard());

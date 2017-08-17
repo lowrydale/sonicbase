@@ -50,6 +50,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static com.sonicbase.common.MemUtil.getMemValue;
@@ -211,6 +213,8 @@ public class DatabaseServer {
 //      }
 //    }
 
+    this.haveProLicense = true;
+    this.disableNow = false;
     this.isRunning = isRunning;
     this.config = config;
     this.cluster = cluster;
@@ -232,9 +236,12 @@ public class DatabaseServer {
     if (replicaCount > 1) {
       usingMultipleReplicas = true;
     }
+
     JsonDict firstServer = shards.getDict(0).getArray("replicas").getDict(0);
     ServersConfig serversConfig = null;
-    executor = new ThreadPoolExecutor(2048, 2048, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+    executor = new ThreadPoolExecutor(Runtime.getRuntime().availableProcessors() * 128,
+        Runtime.getRuntime().availableProcessors() * 128, 10000, TimeUnit.MILLISECONDS,
+        new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 //    if (!skipLicense) {
 //      validateLicense(config);
 //    }
@@ -343,7 +350,6 @@ public class DatabaseServer {
 
     repartitioner = new Repartitioner(this, common);
 
-    commandHandler.setRepartitioner(repartitioner);
     //common.getSchema().initRecordsById(shardCount, (int) (long) databaseDict.getLong("partitionCountForRecordIndex"));
 
     //logger.info("RecordsById: partitionCount=" + common.getSchema().getRecordIndexPartitions().length);
@@ -354,6 +360,9 @@ public class DatabaseServer {
     startMemoryMonitor();
 
     disable();
+    this.disableNow = false;
+    this.haveProLicense = true;
+    //startMasterLicenseValidator();
     startLicenseValidator();
 
     startMasterMonitor();
@@ -701,7 +710,9 @@ public class DatabaseServer {
         if (deathMonitorThreads != null) {
           for (int i = 0; i < shardCount; i++) {
             for (int j = 0; j < replicationFactor; j++) {
-              deathMonitorThreads[i][j].interrupt();
+              if (deathMonitorThreads[i] != null && deathMonitorThreads[i][j] != null) {
+                deathMonitorThreads[i][j].interrupt();
+              }
             }
           }
         }
@@ -844,7 +855,7 @@ public class DatabaseServer {
 
   private int replicaDeadForRestart = -1;
 
-  private void checkHealthOfServer(final int shard, final int replica, final AtomicBoolean isHealthy, final boolean ignoreDeath) throws InterruptedException {
+  public void checkHealthOfServer(final int shard, final int replica, final AtomicBoolean isHealthy, final boolean ignoreDeath) throws InterruptedException {
 
     if (deathOverride != null) {
       isHealthy.set(!deathOverride[shard][replica]);
@@ -1106,9 +1117,9 @@ public class DatabaseServer {
     haveProLicense = true;
 
     final AtomicBoolean haventSet = new AtomicBoolean(true);
-//    if (usingMultipleReplicas) {
-//      throw new InsufficientLicense("You must have a pro license to use multiple replicas");
-//    }
+    //    if (usingMultipleReplicas) {
+    //      throw new InsufficientLicense("You must have a pro license to use multiple replicas");
+    //    }
 
     final AtomicInteger licensePort = new AtomicInteger();
     String json = null;
@@ -1130,39 +1141,18 @@ public class DatabaseServer {
 
     final AtomicBoolean lastHaveProLicense = new AtomicBoolean(haveProLicense);
 
+    try {
+      doValidateLicense(address, licensePort, lastHaveProLicense, haventSet);
+    }
+    catch (IOException e) {
+      logger.error("Error validating licenses", e);
+    }
     masterLicenseValidatorThread = new Thread(new Runnable() {
       @Override
       public void run() {
         while (!shutdownMasterValidatorThread) {
           try {
-            int cores = 0;
-            synchronized (numberOfCoresPerServer) {
-              for (Map.Entry<Integer, Map<Integer, Integer>> shardEntry : numberOfCoresPerServer.entrySet()) {
-                for (Map.Entry<Integer, Integer> replicaEntry : shardEntry.getValue().entrySet()) {
-                  cores += replicaEntry.getValue();
-                }
-              }
-            }
-            HttpResponse response = DatabaseClient.restGet("https://" + address + ":" + licensePort.get() + "/license/checkIn?" +
-                "primaryAddress=" + common.getServersConfig().getShards()[0].getReplicas()[0].getPrivateAddress() +
-                "&primaryPort=" + common.getServersConfig().getShards()[0].getReplicas()[0].getPort() +
-                "&cluster=" + cluster + "&cores=" + cores);
-            String responseStr = StreamUtils.inputStreamToString(response.getContent());
-            logger.info("CheckIn response: " + responseStr);
-
-            JsonDict dict = new JsonDict(responseStr);
-
-            DatabaseServer.this.haveProLicense = dict.getBoolean("inCompliance");
-            DatabaseServer.this.disableNow = dict.getBoolean("disableNow");
-
-            logger.info("lastHaveProLicense=" + lastHaveProLicense.get() + ", haveProLicense=" + haveProLicense);
-            if (haventSet.get() || lastHaveProLicense.get() != haveProLicense) {
-              common.setHaveProLicense(haveProLicense);
-              common.saveSchema(dataDir);
-              lastHaveProLicense.set(haveProLicense);
-              haventSet.set(true);
-              logger.info("Saving schema with haveProLicense=" + haveProLicense);
-            }
+            doValidateLicense(address, licensePort, lastHaveProLicense, haventSet);
           }
           catch (Exception e) {
             logger.error("license server not found");
@@ -1186,6 +1176,37 @@ public class DatabaseServer {
       }
     });
     masterLicenseValidatorThread.start();
+  }
+
+  private void doValidateLicense(String address, AtomicInteger licensePort, AtomicBoolean lastHaveProLicense, AtomicBoolean haventSet) throws IOException {
+    int cores = 0;
+    synchronized (numberOfCoresPerServer) {
+      for (Map.Entry<Integer, Map<Integer, Integer>> shardEntry : numberOfCoresPerServer.entrySet()) {
+        for (Map.Entry<Integer, Integer> replicaEntry : shardEntry.getValue().entrySet()) {
+          cores += replicaEntry.getValue();
+        }
+      }
+    }
+    HttpResponse response = DatabaseClient.restGet("https://" + address + ":" + licensePort.get() + "/license/checkIn?" +
+        "primaryAddress=" + common.getServersConfig().getShards()[0].getReplicas()[0].getPrivateAddress() +
+        "&primaryPort=" + common.getServersConfig().getShards()[0].getReplicas()[0].getPort() +
+        "&cluster=" + cluster + "&cores=" + cores);
+    String responseStr = StreamUtils.inputStreamToString(response.getContent());
+    logger.info("CheckIn response: " + responseStr);
+
+    JsonDict dict = new JsonDict(responseStr);
+
+    DatabaseServer.this.haveProLicense = dict.getBoolean("inCompliance");
+    DatabaseServer.this.disableNow = dict.getBoolean("disableNow");
+
+    logger.info("licenseValidator: cores=" + cores + ", lastHaveProLicense=" + lastHaveProLicense.get() + ", haveProLicense=" + haveProLicense);
+    if (haventSet.get() || lastHaveProLicense.get() != haveProLicense) {
+      common.setHaveProLicense(haveProLicense);
+      common.saveSchema(dataDir);
+      lastHaveProLicense.set(haveProLicense);
+      haventSet.set(true);
+      logger.info("Saving schema with haveProLicense=" + haveProLicense);
+    }
   }
 
   private void shutdownMasterLicenseValidator() {
@@ -1242,6 +1263,7 @@ public class DatabaseServer {
       @Override
       public void run() {
         while (true) {
+          boolean hadError = false;
           try {
             int cores = Runtime.getRuntime().availableProcessors();
 
@@ -1253,7 +1275,13 @@ public class DatabaseServer {
             cobj.put(ComObject.Tag.replica, replica);
             cobj.put(ComObject.Tag.coreCount, cores);
             String command = "DatabaseServer:ComObject:licenseCheckin:";
-            byte[] ret = client.get().sendToMaster(command, cobj);
+            byte[] ret = null;
+            if (0 == shard && common.getServersConfig().getShards()[0].getMasterReplica() == replica) {
+              ret = licenseCheckin(cobj).serialize();
+            }
+            else {
+              ret = client.get().sendToMaster(command, cobj);
+            }
             ComObject retObj = new ComObject(ret);
 
             DatabaseServer.this.haveProLicense = retObj.getBoolean(ComObject.Tag.inCompliance);
@@ -1269,6 +1297,7 @@ public class DatabaseServer {
             }
           }
           catch (Exception e) {
+            hadError = true;
             logger.error("license server not found");
             if (haventSet.get() || lastHaveProLicense.get() != false) {
               common.setHaveProLicense(false);
@@ -1281,7 +1310,12 @@ public class DatabaseServer {
             errorLogger.debug("License server not found", e);
           }
           try {
-            Thread.sleep(60 * 1000);
+            if (hadError) {
+              Thread.sleep(1000);
+            }
+            else {
+              Thread.sleep(60 * 1000);
+            }
           }
           catch (InterruptedException e) {
             logger.error("Error checking licenses", e);
@@ -1807,7 +1841,9 @@ public class DatabaseServer {
           }
           logManager.restoreFileSystem(directory, subDirectory);
 
-          getClient().syncSchema();
+          if (shard != 0 || common.getServersConfig().getShards()[0].masterReplica != replica) {
+            getClient().syncSchema();
+          }
 
           prepareDataFromRestore();
 
@@ -2079,7 +2115,7 @@ public class DatabaseServer {
   }
 
   public void setMinSizeForRepartition(int minSizeForRepartition) {
-    repartitioner.setMinSizeForRepartition(minSizeForRepartition);
+    //repartitioner.setMinSizeForRepartition(minSizeForRepartition);
   }
 
   public long getCommandCount() {
@@ -2280,6 +2316,19 @@ public class DatabaseServer {
 
   public ReentrantReadWriteLock.WriteLock getBatchWriteLock() {
     return batchWriteLock;
+  }
+
+
+  private ReentrantReadWriteLock throttleLock = new ReentrantReadWriteLock();
+  private Lock throttleWriteLock = throttleLock.writeLock();
+  private Lock throttleReadLock = throttleLock.readLock();
+
+  public Lock getThrottleWriteLock() {
+    return throttleWriteLock;
+  }
+
+  public Lock getThrottleReadLock() {
+    return throttleReadLock;
   }
 
   public AtomicInteger getBatchRepartCount() {
@@ -3421,12 +3470,14 @@ public class DatabaseServer {
 
   public void startRepartitioner() {
     logger.info("startRepartitioner - begin");
-    shutdownRepartitioner();
+    //shutdownRepartitioner();
 
-    if (shard == 0 && replica == common.getServersConfig().getShards()[0].getMasterReplica()) {
-      repartitioner = new Repartitioner(this, common);
+    //if (shard == 0 && replica == common.getServersConfig().getShards()[0].getMasterReplica()) {
+      //repartitioner = new Repartitioner(this, common);
+    if (!repartitioner.isRunning())
       repartitioner.start();
-    }
+
+    //}
     logger.info("startRepartitioner - end");
   }
 
@@ -3507,6 +3558,7 @@ public class DatabaseServer {
     repartitioner.shutdown();
     repartitioner.isRebalancing.set(false);
     repartitioner.stopShardsFromRepartitioning();
+    repartitioner = new Repartitioner(this, common);
     logger.info("Shutdown repartitioner - end");
   }
 

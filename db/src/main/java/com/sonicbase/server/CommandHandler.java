@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Created by lowryda on 7/28/17.
@@ -103,11 +104,11 @@ public class CommandHandler {
   }
 
   public byte[] handleCommand(final String command, final byte[] body, boolean replayedCommand, boolean enableQueuing) {
-    return handleCommand(command, body, -1L, -1L, replayedCommand, enableQueuing);
+    return handleCommand(command, body, -1L, -1L, replayedCommand, enableQueuing, null, null);
   }
 
   public byte[] handleCommand(final String command, final byte[] body, long logSequence0, long logSequence1,
-                              boolean replayedCommand, boolean enableQueuing) {
+                              boolean replayedCommand, boolean enableQueuing, AtomicLong timeLogging, AtomicLong handlerTime) {
     try {
       if (shutdown) {
         throw new DatabaseException("Shutdown in progress");
@@ -137,7 +138,8 @@ public class CommandHandler {
       }
 
       if (server.shouldDisableNow() && server.isUsingMultipleReplicas()) {
-        if (!methodStr.equals("healthCheckPriority") && !methodStr.equals("getConfig") &&
+        if (!methodStr.equals("healthCheck") && !methodStr.equals("healthCheckPriority") &&
+            !methodStr.equals("getConfig") &&
             !methodStr.equals("getSchema") && !methodStr.equals("getDbNames")) {
           throw new LicenseOutOfComplianceException("Licenses out of compliance");
         }
@@ -172,8 +174,7 @@ public class CommandHandler {
       Long existingSequence0 = getExistingSequence0(command);
       Long existingSequence1 = getExistingSequence1(command);
 
-      DatabaseServer.LogRequest logRequest = logManager.logRequest(command, body, enableQueuing, methodStr, existingSequence0, existingSequence1);
-
+      DatabaseServer.LogRequest logRequest = logManager.logRequest(command, body, enableQueuing, methodStr, existingSequence0, existingSequence1, timeLogging);
       ComObject ret = null;
 
       if (!replayedCommand && !server.isRunning() && !priorityCommands.contains(methodStr)) {
@@ -189,6 +190,7 @@ public class CommandHandler {
         DatabaseServer.Shard currShard = common.getServersConfig().getShards()[server.getShard()];
         int replPos = command.indexOf("xx_repl_xx");
         try {
+          long handleBegin = System.nanoTime();
           if (cobj != null) {
             cobj.put(ComObject.Tag.sequence0, sequence0);
             cobj.put(ComObject.Tag.sequence1, sequence1);
@@ -199,6 +201,9 @@ public class CommandHandler {
           else {
             Method method = getClass().getMethod(methodStr, String.class, byte[].class, boolean.class);
             ret = (ComObject) method.invoke(this, command, body, replayedCommand);
+          }
+          if (handlerTime != null) {
+            handlerTime.addAndGet(System.nanoTime() - handleBegin);
           }
           if (ret == null) {
             ret = new ComObject();

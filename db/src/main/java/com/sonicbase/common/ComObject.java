@@ -192,7 +192,9 @@ public class ComObject {
     disableNow(116, booleanType),
     coreCount(117, intType),
     state(118, stringType),
-    shards(119, arrayType);
+    shards(119, arrayType),
+    disableDate(120, stringType),
+    multipleLicenseServers(121, booleanType);
 
     public final int tag;
 

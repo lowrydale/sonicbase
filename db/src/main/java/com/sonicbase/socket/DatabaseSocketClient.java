@@ -77,6 +77,7 @@ public class DatabaseSocketClient {
               throw new Exception("Error creating connection: host=" + host + ", port=" + port, t);
             }
           }
+          sock.count_called++;
         //}
         return sock;
       }
@@ -447,20 +448,37 @@ public class DatabaseSocketClient {
   private static AtomicLong totalCallCount = new AtomicLong();
   private static AtomicLong callCount = new AtomicLong();
   private static AtomicLong callDuration = new AtomicLong();
+  private static AtomicLong requestDuration = new AtomicLong();
+  private static AtomicLong processingDuration = new AtomicLong();
+  private static AtomicLong responseDuration = new AtomicLong();
   private static AtomicLong lastLogReset = new AtomicLong(System.currentTimeMillis());
 
   public static void sendBatch(String host, int port, List<Request> requests) {
     try {
-      long begin = System.currentTimeMillis();
+      long begin = System.nanoTime();
       //while (true) {
       totalCallCount.incrementAndGet();
         if (callCount.incrementAndGet() % 10000 == 0) {
+          int connectionCount = 0;
+          int maxConnectionCount = 0;
+          for (ArrayBlockingQueue<Connection> value : pools.values()) {
+            connectionCount += value.size();
+            maxConnectionCount = Math.max(value.size(), maxConnectionCount);
+          }
+
           logger.info("SocketClient stats: callCount=" + totalCallCount.get() + ", avgDuration=" +
-              (callDuration.get() / callCount.get()));
+              (callDuration.get() / callCount.get() / 1000000d) + ", processingDuration=" +
+              (processingDuration.get() / callCount.get() / 1000000d) + ", avgRequestDuration=" +
+              (requestDuration.get() / callCount.get() / 1000000d) + ", avgResponseDuration=" +
+              (responseDuration.get() / callCount.get() / 1000000d) + ", avgConnectionCount=" + (connectionCount / pools.size()) +
+              ", maxConnectionCount=" + maxConnectionCount);
           synchronized (lastLogReset) {
             if (System.currentTimeMillis() - lastLogReset.get() > 4 * 60 * 1000) {
               callDuration.set(0);
               callCount.set(0);
+              requestDuration.set(0);
+              responseDuration.set(0);
+              processingDuration.set(0);
               lastLogReset.set(System.currentTimeMillis());
             }
           }
@@ -532,54 +550,18 @@ public class DatabaseSocketClient {
           //sock.sock.write(ByteBuffer.wrap(body));
           sockBytes.write(body);
 
-          sock.sock.write(ByteBuffer.wrap(sockBytes.toByteArray()));
+          long beginRequest = System.nanoTime();
+          writeRequest(sock, ByteBuffer.wrap(sockBytes.toByteArray()));
+          long processingBegin = System.nanoTime();
+          requestDuration.addAndGet(System.nanoTime() - beginRequest);
 
           int totalRead = 0;
 
           int bodyLen = 0;
-          int nBytes = 0;
-          //sock.clientHandler.await();
-          //
-          //     while (true) {
-          ByteBuffer buf = ByteBuffer.allocateDirect(intBuff.length - totalRead);
-          while ((nBytes = nBytes = sock.sock.read(buf)) > 0) {
-            buf.flip();
-            buf.get(intBuff, totalRead, nBytes);
-            //System.arraycopy(buf.array(), 0, intBuff, totalRead, nBytes);
-            buf.clear();
 
-            totalRead += nBytes;
-            if (totalRead == intBuff.length) {
-              bodyLen = Util.readRawLittleEndian32(intBuff);
-              break;
-            }
-          }
-          //              int lenRead = sock.sock.read(intBuff, totalRead, intBuff.length - totalRead);
-          //              if (lenRead == -1) {
-          //                throw new Exception("EOF");
-          //}
-          //        totalRead += nBytes;
-          //        if (totalRead == intBuff.length) {
-          //          bodyLen = Util.readRawLittleEndian32(intBuff);
-          //          break;
-          //        }
+          byte[] responseBody = readResponse(intBuff, sock, totalRead, bodyLen, processingBegin);
 
-          totalRead = 0;
-          byte[] responseBody = new byte[bodyLen];
-          //while (true) {
-          nBytes = 0;
-          buf = ByteBuffer.allocateDirect(responseBody.length - totalRead);
-          while ((nBytes = sock.sock.read(buf)) > 0) {
-            buf.flip();
-            buf.get(responseBody, totalRead, nBytes);
-            //System.arraycopy(buf.array(), 0, responseBody, totalRead, nBytes);
-            buf.clear();
 
-            totalRead += nBytes;
-            if (totalRead == responseBody.length) {
-              break;
-            }
-          }
           //
           //                    int lenRead = in.read(responseBody, totalRead, responseBody.length - totalRead);
           //                    if (lenRead == -1) {
@@ -643,15 +625,81 @@ public class DatabaseSocketClient {
         }
         finally {
           if (shouldReturn) {
-            return_connection(sock, host, port);
+            if (sock.count_called > 1000) {
+              if (sock != null && sock.sock != null) {
+                sock.sock.close();//clientHandler.channel.close();
+              }
+            }
+            else {
+              return_connection(sock, host, port);
+            }
           }
         }
       //}
-      callDuration.addAndGet(System.currentTimeMillis() - begin);
+      callDuration.addAndGet(System.nanoTime() - begin);
     }
     catch (IOException e) {
       throw new DeadServerException(e);
     }
+  }
+
+  private static byte[] readResponse(byte[] intBuff, Connection sock, int totalRead, int bodyLen, long processingBegin) throws IOException {
+    int nBytes = 0;//sock.clientHandler.await();
+    //
+    //     while (true) {
+    long beginResponse = 0;
+    boolean first = true;
+    ByteBuffer buf = ByteBuffer.allocateDirect(intBuff.length - totalRead);
+    while ((nBytes = sock.sock.read(buf)) > 0) {
+      if (first) {
+        processingDuration.addAndGet(System.nanoTime() - processingBegin);
+        beginResponse = System.nanoTime();
+        first = false;
+      }
+      buf.flip();
+      buf.get(intBuff, totalRead, nBytes);
+      //System.arraycopy(buf.array(), 0, intBuff, totalRead, nBytes);
+      buf.clear();
+
+      totalRead += nBytes;
+      if (totalRead == intBuff.length) {
+        bodyLen = Util.readRawLittleEndian32(intBuff);
+        break;
+      }
+    }
+    //              int lenRead = sock.sock.read(intBuff, totalRead, intBuff.length - totalRead);
+    //              if (lenRead == -1) {
+    //                throw new Exception("EOF");
+    //}
+    //        totalRead += nBytes;
+    //        if (totalRead == intBuff.length) {
+    //          bodyLen = Util.readRawLittleEndian32(intBuff);
+    //          break;
+    //        }
+
+    totalRead = 0;
+    byte[] responseBody = new byte[bodyLen];
+    //while (true) {
+    nBytes = 0;
+    buf = ByteBuffer.allocateDirect(responseBody.length - totalRead);
+    while ((nBytes = sock.sock.read(buf)) > 0) {
+      buf.flip();
+      buf.get(responseBody, totalRead, nBytes);
+      //System.arraycopy(buf.array(), 0, responseBody, totalRead, nBytes);
+      buf.clear();
+
+      totalRead += nBytes;
+      if (totalRead == responseBody.length) {
+        break;
+      }
+    }
+    responseDuration.addAndGet(System.nanoTime() - beginResponse);
+
+    return responseBody;
+  }
+
+  private static void writeRequest(Connection sock, ByteBuffer sockBytes) throws IOException {
+    sock.sock.write(sockBytes);
   }
 
   private static void processResponse(InputStream in, Request request) {

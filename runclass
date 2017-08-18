@@ -43,7 +43,7 @@ java_opts="$java_opts -XX:+CMSClassUnloadingEnabled -XX:+PrintGCDetails  -XX:-Us
 java_opts="$java_opts -XX:+HeapDumpOnOutOfMemoryError  -Djava.net.preferIPv4Stack=true"
 java_opts="$java_opts -XX:+PrintGCDetails -XX:+PrintGCTimeStamps "
 java_opts="$java_opts -XX:-OmitStackTraceInFastThrow -XX:-UseLoopPredicate"
-java_opts="$java_opts -Xmx$_XMX_ -XX:MaxDirectMemorySize=2g "
+java_opts="$java_opts -Xmx$_XMX_ -XX:MaxDirectMemorySize=2g"
 #-XX:ReservedCodeCacheSize=32m
 java_opts="$java_opts -Dfamilysearch.search.disable.foreign.node.registration -Dfamilysearch.search.disable.central.log "
 if [ "$LOG4J_FILE" = "cli-log4j.xml" ]; then

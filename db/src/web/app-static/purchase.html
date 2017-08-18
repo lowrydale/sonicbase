@@ -6,6 +6,7 @@
     <meta name="description" content="Purchase SonicBase licenses.">
 
     <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script src="https://www.paypalobjects.com/api/checkout.js"></script>
 
     <meta charset="UTF-8">
     <title>SonicBase - Purchase Licenses</title>
@@ -74,6 +75,7 @@
                 <li><a href="../index.html">HOME</a></li>
                 <li> <a href="../documentation.html">DOCUMENTATION</a></li>
                 <li><a href="../downloads.html">DOWNLOADS</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
             </ul>
         </nav>
     </header>
@@ -104,10 +106,45 @@
         </tr>
         <tr>
             <td></td><td>
-            <div style="margin-left: 4em;margin-right: 4em;">
-                Pro version will be available for purchase soon.
-            </div>
-            <!--<button type="button" onclick="purchase(document.getElementById('purchase-form'))">Purchase</button>-->
+                <div id="paypal-button"></div>
+
+            <!--                           return paypal.request.post("https://sonicbase.com/license/paypal/create-payment?" +
+               "cores=" + document.getElementById("cores").value +
+               "&promoCode=" + document.getElementById("promoCode").value +
+               "&sessionId=" + readCookie("SBSessionId")
+-->                <script>
+                    paypal.Button.render({
+
+                        env: 'production',
+
+                        commit: true, // Show a 'Pay Now' button
+
+
+                    payment: function() {
+                            return paypal.request.post("https://sonicbase.com:8443/app/license/paypal/create-payment?" +
+                        "cores=" + document.getElementById("coreCount").value +
+                        "&promoCode=" + document.getElementById("promoCode").value +
+                        "&sessionId=" + readCookie("SBSessionId")
+                            ).then(function(data) {
+                                return data.id;
+                            });
+                        },
+
+
+                        onAuthorize: function(data) {
+                            return paypal.request.post("https://sonicbase.com:8443/app/license/paypal/execute-payment?" +
+                                "cores=" + document.getElementById("coreCount").value +
+                                "&promoCode=" + document.getElementById("promoCode").value +
+                                "&sessionId=" + readCookie("SBSessionId"), {
+                                paymentID: data.paymentID,
+                                payerID:   data.payerID
+                            }).then(function() {
+                                window.location.href = "/app-static/licenses.html";
+                            });
+                        }
+
+                    }, '#paypal-button');
+                </script>
         </td>
         </tr>
     </table>

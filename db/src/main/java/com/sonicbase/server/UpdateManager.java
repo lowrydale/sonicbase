@@ -383,6 +383,7 @@ public class UpdateManager {
     }
 
   }
+
   private AtomicLong batchCount = new AtomicLong();
   private AtomicLong batchEntryCount = new AtomicLong();
   private AtomicLong lastBatchLogReset = new AtomicLong(System.currentTimeMillis());
@@ -409,11 +410,19 @@ public class UpdateManager {
     try {
       List<Future> futures = new ArrayList<>();
       final ComArray array = cobj.getArray(ComObject.Tag.insertObjects);
+
+      if (false) {
+        ComObject retObj = new ComObject();
+        retObj.put(ComObject.Tag.count, array.getArray().size());
+        return retObj;
+      }
+
+
       batchEntryCount.addAndGet(array.getArray().size());
       if (batchCount.incrementAndGet() % 1000 == 0) {
         logger.info("batchInsert stats: batchSize=" + array.getArray().size() + ", avgBatchSize=" +
             (batchEntryCount.get() / batchCount.get()) +
-          ", avgBatchDuration=" + (batchDuration.get() / batchCount.get()));
+          ", avgBatchDuration=" + (batchDuration.get() / batchCount.get() / 1000000d));
         synchronized (lastBatchLogReset) {
           if (System.currentTimeMillis() - lastBatchLogReset.get() > 4 * 60 * 1000) {
             lastBatchLogReset.set(System.currentTimeMillis());
@@ -424,7 +433,7 @@ public class UpdateManager {
         }
       }
 
-      long begin = System.currentTimeMillis();
+      long begin = System.nanoTime();
       List<InsertRequest> requests = new ArrayList<>();
       for (int i = 0; i < array.getArray().size(); i++) {
         final int offset = i;
@@ -483,7 +492,7 @@ public class UpdateManager {
         trans.addOperation(batchInsertWithRecord, command, cobj.serialize(), replayedCommand);
       }
 
-      batchDuration.addAndGet(System.currentTimeMillis() - begin);
+      batchDuration.addAndGet(System.nanoTime() - begin);
     }
 //    catch (InterruptedException e) {
 //      //ignore

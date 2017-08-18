@@ -19,6 +19,7 @@ import com.sonicbase.server.ReadManager;
 import com.sonicbase.server.SnapshotManager;
 import com.sonicbase.socket.DatabaseSocketClient;
 import com.sonicbase.socket.DeadServerException;
+import com.sonicbase.util.ISO8601;
 import com.sonicbase.util.JsonArray;
 import com.sonicbase.util.JsonDict;
 import com.sonicbase.util.StreamUtils;
@@ -45,7 +46,11 @@ import net.sf.jsqlparser.statement.truncate.Truncate;
 import net.sf.jsqlparser.statement.update.Update;
 import org.apache.commons.lang.exception.ExceptionUtils;
 
+import javax.net.ssl.*;
 import java.io.*;
+import java.net.URL;
+import java.net.URLConnection;
+import java.security.cert.X509Certificate;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.util.*;
@@ -68,9 +73,27 @@ public class DatabaseClient {
   private ThreadPoolExecutor executor = new ThreadPoolExecutor(128, 128, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
   private static org.apache.log4j.Logger localLogger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
-  private Logger logger;
+  private static Logger logger;
 
   private int pageSize = ReadManager.SELECT_PAGE_SIZE;
+
+  private ThreadLocal<Boolean> isExplicitTrans = new ThreadLocal<>();
+  private ThreadLocal<Boolean> isCommitting = new ThreadLocal<>();
+  private ThreadLocal<Long> transactionId = new ThreadLocal<>();
+  private ThreadLocal<List<TransactionOperation>> transactionOps = new ThreadLocal<>();
+  Timer statsTimer;
+  private ConcurrentHashMap<String, StatementCacheEntry> statementCache = new ConcurrentHashMap<>();
+
+
+  private static final MetricRegistry METRICS = new MetricRegistry();
+
+  private final Object idAllocatorLock = new Object();
+  private final AtomicLong nextId = new AtomicLong(-1L);
+  private final AtomicLong maxAllocatedId = new AtomicLong(-1L);
+
+  public static final com.codahale.metrics.Timer INDEX_LOOKUP_STATS = METRICS.timer("indexLookup");
+  public static final com.codahale.metrics.Timer BATCH_INDEX_LOOKUP_STATS = METRICS.timer("batchIndexLookup");
+  public static final com.codahale.metrics.Timer JOIN_EVALUATE = METRICS.timer("joinEvaluate");
 
   private Set<String> write_verbs = new HashSet<String>();
   private static String[] write_verbs_array = new String[]{
@@ -250,12 +273,6 @@ public class DatabaseClient {
   public ThreadPoolExecutor getExecutor() {
     return executor;
   }
-
-  private ThreadLocal<Boolean> isExplicitTrans = new ThreadLocal<>();
-  private ThreadLocal<Boolean> isCommitting = new ThreadLocal<>();
-  private ThreadLocal<Long> transactionId = new ThreadLocal<>();
-  private ThreadLocal<List<TransactionOperation>> transactionOps = new ThreadLocal<>();
-  Timer statsTimer;
 
   public boolean isExplicitTrans() {
     Boolean explicit = isExplicitTrans.get();
@@ -669,6 +686,9 @@ public class DatabaseClient {
       }
       throw new DatabaseException(e);
     }
+    finally {
+      batch.set(null);
+    }
   }
 
   public String getCluster() {
@@ -745,12 +765,6 @@ public class DatabaseClient {
   public byte[] do_send(List<DatabaseSocketClient.Request> requests) {
     return DatabaseSocketClient.do_send(requests);
   }
-
-  private static final MetricRegistry METRICS = new MetricRegistry();
-
-  public static final com.codahale.metrics.Timer INDEX_LOOKUP_STATS = METRICS.timer("indexLookup");
-  public static final com.codahale.metrics.Timer BATCH_INDEX_LOOKUP_STATS = METRICS.timer("batchIndexLookup");
-  public static final com.codahale.metrics.Timer JOIN_EVALUATE = METRICS.timer("joinEvaluate");
 
   public void configureServers() {
     DatabaseServer.ServersConfig serversConfig = common.getServersConfig();
@@ -1561,8 +1575,6 @@ public class DatabaseClient {
 
   }
 
-  private ConcurrentHashMap<String, StatementCacheEntry> statementCache = new ConcurrentHashMap<>();
-
   public Object executeQuery(String dbName, QueryType queryType, String sql, ParameterHandler parms) throws SQLException {
     return executeQuery(dbName, queryType, sql, parms, false);
   }
@@ -1791,19 +1803,77 @@ public class DatabaseClient {
 
   }
 
-  public static ResultSet describeLicenses() {
+  public static Integer getLicenseDaysLeft() {
     try {
       String json = StreamUtils.inputStreamToString(DatabaseClient.class.getResourceAsStream("/config-license-server.json"));
       JsonDict config = new JsonDict(json);
 
-      HttpResponse response = restGet("https://" + config.getDict("server").getString("publicAddress") + ":" +
+      com.google.api.client.http.HttpResponse response = restGet("https://" + config.getDict("server").getString("publicAddress") + ":" +
           config.getDict("server").getInt("port") + "/license/currUsage");
       JsonDict dict = new JsonDict(StreamUtils.inputStreamToString(response.getContent()));
+      StringBuilder builder = new StringBuilder();
+      String disableDate = dict.getString("disableDate");
+      Calendar cal = ISO8601.from8601String(disableDate);
+      long disableDateLong = cal.getTimeInMillis();
+
+      return (int)((disableDateLong - System.currentTimeMillis()) / 24 / 60 / 60 / 1000);
+    }
+    catch (Exception e) {
+      logger.error("Error getting license status");
+    }
+    return null;
+  }
+
+  public static ResultSet describeLicenses() {
+    try {
+      TrustManager[] trustAllCerts = new TrustManager[] {
+          new X509TrustManager() {
+            public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+              return null;
+            }
+
+            public void checkClientTrusted(X509Certificate[] certs, String authType) {  }
+
+            public void checkServerTrusted(X509Certificate[] certs, String authType) {  }
+
+          }
+      };
+
+      SSLContext sc = SSLContext.getInstance("SSL");
+      sc.init(null, trustAllCerts, new java.security.SecureRandom());
+      HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+
+      // Create all-trusting host name verifier
+      HostnameVerifier allHostsValid = new HostnameVerifier() {
+
+        public boolean verify(String hostname, SSLSession session) {
+          return true;
+        }
+      };
+      // Install the all-trusting host verifier
+      HttpsURLConnection.setDefaultHostnameVerifier(allHostsValid);
+      /*
+       * end of the fix
+       */
+
+      String json = StreamUtils.inputStreamToString(DatabaseClient.class.getResourceAsStream("/config-license-server.json"));
+      JsonDict config = new JsonDict(json);
+
+      URL url = new URL("https://" + config.getDict("server").getString("publicAddress") + ":" +
+          config.getDict("server").getInt("port") + "/license/currUsage");
+      URLConnection con = url.openConnection();
+      InputStream in = new BufferedInputStream(con.getInputStream());
+
+//      HttpResponse response = restGet("https://" + config.getDict("server").getString("publicAddress") + ":" +
+//          config.getDict("server").getInt("port") + "/license/currUsage");
+      JsonDict dict = new JsonDict(StreamUtils.inputStreamToString(in));
       StringBuilder builder = new StringBuilder();
       builder.append("total cores in use=" + dict.getInt("totalCores") + "\n");
       builder.append("total allocated cores=" + dict.getInt("allocatedCores") + "\n");
       builder.append("in compliance=" + dict.getBoolean("inCompliance") + "\n");
       builder.append("disabling now=" + dict.getBoolean("disableNow") + "\n");
+      builder.append("disabling date=" + dict.getString("disableDate") + "\n");
+      builder.append("multiple license servers=" + dict.getBoolean("multipleLicenseServers") + "\n");
       JsonArray servers = dict.getArray("clusters");
       for (int i = 0; i < servers.size(); i++) {
         builder.append(servers.getDict(i).getString("cluster") + "=" + servers.getDict(i).getInt("cores") + "\n");
@@ -2626,10 +2696,6 @@ public class DatabaseClient {
     }
   }
 
-  private final Object idAllocatorLock = new Object();
-  private final AtomicLong nextId = new AtomicLong(-1L);
-  private final AtomicLong maxAllocatedId = new AtomicLong(-1L);
-
   static class TransactionOperation {
     private StatementImpl statement;
     private ParameterHandler parms;
@@ -2688,9 +2754,6 @@ public class DatabaseClient {
     return doInsert(dbName, insertStatement, parms);
 
   }
-
-  private ConcurrentHashMap<String, TableSchema> tableSchema = new ConcurrentHashMap<>();
-  private long lastGotSchema = 0;
 
   private static ConcurrentHashMap<Long, Integer> addedRecords = new ConcurrentHashMap<>();
 

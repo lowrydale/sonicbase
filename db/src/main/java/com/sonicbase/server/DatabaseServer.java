@@ -36,6 +36,8 @@ import javax.net.ssl.*;
 import java.io.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.net.URL;
+import java.net.URLConnection;
 import java.nio.charset.Charset;
 import java.security.InvalidKeyException;
 import java.security.Key;
@@ -119,6 +121,8 @@ public class DatabaseServer {
   private AddressMap addressMap;
   private boolean shutdownMasterValidatorThread = false;
   private Thread masterLicenseValidatorThread;
+  private String disableDate;
+  private Boolean multipleLicenseServers;
 
 
   @SuppressWarnings("restriction")
@@ -1144,7 +1148,7 @@ public class DatabaseServer {
     try {
       doValidateLicense(address, licensePort, lastHaveProLicense, haventSet);
     }
-    catch (IOException e) {
+    catch (Exception e) {
       logger.error("Error validating licenses", e);
     }
     masterLicenseValidatorThread = new Thread(new Runnable() {
@@ -1155,7 +1159,7 @@ public class DatabaseServer {
             doValidateLicense(address, licensePort, lastHaveProLicense, haventSet);
           }
           catch (Exception e) {
-            logger.error("license server not found");
+            logger.error("license server not found", e);
             if (haventSet.get() || lastHaveProLicense.get() != false) {
               common.setHaveProLicense(false);
               common.saveSchema(dataDir);
@@ -1187,26 +1191,77 @@ public class DatabaseServer {
         }
       }
     }
-    HttpResponse response = DatabaseClient.restGet("https://" + address + ":" + licensePort.get() + "/license/checkIn?" +
-        "primaryAddress=" + common.getServersConfig().getShards()[0].getReplicas()[0].getPrivateAddress() +
-        "&primaryPort=" + common.getServersConfig().getShards()[0].getReplicas()[0].getPort() +
-        "&cluster=" + cluster + "&cores=" + cores);
-    String responseStr = StreamUtils.inputStreamToString(response.getContent());
-    logger.info("CheckIn response: " + responseStr);
 
-    JsonDict dict = new JsonDict(responseStr);
 
-    DatabaseServer.this.haveProLicense = dict.getBoolean("inCompliance");
-    DatabaseServer.this.disableNow = dict.getBoolean("disableNow");
+    try {
+      TrustManager[] trustAllCerts = new TrustManager[]{
+          new X509TrustManager() {
+            public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+              return null;
+            }
 
-    logger.info("licenseValidator: cores=" + cores + ", lastHaveProLicense=" + lastHaveProLicense.get() + ", haveProLicense=" + haveProLicense);
-    if (haventSet.get() || lastHaveProLicense.get() != haveProLicense) {
-      common.setHaveProLicense(haveProLicense);
-      common.saveSchema(dataDir);
-      lastHaveProLicense.set(haveProLicense);
-      haventSet.set(true);
-      logger.info("Saving schema with haveProLicense=" + haveProLicense);
+            public void checkClientTrusted(X509Certificate[] certs, String authType) {
+            }
+
+            public void checkServerTrusted(X509Certificate[] certs, String authType) {
+            }
+
+          }
+      };
+
+      SSLContext sc = SSLContext.getInstance("SSL");
+      sc.init(null, trustAllCerts, new java.security.SecureRandom());
+      HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+
+      // Create all-trusting host name verifier
+      HostnameVerifier allHostsValid = new HostnameVerifier() {
+
+        public boolean verify(String hostname, SSLSession session) {
+          return true;
+        }
+      };
+      // Install the all-trusting host verifier
+      HttpsURLConnection.setDefaultHostnameVerifier(allHostsValid);
+      /*
+       * end of the fix
+       */
+
+      URL url = new URL("https://" + address + ":" + licensePort.get() + "/license/checkIn?" +
+          "primaryAddress=" + common.getServersConfig().getShards()[0].getReplicas()[0].getPrivateAddress() +
+          "&primaryPort=" + common.getServersConfig().getShards()[0].getReplicas()[0].getPort() +
+          "&cluster=" + cluster + "&cores=" + cores);
+      URLConnection con = url.openConnection();
+      InputStream in = new BufferedInputStream(con.getInputStream());
+
+//      HttpResponse response = restGet("https://" + config.getDict("server").getString("publicAddress") + ":" +
+//          config.getDict("server").getInt("port") + "/license/currUsage");
+      JsonDict dict = new JsonDict(StreamUtils.inputStreamToString(in));
+
+//      HttpResponse response = DatabaseClient.restGet("https://" + address + ":" + licensePort.get() + "/license/checkIn?" +
+//        "primaryAddress=" + common.getServersConfig().getShards()[0].getReplicas()[0].getPrivateAddress() +
+//        "&primaryPort=" + common.getServersConfig().getShards()[0].getReplicas()[0].getPort() +
+//        "&cluster=" + cluster + "&cores=" + cores);
+//    String responseStr = StreamUtils.inputStreamToString(response.getContent());
+//    logger.info("CheckIn response: " + responseStr);
+
+//    JsonDict dict = new JsonDict(responseStr);
+
+      this.haveProLicense = dict.getBoolean("inCompliance");
+      this.disableNow = dict.getBoolean("disableNow");
+      this.disableDate = dict.getString("disableDate");
+      this.multipleLicenseServers = dict.getBoolean("multipleLicenseServers");
+      logger.info("licenseValidator: cores=" + cores + ", lastHaveProLicense=" + lastHaveProLicense.get() + ", haveProLicense=" + haveProLicense);
+      if (haventSet.get() || lastHaveProLicense.get() != haveProLicense) {
+        common.setHaveProLicense(haveProLicense);
+        common.saveSchema(dataDir);
+        lastHaveProLicense.set(haveProLicense);
+        haventSet.set(true);
+        logger.info("Saving schema with haveProLicense=" + haveProLicense);
+      }
     }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+      }
   }
 
   private void shutdownMasterLicenseValidator() {
@@ -1286,8 +1341,11 @@ public class DatabaseServer {
 
             DatabaseServer.this.haveProLicense = retObj.getBoolean(ComObject.Tag.inCompliance);
             DatabaseServer.this.disableNow = retObj.getBoolean(ComObject.Tag.disableNow);
+            DatabaseServer.this.disableDate = retObj.getString(ComObject.Tag.disableDate);
+            DatabaseServer.this.multipleLicenseServers = retObj.getBoolean(ComObject.Tag.multipleLicenseServers);
 
-            logger.info("lastHaveProLicense=" + lastHaveProLicense.get() + ", haveProLicense=" + haveProLicense);
+            logger.info("licenseCheckin: lastHaveProLicense=" + lastHaveProLicense.get() + ", haveProLicense=" + haveProLicense +
+              ", disableNow=" + disableNow + ", disableDate=" + disableDate + ", multipleLicenseServers=" + multipleLicenseServers);
             if (haventSet.get() || lastHaveProLicense.get() != haveProLicense) {
               common.setHaveProLicense(haveProLicense);
               common.saveSchema(dataDir);
@@ -1298,7 +1356,7 @@ public class DatabaseServer {
           }
           catch (Exception e) {
             hadError = true;
-            logger.error("license server not found");
+            logger.error("license server not found", e);
             if (haventSet.get() || lastHaveProLicense.get() != false) {
               common.setHaveProLicense(false);
               common.saveSchema(dataDir);
@@ -1342,6 +1400,15 @@ public class DatabaseServer {
     ComObject retObj = new ComObject();
     retObj.put(ComObject.Tag.inCompliance, this.haveProLicense);
     retObj.put(ComObject.Tag.disableNow, this.disableNow);
+    if (disableDate != null) {
+      retObj.put(ComObject.Tag.disableDate, this.disableDate);
+    }
+    if (multipleLicenseServers == null) {
+      retObj.put(ComObject.Tag.multipleLicenseServers, false);
+    }
+    else {
+      retObj.put(ComObject.Tag.multipleLicenseServers, this.multipleLicenseServers);
+    }
     return retObj;
   }
 
@@ -4274,6 +4341,8 @@ public class DatabaseServer {
     private List<byte[]> buffers;
     private long[] sequenceNumbers;
     private long[] times;
+    private long begin;
+    private AtomicLong timeLogging;
 
     public LogRequest(int size) {
       this.sequenceNumbers = new long[size];
@@ -4313,6 +4382,22 @@ public class DatabaseServer {
 
     public long[] getSequences0() {
       return times;
+    }
+
+    public void setBegin(long begin) {
+      this.begin = begin;
+    }
+
+    public void setTimeLogging(AtomicLong timeLogging) {
+      this.timeLogging = timeLogging;
+    }
+
+    public AtomicLong getTimeLogging() {
+      return timeLogging;
+    }
+
+    public long getBegin() {
+      return begin;
     }
   }
 
@@ -4448,12 +4533,12 @@ public class DatabaseServer {
   }
 
   public byte[] handleCommand(final String command, final byte[] body, boolean replayedCommand, boolean enableQueuing) {
-    return handleCommand(command, body, -1L, -1L, replayedCommand, enableQueuing);
+    return handleCommand(command, body, -1L, -1L, replayedCommand, enableQueuing, null, null);
   }
 
   public byte[] handleCommand(final String command, final byte[] body, long logSequence0, long logSequence1,
-                              boolean replayedCommand, boolean enableQueuing) {
-    return commandHandler.handleCommand(command, body, logSequence0, logSequence1, replayedCommand, enableQueuing);
+                              boolean replayedCommand, boolean enableQueuing, AtomicLong timeLogging, AtomicLong handlerTime) {
+    return commandHandler.handleCommand(command, body, logSequence0, logSequence1, replayedCommand, enableQueuing, timeLogging, handlerTime);
   }
 
 

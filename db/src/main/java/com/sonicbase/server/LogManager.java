@@ -64,7 +64,7 @@ public class LogManager {
         throw new DatabaseException(e);
       }
     }
-    int logThreadCount = 1;//64;
+    int logThreadCount = 4;//64;
     for (int i = 0; i < logThreadCount; i++) {
       LogProcessor logProcessor = new LogProcessor(i, -1, logRequests, server.getDataDir(), server.getShard(), server.getReplica());
       logProcessors.add(logProcessor);
@@ -507,25 +507,25 @@ public class LogManager {
         try {
           List<DatabaseServer.LogRequest> requests = new ArrayList<>();
           while (true) {
-            DatabaseServer.LogRequest request = currLogRequests.poll(30000, TimeUnit.MILLISECONDS);
-            if (request == null) {
-              Thread.sleep(0, 50000);
-            }
-            else {
-              requests.add(request);
-              break;
-////              if (requests.size() > 20) {
-////                break;
-////              }
-//            }
-            }
-//            logRequests.drainTo(requests, 200);
-//            if (requests.size() == 0) {
+//            DatabaseServer.LogRequest request = currLogRequests.poll(30000, TimeUnit.MILLISECONDS);
+//            if (request == null) {
 //              Thread.sleep(0, 50000);
 //            }
 //            else {
+//              requests.add(request);
 //              break;
+//////              if (requests.size() > 20) {
+//////                break;
+//////              }
+////            }
 //            }
+            currLogRequests.drainTo(requests, 200);
+            if (requests.size() == 0) {
+              Thread.sleep(0, 50000);
+            }
+            else {
+              break;
+            }
           }
           synchronized (this) {
             if (shouldSlice || writer == null || System.currentTimeMillis() - 2 * 60 * 100 > currQueueTime) {
@@ -550,6 +550,9 @@ public class LogManager {
           }
 
           for (DatabaseServer.LogRequest request : requests) {
+            if (request.getTimeLogging() != null) {
+              request.getTimeLogging().addAndGet(System.nanoTime() - request.getBegin());
+            }
             request.getLatch().countDown();
           }
         }
@@ -959,7 +962,7 @@ public class LogManager {
                     public void run() {
                       try {
                         server.handleCommand(request.getCommand(), request.getBody(), request.getSequence0(),
-                            request.getSequence1(), true, false);
+                            request.getSequence1(), true, false, null, null);
                         countProcessed.incrementAndGet();
                         if (System.currentTimeMillis() - lastLogged.get() > 2000) {
                           lastLogged.set(System.currentTimeMillis());
@@ -993,7 +996,7 @@ public class LogManager {
                 executor.submit(new Runnable(){
                   public void run () {
                     try {
-                      server.handleCommand(command, buffer, sequence0, sequence1,true, false);
+                      server.handleCommand(command, buffer, sequence0, sequence1,true, false, null, null);
                       countProcessed.incrementAndGet();
                       if (System.currentTimeMillis() - lastLogged.get() > 2000) {
                         lastLogged.set(System.currentTimeMillis());
@@ -1096,7 +1099,7 @@ public class LogManager {
 
 
   public DatabaseServer.LogRequest logRequest(String command, byte[] body, boolean enableQueuing, String methodStr,
-                                              Long existingSequence0, Long existingSequence1) {
+                                              Long existingSequence0, Long existingSequence1, AtomicLong timeLogging) {
     DatabaseServer.LogRequest request = null;
     try {
       if (enableQueuing && DatabaseClient.getWriteVerbs().contains(methodStr)) {
@@ -1132,6 +1135,8 @@ public class LogManager {
         request.getSequences0()[0] = sequence0;
         request.getSequences1()[0] = sequence1;
         request.setBuffer(bytesOut.toByteArray());
+        request.setBegin(System.nanoTime());
+        request.setTimeLogging(timeLogging);
         logRequests.put(request);
       }
       return request;

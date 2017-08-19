@@ -35,7 +35,7 @@
     <div style="margin-left: 4em;">
 
 <h1>Prepared Statements</h1>
-It is important that you use a parameterized prepared statement. You should not use contstants for parameters
+It is important that you use a parameterized prepared statement. You should not use constants for parameters
 that change frequently. Using parameters allows SonicBased to optimize and reuse the query.<br/>
 
 <h1>Bulk Loading</h1>
@@ -52,8 +52,14 @@ give them different ports.
 <h1>Startup Performance</h1>
 Starting a cluster that is loaded with data can be slow. The server must read every record from disk
 and load it into memory. An optimized disk will speed up server start time. If you need fast startup, it is
-recommended that you have an SSD disk with 5k iops.
+recommended that you have an SSD disk with 2000 iops.
 <br/>
+        <h1>Disk Performance</h1>
+        If you want to quickly load the database using batch inserts, you will need fast disk. The reason for this
+        is that commands are logged to disk and a slow disk can't keep up with the inserts. We were able to achieve
+        good performance with Amazon's SSDs with 2000 provisioned iops, however, using 1000 iops wasn't too bad.
+        You may want to play with different iops to keep the costs down. Slower disks should be fine under a normal load.
+        <br/>
 
 <h1>Networking</h1>
 <div class="mylink">

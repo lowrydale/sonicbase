@@ -1,5 +1,5 @@
 cd ~/
 #delete extraneous config files
 rm sonicbase/keys/*
-tar -czvf sonicbase-1.2.2.tgz sonicbase
-aws s3 cp sonicbase-1.2.2.tgz s3://sonicbase-downloads
+tar -czvf sonicbase-1.2.3.tgz sonicbase
+aws s3 cp sonicbase-1.2.3.tgz s3://sonicbase-downloads

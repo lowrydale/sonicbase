@@ -625,7 +625,7 @@ public class DatabaseSocketClient {
         }
         finally {
           if (shouldReturn) {
-            if (sock.count_called > 1000) {
+            if (sock.count_called > 100000) {
               if (sock != null && sock.sock != null) {
                 sock.sock.close();//clientHandler.channel.close();
               }

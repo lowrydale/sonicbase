@@ -34,6 +34,11 @@
                     touchCookie("SBSessionId");
                     var price = response;
                     document.getElementById("price").innerHTML = price;
+                },
+                statusCode: {
+                    401: function() {
+                        alert("Session has timed out. Please login again.");
+                    }
                 }
             });
         }
@@ -58,6 +63,15 @@
                 success:function(response){
                     touchCookie("SBSessionId");
                     window.location.href = "/app-static/licenses.html";
+                },
+                error: function(xhr) {
+                    if (xhr.status == 401) {
+                        alert("Session has timed out. Please login again.");
+                    }
+                    else {
+                        // revert to default
+                        ajaxError.apply(this, arguments);
+                    }
                 }
             });
         }
@@ -67,9 +81,17 @@
 
 <body>
 <div class="container">
-    <header> <a href="../index.html">
-        <h4 class="logo">SonicBase™</h4>
-    </a>
+    <header>
+        <div class="mobile">
+            <a href="../index.html">
+                <h4 class="logo">SonicBase™</h4>
+            </a>
+        </div>
+
+        <div class="desktop">
+            <a href="../index.html">
+                <img src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+            </a>
         <nav>
             <ul>
                 <li><a href="../index.html">HOME</a></li>
@@ -78,6 +100,7 @@
                 <li><a href="../contact.html">CONTACT</a></li>
             </ul>
         </nav>
+        </div>
     </header>
 
     <div style="margin-left: 4em;">

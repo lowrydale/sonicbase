@@ -51,17 +51,19 @@
                     createCookie("SBSessionId", response, COOKIE_LIFE);
                     window.location.href = "/app-static/licenses.html";
                 },
-                statusCode: {
-                    409: function() {
+                error: function(xhr) {
+
+                    if (xhr.status == 409) {
                         alert('Email already in use');
-                    },
-                    500: function() {
+                    }
+                    else if (xhr.status == 500) {
                         alert("Server error");
                     }
-                },
-                error : function(request,error) {
+                    else {
+                        // revert to default
+                        ajaxError.apply(this, arguments);
+                    }
                 }
-
             });
         }
     </script>
@@ -79,9 +81,17 @@
 
 <body>
 <div class="container">
-    <header> <a href="../index.html">
-        <h4 class="logo">SonicBase™</h4>
-    </a>
+    <header>
+        <div class="mobile">
+            <a href="../index.html">
+                <h4 class="logo">SonicBase™</h4>
+            </a>
+        </div>
+
+        <div class="desktop">
+            <a href="../index.html">
+                <img src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+            </a>
         <nav>
             <ul>
                 <li><a href="../index.html">HOME</a></li>
@@ -90,6 +100,7 @@
                 <li><a href="../contact.html">CONTACT</a></li>
             </ul>
         </nav>
+        </div>
     </header>
 
     <div style="margin-left: 4em;">

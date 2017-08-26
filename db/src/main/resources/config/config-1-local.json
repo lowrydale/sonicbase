@@ -2,7 +2,7 @@
   "dataDirectory": "$HOME/db-data",
   "installDirectory": "$HOME/sonicbase",
   "compressRecords": false,
-  "useUnsafe": false,
+  "useUnsafe": true,
   "maxJavaHeap": "20%",
   "user": "ubuntu",
   "clientIsPrivate": false,

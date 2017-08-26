@@ -194,7 +194,9 @@ public class ComObject {
     state(118, stringType),
     shards(119, arrayType),
     disableDate(120, stringType),
-    multipleLicenseServers(121, booleanType);
+    multipleLicenseServers(121, booleanType),
+    minKey(122, byteArrayType),
+    maxKey(123, byteArrayType);
 
     public final int tag;
 

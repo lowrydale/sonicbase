@@ -149,6 +149,11 @@ td.syntax-main{
 td.syntax-detail{
 	vertical-align:top
 }
+.logo2 {
+	color: #fff;
+	font-weight: bold;
+	margin-top: 15px;
+}
 .logo {
 	color: #fff;
 	font-weight: bold;
@@ -156,6 +161,7 @@ td.syntax-detail{
 	float: left;
 	margin-top: 15px;
 	margin-left: 25px;
+	margin-right: 25px;
 	letter-spacing: 4px;
 	margin-bottom: -5px;
 	font-family: arial;
@@ -473,6 +479,13 @@ footer {
 	float: none;
 	display: none;
 }
+	header {
+		width: 100%;
+		height: 5%;
+		background-color: #26a5bf;
+
+	}
+
 header nav ul {
 }
 nav ul li {

@@ -38,7 +38,7 @@
                         //alert('Email already in use');
                     },
                     404: function() {
-                        alert("Email not found");
+                        alert("Invalid credentials");
                     },
                     500: function() {
                         alert("Server error");
@@ -57,18 +57,20 @@
                     "Accept":"application/text",
                     "Content-type":"application/json"
                 },   url:"/app/account/initiateResetPassword?email=" + encodeURI(email),
-                statusCode: {
-                    200: function() {
-                        alert("Reset password email sent");
-                    },
-                    404: function() {
+                success:function(response){
+                    alert("Reset password email sent");
+                },
+                error: function(xhr) {
+                    if (xhr.status == 404) {
                         alert("Account not found with this email");
-                    },
-                    500: function() {
+                    }
+                    else if (xhr.status == 500) {
                         alert("Server error");
                     }
-                },
-                error : function(request,error) {
+                    else {
+                        // revert to default
+                        ajaxError.apply(this, arguments);
+                    }
                 }
             });
         }
@@ -82,9 +84,17 @@
 
 <body>
 <div class="container">
-    <header> <a href="../index.html">
-        <h4 class="logo">SonicBase™</h4>
-    </a>
+    <header>
+        <div class="mobile">
+            <a href="../index.html">
+                <h4 class="logo">SonicBase™</h4>
+            </a>
+        </div>
+
+        <div class="desktop">
+            <a href="../index.html">
+                <img src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+            </a>
         <nav>
             <ul>
                 <li><a href="../index.html">HOME</a></li>
@@ -93,6 +103,7 @@
                 <li><a href="../contact.html">CONTACT</a></li>
             </ul>
         </nav>
+        </div>
     </header>
 
     <div style="margin-left: 4em;">

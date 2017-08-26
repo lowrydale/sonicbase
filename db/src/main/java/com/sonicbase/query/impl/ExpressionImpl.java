@@ -9,7 +9,6 @@ import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.Expression;
-import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.PreparedIndexLookupNotFoundException;
@@ -51,6 +50,7 @@ public abstract class ExpressionImpl implements Expression {
   private GroupByContext groupByContext;
   protected String dbName;
   private boolean forceSelectOnServer;
+  protected long serializationVersion;
 
   public Counter[] getCounters() {
     return counters;
@@ -143,79 +143,129 @@ public abstract class ExpressionImpl implements Expression {
     cobj.put(ComObject.Tag.legacyCounter, counter.serialize());
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-    cobj.put(ComObject.Tag.method, "evaluateCounter");
-    String command = "DatabaseServer:ComObject:evaluateCounter:";
+    cobj.put(ComObject.Tag.method, "evaluateCounterGetKeys");
+    String command = "DatabaseServer:ComObject:evaluateCounterGetKeys:";
 
-    String batchKey = "DatabaseServer:evaluateCounter";
+    String batchKey = "DatabaseServer:evaluateCounterGetKeys";
 
     Counter lastCounter = null;
     int shardCount = common.getServersConfig().getShardCount();
-    int replicaCount = common.getServersConfig().getShards()[0].getReplicas().length;
+
     for (int i = 0; i < shardCount; i++) {
       byte[] ret = client.send(batchKey, i, 0, command, cobj, DatabaseClient.Replica.def);
       ComObject retObj = new ComObject(ret);
-      Counter retCounter = new Counter();
-      byte[] counterBytes = retObj.getByteArray(ComObject.Tag.legacyCounter);
-      retCounter.deserialize(counterBytes);
+
+      byte[] minKeyBytes = retObj.getByteArray(ComObject.Tag.minKey);
+      byte[] maxKeyBytes = retObj.getByteArray(ComObject.Tag.maxKey);
+      Counter minCounter = getCounterValue(common, client, dbName, counter, minKeyBytes, false);
+      Counter maxCounter = getCounterValue(common, client, dbName, counter, maxKeyBytes, false);
+
+
       if (lastCounter != null) {
-        Long maxLong = retCounter.getMaxLong();
+        Long maxLong = maxCounter.getMaxLong();
         Long lastMaxLong = lastCounter.getMaxLong();
         if (maxLong != null) {
           if (lastMaxLong != null) {
-            retCounter.setMaxLong(Math.max(maxLong, lastMaxLong));
+            maxCounter.setMaxLong(Math.max(maxLong, lastMaxLong));
           }
         }
         else {
-          retCounter.setMaxLong(lastMaxLong);
+          maxCounter.setMaxLong(lastMaxLong);
         }
-        Double maxDouble = retCounter.getMaxDouble();
+        Double maxDouble = maxCounter.getMaxDouble();
         Double lastMaxDouble = lastCounter.getMaxDouble();
         if (maxDouble != null) {
           if (lastMaxDouble != null) {
-            retCounter.setMaxDouble(Math.max(maxDouble, lastMaxDouble));
+            maxCounter.setMaxDouble(Math.max(maxDouble, lastMaxDouble));
           }
         }
         else {
-          retCounter.setMaxDouble(lastMaxDouble);
+          maxCounter.setMaxDouble(lastMaxDouble);
         }
-        Long minLong = retCounter.getMinLong();
+        Long minLong = minCounter.getMinLong();
         Long lastMinLong = lastCounter.getMinLong();
         if (minLong != null) {
           if (lastMinLong != null) {
-            retCounter.setMinLong(Math.max(minLong, lastMinLong));
+            minCounter.setMinLong(Math.max(minLong, lastMinLong));
           }
         }
         else {
-          retCounter.setMinLong(lastMinLong);
+          minCounter.setMinLong(lastMinLong);
         }
-        Double minDouble = retCounter.getMinDouble();
+        Double minDouble = minCounter.getMinDouble();
         Double lastMinDouble = lastCounter.getMinDouble();
         if (minDouble != null) {
           if (lastMinDouble != null) {
-            retCounter.setMinDouble(Math.max(minDouble, lastMinDouble));
+            minCounter.setMinDouble(Math.max(minDouble, lastMinDouble));
           }
         }
         else {
-          retCounter.setMinDouble(lastMinDouble);
+          minCounter.setMinDouble(lastMinDouble);
         }
-        Long count = retCounter.getCount();
-        Long lastCount = lastCounter.getCount();
-        if (count != null) {
-          if (lastCount != null) {
-            retCounter.setCount(count + lastCount);
-          }
-        }
-        else {
-          retCounter.setCount(lastCount);
-        }
+//        Long count = retCounter.getCount();
+//        Long lastCount = lastCounter.getCount();
+//        if (count != null) {
+//          if (lastCount != null) {
+//            retCounter.setCount(count + lastCount);
+//          }
+//        }
+//        else {
+//          retCounter.setCount(lastCount);
+//        }
+        minCounter.setMaxLong(maxCounter.getMaxLong());
+        minCounter.setMaxDouble(maxCounter.getMaxDouble());
       }
-      lastCounter = retCounter;
+      lastCounter = minCounter;
     }
     counter.setMaxLong(lastCounter.getMaxLong());
     counter.setMinLong(lastCounter.getMinLong());
     counter.setMaxDouble(lastCounter.getMaxDouble());
     counter.setMinDouble(lastCounter.getMinDouble());
     counter.setCount(lastCounter.getCount());
+  }
+
+  private static Counter getCounterValue(DatabaseCommon common, DatabaseClient client, String dbName, Counter counter, byte[] keyBytes,
+                                         boolean isMin) throws IOException {
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.legacyCounter, counter.serialize());
+    if (isMin) {
+      cobj.put(ComObject.Tag.minKey, keyBytes);
+    }
+    else {
+      cobj.put(ComObject.Tag.maxKey, keyBytes);
+    }
+    cobj.put(ComObject.Tag.dbName, dbName);
+    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+    cobj.put(ComObject.Tag.method, "evaluateCounterWithRecord");
+    String command = "DatabaseServer:ComObject:evaluateCounterWithRecord:";
+
+    String batchKey = "DatabaseServer:evaluateCounterWithRecord";
+
+    TableSchema tableSchema = common.getTables(dbName).get(counter.getTableName());
+    Object[] key = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
+
+    String indexName = null;
+    IndexSchema indexSchema = null;
+    for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndexes().entrySet()) {
+      if (entry.getValue().isPrimaryKey()) {
+        indexName = entry.getKey();
+        indexSchema = entry.getValue();
+      }
+    }
+    String[] indexFields = indexSchema.getFields();
+    int[] fieldOffsets = new int[indexFields.length];
+    for (int i = 0; i < indexFields.length; i++) {
+      fieldOffsets[i] = tableSchema.getFieldOffset(indexFields[i]);
+    }
+    List<Integer> selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false, fieldOffsets, client.getCommon(), tableSchema,
+        indexName, null, BinaryExpression.Operator.equal, null, key, null);
+
+    byte[] ret = client.send(batchKey, selectedShards.get(0), 0, command, cobj, DatabaseClient.Replica.def);
+    ComObject retObj = new ComObject(ret);
+    Counter retCounter = new Counter();
+    byte[] counterBytes = retObj.getByteArray(ComObject.Tag.legacyCounter);
+    retCounter.deserialize(counterBytes);
+    return retCounter;
   }
 
   public boolean isForceSelectOnServer() {
@@ -292,6 +342,7 @@ public abstract class ExpressionImpl implements Expression {
 
   public void serialize(DataOutputStream out) {
     try {
+      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
       out.writeInt(nextShard);
     }
     catch (IOException e) {
@@ -308,6 +359,7 @@ public abstract class ExpressionImpl implements Expression {
    */
   public void deserialize(DataInputStream in) {
     try {
+      this.serializationVersion = DataUtil.readVLong(in);
       nextShard = in.readInt();
     }
     catch (IOException e) {
@@ -1880,6 +1932,9 @@ public abstract class ExpressionImpl implements Expression {
           cobj.put(ComObject.Tag.leftKey, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), localNextKey));
         }
 
+        if (columns == null) {
+          columns = new ArrayList<>();
+        }
         for (IndexSchema schema : tableSchema.getIndexes().values()) {
           if (schema.isPrimaryKey()) {
             for (String field : schema.getFields()) {

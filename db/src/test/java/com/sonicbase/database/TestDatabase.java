@@ -129,6 +129,12 @@ public class TestDatabase {
       stmt = conn.prepareStatement("create table nokey (id BIGINT, id2 BIGINT)");
       stmt.executeUpdate();
 
+      stmt = conn.prepareStatement("create table nokeysecondaryindex (id BIGINT, id2 BIGINT)");
+      stmt.executeUpdate();
+
+      stmt = conn.prepareStatement("create index id on nokeysecondaryindex(id)");
+      stmt.executeUpdate();
+
       //test insertWithRecord
 
       stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");
@@ -198,6 +204,13 @@ public class TestDatabase {
         assertEquals(stmt.executeUpdate(), 1);
 
         stmt = conn.prepareStatement("insert into nokey (id, id2) VALUES (?, ?)");
+        stmt.setLong(1, i);
+        stmt.setLong(2, i * 2);
+        assertEquals(stmt.executeUpdate(), 1);
+      }
+
+      for (int i = 0; i < recordCount; i++) {
+        stmt = conn.prepareStatement("insert into nokeysecondaryindex (id, id2) VALUES (?, ?)");
         stmt.setLong(1, i);
         stmt.setLong(2, i * 2);
         assertEquals(stmt.executeUpdate(), 1);
@@ -697,6 +710,107 @@ public class TestDatabase {
   }
 
   @Test
+  public void testLessNoKeySecondaryIndex() throws Exception {
+
+    PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id<10 and id>7 order by id2 asc, id desc");
+    ResultSet ret = stmt.executeQuery();
+    assertTrue(ret.next());
+    assertEquals(ret.getInt("id2"), 16);
+    assertEquals(ret.getInt("id"), 8);
+    assertTrue(ret.next());
+    assertEquals(ret.getInt("id2"), 18);
+    assertEquals(ret.getInt("id"), 9);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testLessNoKey() throws Exception {
+
+    PreparedStatement stmt = conn.prepareStatement("select * from nokey where id<10 and id>7 order by id2 asc, id desc");
+    ResultSet ret = stmt.executeQuery();
+    assertTrue(ret.next());
+    assertEquals(ret.getInt("id2"), 16);
+    assertEquals(ret.getInt("id"), 8);
+    assertTrue(ret.next());
+    assertEquals(ret.getInt("id2"), 16);
+    assertEquals(ret.getInt("id"), 8);
+    assertTrue(ret.next());
+    assertEquals(ret.getInt("id2"), 18);
+    assertEquals(ret.getInt("id"), 9);
+    assertTrue(ret.next());
+    assertEquals(ret.getInt("id2"), 18);
+    assertEquals(ret.getInt("id"), 9);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testBasicsNoKeySecondaryIndex() throws Exception {
+
+    //test select returns multiple records with an index using operator '<'
+    PreparedStatement stmt = conn.prepareStatement("select id, id2 from nokeysecondaryIndex where id<5 order by id desc");
+    ResultSet ret = stmt.executeQuery();
+
+    assertTrue(ret.isBeforeFirst());
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 4);
+    assertEquals(ret.getLong("id2"), 8);
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 3);
+    assertEquals(ret.getLong("id2"), 6);
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 2);
+    assertEquals(ret.getLong("id2"), 4);
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 1);
+    assertEquals(ret.getLong("id2"), 2);
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 0);
+    assertEquals(ret.getLong("id2"), 0);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testBasicsNoKey() throws Exception {
+
+    //test select returns multiple records with an index using operator '<'
+    PreparedStatement stmt = conn.prepareStatement("select id, id2 from nokey where id<5 order by id desc");
+    ResultSet ret = stmt.executeQuery();
+
+    assertTrue(ret.isBeforeFirst());
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 4);
+    assertEquals(ret.getLong("id2"), 8);
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 4);
+    assertEquals(ret.getLong("id2"), 8);
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 3);
+    assertEquals(ret.getLong("id2"), 6);
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 3);
+    assertEquals(ret.getLong("id2"), 6);
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 2);
+    assertEquals(ret.getLong("id2"), 4);
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 2);
+    assertEquals(ret.getLong("id2"), 4);
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 1);
+    assertEquals(ret.getLong("id2"), 2);
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 1);
+    assertEquals(ret.getLong("id2"), 2);
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 0);
+    assertEquals(ret.getLong("id2"), 0);
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 0);
+    assertEquals(ret.getLong("id2"), 0);
+    assertFalse(ret.next());
+  }
+
+  @Test
   public void testBasics() throws Exception {
 
     //test select returns multiple records with an index using operator '<'
@@ -793,6 +907,51 @@ public class TestDatabase {
   }
 
   @Test
+  public void testNotInNoKeySecondaryIndex() throws SQLException {
+    //test select with not in expression
+    PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryIndex where id not in (3, 4, 5, 6, 7, 8, 9, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109) order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 0);
+    assertEquals(ret.getLong("id2"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    assertEquals(ret.getLong("id2"), 2);
+    ret.next();
+    assertEquals(ret.getLong("id"), 2);
+    assertEquals(ret.getLong("id2"), 4);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testNotInNoKey() throws SQLException {
+    //test select with not in expression
+    PreparedStatement stmt = conn.prepareStatement("select * from nokey where id not in (3, 4, 5, 6, 7, 8, 9, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109) order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 0);
+    assertEquals(ret.getLong("id2"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id"), 0);
+    assertEquals(ret.getLong("id2"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    assertEquals(ret.getLong("id2"), 2);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    assertEquals(ret.getLong("id2"), 2);
+    ret.next();
+    assertEquals(ret.getLong("id"), 2);
+    assertEquals(ret.getLong("id2"), 4);
+    ret.next();
+    assertEquals(ret.getLong("id"), 2);
+    assertEquals(ret.getLong("id2"), 4);
+    assertFalse(ret.next());
+  }
+
+  @Test
   public void testNotIn() throws SQLException {
     //test select with not in expression
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id not in (5, 6, 7, 8, 9, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109) order by id asc");
@@ -808,6 +967,33 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 3);
     ret.next();
     assertEquals(ret.getLong("id"), 4);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testIdentityNoKeySecondaryIndex() throws SQLException {
+    //test select with not in expression
+    PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id = 5");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    assertEquals(ret.getLong("id2"), 10);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testIdentityNoKey() throws SQLException {
+    //test select with not in expression
+    PreparedStatement stmt = conn.prepareStatement("select * from nokey where id = 5");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    assertEquals(ret.getLong("id2"), 10);
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    assertEquals(ret.getLong("id2"), 10);
     assertFalse(ret.next());
   }
 
@@ -829,6 +1015,22 @@ public class TestDatabase {
     assertFalse(ret.next());
   }
 
+  @Test
+  public void testNoKeySecondaryIndex() throws SQLException {
+    //test select with not in expression
+    PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryIndex where id < 5 order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 0);
+    assertEquals(ret.getLong("id2"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    assertEquals(ret.getLong("id2"), 2);
+    ret.next();
+    assertEquals(ret.getLong("id"), 2);
+    assertEquals(ret.getLong("id2"), 4);
+  }
 
   @Test
   public void testNoKey() throws SQLException {
@@ -854,6 +1056,17 @@ public class TestDatabase {
   }
 
   @Test
+  public void testNoKeySecondaryIndex2() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id <= 2 and id2 = 4 order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 2);
+    assertEquals(ret.getLong("id2"), 4);
+    assertFalse(ret.next());
+  }
+
+  @Test
   public void testNoKey2() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from nokey where id <= 2 and id2 = 4 order by id asc");
     ResultSet ret = stmt.executeQuery();
@@ -869,6 +1082,42 @@ public class TestDatabase {
 
 
   @Test
+  public void testNotInAndNoKeySecondaryIndex() throws SQLException {
+    //test select with not in expression
+    PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id < 4 and id > 1 and id not in (5, 6, 7, 8, 9, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109) order by id desc");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 3);
+    assertEquals(ret.getLong("id2"), 6);
+    ret.next();
+    assertEquals(ret.getLong("id"), 2);
+    assertEquals(ret.getLong("id2"), 4);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testNotInAndNoKey() throws SQLException {
+    //test select with not in expression
+    PreparedStatement stmt = conn.prepareStatement("select * from nokey where id < 4 and id > 1 and id not in (5, 6, 7, 8, 9, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109) order by id desc");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 3);
+    assertEquals(ret.getLong("id2"), 6);
+    ret.next();
+    assertEquals(ret.getLong("id"), 3);
+    assertEquals(ret.getLong("id2"), 6);
+    ret.next();
+    assertEquals(ret.getLong("id"), 2);
+    assertEquals(ret.getLong("id2"), 4);
+    ret.next();
+    assertEquals(ret.getLong("id"), 2);
+    assertEquals(ret.getLong("id2"), 4);
+    assertFalse(ret.next());
+  }
+
+  @Test
   public void testNotInAnd() throws SQLException {
     //test select with not in expression
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id < 4 and id > 1 and id not in (5, 6, 7, 8, 9, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109) order by id desc");
@@ -878,6 +1127,35 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 3);
     ret.next();
     assertEquals(ret.getLong("id"), 2);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testAllNoKeySecondaryIndex() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryIndex");
+    ResultSet ret = stmt.executeQuery();
+
+    for (int i = 0; i < recordCount; i++) {
+      ret.next();
+      assertEquals(ret.getLong("id"), i);
+      assertEquals(ret.getLong("id2"), i * 2);
+    }
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testAllNoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from nokey");
+    ResultSet ret = stmt.executeQuery();
+
+    for (int i = 0; i < recordCount; i++) {
+      ret.next();
+      assertEquals(ret.getLong("id"), i);
+      assertEquals(ret.getLong("id2"), i * 2);
+      ret.next();
+      assertEquals(ret.getLong("id"), i);
+      assertEquals(ret.getLong("id2"), i * 2);
+    }
     assertFalse(ret.next());
   }
 
@@ -930,6 +1208,44 @@ public class TestDatabase {
   }
 
   @Test
+  public void testParametersNoKeySecondaryIndex() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryIndex where id < ? and id > ?");
+    stmt.setLong(1, 5);
+    stmt.setLong(2, 2);
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 3);
+    assertEquals(ret.getLong("id2"), 6);
+    ret.next();
+    assertEquals(ret.getLong("id"), 4);
+    assertEquals(ret.getLong("id2"), 8);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testParametersNoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from nokey where id < ? and id > ?");
+    stmt.setLong(1, 5);
+    stmt.setLong(2, 2);
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 3);
+    assertEquals(ret.getLong("id2"), 6);
+    ret.next();
+    assertEquals(ret.getLong("id"), 3);
+    assertEquals(ret.getLong("id2"), 6);
+    ret.next();
+    assertEquals(ret.getLong("id"), 4);
+    assertEquals(ret.getLong("id2"), 8);
+    ret.next();
+    assertEquals(ret.getLong("id"), 4);
+    assertEquals(ret.getLong("id2"), 8);
+    assertFalse(ret.next());
+  }
+
+  @Test
   public void testParameters() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id < ? and id > ?");
     stmt.setLong(1, 5);
@@ -958,12 +1274,52 @@ public class TestDatabase {
   }
 
   @Test
+  public void testMaxNoKeySecondaryIndex() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from nokeysecondaryindex");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("maxValue"), 9);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testMaxNoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from nokey");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("maxValue"), 9);
+    assertFalse(ret.next());
+  }
+
+  @Test
   public void testMax() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from persons");
     ResultSet ret = stmt.executeQuery();
 
     ret.next();
     assertEquals(ret.getLong("maxValue"), 109);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testMinNoKeySecondaryIndex() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select min(id) as minValue from nokeysecondaryindex");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("minValue"), 0);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testMinNoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select min(id) as minValue from nokey");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("minValue"), 0);
     assertFalse(ret.next());
   }
 
@@ -978,12 +1334,42 @@ public class TestDatabase {
   }
 
   @Test
+  public void testMaxTableScanNoKeySecondaryIndex() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from nokeysecondaryindex where id2 < 1");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("maxValue"), 0);
+    assertFalse(ret.next());
+  }
+
+  @Test
   public void testMaxTableScan() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from persons where id2 < 1");
     ResultSet ret = stmt.executeQuery();
 
     ret.next();
     assertEquals(ret.getLong("maxValue"), 108);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testMaxWhereNoKeySecondaryIndex() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from nokeysecondaryindex where id < 4");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("maxValue"), 3);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testMaxWhereNoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from nokey where id < 4");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("maxValue"), 3);
     assertFalse(ret.next());
   }
 
@@ -998,12 +1384,79 @@ public class TestDatabase {
   }
 
   @Test
+  public void testSumNoKeySecondaryIndex() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select sum(id) as sumValue from nokeysecondaryindex");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("sumValue"), 45);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testSumNoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select sum(id) as sumValue from nokey");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("sumValue"), 90);
+    assertFalse(ret.next());
+  }
+
+  @Test
   public void testSum() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select sum(id) as sumValue from persons");
     ResultSet ret = stmt.executeQuery();
 
     ret.next();
     assertEquals(ret.getLong("sumValue"), 1090);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testLimitNoKeySecondaryIndex() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id < ? and id > ? limit 3");
+    stmt.setLong(1, 9);
+    stmt.setLong(2, 2);
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 3);
+    assertEquals(ret.getLong("id2"), 6);
+    ret.next();
+    assertEquals(ret.getLong("id"), 4);
+    assertEquals(ret.getLong("id2"), 8);
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    assertEquals(ret.getLong("id2"), 10);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testLimitNoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from nokey where id < ? and id > ? limit 3");
+    stmt.setLong(1, 9);
+    stmt.setLong(2, 2);
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 3);
+    assertEquals(ret.getLong("id2"), 6);
+    ret.next();
+    assertEquals(ret.getLong("id"), 3);
+    assertEquals(ret.getLong("id2"), 6);
+    ret.next();
+    assertEquals(ret.getLong("id"), 4);
+    assertEquals(ret.getLong("id2"), 8);
+    ret.next();
+    assertEquals(ret.getLong("id"), 4);
+    assertEquals(ret.getLong("id2"), 8);
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    assertEquals(ret.getLong("id2"), 10);
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    assertEquals(ret.getLong("id2"), 10);
     assertFalse(ret.next());
   }
 
@@ -1025,6 +1478,47 @@ public class TestDatabase {
 
 
   @Test
+  public void testLimitOffsetNoKeySecondaryIndex() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id < ? and id > ? limit 3 offset 2");
+    stmt.setLong(1, 9);
+    stmt.setLong(2, 2);
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 4);
+    assertEquals(ret.getLong("id2"), 8);
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    assertEquals(ret.getLong("id2"), 10);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testLimitOffsetNoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from nokey where id < ? and id > ? limit 3 offset 2");
+    stmt.setLong(1, 9);
+    stmt.setLong(2, 2);
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 3);
+    assertEquals(ret.getLong("id2"), 6);
+    ret.next();
+    assertEquals(ret.getLong("id"), 4);
+    assertEquals(ret.getLong("id2"), 8);
+    ret.next();
+    assertEquals(ret.getLong("id"), 4);
+    assertEquals(ret.getLong("id2"), 8);
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    assertEquals(ret.getLong("id2"), 10);
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    assertEquals(ret.getLong("id2"), 10);
+    assertFalse(ret.next());
+  }
+
+  @Test
   public void testLimitOffset() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id < ? and id > ? limit 3 offset 2");
     stmt.setLong(1, 100);
@@ -1038,6 +1532,34 @@ public class TestDatabase {
     assertFalse(ret.next());
   }
 
+
+  @Test
+  public void testSort2NoKeySecondaryIndex() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id, id2 from nokeysecondaryindex order by id2 asc, id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    for (int i = 0; i < recordCount; i++) {
+      ret.next();
+      assertEquals(ret.getLong("id2"), i * 2);
+      assertEquals(ret.getLong("id"), i);
+    }
+  }
+
+  @Test
+  public void testSort2NoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id, id2 from nokey order by id2 asc, id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    for (int i = 0; i < recordCount; i++) {
+      ret.next();
+      assertEquals(ret.getLong("id2"), i * 2);
+      assertEquals(ret.getLong("id"), i);
+      ret.next();
+      assertEquals(ret.getLong("id2"), i * 2);
+      assertEquals(ret.getLong("id"), i);
+    }
+
+  }
 
   @Test
   public void testSort2() throws SQLException {
@@ -1119,6 +1641,31 @@ public class TestDatabase {
 
 
   @Test
+  public void testAllSortAndNoKeySecondaryIndex() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id < 2 and id2 = 0 order by id2 asc, id desc");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getLong("id"), 0);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testAllSortAndNoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from nokey where id < 2 and id2 = 0 order by id2 asc, id desc");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getLong("id"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getLong("id"), 0);
+    assertFalse(ret.next());
+  }
+
+  @Test
   public void testAllSortAnd() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id > 100 and id2 = 0 order by id2 asc, id desc");
     ResultSet ret = stmt.executeQuery();
@@ -1138,6 +1685,46 @@ public class TestDatabase {
     assertFalse(ret.next());
   }
 
+
+  @Test
+  public void testComplexNoKeySecondaryIndex() throws SQLException {
+    //fails
+
+    //test select returns multiple records with a table scan
+    PreparedStatement stmt = conn.prepareStatement("select nokeysecondaryindex.id  " +
+        "from nokeysecondaryindex where nokeysecondaryindex.id>=1 AND id < 3 AND ID2=2 OR id> 2 AND ID < 4");                                              //
+    ResultSet ret = stmt.executeQuery();
+
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    ret.next();
+    assertEquals(ret.getLong("id"), 3);
+
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testComplexNoKey() throws SQLException {
+    //fails
+
+    //test select returns multiple records with a table scan
+    PreparedStatement stmt = conn.prepareStatement("select nokey.id  " +
+        "from nokey where nokey.id>=1 AND id < 3 AND ID2=2 OR id> 2 AND ID < 4");                                              //
+    ResultSet ret = stmt.executeQuery();
+
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    ret.next();
+    assertEquals(ret.getLong("id"), 3);
+    ret.next();
+    assertEquals(ret.getLong("id"), 3);
+
+    assertFalse(ret.next());
+  }
 
   @Test
   public void testComplex() throws SQLException {
@@ -1161,6 +1748,50 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 8);
     ret.next();
     assertEquals(ret.getLong("id"), 9);
+
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testParensNoKeySecondaryIndex() throws SQLException {
+    //fails
+
+    //test select returns multiple records with a table scan
+    PreparedStatement stmt = conn.prepareStatement("select nokeysecondaryindex.id  " +
+        "from nokeysecondaryindex where nokeysecondaryindex.id<=5 AND (id < 2 OR id> 4)");                                              //
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testParensNoKey() throws SQLException {
+    //fails
+
+    //test select returns multiple records with a table scan
+    PreparedStatement stmt = conn.prepareStatement("select nokey.id  " +
+        "from nokey where nokey.id<=5 AND (id < 2 OR id> 4)");                                              //
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
 
     assertFalse(ret.next());
   }
@@ -1190,6 +1821,56 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 9);
     ret.next();
     assertEquals(ret.getLong("id"), 100);
+
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testPrecedenceNoKeySecondaryIndex() throws SQLException {
+    //fails
+
+    //test select returns multiple records with a table scan
+    PreparedStatement stmt = conn.prepareStatement("select nokeysecondaryindex.id  " +
+        "from nokeysecondaryindex where nokeysecondaryindex.id<=7 AND id > 4 OR id> 8");                                              //
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    ret.next();
+    assertEquals(ret.getLong("id"), 6);
+    ret.next();
+    assertEquals(ret.getLong("id"), 7);
+    ret.next();
+    assertEquals(ret.getLong("id"), 9);
+
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testPrecedenceNoKey() throws SQLException {
+    //fails
+
+    //test select returns multiple records with a table scan
+    PreparedStatement stmt = conn.prepareStatement("select nokey.id  " +
+        "from nokey where nokey.id<=7 AND id > 4 OR id> 8");                                              //
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    ret.next();
+    assertEquals(ret.getLong("id"), 6);
+    ret.next();
+    assertEquals(ret.getLong("id"), 6);
+    ret.next();
+    assertEquals(ret.getLong("id"), 7);
+    ret.next();
+    assertEquals(ret.getLong("id"), 7);
+    ret.next();
+    assertEquals(ret.getLong("id"), 9);
+    ret.next();
+    assertEquals(ret.getLong("id"), 9);
 
     assertFalse(ret.next());
   }
@@ -1233,6 +1914,50 @@ public class TestDatabase {
 
 
   @Test
+  public void testOverlapPrecedenceNoKeySecondaryIndex() throws SQLException {
+    //fails
+
+    //test select returns multiple records with a table scan
+    PreparedStatement stmt = conn.prepareStatement("select nokeysecondaryindex.id  " +
+        "from nokeysecondaryindex where nokeysecondaryindex.id<=8 AND id < 2 OR id> 8");                                              //
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    ret.next();
+    assertEquals(ret.getLong("id"), 9);
+
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testOverlapPrecedenceNoKey() throws SQLException {
+    //fails
+
+    //test select returns multiple records with a table scan
+    PreparedStatement stmt = conn.prepareStatement("select nokey.id  " +
+        "from nokey where nokey.id<=8 AND id < 2 OR id> 8");                                              //
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    ret.next();
+    assertEquals(ret.getLong("id"), 9);
+    ret.next();
+    assertEquals(ret.getLong("id"), 9);
+
+    assertFalse(ret.next());
+  }
+
+  @Test
   public void testOverlapPrecedence() throws SQLException {
     //fails
 
@@ -1266,6 +1991,44 @@ public class TestDatabase {
   }
 
   @Test
+  public void testOverlapPrecedence2NoKeySecondaryIndex() throws SQLException {
+    //fails
+
+    //test select returns multiple records with a table scan
+    PreparedStatement stmt = conn.prepareStatement("select nokeysecondaryindex.id  " +
+        "from nokeysecondaryindex where nokeysecondaryindex.id<=7 AND id = 4 OR id> 8");                                              //
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 4);
+    ret.next();
+    assertEquals(ret.getLong("id"), 9);
+
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testOverlapPrecedence2NoKey() throws SQLException {
+    //fails
+
+    //test select returns multiple records with a table scan
+    PreparedStatement stmt = conn.prepareStatement("select nokey.id  " +
+        "from nokey where nokey.id<=7 AND id = 4 OR id> 8");                                              //
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 4);
+    ret.next();
+    assertEquals(ret.getLong("id"), 4);
+    ret.next();
+    assertEquals(ret.getLong("id"), 9);
+    ret.next();
+    assertEquals(ret.getLong("id"), 9);
+
+    assertFalse(ret.next());
+  }
+
+  @Test
   public void testOverlapPrecedence2() throws SQLException {
     //fails
 
@@ -1289,6 +2052,32 @@ public class TestDatabase {
     ret.next();
     assertEquals(ret.getLong("id"), 109);
 
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testAvgNoKeySecondaryIndex() throws SQLException {
+    //fails
+
+    //test select returns multiple records with a table scan
+    PreparedStatement stmt = conn.prepareStatement("select avg(nokeysecondaryindex.id) as avgValue from nokeysecondaryindex");                                              //
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getDouble("avgValue"), 4.5d);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testAvgNoKey() throws SQLException {
+    //fails
+
+    //test select returns multiple records with a table scan
+    PreparedStatement stmt = conn.prepareStatement("select avg(nokey.id) as avgValue from nokey");                                              //
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getDouble("avgValue"), 4.5d);
     assertFalse(ret.next());
   }
 
@@ -1329,6 +2118,41 @@ public class TestDatabase {
 
     assertFalse(ret.next());
   }
+
+  @Test
+  public void testOrNoKeySecondaryIndex() throws SQLException {
+    //fails
+
+    //test select returns multiple records with a table scan
+    PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id>8 and id2=18 or id<6 and id2=2 order by id desc");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 9);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testOrNoKey() throws SQLException {
+    //fails
+
+    //test select returns multiple records with a table scan
+    PreparedStatement stmt = conn.prepareStatement("select * from nokey where id>8 and id2=18 or id<6 and id2=2 order by id desc");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 9);
+    ret.next();
+    assertEquals(ret.getLong("id"), 9);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    assertFalse(ret.next());
+  }
+
 
   @Test
   public void testOr() throws SQLException {
@@ -1454,6 +2278,44 @@ public class TestDatabase {
   }
 
   @Test
+  public void testInNoKeySecondaryIndex() throws SQLException {
+
+    //test select with in expression
+    PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id in (0, 1, 2)");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    ret.next();
+    assertEquals(ret.getLong("id"), 2);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testInNoKey() throws SQLException {
+
+    //test select with in expression
+    PreparedStatement stmt = conn.prepareStatement("select * from nokey where id in (0, 1, 2)");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    ret.next();
+    assertEquals(ret.getLong("id"), 2);
+    ret.next();
+    assertEquals(ret.getLong("id"), 2);
+    assertFalse(ret.next());
+  }
+
+  @Test
   public void testIn() throws SQLException {
 
     //test select with in expression
@@ -1538,6 +2400,52 @@ public class TestDatabase {
   }
 
   @Test
+  public void testAndNoKeySecondaryIndex() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id!=0 AND id!=1 AND id!=2 AND id!=3 AND id!=4 order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    ret.next();
+    assertEquals(ret.getLong("id"), 6);
+    ret.next();
+    assertEquals(ret.getLong("id"), 7);
+    ret.next();
+    assertEquals(ret.getLong("id"), 8);
+    ret.next();
+    assertEquals(ret.getLong("id"), 9);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testAndNoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from nokey where id!=0 AND id!=1 AND id!=2 AND id!=3 AND id!=4 order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    ret.next();
+    assertEquals(ret.getLong("id"), 6);
+    ret.next();
+    assertEquals(ret.getLong("id"), 6);
+    ret.next();
+    assertEquals(ret.getLong("id"), 7);
+    ret.next();
+    assertEquals(ret.getLong("id"), 7);
+    ret.next();
+    assertEquals(ret.getLong("id"), 8);
+    ret.next();
+    assertEquals(ret.getLong("id"), 8);
+    ret.next();
+    assertEquals(ret.getLong("id"), 9);
+    ret.next();
+    assertEquals(ret.getLong("id"), 9);
+    assertFalse(ret.next());
+  }
+
+  @Test
   public void testAnd() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id!=0 AND id!=1 AND id!=2 AND id!=3 AND id!=4 order by id asc");
     ResultSet ret = stmt.executeQuery();
@@ -1573,6 +2481,32 @@ public class TestDatabase {
     ret.next();
     assertEquals(ret.getLong("id"), 109);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testOrTableScanNoKeySecondaryIndex() throws SQLException {
+    //test select returns multiple records with a table scan
+    PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id2=2 or id2=0 order by id2 asc, id desc");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    assertFalse(ret.next());
+
+//    Set<Long> found = new HashSet<>();
+//    for (int i = 101; i < 110; i += 2) {
+//      ret.next();
+//      found.add(ret.getLong("id"));
+//    }
+//    assertEquals(found.size(), 5);
+//
+//    assertTrue(found.contains(101L));
+//    assertTrue(found.contains(103L));
+//    assertTrue(found.contains(105L));
+//    assertTrue(found.contains(107L));
+//    assertTrue(found.contains(109L));
   }
 
   @Test
@@ -1618,6 +2552,25 @@ public class TestDatabase {
   }
 
   @Test
+  public void testOrIndexNoKeySecondaryIndex() throws SQLException {
+    //test select returns multiple records with an index
+    PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id=0 OR id=1 OR id=2 OR id=3 OR id=4");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    ret.next();
+    assertEquals(ret.getLong("id"), 2);
+    ret.next();
+    assertEquals(ret.getLong("id"), 3);
+    ret.next();
+    assertEquals(ret.getLong("id"), 4);
+    assertFalse(ret.next());
+  }
+
+  @Test
   public void testOrIndex() throws SQLException {
     //test select returns multiple records with an index
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id=0 OR id=1 OR id=2 OR id=3 OR id=4");
@@ -1633,6 +2586,50 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 3);
     ret.next();
     assertEquals(ret.getLong("id"), 4);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testLessEqualNoKeySecondaryIndex() throws SQLException {
+
+    //test select returns multiple records with an index using operator '<='
+    PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id<=3 order by id desc");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 3);
+    ret.next();
+    assertEquals(ret.getLong("id"), 2);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    ret.next();
+    assertEquals(ret.getLong("id"), 0);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testLessEqualNoKey() throws SQLException {
+
+    //test select returns multiple records with an index using operator '<='
+    PreparedStatement stmt = conn.prepareStatement("select * from nokey where id<=3 order by id desc");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 3);
+    ret.next();
+    assertEquals(ret.getLong("id"), 3);
+    ret.next();
+    assertEquals(ret.getLong("id"), 2);
+    ret.next();
+    assertEquals(ret.getLong("id"), 2);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    ret.next();
+    assertEquals(ret.getLong("id"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id"), 0);
     assertFalse(ret.next());
   }
 
@@ -1659,6 +2656,56 @@ public class TestDatabase {
   }
 
   @Test
+  public void testLessEqualAndGreaterEqualNoKeySecondaryIndex() throws SQLException {
+
+    //test select returns multiple records with an index using operator '<='
+    PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id<=5 and id>=1 order by id desc");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    ret.next();
+    assertEquals(ret.getLong("id"), 4);
+    ret.next();
+    assertEquals(ret.getLong("id"), 3);
+    ret.next();
+     assertEquals(ret.getLong("id"), 2);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testLessEqualAndGreaterEqualNoKey() throws SQLException {
+
+    //test select returns multiple records with an index using operator '<='
+    PreparedStatement stmt = conn.prepareStatement("select * from nokey where id<=5 and id>=1 order by id desc");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    ret.next();
+    assertEquals(ret.getLong("id"), 4);
+    ret.next();
+    assertEquals(ret.getLong("id"), 4);
+    ret.next();
+    assertEquals(ret.getLong("id"), 3);
+    ret.next();
+    assertEquals(ret.getLong("id"), 3);
+    ret.next();
+    assertEquals(ret.getLong("id"), 2);
+    ret.next();
+    assertEquals(ret.getLong("id"), 2);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
   public void testLessEqualAndGreaterEqual() throws SQLException {
 
     //test select returns multiple records with an index using operator '<='
@@ -1672,9 +2719,51 @@ public class TestDatabase {
     ret.next();
     assertEquals(ret.getLong("id"), 3);
     ret.next();
-     assertEquals(ret.getLong("id"), 2);
+    assertEquals(ret.getLong("id"), 2);
     ret.next();
     assertEquals(ret.getLong("id"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testGreaterNoKeySecondaryIndex() throws SQLException {
+    //test select returns multiple records with an index using operator '>'
+    PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id>5");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 6);
+    ret.next();
+    assertEquals(ret.getLong("id"), 7);
+    ret.next();
+    assertEquals(ret.getLong("id"), 8);
+    ret.next();
+    assertEquals(ret.getLong("id"), 9);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testGreaterNoKey() throws SQLException {
+    //test select returns multiple records with an index using operator '>'
+    PreparedStatement stmt = conn.prepareStatement("select * from nokey where id>5");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 6);
+    ret.next();
+    assertEquals(ret.getLong("id"), 6);
+    ret.next();
+    assertEquals(ret.getLong("id"), 7);
+    ret.next();
+    assertEquals(ret.getLong("id"), 7);
+    ret.next();
+    assertEquals(ret.getLong("id"), 8);
+    ret.next();
+    assertEquals(ret.getLong("id"), 8);
+    ret.next();
+    assertEquals(ret.getLong("id"), 9);
+    ret.next();
+    assertEquals(ret.getLong("id"), 9);
     assertFalse(ret.next());
   }
 
@@ -1717,6 +2806,54 @@ public class TestDatabase {
       System.out.println(next);
     }
     //assertFalse(ret.next());
+  }
+
+  @Test
+  public void testGreaterEqualNoKeySecondaryIndex() throws SQLException {
+    //test select returns multiple records with an index using operator '<='
+    PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id>=5");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    ret.next();
+    assertEquals(ret.getLong("id"), 6);
+    ret.next();
+    assertEquals(ret.getLong("id"), 7);
+    ret.next();
+    assertEquals(ret.getLong("id"), 8);
+    ret.next();
+    assertEquals(ret.getLong("id"), 9);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testGreaterEqualNoKey() throws SQLException {
+    //test select returns multiple records with an index using operator '<='
+    PreparedStatement stmt = conn.prepareStatement("select * from nokey where id>=5");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    ret.next();
+    assertEquals(ret.getLong("id"), 6);
+    ret.next();
+    assertEquals(ret.getLong("id"), 6);
+    ret.next();
+    assertEquals(ret.getLong("id"), 7);
+    ret.next();
+    assertEquals(ret.getLong("id"), 7);
+    ret.next();
+    assertEquals(ret.getLong("id"), 8);
+    ret.next();
+    assertEquals(ret.getLong("id"), 8);
+    ret.next();
+    assertEquals(ret.getLong("id"), 9);
+    ret.next();
+    assertEquals(ret.getLong("id"), 9);
+    assertFalse(ret.next());
   }
 
   @Test
@@ -1786,6 +2923,106 @@ public class TestDatabase {
       assertEquals(gender.charAt(0), 'm');
 
     }
+  }
+
+  @Test
+  public void testEqual2NoKeySecondaryIndex() throws SQLException {
+    //test select
+    PreparedStatement stmt;
+    ResultSet ret;
+    for (int i = 0; i < recordCount; i++) {
+
+      //test jdbc select
+      stmt = conn.prepareStatement("select * from nokeysecondaryindex where id=" + i);
+      ret = stmt.executeQuery();
+
+      ret.next();
+      long retId = ret.getLong("id");
+      assertEquals(retId, i, "Returned id doesn't match: id=" + i + ", retId=" + retId);
+      assertEquals(ret.getLong("id2"), 2 * i);
+    }
+  }
+
+  @Test
+  public void testEqual2NoKey() throws SQLException {
+    //test select
+    PreparedStatement stmt;
+    ResultSet ret;
+    for (int i = 0; i < recordCount; i++) {
+
+      //test jdbc select
+      stmt = conn.prepareStatement("select * from nokey where id=" + i);
+      ret = stmt.executeQuery();
+
+      ret.next();
+      long retId = ret.getLong("id");
+      assertEquals(retId, i, "Returned id doesn't match: id=" + i + ", retId=" + retId);
+      assertEquals(ret.getLong("id2"), 2 * i);
+    }
+  }
+
+  @Test
+  public void testUpdateNoKeySecondaryIndex() throws SQLException {
+    //fails
+
+    PreparedStatement stmt = conn.prepareStatement("update nokeysecondaryindex set id = ?, id2=? where id=?");
+    stmt.setLong(1, 1000);
+    stmt.setLong(2, 2000);
+    stmt.setLong(3, 0);
+    stmt.executeUpdate();
+
+    stmt = conn.prepareStatement("select * from nokeysecondaryindex where id=" + 0);
+    ResultSet ret = stmt.executeQuery();
+    assertFalse(ret.next());
+
+    stmt = conn.prepareStatement("select * from nokeysecondaryindex where id=1000");
+    ret = stmt.executeQuery();
+    assertTrue(ret.next());
+    assertFalse(ret.next());
+
+    stmt = conn.prepareStatement("select * from nokeysecondaryindex where id2=2000");
+    ret = stmt.executeQuery();
+    assertTrue(ret.next());
+    assertFalse(ret.next());
+
+    stmt = conn.prepareStatement("update nokeysecondaryindex set id = ?, id2=? where id=?");
+    stmt.setLong(1, 0);
+    stmt.setLong(2, 0);
+    stmt.setLong(3, 1000);
+    stmt.executeUpdate();
+  }
+
+  @Test
+  public void testUpdateNoKey() throws SQLException {
+    //fails
+
+    PreparedStatement stmt = conn.prepareStatement("update nokey set id = ?, id2=? where id=?");
+    stmt.setLong(1, 1000);
+    stmt.setLong(2, 2000);
+    stmt.setLong(3, 0);
+    stmt.executeUpdate();
+
+    stmt = conn.prepareStatement("select * from nokey where id=" + 0);
+    ResultSet ret = stmt.executeQuery();
+    assertFalse(ret.next());
+
+    stmt = conn.prepareStatement("select * from nokey where id=1000");
+    ret = stmt.executeQuery();
+    assertTrue(ret.next());
+    assertTrue(ret.next());
+    assertFalse(ret.next());
+
+    stmt = conn.prepareStatement("select * from nokey where id2=2000");
+    ret = stmt.executeQuery();
+    assertTrue(ret.next());
+    assertTrue(ret.next());
+    assertFalse(ret.next());
+
+    stmt = conn.prepareStatement("update nokey set id = ?, id2=? where id=?");
+    stmt.setLong(1, 0);
+    stmt.setLong(2, 0);
+    stmt.setLong(3, 1000);
+    stmt.executeUpdate();
   }
 
   @Test
@@ -1893,6 +3130,66 @@ public class TestDatabase {
     stmt.executeUpdate();
   }
 
+
+  @Test
+  public void testBatchInsertNoKeySecondaryIndex() throws SQLException, InterruptedException {
+
+    client.syncSchema();
+    conn.setAutoCommit(false);
+    PreparedStatement stmt = conn.prepareStatement("insert into nokeysecondaryindex (id, id2) VALUES (?, ?)");
+    for (int i = 0; i < 10; i++) {
+      stmt.setLong(1, 200000 + i);
+      stmt.setLong(2, 200000 * 2 + i);
+      stmt.addBatch();
+    }
+    stmt.executeBatch();
+    conn.commit();
+
+    stmt = conn.prepareStatement("select * from nokeysecondaryindex where id>=200000");
+    ResultSet resultSet = stmt.executeQuery();
+    for (int i = 0; i < 10; i++){
+      assertTrue(resultSet.next());
+    }
+    assertFalse(resultSet.next());
+
+    for (int i = 0; i < 10; i++) {
+      stmt = conn.prepareStatement("delete from nokeysecondaryindex where id=?");
+      stmt.setLong(1, 200000 + i);
+      stmt.executeUpdate();
+    }
+  }
+
+  @Test
+  public void testBatchInsertNoKey() throws SQLException, InterruptedException {
+
+    client.syncSchema();
+    conn.setAutoCommit(false);
+    PreparedStatement stmt = conn.prepareStatement("insert into nokey (id, id2) VALUES (?, ?)");
+    for (int i = 0; i < 10; i++) {
+      stmt.setLong(1, 200000 + i);
+      stmt.setLong(2, 200000 * 2 + i);
+      stmt.addBatch();
+      stmt.setLong(1, 200000 + i);
+      stmt.setLong(2, 200000 * 2 + i);
+      stmt.addBatch();
+    }
+    stmt.executeBatch();
+    conn.commit();
+
+    stmt = conn.prepareStatement("select * from nokey where id>=200000");
+    ResultSet resultSet = stmt.executeQuery();
+    for (int i = 0; i < 10; i++){
+      assertTrue(resultSet.next());
+      assertTrue(resultSet.next());
+    }
+    assertFalse(resultSet.next());
+
+    for (int i = 0; i < 10; i++) {
+      stmt = conn.prepareStatement("delete from nokey where id=?");
+      stmt.setLong(1, 200000 + i);
+      stmt.executeUpdate();
+    }
+  }
 
   @Test
   public void testBatchInsert() throws SQLException, InterruptedException {
@@ -2314,6 +3611,29 @@ public class TestDatabase {
     PreparedStatement stmt2 = conn.prepareStatement("truncate table ToTruncate");
     assertTrue(stmt2.execute());
 
+    rs = stmt.executeQuery();
+    assertFalse(rs.next());
+  }
+
+  @Test
+  public void testDeleteNoPrimaryKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("create table ToDeleteNoPrimarykey (id BIGINT, id2 BIGINT)");
+    stmt.executeUpdate();
+
+    stmt = conn.prepareStatement("insert into ToDeleteNoPrimaryKey (id, id2) VALUES (?, ?)");
+    stmt.setLong(1, 0);
+    stmt.setLong(2, 0 * 2);
+    assertEquals(stmt.executeUpdate(), 1);
+
+    stmt = conn.prepareStatement("select * from ToDeleteNoPrimaryKey where id = 0");
+    ResultSet rs = stmt.executeQuery();
+    assertTrue(rs.next());
+    assertFalse(rs.next());
+
+    PreparedStatement stmt2 = conn.prepareStatement("delete from ToDeleteNoPrimaryKey where id=0");
+    assertTrue(stmt2.execute());
+
+    stmt = conn.prepareStatement("select * from ToDeleteNoPrimaryKey where id = 0");
     rs = stmt.executeQuery();
     assertFalse(rs.next());
   }

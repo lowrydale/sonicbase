@@ -110,6 +110,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
    */
   public void serialize(DataOutputStream out) {
     try {
+      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
       out.writeUTF(fromTable);
       ExpressionImpl.serializeExpression(expression, out);
       out.writeInt(orderByExpressions.size());
@@ -166,6 +167,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
    */
   public void deserialize(DataInputStream in, String dbName) {
     try {
+      long serializationVersion = DataUtil.readVLong(in);
       fromTable = in.readUTF();
       expression = ExpressionImpl.deserializeExpression(in);
       int count = in.readInt();

@@ -92,6 +92,15 @@ public class TestDatabaseAdvanced {
     stmt = conn.prepareStatement("create index socialSecurityNumber on persons(socialSecurityNumber)");
     stmt.executeUpdate();
 
+    stmt = conn.prepareStatement("create table nokey (id BIGINT, id2 BIGINT)");
+    stmt.executeUpdate();
+
+    stmt = conn.prepareStatement("create table nokeysecondaryindex (id BIGINT, id2 BIGINT)");
+    stmt.executeUpdate();
+
+    stmt = conn.prepareStatement("create index id on nokeysecondaryindex(id)");
+    stmt.executeUpdate();
+
     //test insert
 
     stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");
@@ -157,6 +166,25 @@ public class TestDatabaseAdvanced {
       int count = stmt.executeUpdate();
       assertEquals(count, 1);
       ids.add((long) (i + 100));
+    }
+
+    for (int i = 0; i < recordCount; i++) {
+      stmt = conn.prepareStatement("insert into nokey (id, id2) VALUES (?, ?)");
+      stmt.setLong(1, i);
+      stmt.setLong(2, i * 2);
+      assertEquals(stmt.executeUpdate(), 1);
+
+      stmt = conn.prepareStatement("insert into nokey (id, id2) VALUES (?, ?)");
+      stmt.setLong(1, i);
+      stmt.setLong(2, i * 2);
+      assertEquals(stmt.executeUpdate(), 1);
+    }
+
+    for (int i = 0; i < recordCount; i++) {
+      stmt = conn.prepareStatement("insert into nokeysecondaryindex (id, id2) VALUES (?, ?)");
+      stmt.setLong(1, i);
+      stmt.setLong(2, i * 2);
+      assertEquals(stmt.executeUpdate(), 1);
     }
 
     client.beginRebalance("test", "persons", "_1__primarykey");
@@ -249,6 +277,21 @@ public class TestDatabaseAdvanced {
   }
 
   @Test
+  public void testGroupByNoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id, id2 from nokey where id < 2 group by id2 order by id");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getLong("id"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 2);
+    assertEquals(ret.getLong("id"), 1);
+    assertFalse(ret.next());
+
+  }
+
+  @Test
   public void testGroupBy() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select id, id2 from persons group by id2 order by id");
     ResultSet ret = stmt.executeQuery();
@@ -319,6 +362,68 @@ public class TestDatabaseAdvanced {
   }
 
   @Test
+  public void testServerSortNoKeySecondaryIndex() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id, id2 from nokeysecondaryindex where id < 2 order by id2 ASC");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getLong("id"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 2);
+    assertEquals(ret.getLong("id"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testServerSortNoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id, id2 from nokey where id < 2 order by id2 ASC");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getLong("id"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getLong("id"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 2);
+    assertEquals(ret.getLong("id"), 1);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 2);
+    assertEquals(ret.getLong("id"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testGroupByNestedNoKeySecondaryIndex() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id < 2 group by id2,id");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getLong("id"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 2);
+    assertEquals(ret.getLong("id"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testGroupByNestedNoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from nokey where id < 2 group by id2,id");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getLong("id"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 2);
+    assertEquals(ret.getLong("id"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
   public void testGroupByNested() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from persons group by id2,id4");
     ResultSet ret = stmt.executeQuery();
@@ -341,6 +446,38 @@ public class TestDatabaseAdvanced {
     ret.next();
     assertEquals(ret.getLong("id2"), 1);
     assertEquals(ret.getLong("id4"), 2);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testGroupByNestedMinNoKeySecondaryIndex() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select min(id) as minValue from nokeysecondaryindex where id < 2 group by id2,id");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getLong("id"), 0);
+    assertEquals(ret.getLong("minValue"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 2);
+    assertEquals(ret.getLong("id"), 1);
+    assertEquals(ret.getLong("minValue"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testGroupByNestedMinNoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select min(id) as minValue from nokey where id < 2 group by id2,id");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getLong("id"), 0);
+    assertEquals(ret.getLong("minValue"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 2);
+    assertEquals(ret.getLong("id"), 1);
+    assertEquals(ret.getLong("minValue"), 1);
     assertFalse(ret.next());
   }
 
@@ -378,8 +515,37 @@ public class TestDatabaseAdvanced {
   }
 
   @Test
+  public void testGroupByMaxNoKeySecondaryIndex() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id2, max(id) as maxValue from nokeysecondaryindex where id < 2 group by id2");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getInt("maxValue"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 2);
+    assertEquals(ret.getInt("maxValue"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testGroupByMaxNoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id2, max(id) as maxValue from nokey where id < 2 group by id2");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getInt("maxValue"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id2"), 2);
+    assertEquals(ret.getInt("maxValue"), 1);
+    assertFalse(ret.next());
+
+  }
+
+  @Test
   public void testGroupByMax() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("select id2, max(id) as maxValue from persons group by id2");
+    PreparedStatement stmt = conn.prepareStatement("select id2, max(id) as maxValue from persons where id < 200 group by id2");
     ResultSet ret = stmt.executeQuery();
 
     ret.next();
@@ -413,6 +579,38 @@ public class TestDatabaseAdvanced {
   }
 
   @Test
+  public void testGroupByMinNoKeySecondaryIndex() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id2, min(id) as minValue from nokeysecondaryindex where id < 2 group by id2");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getInt("minValue"), 0);
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 2);
+    assertEquals(ret.getLong("minValue"), 1);
+    assertFalse(ret.next());
+
+  }
+
+  @Test
+  public void testGroupByMinNoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id2, min(id) as minValue from nokey where id < 2 group by id2");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getInt("minValue"), 0);
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 2);
+    assertEquals(ret.getLong("minValue"), 1);
+    assertFalse(ret.next());
+
+  }
+
+  @Test
   public void testGroupByMin() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select id2, min(id) as minValue from persons group by id2");
     ResultSet ret = stmt.executeQuery();
@@ -426,6 +624,48 @@ public class TestDatabaseAdvanced {
     assertEquals(ret.getLong("minValue"), 1);
     assertFalse(ret.next());
 
+  }
+
+  @Test
+  public void testGroupByMinMaxSumAvgNoKeySecondaryIndex() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id2, min(id) as minValue, max(id) as maxValue, sum(id) as sumValue, avg(id) as avgValue from nokeysecondaryindex where id < 2 group by id2");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getInt("minValue"), 0);
+    assertEquals(ret.getInt("maxValue"), 0);
+    assertEquals(ret.getInt("sumValue"), 0);
+    assertEquals(ret.getInt("avgValue"), 0);
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 2);
+    assertEquals(ret.getLong("minValue"), 1);
+    assertEquals(ret.getLong("maxValue"), 1);
+    assertEquals(ret.getLong("sumValue"), 1);
+    assertEquals(ret.getLong("avgValue"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testGroupByMinMaxSumAvgNoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id2, min(id) as minValue, max(id) as maxValue, sum(id) as sumValue, avg(id) as avgValue from nokey where id < 2 group by id2");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getInt("minValue"), 0);
+    assertEquals(ret.getInt("maxValue"), 0);
+    assertEquals(ret.getInt("sumValue"), 0);
+    assertEquals(ret.getInt("avgValue"), 0);
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 2);
+    assertEquals(ret.getLong("minValue"), 1);
+    assertEquals(ret.getLong("maxValue"), 1);
+    assertEquals(ret.getLong("sumValue"), 1);
+    assertEquals(ret.getLong("avgValue"), 1);
+    assertFalse(ret.next());
   }
 
   @Test
@@ -450,21 +690,77 @@ public class TestDatabaseAdvanced {
   }
 
   @Test
-    public void testGroupByMinTwoFields() throws SQLException {
-      PreparedStatement stmt = conn.prepareStatement("select id2, min(id) as minValue, min(id3) as minId3Value from persons group by id2");
+    public void testGroupByMinTwoFieldsNoKeySecondaryIndex() throws SQLException {
+      PreparedStatement stmt = conn.prepareStatement("select id2, min(id) as minValue, min(id2) as minId3Value from nokeysecondaryindex where id < 2 group by id2");
       ResultSet ret = stmt.executeQuery();
 
       ret.next();
       assertEquals(ret.getLong("id2"), 0);
       assertEquals(ret.getInt("minValue"), 0);
-      assertEquals(ret.getInt("minId3Value"), 100);
+      assertEquals(ret.getInt("minId3Value"), 0);
 
       ret.next();
-      assertEquals(ret.getLong("id2"), 1);
+      assertEquals(ret.getLong("id2"), 2);
       assertEquals(ret.getLong("minValue"), 1);
-      assertEquals(ret.getLong("minId3Value"), 101);
+      assertEquals(ret.getLong("minId3Value"), 2);
       assertFalse(ret.next());
     }
+
+  @Test
+  public void testGroupByMinTwoFieldsNoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id2, min(id) as minValue, min(id2) as minId3Value from nokey where id < 2 group by id2");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getInt("minValue"), 0);
+    assertEquals(ret.getInt("minId3Value"), 0);
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 2);
+    assertEquals(ret.getLong("minValue"), 1);
+    assertEquals(ret.getLong("minId3Value"), 2);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testGroupByMinTwoFields() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id2, min(id) as minValue, min(id3) as minId3Value from persons group by id2");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getInt("minValue"), 0);
+    assertEquals(ret.getInt("minId3Value"), 100);
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 1);
+    assertEquals(ret.getLong("minValue"), 1);
+    assertEquals(ret.getLong("minId3Value"), 101);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testGroupByMinWhereTablescanNoKeySecondaryIndex() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id2, min(id) as minValue from nokeysecondaryindex where id2 > 0 AND id < 2 group by id2");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 2);
+    assertEquals(ret.getLong("minValue"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testGroupByMinWhereTablescanNoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id2, min(id) as minValue from nokey where id2 > 0 AND id < 2 group by id2");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 2);
+    assertEquals(ret.getLong("minValue"), 1);
+    assertFalse(ret.next());
+  }
 
   @Test
   public void testGroupByMinWhereTablescan() throws SQLException {
@@ -490,6 +786,38 @@ public class TestDatabaseAdvanced {
     ret.next();
     assertEquals(ret.getLong("id2"), 1);
     assertEquals(ret.getLong("minValue"), 101);
+    assertFalse(ret.next());
+
+  }
+
+  @Test
+  public void testGroupCountNoKeySecondaryIndex() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id2, count(id) as countValue from nokeysecondaryindex where id < 2 group by id2");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getLong("countValue"), 1);
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 2);
+    assertEquals(ret.getLong("countValue"), 1);
+    assertFalse(ret.next());
+
+  }
+
+  @Test
+  public void testGroupCountNoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id2, count(id) as countValue from nokey where id < 2 group by id2");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 0);
+    assertEquals(ret.getLong("countValue"), 2);
+
+    ret.next();
+    assertEquals(ret.getLong("id2"), 2);
+    assertEquals(ret.getLong("countValue"), 2);
     assertFalse(ret.next());
 
   }
@@ -848,12 +1176,48 @@ public class TestDatabaseAdvanced {
   }
 
   @Test
+  public void testCount2NoKeySecondaryIndex() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select count(id2) from nokeysecondaryindex");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getInt(1), 10);
+  }
+
+  @Test
+  public void testCount2NoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select count(id2) from nokey");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getInt(1), 20);
+  }
+
+  @Test
   public void testCount2() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select count(id2) from persons");
     ResultSet ret = stmt.executeQuery();
 
     ret.next();
     assertEquals(ret.getInt(1), 14);
+  }
+
+  @Test
+  public void testCount3NoKeySecondaryIndex() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select count(*) from nokeysecondaryindex where id2 = 0");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong(1), 1);
+  }
+
+  @Test
+  public void testCount3NoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select count(*) from nokey where id2 = 0");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong(1), 7);
   }
 
   @Test

@@ -1,0 +1,35 @@
+{
+  "dataDirectory": "c:\\\\db-data",
+  "installDirectory": "c:\\\\sonicbase",
+  "compressRecords": false,
+  "useUnsafe": true,
+  "maxJavaHeap": "20%",
+  "user": "ubuntu",
+  "clientIsPrivate": false,
+  "backup" : {
+    "type" : "fileSystem",
+    "directory": "c:\\\\db-backup",
+    "period": "daily",
+    "time": "23:00",
+    "maxBackupCount": 10,
+    "sharedDirectory": false
+  },
+  "shards" : [
+    {
+      "replicas": [
+        {
+          "publicAddress": "localhost",
+          "privateAddress": "localhost",
+          "port": 9010
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "publicAddress": "localhost",
+      "privateAddress": "localhost",
+      "port": 8080
+    }
+  ]
+}

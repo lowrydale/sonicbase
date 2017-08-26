@@ -11,6 +11,7 @@ import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.ReadManager;
+import com.sonicbase.server.SnapshotManager;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -20,7 +21,6 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class InExpressionImpl extends ExpressionImpl implements InExpression {
-  private DatabaseClient client;
   private ParameterHandler parms;
   private String tableName;
   private List<ExpressionImpl> expressionList = new ArrayList<ExpressionImpl>();
@@ -28,7 +28,7 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
   private boolean isNot;
 
   public InExpressionImpl(DatabaseClient client, ParameterHandler parms, String tableName) {
-    this.client = client;
+    super.setClient(client);
     this.parms = parms;
     this.tableName = tableName;
   }
@@ -125,6 +125,13 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
       out.writeInt(leftExpression.getType().getId());
       leftExpression.serialize(out);
       out.writeBoolean(isNot);
+      if (tableName == null) {
+        out.writeByte(0);
+      }
+      else {
+        out.writeByte(1);
+        out.writeUTF(tableName);
+      }
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -152,6 +159,12 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
       }
       leftExpression = ExpressionImpl.deserializeExpression(in);
       isNot = in.readBoolean();
+
+      if (this.serializationVersion >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION_22) {
+        if (1 == in.readByte()) {
+          tableName = in.readUTF();
+        }
+      }
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -211,7 +224,13 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
     }
 
     if (indexSchema == null) {
-      throw new DatabaseException("Not Supported");
+      SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count, getClient().getCommon().getTables(dbName).get(getTableName()),
+          getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(), getRecordCache(), getCounters(), getGroupByContext());
+      if (context != null) {
+        setNextShard(context.getNextShard());
+        setNextKey(context.getNextKey());
+        return new NextReturn(context.getTableNames(), context.getCurrKeys());
+      }
     }
 
     for (ExpressionImpl inValue : expressionList) {
@@ -220,7 +239,7 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
 
       Object[] key = new Object[]{value};
       AtomicReference<String> usedIndex = new AtomicReference<>();
-      SelectContextImpl currRet = ExpressionImpl.lookupIds(dbName, client.getCommon(), client, getReplica(), count,
+      SelectContextImpl currRet = ExpressionImpl.lookupIds(dbName, getClient().getCommon(), getClient(), getReplica(), count,
           tableName, indexSchema.getName(), isForceSelectOnServer(),
           BinaryExpression.Operator.equal, null,
           null, key, getParms(), this, null, key, null, getColumns(), cNode.getColumnName(), -1, getRecordCache(), usedIndex,
@@ -241,7 +260,7 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
     if (leftExpression instanceof ColumnImpl) {
       String columnName = ((ColumnImpl) leftExpression).getColumnName();
 
-      for (Map.Entry<String, IndexSchema> entry : client.getCommon().getTables(dbName).get(tableName).getIndices().entrySet()) {
+      for (Map.Entry<String, IndexSchema> entry : getClient().getCommon().getTables(dbName).get(tableName).getIndices().entrySet()) {
         if (entry.getValue().getFields()[0].equals(columnName)) {
           return true;
         }

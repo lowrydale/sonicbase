@@ -15,9 +15,16 @@
 <body>
 <div class="container">
     <header id="myHeader">
-        <a href="../index.html">
-            <h4 class="logo">SonicBase™</h4>
-        </a>
+        <div class="mobile">
+            <a href="../index.html">
+                <h4 class="logo">SonicBase™</h4>
+            </a>
+        </div>
+
+        <div class="desktop">
+            <a href="../index.html">
+                <img src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+            </a>
         <nav>
             <ul>
                 <li><a href="../index.html">HOME</a></li>
@@ -25,6 +32,7 @@
                 <li><a href="../contact.html">CONTACT</a></li>
             </ul>
         </nav>
+        </div>
     </header>
 
     <script>
@@ -44,15 +52,30 @@ In this tutorial we will walk you through the process of starting a cluster and 
 Go to the <a href="javascript:parent.window.location.href='../downloads.html'">downloads</a> section of the SonicBase website and download the latest version.
         </div>
 <h1>Unpack Package</h1>
-Type "tar -xzf sonicbase-&lt;version&gt;.tgz" in the parent directory where you want the software to go.
-<h1>Start Client</h1>
-Go to the sonicbase/bin directory and type "./cli" for MacOS and Linux and "./cli.bat" for cygwin and "cli.bat" for Windows. This will start the SonicBase client.
-        <h1>Set Paths</h1>
-        Edit the config-1-local.json file in the sonicbase/config directory. Set the dataDirectory and the installDirectory to
-        the locations you desire. Note on Windows you will need to escape the backslashes so the value can be stored in the json file.<br/>
+        <div style="margin-left: 2em;">
+
+            <lu>
+                <li>
+        Linux/Mac: Type "tar -xzf sonicbase-&lt;version&gt;.tgz" in the parent directory where you want the software to go. A directory
+        named "sonicbase" will be created.<br/>
+                </li>
+                <li>
+                    Windows: Unzip the file sonicbase-&lt;version&gt;.zip in the parent directory where you want the software to go. A directory
+                    named "sonicbase" will be created.
+                </li>
+            </lu>
+        </div>
+<h1>Set Paths In The Config</h1>
+        <div class="mylink">
+Edit the config-1-local.json file in the sonicbase/config directory. See <a href="config.html?framed=true">Configuration Files</a>. Set the dataDirectory and the installDirectory to
+the locations you desire. The installDirectory should point to the sonicbase directory in the unpacked distribution.<br/>
+        </div>
         <br/>
-        On Windows the directory may look like "c:\\\\sonicbase". On linux it may look like "/mnt/sonicbase". On linux and mac
-        you also have the option of prefixing your path with "$HOME" to specify the home directory. This option is not available on Windows.
+        Note on Windows you will need to escape the backslashes so the value can be stored in the json file.<br/>
+On Windows the directory may look like "c:\\\\sonicbase". On linux it may look like "/mnt/sonicbase". On linux and mac
+you also have the option of prefixing your path with "$HOME" to specify the home directory. This option is not available on Windows.
+<h1>Start Client</h1>
+Change to the sonicbase/bin directory and type "./cli" for MacOS and Linux and "./cli.bat" for cygwin and "cli.bat" for Windows. This will start the SonicBase client.
 <h1>Use Cluster</h1>
 In the client, type:<br/>
 &nbsp;&nbsp;use cluster 1-local<br/><br/>
@@ -80,7 +103,7 @@ In the client, type:<br/>
 This will create the database named "db".
 <h1>Create Table</h1>
 In the client, type:<br/>
-&nbsp;&nbsp;create table persons (name VARCHAR, age INT, ssn VARCHAR, PRIMARY KEY (ssn))<br/>
+&nbsp;&nbsp;create table persons (name VARCHAR, age INTEGER, ssn VARCHAR, PRIMARY KEY (ssn))<br/>
 <h1>Insert Record</h1>
 In the client, type:<br/>
 &nbsp;&nbsp;insert into persons (name, age, ssn) VALUES ('bob', 22, '555-66-7777')<br/>

@@ -1005,11 +1005,22 @@ public class CommandHandler {
     }
   }
 
-  public ComObject evaluateCounter(ComObject cobj, boolean replayedCommand) {
+  public ComObject evaluateCounterGetKeys(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return readManager.evaluateCounter(cobj);
+      return readManager.evaluateCounterGetKeys(cobj);
+    }
+    finally {
+      common.getSchemaReadLock(dbName).unlock();
+    }
+  }
+
+  public ComObject evaluateCounterWithRecord(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
+    common.getSchemaReadLock(dbName).lock();
+    try {
+      return readManager.evaluateCounterWithRecord(cobj);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();

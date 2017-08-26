@@ -1851,7 +1851,7 @@ public class ReadManager {
     }
   }
 
-  public ComObject evaluateCounter(ComObject cobj) {
+  public ComObject evaluateCounterGetKeys(ComObject cobj) {
 
     String dbName = cobj.getString(ComObject.Tag.dbName);
 
@@ -1860,15 +1860,19 @@ public class ReadManager {
       byte[] counterBytes = cobj.getByteArray(ComObject.Tag.legacyCounter);
       counter.deserialize(counterBytes);
 
+      boolean isPrimaryKey = false;
       String tableName = counter.getTableName();
       String columnName = counter.getColumnName();
       String indexName = null;
       TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
       for (IndexSchema indexSchema : tableSchema.getIndexes().values()) {
         if (indexSchema.getFields()[0].equals(columnName)) {
+          isPrimaryKey = indexSchema.isPrimaryKey();
           indexName = indexSchema.getName();
         }
       }
+      byte[] maxKey = null;
+      byte[] minKey = null;
       Index index = server.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
       Map.Entry<Object[], Object> entry = index.lastEntry();
       if (entry != null) {
@@ -1883,13 +1887,11 @@ public class ReadManager {
           }
         }
         if (records != null) {
-          Record record = new Record(dbName, server.getCommon(), records[0]);
-          Object value = record.getFields()[tableSchema.getFieldOffset(columnName)];
-          if (counter.isDestTypeLong()) {
-            counter.setMaxLong((Long) DataType.getLongConverter().convert(value));
+          if (isPrimaryKey) {
+            maxKey = DatabaseCommon.serializeKey(tableSchema, indexName, entry.getKey());
           }
           else {
-            counter.setMaxDouble((Double) DataType.getDoubleConverter().convert(value));
+            maxKey = records[0];
           }
         }
       }
@@ -1906,13 +1908,79 @@ public class ReadManager {
           }
         }
         if (records != null) {
-          Record record = new Record(dbName, server.getCommon(), records[0]);
-          Object value = record.getFields()[tableSchema.getFieldOffset(columnName)];
-          if (counter.isDestTypeLong()) {
-            counter.setMinLong((Long) DataType.getLongConverter().convert(value));
+          if (isPrimaryKey) {
+            minKey = DatabaseCommon.serializeKey(tableSchema, indexName, entry.getKey());
           }
           else {
-            counter.setMinDouble((Double) DataType.getDoubleConverter().convert(value));
+            minKey = records[0];
+          }
+        }
+      }
+      ComObject retObj = new ComObject();
+      retObj.put(ComObject.Tag.minKey, minKey);
+      retObj.put(ComObject.Tag.maxKey, maxKey);
+      retObj.put(ComObject.Tag.legacyCounter, counter.serialize());
+      return retObj;
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+
+  public ComObject evaluateCounterWithRecord(ComObject cobj) {
+
+    String dbName = cobj.getString(ComObject.Tag.dbName);
+
+    Counter counter = new Counter();
+    try {
+      byte[] minKeyBytes = cobj.getByteArray(ComObject.Tag.minKey);
+      byte[] maxKeyBytes = cobj.getByteArray(ComObject.Tag.maxKey);
+      byte[] counterBytes = cobj.getByteArray(ComObject.Tag.legacyCounter);
+      counter.deserialize(counterBytes);
+
+      String tableName = counter.getTableName();
+      String columnName = counter.getColumnName();
+      String indexName = null;
+      TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
+      for (IndexSchema indexSchema : tableSchema.getIndexes().values()) {
+        if (indexSchema.isPrimaryKey()) {
+          indexName = indexSchema.getName();
+        }
+      }
+      byte[] keyBytes = minKeyBytes;
+      if (minKeyBytes == null) {
+        keyBytes = maxKeyBytes;
+      }
+      Object[] key = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
+
+      Index index = server.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
+      synchronized (index.getMutex(key)) {
+        Object unsafeAddress = index.get(key);
+        if (unsafeAddress != null) {
+          byte[][] records = null;
+          if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
+            records = server.fromUnsafeToRecords(unsafeAddress);
+          }
+          if (records != null) {
+            Record record = new Record(dbName, server.getCommon(), records[0]);
+            Object value = record.getFields()[tableSchema.getFieldOffset(columnName)];
+            if (minKeyBytes != null) {
+              if (counter.isDestTypeLong()) {
+                counter.setMinLong((Long) DataType.getLongConverter().convert(value));
+              }
+              else {
+                counter.setMinDouble((Double) DataType.getDoubleConverter().convert(value));
+              }
+            }
+            else {
+              if (counter.isDestTypeLong()) {
+                counter.setMaxLong((Long) DataType.getLongConverter().convert(value));
+              }
+              else {
+                counter.setMaxDouble((Double) DataType.getDoubleConverter().convert(value));
+              }
+            }
           }
         }
       }

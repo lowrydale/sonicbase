@@ -7,6 +7,7 @@ import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.Expression;
+import com.sonicbase.query.InExpression;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
@@ -156,7 +157,24 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
         BinaryExpression.Operator.greaterEqual == operator ||
         BinaryExpression.Operator.like == operator) {
 
-      if (!canUseIndex() || operator == Operator.like || (leftExpression instanceof ColumnImpl && rightExpression instanceof ColumnImpl)) {
+      boolean canUseIndex = canUseIndex();
+      Counter[] counters = getCounters();
+      if (counters != null) {
+        outer:
+        for (Counter counter : counters) {
+          TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(counter.getTableName());
+          for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndexes().entrySet()) {
+            if (entry.getValue().isPrimaryKey()) {
+              if (!entry.getValue().getFields()[0].equals(counter.getColumnName())) {
+                canUseIndex = false;
+                break outer;
+              }
+            }
+          }
+        }
+      }
+
+      if (!canUseIndex || operator == Operator.like || (leftExpression instanceof ColumnImpl && rightExpression instanceof ColumnImpl)) {
         if (explain != null) {
           explain.appendSpaces();
           explain.getBuilder().append("Table scan: " + getTopLevelExpression().toString() + "\n");
@@ -207,13 +225,15 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
           currLeftValue = tableSchema.getFields().get(offset).getType().getConverter().convert(currLeftValue);
           originalLeftValue = currLeftValue;
         }
+        IndexSchema indexSchema = null;
         String[] preferredIndexColumns = null;
-        for (Map.Entry<String, IndexSchema> indexSchema : getClient().getCommon().getTables(dbName).get(getTableName()).getIndices().entrySet()) {
-          String[] fields = indexSchema.getValue().getFields();
+        for (Map.Entry<String, IndexSchema> entry : getClient().getCommon().getTables(dbName).get(getTableName()).getIndices().entrySet()) {
+          String[] fields = entry.getValue().getFields();
           if (fields[0].equals(columnName)) {
             if (preferredIndexColumns == null || preferredIndexColumns.length > fields.length) {
               preferredIndexColumns = fields;
-              indexName = indexSchema.getKey();
+              indexName = entry.getKey();
+              indexSchema = entry.getValue();
             }
           }
         }
@@ -231,17 +251,33 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
               ", " + toString() + "\n");
         }
 
-        SelectContextImpl context = ExpressionImpl.lookupIds(dbName, getClient().getCommon(), getClient(), getReplica(), count,
-            getTableName(),
-            indexName, isForceSelectOnServer(),
-            operator, null, getOrderByExpressions(), leftKey, getParms(), getTopLevelExpression(), null, new Object[]{originalLeftValue}, null, getColumns(), columnName,
-            getNextShard(), getRecordCache(), usedIndex, false, getViewVersion(), getCounters(), getGroupByContext(), debug);
-        setNextShard(context.getNextShard());
-        setNextKey(context.getNextKey());
-        if (getNextShard() == -1 || getNextShard() == -2) {
-          exhausted = true;
+        GroupByContext groupByContext = getGroupByContext();
+
+        if (groupByContext != null && !indexSchema.isPrimaryKey()) {
+          SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count, getClient().getCommon().getTables(dbName).get(getTableName()),
+              getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(), getRecordCache(), getCounters(), getGroupByContext());
+          if (context != null) {
+            setNextShard(context.getNextShard());
+            setNextKey(context.getNextKey());
+            if (getNextShard() == -1 || getNextShard() == -2) {
+              exhausted = true;
+            }
+            return new NextReturn(context.getTableNames(), context.getCurrKeys());
+          }
         }
-        return new NextReturn(context.getTableNames(), context.getCurrKeys());
+        else {
+          SelectContextImpl context = ExpressionImpl.lookupIds(dbName, getClient().getCommon(), getClient(), getReplica(), count,
+              getTableName(),
+              indexName, isForceSelectOnServer(),
+              operator, null, getOrderByExpressions(), leftKey, getParms(), getTopLevelExpression(), null, new Object[]{originalLeftValue}, null, getColumns(), columnName,
+              getNextShard(), getRecordCache(), usedIndex, false, getViewVersion(), getCounters(), getGroupByContext(), debug);
+          setNextShard(context.getNextShard());
+          setNextKey(context.getNextKey());
+          if (getNextShard() == -1 || getNextShard() == -2) {
+            exhausted = true;
+          }
+          return new NextReturn(context.getTableNames(), context.getCurrKeys());
+        }
       }
     }
     catch (SchemaOutOfSyncException e) {
@@ -581,7 +617,6 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
         explain.getBuilder().append("Table scan: " + getTopLevelExpression().toString() + "\n");
       }
       else {
-        String[] indexFields = getClient().getCommon().getTables(dbName).get(getTableName()).getIndices().get(indexName).getFields();
         SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count, getClient().getCommon().getTables(dbName).get(getTableName()),
             getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(), getRecordCache(), getCounters(), getGroupByContext());
         if (context != null) {
@@ -596,28 +631,9 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
       //return tableScan(count, getClient(), (ExpressionImpl) getTopLevelExpression(), getParms(), getTableName());
     }
     else if (leftEffectiveOp != rightEffectiveOp && !isLeftColumnCompare && !isRightColumnCompare && leftColumn != null && rightColumn != null && leftColumn.equals(rightColumn)) {
-      String[] indexFields = getClient().getCommon().getTables(dbName).get(getTableName()).getIndices().get(indexName).getFields();
-      Object[] leftKey = null;
-      if (leftValues.size() != 0) {
-        leftKey = ExpressionImpl.buildKey(leftValues, indexFields);
-      }
-      Object[] rightKey = null;
-      if (rightValues.size() != 0) {
-        rightKey = ExpressionImpl.buildKey(rightValues, indexFields);
-      }
-
-      if (explain != null) {
-        explain.appendSpaces();
-        explain.getBuilder().append("Two-sided index lookup: index=" + indexName +
-            ", " + leftColumn + " " + leftOp.getSymbol() + " " + leftValue + " and " + rightColumn + " " + rightOp.getSymbol() + " " + rightValue + "\n");
-      }
-      else {
-        SelectContextImpl context = ExpressionImpl.lookupIds(dbName, getClient().getCommon(), getClient(), getReplica(), count,
-            getTableName(),
-            indexName, isForceSelectOnServer(),
-            leftOp, rightOp, getOrderByExpressions(), leftKey, getParms(), getTopLevelExpression(), rightKey,
-            new Object[]{originalLeftValue}, new Object[]{originalRightValue}, getColumns(), leftColumn, getNextShard(),
-            getRecordCache(), usedIndex, false, getViewVersion(), getCounters(), getGroupByContext(), debug);
+      if (indexName == null) {
+        SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count, getClient().getCommon().getTables(dbName).get(getTableName()),
+            getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(), getRecordCache(), getCounters(), getGroupByContext());
         if (context != null) {
           setNextShard(context.getNextShard());
           setNextKey(context.getNextKey());
@@ -625,6 +641,39 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
             exhausted = true;
           }
           return new NextReturn(context.getTableNames(), context.getCurrKeys());
+        }
+      }
+      else {
+        String[] indexFields = getClient().getCommon().getTables(dbName).get(getTableName()).getIndices().get(indexName).getFields();
+        Object[] leftKey = null;
+        if (leftValues.size() != 0) {
+          leftKey = ExpressionImpl.buildKey(leftValues, indexFields);
+        }
+        Object[] rightKey = null;
+        if (rightValues.size() != 0) {
+          rightKey = ExpressionImpl.buildKey(rightValues, indexFields);
+        }
+
+        if (explain != null) {
+          explain.appendSpaces();
+          explain.getBuilder().append("Two-sided index lookup: index=" + indexName +
+              ", " + leftColumn + " " + leftOp.getSymbol() + " " + leftValue + " and " + rightColumn + " " + rightOp.getSymbol() + " " + rightValue + "\n");
+        }
+        else {
+          SelectContextImpl context = ExpressionImpl.lookupIds(dbName, getClient().getCommon(), getClient(), getReplica(), count,
+              getTableName(),
+              indexName, isForceSelectOnServer(),
+              leftOp, rightOp, getOrderByExpressions(), leftKey, getParms(), getTopLevelExpression(), rightKey,
+              new Object[]{originalLeftValue}, new Object[]{originalRightValue}, getColumns(), leftColumn, getNextShard(),
+              getRecordCache(), usedIndex, false, getViewVersion(), getCounters(), getGroupByContext(), debug);
+          if (context != null) {
+            setNextShard(context.getNextShard());
+            setNextKey(context.getNextKey());
+            if (getNextShard() == -1 || getNextShard() == -2) {
+              exhausted = true;
+            }
+            return new NextReturn(context.getTableNames(), context.getCurrKeys());
+          }
         }
       }
     }
@@ -767,6 +816,11 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
             ", indexedExpression=[" + leftColumn +  " " + leftOp.getSymbol() + " " + leftValue + "] otherExpression=[" + rightColumn + " " + rightOp.getSymbol() + " " + rightValue + "]\n");
       }
       explain.indent();
+    }
+    if (leftExpression instanceof InExpressionImpl) {
+      ExpressionImpl tmp = leftExpression;
+      leftExpression = rightExpression;
+      rightExpression = leftExpression;
     }
     leftIds = leftExpression.next(count, explain);
     if (explain != null) {

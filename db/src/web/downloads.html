@@ -13,24 +13,30 @@
 
         var chboxs = document.getElementsByName("c1");
         if(chboxs[0].checked){
-            document.getElementById("div1").style.display = "block";
-            document.getElementById("div2").style.display = "none";
+            document.getElementById("purchaseButton").disabled = false;
         }
         else {
-            document.getElementById("div1").style.display = "none";
-            document.getElementById("div2").style.display = "block";
+            document.getElementById("purchaseButton").disabled = true;
         }
-        var chboxs = document.getElementsByName("c2");
+        chboxs = document.getElementsByName("c2");
         if(chboxs[0].checked){
-            document.getElementById("div3").style.display = "block";
-            document.getElementById("div4").style.display = "none";
+            document.getElementById("trialButton").disabled = false;
         }
         else {
-            document.getElementById("div3").style.display = "none";
-            document.getElementById("div4").style.display = "block";
+            document.getElementById("trialButton").disabled = true;
+        }
+        chboxs = document.getElementsByName("c3");
+        if(chboxs[0].checked){
+            document.getElementById("freeButton").disabled = false;
+        }
+        else {
+            document.getElementById("freeButton").disabled = true;
         }
     }
 
+    function freeDownload() {
+        window.location.href = "/app-static/free-downloads.html";
+    }
     function login(){
         window.location.href = "app-static/login.html";
     }
@@ -39,9 +45,17 @@
 
 <body>
  <div class="container">
-  <header> <a href="index.html">
-    <h4 class="logo">SonicBase™</h4>
-    </a>
+  <header>
+      <div class="mobile">
+          <a href="index.html">
+              <h4 class="logo">SonicBase™</h4>
+          </a>
+      </div>
+
+      <div class="desktop">
+      <a href="index.html">
+          <img src="images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+        </a>
       <nav>
           <ul>
               <li><a href="index.html">HOME</a></li>
@@ -50,85 +64,43 @@
               <li><a href="contact.html">CONTACT</a></li>
           </ul>
       </nav>
+      </div>
   </header>
 
-     <div style="margin-left: 4em;">
+     <div style="margin-left: 2em; margin-right: 2em">
      <div class="desktop">
          <table width="100%" border="0">
              <tbody>
              <tr valign=top>
-                 <td width=25%>
-                     <h1>Purchase Licenses</h1>
-                     $31.25 per core or $250 for an 8 core server per year. <button onclick="login()">Purchase</button>
-                     <br/><br/>
-                     <h1>Free Downloads</h1>
+                 <td width=30%>
+                     <h1>Purchase Pro Licenses</h1>
+                     $31.25 per core or $250 for an 8 core server per year.<br/>
+                     <button onclick="login()" disabled="true" id="purchaseButton">Purchase</button>
                      <input type="checkbox" name="c1" onclick="agreeToLicense()">Agree to license terms</input>
+                     <br/><br/>
+                     <h1>Request 30-day Pro Trial&nbsp;&nbsp;&nbsp;</h1>
+                     You may obtain a 30-day trial license to test all the features of SonicBase.<br/>
+                     <button onclick="login()" disabled="true" id="trialButton">Request Trial</button>
+                     <input type="checkbox" name="c2" onclick="agreeToLicense()">Agree to license terms</input>
+                     <br/><br/>
+                     <h1>Free Download</h1>
+                        <button onclick="freeDownload()" disabled="true" id="freeButton">Free Download</button>
+                     <input type="checkbox" name="c3" onclick="agreeToLicense()">Agree to license terms</input>
                      <br/>
                      <br/>
-                     <table width="100%">
-                         <tr><td colspan="2">
-                             Free and Pro versions share the same download.
-                             </td>
-                         </tr>
-                         <tr>
-                             <td>
-                     <div id="div1" style="display: none">
-                         <div class="mylink">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="https://sonicbase-downloads.s3.amazonaws.com/sonicbase-1.2.3.tgz">1.2.3</a></div>
-                         <div class="mylink">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="https://sonicbase-downloads.s3.amazonaws.com/sonicbase-1.2.2.tgz">1.2.2</a></div>
-                         <div class="mylink">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="https://sonicbase-downloads.s3.amazonaws.com/sonicbase-1.2.1.tgz">1.2.1</a></div>
-                     </div>
-                     <div id="div2" style="display: block">
-                         <div class="mylink">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.2.3</div>
-                         <div class="mylink">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.2.2</div>
-                         <div class="mylink">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.2.1</div>
-                     </div>
-                             </td>
-                             <td>
-                                 &nbsp;&nbsp;&nbsp;&nbsp;8/18/2017<br/>
-                                 &nbsp;&nbsp;&nbsp;&nbsp;8/10/2017<br/>
-                                 &nbsp;&nbsp;&nbsp;&nbsp;6/31/2017<br/>
-                             </td>
-                         </tr>
-                         <tr><td colspan="2">
-                             <br/><br/>
-
-                         </td></tr>
-                     </table>
-                 </td>
+                  </td>
                  <td width="75%" bgcolor="#ffffff"><iframe frameBorder="0" width=100% height=1024px src="license-agreement.html" name="doc-frame"></iframe></td>
              </tr>
              </tbody>
          </table>
      </div>
-     <div class="mobile">
+         <div class="mobile">
          <table width="100%" border="0">
              <tbody>
-             <tr valign=top>
-                 <td>
-                     <h2>&nbsp;&nbsp;Free Downloads</h2>
-                 </td>
-                 <td>
-                     Free and Pro versions share the same download.
-                     <br/>
-                     <div id="div3" style="display: none">
-                         <div class="mylink">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="https://sonicbase-downloads.s3.amazonaws.com/sonicbase-1.2.3.tgz">Version 1.2.3</a></div>
-                         <div class="mylink">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="https://sonicbase-downloads.s3.amazonaws.com/sonicbase-1.2.2.tgz">Version 1.2.2</a></div>
-                         <div class="mylink">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="https://sonicbase-downloads.s3.amazonaws.com/sonicbase-1.2.1.tgz">Version 1.2.1</a></div>
-                     </div>
-                     <div id="div4" style="display: block">
-                         <div class="mylink">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.2.3</div>
-                         <div class="mylink">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.2.2</div>
-                         <div class="mylink">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.2.1</div>
-                     </div>
-                 </td>
-             </tr>
              <tr><td colspan="2">
                  Access the website from a desktop to download software.
              </td>
              </tr>
-             <tr><td colspan="2">
-                 Pro version will be available soon for a small fee.
-             </td></tr>
              </tbody>
          </table>
      </div>

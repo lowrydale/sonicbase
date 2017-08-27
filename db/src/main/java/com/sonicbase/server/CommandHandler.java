@@ -583,6 +583,9 @@ public class CommandHandler {
   }
 
   public ComObject updateSchema(ComObject cobj, boolean replayedCommand) throws IOException {
+    if (replayedCommand) {
+      return null;
+    }
     DatabaseCommon tempCommon = new DatabaseCommon();
     tempCommon.deserializeSchema(cobj.getByteArray(ComObject.Tag.schemaBytes));
 

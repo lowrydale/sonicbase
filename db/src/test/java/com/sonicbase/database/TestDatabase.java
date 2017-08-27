@@ -96,6 +96,12 @@ public class TestDatabase {
         server.shutdownRepartitioner();
       }
 
+      dbServers[0].enableSnapshot(false);
+      dbServers[1].enableSnapshot(false);
+      dbServers[2].enableSnapshot(false);
+      dbServers[3].enableSnapshot(false);
+
+
       Thread.sleep(5000);
 
       //DatabaseClient client = new DatabaseClient("localhost", 9010, true);
@@ -290,20 +296,33 @@ public class TestDatabase {
       assertEquals(count, 4);
       count = client.getPartitionSize("test", 1, "children", "_1_socialsecuritynumber");
       assertEquals(count, 6);
+      count = client.getPartitionSize("test", 0, "nokey", "_1__primarykey");
+      assertEquals(count, 9);
+      count = client.getPartitionSize("test", 1, "nokey", "_1__primarykey");
+      assertEquals(count, 11);
+      count = client.getPartitionSize("test", 0, "nokeysecondaryindex", "_1__primarykey");
+      assertEquals(count, 4);
+      count = client.getPartitionSize("test", 1, "nokeysecondaryindex", "_1__primarykey");
+      assertEquals(count, 6);
+      count = client.getPartitionSize("test", 0, "nokeysecondaryindex", "_1_id");
+      assertEquals(count, 4);
+      count = client.getPartitionSize("test", 1, "nokeysecondaryindex", "_1_id");
+      assertEquals(count, 6);
 
-      dbServers[0].enableSnapshot(false);
      // dbServers[1].enableSnapshot(false);
 
-      dbServers[0].runSnapshot();
+//      dbServers[0].runSnapshot();
 //      dbServers[0].recoverFromSnapshot();
 //      dbServers[0].getSnapshotManager().lockSnapshot("test");
 //      dbServers[0].getSnapshotManager().unlockSnapshot(1);
 //
       long commandCount = dbServers[1].getCommandCount();
-//      dbServers[2].purgeMemory();
-//      dbServers[2].replayLogs();
-//      dbServers[3].purgeMemory();
-//      dbServers[3].replayLogs();
+      dbServers[2].purgeMemory();
+      dbServers[2].recoverFromSnapshot();
+      dbServers[2].replayLogs();
+      dbServers[3].purgeMemory();
+      dbServers[3].recoverFromSnapshot();
+      dbServers[3].replayLogs();
 
       //    assertEquals(dbServers[1].getLogManager().getCountLogged(), commandCount);
       //    assertEquals(dbServers[1].getCommandCount(), commandCount * 2);

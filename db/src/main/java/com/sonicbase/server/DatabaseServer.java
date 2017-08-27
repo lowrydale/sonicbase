@@ -1914,6 +1914,8 @@ public class DatabaseServer {
 
           prepareDataFromRestore();
 
+          deleteManager.forceDeletes();
+
           isRestoreComplete = true;
         }
         catch (Exception e) {
@@ -2276,9 +2278,9 @@ public class DatabaseServer {
           innerIndex.clear();
         }
       }
-      common.getTables(dbName).clear();
+      //common.getTables(dbName).clear();
     }
-    common.saveSchema(dataDir);
+    //common.saveSchema(dataDir);
   }
 
   public void replayLogs() {

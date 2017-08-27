@@ -1714,7 +1714,11 @@ public class ReadManager {
         for (byte[] bytes : records) {
           long dbViewNum = Record.getDbViewNumber(bytes);
           long dbViewFlags = Record.getDbViewFlags(bytes);
-          if (dbViewNum <= viewVersion) {
+          //todo: is this right?
+          if (/*dbViewNum <= viewVersion &&*/ (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
+            remaining.add(bytes);
+          }
+          else if (dbViewNum <= viewVersion) {
             remaining.add(bytes);
           }
           else if (//dbViewNum < server.getCommon().getSchema().getVersion()  ||
@@ -1740,7 +1744,8 @@ public class ReadManager {
 //
 //                    }
 //                    else
-              if (dbViewNum <= viewVersion && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
+            //todo: is this right
+              if (/*dbViewNum <= viewVersion &&*/ (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
               remaining.add(bytes);
             }
             else if (dbViewNum == server.getSchemaVersion() ||

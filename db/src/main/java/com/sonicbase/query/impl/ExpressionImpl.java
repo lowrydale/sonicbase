@@ -1702,9 +1702,14 @@ public abstract class ExpressionImpl implements Expression {
             if (currRetRecords.length > 0) {
               for (int k = 0; k < currRetRecords.length; k++) {
                 byte[] recordBytes = (byte[])records.getArray().get(k);
-                currRetRecords[k] = new Record(dbName, client.getCommon(), recordBytes);
-                if (debug) {
-                  System.out.println("hit record: shard=" + calledShard + ", replica=" + replica);
+                try {
+                  currRetRecords[k] = new Record(dbName, client.getCommon(), recordBytes);
+                  if (debug) {
+                    System.out.println("hit record: shard=" + calledShard + ", replica=" + replica);
+                  }
+                }
+                catch (Exception e) {
+                  throw e;
                 }
               }
             }

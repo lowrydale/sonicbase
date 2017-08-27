@@ -94,6 +94,14 @@ public class NettyServer {
     public long getSequence1() {
       return sequence1;
     }
+
+    public void setSequence0(long sequence0) {
+      this.sequence0 = sequence0;
+    }
+
+    public void setSequence1(long sequence1) {
+      this.sequence1 = sequence1;
+    }
   }
 
   public NettyServer() {
@@ -905,6 +913,8 @@ public class NettyServer {
               //}
               logger.info("applying queues");
               databaseServer.getLogManager().applyQueues();
+
+              databaseServer.getDeleteManager().forceDeletes();
 
               logger.info("running snapshot loop");
               databaseServer.getSnapshotManager().runSnapshotLoop();

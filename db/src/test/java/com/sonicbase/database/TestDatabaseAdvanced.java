@@ -663,7 +663,7 @@ public class TestDatabaseAdvanced {
     assertEquals(ret.getLong("id2"), 2);
     assertEquals(ret.getLong("minValue"), 1);
     assertEquals(ret.getLong("maxValue"), 1);
-    assertEquals(ret.getLong("sumValue"), 1);
+    assertEquals(ret.getLong("sumValue"), 2);
     assertEquals(ret.getLong("avgValue"), 1);
     assertFalse(ret.next());
   }

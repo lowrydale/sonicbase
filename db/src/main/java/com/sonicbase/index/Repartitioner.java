@@ -1330,8 +1330,10 @@ public class Repartitioner extends Thread {
         }
         finally {
           for (MoveProcessor moveProcessor : moveProcessors) {
-            moveProcessor.await();
-            moveProcessor.shutdown();
+            if (moveProcessor != null) {
+              moveProcessor.await();
+              moveProcessor.shutdown();
+            }
           }
           //databaseServer.getDeleteManager().saveDeletes(dbName, tableName, indexName, keysToDelete);
           deleteRecordsOnOtherReplicas(dbName, tableName, indexName, keysToDelete);
@@ -1821,7 +1823,7 @@ public class Repartitioner extends Thread {
         TableSchema tableSchema = common.getTables(dbName).get(tableName);
         Index index = databaseServer.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexName);
         IndexSchema indexSchema = common.getTables(dbName).get(tableName).getIndices().get(indexName);
-        databaseServer.getUpdateManager().doInsertKeys(moveRequests, index, tableName, indexSchema);
+        databaseServer.getUpdateManager().doInsertKeys(dbName, moveRequests, index, tableName, indexSchema);
 
       return null;
     }

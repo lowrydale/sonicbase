@@ -826,6 +826,8 @@ public class LogManager {
       NettyServer.Request ret = new NettyServer.Request();
       ret.setCommand(command);
       ret.setBody(buffer);
+      ret.setSequence0(sequence0);
+      ret.setSequence1(sequence1);
       return ret;
     }
 
@@ -866,7 +868,10 @@ public class LogManager {
     allCurrentSources.clear();
     synchronized (logLock) {
       File[] files = dataRootDir.listFiles();
-      if (files != null) {
+      if (files == null) {
+        logger.warn("No files to restore: shard=" + server.getShard() + ", replica=" + server.getReplica());
+      }
+      else {
         final AtomicInteger countProcessed = new AtomicInteger();
         logger.info("applyQueues - begin: fileCount=" + files.length);
         List<LogSource> sources = new ArrayList<>();
@@ -1031,6 +1036,9 @@ public class LogManager {
             catch (InterruptedException e) {
               throw new DatabaseException(e);
             }
+          }
+          if (countFinished.get() == 0) {
+            logger.info("Processed no commands: shard=" + server.getShard() + ", replica=" + server.getReplica());
           }
         }
         finally {

@@ -55,7 +55,7 @@ public class DeleteManager {
     }
   }
 
-  public void doDeletes() {
+  public void doDeletes(boolean ignoreVersion) {
     try {
       synchronized (this) {
         File dir = getReplicaRoot();
@@ -75,7 +75,7 @@ public class DeleteManager {
               TableSchema tableSchema = databaseServer.getCommon().getTables(dbName).get(tableName);
               String indexName = in.readUTF();
               long schemaVersionToDeleteAt = in.readLong();
-              if (schemaVersionToDeleteAt > databaseServer.getCommon().getSchemaVersion()) {
+              if (!ignoreVersion && schemaVersionToDeleteAt > databaseServer.getCommon().getSchemaVersion()) {
                 return;
               }
               final Index index = databaseServer.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
@@ -177,7 +177,7 @@ public class DeleteManager {
         while (true) {
           try {
             Thread.sleep(2_000);
-            doDeletes();
+            doDeletes(false);
           }
           catch (Exception e) {
             logger.error("Error procesing deletes file", e);
@@ -262,7 +262,7 @@ public class DeleteManager {
         if (files == null || files.length == 0) {
           return;
         }
-        doDeletes();
+        doDeletes(true);
       }
     }
   }

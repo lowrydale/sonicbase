@@ -298,7 +298,13 @@ public class UpdateManager {
       long serializationVersion = cobj.getLong(ComObject.Tag.serializationVersion);
 
       String tableName = server.getCommon().getTablesById(dbName).get(cobj.getInt(ComObject.Tag.tableId)).getName();
-      String indexName = server.getCommon().getTablesById(dbName).get(cobj.getInt(ComObject.Tag.tableId)).getIndexesById().get(cobj.getInt(ComObject.Tag.indexId)).getName();
+      String indexName = null;
+      try {
+        indexName = server.getCommon().getTablesById(dbName).get(cobj.getInt(ComObject.Tag.tableId)).getIndexesById().get(cobj.getInt(ComObject.Tag.indexId)).getName();
+      }
+      catch (Exception e) {
+        throw e;
+      }
       boolean isExplicitTrans = outerCobj.getBoolean(ComObject.Tag.isExcpliciteTrans);
 
       long transactionId = outerCobj.getLong(ComObject.Tag.transactionId);
@@ -584,7 +590,13 @@ public class UpdateManager {
       }
 
       TableSchema tableSchema = server.getCommon().getTablesById(dbName).get(cobj.getInt(ComObject.Tag.tableId));
-      IndexSchema indexSchema = tableSchema.getIndexesById().get(cobj.getInt(ComObject.Tag.indexId));
+      IndexSchema indexSchema = null;
+      try {
+        indexSchema = tableSchema.getIndexesById().get(cobj.getInt(ComObject.Tag.indexId));
+      }
+      catch (Exception e) {
+        throw e;
+      }
       String tableName = tableSchema.getName();
       String indexName = indexSchema.getName();
       long id = cobj.getLong(ComObject.Tag.id);
@@ -623,7 +635,7 @@ public class UpdateManager {
 //        if (null != index.get(primaryKey)) {
 //          alreadyExisted = true;
 //        }
-        doInsertKey(id, recordBytes, primaryKey, index, tableSchema.getName(), indexName, replayedCommand);
+        doInsertKey(dbName, id, recordBytes, primaryKey, index, tableSchema.getName(), indexName, replayedCommand);
 
         int selectedShard = selectedShards.get(0);
         if (indexSchema.getCurrPartitions()[selectedShard].getShardOwning() != server.getShard()) {
@@ -675,7 +687,7 @@ public class UpdateManager {
 
           if (indexSchema.getCurrPartitions()[selectedShards.get(0)].getShardOwning() != server.getShard()) {
             if (server.getRepartitioner().undeleteIndexEntry(dbName, tableName, indexName, primaryKey, recordBytes)) {
-              doInsertKey(id, recordBytes, primaryKey, index, tableSchema.getName(), indexName, replayedCommand);
+              doInsertKey(dbName, id, recordBytes, primaryKey, index, tableSchema.getName(), indexName, replayedCommand);
             }
           }
         }
@@ -872,8 +884,8 @@ public class UpdateManager {
   }
 
   private void doInsertKey(
-      long id, byte[] recordBytes, Object[] key, Index index, String tableName, String indexName, boolean ignoreDuplicates) throws IOException, DatabaseException {
-    doActualInsertKeyWithRecord(recordBytes, key, index, tableName, indexName, ignoreDuplicates);
+      String dbName, long id, byte[] recordBytes, Object[] key, Index index, String tableName, String indexName, boolean ignoreDuplicates) throws IOException, DatabaseException {
+    doActualInsertKeyWithRecord(dbName, recordBytes, key, index, tableName, indexName, ignoreDuplicates);
   }
 
   private void doInsertKey(Object[] key, byte[] primaryKeyBytes, String tableName, Index index, IndexSchema indexSchema) {
@@ -888,6 +900,7 @@ public class UpdateManager {
   }
 
   public void doInsertKeys(
+      String dbName,
       List<Repartitioner.MoveRequest> moveRequests, Index index, String tableName, IndexSchema indexSchema) {
     //    ArrayBlockingQueue<Entry> existing = insertQueue.computeIfAbsent(index, k -> new ArrayBlockingQueue<>(1000));
     //    insertThreads.computeIfAbsent(index, k -> createThread(index));
@@ -896,7 +909,7 @@ public class UpdateManager {
       for (Repartitioner.MoveRequest moveRequest : moveRequests) {
         byte[][] content = moveRequest.getContent();
         for (int i = 0; i < content.length; i++) {
-          doActualInsertKeyWithRecord(content[i], moveRequest.getKey(), index, tableName, indexSchema.getName(), true);
+          doActualInsertKeyWithRecord(dbName, content[i], moveRequest.getKey(), index, tableName, indexSchema.getName(), true);
         }
       }
     }
@@ -962,6 +975,7 @@ public class UpdateManager {
    */
 
   private void doActualInsertKeyWithRecord(
+      String dbName,
       byte[] recordBytes, Object[] key, Index index, String tableName, String indexName, boolean ignoreDuplicates) {
 //    int fieldCount = index.getComparators().length;
 //    if (fieldCount != key.length) {

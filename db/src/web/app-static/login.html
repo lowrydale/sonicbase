@@ -35,10 +35,11 @@
                 statusCode: {
                     401: function() {
                         alert("Invalid credentials");
-                        //alert('Email already in use');
+                        window.location.href = "/app-static/login.html";
                     },
                     404: function() {
                         alert("Invalid credentials");
+                        window.location.href = "/app-static/login.html";
                     },
                     500: function() {
                         alert("Server error");

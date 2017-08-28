@@ -52,6 +52,7 @@
 
                     if (xhr.status == 401) {
                         alert("Session has timed out. Please login again.");
+                        window.location.href = "/app-static/login.html";
                     }
                     else {
                         // revert to default
@@ -121,6 +122,7 @@
 
                     if (xhr.status == 401) {
                         alert("Session has timed out. Please login again.");
+                        window.location.href = "/app-static/login.html";
                     }
                     else if (xhr.status == 500) {
                         alert("Server error");
@@ -205,7 +207,7 @@
                             <div class="mylink">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.2.1&nbsp;&nbsp;<a href='https://sonicbase-downloads.s3.amazonaws.com/sonicbase-1.2.1.tgz'>tgz</a></div>
                         </td>
                         <td>
-                            &nbsp;&nbsp;&nbsp;&nbsp;8/25/2017<br/>
+                            &nbsp;&nbsp;&nbsp;&nbsp;8/27/2017<br/>
                             &nbsp;&nbsp;&nbsp;&nbsp;8/18/2017<br/>
                             &nbsp;&nbsp;&nbsp;&nbsp;8/10/2017<br/>
                             &nbsp;&nbsp;&nbsp;&nbsp;6/31/2017<br/>

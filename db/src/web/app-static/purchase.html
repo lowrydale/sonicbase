@@ -38,6 +38,7 @@
                 statusCode: {
                     401: function() {
                         alert("Session has timed out. Please login again.");
+                        window.location.href = "/app-static/login.html";
                     }
                 }
             });

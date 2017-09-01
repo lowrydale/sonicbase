@@ -157,9 +157,21 @@ public abstract class ExpressionImpl implements Expression {
 
       byte[] minKeyBytes = retObj.getByteArray(ComObject.Tag.minKey);
       byte[] maxKeyBytes = retObj.getByteArray(ComObject.Tag.maxKey);
-      Counter minCounter = getCounterValue(common, client, dbName, counter, minKeyBytes, false);
-      Counter maxCounter = getCounterValue(common, client, dbName, counter, maxKeyBytes, false);
 
+      Counter minCounter = null;
+      if (minKeyBytes != null) {
+        minCounter = getCounterValue(common, client, dbName, counter, minKeyBytes, false);
+      }
+      else {
+        minCounter = new Counter();
+      }
+      Counter maxCounter = null;
+      if (maxKeyBytes != null) {
+        maxCounter = getCounterValue(common, client, dbName, counter, maxKeyBytes, false);
+      }
+      else {
+        maxCounter = new Counter();
+      }
 
       if (lastCounter != null) {
         Long maxLong = maxCounter.getMaxLong();

@@ -2868,18 +2868,18 @@ public class DatabaseClient {
           }
         }
 
-        if (keyInfo.indexSchema.getValue().isPrimaryKey()) {
-          if (!keyInfo.currAndLastMatch) {
-            if (keyInfo.isCurrPartition()) {
-              record.setDbViewNumber(common.getSchemaVersion());
-              record.setDbViewFlags(Record.DB_VIEW_FLAG_ADDING);
-            }
-            else {
-              record.setDbViewFlags(Record.DB_VIEW_FLAG_DELETING);
-              record.setDbViewNumber(common.getSchemaVersion() - 1);
-            }
-          }
-        }
+//        if (keyInfo.indexSchema.getValue().isPrimaryKey()) {
+//          if (!keyInfo.currAndLastMatch) {
+//            if (keyInfo.isCurrPartition()) {
+//              record.setDbViewNumber(common.getSchemaVersion());
+//              record.setDbViewFlags(Record.DB_VIEW_FLAG_ADDING);
+//            }
+//            else {
+//              record.setDbViewFlags(Record.DB_VIEW_FLAG_ADDING);
+//              record.setDbViewNumber(common.getSchemaVersion() - 1);
+//            }
+//          }
+//        }
         PreparedInsert insert = new PreparedInsert();
         insert.dbName = dbName;
         insert.keyInfo = keyInfo;

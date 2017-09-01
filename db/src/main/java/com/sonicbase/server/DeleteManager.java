@@ -3,6 +3,7 @@ package com.sonicbase.server;
 import com.sonicbase.common.AWSClient;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.Logger;
+import com.sonicbase.common.Record;
 import com.sonicbase.index.Index;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.TableSchema;
@@ -99,9 +100,13 @@ public class DeleteManager {
                       final List<Object> toFreeBatch = new ArrayList<>();
                       for (Object[] currKey : currBatch) {
                         synchronized (index.getMutex(currKey)) {
-                          Object toFree = index.remove(currKey);
-                          if (toFree != null) {
-                            toFreeBatch.add(toFree);
+                          Object value = index.get(currKey);
+                          byte[][] content = databaseServer.fromUnsafeToRecords(value);
+                          if ((Record.DB_VIEW_FLAG_DELETING & Record.getDbViewFlags(content[0])) != 0) {
+                            Object toFree = index.remove(currKey);
+                            if (toFree != null) {
+                              toFreeBatch.add(toFree);
+                            }
                           }
                         }
                       }
@@ -112,11 +117,16 @@ public class DeleteManager {
                 }
               }
               final List<Object> toFreeBatch = new ArrayList<>();
-              for (Object[] key : batch) {
-                Object toFree = index.remove(key);
-                //index.remove(key);
-                if (toFree != null) {
-                  toFreeBatch.add(toFree);
+              for (Object[] currKey : batch) {
+                synchronized (index.getMutex(currKey)) {
+                  Object value = index.get(currKey);
+                  byte[][] content = databaseServer.fromUnsafeToRecords(value);
+                  if ((Record.DB_VIEW_FLAG_DELETING & Record.getDbViewFlags(content[0])) != 0) {
+                    Object toFree = index.remove(currKey);
+                    if (toFree != null) {
+                      toFreeBatch.add(toFree);
+                    }
+                  }
                 }
               }
               doFreeMemory(toFreeBatch);

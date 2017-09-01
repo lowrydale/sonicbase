@@ -1714,16 +1714,16 @@ public class ReadManager {
         for (byte[] bytes : records) {
           long dbViewNum = Record.getDbViewNumber(bytes);
           long dbViewFlags = Record.getDbViewFlags(bytes);
-          //todo: is this right?
-          if (/*dbViewNum <= viewVersion &&*/ (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
+          if (dbViewNum <= viewVersion && (dbViewFlags & Record.DB_VIEW_FLAG_ADDING) != 0) {
             remaining.add(bytes);
           }
-          else if (dbViewNum <= viewVersion) {
+          else if (dbViewNum >= viewVersion && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
             remaining.add(bytes);
           }
-          else if (//dbViewNum < server.getCommon().getSchema().getVersion()  ||
-              (dbViewFlags & Record.DB_VIEW_FLAG_ADDING) == 0
-              ) {
+//          else if (dbViewNum < (viewVersion + 1) && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
+//            remaining.add(bytes);
+//          }
+          else if ((dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
             remaining.add(bytes);
           }
         }
@@ -1744,22 +1744,29 @@ public class ReadManager {
 //
 //                    }
 //                    else
-            //todo: is this right
-              if (/*dbViewNum <= viewVersion &&*/ (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
+            if (dbViewNum <= viewVersion && (dbViewFlags & Record.DB_VIEW_FLAG_ADDING) != 0) {
               remaining.add(bytes);
             }
-            else if (dbViewNum == server.getSchemaVersion() ||
-                (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
-              //        remaining.add(bytes);
+            else if (dbViewNum >= viewVersion && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
+              remaining.add(bytes);
             }
-            else if ((dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
-              synchronized (index.getMutex(key)) {
-                Object unsafeAddress = index.remove(key);
-                if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
-                  server.freeUnsafeIds(unsafeAddress);
-                }
-              }
+//            else if (dbViewNum < (viewVersion + 1) && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
+//              remaining.add(bytes);
+//            }
+            else if ((dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
+              remaining.add(bytes);
             }
+//            else {
+//              remaining.add(bytes);
+//            }
+//          else if ((dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
+//            synchronized (index.getMutex(key)) {
+//              Object unsafeAddress = index.remove(key);
+//              if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
+//                server.freeUnsafeIds(unsafeAddress);
+//              }
+//            }
+//          }
           }
           if (remaining.size() == 0) {
             records = null;
@@ -1791,25 +1798,29 @@ public class ReadManager {
         for (byte[] bytes : records) {
           long dbViewNum = Record.getDbViewNumber(bytes);
           long dbViewFlags = Record.getDbViewFlags(bytes);
-//                    if (dbViewNum > viewVersion && (dbViewFlags & Record.DB_VIEW_FLAG_ADDING) != 0) {
-//
-//                    }
-//                    else
-          if (dbViewNum <= viewVersion && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
+          if (dbViewNum <= viewVersion && (dbViewFlags & Record.DB_VIEW_FLAG_ADDING) != 0) {
             remaining.add(bytes);
           }
-          else if (dbViewNum == server.getSchemaVersion() ||
-              (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
-            //        remaining.add(bytes);
+          else if (dbViewNum >= viewVersion && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
+            remaining.add(bytes);
           }
-          else if ((dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
-            synchronized (index.getMutex(key)) {
-              Object unsafeAddress = index.remove(key);
-              if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
-                server.freeUnsafeIds(unsafeAddress);
-              }
-            }
+//          else if (dbViewNum < (viewVersion + 1) && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
+//            remaining.add(bytes);
+//          }
+          else if ((dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
+            remaining.add(bytes);
           }
+//          else {
+//            remaining.add(bytes);
+//          }
+//          else if ((dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
+//            synchronized (index.getMutex(key)) {
+//              Object unsafeAddress = index.remove(key);
+//              if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
+//                server.freeUnsafeIds(unsafeAddress);
+//              }
+//            }
+//          }
         }
         if (remaining.size() == 0) {
           records = null;
@@ -1874,6 +1885,7 @@ public class ReadManager {
         if (indexSchema.getFields()[0].equals(columnName)) {
           isPrimaryKey = indexSchema.isPrimaryKey();
           indexName = indexSchema.getName();
+          //break;
         }
       }
       byte[] maxKey = null;
@@ -1921,9 +1933,16 @@ public class ReadManager {
           }
         }
       }
+      if (minKey == null || maxKey == null) {
+        logger.error("minkey==null || maxkey==null");
+      }
       ComObject retObj = new ComObject();
-      retObj.put(ComObject.Tag.minKey, minKey);
-      retObj.put(ComObject.Tag.maxKey, maxKey);
+      if (minKey != null) {
+        retObj.put(ComObject.Tag.minKey, minKey);
+      }
+      if (maxKey != null) {
+        retObj.put(ComObject.Tag.maxKey, maxKey);
+      }
       retObj.put(ComObject.Tag.legacyCounter, counter.serialize());
       return retObj;
     }

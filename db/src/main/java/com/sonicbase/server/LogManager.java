@@ -694,7 +694,7 @@ public class LogManager {
     return new File(server.getDataDir(), "queue/" + server.getShard() + "/" + server.getReplica());
   }
 
-  class ByteCounterStream extends InputStream {
+  public static class ByteCounterStream extends InputStream {
     long count;
     private final InputStream in;
 
@@ -705,6 +705,10 @@ public class LogManager {
     public int read() throws IOException {
       count++;
       return in.read();
+    }
+
+    public long getCount() {
+      return count;
     }
   }
 

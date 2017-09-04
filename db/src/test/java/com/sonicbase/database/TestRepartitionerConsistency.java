@@ -3,8 +3,10 @@ package com.sonicbase.database;
 
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.DatabaseCommon;
+import com.sonicbase.common.Record;
 import com.sonicbase.index.Index;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
+import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
@@ -87,7 +89,7 @@ public class TestRepartitionerConsistency {
 
       client = ((ConnectionProxy) conn).getDatabaseClient();
 
-      client.setPageSize(3);
+      //client.setPageSize(3);
 
       PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
       stmt.executeUpdate();
@@ -165,24 +167,48 @@ public class TestRepartitionerConsistency {
               long highest = highestId.get();
               lastHighest = highest;
               for (int i = 0; i < highest; i++) {
-                rs.next();
-                long id = rs.getLong("id");
+                //Thread.sleep(1);
+                long id = -1;
+//                rs.next();
+                if (!rs.next()) {
+                  System.out.println("didn't reach end: " + i);
+                }
+                else {
+                  id = rs.getLong("id");
+                }
                 if (id != i) {
                   IndexSchema schema = dbServers[0].getCommon().getTables("test").get("persons").getIndexes().get("_1__primarykey");
                   Index index0 = dbServers[0].getIndices().get("test").getIndices().get("persons").get("_1__primarykey");
                   Index index1 = dbServers[2].getIndices().get("test").getIndices().get("persons").get("_1__primarykey");
+                  Index index0_1 = dbServers[1].getIndices().get("test").getIndices().get("persons").get("_1__primarykey");
+                  Index index1_1 = dbServers[3].getIndices().get("test").getIndices().get("persons").get("_1__primarykey");
 
+                  String debug0 = getRecordDebug(i, index0, dbServers[0]);
+                  String debug1 = getRecordDebug(i, index1, dbServers[2]);
+                  String debug0_1 = getRecordDebug(i, index0_1, dbServers[1]);
+                  String debug1_1 = getRecordDebug(i, index1_1, dbServers[3]);
+                  String debuglast0 = getRecordDebug((long)index0.lastEntry().getKey()[0], index0, dbServers[0]);
+                  String debuglast1 = index1.lastEntry() == null ? "" : getRecordDebug((long)index1.lastEntry().getKey()[0], index1, dbServers[2]);
+                  String debugId0 = getRecordDebug(id, index0, dbServers[0]);
+                  String debugId1 = getRecordDebug(id, index1, dbServers[2]);
                   TableSchema.Partition[] partitions = schema.getCurrPartitions();
-                  System.out.println("upperKey=" + DatabaseCommon.keyToString(partitions[0].getUpperKey()) +
+                  TableSchema.Partition[] lastPartitions = schema.getLastPartitions();
+                  System.out.println("schemaVersion=" + dbServers[0].getSchemaVersion() + ", lastUpperKey=" + (lastPartitions == null ? "null" : DatabaseCommon.keyToString(lastPartitions[0].getUpperKey())) +
+                      ", upperKey=" + DatabaseCommon.keyToString(partitions[0].getUpperKey()) +
                     ", last0=" + DatabaseCommon.keyToString(index0.lastEntry().getKey()) + ", shard0=" + dbServers[0].getShard() +
-                      ", last1=" + DatabaseCommon.keyToString(index1.lastEntry().getKey()) + ", shard1=" + dbServers[2].getShard() +
+                      ", lastRecord0=" + debuglast0 +
+                      ", last1=" + (index1.lastEntry() == null ? "" : DatabaseCommon.keyToString(index1.lastEntry().getKey())) + ", shard1=" + dbServers[2].getShard() +
+                      ", lastRecord1=" + debuglast1 +
                   ", first0=" + DatabaseCommon.keyToString(index0.firstEntry().getKey()) + ", shard0=" + dbServers[0].getShard() +
-                      ", first1=" + DatabaseCommon.keyToString(index1.firstEntry().getKey()) + ", shard1=" + dbServers[2].getShard());
+                      ", first1=" + (index1.firstEntry() == null ? "" : DatabaseCommon.keyToString(index1.firstEntry().getKey())) + ", shard1=" + dbServers[2].getShard() +
+                    ", size0=" + index0.size() + ", size1=" + index1.size() + ", nextRecord0: " + debug0 + ", nextRecord1=" + debug1 +
+                      ", nextRecord0_1: " + debug0_1 + ", nextRecord1_1=" + debug1_1 +
+                      ", foundRecord0: " + debugId0 + ", foundRecord1=" + debugId1);
 
                   throw new Exception(id + " != " + i);
                 }
               }
-              System.out.println("finished range");
+              System.out.println("finished range: " + lastHighest);
             }
             catch (Exception e) {
               try {
@@ -205,6 +231,49 @@ public class TestRepartitionerConsistency {
     catch (Exception e) {
       e.printStackTrace();
     }
+  }
+
+  private String getRecordDebug(long i, Index index1, DatabaseServer dbServer) {
+    String debug = "recordNotFound=" + i;
+    Object[] key = new Object[]{(long)i};
+    synchronized (index1.getMutex(key)) {
+      Object value = index1.get(key);
+      if (value != null && !value.equals(0L)) {
+        debug = "recordFound=" + i;
+        byte[][] bytes = dbServer.fromUnsafeToRecords(value);
+        if (bytes == null) {
+//          while (bytes == null) {
+//            System.out.println("nullRecord value=" + value);
+//            try {
+//              Thread.sleep(100);
+//            }
+//            catch (InterruptedException e) {
+//              e.printStackTrace();
+//            }
+//            value = index1.get(key);
+//            if (value != null && !value.equals(0L)) {
+//              bytes = dbServers[0].fromUnsafeToRecords(value);
+//            }
+//          }
+
+          debug += ", nullRecord";
+        }
+        else {
+          if (bytes.length > 1) {
+            throw new DatabaseException("More than one record");
+          }
+          long flags = Record.getDbViewFlags(bytes[0]);
+          if ((flags & Record.DB_VIEW_FLAG_DELETING) != 0) {
+            debug += ", flag=deleting";
+          }
+          if ((flags & Record.DB_VIEW_FLAG_ADDING) != 0) {
+            debug += ", flag=adding";
+          }
+          debug += ", ver=" + Record.getDbViewNumber(bytes[0]);
+        }
+      }
+    }
+    return debug;
   }
 
 }

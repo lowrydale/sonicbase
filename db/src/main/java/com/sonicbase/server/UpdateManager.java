@@ -139,7 +139,7 @@ public class UpdateManager {
               if (tableSchema.getFields().get(0).getName().equals("_id")) {
                 id = (long) record.getFields()[0];
               }
-              List<DatabaseClient.KeyInfo> keys = server.getDatabaseClient().getKeys(tableSchema, columnNames, values, id);
+              List<DatabaseClient.KeyInfo> keys = server.getDatabaseClient().getKeys(server.getCommon(), tableSchema, columnNames, values, id);
 
               for (final DatabaseClient.KeyInfo keyInfo : keys) {
                 if (keyInfo.getIndexSchema().getValue().isPrimaryKey()) {
@@ -960,8 +960,8 @@ public class UpdateManager {
           System.arraycopy(records, 0, newRecords, 0, records.length);
           newRecords[newRecords.length - 1] = primaryKeyBytes;
           Object address = server.toUnsafeFromRecords(newRecords);
-          server.freeUnsafeIds(existingValue);
           index.put(key, address);
+          server.freeUnsafeIds(existingValue);
         }
       }
       if (existingValue == null) {

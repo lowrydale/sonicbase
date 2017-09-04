@@ -1,6 +1,7 @@
 package com.sonicbase.database;
 
 import com.sonicbase.common.DatabaseCommon;
+import com.sonicbase.common.Record;
 import com.sonicbase.index.Index;
 import com.sonicbase.util.ISO8601;
 import org.testng.annotations.Test;
@@ -136,5 +137,17 @@ public class TestLite {
       Thread.sleep(200000);
     }
 
+  }
+
+  @Test
+  public void testRecord() {
+    byte[] bytes = new byte[100];
+    Record.setDbViewNumber(bytes, 100);
+
+    assertEquals(Record.getDbViewNumber(bytes), 100);
+
+    Record.setDbViewFlags(bytes, (short)1);
+
+    assertEquals(Record.getDbViewFlags(bytes), 1);
   }
 }

@@ -13,6 +13,9 @@ import org.apache.commons.io.FileUtils;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Created by lowryda on 5/15/17.
@@ -29,6 +32,9 @@ public class DeleteManager {
   public DeleteManager(DatabaseServer databaseServer) {
     this.databaseServer = databaseServer;
     logger = new Logger(databaseServer.getDatabaseClient());
+    this.executor = new ThreadPoolExecutor(Runtime.getRuntime().availableProcessors() * 2,
+        Runtime.getRuntime().availableProcessors() * 2, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+    this.freeExecutor = new ThreadPoolExecutor(4, 4, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
   }
 
   public void saveDeletes(String dbName, String tableName, String indexName, ConcurrentLinkedQueue<Object[]> keysToDelete) {
@@ -56,6 +62,8 @@ public class DeleteManager {
     }
   }
 
+  private AtomicReference<LogManager.ByteCounterStream> counterStream = new AtomicReference<>();
+
   public void doDeletes(boolean ignoreVersion) {
     try {
       synchronized (this) {
@@ -70,7 +78,8 @@ public class DeleteManager {
               }
             });
             List<Future> futures = new ArrayList<>();
-            try (DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(files[0])))) {
+            counterStream.set(new LogManager.ByteCounterStream(new FileInputStream(files[0])));
+            try (DataInputStream in = new DataInputStream(new BufferedInputStream(counterStream.get()))) {
               String dbName = in.readUTF();
               String tableName = in.readUTF();
               TableSchema tableSchema = databaseServer.getCommon().getTables(dbName).get(tableName);
@@ -81,14 +90,23 @@ public class DeleteManager {
               }
               final Index index = databaseServer.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
               List<Object[]> batch = new ArrayList<>();
+              int errorsInARow = 0;
               while (true) {
                 Object[] key = null;
                 try {
                    key = DatabaseCommon.deserializeKey(tableSchema, in);
+                   errorsInARow = 0;
                 }
                 catch (EOFException e) {
                   //expected
                   break;
+                }
+                catch (Exception e) {
+                  logger.error("Error deserializing key", e);
+                  if (errorsInARow++ > 20) {
+                    break;
+                  }
+                  continue;
                 }
                 batch.add(key);
                 if (batch.size() > 100_000) {
@@ -102,10 +120,13 @@ public class DeleteManager {
                         synchronized (index.getMutex(currKey)) {
                           Object value = index.get(currKey);
                           byte[][] content = databaseServer.fromUnsafeToRecords(value);
-                          if ((Record.DB_VIEW_FLAG_DELETING & Record.getDbViewFlags(content[0])) != 0) {
-                            Object toFree = index.remove(currKey);
-                            if (toFree != null) {
-                              toFreeBatch.add(toFree);
+                          if (content != null) {
+                            if ((Record.DB_VIEW_FLAG_DELETING & Record.getDbViewFlags(content[0])) != 0) {
+                              Object toFree = index.remove(currKey);
+                              if (toFree != null) {
+                                //  toFreeBatch.add(toFree);
+                                databaseServer.freeUnsafeIds(toFree);
+                              }
                             }
                           }
                         }
@@ -121,10 +142,13 @@ public class DeleteManager {
                 synchronized (index.getMutex(currKey)) {
                   Object value = index.get(currKey);
                   byte[][] content = databaseServer.fromUnsafeToRecords(value);
-                  if ((Record.DB_VIEW_FLAG_DELETING & Record.getDbViewFlags(content[0])) != 0) {
-                    Object toFree = index.remove(currKey);
-                    if (toFree != null) {
-                      toFreeBatch.add(toFree);
+                  if (content != null) {
+                    if ((Record.DB_VIEW_FLAG_DELETING & Record.getDbViewFlags(content[0])) != 0) {
+                      Object toFree = index.remove(currKey);
+                      if (toFree != null) {
+                        //toFreeBatch.add(toFree);
+                        databaseServer.freeUnsafeIds(toFree);
+                      }
                     }
                   }
                 }
@@ -135,6 +159,8 @@ public class DeleteManager {
             for (Future future : futures) {
               future.get();
             }
+            bytesRead.addAndGet(counterStream.get().getCount());
+            counterStream.set(null);
             files[0].delete();
           }
         }
@@ -177,9 +203,6 @@ public class DeleteManager {
   }
 
   public void start() {
-    this.executor = new ThreadPoolExecutor(Runtime.getRuntime().availableProcessors() * 2,
-        Runtime.getRuntime().availableProcessors() * 2, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
-    this.freeExecutor = new ThreadPoolExecutor(4, 4, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
     mainThread = new Thread(new Runnable() {
       @Override
@@ -264,16 +287,51 @@ public class DeleteManager {
     }
   }
 
+  private long totalBytes = 0;
+  private AtomicLong bytesRead = new AtomicLong();
+
+  public double getPercentDeleteComplete() {
+
+    if (totalBytes == 0) {
+      return 0;
+    }
+    LogManager.ByteCounterStream stream = counterStream.get();
+    long readBytes = bytesRead.get();
+    if (stream != null) {
+      readBytes += stream.getCount();
+    }
+
+    return (double)readBytes / (double)totalBytes;
+  }
+
+  private AtomicBoolean isForcingDeletes = new AtomicBoolean();
+
+  public boolean isForcingDeletes() {
+    return isForcingDeletes.get();
+  }
+
   public void forceDeletes() {
     File dir = getReplicaRoot();
-    if (dir.exists()) {
-      while (true) {
+    totalBytes = 0;
+    bytesRead.set(0);
+    isForcingDeletes.set(true);
+    try {
+      if (dir.exists()) {
         File[] files = dir.listFiles();
-        if (files == null || files.length == 0) {
-          return;
+        for (File file : files) {
+          totalBytes += file.length();
         }
-        doDeletes(true);
+        while (true) {
+          files = dir.listFiles();
+          if (files == null || files.length == 0) {
+            return;
+          }
+          doDeletes(true);
+        }
       }
+    }
+    finally {
+      isForcingDeletes.set(false);
     }
   }
 }

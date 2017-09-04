@@ -655,7 +655,7 @@ public class DatabaseClient {
           if (e.getCause() instanceof SchemaOutOfSyncException) {
             synchronized (mutex) {
               for (PreparedInsert insert : withRecordPrepared) {
-                List<KeyInfo> keys = getKeys(common.getTables(insert.dbName).get(insert.tableSchema.getName()), insert.columnNames, insert.values, insert.id);
+                List<KeyInfo> keys = getKeys(common, common.getTables(insert.dbName).get(insert.tableSchema.getName()), insert.columnNames, insert.values, insert.id);
                 for (KeyInfo key : keys) {
                   if (key.indexSchema.getKey().equals(insert.indexName)) {
                     insert.keyInfo.shard = key.shard;
@@ -665,7 +665,7 @@ public class DatabaseClient {
               }
 
               for (PreparedInsert insert : prepared) {
-                List<KeyInfo> keys = getKeys(common.getTables(insert.dbName).get(insert.tableSchema.getName()), insert.columnNames, insert.values, insert.id);
+                List<KeyInfo> keys = getKeys(common, common.getTables(insert.dbName).get(insert.tableSchema.getName()), insert.columnNames, insert.values, insert.id);
                 for (KeyInfo key : keys) {
                   if (key.indexSchema.getKey().equals(insert.indexName)) {
                     insert.keyInfo.shard = key.shard;
@@ -2839,7 +2839,7 @@ public class DatabaseClient {
     try {
       tableSchema = common.getTables(dbName).get(tableName);
 
-      List<KeyInfo> keys = getKeys(tableSchema, columnNames, values, id);
+      List<KeyInfo> keys = getKeys(common, tableSchema, columnNames, values, id);
       if (keys.size() == 0) {
         throw new DatabaseException("key not generated for record to insert");
       }
@@ -3112,7 +3112,7 @@ public class DatabaseClient {
     }
   }
 
-  public List<KeyInfo> getKeys(TableSchema tableSchema, List<String> columnNames, List<Object> values, long id) {
+  public static List<KeyInfo> getKeys(DatabaseCommon common, TableSchema tableSchema, List<String> columnNames, List<Object> values, long id) {
     List<KeyInfo> ret = new ArrayList<>();
     for (Map.Entry<String, IndexSchema> indexSchema : tableSchema.getIndices().entrySet()) {
       String[] fields = indexSchema.getValue().getFields();

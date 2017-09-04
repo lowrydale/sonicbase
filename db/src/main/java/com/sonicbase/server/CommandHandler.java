@@ -657,9 +657,13 @@ public class CommandHandler {
       retObj.put(ComObject.Tag.percentComplete, snapshotManager.getPercentRecoverComplete());
       retObj.put(ComObject.Tag.stage, "recoveringSnapshot");
     }
-    else {
+    else if (!server.getDeleteManager().isForcingDeletes()) {
       retObj.put(ComObject.Tag.percentComplete, logManager.getPercentApplyQueuesComplete());
       retObj.put(ComObject.Tag.stage, "applyingLogs");
+    }
+    else {
+      retObj.put(ComObject.Tag.percentComplete, server.getDeleteManager().getPercentDeleteComplete());
+      retObj.put(ComObject.Tag.stage, "forcingDeletes");
     }
     Exception error = snapshotManager.getErrorRecovering();
     if (error != null) {

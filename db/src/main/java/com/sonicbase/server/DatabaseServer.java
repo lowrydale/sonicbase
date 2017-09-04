@@ -291,7 +291,6 @@ public class DatabaseServer {
     this.awsClient = new AWSClient(client.get());
 
     this.deleteManager = new DeleteManager(this);
-    this.deleteManager.start();
     this.updateManager = new UpdateManager(this);
     this.snapshotManager = new SnapshotManager(this);
     this.transactionManager = new TransactionManager(this);
@@ -369,7 +368,7 @@ public class DatabaseServer {
     //startMasterLicenseValidator();
     startLicenseValidator();
 
-    startMasterMonitor();
+    //startMasterMonitor();
 
     logger.info("Started server");
 
@@ -401,7 +400,7 @@ public class DatabaseServer {
     return commandHandler.getTestWriteCallCount();
   }
 
-  private void startMasterMonitor() {
+  public void startMasterMonitor() {
     if (replicationFactor == 1) {
       if (shard != 0) {
         return;
@@ -881,6 +880,7 @@ public class DatabaseServer {
     Thread checkThread = new Thread(new Runnable() {
       @Override
       public void run() {
+        int backoff = 100;
         while (true) {
           Host host = common.getServersConfig().getShards()[shard].getReplicas()[replica];
           boolean wasDead = host.dead;
@@ -898,8 +898,8 @@ public class DatabaseServer {
             break;
           }
           catch (Exception e) {
-            int index = ExceptionUtils.indexOfThrowable(e, DeadServerException.class);
-            if (-1 != index) {
+            //int index = ExceptionUtils.indexOfThrowable(e, DeadServerException.class);
+            if (e instanceof DeadServerException) {//-1 != index) {
               //if (!wasDead) {
               logger.error("Error checking health of server - dead server: shard=" + shard + ", replica=" + replica);
               //}
@@ -908,7 +908,8 @@ public class DatabaseServer {
               logger.error("Error checking health of server: shard=" + shard + ", replica=" + replica, e);
             }
             try {
-              Thread.sleep(200);
+              Thread.sleep(backoff);
+              backoff *= 2;
             }
             catch (InterruptedException e1) {
               break;
@@ -3893,14 +3894,55 @@ public class DatabaseServer {
     commandHandler.shutdown();
   }
 
-  private static class AddressMap {
+//  public static class AddressMap {
+//    private ConcurrentHashMap<Long, Long>  map = new ConcurrentHashMap<>();
+//    private AtomicLong currOuterAddress = new AtomicLong();
+//    Object[] mutex = new Object[10000];
+//
+//    public AddressMap() {
+//      for (int i = 0; i < mutex.length; i++) {
+//        mutex[i] = new Object();
+//      }
+//    }
+//
+//    public Object getMutex(long outerAddress) {
+//      return mutex[(int)(outerAddress % mutex.length)];
+//    }
+//
+//    public long addAddress(long innerAddress) {
+//      long outerAddress = currOuterAddress.incrementAndGet();
+//      if (innerAddress == 0 || innerAddress == -1L) {
+//        throw new DatabaseException("Adding invalid address");
+//      }
+//      synchronized (getMutex(outerAddress)) {
+//        map.put(outerAddress, innerAddress);
+//      }
+//      return outerAddress;
+//    }
+//
+//    public Long getAddress(long outerAddress) {
+//      synchronized (getMutex(outerAddress)) {
+//        Long ret = map.get(outerAddress);
+//        return ret;
+//      }
+//    }
+//
+//    public Long removeAddress(long outerAddress) {
+//      synchronized (getMutex(outerAddress)) {
+//        Long ret = map.remove(outerAddress);
+//        return ret;
+//      }
+//    }
+//  }
+
+  public static class AddressMap {
     private Long2LongOpenHashMap[] map = new Long2LongOpenHashMap[10_000];
     private AtomicLong currOuterAddress = new AtomicLong();
 
     public AddressMap() {
       for (int i = 0; i < map.length; i++) {
         map[i] = new Long2LongOpenHashMap();
-        map[i].defaultReturnValue(-1);
+        //map[i].defaultReturnValue(-1);
       }
     }
 
@@ -3910,6 +3952,9 @@ public class DatabaseServer {
 
     public long addAddress(long innerAddress) {
       long outerAddress = currOuterAddress.incrementAndGet();
+      if (innerAddress == 0 || innerAddress == -1) {
+        throw new DatabaseException("Adding invalid address");
+      }
       synchronized (getMutex(outerAddress)) {
         map[(int)(outerAddress % map.length)].put(outerAddress, innerAddress);
       }
@@ -3918,20 +3963,20 @@ public class DatabaseServer {
 
     public Long getAddress(long outerAddress) {
       synchronized (getMutex(outerAddress)) {
-        long ret = map[(int)(outerAddress % map.length)].get(outerAddress);
-        if (ret == -1L) {
-          return null;
-        }
+        Long ret = map[(int)(outerAddress % map.length)].get((Long)outerAddress);
+//        if (ret == -1L) {
+//          return null;
+//        }
         return ret;
       }
     }
 
     public Long removeAddress(long outerAddress) {
       synchronized (getMutex(outerAddress)) {
-        long ret = map[(int)(outerAddress % map.length)].remove(outerAddress);
-        if (ret == -1L) {
-          return null;
-        }
+        Long ret = map[(int)(outerAddress % map.length)].remove((Long)outerAddress);
+//        if (ret == -1L) {
+//          return null;
+//        }
         return ret;
       }
     }
@@ -4031,6 +4076,9 @@ public class DatabaseServer {
           unsafe.putByte(address + i, bytes[i - lenBuffer.length]);
         }
 
+        if (address == 0 || address == -1L) {
+          throw new DatabaseException("Inserted null address *****************");
+        }
         return addressMap.addAddress(address);
       }
       catch (IOException e) {
@@ -4148,6 +4196,8 @@ public class DatabaseServer {
         synchronized (addressMap.getMutex((long)obj)) {
           Long address = addressMap.getAddress((long) obj);
           if (address == null) {
+            System.out.println("null address ******************* outerAddress=" + (long)obj);
+            new Exception().printStackTrace();
             return null;
           }
 
@@ -4330,6 +4380,10 @@ public class DatabaseServer {
         unsafe.freeMemory(address);
       }
     }
+  }
+
+  public AddressMap getAddressMap() {
+    return addressMap;
   }
 
 

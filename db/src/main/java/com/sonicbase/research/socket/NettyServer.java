@@ -915,6 +915,9 @@ public class NettyServer {
               databaseServer.getLogManager().applyQueues();
 
               databaseServer.getDeleteManager().forceDeletes();
+              databaseServer.getDeleteManager().start();
+
+              databaseServer.startMasterMonitor();
 
               logger.info("running snapshot loop");
               databaseServer.getSnapshotManager().runSnapshotLoop();

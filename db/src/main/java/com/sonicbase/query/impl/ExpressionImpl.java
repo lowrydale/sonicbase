@@ -1387,6 +1387,7 @@ public abstract class ExpressionImpl implements Expression {
           throw new DatabaseException("view version not set");
           //viewVersion = common.getSchemaVersion();
         }
+
         TableSchema tableSchema = common.getTables(dbName).get(tableName);
         IndexSchema indexSchema = tableSchema.getIndexes().get(indexName);
         int originalShard = shard;
@@ -1554,7 +1555,14 @@ public abstract class ExpressionImpl implements Expression {
             prepared.lastTimeUsed = System.currentTimeMillis();
           }
 
+          Object[] lastKey = null;
+          boolean justSwitched = false;
+          int attempt = 0;
           while (true) {
+            lastKey = nextKey;
+            int lastShard = nextShard;
+            boolean switchedShards = false;
+
             boolean isPrepared = prepared.serversPrepared[localShard][replica];
             long preparedId = prepared.preparedId;
 
@@ -1679,6 +1687,7 @@ public abstract class ExpressionImpl implements Expression {
                 else {
                   if (nextKey == null) {
                     localShard = nextShard = selectedShards.get(i + 1);
+                    switchedShards = true;
                     //System.out.println("nextKey == null, nextShard=" + localShard);
                   }
                   break;
@@ -1731,6 +1740,11 @@ public abstract class ExpressionImpl implements Expression {
 
             retKeys = aggregateResults(retKeys, currRetKeys);
 
+            if (switchedShards && logger.isDebugEnabled()) {
+              //long id = (Long) currRetRecords[currRetRecords.length - 1].getFields()[tableSchema.getFieldOffset("id")];
+              logger.debug("Switched shards: id=" + (nextKey == null ? "null" : (long)nextKey[0]) +
+                  ", retLen=" + (recordRet == null ? 0 : recordRet.length) + ", count=" + count + ", nextShard=" + nextShard);
+            }
 
             Counter[] retCounters = null;
             ComArray countersArray = retObj.getArray(ComObject.Tag.counters);
@@ -1746,6 +1760,37 @@ public abstract class ExpressionImpl implements Expression {
             byte[] groupBytes = retObj.getByteArray(ComObject.Tag.legacyGroupContext);
             if (groupBytes != null) {
               groupByContext.deserialize(groupBytes, client.getCommon(), dbName);
+            }
+
+            if (attempt >= 5) {
+              attempt = 0;
+            }
+            else {
+              if (justSwitched) {
+                justSwitched = false;
+                if (groupBytes == null && countersArray == null && (currRetKeys == null || currRetKeys.length == 0) && (currRetRecords == null || currRetRecords.length == 0)) {
+                  //System.out.println("just switched, found nothing");
+                  if (true || lastKey != null) {
+                    nextShard = lastShard;
+                    nextKey = lastKey;
+                    replica = (replica + 1) % client.getReplicaCount();
+                    attempt++;
+                  }
+                }
+                else {
+                  attempt = 0;
+                }
+              }
+            }
+
+            if (switchedShards) {
+              justSwitched = true;
+            }
+
+            if (switchedShards && logger.isDebugEnabled()) {
+              long id = currRetRecords.length == 0 ? -1 : (Long) currRetRecords[currRetRecords.length - 1].getFields()[tableSchema.getFieldOffset("id")];
+              logger.debug("Switched shards: id=" + id +
+                  ", retLen=" + (recordRet == null ? 0 : recordRet.length) + ", count=" + count + ", nextShard=" + nextShard);
             }
 
             if (/*originalShard != -1 ||*/localShard == -1 || localShard == -2 || (retKeys != null && retKeys.length >= count) || (recordRet != null && recordRet.length >= count)) {

@@ -132,9 +132,8 @@ public class Record {
   }
 
   public static long getDbViewNumber(byte[] bytes) {
-    DataUtil.ResultLength resultLen = new DataUtil.ResultLength();
     int offset = 8 * 3; //sequence numbers
-    DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes, offset, bytes.length - offset));
+    DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes, offset, 8));
     try {
       return in.readLong();
     }

@@ -122,7 +122,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
               if (tableFields.get(0).getName().equals("_id")) {
                 id = (long)record.getFields()[0];
               }
-              List<DatabaseClient.KeyInfo> previousKeys = client.getKeys(tableSchema, columnNames, values, id);
+              List<DatabaseClient.KeyInfo> previousKeys = client.getKeys(client.getCommon(), tableSchema, columnNames, values, id);
 
               List<ColumnImpl> qColumns = getColumns();
               List<ExpressionImpl> setExpressions = getSetExpressions();
@@ -213,7 +213,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
 
               //update keys
 
-              List<DatabaseClient.KeyInfo> newKeys = client.getKeys(tableSchema, columnNames, values, id);
+              List<DatabaseClient.KeyInfo> newKeys = client.getKeys(client.getCommon(), tableSchema, columnNames, values, id);
 
               Map<String, ConcurrentSkipListMap<Object[], DatabaseClient.KeyInfo>> orderedKeyInfosPrevious = new HashMap<>();
               Map<String, ConcurrentSkipListMap<Object[], DatabaseClient.KeyInfo>> orderedKeyInfosNew = new HashMap<>();

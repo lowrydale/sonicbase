@@ -1036,7 +1036,7 @@ public class Repartitioner extends Thread {
     private final Index index;
     private final ConcurrentLinkedQueue<Object[]> keysToDelete;
     private final ThreadPoolExecutor executor;
-    private ArrayBlockingQueue<List<MoveRequest>> queue = new ArrayBlockingQueue<>(100000);
+    private ArrayBlockingQueue<MoveRequestList> queue = new ArrayBlockingQueue<>(100000);
     private boolean shutdown;
     private Thread thread;
     private AtomicInteger countStarted = new AtomicInteger();
@@ -1069,7 +1069,7 @@ public class Repartitioner extends Thread {
         public void run() {
           while (!shutdown) {
             try {
-              final List<MoveRequest> list = queue.poll(30000, TimeUnit.MILLISECONDS);
+              final MoveRequestList list = queue.poll(30000, TimeUnit.MILLISECONDS);
               if (list == null) {
                 continue;
               }
@@ -1080,13 +1080,14 @@ public class Repartitioner extends Thread {
                   try {
                     final List<Object> toFree = new ArrayList<>();
                     long begin = System.currentTimeMillis();
-                    moveIndexEntriesToShard(dbName, tableName, indexName, isPrimaryKey, shard, list);
-                    for (MoveRequest request : list) {
-                      if (false && request.shouldDeleteNow) {
+                    moveIndexEntriesToShard(dbName, tableName, indexName, isPrimaryKey, shard, list.moveRequests);
+                    for (MoveRequest request : list.moveRequests) {
+                      if (request.shouldDeleteNow) {
                         synchronized (index.getMutex(request.key)) {
                           Object value = index.remove(request.key);
                           if (value != null) {
-                            toFree.add(value);
+                            //toFree.add(value);
+                            databaseServer.freeUnsafeIds(value);
                           }
                         }
                       }
@@ -1110,7 +1111,7 @@ public class Repartitioner extends Thread {
 //                      }
 //                    }, 30 * 1000);
 
-                    logger.info("moved entries: table=" + tableName + ", index=" + indexName + ", count=" + list.size() +
+                    logger.info("moved entries: table=" + tableName + ", index=" + indexName + ", count=" + list.moveRequests.size() +
                         ", shard=" + shard + ", duration=" + (System.currentTimeMillis() - begin));
                   }
                   catch (Exception e) {
@@ -1119,6 +1120,7 @@ public class Repartitioner extends Thread {
                   }
                   finally {
                     countFinished.incrementAndGet();
+                    list.latch.countDown();
                   }
                 }
               });
@@ -1484,12 +1486,15 @@ public class Repartitioner extends Thread {
                 Record.setDbViewNumber(content[i], common.getSchemaVersion());
                 newContent[i] = content[i];
               }
-              toFree.add(value);
+              //toFree.add(value);
               Object newValue = databaseServer.toUnsafeFromRecords(newContent);
               index.put(key, newValue);
+              databaseServer.freeUnsafeIds(value);
             }
             else {
-              toFree.add(index.remove(key));
+              Object currValue = index.remove(key);
+              //toFree.add(currValue);
+              databaseServer.freeUnsafeIds(currValue);
             }
           }
         }
@@ -1515,6 +1520,15 @@ public class Repartitioner extends Thread {
     return null;
   }
 
+  class MoveRequestList {
+    List<MoveRequest> moveRequests;
+    CountDownLatch latch = new CountDownLatch(1);
+
+    public MoveRequestList(List<MoveRequest> list) {
+      this.moveRequests = list;
+    }
+  }
+
   private void doProcessEntries(MoveProcessor[] moveProcessors, int shardOffset, final String tableName, final String indexName,
                                 List<MapEntry> toProcess, final Index index, final IndexSchema indexSchema, final String dbName,
                                 int[] fieldOffsets, TableSchema tableSchema, ComObject cobj) {
@@ -1522,6 +1536,8 @@ public class Repartitioner extends Thread {
     for (int i = 0; i < databaseServer.getShardCount(); i++) {
       moveRequests.put(i, new ArrayList<MoveRequest>());
     }
+
+    List<MoveRequestList> lists = new ArrayList<>();
 
     int count = 0;
     int consecutiveErrors = 0;
@@ -1565,13 +1581,22 @@ public class Repartitioner extends Thread {
                     Record.setDbViewNumber(newBytes, common.getSchemaVersion());
                     newContent[i] = newBytes;
                   }
-                  toFree.add(entry.value);
-                  //databaseServer.freeUnsafeIds(entry.value);
+                  //toFree.add(entry.value);
                   Object newValue = databaseServer.toUnsafeFromRecords(newContent);
                   index.put(entry.key, newValue);
+                  databaseServer.freeUnsafeIds(entry.value);
                 }
               }
               else {
+                for (int i = 0; i < content.length; i++) {
+                  Record.setDbViewFlags(content[i], (short)0 );
+                  Record.setDbViewNumber(content[i],0);// common.getSchemaVersion() - 2);
+                }
+                //toFree.add(entry.value);
+                Object newValue = databaseServer.toUnsafeFromRecords(content);
+                index.put(entry.key, newValue);
+                databaseServer.freeUnsafeIds(entry.value);
+
                 content = null;
               }
             }
@@ -1582,14 +1607,21 @@ public class Repartitioner extends Thread {
             boolean shouldDeleteNow = false;
             if (indexSchema.isPrimaryKey()) {
               long dbViewFlags = Record.getDbViewFlags(content[0]);
-//              if (dbViewFlags == Record.DB_VIEW_FLAG_DELETING) {
-//                shouldDeleteNow = true;
-//              }
+              if (dbViewFlags == Record.DB_VIEW_FLAG_DELETING) {
+                //shouldDeleteNow = true;
+              }
             }
             list.add(new MoveRequest(entry.key, content, shouldDeleteNow));
             if (list.size() > 50000) {
+//              for (Object obj : toFree) {
+//                databaseServer.freeUnsafeIds(obj);
+//              }
+//              toFree.clear();
+
               moveRequests.put(shard, new ArrayList<MoveRequest>());
-              moveProcessors[shard].queue.put(list);
+              MoveRequestList requestList = new MoveRequestList(list);
+              lists.add(requestList);
+              moveProcessors[shard].queue.put(requestList);
             }
           }
           consecutiveErrors = 0;
@@ -1611,21 +1643,33 @@ public class Repartitioner extends Thread {
         //databaseServer.getThrottleWriteLock().unlock();
       }
     }
-    for (Object obj : toFree) {
-      databaseServer.freeUnsafeIds(obj);
-    }
 
     try {
+//      for (Object obj : toFree) {
+//        databaseServer.freeUnsafeIds(obj);
+//      }
+
       for (int i = 0; i < databaseServer.getShardCount(); i++) {
         final int shard = i;
         final List<MoveRequest> list = moveRequests.get(i);
         if (list.size() != 0) {
-          moveProcessors[shard].queue.put(list);
+          MoveRequestList requestList = new MoveRequestList(list);
+          lists.add(requestList);
+          moveProcessors[shard].queue.put(requestList);
         }
       }
     }
     catch (Exception e) {
       throw new DatabaseException(e);
+    }
+
+    for (MoveRequestList requestList : lists) {
+      try {
+        requestList.latch.await();
+      }
+      catch (InterruptedException e) {
+        throw new DatabaseException();
+      }
     }
   }
 
@@ -2327,6 +2371,37 @@ public static class GlobalIndexCounts {
         return;
       }
       while (!shutdown) {
+
+        boolean ok = false;
+        for (int shard = 0; shard < databaseServer.getShardCount(); shard++) {
+          ok = false;
+          for (int replica = 0; replica < databaseServer.getReplicationFactor(); replica++) {
+            try {
+              AtomicBoolean isHealthy = new AtomicBoolean();
+              databaseServer.checkHealthOfServer(shard, replica, isHealthy, true);
+              if (isHealthy.get()) {
+                ok = true;
+                break;
+              }
+            }
+            catch (Exception e) {
+              e.printStackTrace();
+            }
+          }
+          if (!ok) {
+            break;
+          }
+        }
+        if (!ok) {
+          try {
+            Thread.sleep(2000);
+          }
+          catch (InterruptedException e) {
+            throw new DatabaseException(e);
+          }
+          continue;
+        }
+
         try {
           for (String dbName : databaseServer.getDbNames(databaseServer.getDataDir())) {
             ComObject cobj = new ComObject();

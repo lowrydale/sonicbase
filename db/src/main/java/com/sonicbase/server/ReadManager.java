@@ -17,6 +17,7 @@ import com.sonicbase.util.DataUtil;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -584,7 +585,7 @@ public class ReadManager {
         else {
           entry = doIndexLookupTwoKeys(dbName, count, tableSchema, indexSchema, forceSelectOnServer, excludeKeys,
               originalLeftKey, leftKey, columnOffsets, originalRightKey, rightKey, leftOperator, rightOperator, parms,
-              evaluateExpression, expression, index, ascending, retKeys, retRecords, false, counters, groupContext);
+              evaluateExpression, expression, index, ascending, retKeys, retRecords, viewVersion, false, counters, groupContext);
         }
         //todo: support rightOperator
       }
@@ -597,7 +598,7 @@ public class ReadManager {
         else {
           entry = doIndexLookupTwoKeys(dbName, count, tableSchema, indexSchema, forceSelectOnServer, excludeKeys,
               originalLeftKey, leftKey, columnOffsets, originalRightKey, rightKey, leftOperator, rightOperator, parms,
-              evaluateExpression, expression, index, ascending, retKeys, retRecords, true, counters, groupContext);
+              evaluateExpression, expression, index, ascending, retKeys, retRecords, viewVersion, true, counters, groupContext);
         }
       }
 
@@ -949,7 +950,8 @@ public class ReadManager {
           boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
           if (pass) {
             byte[][] currRecords = new byte[][]{bytes};
-            records = processViewFlags(dbName, tableSchema, indexSchema, index, viewVersion, entry.getKey(), records);
+            AtomicBoolean done = new AtomicBoolean();
+            records = processViewFlags(dbName, tableSchema, indexSchema, index, viewVersion, entry.getKey(), records, done);
             if (records != null) {
 
               byte[][] currRet = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, entry.getKey(), tableSchema, counters, groupByContext);
@@ -963,7 +965,8 @@ public class ReadManager {
         }
       }
       else {
-        records = processViewFlags(dbName, tableSchema, indexSchema, index, viewVersion, entry.getKey(), records);
+        AtomicBoolean done = new AtomicBoolean();
+        records = processViewFlags(dbName, tableSchema, indexSchema, index, viewVersion, entry.getKey(), records, done);
         if (records != null) {
           byte[][] retRecords = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, entry.getKey(), tableSchema, counters, groupByContext);
           if (counters == null) {
@@ -985,28 +988,28 @@ public class ReadManager {
 
 
   private Map.Entry<Object[], Object> doIndexLookupTwoKeys(
-      String dbName,
-      int count,
-      TableSchema tableSchema,
-      IndexSchema indexSchema,
-      boolean forceSelectOnServer, List<Object[]> excludeKeys,
-      Object[] originalLeftKey,
-      Object[] leftKey,
-      Set<Integer> columnOffsets,
-      Object[] originalRightKey,
-      Object[] rightKey,
-      BinaryExpression.Operator leftOperator,
-      BinaryExpression.Operator rightOperator,
-      ParameterHandler parms,
-      boolean evaluateExpression,
-      Expression expression,
-      Index index,
-      Boolean ascending,
-      List<byte[]> retKeys,
-      List<byte[]> retRecords,
-      boolean keys,
-      Counter[] counters,
-      GroupByContext groupContext) {
+          String dbName,
+          int count,
+          TableSchema tableSchema,
+          IndexSchema indexSchema,
+          boolean forceSelectOnServer, List<Object[]> excludeKeys,
+          Object[] originalLeftKey,
+          Object[] leftKey,
+          Set<Integer> columnOffsets,
+          Object[] originalRightKey,
+          Object[] rightKey,
+          BinaryExpression.Operator leftOperator,
+          BinaryExpression.Operator rightOperator,
+          ParameterHandler parms,
+          boolean evaluateExpression,
+          Expression expression,
+          Index index,
+          Boolean ascending,
+          List<byte[]> retKeys,
+          List<byte[]> retRecords,
+          long viewVersion, boolean keys,
+          Counter[] counters,
+          GroupByContext groupContext) {
 
     BinaryExpression.Operator greaterOp = leftOperator;
     Object[] greaterKey = leftKey;
@@ -1164,31 +1167,40 @@ public class ReadManager {
           }
         }
         else {
-          if (parms != null && expression != null && evaluateExpression) {
-            for (byte[] bytes : records) {
-              Record record = new Record(tableSchema);
-              record.deserialize(dbName, server.getCommon(), bytes, null, true);
-              boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
-              if (pass) {
-                byte[][] currRecords = new byte[][]{bytes};
-                byte[][] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, entry.getKey(), tableSchema, counters, groupContext);
-                if (counters == null) {
-                  for (byte[] currBytes : ret) {
-                    retRecords.add(currBytes);
-                  }
-                }
-              }
+          AtomicBoolean done = new AtomicBoolean();
+          records = processViewFlags(dbName, tableSchema, indexSchema, index, viewVersion, entry.getKey(), records, done);
+          if (records == null) {
+            if (done.get()) {
+              entry = null;
+              break outer;
             }
           }
           else {
-            if (records.length > 2) {
-              logger.error("Records size: " + records.length);
-            }
+            if (parms != null && expression != null && evaluateExpression) {
+              for (byte[] bytes : records) {
+                Record record = new Record(tableSchema);
+                record.deserialize(dbName, server.getCommon(), bytes, null, true);
+                boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
+                if (pass) {
+                  byte[][] currRecords = new byte[][]{bytes};
+                  byte[][] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, entry.getKey(), tableSchema, counters, groupContext);
+                  if (counters == null) {
+                    for (byte[] currBytes : ret) {
+                      retRecords.add(currBytes);
+                    }
+                  }
+                }
+              }
+            } else {
+              if (records.length > 2) {
+                logger.error("Records size: " + records.length);
+              }
 
-            byte[][] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, entry.getKey(), tableSchema, counters, groupContext);
-            if (counters == null) {
-              for (byte[] currBytes : ret) {
-                retRecords.add(currBytes);
+              byte[][] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, entry.getKey(), tableSchema, counters, groupContext);
+              if (counters == null) {
+                for (byte[] currBytes : ret) {
+                  retRecords.add(currBytes);
+                }
               }
             }
           }
@@ -1348,7 +1360,9 @@ public class ReadManager {
           if (keyToUse == null) {
             keyToUse = originalKey;
           }
-            handleRecord(dbName, tableSchema, indexSchema, viewVersion, index, keyToUse, parms, evaluateExpresion, expression, columnOffsets, forceSelectOnServer, retKeys, retRecords, keys, counters, groupContext, records, currKeys);
+
+          handleRecord(dbName, tableSchema, indexSchema, viewVersion, index, keyToUse, parms, evaluateExpresion, expression, columnOffsets, forceSelectOnServer, retKeys, retRecords, keys, counters, groupContext, records, currKeys);
+
           //}
         }
       }
@@ -1612,6 +1626,23 @@ public class ReadManager {
               Object unsafeAddress = currEntry.getValue();//index.get(entry.getKey());
               if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
                 records = server.fromUnsafeToRecords(unsafeAddress);
+                while (records == null) {
+                  try {
+                    Thread.sleep(100);
+                    System.out.println("null records ************************************");
+                  }
+                  catch (InterruptedException e) {
+                    throw new DatabaseException(e);
+                  }
+                  currEntry.setValue(index.get(currEntry.getKey()));
+                  unsafeAddress = currEntry.getValue();//index.get(entry.getKey());
+                  if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
+                    records = server.fromUnsafeToRecords(unsafeAddress);
+                  }
+                  else {
+                    break;
+                  }
+                }
               }
             }
           }
@@ -1623,8 +1654,15 @@ public class ReadManager {
             }
           }
           else {
-            records = processViewFlags(dbName, tableSchema, indexSchema, index, viewVersion, currEntry.getKey(), records);
-            if (records != null) {
+            AtomicBoolean done = new AtomicBoolean();
+            records = processViewFlags(dbName, tableSchema, indexSchema, index, viewVersion, currEntry.getKey(), records, done);
+            if (records == null) {
+              if (done.get()) {
+                entry = null;
+                break outer;
+              }
+            }
+            else {
               if (parms != null && expression != null && evaluateExpresion) {
                 for (byte[] bytes : records) {
                   Record record = new Record(tableSchema);
@@ -1707,24 +1745,17 @@ public class ReadManager {
   }
 
   private byte[][] processViewFlags(String dbName, TableSchema tableSchema, IndexSchema indexSchema, Index index,
-                                    long viewVersion, Object[] key, byte[][] records) {
-    if (records != null) {
+                                    long viewVersion, Object[] key, byte[][] records, AtomicBoolean done) {
+    if (records == null) {
+      System.out.println("null records *******************");
+    }
+    else {
       if (indexSchema == null || server.getCommon().getTables(dbName).get(tableSchema.getName()).getIndices().get(indexSchema.getName()).getLastPartitions() != null) {
         List<byte[]> remaining = new ArrayList<>();
         for (byte[] bytes : records) {
-          long dbViewNum = Record.getDbViewNumber(bytes);
-          long dbViewFlags = Record.getDbViewFlags(bytes);
-          if (dbViewNum <= viewVersion && (dbViewFlags & Record.DB_VIEW_FLAG_ADDING) != 0) {
-            remaining.add(bytes);
-          }
-          else if (dbViewNum >= viewVersion && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
-            remaining.add(bytes);
-          }
-//          else if (dbViewNum < (viewVersion + 1) && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
-//            remaining.add(bytes);
-//          }
-          else if ((dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
-            remaining.add(bytes);
+          if (!processViewFlags(viewVersion, remaining, bytes)) {
+            done.set(true);
+            return null;
           }
         }
         if (remaining.size() == 0) {
@@ -1738,23 +1769,9 @@ public class ReadManager {
         List<byte[]> remaining = new ArrayList<>();
         if (records != null) {
           for (byte[] bytes : records) {
-            long dbViewNum = Record.getDbViewNumber(bytes);
-            long dbViewFlags = Record.getDbViewFlags(bytes);
-//                    if (dbViewNum > viewVersion && (dbViewFlags & Record.DB_VIEW_FLAG_ADDING) != 0) {
-//
-//                    }
-//                    else
-            if (dbViewNum <= viewVersion && (dbViewFlags & Record.DB_VIEW_FLAG_ADDING) != 0) {
-              remaining.add(bytes);
-            }
-            else if (dbViewNum >= viewVersion && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
-              remaining.add(bytes);
-            }
-//            else if (dbViewNum < (viewVersion + 1) && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
-//              remaining.add(bytes);
-//            }
-            else if ((dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
-              remaining.add(bytes);
+            if (!processViewFlags(viewVersion, remaining, bytes)) {
+              done.set(true);
+              return null;
             }
 //            else {
 //              remaining.add(bytes);
@@ -1780,35 +1797,52 @@ public class ReadManager {
     return records;
   }
 
-  private void handleRecord(String dbName, TableSchema tableSchema, IndexSchema indexSchema, long viewVersion,
-                            Index index, Object[] key, ParameterHandler parms, boolean evaluateExpresion,
-                            Expression expression, Set<Integer> columnOffsets, boolean forceSelectOnServer,
-                            List<byte[]> retKeys, List<byte[]> retRecords, boolean keys, Counter[] counters,
-                            GroupByContext groupContext, byte[][] records, byte[][] currKeys) {
+  private boolean processViewFlags(long viewVersion, List<byte[]> remaining, byte[] bytes) {
+    long dbViewNum = Record.getDbViewNumber(bytes);
+    long dbViewFlags = Record.getDbViewFlags(bytes);
+//                    if (dbViewNum > viewVersion && (dbViewFlags & Record.DB_VIEW_FLAG_ADDING) != 0) {
+//
+//                    }
+//                    else
+    if ((dbViewNum <= viewVersion - 1) && (dbViewFlags & Record.DB_VIEW_FLAG_ADDING) != 0) {
+      remaining.add(bytes);
+    }
+    else if ((dbViewNum == viewVersion) && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
+      remaining.add(bytes);
+    }
+//            else if (dbViewNum < (viewVersion + 1) && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
+//              remaining.add(bytes);
+//            }
+    else if ((dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
+      remaining.add(bytes);
+    }
+    else {
+      return false;
+    }
+    return true;
+  }
+
+  private boolean handleRecord(String dbName, TableSchema tableSchema, IndexSchema indexSchema, long viewVersion,
+                               Index index, Object[] key, ParameterHandler parms, boolean evaluateExpresion,
+                               Expression expression, Set<Integer> columnOffsets, boolean forceSelectOnServer,
+                               List<byte[]> retKeys, List<byte[]> retRecords, boolean keys, Counter[] counters,
+                               GroupByContext groupContext, byte[][] records, byte[][] currKeys) {
     if (keys) {
       for (byte[] currKey : currKeys) {
         retKeys.add(currKey);
       }
     }
     else {
-      records = processViewFlags(dbName, tableSchema, indexSchema, index, viewVersion, key, records);
+//      records = processViewFlags(dbName, tableSchema, indexSchema, index, viewVersion, key, records);
 
       List<byte[]> remaining = new ArrayList<>();
-      if (records != null) {
+      if (records == null) {
+        System.out.println("null records *******************");
+      }
+      else {
         for (byte[] bytes : records) {
-          long dbViewNum = Record.getDbViewNumber(bytes);
-          long dbViewFlags = Record.getDbViewFlags(bytes);
-          if (dbViewNum <= viewVersion && (dbViewFlags & Record.DB_VIEW_FLAG_ADDING) != 0) {
-            remaining.add(bytes);
-          }
-          else if (dbViewNum >= viewVersion && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
-            remaining.add(bytes);
-          }
-//          else if (dbViewNum < (viewVersion + 1) && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
-//            remaining.add(bytes);
-//          }
-          else if ((dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
-            remaining.add(bytes);
+          if (!processViewFlags(viewVersion, remaining, bytes)) {
+            return false;
           }
 //          else {
 //            remaining.add(bytes);
@@ -1857,6 +1891,7 @@ public class ReadManager {
         }
       }
     }
+    return true;
   }
 
   private void count(Counter[] counters, Record record) {

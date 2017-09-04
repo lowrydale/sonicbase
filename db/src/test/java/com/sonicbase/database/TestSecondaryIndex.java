@@ -1,4 +1,4 @@
-/* © 2017 by Intellectual Reserve, Inc. All rights reserved. */
+
 package com.sonicbase.database;
 
 import com.sonicbase.client.DatabaseClient;

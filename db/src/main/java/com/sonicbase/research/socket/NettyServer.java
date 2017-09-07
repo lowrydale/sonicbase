@@ -906,11 +906,8 @@ public class NettyServer {
           @Override
           public void run() {
             try {
-              //for (int i = 0; i < 10000000; i++) {
-              for (String dbName : databaseServer.getDbNames(databaseServer.getDataDir())) {
-                databaseServer.getSnapshotManager().recoverFromSnapshot(dbName);
-              }
-              //}
+              databaseServer.recoverFromSnapshot();
+
               logger.info("applying queues");
               databaseServer.getLogManager().applyQueues();
 

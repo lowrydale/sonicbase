@@ -381,7 +381,7 @@ public class LogManager {
       if (files != null) {
         ComArray fileNameArray = retObj.putArray(ComObject.Tag.filenames, ComObject.Type.stringType);
         for (File file : files) {
-           fileNameArray.add(file.getName());
+          fileNameArray.add(file.getName());
         }
       }
       return retObj;
@@ -465,7 +465,7 @@ public class LogManager {
     if (totalBytes == 0) {
       return 0;
     }
-    return (double)readBytes / (double)totalBytes;
+    return (double) readBytes / (double) totalBytes;
   }
 
   private static class QueueEntry {
@@ -506,48 +506,10 @@ public class LogManager {
       while (true) {
         try {
           List<DatabaseServer.LogRequest> requests = new ArrayList<>();
-          while (true) {
-//            DatabaseServer.LogRequest request = currLogRequests.poll(30000, TimeUnit.MILLISECONDS);
-//            if (request == null) {
-//              Thread.sleep(0, 50000);
-//            }
-//            else {
-//              requests.add(request);
-//              break;
-//////              if (requests.size() > 20) {
-//////                break;
-//////              }
-////            }
-//            }
-            currLogRequests.drainTo(requests, 200);
-            if (requests.size() == 0) {
-              Thread.sleep(0, 50000);
-            }
-            else {
-              break;
-            }
-          }
-          synchronized (this) {
-            if (shouldSlice || writer == null || System.currentTimeMillis() - 2 * 60 * 100 > currQueueTime) {
-              closeAndCreateLog();
-            }
+          requests.add(currLogRequests.take());
+          currLogRequests.drainTo(requests, 100);
 
-            for (DatabaseServer.LogRequest request : requests) {
-              if (request.getBuffers() != null) {
-                writer.writeInt(request.getBuffers().size());
-                for (byte[] buffer : request.getBuffers()) {
-                  countLogged.incrementAndGet();
-                  writer.write(buffer);
-                }
-              }
-              else {
-                writer.writeInt(1);
-                writer.write(request.getBuffer());
-                countLogged.incrementAndGet();
-              }
-            }
-            writer.flush();
-          }
+          logRequests(requests);
 
           for (DatabaseServer.LogRequest request : requests) {
             if (request.getTimeLogging() != null) {
@@ -559,6 +521,30 @@ public class LogManager {
         catch (Exception t) {
           logger.error("Error processing log requests", t);
         }
+      }
+    }
+
+    public void logRequests(List<DatabaseServer.LogRequest> requests) throws IOException, ParseException {
+      synchronized (this) {
+        if (shouldSlice || writer == null || System.currentTimeMillis() - 2 * 60 * 100 > currQueueTime) {
+          closeAndCreateLog();
+        }
+
+        for (DatabaseServer.LogRequest request : requests) {
+          if (request.getBuffers() != null) {
+            writer.writeInt(request.getBuffers().size());
+            for (byte[] buffer : request.getBuffers()) {
+              countLogged.incrementAndGet();
+              writer.write(buffer);
+            }
+          }
+          else {
+            writer.writeInt(1);
+            writer.write(request.getBuffer());
+            countLogged.incrementAndGet();
+          }
+        }
+        writer.flush();
       }
     }
 
@@ -701,6 +687,7 @@ public class LogManager {
     public ByteCounterStream(InputStream in) {
       this.in = in;
     }
+
     @Override
     public int read() throws IOException {
       count++;
@@ -712,7 +699,7 @@ public class LogManager {
     }
   }
 
-  class LogSource {
+  public static class LogSource {
     private long totalBytes;
     private String filename;
     private ByteCounterStream counterStream;
@@ -725,7 +712,7 @@ public class LogManager {
     DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
     public int offset;
 
-    LogSource(File file) throws IOException {
+    public LogSource(File file, DatabaseServer server, Logger logger) throws IOException {
       InputStream inputStream = null;
       if (file.getName().contains(".gz")) {
         inputStream = new GZIPInputStream(new BufferedInputStream(new FileInputStream(file)));
@@ -737,7 +724,7 @@ public class LogManager {
       in = new DataInputStream(counterStream);
       filename = file.getAbsolutePath();
       totalBytes = file.length();
-      readNext();
+      readNext(server, logger);
     }
 
     public long getTotalBytes() {
@@ -748,16 +735,16 @@ public class LogManager {
       return counterStream.count;
     }
 
-    boolean take() {
-      readNext();
+    public boolean take(DatabaseServer server, Logger logger) {
+      readNext(server, logger);
       return command != null || requests != null;
     }
 
-    void readNext() {
+    public void readNext(DatabaseServer server, Logger logger) {
       try {
         int count = in.readInt();
         if (count == 1) {
-          NettyServer.Request request = readRequest();
+          NettyServer.Request request = readRequest(server);
           command = request.getCommand();
           buffer = request.getBody();
           sequence0 = request.getSequence0();
@@ -769,7 +756,7 @@ public class LogManager {
           long lowestSequence0 = Long.MAX_VALUE;
           long lowestSequence1 = Long.MAX_VALUE;
           for (int i = 0; i < count; i++) {
-            NettyServer.Request request = readRequest();
+            NettyServer.Request request = readRequest(server);
             if (sequence0 < lowestSequence1 && sequence1 < lowestSequence1) {
               lowestSequence0 = sequence0;
               lowestSequence1 = sequence1;
@@ -780,9 +767,24 @@ public class LogManager {
           sequence1 = lowestSequence1;
           command = null;
           buffer = null;
+          throw new DatabaseException("Processing batch");
+        }
+      }
+      catch (EOFException e) {
+        command = null;
+        buffer = null;
+        sequence1 = -1;
+        sequence0 = -1;
+        requests = null;
+        try {
+          in.close();
+        }
+        catch (IOException e1) {
+          logger.error("Error closing stream", e1);
         }
       }
       catch (IOException e) {
+        logger.error("Error reading log entry", e);
         command = null;
         buffer = null;
         sequence1 = -1;
@@ -797,15 +799,15 @@ public class LogManager {
       }
     }
 
-    private NettyServer.Request readRequest() throws IOException {
+    private NettyServer.Request readRequest(DatabaseServer server) throws IOException {
       sequence0 = DataUtil.readVLong(in, resultLength);
       sequence1 = DataUtil.readVLong(in, resultLength);
       int size = in.readInt();
       byte[] commandBuffer = new byte[size];
       in.readFully(commandBuffer);
       String command = new String(commandBuffer, UTF8_STR);
-     // String[] parts = command.split(":");
-     // StringBuilder builder = new StringBuilder();
+      // String[] parts = command.split(":");
+      // StringBuilder builder = new StringBuilder();
 //      for (int i = 0; i < parts.length; i++) {
 //        if (i != 0) {
 //          builder.append(":");
@@ -837,6 +839,14 @@ public class LogManager {
 
     public void close() throws IOException {
       in.close();
+    }
+
+    public String getCommand() {
+      return command;
+    }
+
+    public byte[] getBuffer() {
+      return buffer;
     }
   }
 
@@ -897,14 +907,14 @@ public class LogManager {
             }
           }
           if (slicePoint == null) {
-            LogSource src = new LogSource(file);
+            LogSource src = new LogSource(file, server, logger);
             sources.add(src);
             allCurrentSources.add(src);
             continue;
           }
           if (beforeSlice) {
             if (sliceFiles.contains(file.getAbsolutePath())) {
-              LogSource src = new LogSource(file);
+              LogSource src = new LogSource(file, server, logger);
               sources.add(src);
               allCurrentSources.add(src);
             }
@@ -912,7 +922,7 @@ public class LogManager {
 
           if (!beforeSlice) {
             if (!sliceFiles.contains(file.getAbsolutePath())) {
-              LogSource src = new LogSource(file);
+              LogSource src = new LogSource(file, server, logger);
               sources.add(src);
               allCurrentSources.add(src);
             }
@@ -940,11 +950,12 @@ public class LogManager {
                     minOffset = i;
                   }
                 }
+                throw new DatabaseException("Processing batch");
               }
               else {
                 long sequence0 = sources.get(i).sequence0;
                 long sequence1 = sources.get(i).sequence1;
-                if (sequence0 < minSequence0 && sequence1 < minSequence1) {
+                if (sequence0 <= minSequence0 && sequence1 <= minSequence1) {
                   minSequence0 = sequence0;
                   minSequence1 = sequence1;
                   minOffset = i;
@@ -961,35 +972,35 @@ public class LogManager {
                 final NettyServer.Request request = minSource.requests.get(minSource.offset++);
                 if (minSource.requests.size() <= minSource.offset) {
                   minSource.offset = 0;
-                  if (!minSource.take()) {
+                  if (!minSource.take(server, logger)) {
                     sources.remove(minOffset);
                   }
                 }
-                  countBatched.incrementAndGet();
-                  countSubmitted.incrementAndGet();
-                  executor.submit(new Runnable() {
-                    public void run() {
-                      try {
-                        server.handleCommand(request.getCommand(), request.getBody(), request.getSequence0(),
-                            request.getSequence1(), true, false, null, null);
-                        countProcessed.incrementAndGet();
-                        if (System.currentTimeMillis() - lastLogged.get() > 2000) {
-                          lastLogged.set(System.currentTimeMillis());
-                          logger.info("applyQueues - progress: count=" + countProcessed.get() +
-                              ", countBatched=" + countBatched.get() +
-                              ", avgBatchSize=" + (countProcessed.get() / batchCount.get()) +
-                              ", rate=" + (double) countProcessed.get() / (double) (System.currentTimeMillis() - begin) * 1000d);
-                        }
-                      }
-                      catch (Exception e) {
-                        logger.error("Error replaying command: command=" + minSource.command, e);
-                      }
-                      finally {
-                        countFinished.incrementAndGet();
+                countBatched.incrementAndGet();
+                countSubmitted.incrementAndGet();
+                executor.submit(new Runnable() {
+                  public void run() {
+                    try {
+                      server.handleCommand(request.getCommand(), request.getBody(), request.getSequence0(),
+                          request.getSequence1(), true, false, null, null);
+                      countProcessed.incrementAndGet();
+                      if (System.currentTimeMillis() - lastLogged.get() > 2000) {
+                        lastLogged.set(System.currentTimeMillis());
+                        logger.info("applyQueues - progress: count=" + countProcessed.get() +
+                            ", countBatched=" + countBatched.get() +
+                            ", avgBatchSize=" + (countProcessed.get() / batchCount.get()) +
+                            ", rate=" + (double) countProcessed.get() / (double) (System.currentTimeMillis() - begin) * 1000d);
                       }
                     }
-                  });
-
+                    catch (Exception e) {
+                      logger.error("Error replaying command: command=" + minSource.command, e);
+                    }
+                    finally {
+                      countFinished.incrementAndGet();
+                    }
+                  }
+                });
+                throw new DatabaseException("Processing batch");
               }
               else {
                 if (minSource.command == null) {
@@ -1002,15 +1013,15 @@ public class LogManager {
                 final byte[] buffer = minSource.buffer;
                 final long sequence0 = minSource.sequence0;
                 final long sequence1 = minSource.sequence1;
-                executor.submit(new Runnable(){
-                  public void run () {
+                executor.submit(new Runnable() {
+                  public void run() {
                     try {
-                      server.handleCommand(command, buffer, sequence0, sequence1,true, false, null, null);
+                      server.handleCommand(command, buffer, sequence0, sequence1, true, false, null, null);
                       countProcessed.incrementAndGet();
                       if (System.currentTimeMillis() - lastLogged.get() > 2000) {
                         lastLogged.set(System.currentTimeMillis());
                         logger.info("applyQueues - progress: count=" + countProcessed.get() +
-                                 ", countBatched=" + countBatched.get() +
+                            ", countBatched=" + countBatched.get() +
                             ", avgBatchSize=" + (countProcessed.get() / batchCount.get()) +
                             ", rate=" + (double) countProcessed.get() / (double) (System.currentTimeMillis() - begin) * 1000d);
                       }
@@ -1024,7 +1035,7 @@ public class LogManager {
                   }
                 });
 
-                if (!minSource.take()) {
+                if (!minSource.take(server, logger)) {
                   sources.remove(minOffset);
                 }
               }
@@ -1033,12 +1044,14 @@ public class LogManager {
               logger.error("Error replaying command: command=" + minSource.command, t);
             }
           }
-          while (countSubmitted.get() > countFinished.get()) {
-            try {
-              Thread.sleep(100);
-            }
-            catch (InterruptedException e) {
-              throw new DatabaseException(e);
+          if (countSubmitted.get() > 0) {
+            while (countSubmitted.get() > countFinished.get()) {
+              try {
+                Thread.sleep(100);
+              }
+              catch (InterruptedException e) {
+                throw new DatabaseException(e);
+              }
             }
           }
           if (countFinished.get() == 0) {
@@ -1064,7 +1077,7 @@ public class LogManager {
       DatabaseServer.LogRequest logRequest = new DatabaseServer.LogRequest(requests.size());
       List<byte[]> serializedCommands = new ArrayList<>();
       for (int i = 0; i < requests.size(); i++) {
-        NettyServer.Request  request = requests.get(i);
+        NettyServer.Request request = requests.get(i);
         String command = request.getCommand();
         byte[] body = request.getBody();
         int pos = command.indexOf(':');
@@ -1149,6 +1162,12 @@ public class LogManager {
         request.setBuffer(bytesOut.toByteArray());
         request.setBegin(System.nanoTime());
         request.setTimeLogging(timeLogging);
+//        logProcessors.get(0).logRequests(Collections.singletonList(request));
+//        if (request.getTimeLogging() != null) {
+//          request.getTimeLogging().addAndGet(System.nanoTime() - request.getBegin());
+//        }
+//        request.getLatch().countDown();
+
         logRequests.put(request);
       }
       return request;

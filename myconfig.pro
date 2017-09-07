@@ -13,6 +13,15 @@
 -keep public class com.sonicbase.research.socket.NettyServer {
       public static void main(java.lang.String[]);
 }
+-keep public class com.sonicbase.misc.FindIdInSnapshot {
+      public static void main(java.lang.String[]);
+}
+-keep public class com.sonicbase.misc.RecordLoader {
+      public static void main(java.lang.String[]);
+}
+-keep public class com.sonicbase.misc.RecordValidator {
+      public static void main(java.lang.String[]);
+}
 -keep public class com.sonicbase.research.socket.NettyServer$MyChannelInitializer
 -keep public class com.sonicbase.research.socket.NettyServer$ServerHandler
 -keep public class com.sonicbase.jdbcdriver.Driver
@@ -46,6 +55,18 @@
     !private <methods>;
 }
 -keepclassmembers class com.sonicbase.research.socket.NettyServer {
+    !private <methods>;
+    private <methods>;
+}
+-keepclassmembers class com.sonicbase.misc.FindIdInSnapshot {
+    !private <methods>;
+    private <methods>;
+}
+-keepclassmembers class com.sonicbase.misc.RecordLoader {
+    !private <methods>;
+    private <methods>;
+}
+-keepclassmembers class com.sonicbase.misc.RecordValidator {
     !private <methods>;
     private <methods>;
 }

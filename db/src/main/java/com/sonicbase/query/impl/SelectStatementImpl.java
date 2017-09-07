@@ -949,7 +949,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
             cobj.put(ComObject.Tag.tableName, fromTable);
 
             String command = "DatabaseServer:ComObject:countRecords:";
-            byte[] lookupRet = client.send(null, shard, 0, command, cobj, DatabaseClient.Replica.def);
+            byte[] lookupRet = client.send(null, shard, 0, command, cobj, DatabaseClient.Replica.master);
             if (previousSchemaVersion < client.getCommon().getSchemaVersion()) {
               throw new SchemaOutOfSyncException();
             }

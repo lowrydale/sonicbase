@@ -107,6 +107,8 @@ public class DatabaseClient {
       "createTable",
       "createTableSlave",
       "createDatabase",
+      "createDatabaseSlave",
+      "echoWrite",
       "delete",
       "deleteRecord",
       "deleteIndexEntryByKey",
@@ -797,45 +799,54 @@ public class DatabaseClient {
   }
 
   private void syncConfig() {
-    ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.dbName, "__none__");
-    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-    cobj.put(ComObject.Tag.method, "getConfig");
-    String command = "DatabaseServer:ComObject:getConfig:";
-    try {
-      byte[] ret = null;
-      int receivedReplica = -1;
+    while (true) {
+      ComObject cobj = new ComObject();
+      cobj.put(ComObject.Tag.dbName, "__none__");
+      cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+      cobj.put(ComObject.Tag.method, "getConfig");
+      String command = "DatabaseServer:ComObject:getConfig:";
       try {
-        ret = send(null, 0, 0, command, cobj, Replica.specified);
-        receivedReplica = 0;
-      }
-      catch (Exception e) {
-        localLogger.error("Error getting config from master", e);
-      }
-      if (ret == null) {
-        for (int replica = 1; replica < getReplicaCount(); replica++) {
-          try {
-            ret = send(null, 0, replica, command, cobj, Replica.specified);
-            receivedReplica = replica;
-            break;
-          }
-          catch (Exception e) {
-            localLogger.error("Error getting config from replica: replica=" + replica, e);
+        byte[] ret = null;
+        int receivedReplica = -1;
+        try {
+          ret = send(null, 0, 0, command, cobj, Replica.specified);
+          receivedReplica = 0;
+        }
+        catch (Exception e) {
+          localLogger.error("Error getting config from master", e);
+        }
+        if (ret == null) {
+          for (int replica = 1; replica < getReplicaCount(); replica++) {
+            try {
+              ret = send(null, 0, replica, command, cobj, Replica.specified);
+              receivedReplica = replica;
+              break;
+            }
+            catch (Exception e) {
+              localLogger.error("Error getting config from replica: replica=" + replica, e);
+            }
           }
         }
+        if (ret == null) {
+          localLogger.error("Error getting config from any replica");
+        }
+        else {
+          ComObject retObj = new ComObject(ret);
+          common.deserializeConfig(retObj.getByteArray(ComObject.Tag.configBytes));
+          localLogger.info("Client received config from server: sourceReplica=" + receivedReplica +
+              ", config=" + common.getServersConfig());
+        }
+        break;
       }
-      if (ret == null) {
-        localLogger.error("Error getting config from any replica");
+      catch (Exception t) {
+        logger.error("Error syncing config", t);
+        try {
+          Thread.sleep(2000);
+        }
+        catch (InterruptedException e) {
+          throw new DatabaseException(e);
+        }
       }
-      else {
-        ComObject retObj = new ComObject(ret);
-        common.deserializeConfig(retObj.getByteArray(ComObject.Tag.configBytes));
-        localLogger.info("Client received config from server: sourceReplica=" + receivedReplica +
-          ", config=" + common.getServersConfig());
-      }
-    }
-    catch (Exception t) {
-      throw new DatabaseException(t);
     }
   }
 

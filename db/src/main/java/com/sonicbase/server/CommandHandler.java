@@ -723,6 +723,12 @@ public class CommandHandler {
     return cobj;
   }
 
+  public ComObject echoWrite(ComObject cobj, boolean replayedCommand) {
+    logger.info("called echo");
+    echoCount.set(cobj.getInt(ComObject.Tag.count));
+    return cobj;
+  }
+
   public ComObject echo2(ComObject cobj, boolean replayedCommand) {
     logger.info("called echo2");
     throw new DatabaseException("not supported");

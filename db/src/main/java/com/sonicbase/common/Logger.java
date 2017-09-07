@@ -149,7 +149,7 @@ public class Logger {
           logger.error(msg, e);
         }
       }
-      if (ready) {
+      if (ready && databaseClient != null) {
         if (shard != -1) {
           queue.put(new Error(databaseClient, "shard=" + shard + ", replica=" + replica + " " + msg, e));
         }

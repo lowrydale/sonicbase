@@ -49,7 +49,8 @@ that change frequently. Using parameters allows SonicBased to optimize and reuse
 <h1>Bulk Loading</h1>
 When bulk loading you should have many clients with up to sixteen threads per client all doing batch inserts.
 The source records should be divided evenly by primary key range across all the clients. In our testing
-we used twice as many clients as servers and the clients had half the cores.<br/>
+we used twice as many clients as servers and the clients had half the cores. The worst thing you can do is load
+        all the records from a single client.<br/>
 
 <h1>Machine Size</h1>
 A pretty optimal size of machine is one that has 60gig of ram. Larger machines have a tendency to have

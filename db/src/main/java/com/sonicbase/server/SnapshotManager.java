@@ -58,14 +58,14 @@ public class SnapshotManager {
     File dataRootDir = new File(dataRoot);
     dataRootDir.mkdirs();
 
-    int highestSnapshot = getHighestSafeSnapshotVersion(dataRootDir);
+    int highestSnapshot = getHighestSafeSnapshotVersion(dataRootDir, logger);
 
     lockedSnapshots.put(highestSnapshot, highestSnapshot);
 
     return new File(dataRootDir, String.valueOf(highestSnapshot)).getAbsolutePath();
   }
 
-  private int getHighestSafeSnapshotVersion(File dataRootDir) {
+  public static int getHighestSafeSnapshotVersion(File dataRootDir, Logger logger) {
     int highestSnapshot = -1;
     try {
       String[] dirs = dataRootDir.list();
@@ -161,7 +161,7 @@ public class SnapshotManager {
         }
       }
 
-      int highestSnapshot = getHighestSafeSnapshotVersion(dataRootDir);
+      int highestSnapshot = getHighestSafeSnapshotVersion(dataRootDir, logger);
 
       if (highestSnapshot == -1) {
         return;
@@ -329,6 +329,7 @@ public class SnapshotManager {
             for (String dbName : dbNames) {
               runSnapshot(dbName);
             }
+            server.getCommon().saveSchema(server.getDataDir());
           }
           catch (InterruptedException e) {
             break;
@@ -388,26 +389,27 @@ public class SnapshotManager {
           }
 
           final boolean isPrimaryKey = indexEntry.getValue().isPrimaryKey();
-          index.iterate(new Index.Visitor() {
-            @Override
-            public boolean visit(Object[] key, Object value) throws IOException {
-              int bucket = (int) (countSaved.incrementAndGet() % SNAPSHOT_BUCKET_COUNT);
+          Map.Entry<Object[], Object> entry = index.firstEntry();
+          while (entry != null) {
+            int bucket = (int) (countSaved.incrementAndGet() % SNAPSHOT_BUCKET_COUNT);
 
-              byte[][] records = null;
-              synchronized (index.getMutex(key)) {
-                Object currValue = index.get(key);
-                if (currValue == null || currValue.equals(0L)) {
-                  return false;
-                }
+            byte[][] records = null;
+            synchronized (index.getMutex(entry.getKey())) {
+              Object currValue = index.get(entry.getKey());
+              if (currValue == null || currValue.equals(0L)) {
+                logger.error("null record: key=" + DatabaseCommon.keyToString(entry.getKey()));
+              }
+              else {
                 if (isPrimaryKey) {
                   records = server.fromUnsafeToRecords(currValue);
-                }
-                else {
+                } else {
                   records = server.fromUnsafeToKeys(currValue);
                 }
               }
+            }
+            if (records != null) {
               outStreams[bucket].writeBoolean(true);
-              byte[] keyBytes = DatabaseCommon.serializeKey(tableEntry.getValue(), indexEntry.getKey(), key);
+              byte[] keyBytes = DatabaseCommon.serializeKey(tableEntry.getValue(), indexEntry.getKey(), entry.getKey());
               outStreams[bucket].write(keyBytes);
 
               DataUtil.writeVLong(outStreams[bucket], records.length, resultLength);
@@ -424,9 +426,10 @@ public class SnapshotManager {
                       ", table=" + tableEntry.getKey() + INDEX_STR + indexEntry.getKey());
                 }
               }
-              return true;
             }
-          });
+            entry = index.higherEntry(entry.getKey());
+          }
+
           logger.info("Snapshot progress - finished index: count=" + savedCount + RATE_STR +
               ((float) savedCount.get() / (float) ((System.currentTimeMillis() - subBegin)) * 1000f) +
               DURATION_STR + (System.currentTimeMillis() - subBegin) / 1000f +
@@ -469,7 +472,7 @@ public class SnapshotManager {
     String dataRoot = getSnapshotRootDir(dbName);
     File dataRootDir = new File(dataRoot);
     dataRootDir.mkdirs();
-    int highestSnapshot = getHighestSafeSnapshotVersion(dataRootDir);
+    int highestSnapshot = getHighestSafeSnapshotVersion(dataRootDir, logger);
 
     for (String dirStr : dataRootDir.list()) {
       int dirNum = -1;

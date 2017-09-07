@@ -275,6 +275,9 @@ public class DatabaseServer {
       isInternal = databaseDict.getBoolean("clientIsPrivate");
     }
     serversConfig = new ServersConfig(cluster, shards, replicationFactor, isInternal);
+
+    initServersForUnitTest(host, port, unitTest, serversConfig);
+
     this.replica = serversConfig.getThisReplica(host, port);
 
     common.setShard(serversConfig.getThisShard(host, port));
@@ -348,8 +351,6 @@ public class DatabaseServer {
     }
 
     common.setServersConfig(serversConfig);
-
-    initServersForUnitTest(host, port, unitTest, serversConfig);
 
     repartitioner = new Repartitioner(this, common);
 
@@ -1083,6 +1084,10 @@ public class DatabaseServer {
 
   public boolean haveProLicense() {
     return haveProLicense;
+  }
+
+  public Logger getLogger() {
+    return logger;
   }
 
   private static class NullX509TrustManager implements X509TrustManager {
@@ -2264,9 +2269,12 @@ public class DatabaseServer {
     for (String dbName : getDbNames(dataDir)) {
       snapshotManager.runSnapshot(dbName);
     }
+    getCommon().saveSchema(getDataDir());
+
   }
 
   public void recoverFromSnapshot() throws Exception {
+      common.loadSchema(dataDir);
     for (String dbName : getDbNames(dataDir)) {
       snapshotManager.recoverFromSnapshot(dbName);
     }

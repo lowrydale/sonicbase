@@ -925,31 +925,32 @@ public class Repartitioner extends Thread {
   }
 
   public void deleteIndexEntry(String tableName, String indexName, Object[] primaryKey) {
-    if (tableName.equals(currTableRepartitioning) && indexName.equals(currIndexRepartitioning)) {
-      ConcurrentHashMap<String, ConcurrentLinkedQueue<Object[]>> indicesToDelete = getIndicesToDeleteFrom(tableName, indexName);
-      ConcurrentLinkedQueue<Object[]> keysToDelete = indicesToDelete.get(indexName);
-      keysToDelete.add(primaryKey);
-    }
+//    if (tableName.equals(currTableRepartitioning) && indexName.equals(currIndexRepartitioning)) {
+//      ConcurrentHashMap<String, ConcurrentLinkedQueue<Object[]>> indicesToDelete = getIndicesToDeleteFrom(tableName, indexName);
+//      ConcurrentLinkedQueue<Object[]> keysToDelete = indicesToDelete.get(indexName);
+//      keysToDelete.add(primaryKey);
+//    }
   }
 
   public boolean undeleteIndexEntry(String dbName, String tableName, String indexName, Object[] primaryKey, byte[] recordBytes) {
-    if (tableName.equals(currTableRepartitioning) && indexName.equals(currIndexRepartitioning)) {
-      Comparator[] comparators = databaseServer.getIndices(dbName).getIndices().get(tableName).get(indexName).getComparators();
-
-      ConcurrentHashMap<String, ConcurrentLinkedQueue<Object[]>> indicesToDelete = getIndicesToDeleteFrom(tableName, indexName);
-      ConcurrentLinkedQueue<Object[]> keysToDelete = indicesToDelete.get(indexName);
-      for (Object[] key : keysToDelete) {
-        if (0 == DatabaseCommon.compareKey(comparators, key, primaryKey)) {
-          keysToDelete.remove(key);
-          break;
-        }
-      }
-      return false;
-    }
-    else {
-      return true;
-    }
-  }
+//    if (tableName.equals(currTableRepartitioning) && indexName.equals(currIndexRepartitioning)) {
+//      Comparator[] comparators = databaseServer.getIndices(dbName).getIndices().get(tableName).get(indexName).getComparators();
+//
+//      ConcurrentHashMap<String, ConcurrentLinkedQueue<Object[]>> indicesToDelete = getIndicesToDeleteFrom(tableName, indexName);
+//      ConcurrentLinkedQueue<Object[]> keysToDelete = indicesToDelete.get(indexName);
+//      for (Object[] key : keysToDelete) {
+//        if (0 == DatabaseCommon.compareKey(comparators, key, primaryKey)) {
+//          keysToDelete.remove(key);
+//          break;
+//        }
+//      }
+//      return false;
+//    }
+//    else {
+//      return true;
+//    }
+  return true;
+ }
 
   public static class MoveRequest {
     private final boolean shouldDeleteNow;
@@ -1232,7 +1233,7 @@ public class Repartitioner extends Thread {
                       final List<MapEntry> toProcess = currEntries.get();
                       currEntries.set(new ArrayList<MapEntry>());
                       countSubmitted.incrementAndGet();
-                      if (countSubmitted.get() > 20) {
+                      if (countSubmitted.get() > 2) {
                         databaseServer.setThrottleInsert(true);
                       }
                       executor.submit(new Runnable() {
@@ -1286,7 +1287,7 @@ public class Repartitioner extends Thread {
                       final List<MapEntry> toProcess = currEntries.get();
                       currEntries.set(new ArrayList<MapEntry>());
                       countSubmitted.incrementAndGet();
-                      if (countSubmitted.get() > 20) {
+                      if (countSubmitted.get() > 2) {
                         databaseServer.setThrottleInsert(true);
                       }
                       executor.submit(new Runnable() {
@@ -1374,6 +1375,7 @@ public class Repartitioner extends Thread {
 
   private void deleteRecordsOnOtherReplicas(final String dbName, String tableName, String indexName, ConcurrentLinkedQueue<Object[]> keysToDelete) {
 
+    ThreadPoolExecutor executor = new ThreadPoolExecutor(16, 16, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
     List<Future> futures = new ArrayList<>();
     try {
       int count = 0;
@@ -1396,7 +1398,7 @@ public class Repartitioner extends Thread {
           cobj = new ComObject();
           keys = cobj.putArray(ComObject.Tag.keys, ComObject.Type.byteArrayType);
 
-          sendDeletes(currObj, futures);
+          sendDeletes(executor, currObj, futures);
           logger.info("delete moved entries progress: submittedCount=" + count);
         }
       }
@@ -1407,7 +1409,7 @@ public class Repartitioner extends Thread {
         cobj.put(ComObject.Tag.tableName, tableName);
         cobj.put(ComObject.Tag.indexName, indexName);
 
-        sendDeletes(cobj, futures);
+        sendDeletes(executor, cobj, futures);
         logger.info("delete moved entries progress: submittedCount=" + count);
       }
     }
@@ -1426,24 +1428,31 @@ public class Repartitioner extends Thread {
           logger.error("Error deleting moved records on replica", e);
         }
       }
+      executor.shutdownNow();
     }
   }
 
-  public void sendDeletes(final ComObject currObj, List<Future> futures) {
+  public void sendDeletes(ThreadPoolExecutor executor, final ComObject currObj, List<Future> futures) {
     int replicaCount = databaseServer.getReplicationFactor();
     for (int i = 0; i < replicaCount; i++) {
       final int replica = i;
       //        if (replica == databaseServer.getReplica()) {
       //          continue;
       //        }
-      futures.add(databaseServer.getExecutor().submit(new Callable() {
+      futures.add(executor.submit(new Callable() {
         @Override
         public Object call() throws Exception {
 
-          String command = "DatabaseServer:ComObject:deleteMovedRecords:";
-          databaseServer.getDatabaseClient().send(null, databaseServer.getShard(), replica,
-              command, currObj, DatabaseClient.Replica.specified);
-          return currObj.getArray(ComObject.Tag.keys).getArray().size();
+          if (replica == databaseServer.getReplica()) {
+            deleteMovedRecords(currObj);
+            return currObj.getArray(ComObject.Tag.keys).getArray().size();
+          }
+          else {
+            String command = "DatabaseServer:ComObject:deleteMovedRecords:";
+            databaseServer.getDatabaseClient().send(null, databaseServer.getShard(), replica,
+                command, currObj, DatabaseClient.Replica.specified);
+            return currObj.getArray(ComObject.Tag.keys).getArray().size();
+          }
         }
       }));
     }
@@ -1464,52 +1473,61 @@ public class Repartitioner extends Thread {
           keysToDelete.add(key);
         }
       }
-      final List<Object> toFree = new ArrayList<>();
+      int count = 0;
+      //final List<Object> toFree = new ArrayList<>();
       Index index = databaseServer.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
       for (Object[] key : keysToDelete) {
         synchronized (index.getMutex(key)) {
-          Object value = index.get(key);
-          byte[][] content = null;
-          if (value != null) {
-            if (indexSchema.isPrimaryKey()) {
-              content = databaseServer.fromUnsafeToRecords(value);
-            }
-            else {
-              content = databaseServer.fromUnsafeToKeys(value);
-            }
+          Object toFree = index.remove(key);
+          if (toFree != null) {
+            //  toFreeBatch.add(toFree);
+            databaseServer.freeUnsafeIds(toFree);
           }
-          if (content != null) {
-            if (indexSchema.isPrimaryKey()) {
-              byte[][] newContent = new byte[content.length][];
-              for (int i = 0; i < content.length; i++) {
-                Record.setDbViewFlags(content[i], Record.DB_VIEW_FLAG_DELETING);
-                Record.setDbViewNumber(content[i], common.getSchemaVersion());
-                newContent[i] = content[i];
-              }
-              //toFree.add(value);
-              Object newValue = databaseServer.toUnsafeFromRecords(newContent);
-              index.put(key, newValue);
-              databaseServer.freeUnsafeIds(value);
-            }
-            else {
-              Object currValue = index.remove(key);
-              //toFree.add(currValue);
-              databaseServer.freeUnsafeIds(currValue);
-            }
-          }
+//          Object value = index.get(key);
+//          byte[][] content = null;
+//          if (value != null) {
+//            if (indexSchema.isPrimaryKey()) {
+//              content = databaseServer.fromUnsafeToRecords(value);
+//            }
+//            else {
+//              content = databaseServer.fromUnsafeToKeys(value);
+//            }
+//          }
+//          if (content != null) {
+//            if (indexSchema.isPrimaryKey()) {
+//              byte[][] newContent = new byte[content.length][];
+//              for (int i = 0; i < content.length; i++) {
+//                Record.setDbViewFlags(content[i], Record.DB_VIEW_FLAG_DELETING);
+//                Record.setDbViewNumber(content[i], common.getSchemaVersion());
+//                newContent[i] = content[i];
+//              }
+//              //toFree.add(value);
+//              Object newValue = databaseServer.toUnsafeFromRecords(newContent);
+//              index.put(key, newValue);
+//              databaseServer.freeUnsafeIds(value);
+//            }
+//            else {
+//              Object currValue = index.remove(key);
+//              //toFree.add(currValue);
+//              databaseServer.freeUnsafeIds(currValue);
+//            }
+//          }
+        }
+        if (count++ % 100000 == 0) {
+          logger.info("deleteMovedRecords progress: count=" + count);
         }
       }
 //      Timer timer = new Timer("Free memory");
 //      timer.schedule(new TimerTask(){
 //        @Override
 //        public void run() {
-      for (Object obj : toFree) {
-        databaseServer.freeUnsafeIds(obj);
-      }
+//      for (Object obj : toFree) {
+//        databaseServer.freeUnsafeIds(obj);
+//      }
 
-      if (indexSchema.isPrimaryKey()) {
-        databaseServer.getDeleteManager().saveDeletes(dbName, tableName, indexName, keysToDelete);
-      }
+//      if (indexSchema.isPrimaryKey()) {
+//        databaseServer.getDeleteManager().saveDeletes(dbName, tableName, indexName, keysToDelete);
+//      }
 
 //        }
 //      }, 30 * 1000);
@@ -1547,10 +1565,10 @@ public class Repartitioner extends Thread {
       for (MapEntry entry : toProcess) {
         try {
           if (lockCount == 0) {
-            //databaseServer.getThrottleWriteLock().lock();
+            //databaseServer.getThrottleReadLock().lock();
           }
           if (lockCount++ % 2 == 0) {
-            //databaseServer.getThrottleWriteLock().unlock();
+            //databaseServer.getThrottleReadLock().unlock();
             lockCount = 0;
           }
           byte[][] content = null;
@@ -1640,7 +1658,7 @@ public class Repartitioner extends Thread {
     }
     finally {
       if (lockCount != 0) {
-        //databaseServer.getThrottleWriteLock().unlock();
+        //databaseServer.getThrottleReadLock().unlock();
       }
     }
 

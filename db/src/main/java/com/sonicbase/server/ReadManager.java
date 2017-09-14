@@ -1,5 +1,6 @@
 package com.sonicbase.server;
 
+import com.amazonaws.transform.MapEntry;
 import com.codahale.metrics.MetricRegistry;
 import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
@@ -1298,7 +1299,7 @@ public class ReadManager {
 
   private Map.Entry<Object[], Object> doIndexLookupOneKey(
       String dbName,
-      int count,
+      final int count,
       TableSchema tableSchema,
       IndexSchema indexSchema,
       ParameterHandler parms,
@@ -1723,18 +1724,62 @@ public class ReadManager {
         if (entry == null) {
           break outer;
         }
-        int diff = Math.max(retRecords.size(), retKeys.size());
+        final int diff = Math.max(retRecords.size(), retKeys.size());
         if (count - diff <= 0) {
           break outer;
         }
-        entries = new Map.Entry[count - diff];
         if (ascending != null && !ascending) {
-          entries = index.lowerEntries((entry.getKey()), entries);
+          if (true) {
+            final AtomicInteger countRead = new AtomicInteger();
+            final List<MapEntry<Object[], Object>> currEntries = new ArrayList<>();
+            index.visitHeadMap(entry.getKey(), new Index.Visitor() {
+              @Override
+              public boolean visit(Object[] key, Object value) throws IOException {
+                MapEntry<Object[], Object> curr = new MapEntry<>();
+                curr.setKey(key);
+                curr.setValue(value);
+                currEntries.add(curr);
+                if (countRead.incrementAndGet() >= count - diff) {
+                  return false;
+                }
+                return true;
+              }
+            });
+            entries = currEntries.toArray(new Map.Entry[currEntries.size()]);
+          }
+          else {
+            entries = index.lowerEntries((entry.getKey()), entries);
+          }
         }
         else {
-          entries = index.higherEntries(entry.getKey(), entries);
+          if (true) {
+            final AtomicInteger countRead = new AtomicInteger();
+            final List<MapEntry<Object[], Object>> currEntries = new ArrayList<>();
+            final AtomicBoolean first = new AtomicBoolean(true);
+            index.visitTailMap(entry.getKey(), new Index.Visitor() {
+              @Override
+              public boolean visit(Object[] key, Object value) throws IOException {
+                if (first.get()) {
+                  first.set(false);
+                  return true;
+                }
+                MapEntry<Object[], Object> curr = new MapEntry<>();
+                curr.setKey(key);
+                curr.setValue(value);
+                currEntries.add(curr);
+                if (countRead.incrementAndGet() >= count - diff) {
+                  return false;
+                }
+                return true;
+              }
+            });
+            entries = currEntries.toArray(new Map.Entry[currEntries.size()]);
+          }
+          else {
+            entries = index.higherEntries(entry.getKey(), entries);
+          }
         }
-        if (entries == null) {
+        if (entries == null || entries.length == 0) {
           entry = null;
           break outer;
         }

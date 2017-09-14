@@ -2274,7 +2274,7 @@ public class DatabaseServer {
   }
 
   public void recoverFromSnapshot() throws Exception {
-      common.loadSchema(dataDir);
+    //common.loadSchema(dataDir);
     for (String dbName : getDbNames(dataDir)) {
       snapshotManager.recoverFromSnapshot(dbName);
     }
@@ -3749,6 +3749,7 @@ public class DatabaseServer {
           downloadFilesForReload(files);
 
           common.loadSchema(getDataDir());
+          DatabaseServer.this.getClient().syncSchema();
           prepareDataFromRestore();
           snapshotManager.enableSnapshot(true);
           isRunning.set(true);
@@ -4000,9 +4001,9 @@ public class DatabaseServer {
         DataOutputStream out = new DataOutputStream(bytesOut);
         DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
         //out.writeInt(0);
-        out.writeInt(records.length);
+        DataUtil.writeVLong(out, records.length);
         for (byte[] record : records) {
-          DataUtil.writeVLong(out, record.length, resultLength);
+          DataUtil.writeVLong(out, record.length);
           out.write(record);
         }
         out.close();
@@ -4042,7 +4043,7 @@ public class DatabaseServer {
         DataOutputStream out = new DataOutputStream(bytesOut);
         DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
         //out.writeInt(0);
-        out.writeInt(records.length);
+        DataUtil.writeVLong(out, records.length);
         for (byte[] record : records) {
           DataUtil.writeVLong(out, record.length, resultLength);
           out.write(record);
@@ -4107,7 +4108,7 @@ public class DatabaseServer {
         DataOutputStream out = new DataOutputStream(bytesOut);
         DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
         //out.writeInt(0);
-        out.writeInt(records.length);
+        DataUtil.writeVLong(out, records.length);
         for (byte[] record : records) {
           DataUtil.writeVLong(out, record.length, resultLength);
           out.write(record);
@@ -4149,7 +4150,7 @@ public class DatabaseServer {
         DataOutputStream out = new DataOutputStream(bytesOut);
         DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
         //out.writeInt(0);
-        out.writeInt(records.length);
+        DataUtil.writeVLong(out, records.length);
         for (byte[] record : records) {
           DataUtil.writeVLong(out, record.length, resultLength);
           out.write(record);
@@ -4240,7 +4241,7 @@ public class DatabaseServer {
           DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
           //in.readInt(); //byte count
           //in.readInt(); //orig len
-          byte[][] ret = new byte[in.readInt()][];
+          byte[][] ret = new byte[(int)DataUtil.readVLong(in)][];
           for (int i = 0; i < ret.length; i++) {
             int len = (int) DataUtil.readVLong(in, resultLength);
             byte[] record = new byte[len];
@@ -4273,7 +4274,7 @@ public class DatabaseServer {
         DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
         //in.readInt(); //byte count
         //in.readInt(); //orig len
-        byte[][] ret = new byte[in.readInt()][];
+        byte[][] ret = new byte[(int)DataUtil.readVLong(in)][];
         for (int i = 0; i < ret.length; i++) {
           int len = (int) DataUtil.readVLong(in, resultLength);
           byte[] record = new byte[len];
@@ -4328,7 +4329,7 @@ public class DatabaseServer {
           DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
           //in.readInt(); //byte count
           //in.readInt(); //orig len
-          byte[][] ret = new byte[in.readInt()][];
+          byte[][] ret = new byte[(int)DataUtil.readVLong(in)][];
           for (int i = 0; i < ret.length; i++) {
             int len = (int) DataUtil.readVLong(in, resultLength);
             byte[] record = new byte[len];
@@ -4363,7 +4364,7 @@ public class DatabaseServer {
         DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
         //in.readInt(); //byte count
         //in.readInt(); //orig len
-        byte[][] ret = new byte[in.readInt()][];
+        byte[][] ret = new byte[(int)DataUtil.readVLong(in)][];
         for (int i = 0; i < ret.length; i++) {
           int len = (int) DataUtil.readVLong(in, resultLength);
           byte[] record = new byte[len];

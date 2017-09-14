@@ -113,7 +113,7 @@ public class DeleteManager {
                   break;
                 }
                 catch (Exception e) {
-                  logger.error("Error deserializing key", e);
+                  logger.error("Error deserializing key: " + ((errorsInARow > 20) ? " aborting" : ""), e);
                   if (errorsInARow++ > 20) {
                     break;
                   }

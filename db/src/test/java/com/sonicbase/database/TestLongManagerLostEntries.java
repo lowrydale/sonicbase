@@ -127,37 +127,37 @@ public class TestLongManagerLostEntries {
     System.out.println("count missing=" + countMissing);
     foundIds.clear();
 
-    int count = 0;
-    File dir = new File(dbServers[0].getDataDir(), "/queue/0/0/self");
-    File[] files = dir.listFiles();
-    for (File file : files) {
-      LogManager.LogSource source = new LogManager.LogSource(file, dbServers[0], dbServers[0].getLogger());
-      while (true) {
-        if (source.getCommand() == null) {
-          break;
-        }
-        if (count++ % 10000 == 0) {
-          System.out.println("progress: " + count);
-        }
-        byte[] body = source.getBuffer();
-        ComObject cobj = new ComObject(body);
-        long id = cobj.getLong(ComObject.Tag.countLong);
-        foundIds.put(id, id);
-
-        source.readNext(dbServers[0], dbServers[0].getLogger());
-      }
-    }
-    first = true;
-    countMissing = 0;
-    for (int i = 0; i < countToProcess; i++) {
-      if (!foundIds.containsKey((long)i)) {
-        if (first) {
-          System.out.println("doesn't contain: " + i);
-          first = false;
-        }
-        countMissing++;
-      }
-    }
+//    int count = 0;
+//    File dir = new File(dbServers[0].getDataDir(), "/queue/0/0/self");
+//    File[] files = dir.listFiles();
+//    for (File file : files) {
+//      LogManager.LogSource source = new LogManager.LogSource(file, dbServers[0], dbServers[0].getLogger());
+//      while (true) {
+//        if (source.getCommand() == null) {
+//          break;
+//        }
+//        if (count++ % 10000 == 0) {
+//          System.out.println("progress: " + count);
+//        }
+//        byte[] body = source.getBuffer();
+//        ComObject cobj = new ComObject(body);
+//        long id = cobj.getLong(ComObject.Tag.countLong);
+//        foundIds.put(id, id);
+//
+//        source.readNext(dbServers[0], dbServers[0].getLogger());
+//      }
+//    }
+//    first = true;
+//    countMissing = 0;
+//    for (int i = 0; i < countToProcess; i++) {
+//      if (!foundIds.containsKey((long)i)) {
+//        if (first) {
+//          System.out.println("doesn't contain: " + i);
+//          first = false;
+//        }
+//        countMissing++;
+//      }
+//    }
 
     System.out.println("count missing=" + countMissing);
   }

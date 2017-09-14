@@ -240,6 +240,7 @@ public class UpdateManager {
       for (int i = 0; i < array.getArray().size(); i++) {
         ComObject innerObj = (ComObject) array.getArray().get(i);
 
+        throttle();
         //server.getThrottleWriteLock().lock();
         try {
           doInsertIndexEntryByKey(cobj, innerObj, replayedCommand, isExplicitTrans, transactionId, false);
@@ -395,6 +396,9 @@ public class UpdateManager {
   private AtomicLong lastBatchLogReset = new AtomicLong(System.currentTimeMillis());
   private AtomicLong batchDuration = new AtomicLong();
 
+  private AtomicLong insertCount = new AtomicLong();
+  private AtomicLong lastReset = new AtomicLong(System.currentTimeMillis());
+
   public ComObject batchInsertIndexEntryByKeyWithRecord(final ComObject cobj, final boolean replayedCommand) {
     long schemaVersion = cobj.getLong(ComObject.Tag.schemaVersion);
     if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
@@ -409,10 +413,10 @@ public class UpdateManager {
     final long transactionId = cobj.getLong(ComObject.Tag.transactionId);
     int count = 0;
 
-    boolean hasRepartitioned = hasRepartitioned(dbName, cobj);
-    if (hasRepartitioned) {
-      //server.getThrottleReadLock().lock();
-    }
+    //boolean hasRepartitioned = hasRepartitioned(dbName, cobj);
+//    if (hasRepartitioned) {
+//      //server.getThrottleReadLock().lock();
+//    }
     try {
       List<Future> futures = new ArrayList<>();
       final ComArray array = cobj.getArray(ComObject.Tag.insertObjects);
@@ -466,6 +470,9 @@ public class UpdateManager {
           }
         }
         else {
+
+          throttle();
+
           //server.getThrottleWriteLock().lock();
           try {
             doInsertIndexEntryByKeyWithRecord(cobj, innerObj, sequence0, sequence1, sequence2, replayedCommand, transactionId, isExplicitTrans, false);
@@ -477,9 +484,9 @@ public class UpdateManager {
         count++;
         //if (insertCount.incrementAndGet() % 5000 == 0) {
         //todo: may need to restore the throttle
-//          while (server.isThrottleInsert()) {
-//            Thread.sleep(100);
-//          }
+          //while (server.isThrottleInsert()) {
+            //Thread.sleep(100);
+          //}
         //}
         //      }
       }
@@ -500,6 +507,9 @@ public class UpdateManager {
 
       batchDuration.addAndGet(System.nanoTime() - begin);
     }
+    catch (SchemaOutOfSyncException e) {
+      throw e;
+    }
 //    catch (InterruptedException e) {
 //      //ignore
 //    }
@@ -507,47 +517,60 @@ public class UpdateManager {
       throw new DatabaseException(e);
     }
     finally {
-      if (hasRepartitioned) {
-      //  server.getThrottleReadLock().unlock();
-      }
+//      if (hasRepartitioned) {
+//      //  server.getThrottleReadLock().unlock();
+//      }
     }
     ComObject retObj = new ComObject();
     retObj.put(ComObject.Tag.count, count);
     return retObj;
   }
 
-  private boolean haveLogged = false;
-
-  private boolean hasRepartitioned(String dbName, ComObject cobj) {
-
-    final ComArray array = cobj.getArray(ComObject.Tag.insertObjects);
-
-    Set<Integer> tables = new HashSet<>();
-    for (int i = 0; i < array.getArray().size(); i++) {
-      final int offset = i;
-
-      final ComObject innerObj = (ComObject) array.getArray().get(offset);
-      tables.add(innerObj.getInt(ComObject.Tag.tableId));
-    }
-
-    boolean hasRepartitioned = true;
-    outer:
-    for (Integer tableId : tables) {
-      TableSchema tableSchema = server.getCommon().getTablesById(dbName).get(tableId);
-      for (Map.Entry<String, IndexSchema> indexEntry : tableSchema.getIndexes().entrySet()) {
-        TableSchema.Partition[] partitions = indexEntry.getValue().getCurrPartitions();
-        if (partitions[0].isUnboundUpper()) {
-          hasRepartitioned = false;
-          break outer;
-        }
+  private void throttle() throws InterruptedException {
+    insertCount.incrementAndGet();
+    synchronized (insertCount) {
+      if (System.currentTimeMillis() - lastReset.get() > 30_000) {
+        lastReset.set(System.currentTimeMillis());
+        insertCount.set(0);
+      }
+      while (insertCount.get() / (double)(System.currentTimeMillis() - lastReset.get()) * 1000d > 200_000) {
+        Thread.sleep(20);
       }
     }
-    if (hasRepartitioned && !haveLogged) {
-      logger.info("Have repartitioned");
-      haveLogged = true;
-    }
-    return hasRepartitioned;
   }
+
+  private boolean haveLogged = false;
+
+//  private boolean hasRepartitioned(String dbName, ComObject cobj) {
+//
+//    final ComArray array = cobj.getArray(ComObject.Tag.insertObjects);
+//
+//    Set<Integer> tables = new HashSet<>();
+//    for (int i = 0; i < array.getArray().size(); i++) {
+//      final int offset = i;
+//
+//      final ComObject innerObj = (ComObject) array.getArray().get(offset);
+//      tables.add(innerObj.getInt(ComObject.Tag.tableId));
+//    }
+//
+//    boolean hasRepartitioned = true;
+//    outer:
+//    for (Integer tableId : tables) {
+//      TableSchema tableSchema = server.getCommon().getTablesById(dbName).get(tableId);
+//      for (Map.Entry<String, IndexSchema> indexEntry : tableSchema.getIndexes().entrySet()) {
+//        TableSchema.Partition[] partitions = indexEntry.getValue().getCurrPartitions();
+//        if (partitions[0].isUnboundUpper()) {
+//          hasRepartitioned = false;
+//          break outer;
+//        }
+//      }
+//    }
+//    if (hasRepartitioned && !haveLogged) {
+//      logger.info("Have repartitioned");
+//      haveLogged = true;
+//    }
+//    return hasRepartitioned;
+//  }
 
   public ComObject insertIndexEntryByKeyWithRecord(ComObject cobj, boolean replayedCommand) {
     try {
@@ -629,18 +652,18 @@ public class UpdateManager {
         for (int i = 0; i < indexFields.length; i++) {
           fieldOffsets[i] = tableSchema.getFieldOffset(indexFields[i]);
         }
-        selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false, fieldOffsets, server.getCommon(), tableSchema,
-            indexName, null, BinaryExpression.Operator.equal, null, primaryKey, null);
+//        selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false, fieldOffsets, server.getCommon(), tableSchema,
+//            indexName, null, BinaryExpression.Operator.equal, null, primaryKey, null);
 
 //        if (null != index.get(primaryKey)) {
 //          alreadyExisted = true;
 //        }
         doInsertKey(dbName, id, recordBytes, primaryKey, index, tableSchema.getName(), indexName, replayedCommand);
 
-        int selectedShard = selectedShards.get(0);
-        if (indexSchema.getCurrPartitions()[selectedShard].getShardOwning() != server.getShard()) {
-          server.getRepartitioner().deleteIndexEntry(tableName, indexName, primaryKey);
-        }
+//        int selectedShard = selectedShards.get(0);
+//        if (indexSchema.getCurrPartitions()[selectedShard].getShardOwning() != server.getShard()) {
+//          server.getRepartitioner().deleteIndexEntry(tableName, indexName, primaryKey);
+//        }
       }
       else {
         if (transactionId != 0) {

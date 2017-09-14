@@ -11,6 +11,7 @@ import org.apache.commons.lang.exception.ExceptionUtils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -215,7 +216,20 @@ public class CommandHandler {
             ret.put(ComObject.Tag.sequence1, sequence1);
           }
         }
+        catch (InvocationTargetException e) {
+          if (e.getCause() instanceof SchemaOutOfSyncException) {
+            throw (SchemaOutOfSyncException)e.getCause();
+          }
+          throw new DatabaseException(e);
+        }
+        catch (SchemaOutOfSyncException e) {
+          throw e;
+        }
         catch (Exception e) {
+          if (e.getCause() instanceof SchemaOutOfSyncException) {
+            throw (SchemaOutOfSyncException)e.getCause();
+          }
+
 //          boolean schemaOutOfSync = false;
 //          int index = ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class);
 //          if (-1 != index) {
@@ -258,12 +272,15 @@ public class CommandHandler {
     catch (InterruptedException e) {
       throw new DatabaseException(e);
     }
-    catch (DeadServerException e) {
+    catch (DeadServerException | SchemaOutOfSyncException e) {
       throw e; //don't log
     }
     catch (Exception e) {
       if (-1 != ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class)) {
         throw new DatabaseException(e); //don't log
+      }
+      if (e.getCause() instanceof SchemaOutOfSyncException) {
+        throw new DatabaseException(e);
       }
       logger.error("Error handling command: command=" + command, e);
       throw new DatabaseException(e);

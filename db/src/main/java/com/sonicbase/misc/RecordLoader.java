@@ -43,7 +43,7 @@ public class RecordLoader {
     PreparedStatement stmt = conn.prepareStatement("create table Persons (id1 BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id1))");
     stmt.executeUpdate();
 
-    int id = 20_000_000;
+    int id = 0;
     int batchSize = 100;
     long begin = System.currentTimeMillis();
     while (true) {
@@ -58,7 +58,7 @@ public class RecordLoader {
 
         stmt.addBatch();
 
-        if (id-- % 100_000 == 0) {
+        if (id++ % 100_000 == 0) {
           System.out.println("progress: count=" + id + ", rate=" + (double)id / (double)(System.currentTimeMillis() - begin) * 1000f +
             ", latency=" + ((double)System.currentTimeMillis() - begin) / (double)id);
         }

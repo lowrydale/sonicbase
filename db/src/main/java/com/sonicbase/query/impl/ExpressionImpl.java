@@ -1762,26 +1762,26 @@ public abstract class ExpressionImpl implements Expression {
               groupByContext.deserialize(groupBytes, client.getCommon(), dbName);
             }
 
-            if (attempt >= 5) {
-              attempt = 0;
-            }
-            else {
-              if (justSwitched) {
-                justSwitched = false;
-                if (groupBytes == null && countersArray == null && (currRetKeys == null || currRetKeys.length == 0) && (currRetRecords == null || currRetRecords.length == 0)) {
-                  //System.out.println("just switched, found nothing");
-                  if (true || lastKey != null) {
-                    nextShard = lastShard;
-                    nextKey = lastKey;
-                    replica = (replica + 1) % client.getReplicaCount();
-                    attempt++;
-                  }
-                }
-                else {
-                  attempt = 0;
-                }
-              }
-            }
+//            if (attempt >= 5) {
+//              attempt = 0;
+//            }
+//            else {
+//              if (justSwitched) {
+//                justSwitched = false;
+//                if (groupBytes == null && countersArray == null && (currRetKeys == null || currRetKeys.length == 0) && (currRetRecords == null || currRetRecords.length == 0)) {
+//                  //System.out.println("just switched, found nothing");
+//                  if (true || lastKey != null) {
+//                    nextShard = lastShard;
+//                    nextKey = lastKey;
+//                    replica = (replica + 1) % client.getReplicaCount();
+//                    attempt++;
+//                  }
+//                }
+//                else {
+//                  attempt = 0;
+//                }
+//              }
+//            }
 
             if (switchedShards) {
               justSwitched = true;

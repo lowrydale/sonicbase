@@ -157,6 +157,22 @@ public class ResultSetImpl implements ResultSet {
     return describeStrs;
   }
 
+  public long getViewVersion() {
+    return selectStatement.getViewVersion();
+  }
+
+  public int getCurrShard() {
+    return selectStatement.getCurrShard();
+  }
+
+  public int getLastShard() {
+    return selectStatement.getLastShard();
+  }
+
+  public boolean isCurrPartitions() {
+    return selectStatement.isCurrPartitions();
+  }
+
   public static class MultiTableRecordList {
     private String[] tableNames;
     private long[][] ids;

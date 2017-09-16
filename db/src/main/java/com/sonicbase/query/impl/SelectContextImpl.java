@@ -8,6 +8,8 @@ import java.io.IOException;
  * Responsible for
  */
 public class SelectContextImpl {
+  private boolean currPartitions;
+  private int lastShard;
   private SelectStatementImpl selectStatement;
   private int nextShard = -1;
   private Object[] nextKey;
@@ -33,7 +35,7 @@ public class SelectContextImpl {
   public SelectContextImpl(
       String tableName, String indexName, BinaryExpression.Operator operator,
       int nextShard, Object[] nextKey,
-      Object[][][] keys, ExpressionImpl.RecordCache recordCache) throws IOException {
+      Object[][][] keys, ExpressionImpl.RecordCache recordCache, int lastShard, boolean currPartitions) throws IOException {
     this.tableNames = new String[]{tableName};
     this.indexName = indexName;
     this.operator = operator;
@@ -41,6 +43,8 @@ public class SelectContextImpl {
     this.nextKey = nextKey;
     this.recordCache = recordCache;
     this.currKeys = keys;
+    this.lastShard = lastShard;
+    this.currPartitions = currPartitions;
   }
 
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
@@ -61,6 +65,14 @@ public class SelectContextImpl {
 
   public SelectContextImpl() {
 
+  }
+
+  public boolean isCurrPartitions() {
+    return currPartitions;
+  }
+
+  public int getLastShard() {
+    return lastShard;
   }
 
   public Boolean getSortWithIndex() {

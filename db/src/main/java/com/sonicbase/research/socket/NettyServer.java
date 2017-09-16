@@ -211,6 +211,7 @@ public class NettyServer {
 
   private AtomicLong totalCallCount = new AtomicLong();
   private AtomicLong callCount = new AtomicLong();
+  private AtomicLong lastLoggedSocketServerStats = new AtomicLong(System.currentTimeMillis());
   private AtomicLong requestDuration = new AtomicLong();
   private AtomicLong responseDuration = new AtomicLong();
   private AtomicLong lastLogReset = new AtomicLong();
@@ -512,7 +513,15 @@ public class NettyServer {
             destBuff.clear();
           }
 
-          if (callCount.incrementAndGet() % 1000 == 0) {
+          callCount.incrementAndGet();
+          boolean shouldLog = false;
+          synchronized (lastLoggedSocketServerStats) {
+            if (System.currentTimeMillis() - lastLoggedSocketServerStats.get() > 5_000) {
+              shouldLog = true;
+              lastLoggedSocketServerStats.set(System.currentTimeMillis());
+            }
+          }
+          if (shouldLog) {
             logger.info("SocketServer stats: callCount=" + totalCallCount.get() + ", requestDuration=" +
                 (requestDuration.get() / callCount.get() / 1000000d) + ", responseDuration=" +
                 (responseDuration.get() / callCount.get() / 1000000d) + ", avgRequestSize=" + (totalRequestSize.get() / callCount.get()) +

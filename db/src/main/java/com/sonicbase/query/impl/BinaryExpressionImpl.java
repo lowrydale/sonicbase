@@ -602,6 +602,8 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
             originalSingleKey, null, getColumns(), leftColumn, getNextShard(),
             getRecordCache(), usedIndex, false, getViewVersion(), getCounters(), getGroupByContext(), debug);
         if (context != null) {
+          setLastShard(context.getLastShard());
+          setIsCurrPartitions(context.isCurrPartitions());
           setNextShard(context.getNextShard());
           setNextKey(context.getNextKey());
           if (getNextShard() == -1 || getNextShard() == -2) {
@@ -1327,5 +1329,17 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
 
   public BinaryExpression.Operator getOperator() {
     return operator;
+  }
+
+  public void setLastShard(int lastShard) {
+    super.setLastShard(lastShard);
+    leftExpression.setLastShard(lastShard);
+    rightExpression.setLastShard(lastShard);
+  }
+
+  public void setIsCurrPartitions(boolean isCurrPartitions) {
+    super.setIsCurrPartitions(isCurrPartitions);
+    leftExpression.setIsCurrPartitions(isCurrPartitions);
+    rightExpression.setIsCurrPartitions(isCurrPartitions);
   }
 }

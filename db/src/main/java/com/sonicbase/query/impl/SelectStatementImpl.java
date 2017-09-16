@@ -319,6 +319,22 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     return pageSize;
   }
 
+  public long getViewVersion() {
+    return expression.getViewVersion();
+  }
+
+  public int getCurrShard() {
+    return expression.getNextShard();
+  }
+
+  public int getLastShard() {
+    return expression.getLastShard();
+  }
+
+  public boolean isCurrPartitions() {
+    return expression.isCurrPartitions();
+  }
+
   public static class Function {
     private String name;
     private ExpressionList parms;

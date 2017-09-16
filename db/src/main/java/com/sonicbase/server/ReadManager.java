@@ -1799,7 +1799,7 @@ public class ReadManager {
         List<byte[]> remaining = new ArrayList<>();
         for (byte[] bytes : records) {
           if (!processViewFlags(viewVersion, remaining, bytes)) {
-            done.set(true);
+            //done.set(true);
             return null;
           }
         }
@@ -1815,7 +1815,7 @@ public class ReadManager {
         if (records != null) {
           for (byte[] bytes : records) {
             if (!processViewFlags(viewVersion, remaining, bytes)) {
-              done.set(true);
+              //done.set(true);
               return null;
             }
 //            else {
@@ -1849,15 +1849,13 @@ public class ReadManager {
 //
 //                    }
 //                    else
+//    remaining.add(bytes);
     if ((dbViewNum <= viewVersion - 1) && (dbViewFlags & Record.DB_VIEW_FLAG_ADDING) != 0) {
       remaining.add(bytes);
     }
-    else if ((dbViewNum == viewVersion) && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
+    else if ((dbViewNum == viewVersion || dbViewNum == viewVersion - 1) && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
       remaining.add(bytes);
     }
-//            else if (dbViewNum < (viewVersion + 1) && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
-//              remaining.add(bytes);
-//            }
     else if ((dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
       remaining.add(bytes);
     }

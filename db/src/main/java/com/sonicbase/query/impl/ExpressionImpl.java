@@ -51,6 +51,8 @@ public abstract class ExpressionImpl implements Expression {
   protected String dbName;
   private boolean forceSelectOnServer;
   protected long serializationVersion;
+  private int lastShard;
+  private boolean isCurrPartitions;
 
   public Counter[] getCounters() {
     return counters;
@@ -108,6 +110,14 @@ public abstract class ExpressionImpl implements Expression {
   public void reset() {
     nextShard = -1;
     nextKey = null;
+  }
+
+  public void setLastShard(int lastShard) {
+    this.lastShard = lastShard;
+  }
+
+  public int getLastShard() {
+    return lastShard;
   }
 
   public void setDebug(boolean debug) {
@@ -287,6 +297,13 @@ public abstract class ExpressionImpl implements Expression {
   public void getColumnsInExpression(List<ColumnImpl> columns) {
   }
 
+  public void setIsCurrPartitions(boolean isCurrPartitions) {
+    this.isCurrPartitions = isCurrPartitions;
+  }
+
+  public boolean isCurrPartitions() {
+    return isCurrPartitions;
+  }
 
   public static enum Type {
     column(0),
@@ -1391,6 +1408,8 @@ public abstract class ExpressionImpl implements Expression {
         TableSchema tableSchema = common.getTables(dbName).get(tableName);
         IndexSchema indexSchema = tableSchema.getIndexes().get(indexName);
         int originalShard = shard;
+        int lastShard = -1;
+        boolean currPartitions = false;
         List<Integer> selectedShards = null;
         int currShardOffset = 0;
         long previousSchemaVersion = common.getSchemaVersion();
@@ -1482,9 +1501,12 @@ public abstract class ExpressionImpl implements Expression {
           }
           else {
 
+            currPartitions = false;
+            selectedShards = new ArrayList<>();
             selectedShards = Repartitioner.findOrderedPartitionForRecord(false, true, fieldOffsets, common, tableSchema,
                 indexSchema.getName(), orderByExpressions, leftOperator, rightOperator, originalLeftValue, originalRightValue);
             if (selectedShards.size() == 0) {
+              currPartitions = true;
               selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false, fieldOffsets, common, tableSchema,
                   indexSchema.getName(), orderByExpressions, leftOperator, rightOperator, originalLeftValue, originalRightValue);
               //              for (Integer curr : currSelectedShards) {
@@ -1507,6 +1529,8 @@ public abstract class ExpressionImpl implements Expression {
 
           if (localShard == -1) {
             localShard = nextShard = selectedShards.get(currShardOffset);
+            lastShard = localShard;
+
           }
           boolean found = false;
           for (int i = 0; i < selectedShards.size(); i++) {
@@ -1516,6 +1540,7 @@ public abstract class ExpressionImpl implements Expression {
           }
           if (!found) {
             localShard = nextShard = selectedShards.get(currShardOffset);
+            lastShard = localShard;
           }
           usedIndex.set(indexSchema.getName());
 
@@ -1560,7 +1585,7 @@ public abstract class ExpressionImpl implements Expression {
           int attempt = 0;
           while (true) {
             lastKey = nextKey;
-            int lastShard = nextShard;
+            lastShard = nextShard;
             boolean switchedShards = false;
 
             boolean isPrepared = prepared.serversPrepared[localShard][replica];
@@ -1651,6 +1676,15 @@ public abstract class ExpressionImpl implements Expression {
               replicas.add(0);
               replicas.add(1);
             }
+
+//            TableSchema.Partition[] lastPartitions = indexSchema.getLastPartitions();
+//            if (lastPartitions != null && lastPartitions[0].getUpperKey() != null) {
+//              if (leftValue != null && nextShard == 0) {
+//                if ((long)lastPartitions[0].getUpperKey()[0] - (long)leftValue[0] < 800) {
+//                  System.out.println("almost");
+//                }
+//              }
+//            }
 
 
             cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
@@ -1848,7 +1882,8 @@ public abstract class ExpressionImpl implements Expression {
             throw new SchemaOutOfSyncException();
           }
 
-          return new SelectContextImpl(tableSchema.getName(), indexSchema.getName(), leftOperator, nextShard, nextKey, retKeys, recordCache);
+          return new SelectContextImpl(tableSchema.getName(), indexSchema.getName(), leftOperator, nextShard, nextKey,
+              retKeys, recordCache, lastShard, currPartitions);
         }
         return new SelectContextImpl();
       }
@@ -2130,7 +2165,7 @@ public abstract class ExpressionImpl implements Expression {
 
       return new SelectContextImpl(tableSchema.getName(),
           indexSchema.getName(), null, nextShard, localNextKey,
-          retKeys, recordCache);
+          retKeys, recordCache, -1, true);
     }
     catch (IOException e) {
       throw new DatabaseException(e);

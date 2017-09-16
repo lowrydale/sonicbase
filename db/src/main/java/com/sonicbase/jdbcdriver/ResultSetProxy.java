@@ -32,6 +32,22 @@ public class ResultSetProxy implements java.sql.ResultSet {
   private ResultSetImpl resultSet;
   private boolean wasNull = false;
 
+  public long getViewVersion() {
+    return resultSets.get(0).resultSet.getViewVersion();
+  }
+
+  public int getCurrShard() {
+    return resultSets.get(0).resultSet.getCurrShard();
+  }
+
+  public int getLastShard() {
+    return resultSets.get(0).resultSet.getLastShard();
+  }
+
+  public boolean isCurrPartitions() {
+    return resultSets.get(0).resultSet.isCurrPartitions();
+  }
+
   @ExcludeRename
   public enum FieldType {
     BIT("BIT", Types.BIT),

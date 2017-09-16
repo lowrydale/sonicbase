@@ -51,6 +51,11 @@ public class DatabaseSocketClient {
   private static AtomicInteger connectionCount = new AtomicInteger();
   private List<Thread> batchThreads = new ArrayList<>();
 
+
+  public static int getConnectionCount() {
+    return connectionCount.get();
+  }
+
   private static Connection borrow_connection(String host, int port) {
     for (int i = 0; i < 1; i++) {
       try {
@@ -67,17 +72,17 @@ public class DatabaseSocketClient {
 //          }
 //        }
 //        else {
-          sock = pool.poll(0, TimeUnit.MILLISECONDS);
-          if (sock == null) {
-            try {
-              connectionCount.incrementAndGet();
-              sock = new Connection(host, port);//new NioClient(host, port);
-            }
-            catch (Exception t) {
-              throw new Exception("Error creating connection: host=" + host + ", port=" + port, t);
-            }
+        sock = pool.poll(0, TimeUnit.MILLISECONDS);
+        if (sock == null) {
+          try {
+            connectionCount.incrementAndGet();
+            sock = new Connection(host, port);//new NioClient(host, port);
           }
-          sock.count_called++;
+          catch (Exception t) {
+            throw new Exception("Error creating connection: host=" + host + ", port=" + port, t);
+          }
+        }
+        sock.count_called++;
         //}
         return sock;
       }
@@ -458,183 +463,184 @@ public class DatabaseSocketClient {
       long begin = System.nanoTime();
       //while (true) {
       totalCallCount.incrementAndGet();
-        if (callCount.incrementAndGet() % 10000 == 0) {
-          int connectionCount = 0;
-          int maxConnectionCount = 0;
-          for (ArrayBlockingQueue<Connection> value : pools.values()) {
-            connectionCount += value.size();
-            maxConnectionCount = Math.max(value.size(), maxConnectionCount);
-          }
+      if (callCount.incrementAndGet() % 10000 == 0) {
+        int connectionCount = 0;
+        int maxConnectionCount = 0;
+        for (ArrayBlockingQueue<Connection> value : pools.values()) {
+          connectionCount += value.size();
+          maxConnectionCount = Math.max(value.size(), maxConnectionCount);
+        }
 
-          logger.info("SocketClient stats: callCount=" + totalCallCount.get() + ", avgDuration=" +
-              (callDuration.get() / callCount.get() / 1000000d) + ", processingDuration=" +
-              (processingDuration.get() / callCount.get() / 1000000d) + ", avgRequestDuration=" +
-              (requestDuration.get() / callCount.get() / 1000000d) + ", avgResponseDuration=" +
-              (responseDuration.get() / callCount.get() / 1000000d) + ", avgConnectionCount=" + (connectionCount / pools.size()) +
-              ", maxConnectionCount=" + maxConnectionCount);
-          synchronized (lastLogReset) {
-            if (System.currentTimeMillis() - lastLogReset.get() > 4 * 60 * 1000) {
-              callDuration.set(0);
-              callCount.set(0);
-              requestDuration.set(0);
-              responseDuration.set(0);
-              processingDuration.set(0);
-              lastLogReset.set(System.currentTimeMillis());
-            }
+        logger.info("SocketClient stats: callCount=" + totalCallCount.get() + ", avgDuration=" +
+            (callDuration.get() / callCount.get() / 1000000d) + ", processingDuration=" +
+            (processingDuration.get() / callCount.get() / 1000000d) + ", avgRequestDuration=" +
+            (requestDuration.get() / callCount.get() / 1000000d) + ", avgResponseDuration=" +
+            (responseDuration.get() / callCount.get() / 1000000d) + ", avgConnectionCount=" + (connectionCount / pools.size()) +
+            ", maxConnectionCount=" + maxConnectionCount);
+        synchronized (lastLogReset) {
+          if (System.currentTimeMillis() - lastLogReset.get() > 4 * 60 * 1000) {
+            callDuration.set(0);
+            callCount.set(0);
+            requestDuration.set(0);
+            responseDuration.set(0);
+            processingDuration.set(0);
+            lastLogReset.set(System.currentTimeMillis());
           }
         }
-        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-        byte[] intBuff = new byte[4];
-        int requestCount = requests.size();
-        Util.writeRawLittleEndian32(requestCount, intBuff);
-        bytesOut.write(intBuff);
-        for (Request currRequest : requests) {
-          serializeSingleRequest(bytesOut, currRequest.command, currRequest.body);
-        }
-        bytesOut.close();
-        byte[] body = bytesOut.toByteArray();
-        int originalBodyLen = body.length;
-        if (COMPRESS) {
-          if (LZO_COMPRESSION) {
-            LZ4Factory factory = LZ4Factory.fastestInstance();
+      }
+      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+      byte[] intBuff = new byte[4];
+      int requestCount = requests.size();
+      Util.writeRawLittleEndian32(requestCount, intBuff);
+      bytesOut.write(intBuff);
+      for (Request currRequest : requests) {
+        serializeSingleRequest(bytesOut, currRequest.command, currRequest.body);
+      }
+      bytesOut.close();
+      byte[] body = bytesOut.toByteArray();
+      int originalBodyLen = body.length;
+      if (COMPRESS) {
+        if (LZO_COMPRESSION) {
+          LZ4Factory factory = LZ4Factory.fastestInstance();
 
-            LZ4Compressor compressor = factory.fastCompressor();
-            int maxCompressedLength = compressor.maxCompressedLength(body.length);
-            byte[] compressed = new byte[maxCompressedLength];
-            int compressedLength = compressor.compress(body, 0, body.length, compressed, 0, maxCompressedLength);
-            body = new byte[compressedLength];
-            System.arraycopy(compressed, 0, body, 0, compressedLength);
-          }
-          else {
-            ByteArrayOutputStream bodyBytesOut = new ByteArrayOutputStream();
-            GZIPOutputStream bodyOut = new GZIPOutputStream(bodyBytesOut);
-            bodyOut.write(body);
-            bodyOut.close();
-            body = bodyBytesOut.toByteArray();
-          }
-          Util.writeRawLittleEndian32(body.length + 12, intBuff);
+          LZ4Compressor compressor = factory.fastCompressor();
+          int maxCompressedLength = compressor.maxCompressedLength(body.length);
+          byte[] compressed = new byte[maxCompressedLength];
+          int compressedLength = compressor.compress(body, 0, body.length, compressed, 0, maxCompressedLength);
+          body = new byte[compressedLength];
+          System.arraycopy(compressed, 0, body, 0, compressedLength);
         }
         else {
-          Util.writeRawLittleEndian32(body.length + 8, intBuff);
+          ByteArrayOutputStream bodyBytesOut = new ByteArrayOutputStream();
+          GZIPOutputStream bodyOut = new GZIPOutputStream(bodyBytesOut);
+          bodyOut.write(body);
+          bodyOut.close();
+          body = bodyBytesOut.toByteArray();
         }
+        Util.writeRawLittleEndian32(body.length + 12, intBuff);
+      }
+      else {
+        Util.writeRawLittleEndian32(body.length + 8, intBuff);
+      }
 
-        boolean shouldReturn = true;
-        Connection sock = borrow_connection(host, port);
-        try {
-          //System.out.println("borrow: " + (end - begin) / 1000000f);
+      boolean shouldReturn = true;
+      Connection sock = borrow_connection(host, port);
+      try {
+        //System.out.println("borrow: " + (end - begin) / 1000000f);
 
-          ByteArrayOutputStream sockBytes = new ByteArrayOutputStream();
+        ByteArrayOutputStream sockBytes = new ByteArrayOutputStream();
 
-          sockBytes.write(intBuff);
+        sockBytes.write(intBuff);
 //          ByteBuffer buf = ByteBuffer.wrap(intBuff);
 //          sock.sock.write(buf);
-          if (COMPRESS) {
-            byte[] originalLenBuff = new byte[4];
-            Util.writeRawLittleEndian32(originalBodyLen, originalLenBuff);
-            //buf = ByteBuffer.wrap(originalLenBuff);
-            //sock.sock.write(buf);
-            sockBytes.write(originalLenBuff);
+        if (COMPRESS) {
+          byte[] originalLenBuff = new byte[4];
+          Util.writeRawLittleEndian32(originalBodyLen, originalLenBuff);
+          //buf = ByteBuffer.wrap(originalLenBuff);
+          //sock.sock.write(buf);
+          sockBytes.write(originalLenBuff);
 
-          }
+        }
 //          CRC32 checksum = new CRC32();
 //          checksum.update(body, 0, body.length);
-          long checksumValue = 0;//checksum.getValue();
-          //checksumValue = Arrays.hashCode(body);
-          byte[] longBuff = new byte[8];
+        long checksumValue = 0;//checksum.getValue();
+        //checksumValue = Arrays.hashCode(body);
+        byte[] longBuff = new byte[8];
 
-          Util.writeRawLittleEndian64(checksumValue, longBuff);
-          //buf = ByteBuffer.wrap(longBuff);
-          //sock.sock.write(buf);
-          sockBytes.write(longBuff);
+        Util.writeRawLittleEndian64(checksumValue, longBuff);
+        //buf = ByteBuffer.wrap(longBuff);
+        //sock.sock.write(buf);
+        sockBytes.write(longBuff);
 
-          //sock.sock.write(ByteBuffer.wrap(body));
-          sockBytes.write(body);
+        //sock.sock.write(ByteBuffer.wrap(body));
+        sockBytes.write(body);
 
-          long beginRequest = System.nanoTime();
-          writeRequest(sock, ByteBuffer.wrap(sockBytes.toByteArray()));
-          long processingBegin = System.nanoTime();
-          requestDuration.addAndGet(System.nanoTime() - beginRequest);
+        long beginRequest = System.nanoTime();
+        writeRequest(sock, ByteBuffer.wrap(sockBytes.toByteArray()));
+        long processingBegin = System.nanoTime();
+        requestDuration.addAndGet(System.nanoTime() - beginRequest);
 
-          int totalRead = 0;
+        int totalRead = 0;
 
-          int bodyLen = 0;
+        int bodyLen = 0;
 
-          byte[] responseBody = readResponse(intBuff, sock, totalRead, bodyLen, processingBegin);
+        byte[] responseBody = readResponse(intBuff, sock, totalRead, bodyLen, processingBegin);
 
 
-          //
-          //                    int lenRead = in.read(responseBody, totalRead, responseBody.length - totalRead);
-          //                    if (lenRead == -1) {
-          //                      throw new Exception("EOF");
-          //                    }
-          //
+        //
+        //                    int lenRead = in.read(responseBody, totalRead, responseBody.length - totalRead);
+        //                    if (lenRead == -1) {
+        //                      throw new Exception("EOF");
+        //                    }
+        //
 
-          int offset = 0;
-          if (COMPRESS) {
-            originalBodyLen = Util.readRawLittleEndian32(responseBody, 0);
-            offset += 4;
-          }
-          long responseChecksum = Util.readRawLittleEndian64(responseBody, offset);
-          offset += 8;
-          //body = new byte[responseBody.length - offset];
-          //System.arraycopy(responseBody, offset, body, 0, body.length);
+        int offset = 0;
+        if (COMPRESS) {
+          originalBodyLen = Util.readRawLittleEndian32(responseBody, 0);
+          offset += 4;
+        }
+        long responseChecksum = Util.readRawLittleEndian64(responseBody, offset);
+        offset += 8;
+        //body = new byte[responseBody.length - offset];
+        //System.arraycopy(responseBody, offset, body, 0, body.length);
 
 //          checksum = new CRC32();
 //          checksum.update(body, 0, body.length);
-          checksumValue = 0;//checksum.getValue();
+        checksumValue = 0;//checksum.getValue();
 //          if (checksumValue != responseChecksum) {
 //            throw new DatabaseException("Checksum mismatch");
 //          }
 
-          if (DatabaseSocketClient.COMPRESS) {
-            if (DatabaseSocketClient.LZO_COMPRESSION) {
-              LZ4Factory factory = LZ4Factory.fastestInstance();
+        if (DatabaseSocketClient.COMPRESS) {
+          if (DatabaseSocketClient.LZO_COMPRESSION) {
+            LZ4Factory factory = LZ4Factory.fastestInstance();
 
-              LZ4FastDecompressor decompressor = factory.fastDecompressor();
-              byte[] restored = new byte[originalBodyLen];
-              decompressor.decompress(responseBody, offset, restored, 0, originalBodyLen);
-              body = restored;
-            } else {
-              GZIPInputStream bodyIn = new GZIPInputStream(new ByteArrayInputStream(body));
-              body = new byte[originalBodyLen];
-              bodyIn.read(body);
-            }
+            LZ4FastDecompressor decompressor = factory.fastDecompressor();
+            byte[] restored = new byte[originalBodyLen];
+            decompressor.decompress(responseBody, offset, restored, 0, originalBodyLen);
+            body = restored;
           }
-
-          ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
-          bytesIn.read(intBuff); //response count
-
-          for (Request currRequest : requests) {
-            try {
-              processResponse(bytesIn, currRequest);
-            }
-            catch (Exception t) {
-              System.out.println("Error processing response: command=" + currRequest.command);
-              throw new DeadServerException(t);
-            }
+          else {
+            GZIPInputStream bodyIn = new GZIPInputStream(new ByteArrayInputStream(body));
+            body = new byte[originalBodyLen];
+            bodyIn.read(body);
           }
+        }
+
+        ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
+        bytesIn.read(intBuff); //response count
+
+        for (Request currRequest : requests) {
+          try {
+            processResponse(bytesIn, currRequest);
+          }
+          catch (Exception t) {
+            System.out.println("Error processing response: command=" + currRequest.command);
+            throw new DeadServerException(t);
+          }
+        }
         //  break;
+      }
+      catch (Exception e) {
+        if (sock != null && sock.sock != null) {
+          sock.sock.close();//clientHandler.channel.close();
         }
-        catch (Exception e) {
-          if (sock != null && sock.sock != null) {
-            sock.sock.close();//clientHandler.channel.close();
-          }
-          connectionCount.decrementAndGet();
-          shouldReturn = false;
-          throw new DeadServerException(e);
-        }
-        finally {
-          if (shouldReturn) {
-            if (sock.count_called > 100000) {
-              if (sock != null && sock.sock != null) {
-                sock.sock.close();//clientHandler.channel.close();
-              }
-            }
-            else {
-              return_connection(sock, host, port);
+        connectionCount.decrementAndGet();
+        shouldReturn = false;
+        throw new DeadServerException(e);
+      }
+      finally {
+        if (shouldReturn) {
+          if (sock.count_called > 100000) {
+            if (sock != null && sock.sock != null) {
+              sock.sock.close();//clientHandler.channel.close();
             }
           }
+          else {
+            return_connection(sock, host, port);
+          }
         }
+      }
       //}
       callDuration.addAndGet(System.nanoTime() - begin);
     }
@@ -778,7 +784,7 @@ public class DatabaseSocketClient {
   public static final boolean COMPRESS = true;
   public static final boolean LZO_COMPRESSION = true;
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
+  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP2", justification = "copying the passed in data is too slow")
   @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public byte[] do_send(String batchKey, String command, byte[] body, String hostPort) {
     try {

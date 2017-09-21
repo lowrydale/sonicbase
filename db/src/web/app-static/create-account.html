@@ -36,17 +36,17 @@
                 }
             });
 
-            var captchaResponse = grecaptcha.getResponse(widgetId1);
-            if (captchaResponse == null || captchaResponse.length == 0) {
-                alert("Please specify you are not a robot");
-                return;
-            }
+//            var captchaResponse = grecaptcha.getResponse(widgetId1);
+//            if (captchaResponse == null || captchaResponse.length == 0) {
+//                alert("Please specify you are not a robot");
+//                return;
+//            }
             $.ajax({
                 headers:{
                     "Accept":"application/text",
                     "Content-type":"application/json"
                 },   url:"/app/account/create?email=" + encodeURI(email) + "&password=" + encodeURI(password) +
-                            "&referringSite=" + site + "&captchaResponse=" + encodeURI(captchaResponse),
+                            "&referringSite=" + site /* "&captchaResponse=" + encodeURI(captchaResponse)*/,
                 success:function(response){
                     createCookie("SBSessionId", response, COOKIE_LIFE);
                     window.location.href = "/app-static/licenses.html";
@@ -90,7 +90,7 @@
 
         <div class="desktop">
             <a href="../index.html">
-                <img src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+                <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
             </a>
         <nav>
             <ul>
@@ -137,10 +137,12 @@
 
     </form>
         <br/><br/>
+        <!--
         <div id="html_element"></div>
         <script src="https://www.google.com/recaptcha/api.js?onload=onloadCallback&render=explicit"
                 async defer>
         </script>
+        -->
     </div>
     <footer>
         <script type="text/javascript" src="https://cdn.ywxi.net/js/1.js" async></script>

@@ -20,6 +20,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Responsible for
@@ -256,10 +257,16 @@ public class ReadManager {
 
         boolean forceSelectOnServer = false;
         if (indexSchema.isPrimaryKey()) {
-          doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, null, false, null, columnOffsets, forceSelectOnServer, null, leftKey, leftKey, leftOperator, index, ascending, retKeys, retRecords, server.getCommon().getSchemaVersion(), false, counters, groupContext);
+          doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, null, false, null,
+              columnOffsets, forceSelectOnServer, null, leftKey, leftKey, leftOperator, index, ascending,
+              retKeys, retRecords, server.getCommon().getSchemaVersion(), false, counters, groupContext,
+              new AtomicLong(), null, null);
         }
         else {
-          doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, null, false, null, columnOffsets, forceSelectOnServer, null, leftKey, leftKey, leftOperator, index, ascending, retKeys, retRecords, server.getCommon().getSchemaVersion(), true, counters, groupContext);
+          doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, null, false,
+              null, columnOffsets, forceSelectOnServer, null, leftKey, leftKey, leftOperator,
+              index, ascending, retKeys, retRecords, server.getCommon().getSchemaVersion(), true, counters,
+              groupContext, new AtomicLong(), null, null);
 
 //          if (indexSchema.isPrimaryKeyGroup()) {
 //            if (((Long)leftKey[0]) == 5) {
@@ -533,6 +540,10 @@ public class ReadManager {
         groupContext.deserialize(groupContextBytes, server.getCommon(), dbName);
       }
 
+      Long offset = cobj.getLong(ComObject.Tag.offsetLong);
+      Long limit = cobj.getLong(ComObject.Tag.limitLong);
+      AtomicLong currOffset = new AtomicLong(cobj.getLong(ComObject.Tag.currOffset));
+
       Index index = server.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexName);
       Map.Entry<Object[], Object> entry = null;
 
@@ -581,12 +592,13 @@ public class ReadManager {
         if (rightOperator == null) {
           entry = doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, parms, evaluateExpression, expression,
               columnOffsets, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, leftOperator, index,
-              ascending, retKeys, retRecords, viewVersion, false, counters, groupContext);
+              ascending, retKeys, retRecords, viewVersion, false, counters, groupContext, currOffset, limit, offset);
         }
         else {
           entry = doIndexLookupTwoKeys(dbName, count, tableSchema, indexSchema, forceSelectOnServer, excludeKeys,
               originalLeftKey, leftKey, columnOffsets, originalRightKey, rightKey, leftOperator, rightOperator, parms,
-              evaluateExpression, expression, index, ascending, retKeys, retRecords, viewVersion, false, counters, groupContext);
+              evaluateExpression, expression, index, ascending, retKeys, retRecords, viewVersion, false, counters,
+              groupContext, currOffset, limit, offset);
         }
         //todo: support rightOperator
       }
@@ -594,12 +606,12 @@ public class ReadManager {
         if (rightOperator == null) {
           entry = doIndexLookupOneKey(dbName, count, tableSchema, indexSchema, parms, evaluateExpression, expression,
               columnOffsets, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, leftOperator, index, ascending,
-              retKeys, retRecords, viewVersion, true, counters, groupContext);
+              retKeys, retRecords, viewVersion, true, counters, groupContext, currOffset, limit, offset);
         }
         else {
           entry = doIndexLookupTwoKeys(dbName, count, tableSchema, indexSchema, forceSelectOnServer, excludeKeys,
               originalLeftKey, leftKey, columnOffsets, originalRightKey, rightKey, leftOperator, rightOperator, parms,
-              evaluateExpression, expression, index, ascending, retKeys, retRecords, viewVersion, true, counters, groupContext);
+              evaluateExpression, expression, index, ascending, retKeys, retRecords, viewVersion, true, counters, groupContext, currOffset, limit, offset);
         }
       }
 
@@ -627,6 +639,8 @@ public class ReadManager {
       if (groupContext != null) {
         retObj.put(ComObject.Tag.legacyGroupContext, groupContext.serialize(server.getCommon()));
       }
+
+      retObj.put(ComObject.Tag.currOffset, currOffset.get());
 
       if (schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
@@ -773,6 +787,10 @@ public class ReadManager {
       }
       int count = cobj.getInt(ComObject.Tag.count);
 
+      AtomicLong currOffset = new AtomicLong(cobj.getLong(ComObject.Tag.currOffset));
+      Long limit = cobj.getLong(ComObject.Tag.limitLong);
+      Long offset = cobj.getLong(ComObject.Tag.offsetLong);
+
       int tableId = cobj.getInt(ComObject.Tag.tableId);
       byte[] parmBytes = cobj.getByteArray(ComObject.Tag.parms);
       ParameterHandler parms = null;
@@ -866,7 +884,7 @@ public class ReadManager {
 
       if (tableSchema.getIndexes().get(indexName).isPrimaryKey()) {
         entry = doIndexLookupWithRecordsExpression(dbName, viewVersion, count, tableSchema, indexSchema, columnOffsets, parms, expression, index, leftKey,
-            ascending, retRecords, counters, groupByContext);
+            ascending, retRecords, counters, groupByContext, currOffset, limit, offset);
       }
       else {
         //entry = doIndexLookupExpression(count, indexSchema, columnOffsets, index, leftKey, ascending, retKeys);
@@ -897,6 +915,8 @@ public class ReadManager {
         retObj.put(ComObject.Tag.legacyGroupContext, groupByContext.serialize(server.getCommon()));
       }
 
+      retObj.put(ComObject.Tag.currOffset, currOffset.get());
+
       if (schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
       }
@@ -911,7 +931,7 @@ public class ReadManager {
   private Map.Entry<Object[], Object> doIndexLookupWithRecordsExpression(
       String dbName, long viewVersion, int count, TableSchema tableSchema, IndexSchema indexSchema, Set<Integer> columnOffsets, ParameterHandler parms,
       Expression expression,
-      Index index, Object[] leftKey, Boolean ascending, List<byte[]> ret, Counter[] counters, GroupByContext groupByContext) {
+      Index index, Object[] leftKey, Boolean ascending, List<byte[]> ret, Counter[] counters, GroupByContext groupByContext, AtomicLong currOffset, Long limit, Long offset) {
 
     Map.Entry<Object[], Object> entry;
     if (ascending == null || ascending) {
@@ -930,6 +950,7 @@ public class ReadManager {
         entry = index.ceilingEntry(leftKey);
       }
     }
+    outer:
     while (entry != null) {
       if (ret.size() >= count) {
         break;
@@ -958,7 +979,31 @@ public class ReadManager {
               byte[][] currRet = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, entry.getKey(), tableSchema, counters, groupByContext);
               if (counters == null) {
                 for (byte[] currBytes : currRet) {
-                  ret.add(currBytes);
+                  boolean localDone = false;
+                  boolean include = true;
+                  long targetOffset = 1;
+                  currOffset.incrementAndGet();
+                  if (offset != null) {
+                    targetOffset = offset;
+                    if (currOffset.get() < offset) {
+                      include = false;
+                    }
+                  }
+                  if (include) {
+                    if (limit != null) {
+                      if (currOffset.get() >= targetOffset + limit) {
+                        include = false;
+                        localDone = true;
+                      }
+                    }
+                  }
+                  if (include) {
+                    ret.add(currBytes);
+                  }
+                  if (localDone) {
+                    entry = null;
+                    break outer;
+                  }
                 }
               }
             }
@@ -972,7 +1017,31 @@ public class ReadManager {
           byte[][] retRecords = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, entry.getKey(), tableSchema, counters, groupByContext);
           if (counters == null) {
             for (byte[] currBytes : retRecords) {
-              ret.add(currBytes);
+              boolean localDone = false;
+              boolean include = true;
+              long targetOffset = 1;
+              currOffset.incrementAndGet();
+              if (offset != null) {
+                targetOffset = offset;
+                if (currOffset.get() < offset) {
+                  include = false;
+                }
+              }
+              if (include) {
+                if (limit != null) {
+                  if (currOffset.get() >= targetOffset + limit) {
+                    include = false;
+                    localDone = true;
+                  }
+                }
+              }
+              if (include) {
+                ret.add(currBytes);
+              }
+              if (localDone) {
+                entry = null;
+                break outer;
+              }
             }
           }
         }
@@ -989,28 +1058,28 @@ public class ReadManager {
 
 
   private Map.Entry<Object[], Object> doIndexLookupTwoKeys(
-          String dbName,
-          int count,
-          TableSchema tableSchema,
-          IndexSchema indexSchema,
-          boolean forceSelectOnServer, List<Object[]> excludeKeys,
-          Object[] originalLeftKey,
-          Object[] leftKey,
-          Set<Integer> columnOffsets,
-          Object[] originalRightKey,
-          Object[] rightKey,
-          BinaryExpression.Operator leftOperator,
-          BinaryExpression.Operator rightOperator,
-          ParameterHandler parms,
-          boolean evaluateExpression,
-          Expression expression,
-          Index index,
-          Boolean ascending,
-          List<byte[]> retKeys,
-          List<byte[]> retRecords,
-          long viewVersion, boolean keys,
-          Counter[] counters,
-          GroupByContext groupContext) {
+      String dbName,
+      int count,
+      TableSchema tableSchema,
+      IndexSchema indexSchema,
+      boolean forceSelectOnServer, List<Object[]> excludeKeys,
+      Object[] originalLeftKey,
+      Object[] leftKey,
+      Set<Integer> columnOffsets,
+      Object[] originalRightKey,
+      Object[] rightKey,
+      BinaryExpression.Operator leftOperator,
+      BinaryExpression.Operator rightOperator,
+      ParameterHandler parms,
+      boolean evaluateExpression,
+      Expression expression,
+      Index index,
+      Boolean ascending,
+      List<byte[]> retKeys,
+      List<byte[]> retRecords,
+      long viewVersion, boolean keys,
+      Counter[] counters,
+      GroupByContext groupContext, AtomicLong currOffset, Long limit, Long offset) {
 
     BinaryExpression.Operator greaterOp = leftOperator;
     Object[] greaterKey = leftKey;
@@ -1021,7 +1090,7 @@ public class ReadManager {
     if (greaterOp == BinaryExpression.Operator.less ||
         greaterOp == BinaryExpression.Operator.lessEqual) {
       greaterOp = rightOperator;
-      greaterKey = rightKey;
+      greaterKey = leftKey;
       greaterOriginalKey = originalRightKey;
       lessOp = leftOperator;
       lessKey = leftKey;
@@ -1032,6 +1101,7 @@ public class ReadManager {
     if (ascending == null || ascending) {
       if (greaterKey != null) {
         entry = index.floorEntry(greaterKey);
+        lessKey = originalLeftKey;
       }
       else {
         if (greaterOriginalKey == null) {
@@ -1049,6 +1119,7 @@ public class ReadManager {
       if (ascending != null && !ascending) {
         if (lessKey != null) {
           entry = index.ceilingEntry(lessKey);
+          greaterKey = originalRightKey;
         }
         else {
           if (lessOriginalKey == null) {
@@ -1164,7 +1235,31 @@ public class ReadManager {
         }
         if (keys) {
           for (byte[] currKey : currKeys) {
-            retKeys.add(currKey);
+            boolean localDone = false;
+            boolean include = true;
+            long targetOffset = 1;
+            currOffset.incrementAndGet();
+            if (offset != null) {
+              targetOffset = offset;
+              if (currOffset.get() < offset) {
+                include = false;
+              }
+            }
+            if (include) {
+              if (limit != null) {
+                if (currOffset.get() >= targetOffset + limit) {
+                  include = false;
+                  localDone = true;
+                }
+              }
+            }
+            if (include) {
+              retKeys.add(currKey);
+            }
+            if (localDone) {
+              entry = null;
+              break outer;
+            }
           }
         }
         else {
@@ -1187,7 +1282,31 @@ public class ReadManager {
                   byte[][] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, entry.getKey(), tableSchema, counters, groupContext);
                   if (counters == null) {
                     for (byte[] currBytes : ret) {
-                      retRecords.add(currBytes);
+                      boolean localDone = false;
+                      boolean include = true;
+                      long targetOffset = 1;
+                      currOffset.incrementAndGet();
+                      if (offset != null) {
+                        targetOffset = offset;
+                        if (currOffset.get() < offset) {
+                          include = false;
+                        }
+                      }
+                      if (include) {
+                        if (limit != null) {
+                          if (currOffset.get() >= targetOffset + limit) {
+                            include = false;
+                            localDone = true;
+                          }
+                        }
+                      }
+                      if (include) {
+                        retRecords.add(currBytes);
+                      }
+                      if (localDone) {
+                        entry = null;
+                        break outer;
+                      }
                     }
                   }
                 }
@@ -1200,7 +1319,31 @@ public class ReadManager {
               byte[][] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, entry.getKey(), tableSchema, counters, groupContext);
               if (counters == null) {
                 for (byte[] currBytes : ret) {
-                  retRecords.add(currBytes);
+                  boolean localDone = false;
+                  boolean include = true;
+                  long targetOffset = 1;
+                  currOffset.incrementAndGet();
+                  if (offset != null) {
+                    targetOffset = offset;
+                    if (currOffset.get() < offset) {
+                      include = false;
+                    }
+                  }
+                  if (include) {
+                    if (limit != null) {
+                      if (currOffset.get() >= targetOffset + limit) {
+                        include = false;
+                        localDone = true;
+                      }
+                    }
+                  }
+                  if (include) {
+                    retRecords.add(currBytes);
+                  }
+                  if (localDone) {
+                    entry = null;
+                    break outer;
+                  }
                 }
               }
             }
@@ -1317,7 +1460,7 @@ public class ReadManager {
       long viewVersion,
       boolean keys,
       Counter[] counters,
-      GroupByContext groupContext) {
+      GroupByContext groupContext, AtomicLong currOffset, Long limit, Long offset) {
     Map.Entry<Object[], Object> entry = null;
 
     //count = 3;
@@ -1650,7 +1793,31 @@ public class ReadManager {
           if (keys) {
             if (currKeys != null) {
               for (byte[] currKey : currKeys) {
-                retKeys.add(currKey);
+                boolean localDone = false;
+                boolean include = true;
+                long targetOffset = 1;
+                currOffset.incrementAndGet();
+                if (offset != null) {
+                  targetOffset = offset;
+                  if (currOffset.get() < offset) {
+                    include = false;
+                  }
+                }
+                if (include) {
+                  if (limit != null) {
+                    if (currOffset.get() >= targetOffset + limit) {
+                      include = false;
+                      localDone = true;
+                    }
+                  }
+                }
+                if (include) {
+                  retKeys.add(currKey);
+                }
+                if (localDone) {
+                  entry = null;
+                  break outer;
+                }
               }
             }
           }
@@ -1680,7 +1847,31 @@ public class ReadManager {
                       byte[][] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, currRecords, null, tableSchema, counters, groupContext);
                       if (counters == null) {
                         for (byte[] currBytes : ret) {
-                          retRecords.add(currBytes);
+                          boolean localDone = false;
+                          boolean include = true;
+                          long targetOffset = 1;
+                          currOffset.incrementAndGet();
+                          if (offset != null) {
+                            targetOffset = offset;
+                            if (currOffset.get() < offset) {
+                              include = false;
+                            }
+                          }
+                          if (include) {
+                            if (limit != null) {
+                              if (currOffset.get() >= targetOffset + limit) {
+                                include = false;
+                                localDone = true;
+                              }
+                            }
+                          }
+                          if (include) {
+                            retRecords.add(currBytes);
+                          }
+                          if (localDone) {
+                            entry = null;
+                            break outer;
+                          }
                         }
                       }
 //                    }
@@ -1701,7 +1892,31 @@ public class ReadManager {
                     byte[][] ret = applySelectToResultRecords(dbName, columnOffsets, forceSelectOnServer, records, entry.getKey(), tableSchema, counters, groupContext);
                     if (counters == null) {
                       for (byte[] currBytes : ret) {
-                        retRecords.add(currBytes);
+                        boolean localDone = false;
+                        boolean include = true;
+                        long targetOffset = 1;
+                        currOffset.incrementAndGet();
+                        if (offset != null) {
+                          targetOffset = offset;
+                          if (currOffset.get() < offset) {
+                            include = false;
+                          }
+                        }
+                        if (include) {
+                          if (limit != null) {
+                            if (currOffset.get() >= targetOffset + limit) {
+                              include = false;
+                              localDone = true;
+                            }
+                          }
+                        }
+                        if (include) {
+                          retRecords.add(currBytes);
+                        }
+                        if (localDone) {
+                          entry = null;
+                          break outer;
+                        }
                       }
                     }
 //                  }

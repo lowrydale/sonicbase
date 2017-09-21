@@ -7,12 +7,12 @@ import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.Expression;
-import com.sonicbase.query.InExpression;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.ReadManager;
 import net.sf.jsqlparser.statement.select.Limit;
+import net.sf.jsqlparser.statement.select.Offset;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -23,6 +23,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -131,7 +132,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
 
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain explain) {
+  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset) {
 
     if (exhausted) {
       return null;
@@ -140,10 +141,10 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     AtomicReference<String> usedIndex = new AtomicReference<>();
 
     if (BinaryExpression.Operator.or == operator) {
-      return evaluateOrExpression(count, explain);
+      return evaluateOrExpression(count, explain, currOffset, limit, offset);
     }
     else if (BinaryExpression.Operator.and == operator) {
-      NextReturn ret = evaluateAndExpression(count, usedIndex, explain);
+      NextReturn ret = evaluateAndExpression(count, usedIndex, explain, currOffset, limit, offset);
 //       if (leftExpression.nextShard == -2 ||| rightExpression.nextShard == -2) {
 //         nextShard
 //       }
@@ -180,8 +181,10 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
           explain.getBuilder().append("Table scan: " + getTopLevelExpression().toString() + "\n");
         }
 
-        SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count, getClient().getCommon().getTables(dbName).get(getTableName()),
-            getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(), getRecordCache(), getCounters(), getGroupByContext());
+        SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count,
+            getClient().getCommon().getTables(dbName).get(getTableName()),
+            getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(),
+            getRecordCache(), getCounters(), getGroupByContext(), currOffset, limit, offset);
         if (context != null) {
           setNextShard(context.getNextShard());
           setNextKey(context.getNextKey());
@@ -193,7 +196,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
 //         return tableScan(count, getClient(), (ExpressionImpl) getTopLevelExpression(), getParms(), getTableName());
       }
 
-      return evaluateRelationalOp(count, usedIndex, explain);
+      return evaluateRelationalOp(count, usedIndex, explain, currOffset, limit, offset);
     }
     return null;
   }
@@ -204,11 +207,12 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     rightExpression.getColumnsInExpression(columns);
   }
 
-  public NextReturn next(SelectStatementImpl.Explain explain) {
-    return next(ReadManager.SELECT_PAGE_SIZE, explain);
+  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset) {
+    return next(ReadManager.SELECT_PAGE_SIZE, explain, currOffset, limit, offset);
   }
 
-  private NextReturn evaluateRelationalOp(int count, AtomicReference<String> usedIndex, SelectStatementImpl.Explain explain) {
+  private NextReturn evaluateRelationalOp(int count, AtomicReference<String> usedIndex, SelectStatementImpl.Explain explain,
+                                          AtomicLong currOffset, Limit limit, Offset offset) {
     try {
       ExpressionImpl rightExpression = getRightExpression();
       ExpressionImpl leftExpression = getLeftExpression();
@@ -221,8 +225,8 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
         else {
           Object currLeftValue = ExpressionImpl.getValueFromExpression(getParms(), rightExpression);
           TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(getTableName());
-          int offset = tableSchema.getFieldOffset(columnName);
-          currLeftValue = tableSchema.getFields().get(offset).getType().getConverter().convert(currLeftValue);
+          int o = tableSchema.getFieldOffset(columnName);
+          currLeftValue = tableSchema.getFields().get(o).getType().getConverter().convert(currLeftValue);
           originalLeftValue = currLeftValue;
         }
         IndexSchema indexSchema = null;
@@ -254,8 +258,10 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
         GroupByContext groupByContext = getGroupByContext();
 
         if (groupByContext != null && !indexSchema.isPrimaryKey()) {
-          SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count, getClient().getCommon().getTables(dbName).get(getTableName()),
-              getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(), getRecordCache(), getCounters(), getGroupByContext());
+          SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count,
+              getClient().getCommon().getTables(dbName).get(getTableName()),
+              getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(),
+              getRecordCache(), getCounters(), getGroupByContext(), currOffset, limit, offset);
           if (context != null) {
             setNextShard(context.getNextShard());
             setNextKey(context.getNextKey());
@@ -269,8 +275,9 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
           SelectContextImpl context = ExpressionImpl.lookupIds(dbName, getClient().getCommon(), getClient(), getReplica(), count,
               getTableName(),
               indexName, isForceSelectOnServer(),
-              operator, null, getOrderByExpressions(), leftKey, getParms(), getTopLevelExpression(), null, new Object[]{originalLeftValue}, null, getColumns(), columnName,
-              getNextShard(), getRecordCache(), usedIndex, false, getViewVersion(), getCounters(), getGroupByContext(), debug);
+              operator, null, getOrderByExpressions(), leftKey, getParms(), getTopLevelExpression(), null,
+              new Object[]{originalLeftValue}, null, getColumns(), columnName,
+              getNextShard(), getRecordCache(), usedIndex, false, getViewVersion(), getCounters(), getGroupByContext(), debug, currOffset, limit, offset);
           setNextShard(context.getNextShard());
           setNextKey(context.getNextKey());
           if (getNextShard() == -1 || getNextShard() == -2) {
@@ -488,7 +495,8 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     return null;
   }
 
-  private NextReturn evaluateAndExpression(int count, AtomicReference<String> usedIndex, SelectStatementImpl.Explain explain) {
+  private NextReturn evaluateAndExpression(int count, AtomicReference<String> usedIndex, SelectStatementImpl.Explain explain,
+                                           AtomicLong currOffset, Limit limit, Offset offset) {
     String rightColumn = null;
     String leftColumn = null;
     BinaryExpression.Operator leftOp = null;
@@ -600,7 +608,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
             indexName, isForceSelectOnServer(),
             leftOp, null, getOrderByExpressions(), singleKey, getParms(), getTopLevelExpression(), null,
             originalSingleKey, null, getColumns(), leftColumn, getNextShard(),
-            getRecordCache(), usedIndex, false, getViewVersion(), getCounters(), getGroupByContext(), debug);
+            getRecordCache(), usedIndex, false, getViewVersion(), getCounters(), getGroupByContext(), debug, currOffset, limit, offset);
         if (context != null) {
           setLastShard(context.getLastShard());
           setIsCurrPartitions(context.isCurrPartitions());
@@ -619,8 +627,10 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
         explain.getBuilder().append("Table scan: " + getTopLevelExpression().toString() + "\n");
       }
       else {
-        SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count, getClient().getCommon().getTables(dbName).get(getTableName()),
-            getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(), getRecordCache(), getCounters(), getGroupByContext());
+        SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count,
+            getClient().getCommon().getTables(dbName).get(getTableName()),
+            getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(),
+            getRecordCache(), getCounters(), getGroupByContext(), currOffset, limit, offset);
         if (context != null) {
           setNextShard(context.getNextShard());
           setNextKey(context.getNextKey());
@@ -634,8 +644,10 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     }
     else if (leftEffectiveOp != rightEffectiveOp && !isLeftColumnCompare && !isRightColumnCompare && leftColumn != null && rightColumn != null && leftColumn.equals(rightColumn)) {
       if (indexName == null) {
-        SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count, getClient().getCommon().getTables(dbName).get(getTableName()),
-            getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(), getRecordCache(), getCounters(), getGroupByContext());
+        SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count,
+            getClient().getCommon().getTables(dbName).get(getTableName()),
+            getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(),
+            getRecordCache(), getCounters(), getGroupByContext(), currOffset, limit, offset);
         if (context != null) {
           setNextShard(context.getNextShard());
           setNextKey(context.getNextKey());
@@ -667,7 +679,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
               indexName, isForceSelectOnServer(),
               leftOp, rightOp, getOrderByExpressions(), leftKey, getParms(), getTopLevelExpression(), rightKey,
               new Object[]{originalLeftValue}, new Object[]{originalRightValue}, getColumns(), leftColumn, getNextShard(),
-              getRecordCache(), usedIndex, false, getViewVersion(), getCounters(), getGroupByContext(), debug);
+              getRecordCache(), usedIndex, false, getViewVersion(), getCounters(), getGroupByContext(), debug, currOffset, limit, offset);
           if (context != null) {
             setNextShard(context.getNextShard());
             setNextKey(context.getNextKey());
@@ -688,8 +700,10 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
           explain.appendSpaces();
           explain.getBuilder().append("Table scan: " + getTopLevelExpression().toString() + "\n");
         }
-        SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count, getClient().getCommon().getTables(dbName).get(getTableName()),
-            getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(), getRecordCache(), getCounters(), getGroupByContext());
+        SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count,
+            getClient().getCommon().getTables(dbName).get(getTableName()),
+            getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(),
+            getRecordCache(), getCounters(), getGroupByContext(), currOffset, limit, offset);
         if (context != null) {
           setNextShard(context.getNextShard());
           setNextKey(context.getNextKey());
@@ -701,7 +715,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
 //        return tableScan(count, getClient(), (ExpressionImpl) getTopLevelExpression(), getParms(), getTableName());
       }
       return evaluateOneSidedIndex(new String[]{getTableName()}, count, leftExpression, rightExpression, leftColumn, leftOp,
-          leftValue, rightColumn, rightOp, rightValue, explain);
+          leftValue, rightColumn, rightOp, rightValue, explain, currOffset, limit, offset);
     }
     return null;
   }
@@ -766,7 +780,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
 
   private NextReturn evaluateOneSidedIndex(
       final String[] tableNames, int count, ExpressionImpl leftExpression, ExpressionImpl rightExpression, String leftColumn, Operator leftOp,
-      Object leftValue, String rightColumn, Operator rightOp, Object rightValue, SelectStatementImpl.Explain explain) {
+      Object leftValue, String rightColumn, Operator rightOp, Object rightValue, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset) {
     if (getNextShard() == -2) {
       return null;
     }
@@ -824,7 +838,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
       leftExpression = rightExpression;
       rightExpression = leftExpression;
     }
-    leftIds = leftExpression.next(count, explain);
+    leftIds = leftExpression.next(count, explain, currOffset, limit, offset);
     if (explain != null) {
       explain.appendSpaces();
       explain.getBuilder().append(" AND \n");
@@ -887,7 +901,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     }
     else {
       //todo: loop while less than 200
-      NextReturn rightIds = rightExpression.next(explain);
+      NextReturn rightIds = rightExpression.next(explain, currOffset, limit, offset);
 
       if (rightIds != null && rightIds.getIds() != null) {
         String[] columns = null;
@@ -950,10 +964,12 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     }
   }
 
-  private NextReturn evaluateOrExpression(int count, SelectStatementImpl.Explain explain) {
+  private NextReturn evaluateOrExpression(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset) {
     if (!leftExpression.canUseIndex() || !rightExpression.canUseIndex()) {
-      SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count, getClient().getCommon().getTables(dbName).get(getTableName()),
-          getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(), getRecordCache(), getCounters(), getGroupByContext());
+      SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count,
+          getClient().getCommon().getTables(dbName).get(getTableName()),
+          getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(), getRecordCache(),
+          getCounters(), getGroupByContext(), currOffset, limit, offset);
       if (context != null) {
         setNextShard(context.getNextShard());
         setNextKey(context.getNextKey());
@@ -967,13 +983,13 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     if (explain != null) {
       explain.indent();
     }
-    NextReturn leftIds = leftExpression.next(explain);
+    NextReturn leftIds = leftExpression.next(explain, currOffset, limit, offset);
     if (explain != null) {
       explain.outdent();
       explain.getBuilder().append(" OR \n");
       explain.indent();
     }
-    NextReturn rightIds = rightExpression.next(explain);
+    NextReturn rightIds = rightExpression.next(explain, currOffset, limit, offset);
     if (explain != null) {
       explain.outdent();
     }

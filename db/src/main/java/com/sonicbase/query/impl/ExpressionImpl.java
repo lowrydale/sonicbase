@@ -16,6 +16,7 @@ import com.sonicbase.server.SnapshotManager;
 import com.sonicbase.util.DataUtil;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.sf.jsqlparser.statement.select.Limit;
+import net.sf.jsqlparser.statement.select.Offset;
 import org.apache.commons.lang.exception.ExceptionUtils;
 
 import java.io.*;
@@ -399,9 +400,9 @@ public abstract class ExpressionImpl implements Expression {
   abstract public Object evaluateSingleRecord(
       TableSchema[] tableSchemas, Record[] records, ParameterHandler parms);
 
-  abstract public NextReturn next(SelectStatementImpl.Explain explain);
+  abstract public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset);
 
-  public abstract NextReturn next(int count, SelectStatementImpl.Explain explain);
+  public abstract NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset);
 
   abstract public boolean canUseIndex();
 
@@ -950,7 +951,7 @@ public abstract class ExpressionImpl implements Expression {
     SelectContextImpl context = ExpressionImpl.lookupIds(dbName, client.getCommon(), client, replica, 1, tableSchema.getName(), primaryKeyIndex.getName(), forceSelectOnServer,
         BinaryExpression.Operator.equal, null, null, key, parms, expression, null, key, null,
         columns, primaryKeyIndex.getFields()[0], nextShard, recordCache, usedIndex, true, viewVersion, expression == null ? null : ((ExpressionImpl)expression).getCounters(),
-        expression == null ? null : ((ExpressionImpl)expression).groupByContext, debug);
+        expression == null ? null : ((ExpressionImpl)expression).groupByContext, debug, new AtomicLong(), null, null);
 //
     Object[][][] currKeys = context.getCurrKeys();
     if (currKeys != null) {
@@ -1006,7 +1007,7 @@ public abstract class ExpressionImpl implements Expression {
         BinaryExpression.Operator.equal, null, null, key, parms, expression, null, key, null,
         columns, primaryKeyIndex.getFields()[0], nextShard, recordCache, usedIndex, false, viewVersion,
         expression == null ? null : ((ExpressionImpl)expression).getCounters(),
-        expression == null ? null : ((ExpressionImpl)expression).groupByContext, debug);
+        expression == null ? null : ((ExpressionImpl)expression).groupByContext, debug, new AtomicLong(), null, null);
 
     CachedRecord ret = recordCache.get(tableName, key);
     if (ret != null) {
@@ -1393,7 +1394,8 @@ public abstract class ExpressionImpl implements Expression {
       Object[] originalLeftValue,
       Object[] originalRightValue,
       List<ColumnImpl> columns, String columnName, int shard, RecordCache recordCache,
-      AtomicReference<String> usedIndex, boolean evaluateExpression, long viewVersion, Counter[] counters, GroupByContext groupByContext, boolean debug) {
+      AtomicReference<String> usedIndex, boolean evaluateExpression, long viewVersion, Counter[] counters,
+      GroupByContext groupByContext, boolean debug, AtomicLong currOffset, Limit limit, Offset offset) {
 
     Timer.Context ctx = DatabaseClient.INDEX_LOOKUP_STATS.time();
     StringBuilder preparedKey = new StringBuilder();
@@ -1608,6 +1610,14 @@ public abstract class ExpressionImpl implements Expression {
             cobj.put(ComObject.Tag.transactionId, client.getTransactionId());
             cobj.put(ComObject.Tag.viewVersion, viewVersion);
 
+            cobj.put(ComObject.Tag.currOffset, currOffset.get());
+            if (limit != null) {
+              cobj.put(ComObject.Tag.limitLong, limit.getRowCount());
+            }
+            if (offset != null) {
+              cobj.put(ComObject.Tag.offsetLong, offset.getOffset());
+            }
+
             if (!isPrepared) {
               cobj.put(ComObject.Tag.tableId, tableSchema.getTableId());
               cobj.put(ComObject.Tag.indexId, indexSchema.getIndexId());
@@ -1710,6 +1720,10 @@ public abstract class ExpressionImpl implements Expression {
             }
             else {
               nextKey = null;
+            }
+            Long retOffset = retObj.getLong(ComObject.Tag.currOffset);
+            if (retOffset != null) {
+              currOffset.set(retOffset);
             }
             for (int i = 0; i < selectedShards.size(); i++) {
               if (localShard == selectedShards.get(i)) {
@@ -1826,6 +1840,20 @@ public abstract class ExpressionImpl implements Expression {
               logger.debug("Switched shards: id=" + id +
                   ", retLen=" + (recordRet == null ? 0 : recordRet.length) + ", count=" + count + ", nextShard=" + nextShard);
             }
+
+            if (limit != null) {
+              long tmpOffset = 1;
+              if (offset != null) {
+                tmpOffset = offset.getOffset();
+              }
+              if (currOffset.get() >= tmpOffset + limit.getRowCount() - 1) {
+                nextShard = -2;
+                nextKey = null;
+                break;
+              }
+            }
+
+            localLeftValue = nextKey;
 
             if (/*originalShard != -1 ||*/localShard == -1 || localShard == -2 || (retKeys != null && retKeys.length >= count) || (recordRet != null && recordRet.length >= count)) {
               break;
@@ -1973,7 +2001,7 @@ public abstract class ExpressionImpl implements Expression {
   public static SelectContextImpl tableScan(
       String dbName, long viewVersion, DatabaseClient client, int count, TableSchema tableSchema, List<OrderByExpressionImpl> orderByExpressions,
       ExpressionImpl expression, ParameterHandler parms, List<ColumnImpl> columns, int shard, Object[] nextKey,
-      RecordCache recordCache, Counter[] counters, GroupByContext groupByContext) {
+      RecordCache recordCache, Counter[] counters, GroupByContext groupByContext, AtomicLong currOffset, Limit limit, Offset offset) {
     try {
       int localShard = shard;
       Object[] localNextKey = nextKey;
@@ -2029,6 +2057,14 @@ public abstract class ExpressionImpl implements Expression {
           cobj.put(ComObject.Tag.leftKey, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), localNextKey));
         }
 
+        cobj.put(ComObject.Tag.currOffset, currOffset.get());
+        if (limit != null) {
+          cobj.put(ComObject.Tag.limitLong, limit.getRowCount());
+        }
+        if (offset != null) {
+          cobj.put(ComObject.Tag.offsetLong, offset.getOffset());
+        }
+
         if (columns == null) {
           columns = new ArrayList<>();
         }
@@ -2073,6 +2109,11 @@ public abstract class ExpressionImpl implements Expression {
           throw new SchemaOutOfSyncException();
         }
         ComObject retObj = new ComObject(lookupRet);
+
+        Long retOffset = retObj.getLong(ComObject.Tag.currOffset);
+        if (retOffset != null) {
+          currOffset.set(retOffset);
+        }
 
         localNextKey = null;
         byte[] keyBytes = retObj.getByteArray(ComObject.Tag.keyBytes);
@@ -2160,6 +2201,17 @@ public abstract class ExpressionImpl implements Expression {
             recordCache.put(tableSchema.getName(), key, new CachedRecord(record, curr));
           }
 
+        }
+
+        if (limit != null) {
+          long tmpOffset = 1;
+          if (offset != null) {
+            tmpOffset = offset.getOffset();
+          }
+          if (currOffset.get() >= tmpOffset + limit.getRowCount() - 1) {
+            nextShard = -2;
+            nextKey = null;
+          }
         }
       }
 

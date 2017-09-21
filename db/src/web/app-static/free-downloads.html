@@ -32,17 +32,17 @@
             }
         });
 
-        var captchaResponse = grecaptcha.getResponse(widgetId1);
-        if (captchaResponse == null || captchaResponse.length == 0) {
-            alert("Please specify you are not a robot");
-            return;
-        }
+//        var captchaResponse = grecaptcha.getResponse(widgetId1);
+//        if (captchaResponse == null || captchaResponse.length == 0) {
+//            alert("Please specify you are not a robot");
+//            return;
+//        }
         $.ajax({
             headers:{
                 "Accept":"application/text",
                 "Content-type":"application/json"
             },   url:"/app/notifyFreeDownload?" +
-            "referringSite=" + site + "&captchaResponse=" + encodeURI(captchaResponse) +
+            "referringSite=" + site + /*"&captchaResponse=" + encodeURI(captchaResponse) +*/
             "&downloadUrl=" + encodeURI(url),
             success:function(response){
                 window.location.href = url;
@@ -90,7 +90,7 @@
       </div>
       <div class="desktop">
           <a href="../index.html">
-              <img src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+              <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
           </a>
 
       <nav>
@@ -123,10 +123,12 @@
 
                      </form>
                      <br/><br/>
+                     <!--
                      <div id="html_element"></div>
                      <script src="https://www.google.com/recaptcha/api.js?onload=onloadCallback&render=explicit"
                              async defer>
                      </script>
+                     -->
                  </td>
                  <td>
                      <table width="100%">
@@ -143,7 +145,7 @@
                                  <div class="mylink">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.2.1&nbsp;&nbsp;<a href="#" onclick="freeDownload('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-1.2.1.tgz')">tgz</a></div>
                              </td>
                              <td>
-                                 &nbsp;&nbsp;&nbsp;&nbsp;9/15/2017<br/>
+                                 &nbsp;&nbsp;&nbsp;&nbsp;9/20/2017<br/>
                                  &nbsp;&nbsp;&nbsp;&nbsp;8/18/2017<br/>
                                  &nbsp;&nbsp;&nbsp;&nbsp;8/10/2017<br/>
                                  &nbsp;&nbsp;&nbsp;&nbsp;6/31/2017<br/>

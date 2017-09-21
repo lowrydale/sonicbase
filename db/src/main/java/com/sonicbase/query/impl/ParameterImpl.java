@@ -4,11 +4,14 @@ import com.sonicbase.common.Record;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.TableSchema;
+import net.sf.jsqlparser.statement.select.Limit;
+import net.sf.jsqlparser.statement.select.Offset;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Responsible for
@@ -83,12 +86,12 @@ public class ParameterImpl extends ExpressionImpl {
     return ExpressionImpl.Type.parameter;
   }
 
-  public NextReturn next(SelectStatementImpl.Explain explain) {
+  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset) {
     return null;
   }
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain explain) {
+  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset) {
     return null;
   }
 

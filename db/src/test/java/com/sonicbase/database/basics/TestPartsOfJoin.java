@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.testng.Assert.assertEquals;
@@ -155,7 +156,8 @@ public class TestPartsOfJoin {
     SelectContextImpl ret = ExpressionImpl.lookupIds("test",
           client.getCommon(), client, 0, 1000, tableSchema.getName(), indexSchema.getName(), false, BinaryExpression.Operator.less,
           null, null, new Object[]{100L}, null, null, null, new Object[]{100L}, null, null, "id", 0, recordCache, usedIndex,
-        false, client.getCommon().getSchemaVersion(), null, null, false);
+        false, client.getCommon().getSchemaVersion(), null, null, false,
+        new AtomicLong(), null, null);
 
     Object[][][] keys = ret.getCurrKeys();
     assertEquals(keys[0][0][0], 9L);

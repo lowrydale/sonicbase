@@ -21,6 +21,11 @@ var TREE_ITEMS = [
 	['Documentation', '',
 	    ['Getting Started', 'docs/getting-started.html?framed=true'],
         ['Features', 'docs/features.html?framed=true'],
+        ['Benchmarks', null,
+            ['Batch Insert', 'docs/benchmarks-batch-insert.html?framed=true'],
+            ['Identity Query', 'docs/benchmarks-identity-query.html?framed=true'],
+            ['Range Query', 'docs/benchmarks-range-query.html?framed=true'],
+        ],
 		['SQL Syntax', null,
 			['Select', 0,
 				['Select Basics', 'docs/select-basics.html?framed=true'],
@@ -54,27 +59,21 @@ var TREE_ITEMS = [
 		['Data Types',  'docs/datatypes.html?framed=true'],
 		['Performance Considerations', 'docs/performance-considerations.html?framed=true'],
         ['Troubleshooting', 'docs/troubleshooting.html?framed=true'],
-        ['Benchmarks', null,
-            ['Batch Insert', 'docs/benchmarks-batch-insert.html?framed=true'],
-            ['Identity Query', 'docs/benchmarks-identity-query.html?framed=true'],
-            ['Range Query', 'docs/benchmarks-range-query.html?framed=true'],
-        ],
 		['Pro Version/30-day Trial',  0,
             ['Getting Started', 'docs/pro-getting-started.html?framed=true'],
 		    ['Features', 'docs/pro-features.html?framed=true'],
             ['SQL Syntax', null,
-                ['Select', 0,
-                    ['Joins', 0,
-                        ['Inner', 'docs/joins-inner.html?framed=true'],
-                        ['Left Outer', 'docs/joins-left-outer.html?framed=true'],
-                        ['Right Outer', 'docs/joins-right-outer.html?framed=true'],
-                        ['Full', 'docs/joins-full.html?framed=true'],
-                        ['Three-Way', 'docs/joins-three-way.html?framed=true']
-                    ]
-                ],
+                ['Joins', 0,
+                    ['Inner', 'docs/joins-inner.html?framed=true'],
+                    ['Left Outer', 'docs/joins-left-outer.html?framed=true'],
+                    ['Right Outer', 'docs/joins-right-outer.html?framed=true'],
+                    ['Full', 'docs/joins-full.html?framed=true'],
+                    ['Three-Way', 'docs/joins-three-way.html?framed=true']
+                ]
                 ['Describe Shards', 'docs/describe-shards.html?framed=true'],
                 ['Describe Server Stats', 'docs/describe-server-stats.html?framed=true'],
                 ['Describe Server Health', 'docs/describe-server-health.html?framed=true']
+                    ['Describe Licenses', 'docs/license-server.html?framed=true']
             ],
             ['Transactions',  'docs/transactions.html?framed=true'],
             ['Backup & Restore',  'docs/backup-restore.html?framed=true'],
@@ -136,7 +135,7 @@ var TREE_TPL = {
 
       <div class="desktop">
           <a href="index.html">
-              <img src="images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+              <img style="margin-top:3px" src="images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
           </a>
           <nav>
           <ul>
@@ -155,6 +154,9 @@ var TREE_TPL = {
              <div style="margin-left: 1em;">
                      <a href="docs/getting-started.html">Getting Started</a><br/>
                      <a href="docs/features.html">Features</a><br/>
+                 <a href="docs/benchmarks-batch-insert.html">Benchmarks - Batch Insert</a><br/>
+                 <a href="docs/benchmarks-identity-query.html">Benchmarks - Identity Query</a><br/>
+                 <a href="docs/benchmarks-range-query.html">Benchmarks - Range Query</a><br/>
                      <a href="docs/select-basics.html">SQL Syntax Basics</a><br/>
                      <a href="docs/select-order-by.html">SQL Syntax Order By</a><br/>
                      <a href="docs/select-functions.html">SQL Syntax Functions</a><br/>
@@ -181,9 +183,6 @@ var TREE_TPL = {
                      <a href="docs/monitoring.html">Monitoring</a><br/>
                      <a href="docs/performance-considerations.html">Performance Considerations</a><br/>
                     <a href="docs/troubleshooting.html">Troubleshooting</a><br/>
-                 <a href="docs/benchmarks-batch-insert.html">Benchmarks - Batch Insert</a><br/>
-                 <a href="docs/benchmarks-identity-query.html">Benchmarks - Identity Query</a><br/>
-                 <a href="docs/benchmarks-range-query.html">Benchmarks - Range Query</a><br/>
                      <a href="docs/pro-getting-started.html">Pro - Getting Started</a><br/>
                      <a href="docs/pro-features.html">Pro - Version Features</a><br/>
                      <a href="docs/joins-inner.html">Pro - SQL Syntax Inner Join</a><br/>

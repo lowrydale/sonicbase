@@ -31,7 +31,7 @@
 
       <div class="desktop">
         <a href="index.html">
-        <img src="images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+        <img style="margin-top:3px" src="images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
         </a>
       <nav>
         <ul>
@@ -79,15 +79,30 @@
     <h2>Distributed Database</h2>
     Records and indices are spread out across as many servers as you deem necessary. The data is transparently divided into shards
     and it is dynamically distributed as you add or delete records. You can scale SonicBase to billions
-    of records. See the documented benchmarks for more details. Sonicbase Pro supports cross-shard transactions and cross-shard joins.
+    of records on commodity servers. See the documented benchmarks for more details. SonicBase Pro supports cross-shard transactions and cross-shard joins.
     <h2>Relational Database</h2>
     SonicBase supports the SQL syntax. SQL support is accessed via the JDBC driver.
     <h2>Cross-platform Database</h2>
     SonicBase is cross-platform, supporting Linux, Mac, Cygwin and Windows.
     <h2>Performance</h2>
     With a 32 server, 4 billion record cluster with replication factor equals 1 we achieved 4.4 million batch record inserts per second and
-    49 million range-based record reads per second.
+    49 million range-based record reads per second. With SonicBase you can achieve linear scalability.
+    <h2>Coming Soon</h2>
 
+    <div style="margin-left: 2em; margin-right: 2em; font-size: 16px;">
+    <h3>Automatic Bulk Import</h3>
+    We are adding the ability to automatically load your SonicBase database from another JDBC compliant database. This will allow
+    you to quickly load SonicBase and do analytics on your data.
+
+    <h3>Streaming Analytics</h3>
+      You will be able to connect to a streaming source such as Kafka or AWS Simple Queuing Service and load your SonicBase
+      database in real-time, while you perform analytics functions on your SonicBase database. Optionally, you will be able
+      to automatically remove data that has been in the database for a specified amount of time. This will allow you to continuously
+      injest data into the database without running out of space.
+    </div>
+    <div class="mylink">
+    <h2><a href="downloads.html">Get Started Now</a></h2>
+    </div>
 <br/><br/><br/>
   </div>
   <!-- Copyrights Section -->

@@ -22,6 +22,7 @@ import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class UpdateStatementImpl extends StatementImpl implements UpdateStatement {
   private final DatabaseClient client;
@@ -73,7 +74,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
         getWhereClause().reset();
         while (true) {
 
-          ExpressionImpl.NextReturn ret = getWhereClause().next(explain);
+          ExpressionImpl.NextReturn ret = getWhereClause().next(explain, new AtomicLong(), null, null);
           if (ret == null || ret.getIds() == null) {
             return countUpdated;
           }

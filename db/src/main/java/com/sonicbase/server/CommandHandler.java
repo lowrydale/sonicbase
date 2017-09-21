@@ -331,6 +331,26 @@ public class CommandHandler {
     return existingSequenceNumber;
   }
 
+  public ComObject cancelBulkImport(final ComObject cobj, boolean replayedCommand) {
+    return server.cancelBulkImport(cobj);
+  }
+
+  public ComObject getBulkImportProgress(final ComObject cobj, boolean replayedCommand) {
+    return server.getBulkImportProgress(cobj);
+  }
+
+  public ComObject getBulkImportProgressOnServer(final ComObject cobj, boolean replayedCommand) {
+    return server.getBulkImportProgressOnServer(cobj);
+  }
+
+  public ComObject startBulkImportOnServer(ComObject cobj, boolean replayedCommand) {
+    return server.startBulkImportOnServer(cobj);
+  }
+
+  public ComObject startBulkImport(ComObject cobj, boolean replayedCommand) {
+    return server.startBulkImport(cobj);
+  }
+
   public ComObject licenseCheckin(ComObject cobj, boolean replayedCommand) {
     return server.licenseCheckin(cobj);
   }

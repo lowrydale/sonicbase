@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.testng.Assert.*;
@@ -564,7 +565,8 @@ public class TestDatabase {
        new Object[]{"933-28-0".getBytes()},
            null,
            columns, "socialsecuritynumber", 0, recordCache,
-           usedIndex, false, client.getCommon().getSchemaVersion(), null, null, false);
+           usedIndex, false, client.getCommon().getSchemaVersion(), null, null,
+         false, new AtomicLong(), null, null);
 
      assertEquals(ret.getCurrKeys().length, 4);
 
@@ -1467,15 +1469,6 @@ public class TestDatabase {
     ret.next();
     assertEquals(ret.getLong("id"), 4);
     assertEquals(ret.getLong("id2"), 8);
-    ret.next();
-    assertEquals(ret.getLong("id"), 4);
-    assertEquals(ret.getLong("id2"), 8);
-    ret.next();
-    assertEquals(ret.getLong("id"), 5);
-    assertEquals(ret.getLong("id2"), 10);
-    ret.next();
-    assertEquals(ret.getLong("id"), 5);
-    assertEquals(ret.getLong("id2"), 10);
     assertFalse(ret.next());
   }
 
@@ -1509,6 +1502,9 @@ public class TestDatabase {
     ret.next();
     assertEquals(ret.getLong("id"), 5);
     assertEquals(ret.getLong("id2"), 10);
+    ret.next();
+    assertEquals(ret.getLong("id"), 6);
+    assertEquals(ret.getLong("id2"), 12);
     assertFalse(ret.next());
   }
 
@@ -1528,12 +1524,6 @@ public class TestDatabase {
     ret.next();
     assertEquals(ret.getLong("id"), 4);
     assertEquals(ret.getLong("id2"), 8);
-    ret.next();
-    assertEquals(ret.getLong("id"), 5);
-    assertEquals(ret.getLong("id2"), 10);
-    ret.next();
-    assertEquals(ret.getLong("id"), 5);
-    assertEquals(ret.getLong("id2"), 10);
     assertFalse(ret.next());
   }
 
@@ -1548,6 +1538,23 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 4);
     ret.next();
     assertEquals(ret.getLong("id"), 5);
+    ret.next();
+    assertEquals(ret.getLong("id"), 6);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testLimitOffsetOneKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where id > ? limit 3 offset 2");
+    stmt.setLong(1, 2);
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 4);
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    ret.next();
+    assertEquals(ret.getLong("id"), 6);
     assertFalse(ret.next());
   }
 
@@ -2670,6 +2677,46 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 1);
     ret.next();
     assertEquals(ret.getLong("id"), 0);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testLessEqualGreaterEqual() throws SQLException {
+
+    //test select returns multiple records with an index using operator '<='
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where id >= 1 and id<=5 order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    ret.next();
+    assertEquals(ret.getLong("id"), 2);
+    ret.next();
+    assertEquals(ret.getLong("id"), 3);
+    ret.next();
+    assertEquals(ret.getLong("id"), 4);
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testLessEqualGreaterEqualDesc() throws SQLException {
+
+    //test select returns multiple records with an index using operator '<='
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where id >= 1 and id<=5 order by id desc");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    ret.next();
+    assertEquals(ret.getLong("id"), 4);
+    ret.next();
+    assertEquals(ret.getLong("id"), 3);
+    ret.next();
+    assertEquals(ret.getLong("id"), 2);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
     assertFalse(ret.next());
   }
 

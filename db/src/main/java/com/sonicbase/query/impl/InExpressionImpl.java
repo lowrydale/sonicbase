@@ -12,12 +12,15 @@ import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.ReadManager;
 import com.sonicbase.server.SnapshotManager;
+import net.sf.jsqlparser.statement.select.Limit;
+import net.sf.jsqlparser.statement.select.Offset;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class InExpressionImpl extends ExpressionImpl implements InExpression {
@@ -193,13 +196,15 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
   }
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain explain) {
+  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset) {
     if (getNextShard() == -2) {
       return new NextReturn(new String[]{getTableName()}, null);
     }
     if (isNot()) {
-      SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count, getClient().getCommon().getTables(dbName).get(getTableName()),
-           getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(), getRecordCache(), getCounters(), getGroupByContext());
+      SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count,
+          getClient().getCommon().getTables(dbName).get(getTableName()),
+           getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(),
+          getRecordCache(), getCounters(), getGroupByContext(), currOffset, limit, offset);
        if (context != null) {
          setNextShard(context.getNextShard());
          setNextKey(context.getNextKey());
@@ -224,8 +229,10 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
     }
 
     if (indexSchema == null) {
-      SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count, getClient().getCommon().getTables(dbName).get(getTableName()),
-          getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(), getRecordCache(), getCounters(), getGroupByContext());
+      SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count,
+          getClient().getCommon().getTables(dbName).get(getTableName()),
+          getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(),
+          getRecordCache(), getCounters(), getGroupByContext(), currOffset, limit, offset);
       if (context != null) {
         setNextShard(context.getNextShard());
         setNextKey(context.getNextKey());
@@ -243,7 +250,7 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
           tableName, indexSchema.getName(), isForceSelectOnServer(),
           BinaryExpression.Operator.equal, null,
           null, key, getParms(), this, null, key, null, getColumns(), cNode.getColumnName(), -1, getRecordCache(), usedIndex,
-          false, getViewVersion(), getCounters(), getGroupByContext(), debug);
+          false, getViewVersion(), getCounters(), getGroupByContext(), debug, currOffset, limit, offset);
       ret = ExpressionImpl.aggregateResults(ret, currRet.getCurrKeys());
     }
     setNextShard(-2);
@@ -251,8 +258,8 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
   }
 
 
-  public NextReturn next(SelectStatementImpl.Explain explain) {
-    return next(ReadManager.SELECT_PAGE_SIZE, explain);
+  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset) {
+    return next(ReadManager.SELECT_PAGE_SIZE, explain, currOffset, limit, offset);
   }
 
   @Override

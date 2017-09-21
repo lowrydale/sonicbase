@@ -5,12 +5,15 @@ import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.TableSchema;
 import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
+import net.sf.jsqlparser.statement.select.Limit;
+import net.sf.jsqlparser.statement.select.Offset;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class ColumnImpl extends ExpressionImpl {
   private ExpressionList parameters;
@@ -166,12 +169,12 @@ public class ColumnImpl extends ExpressionImpl {
   }
 
   @Override
-  public NextReturn next(SelectStatementImpl.Explain explainBuilder) {
+  public NextReturn next(SelectStatementImpl.Explain explainBuilder, AtomicLong currOffset, Limit limit, Offset offset) {
     return null;
   }
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain explain) {
+  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset) {
     return null;
   }
 

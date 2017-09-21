@@ -91,7 +91,7 @@
 
         <div class="desktop">
             <a href="../index.html">
-                <img src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+                <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
             </a>
         <nav>
             <ul>
@@ -132,11 +132,7 @@
             <td></td><td>
                 <div id="paypal-button"></div>
 
-            <!--                           return paypal.request.post("https://sonicbase.com/license/paypal/create-payment?" +
-               "cores=" + document.getElementById("cores").value +
-               "&promoCode=" + document.getElementById("promoCode").value +
-               "&sessionId=" + readCookie("SBSessionId")
--->                <script>
+                <script>
                     paypal.Button.render({
 
                         env: 'production',
@@ -169,6 +165,7 @@
 
                     }, '#paypal-button');
                 </script>
+        
         </td>
         </tr>
     </table>

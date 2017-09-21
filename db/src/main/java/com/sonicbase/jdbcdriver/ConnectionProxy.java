@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -33,8 +34,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class ConnectionProxy implements Connection {
 
   private static final Object clientMutex = new Object();
-  private static DatabaseClient databaseClient;
+  private static Map<String, ClientEntry> clients = new ConcurrentHashMap<>();
   private final String dbName;
+  private final String url;
   private boolean autoCommit;
   private java.util.Map<String, Class<?>> typemap;
   private int rsHoldability;
@@ -43,6 +45,15 @@ public class ConnectionProxy implements Connection {
   private boolean closed = false;
   private int shard;
 
+
+  private class ClientEntry {
+    private DatabaseClient client;
+    private AtomicInteger refCount = new AtomicInteger();
+
+    public ClientEntry(DatabaseClient client) {
+      this.client = client;
+    }
+  }
 
   public ConnectionProxy(String url, Properties properties) throws SQLException {
 
@@ -58,17 +69,21 @@ public class ConnectionProxy implements Connection {
         db = db.toLowerCase();
       }
       synchronized (clientMutex) {
-        if (databaseClient != null) {
-          databaseClient.shutdown();
+        ClientEntry clientEntry = clients.get(url);
+        if (clientEntry == null) {
+          DatabaseClient client = new DatabaseClient(hosts, -1, -1, true);
+          clientEntry = new ClientEntry(client);
+          clients.put(url, clientEntry);
+          if (db != null) {
+            client.initDb(db);
+          }
         }
-        databaseClient = new DatabaseClient(hosts, -1, -1, true);
+        clientEntry.refCount.incrementAndGet();
         Logger.setIsClient(true);
         Logger.setReady();
       }
-      if (db != null) {
-        databaseClient.initDb(db);
-      }
       this.dbName = db;
+      this.url = url;
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -81,7 +96,7 @@ public class ConnectionProxy implements Connection {
   private static final AtomicInteger globalContextRefCount = new AtomicInteger();
 
   public DatabaseClient getDatabaseClient() {
-    return databaseClient;
+    return clients.get(url).client;
   }
 
   private void initGlobalContext() {
@@ -89,31 +104,31 @@ public class ConnectionProxy implements Connection {
   }
 
   public boolean isBackupComplete() {
-    return databaseClient.isBackupComplete();
+    return clients.get(url).client.isBackupComplete();
   }
 
   public boolean isRestoreComplete() {
-    return databaseClient.isRestoreComplete();
+    return clients.get(url).client.isRestoreComplete();
   }
 
   public void startBackup() {
-    databaseClient.startBackup();
+    clients.get(url).client.startBackup();
   }
 
   public void startRestore(String subDir) {
-    databaseClient.startRestore(subDir);
+    clients.get(url).client.startRestore(subDir);
   }
 
   public int getReplicaCount() {
-    return databaseClient.getReplicaCount();
+    return clients.get(url).client.getReplicaCount();
   }
 
   public int getShardCount() {
-    return databaseClient.getShardCount();
+    return clients.get(url).client.getShardCount();
   }
 
   public long getSchemaVersion() {
-    return databaseClient.getCommon().getSchemaVersion();
+    return clients.get(url).client.getCommon().getSchemaVersion();
   }
 
   public static com.sonicbase.query.ResultSet describeLicenses() {
@@ -137,36 +152,36 @@ public class ConnectionProxy implements Connection {
 
   public byte[] send(String batchKey,
                      int shard, long auth_user, String command, ComObject body, Replica replica) {
-    return databaseClient.send(batchKey, shard, auth_user, command, body, replica.cliReplica);
+    return clients.get(url).client.send(batchKey, shard, auth_user, command, body, replica.cliReplica);
   }
 
   public byte[] send(String batchKey,
                      int shard, long auth_user, String command, ComObject body, Replica replica, boolean ignoreDeath) {
-    return databaseClient.send(batchKey, shard, auth_user, command, body, replica.cliReplica, ignoreDeath);
+    return clients.get(url).client.send(batchKey, shard, auth_user, command, body, replica.cliReplica, ignoreDeath);
   }
 
   public int getMasterReplica(int shard) {
-    return databaseClient.getCommon().getServersConfig().getShards()[shard].getMasterReplica();
+    return clients.get(url).client.getCommon().getServersConfig().getShards()[shard].getMasterReplica();
   }
 
   public Map<String, TableSchema> getTables(String dbName) {
-    return databaseClient.getCommon().getTables(dbName);
+    return clients.get(url).client.getCommon().getTables(dbName);
   }
 
   public String debugRecord(String dbName, String tableName, String indexName, String key) {
-    return databaseClient.debugRecord(dbName, tableName, indexName, key);
+    return clients.get(url).client.debugRecord(dbName, tableName, indexName, key);
   }
 
   public ReconfigureResults reconfigureCluster() {
-    return databaseClient.reconfigureCluster();
+    return clients.get(url).client.reconfigureCluster();
   }
 
   public byte[] sendToMaster(String command, ComObject body) {
-    return databaseClient.sendToMaster(command, body);
+    return clients.get(url).client.sendToMaster(command, body);
   }
 
     public void syncSchema() {
-    databaseClient.syncSchema();
+    clients.get(url).client.syncSchema();
   }
 
     protected void checkClosed() throws SQLException {
@@ -177,7 +192,7 @@ public class ConnectionProxy implements Connection {
 
   public Statement createStatement() throws SQLException {
     try {
-      return new StatementProxy(this, databaseClient, null);
+      return new StatementProxy(this, clients.get(url).client, null);
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -186,7 +201,7 @@ public class ConnectionProxy implements Connection {
 
   public void beginExplicitTransaction(String dbName) throws SQLException {
     try {
-      databaseClient.beginExplicitTransaction(dbName);
+      clients.get(url).client.beginExplicitTransaction(dbName);
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -199,7 +214,7 @@ public class ConnectionProxy implements Connection {
 
   public void commit() throws SQLException {
     try {
-      databaseClient.commit(dbName, null);
+      clients.get(url).client.commit(dbName, null);
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -208,7 +223,7 @@ public class ConnectionProxy implements Connection {
 
   public void rollback() throws SQLException {
     try {
-      databaseClient.rollback(dbName);
+      clients.get(url).client.rollback(dbName);
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -236,8 +251,13 @@ public class ConnectionProxy implements Connection {
       if (closed) {
         throw new SQLException("Attempting to close a connection that is already closed");
       }
+
       closed = true;
-      databaseClient.shutdown();
+      ClientEntry entry = clients.get(url);
+      if (entry.refCount.decrementAndGet() == 0) {
+        entry.client.shutdown();
+        clients.remove(url);
+      }
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -261,23 +281,17 @@ public class ConnectionProxy implements Connection {
   }
 
   public void setCatalog(String catalog) throws SQLException {
-    //todo: implement
-    throw new NotImplementedException();
   }
 
   public String getCatalog() throws SQLException {
-    //todo: implement
-    throw new NotImplementedException();
+    return null;
   }
 
   public void setTransactionIsolation(int level) throws SQLException {
-    //todo: implement
-    throw new NotImplementedException();
   }
 
   public int getTransactionIsolation() throws SQLException {
-    //todo: implement
-    throw new NotImplementedException();
+    return TRANSACTION_READ_COMMITTED;
   }
 
   public SQLWarning getWarnings() throws SQLException {
@@ -305,7 +319,7 @@ public class ConnectionProxy implements Connection {
 
   public PreparedStatement prepareStatement(String sql) throws SQLException {
     try {
-      return new StatementProxy(this, databaseClient, sql);
+      return new StatementProxy(this, clients.get(url).client, sql);
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -318,7 +332,7 @@ public class ConnectionProxy implements Connection {
 
   public Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException {
     try {
-      return new StatementProxy(this, databaseClient, null);
+      return new StatementProxy(this, clients.get(url).client, null);
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -327,7 +341,7 @@ public class ConnectionProxy implements Connection {
 
   public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
     try {
-      return new StatementProxy(this, databaseClient, null);
+      return new StatementProxy(this, clients.get(url).client, null);
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -336,7 +350,7 @@ public class ConnectionProxy implements Connection {
 
   public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
     try {
-      return new StatementProxy(this, databaseClient, sql);
+      return new StatementProxy(this, clients.get(url).client, sql);
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -349,7 +363,7 @@ public class ConnectionProxy implements Connection {
 
   public PreparedStatement prepareStatement(String sql, int autoGeneratedKeys) throws SQLException {
     try {
-      return new StatementProxy(this, databaseClient, sql);
+      return new StatementProxy(this, clients.get(url).client, sql);
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -358,7 +372,7 @@ public class ConnectionProxy implements Connection {
 
   public PreparedStatement prepareStatement(String sql, int[] columnIndexes) throws SQLException {
     try {
-      return new StatementProxy(this, databaseClient, sql);
+      return new StatementProxy(this, clients.get(url).client, sql);
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -367,7 +381,7 @@ public class ConnectionProxy implements Connection {
 
   public PreparedStatement prepareStatement(String sql, String[] columnNames) throws SQLException {
     try {
-      return new StatementProxy(this, databaseClient, sql);
+      return new StatementProxy(this, clients.get(url).client, sql);
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -376,7 +390,7 @@ public class ConnectionProxy implements Connection {
 
   public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency) throws SQLException {
     try {
-      return new StatementProxy(this, databaseClient, sql);
+      return new StatementProxy(this, clients.get(url).client, sql);
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -554,7 +568,7 @@ public class ConnectionProxy implements Connection {
 
   public void createDatabase(String dbName) {
     try {
-      databaseClient.createDatabase(dbName);
+      clients.get(url).client.createDatabase(dbName);
     }
     catch (Exception e) {
       throw new DatabaseException(e);

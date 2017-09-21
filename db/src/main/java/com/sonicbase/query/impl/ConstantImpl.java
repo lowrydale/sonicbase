@@ -5,6 +5,8 @@ import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.TableSchema;
+import net.sf.jsqlparser.statement.select.Limit;
+import net.sf.jsqlparser.statement.select.Offset;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -12,6 +14,7 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.sql.Types;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 
 
 public class ConstantImpl extends ExpressionImpl {
@@ -164,12 +167,12 @@ public class ConstantImpl extends ExpressionImpl {
     return ExpressionImpl.Type.constant;
   }
 
-  public NextReturn next(SelectStatementImpl.Explain explain) {
+  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset) {
     return null;
   }
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain explain) {
+  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset) {
     return null;
   }
 

@@ -8,6 +8,8 @@ import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.ReadManager;
+import net.sf.jsqlparser.statement.select.Limit;
+import net.sf.jsqlparser.statement.select.Offset;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -15,6 +17,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class AllRecordsExpressionImpl extends ExpressionImpl {
@@ -86,7 +89,7 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
   }
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain explain) {
+  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset) {
     TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(getFromTable());
     IndexSchema indexSchema = null;
     for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndexes().entrySet()) {
@@ -107,7 +110,7 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
     AtomicReference<String> usedIndex = new AtomicReference<>();
     SelectContextImpl context = ExpressionImpl.lookupIds(dbName, getClient().getCommon(), getClient(), getReplica(), count, tableSchema.getName(), indexSchema.getName(), isForceSelectOnServer(),
         op, null, getOrderByExpressions(), getNextKey(), getParms(), this, null, getNextKey(), null,
-        getColumns(), indexSchema.getFields()[0], getNextShard(), getRecordCache(), usedIndex, false, getViewVersion(), getCounters(), getGroupByContext(), debug);
+        getColumns(), indexSchema.getFields()[0], getNextShard(), getRecordCache(), usedIndex, false, getViewVersion(), getCounters(), getGroupByContext(), debug, currOffset, limit, offset);
     setNextShard(context.getNextShard());
     setNextKey(context.getNextKey());
     NextReturn ret = new NextReturn();
@@ -118,8 +121,8 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
 
 
   @Override
-  public NextReturn next(SelectStatementImpl.Explain explain) {
-    return next(ReadManager.SELECT_PAGE_SIZE, explain);
+  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset) {
+    return next(ReadManager.SELECT_PAGE_SIZE, explain, currOffset, limit, offset);
   }
 
   @Override

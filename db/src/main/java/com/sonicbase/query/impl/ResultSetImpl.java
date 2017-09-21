@@ -395,26 +395,26 @@ public class ResultSetImpl implements ResultSet {
 //      currRecord = readRecords[currPos];
 //    }
 //    else {
-    if (offset != null) {
-      while (currTotalPos < offset.getOffset() - 1) {
-        if ((selectContext.getCurrKeys().length == 0 || currPos >= selectContext.getCurrKeys().length)) {
-          while (true) {
-            try {
-              getMoreResults();
-              break;
-            }
-            catch (SchemaOutOfSyncException e) {
-              continue;
-            }
-            catch (Exception e) {
-              throw new DatabaseException(e);
-            }
-          }
-        }
-        currPos++;
-        currTotalPos++;
-      }
-    }
+//    if (offset != null) {
+//      while (currTotalPos < offset.getOffset() - 1) {
+//        if ((selectContext.getCurrKeys().length == 0 || currPos >= selectContext.getCurrKeys().length)) {
+//          while (true) {
+//            try {
+//              getMoreResults();
+//              break;
+//            }
+//            catch (SchemaOutOfSyncException e) {
+//              continue;
+//            }
+//            catch (Exception e) {
+//              throw new DatabaseException(e);
+//            }
+//          }
+//        }
+//        currPos++;
+//        currTotalPos++;
+//      }
+//    }
 
     if (groupByColumns != null) {
       Object[] lastFields = new Object[groupByColumns.size()];
@@ -533,13 +533,20 @@ public class ResultSetImpl implements ResultSet {
         }
       }
     }
-    if (limit != null) {
-      if (!limit.isLimitAll() && !limit.isLimitNull()) {
-        if (currTotalPos >= limit.getRowCount()) {
-          return false;
-        }
-      }
-    }
+//    if (limit != null) {
+//      if (!limit.isLimitAll() && !limit.isLimitNull()) {
+//        if (offset != null) {
+//          if (currTotalPos >= offset.getOffset() + limit.getRowCount()) {
+//            return false;
+//          }
+//        }
+//        else {
+//          if (currTotalPos >= limit.getRowCount()) {
+//            return false;
+//          }
+//        }
+//      }
+//    }
     //   readCurrentRecord();
 
     if (selectContext.getCurrKeys() == null) {

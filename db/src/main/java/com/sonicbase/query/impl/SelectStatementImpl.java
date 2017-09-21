@@ -64,6 +64,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
   private GroupByContext groupByContext;
   private Long pageSize;
   private boolean forceSelectOnServer;
+  private AtomicLong currOffset = new AtomicLong();
 
   public SelectStatementImpl(DatabaseClient client) {
     this.client = client;
@@ -1018,7 +1019,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
         else {
           expression.forceSelectOnServer(forceSelectOnServer);
           expression.setDbName(dbName);
-          ret = expression.next(count, explain);
+          ret = expression.next(count, explain, currOffset, limit, offset);
         }
         if (ret == null) {
           return null;
@@ -1251,7 +1252,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                       explain.getBuilder().append("inner join based on expression: table=" + fromTable + ", expression=" + expression.toString() + "\n");
                     }
                     long begin = System.nanoTime();
-                    ids = expression.next(pageSize / threadCount, explain);
+                    ids = expression.next(pageSize / threadCount, explain, currOffset, limit, offset);
                     if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
                       hadSelectRet = true;
                     }
@@ -1281,7 +1282,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                     allExpression.setDbName(dbName);
                     allExpression.setColumns(getSelectColumns());
                     allExpression.setOrderByExpressions(expression.getOrderByExpressions());
-                    ids = allExpression.next(pageSize / threadCount, explain);
+                    ids = allExpression.next(pageSize / threadCount, explain, currOffset, limit, offset);
                     if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
                       hadSelectRet = true;
                     }
@@ -1306,7 +1307,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                     allExpression.setDbName(dbName);
                     allExpression.setColumns(getSelectColumns());
                     allExpression.setOrderByExpressions(expression.getOrderByExpressions());
-                    ids = allExpression.next(pageSize / threadCount, explain);
+                    ids = allExpression.next(pageSize / threadCount, explain, currOffset, limit, offset);
                     if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
                       hadSelectRet = true;
                     }

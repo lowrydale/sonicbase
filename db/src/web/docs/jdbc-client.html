@@ -19,7 +19,7 @@
         </div>
         <div class="desktop">
             <a href="../index.html">
-                <img src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+                <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
             </a>
         <nav>
             <ul>
@@ -41,7 +41,7 @@
     <div style="margin-left: 4em;">
 
     <h1>Installing the JDBC Driver Jar</h1>
-    For your code to be able to reference the jdbc driver you will need to install the jar in your local maven repository.
+    If you are using Maven, for your code to be able to reference the jdbc driver you will need to install the jar in your local maven repository.
     In your project's main directory, issue the following command:<br/>
     <br/>
     mvn install:install-file -Dfile=&lt;path&gt;/sonicbase-&lt;version&gt;.jar -DgroupId=com.sonicbase -DartifactId=sonicbase -Dversion=&lt;version&gt; -Dpackaging=jar<br/>
@@ -82,6 +82,22 @@ Connect to the database with the following code:<br/>
         is separated by a comma. For the free version, only one replica may be specified.
 
 
+        <h1>Connection Pool</h1>
+        C3P0 is a good connection pool to use. Below is an example of how to use it:<br/>
+        <br/>
+        ComboPooledDataSource cpds = new ComboPooledDataSource();<br/>
+        cpds.setDriverClass("com.sonicbase.jdbcdriver.Driver");<br/>
+        cpds.setJdbcUrl("jdbc:sonicbase:localhost:9010/db");<br/>
+<br/>
+        cpds.setMinPoolSize(5);<br/>
+        cpds.setAcquireIncrement(1);<br/>
+        cpds.setMaxPoolSize(20);<br/>
+    <br/>
+        //aquire connection<br/>
+        Connection conn = cpds.getConnection();<br/>
+        <br/>
+        //release connection<br/>
+        conn.close();<br/>
 </div>
 </div>
 </body>

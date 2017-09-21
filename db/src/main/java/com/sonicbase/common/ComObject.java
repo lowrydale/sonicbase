@@ -196,7 +196,17 @@ public class ComObject {
     disableDate(120, stringType),
     multipleLicenseServers(121, booleanType),
     minKey(122, byteArrayType),
-    maxKey(123, byteArrayType);
+    maxKey(123, byteArrayType),
+    driverName(124, stringType),
+    user(125, stringType),
+    password(126, stringType),
+    connectString(127, stringType),
+    offsetLong(128, longType),
+    limitLong(129, longType),
+    expectedCount(130, longType),
+    progressObject(131, objectType),
+    progressArray(132, arrayType),
+    currOffset(133, longType);
 
     public final int tag;
 

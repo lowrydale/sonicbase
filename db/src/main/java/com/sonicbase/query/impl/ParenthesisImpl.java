@@ -4,11 +4,14 @@ import com.sonicbase.common.Record;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.TableSchema;
+import net.sf.jsqlparser.statement.select.Limit;
+import net.sf.jsqlparser.statement.select.Offset;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Responsible for
@@ -87,12 +90,12 @@ public class ParenthesisImpl extends ExpressionImpl {
   }
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain eplain) {
+  public NextReturn next(int count, SelectStatementImpl.Explain eplain, AtomicLong currOffset, Limit limit, Offset offset) {
     return null;
   }
 
 
-  public NextReturn next(SelectStatementImpl.Explain explainBuilder) {
+  public NextReturn next(SelectStatementImpl.Explain explainBuilder, AtomicLong currOffset, Limit limit, Offset offset) {
     return null;
   }
 

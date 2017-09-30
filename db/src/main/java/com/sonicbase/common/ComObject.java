@@ -206,7 +206,17 @@ public class ComObject {
     expectedCount(130, longType),
     progressObject(131, objectType),
     progressArray(132, arrayType),
-    currOffset(133, longType);
+    currOffset(133, longType),
+    accepted(134, booleanType),
+    statuses(135, arrayType),
+    prePocessCountProcessed(136, longType),
+    preProcessExpectedCount(137, longType),
+    preProcessFinished(138, booleanType),
+    shouldProcess(139, booleanType),
+    preProcessException(140, stringType),
+    nextKey(149, byteArrayType),
+    lowerKey(150, byteArrayType),
+    whereClause(151, stringType);
 
     public final int tag;
 

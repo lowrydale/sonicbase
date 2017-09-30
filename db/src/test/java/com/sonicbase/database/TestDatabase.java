@@ -285,6 +285,10 @@ public class TestDatabase {
         Thread.sleep(1000);
       }
 
+      for (DatabaseServer server : dbServers) {
+        server.shutdownRepartitioner();
+      }
+
       //Thread.sleep(60000);
 
 //      assertTrue(client.getPartitionSize("test", 0, "persons", "_1__primarykey") >= 8);
@@ -372,6 +376,17 @@ public class TestDatabase {
 //        }
 //      }
 
+//      for (DatabaseServer server : dbServers) {
+//        server.purgeMemory();
+//      }
+//
+//      for (DatabaseServer server : dbServers) {
+//        server.getCommon().loadSchema(server.getDataDir());
+//        server.recoverFromSnapshot();
+//        server.getLogManager().applyQueues();
+//      }
+
+
       JsonDict backupConfig = new JsonDict("{\n" +
           "    \"type\" : \"fileSystem\",\n" +
           "    \"directory\": \"/data/db-backup\",\n" +
@@ -383,6 +398,15 @@ public class TestDatabase {
 
       for (DatabaseServer dbServer : dbServers) {
         dbServer.setBackupConfig(backupConfig);
+      }
+
+      client.syncSchema();
+
+      for (Map.Entry<String, TableSchema> entry : client.getCommon().getTables("test").entrySet()) {
+        for (Map.Entry<String, IndexSchema> indexEntry : entry.getValue().getIndices().entrySet()) {
+          Object[] upperKey = indexEntry.getValue().getCurrPartitions()[0].getUpperKey();
+          System.out.println("table=" + entry.getKey() + ", index=" + indexEntry.getKey() + ", upper=" + (upperKey == null ? null : DatabaseCommon.keyToString(upperKey)));
+        }
       }
 
       client.startBackup();
@@ -406,7 +430,24 @@ public class TestDatabase {
         }
       }
 
-//      Thread.sleep(10000);
+      client.syncSchema();
+      for (Map.Entry<String, TableSchema> entry : client.getCommon().getTables("test").entrySet()) {
+        for (Map.Entry<String, IndexSchema> indexEntry : entry.getValue().getIndices().entrySet()) {
+          Object[] upperKey = indexEntry.getValue().getCurrPartitions()[0].getUpperKey();
+          System.out.println("table=" + entry.getKey() + ", index=" + indexEntry.getKey() + ", upper=" + (upperKey == null ? null : DatabaseCommon.keyToString(upperKey)));
+        }
+      }
+
+
+      for (DatabaseServer server : dbServers) {
+        server.shutdownRepartitioner();
+      }
+//      client.beginRebalance("test", "persons", "_1__primarykey");
+//
+
+      Thread.sleep(10_000);
+
+      //client.syncSchema();
 
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "test");
@@ -699,8 +740,8 @@ public class TestDatabase {
     List<String> primaryKey = new ArrayList<>();
     primaryKey.add("id");
     tableSchema.setPrimaryKey(primaryKey);
-    common.addTable("test", "/data/database", tableSchema);
-    common.saveSchema("/data/database");
+    common.addTable(client, "test", "/data/database", tableSchema);
+    common.saveSchema(client, "/data/database");
 
     common.getTables("test").clear();
     common.loadSchema("/data/database");
@@ -3196,7 +3237,7 @@ public class TestDatabase {
   }
 
 
-  @Test
+  //@Test
   public void testBatchInsertNoKeySecondaryIndex() throws SQLException, InterruptedException {
 
     try {

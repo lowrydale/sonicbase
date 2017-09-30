@@ -13,11 +13,7 @@ import com.sonicbase.query.UpdateStatement;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.server.SnapshotManager;
-import com.sonicbase.util.DataUtil;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -242,7 +238,8 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
                 ConcurrentSkipListMap<Object[], DatabaseClient.KeyInfo> prevMap = orderedKeyInfosPrevious.get(newEntry.getKey());
                 if (prevMap == null) {
                   for (Map.Entry<Object[], DatabaseClient.KeyInfo> innerNewEntry : newEntry.getValue().entrySet()) {
-                    client.insertKey(dbName, tableSchema.getName(), innerNewEntry.getValue(), indexSchema.getName(), newPrimaryKey);
+                    client.insertKey(dbName, tableSchema.getName(), innerNewEntry.getValue(), indexSchema.getName(),
+                        newPrimaryKey, -1, -1);
                   }
                 }
                 else {
@@ -251,7 +248,8 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
                       if (innerNewEntry.getValue().getIndexSchema().getKey().equals(indexSchema.getName())) {
                         continue;
                       }
-                      client.insertKey(dbName, tableSchema.getName(), innerNewEntry.getValue(), indexSchema.getName(), newPrimaryKey);
+                      client.insertKey(dbName, tableSchema.getName(), innerNewEntry.getValue(), indexSchema.getName(),
+                          newPrimaryKey, -1, -1);
                     }
                   }
                 }

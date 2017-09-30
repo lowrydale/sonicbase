@@ -305,7 +305,7 @@ public class Repartitioner extends Thread {
 
           common.setSchema(dbName, schema);
 
-          common.saveSchema(databaseServer.getDataDir());
+          common.saveSchema(databaseServer.getClient(), databaseServer.getDataDir());
         }
         finally {
           //common.getSchemaWriteLock(dbName).unlock();
@@ -433,7 +433,7 @@ public class Repartitioner extends Thread {
           }
         }
 
-        common.saveSchema(databaseServer.getDataDir());
+        common.saveSchema(databaseServer.getClient(), databaseServer.getDataDir());
         common.loadSchema(databaseServer.getDataDir());
         logger.info("master - Post-save schemaVersion=" + common.getSchemaVersion() + ", shard=" + common.getShard() +
             ", replica=" + common.getReplica());
@@ -1475,7 +1475,7 @@ public class Repartitioner extends Thread {
         @Override
         public Object call() throws Exception {
 
-          if (replica == databaseServer.getReplica()) {
+          if (false && replica == databaseServer.getReplica()) {
             deleteMovedRecords(currObj);
             return currObj.getArray(ComObject.Tag.keys).getArray().size();
           }

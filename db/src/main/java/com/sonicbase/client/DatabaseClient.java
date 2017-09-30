@@ -148,7 +148,8 @@ public class DatabaseClient {
       "serverSelectDelete",
       "commit",
       "rollback",
-      "testWrite"
+      "testWrite",
+      "saveSchema"
 
   };
 
@@ -566,7 +567,7 @@ public class DatabaseClient {
               withRecordProcessed.get(insert.keyInfo.shard).add(insert);
             }
             for (PreparedInsert insert : prepared) {
-              ComObject obj = serializeInsertKey(insert.dbName, insert.tableId, insert.indexId, insert.tableName, insert.keyInfo,
+              ComObject obj = serializeInsertKey(getCommon(), insert.dbName, insert.tableId, insert.indexId, insert.tableName, insert.keyInfo,
                   insert.primaryKeyIndexName, insert.primaryKey);
               cobjs2.get(insert.keyInfo.shard).getArray(ComObject.Tag.insertObjects).getArray().add(obj);
               processed.get(insert.keyInfo.shard).add(insert);
@@ -733,6 +734,17 @@ public class DatabaseClient {
     catch (Exception e) {
       throw new DatabaseException(e);
     }
+  }
+
+  private static ConcurrentHashMap<String, String> lowered = new ConcurrentHashMap<>();
+
+  public static String toLower(String value) {
+    String lower = lowered.get(value);
+    if (lower == null) {
+      lower = value.toLowerCase();
+      lowered.putIfAbsent(value, lower);
+    }
+    return lower;
   }
 
   static class SocketException extends Exception {
@@ -1598,10 +1610,10 @@ public class DatabaseClient {
     while (true) {
       try {
         Statement statement;
-        if (sql.toLowerCase().startsWith("describe")) {
+        if (toLower(sql.substring(0, "describe".length())).startsWith("describe")) {
           return doDescribe(dbName, sql);
         }
-        else if (sql.toLowerCase().startsWith("explain")) {
+        else if (toLower(sql.substring(0, "explain".length())).startsWith("explain")) {
           return doExplain(dbName, sql, parms);
         }
         else {
@@ -2548,13 +2560,13 @@ public class DatabaseClient {
     return updateStatement.execute(dbName, null);
   }
 
-  public void insertKey(String dbName, String tableName, KeyInfo keyInfo, String primaryKeyIndexName, Object[] primaryKey) {
+  public void insertKey(String dbName, String tableName, KeyInfo keyInfo, String primaryKeyIndexName, Object[] primaryKey, int shard, int replica) {
     try {
       String command = "DatabaseServer:ComObject:insertIndexEntryByKey:";
 
       int tableId = common.getTables(dbName).get(tableName).getTableId();
       int indexId = common.getTables(dbName).get(tableName).getIndexes().get(keyInfo.indexSchema.getKey()).getIndexId();
-      ComObject cobj = serializeInsertKey(dbName, tableId, indexId, tableName, keyInfo, primaryKeyIndexName, primaryKey);
+      ComObject cobj = serializeInsertKey(getCommon(), dbName, tableId, indexId, tableName, keyInfo, primaryKeyIndexName, primaryKey);
 
       cobj.put(ComObject.Tag.dbName, dbName);
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
@@ -2564,15 +2576,23 @@ public class DatabaseClient {
       cobj.put(ComObject.Tag.isCommitting, isCommitting());
       cobj.put(ComObject.Tag.transactionId, getTransactionId());
 
-      send("DatabaseServer:insertIndexEntryByKey", keyInfo.shard, rand.nextLong(), command, cobj, DatabaseClient.Replica.def);
+//      if (keyInfo.shard != -1) {
+//        if (shard == keyInfo.shard) {
+//          send("DatabaseServer:insertIndexEntryByKey", shard, replica, command, cobj, DatabaseClient.Replica.def);
+//        }
+//      }
+//      else {
+        send("DatabaseServer:insertIndexEntryByKey", keyInfo.shard, rand.nextLong(), command, cobj, DatabaseClient.Replica.def);
+//      }
     }
     catch (IOException e) {
       throw new DatabaseException(e);
     }
   }
 
-  private ComObject serializeInsertKey(String dbName, int tableId, int indexId, String tableName, KeyInfo keyInfo,
-                                       String primaryKeyIndexName, Object[] primaryKey) throws IOException {
+  public static ComObject serializeInsertKey(DatabaseCommon common, String dbName, int tableId, int indexId,
+                                             String tableName, KeyInfo keyInfo,
+                                              String primaryKeyIndexName, Object[] primaryKey) throws IOException {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.serializationVersion, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
 //    cobj.put(ComObject.Tag.dbName, dbName);
@@ -2734,7 +2754,7 @@ public class DatabaseClient {
     int parmOffset = 1;
     for (int i = 0; i < srcColumns.size(); i++) {
       Column column = (Column) srcColumns.get(i);
-      columnNames.add(column.getColumnName().toLowerCase());
+      columnNames.add(toLower(column.getColumnName()));
       Expression expression = (Expression) srcExpressions.get(i);
       //todo: this doesn't handle out of order fields
       if (expression instanceof JdbcParameter) {
@@ -2946,7 +2966,8 @@ public class DatabaseClient {
               insertKeyWithRecord(dbName, insertStatement.getTableName(), insert.keyInfo, insert.record);
             }
             else {
-              insertKey(dbName, insertStatement.getTableName(), insert.keyInfo, insert.primaryKeyIndexName, insert.primaryKey);
+              insertKey(dbName, insertStatement.getTableName(), insert.keyInfo, insert.primaryKeyIndexName,
+                  insert.primaryKey, -1, -1);
             }
             insertCountCompleted++;
             if (previousSchemaVersion != common.getSchemaVersion()) {
@@ -3517,9 +3538,9 @@ public class DatabaseClient {
       ColumnImpl columnNode = new ColumnImpl();
       String colTableName = column.getTable().getName();
       if (colTableName != null) {
-        columnNode.setTableName(colTableName.toLowerCase());
+        columnNode.setTableName(toLower(colTableName));
       }
-      columnNode.setColumnName(column.getColumnName().toLowerCase());
+      columnNode.setColumnName(toLower(column.getColumnName()));
       return columnNode;
     }
     else if (whereExpression instanceof StringValue) {

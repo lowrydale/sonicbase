@@ -26,7 +26,7 @@ public class Index {
   private boolean ordered = false;
 
   private final Comparator[] comparators;
-  private Object[] mutexes = new Object[100000];
+  private Object[] mutexes = new Object[100_000];
 
   private boolean fastUtil = false;
 

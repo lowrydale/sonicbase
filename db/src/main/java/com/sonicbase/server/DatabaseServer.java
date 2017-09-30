@@ -11,6 +11,7 @@ import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.ExpressionImpl;
 import com.sonicbase.research.socket.NettyServer;
 import com.sonicbase.schema.FieldSchema;
+import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.socket.DeadServerException;
 import com.sonicbase.util.*;
@@ -126,7 +127,7 @@ public class DatabaseServer {
   private Thread masterLicenseValidatorThread;
   private String disableDate;
   private Boolean multipleLicenseServers;
-
+  private BulkImportManager bulkImportManager;
 
   @SuppressWarnings("restriction")
   private static Unsafe getUnsafe() {
@@ -303,9 +304,10 @@ public class DatabaseServer {
     this.readManager = new ReadManager(this);
     this.logManager = new LogManager(this);
     this.schemaManager = new SchemaManager(this);
+    this.bulkImportManager = new BulkImportManager(this);
     //recordsById = new IdIndex(!unitTest, (int) (long) databaseDict.getLong("subPartitionsForIdIndex"), (int) (long) databaseDict.getLong("initialIndexSize"), (int) (long) databaseDict.getLong("indexEntrySize"));
 
-    this.commandHandler = new CommandHandler(this, deleteManager, snapshotManager, updateManager, transactionManager, readManager, logManager, schemaManager);
+    this.commandHandler = new CommandHandler(this, bulkImportManager, deleteManager, snapshotManager, updateManager, transactionManager, readManager, logManager, schemaManager);
     this.replicationFactor = shards.getDict(0).getArray("replicas").size();
 //    if (replicationFactor < 2) {
 //      throw new DatabaseException("Replication Factor must be at least two");
@@ -344,7 +346,7 @@ public class DatabaseServer {
       common.loadSchema(dataDir);
     }
 
-    common.saveSchema(dataDir);
+    common.saveSchema(getClient(), dataDir);
 
     for (String dbName : dbNames) {
       logger.info("Loaded database schema: dbName=" + dbName + ", tableCount=" + common.getTables(dbName).size());
@@ -632,7 +634,7 @@ public class DatabaseServer {
       common.getServersConfig().getShards()[shard].setMasterReplica(newReplica);
     }
 
-    common.saveSchema(getDataDir());
+    common.saveSchema(getClient(), getDataDir());
     pushSchema();
 
     List<Future> futures = new ArrayList<>();
@@ -855,7 +857,7 @@ public class DatabaseServer {
     }
     if (changed) {
       logger.info("server health changed: shard=" + shard + ", replica=" + replica + ", isHealthy=" + isHealthy.get());
-      common.saveSchema(getDataDir());
+      common.saveSchema(getClient(), getDataDir());
       pushSchema();
     }
   }
@@ -1093,885 +1095,6 @@ public class DatabaseServer {
     return logger;
   }
 
-  private static class BulkImportStatus {
-    private long countExpected;
-    private long countProcessed;
-    private boolean finished;
-  }
-
-  private ConcurrentHashMap<String, ConcurrentHashMap<String, BulkImportStatus>> bulkImportStatus = new ConcurrentHashMap<>();
-
-  private ConcurrentHashMap<String, Long> importCountExpected = new ConcurrentHashMap<>();
-  private ConcurrentHashMap<String, AtomicLong> importCountProcessed = new ConcurrentHashMap<>();
-  private ConcurrentHashMap<String, Boolean> importFinished = new ConcurrentHashMap<>();
-  private ConcurrentHashMap<String, AtomicBoolean> cancelBulkImport = new ConcurrentHashMap<>();
-
-
-  public ComObject getBulkImportProgressOnServer(final ComObject cobj) {
-    ComObject retObj = new ComObject();
-    String dbName = cobj.getString(ComObject.Tag.dbName);
-    String tableName = cobj.getString(ComObject.Tag.tableName);
-    AtomicLong processed = importCountProcessed.get(dbName + ":" + tableName);
-    if (processed == null) {
-      retObj.put(ComObject.Tag.countLong, 0);
-    }
-    else {
-      retObj.put(ComObject.Tag.countLong, processed.get());
-    }
-    Long expected = importCountExpected.get(dbName + ":" + tableName);
-    if (expected == null) {
-      expected = 0L;
-    }
-    retObj.put(ComObject.Tag.expectedCount, expected);
-
-    Boolean finished = importFinished.get(dbName + ":" + tableName);
-    if (finished == null) {
-      retObj.put(ComObject.Tag.finished, false);
-    }
-    else {
-      retObj.put(ComObject.Tag.finished, finished);
-    }
-    return retObj;
-  }
-
-  public ComObject startBulkImportOnServer(final ComObject cobj) {
-    final String dbName = cobj.getString(ComObject.Tag.dbName);
-    final String tableName = cobj.getString(ComObject.Tag.tableName);
-
-    logger.info("startBulkImportOnServer - begin: db=" + dbName + ", table=" + tableName);
-    importCountProcessed.put(dbName + ":" + tableName, new AtomicLong(0));
-    importFinished.put(dbName + ":" + tableName, false);
-    cancelBulkImport.put(dbName + ":" + tableName, new AtomicBoolean(false));
-
-    final AtomicLong countRead = new AtomicLong();
-    final AtomicLong countProcessed = importCountProcessed.get(dbName + ":" + tableName);
-    Thread thread = new Thread(new Runnable() {
-      @Override
-      public void run() {
-        final ThreadPoolExecutor executor = new ThreadPoolExecutor(8, 8, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
-        Connection insertConn = null;
-        try {
-
-          Class.forName(cobj.getString(ComObject.Tag.driverName));
-
-          final AtomicInteger countSubmitted = new AtomicInteger();
-          final AtomicInteger countFinished = new AtomicInteger();
-          JsonDict dict = getConfig();
-          JsonDict databaseDict = dict;
-          JsonArray array = databaseDict.getArray("shards");
-          JsonDict replica = array.getDict(0);
-          JsonArray replicasArray = replica.getArray("replicas");
-          final String address = databaseDict.getBoolean("clientIsPrivate") ?
-              replicasArray.getDict(0).getString("privateAddress") :
-              replicasArray.getDict(0).getString("publicAddress");
-          final int port = replicasArray.getDict(0).getInt("port");
-
-          Class.forName("com.sonicbase.jdbcdriver.Driver");
-          insertConn = DriverManager.getConnection("jdbc:sonicbase:" + address + ":" + port + "/" + dbName);
-
-          final Connection finalInsertConn = insertConn;
-
-          final String user = cobj.getString(ComObject.Tag.user);
-          final String password = cobj.getString(ComObject.Tag.password);
-
-          Connection conn = null;
-          long count = 0;
-          try {
-            if (user != null) {
-              conn = DriverManager.getConnection(cobj.getString(ComObject.Tag.connectString), user, password);
-            }
-            else {
-              conn = DriverManager.getConnection(cobj.getString(ComObject.Tag.connectString));
-            }
-
-            PreparedStatement stmt = conn.prepareStatement("select count(*) from " + tableName);
-            try {
-              ResultSet rs = stmt.executeQuery();
-              rs.next();
-              count = rs.getLong(1);
-            }
-            finally {
-              stmt.close();
-            }
-
-            importCountExpected.put(dbName + ":" + tableName, count);
-
-            stmt = null;
-            String str = "select * from " + tableName;
-            stmt = conn.prepareStatement(str);
-            TableSchema tableSchema = common.getTables(dbName).get(tableName);
-            final List<FieldSchema> fields = tableSchema.getFields();
-
-            int countPer = (int)((double)count / 8d);
-
-            int[] offsets = new int[8];
-            for (int i = 0; i < 8; i++) {
-              offsets[i] = (int)(i == 0 ? 0 : count / 8 * i);
-            }
-            final long[] keys = new long[8];
-
-            int recordOffset = 0;
-            int slice = 0;
-            ResultSet rs = stmt.executeQuery();
-            while (rs.next()) {
-              long id = rs.getLong("id1");
-              if (recordOffset == offsets[slice]) {
-                keys[slice] = id;
-                slice++;
-              }
-              if (slice == keys.length) {
-                break;
-              }
-              recordOffset++;
-            }
-
-            logger.info("bulkImport got keys");
-            final StringBuilder fieldsStr = new StringBuilder();
-            final StringBuilder parmsStr = new StringBuilder();
-            boolean first = true;
-            for (FieldSchema field : fields) {
-              if (first) {
-                first = false;
-              }
-              else {
-                fieldsStr.append(",");
-                parmsStr.append(",");
-              }
-              fieldsStr.append(field.getName());
-              parmsStr.append("?");
-            }
-
-            Thread[] threads = new Thread[keys.length];
-            for (int i = 0; i < keys.length; i++) {
-              final int currSlice = i;
-              threads[i] = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                  final List<Future> futures = new ArrayList<>();
-                  Connection localConn = null;
-                  try {
-                    logger.info("bulkImport starting slave thread: currSlice=" + currSlice + ", key=" + keys[currSlice]);
-                    if (user != null) {
-                      localConn = DriverManager.getConnection(cobj.getString(ComObject.Tag.connectString), user, password);
-                    }
-                    else {
-                      localConn = DriverManager.getConnection(cobj.getString(ComObject.Tag.connectString));
-                    }
-
-                    PreparedStatement stmt = null;
-                    if (currSlice == 0) {
-                      stmt = localConn.prepareStatement("select * from persons where id1<" + keys[1]);
-                    }
-                    else if (currSlice == keys.length - 1) {
-                      stmt = localConn.prepareStatement("select * from persons where id1>=" + keys[currSlice]);
-                    }
-                    else {
-                      stmt = localConn.prepareStatement("select * from persons where id1>=" + keys[currSlice] + " and id1<" + keys[currSlice + 1]);
-                    }
-                    try {
-                      ResultSet rs = stmt.executeQuery();
-
-                      int batchSize = 100;
-                      List<Object[]> currBatch = new ArrayList<>();
-                      while (rs.next() && !cancelBulkImport.get(dbName + ":" + tableName).get()) {
-//                        long id = rs.getLong("id1");
-//                        if (currSlice == 0) {
-//                          if (id >= keys[1]) {
-//                            break;
-//                          }
-//                        }
-//                        else if (currSlice == keys.length - 1) {
-//                        }
-//                        else {
-//                          if (id >= keys[currSlice + 1]) {
-//                            break;
-//                          }
-//                        }
-
-                        final Object[] currRecord = new Object[fields.size()];
-
-                        int offset = 0;
-                        for (FieldSchema field : fields) {
-                          switch (field.getType()) {
-                            case BIT: {
-                              boolean value = rs.getBoolean(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case TINYINT: {
-                              byte value = rs.getByte(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case SMALLINT: {
-                              short value = rs.getShort(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case INTEGER: {
-                              int value = rs.getInt(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case BIGINT: {
-                              long value = rs.getLong(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case FLOAT: {
-                              double value = rs.getDouble(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case REAL: {
-                              float value = rs.getFloat(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case DOUBLE: {
-                              double value = rs.getDouble(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case NUMERIC: {
-                              BigDecimal value = rs.getBigDecimal(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case DECIMAL: {
-                              BigDecimal value = rs.getBigDecimal(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case CHAR: {
-                              String value = rs.getString(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case VARCHAR: {
-                              String value = rs.getString(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case LONGVARCHAR: {
-                              String value = rs.getString(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case DATE: {
-                              java.sql.Date value = rs.getDate(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case TIME: {
-                              java.sql.Time value = rs.getTime(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case TIMESTAMP: {
-                              java.sql.Timestamp value = rs.getTimestamp(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case BINARY: {
-                              Blob value = rs.getBlob(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case VARBINARY: {
-                              Blob value = rs.getBlob(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case LONGVARBINARY: {
-                              Blob value = rs.getBlob(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case BLOB: {
-                              Blob value = rs.getBlob(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case CLOB: {
-                              String value = rs.getString(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case BOOLEAN: {
-                              boolean value = rs.getBoolean(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case ROWID: {
-                              long value = rs.getLong(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case NCHAR: {
-                              String value = rs.getString(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case NVARCHAR: {
-                              String value = rs.getString(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case LONGNVARCHAR: {
-                              String value = rs.getString(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                            case NCLOB: {
-                              String value = rs.getString(field.getName());
-                              if (!rs.wasNull()) {
-                                currRecord[offset] = value;
-                              }
-                            }
-                            break;
-                          }
-
-                          offset++;
-                        }
-                        currBatch.add(currRecord);
-                        countRead.incrementAndGet();
-
-                        if (currBatch.size() >= batchSize && !cancelBulkImport.get(dbName + ":" + tableName).get()) {
-                          countSubmitted.incrementAndGet();
-                          final List<Object[]> batchToProcess = currBatch;
-                          currBatch = new ArrayList<>();
-                          futures.add(executor.submit(new Runnable() {
-                            @Override
-                            public void run() {
-                              insertRecords(finalInsertConn, countProcessed, countFinished, batchToProcess, tableName, fields, fieldsStr, parmsStr);
-                            }
-                          }));
-                        }
-                      }
-                      if (currBatch.size() > 0 && !cancelBulkImport.get(dbName + ":" + tableName).get()) {
-                        countSubmitted.incrementAndGet();
-                        insertRecords(finalInsertConn, countProcessed, countFinished, currBatch, tableName, fields, fieldsStr, parmsStr);
-                      }
-                      logger.info("bulkImport finished reading records: currSlice=" + currSlice);
-                    }
-                    finally {
-                      stmt.close();
-                    }
-                    for (Future future : futures) {
-                      future.get();
-                    }
-                  }
-                  catch (Exception e) {
-                    logger.error("Error importing records", e);
-                  }
-                  finally {
-                    try {
-                      localConn.close();
-                    }
-                    catch (SQLException e) {
-                      logger.error("Error closing connection", e);
-                    }
-                  }
-                }
-              });
-
-              threads[i].start();
-            }
-            for (int i = 0; i < threads.length; i++) {
-              threads[i].join();
-            }
-          }
-          finally {
-            conn.close();
-          }
-          logger.info("bulkImport finished inserting records");
-          importFinished.put(dbName + ":" + tableName, true);
-        }
-        catch (Exception e) {
-          logger.error("Error importing records", e);
-          throw new DatabaseException(e);
-        }
-        finally {
-          if (insertConn != null) {
-            try {
-              insertConn.close();
-            }
-            catch (SQLException e) {
-              logger.error("Error closing connection", e);
-            }
-          }
-          executor.shutdownNow();
-        }
-      }
-    });
-    thread.start();
-
-    return null;
-  }
-
-  private void insertRecords(Connection insertConn, AtomicLong countProcessed, AtomicInteger countFinished, List<Object[]> currBatch, String tableName,
-                             List<FieldSchema> fields, StringBuilder fieldsStr, StringBuilder parmsStr) {
-    PreparedStatement insertStmt = null;
-    try {
-      insertStmt = insertConn.prepareStatement("insert into " + tableName +
-          " (" + fieldsStr.toString() + ") VALUES (" + parmsStr.toString() + ")");
-
-      for (Object[] currRecord : currBatch) {
-        int offset = 0;
-        for (FieldSchema field : fields) {
-          switch (field.getType()) {
-            case BIT: {
-              if (currRecord[offset] != null) {
-                insertStmt.setBoolean(offset + 1, (Boolean) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.BIT);
-              }
-            }
-            break;
-            case TINYINT: {
-              if (currRecord[offset] != null) {
-                insertStmt.setByte(offset + 1, (Byte) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.TINYINT);
-              }
-            }
-            break;
-            case SMALLINT: {
-              if (currRecord[offset] != null) {
-                insertStmt.setShort(offset + 1, (Short) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.SMALLINT);
-              }
-            }
-            break;
-            case INTEGER: {
-              if (currRecord[offset] != null) {
-                insertStmt.setInt(offset + 1, (Integer) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.INTEGER);
-              }
-            }
-            break;
-            case BIGINT: {
-              if (currRecord[offset] != null) {
-                insertStmt.setLong(offset + 1, (Long) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.BIGINT);
-              }
-            }
-            break;
-            case FLOAT: {
-              if (currRecord[offset] != null) {
-                insertStmt.setDouble(offset + 1, (Double) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.FLOAT);
-              }
-            }
-            break;
-            case REAL: {
-              if (currRecord[offset] != null) {
-                insertStmt.setFloat(offset + 1, (Float) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.REAL);
-              }
-            }
-            break;
-            case DOUBLE: {
-              if (currRecord[offset] != null) {
-                insertStmt.setDouble(offset + 1, (Double) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.DOUBLE);
-              }
-            }
-            break;
-            case NUMERIC: {
-              if (currRecord[offset] != null) {
-                insertStmt.setBigDecimal(offset + 1, (BigDecimal) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.NUMERIC);
-              }
-            }
-            break;
-            case DECIMAL: {
-              if (currRecord[offset] != null) {
-                insertStmt.setBigDecimal(offset + 1, (BigDecimal) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.DECIMAL);
-              }
-            }
-            break;
-            case CHAR: {
-              if (currRecord[offset] != null) {
-                insertStmt.setString(offset + 1, (String) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.CHAR);
-              }
-            }
-            break;
-            case VARCHAR: {
-              if (currRecord[offset] != null) {
-                insertStmt.setString(offset + 1, (String) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.VARCHAR);
-              }
-            }
-            break;
-            case LONGVARCHAR: {
-              if (currRecord[offset] != null) {
-                insertStmt.setString(offset + 1, (String) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.LONGVARCHAR);
-              }
-            }
-            break;
-            case DATE: {
-              if (currRecord[offset] != null) {
-                insertStmt.setDate(offset + 1, (java.sql.Date) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.DATE);
-              }
-            }
-            break;
-            case TIME: {
-              if (currRecord[offset] != null) {
-                insertStmt.setTime(offset + 1, (java.sql.Time) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.TIME);
-              }
-            }
-            break;
-            case TIMESTAMP: {
-              if (currRecord[offset] != null) {
-                insertStmt.setTimestamp(offset + 1, (Timestamp) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.TIMESTAMP);
-              }
-            }
-            break;
-            case BINARY: {
-              if (currRecord[offset] != null) {
-                insertStmt.setBlob(offset + 1, (Blob) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.BINARY);
-              }
-            }
-            break;
-            case VARBINARY: {
-              if (currRecord[offset] != null) {
-                insertStmt.setBlob(offset + 1, (Blob) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.VARBINARY);
-              }
-            }
-            break;
-            case LONGVARBINARY: {
-              if (currRecord[offset] != null) {
-                insertStmt.setBlob(offset + 1, (Blob) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.LONGVARBINARY);
-              }
-            }
-            break;
-            case BLOB: {
-              if (currRecord[offset] != null) {
-                insertStmt.setBlob(offset + 1, (Blob) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.BLOB);
-              }
-            }
-            break;
-            case CLOB: {
-              if (currRecord[offset] != null) {
-                insertStmt.setString(offset + 1, (String) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.CLOB);
-              }
-            }
-            break;
-            case BOOLEAN: {
-              if (currRecord[offset] != null) {
-                insertStmt.setBoolean(offset + 1, (Boolean) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.BOOLEAN);
-              }
-            }
-            break;
-            case ROWID: {
-              if (currRecord[offset] != null) {
-                insertStmt.setLong(offset + 1, (Long) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.ROWID);
-              }
-            }
-            break;
-            case NCHAR: {
-              if (currRecord[offset] != null) {
-                insertStmt.setString(offset + 1, (String) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.NCHAR);
-              }
-            }
-            break;
-            case NVARCHAR: {
-              if (currRecord[offset] != null) {
-                insertStmt.setString(offset + 1, (String) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.NVARCHAR);
-              }
-            }
-            break;
-            case LONGNVARCHAR: {
-              if (currRecord[offset] != null) {
-                insertStmt.setString(offset + 1, (String) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.LONGNVARCHAR);
-              }
-            }
-            break;
-            case NCLOB: {
-              if (currRecord[offset] != null) {
-                insertStmt.setString(offset + 1, (String) currRecord[offset]);
-              }
-              else {
-                insertStmt.setNull(offset, Types.NCLOB);
-              }
-            }
-            break;
-          }
-          offset++;
-        }
-        insertStmt.addBatch();
-      }
-      insertStmt.executeBatch();
-
-      countProcessed.addAndGet(currBatch.size());
-    }
-    catch (Exception e) {
-      logger.error("Error inserting records", e);
-      throw new DatabaseException(e);
-    }
-    finally {
-      try {
-        if (insertStmt != null) {
-          insertStmt.close();
-        }
-      }
-      catch (Exception e) {
-        logger.error("Error closing connection", e);
-      }
-      finally {
-        countFinished.incrementAndGet();
-      }
-    }
-  }
-
-  private AtomicInteger currServerImporting = new AtomicInteger();
-
-  public ComObject startBulkImport(ComObject cobj) {
-    try {
-      final String dbName = cobj.getString(ComObject.Tag.dbName);
-      final String tableName = cobj.getString(ComObject.Tag.tableName);
-
-      ConcurrentHashMap<String, BulkImportStatus> tableStatus = null;
-      synchronized (bulkImportStatus) {
-        tableStatus = bulkImportStatus.get(dbName + ":" + tableName);
-        if (tableStatus == null) {
-          tableStatus = new ConcurrentHashMap<>();
-          bulkImportStatus.put(dbName + ":" + tableName, tableStatus);
-        }
-
-        int serverCount = shardCount * replicationFactor;
-
-
-        currServerImporting.set((currServerImporting.get() + 1) % serverCount);
-
-        String user = cobj.getString(ComObject.Tag.user);
-        String password = cobj.getString(ComObject.Tag.password);
-
-        logger.info("startBulkImport: dbName=" + dbName + ", tableName=" + tableName +
-            ", driver=" + cobj.getString(ComObject.Tag.driverName) +
-            ", connectStr=" + cobj.getString(ComObject.Tag.connectString) + ", user=" + user + ", password=" + password);
-
-        int offset = 0;
-        outer:
-        for (int shard = 0; shard < shardCount; shard++) {
-          for (int replica = 0; replica < replicationFactor; replica++) {
-            if (offset == currServerImporting.get()) {
-              String command = "DatabaseServer:ComObject:startBulkImportOnServer:";
-              cobj.put(ComObject.Tag.method, "startBulkImportOnServer");
-              getClient().send(null, shard, replica, command, cobj, DatabaseClient.Replica.specified);
-              break outer;
-            }
-            offset++;
-          }
-        }
-      }
-
-      final ConcurrentHashMap<String, BulkImportStatus> finalTableStatus = tableStatus;
-
-      Thread thread = new Thread(new Runnable() {
-        @Override
-        public void run() {
-          while (true) {
-            try {
-              ComObject cobj = new ComObject();
-              cobj.put(ComObject.Tag.dbName, dbName);
-              cobj.put(ComObject.Tag.tableName, tableName);
-              String command = "DatabaseServer:ComObject:getBulkImportProgressOnServer:";
-              cobj.put(ComObject.Tag.method, "getBulkImportProgressOnServer");
-              for (int i = 0; i < shardCount; i++) {
-                for (int j = 0; j < replicationFactor; j++) {
-                  byte[] bytes = getClient().send(null, i, j, command, cobj, DatabaseClient.Replica.specified);
-                  ComObject retObj = new ComObject(bytes);
-
-                  BulkImportStatus status = finalTableStatus.get(i + ":" + j);
-                  if (status == null) {
-                    status = new BulkImportStatus();
-                    finalTableStatus.put(i + ":" + j, status);
-                  }
-                  status.countExpected = retObj.getLong(ComObject.Tag.expectedCount);
-                  status.countProcessed = retObj.getLong(ComObject.Tag.countLong);
-                  status.finished = retObj.getBoolean(ComObject.Tag.finished);
-                }
-              }
-              Thread.sleep(10_000);
-            }
-            catch (Exception e) {
-              logger.error("Error in import monitor thread");
-              try {
-                Thread.sleep(10_000);
-              }
-              catch (InterruptedException e1) {
-                break;
-              }
-            }
-          }
-        }
-      });
-      thread.start();
-
-      return null;
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-  }
-
-  public ComObject cancelBulkImport(final ComObject cobj) {
-    String dbName = cobj.getString(ComObject.Tag.dbName);
-    String tableName = cobj.getString(ComObject.Tag.tableName);
-    cancelBulkImport.put(dbName + ":" + tableName, new AtomicBoolean(true));
-    return null;
-  }
-
-  public ComObject getBulkImportProgress(final ComObject cobj) {
-    String dbName = cobj.getString(ComObject.Tag.dbName);
-
-    ComObject retObj = new ComObject();
-    ComArray array = retObj.putArray(ComObject.Tag.progressArray, ComObject.Type.objectType);
-    for (Map.Entry<String, ConcurrentHashMap<String, BulkImportStatus>> entry : bulkImportStatus.entrySet()) {
-      if (entry.getKey().startsWith(dbName + ":")) {
-        String tableName = entry.getKey();
-        long countExpected = 0;
-        long countProcessed = 0;
-        boolean finished = true;
-        for (Map.Entry<String, BulkImportStatus> serverEntry : entry.getValue().entrySet()) {
-          countProcessed += serverEntry.getValue().countProcessed;
-          countExpected += serverEntry.getValue().countExpected;
-          if (!serverEntry.getValue().finished) {
-            finished = false;
-          }
-        }
-        ComObject serverObj = new ComObject();
-        serverObj.put(ComObject.Tag.tableName, tableName);
-        serverObj.put(ComObject.Tag.expectedCount, countExpected);
-        serverObj.put(ComObject.Tag.countLong, countProcessed);
-        serverObj.put(ComObject.Tag.finished, finished);
-        array.add(serverObj);
-      }
-    }
-
-    return retObj;
-  }
 
   private static class NullX509TrustManager implements X509TrustManager {
     public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
@@ -2004,7 +1127,7 @@ public class DatabaseServer {
       logger.info("Overriding pro license");
       haveProLicense = true;
       common.setHaveProLicense(haveProLicense);
-      common.saveSchema(dataDir);
+      common.saveSchema(getClient(), dataDir);
       return;
     }
     haveProLicense = true;
@@ -2022,7 +1145,7 @@ public class DatabaseServer {
     catch (Exception e) {
       logger.error("Error initializing license validator", e);
       common.setHaveProLicense(false);
-      common.saveSchema(dataDir);
+      common.saveSchema(getClient(), dataDir);
       DatabaseServer.this.haveProLicense = false;
       disableNow = true;
       haventSet.set(false);
@@ -2051,7 +1174,7 @@ public class DatabaseServer {
             logger.error("license server not found", e);
             if (haventSet.get() || lastHaveProLicense.get() != false) {
               common.setHaveProLicense(false);
-              common.saveSchema(dataDir);
+              common.saveSchema(getClient(), dataDir);
               DatabaseServer.this.haveProLicense = false;
               lastHaveProLicense.set(false);
               haventSet.set(false);
@@ -2142,7 +1265,7 @@ public class DatabaseServer {
       logger.info("licenseValidator: cores=" + cores + ", lastHaveProLicense=" + lastHaveProLicense.get() + ", haveProLicense=" + haveProLicense);
       if (haventSet.get() || lastHaveProLicense.get() != haveProLicense) {
         common.setHaveProLicense(haveProLicense);
-        common.saveSchema(dataDir);
+        common.saveSchema(getClient(), dataDir);
         lastHaveProLicense.set(haveProLicense);
         haventSet.set(true);
         logger.info("Saving schema with haveProLicense=" + haveProLicense);
@@ -2173,7 +1296,7 @@ public class DatabaseServer {
       logger.info("Overriding pro license");
       haveProLicense = true;
       common.setHaveProLicense(haveProLicense);
-      common.saveSchema(dataDir);
+      common.saveSchema(getClient(), dataDir);
       return;
     }
     haveProLicense = true;
@@ -2191,7 +1314,7 @@ public class DatabaseServer {
     catch (Exception e) {
       logger.error("Error initializing license validator", e);
       common.setHaveProLicense(false);
-      common.saveSchema(dataDir);
+      common.saveSchema(getClient(), dataDir);
       DatabaseServer.this.haveProLicense = false;
       disableNow = true;
       haventSet.set(false);
@@ -2237,7 +1360,7 @@ public class DatabaseServer {
                 ", disableNow=" + disableNow + ", disableDate=" + disableDate + ", multipleLicenseServers=" + multipleLicenseServers);
             if (haventSet.get() || lastHaveProLicense.get() != haveProLicense) {
               common.setHaveProLicense(haveProLicense);
-              common.saveSchema(dataDir);
+              common.saveSchema(getClient(), dataDir);
               lastHaveProLicense.set(haveProLicense);
               haventSet.set(true);
               logger.info("Saving schema with haveProLicense=" + haveProLicense);
@@ -2248,7 +1371,7 @@ public class DatabaseServer {
             logger.error("license server not found", e);
             if (haventSet.get() || lastHaveProLicense.get() != false) {
               common.setHaveProLicense(false);
-              common.saveSchema(dataDir);
+              common.saveSchema(getClient(), dataDir);
               DatabaseServer.this.haveProLicense = false;
               lastHaveProLicense.set(false);
               haventSet.set(false);
@@ -2775,6 +1898,7 @@ public class DatabaseServer {
       @Override
       public void run() {
         try {
+          System.out.println("doRestoreFileSystem: shard=" + shard + ", replica=" + replica);
           String directory = cobj.getString(ComObject.Tag.directory);
           String subDirectory = cobj.getString(ComObject.Tag.subDirectory);
 
@@ -2791,19 +1915,29 @@ public class DatabaseServer {
           BufferedInputStream in = new BufferedInputStream(new FileInputStream(file));
           ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
           IOUtils.copy(in, bytesOut);
-          synchronized (common) {
-            common.deserializeSchema(bytesOut.toByteArray());
-            common.saveSchema(getDataDir());
-          }
+//          common.clearSchema();
+//          synchronized (common) {
+//            common.deserializeSchema(bytesOut.toByteArray());
+//            common.saveSchema(getClient(), getDataDir());
+//          }
           logManager.restoreFileSystem(directory, subDirectory);
 
-          if (shard != 0 || common.getServersConfig().getShards()[0].masterReplica != replica) {
-            getClient().syncSchema();
-          }
+//          if (shard != 0 || common.getServersConfig().getShards()[0].masterReplica != replica) {
+//            getClient().syncSchema();
+//          }
 
           prepareDataFromRestore();
 
           deleteManager.forceDeletes();
+
+//          synchronized (common) {
+//            if (shard != 0 || common.getServersConfig().getShards()[0].masterReplica != replica) {
+//              long schemaVersion = common.getSchemaVersion() + 100;
+//              common.setSchemaVersion(schemaVersion);
+//            }
+//            common.saveSchema(getClient(), getDataDir());
+//          }
+//          pushSchema();
 
           isRestoreComplete = true;
         }
@@ -2855,7 +1989,7 @@ public class DatabaseServer {
           byte[] bytes = awsClient.downloadBytes(bucket, key);
           synchronized (common) {
             common.deserializeSchema(bytes);
-            common.saveSchema(getDataDir());
+            common.saveSchema(getClient(), getDataDir());
           }
           logManager.restoreAWS(bucket, prefix, subDirectory);
 
@@ -2974,7 +2108,8 @@ public class DatabaseServer {
       finalRestoreException = null;
       doingRestore = true;
 
-      pushSchema();
+      common.clearSchema();
+
       // delete snapshots and logs
       // enter recovery mode (block commands)
       ComObject cobj = new ComObject();
@@ -2989,6 +2124,27 @@ public class DatabaseServer {
         backupConfig = backup;
       }
       String type = backupConfig.getString("type");
+
+
+      if (type.equals("fileSystem")) {
+        String currDirectory = backupConfig.getString("directory");
+        currDirectory = currDirectory.replace("$HOME", System.getProperty("user.home"));
+
+        File file = new File(currDirectory, subDirectory);
+        file = new File(file, "snapshot/" + getShard() + "/0/schema.bin");
+        BufferedInputStream in = new BufferedInputStream(new FileInputStream(file));
+        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+        IOUtils.copy(in, bytesOut);
+
+
+        synchronized (common) {
+          common.deserializeSchema(bytesOut.toByteArray());
+          common.saveSchema(getClient(), getDataDir());
+        }
+      }
+      pushSchema();
+
+
       if (type.equals("AWS")) {
         // if aws
         //    tell all servers to upload with a specific root directory
@@ -3051,6 +2207,13 @@ public class DatabaseServer {
         Thread.sleep(2000);
       }
 
+      synchronized (common) {
+        if (shard != 0 || common.getServersConfig().getShards()[0].masterReplica != replica) {
+          long schemaVersion = common.getSchemaVersion() + 100;
+          common.setSchemaVersion(schemaVersion);
+        }
+        common.saveSchema(getClient(), getDataDir());
+      }
       pushSchema();
 
       cobj = new ComObject();
@@ -3060,6 +2223,16 @@ public class DatabaseServer {
       command = "DatabaseServer:ComObject:finishRestore:";
       ret = getDatabaseClient().sendToAllShards(null, 0, command, cobj, DatabaseClient.Replica.all, true);
 
+      for (String dbName : getDbNames(getDataDir())) {
+        getClient().beginRebalance(dbName, "persons", "_1__primarykey");
+
+        while (true) {
+          if (getClient().isRepartitioningComplete(dbName)) {
+            break;
+          }
+          Thread.sleep(1000);
+        }
+      }
     }
     catch (Exception e) {
       finalRestoreException = e;
@@ -3152,7 +2325,7 @@ public class DatabaseServer {
     for (String dbName : getDbNames(dataDir)) {
       snapshotManager.runSnapshot(dbName);
     }
-    getCommon().saveSchema(getDataDir());
+    getCommon().saveSchema(getClient(), getDataDir());
 
   }
 
@@ -3170,7 +2343,7 @@ public class DatabaseServer {
           innerIndex.clear();
         }
       }
-      //common.getTables(dbName).clear();
+      common.getTables(dbName).clear();
     }
     //common.saveSchema(dataDir);
   }
@@ -5570,7 +4743,7 @@ public class DatabaseServer {
 
       common.setServersConfig(newConfig);
 
-      common.saveSchema(getDataDir());
+      common.saveSchema(getClient(), getDataDir());
 
       pushSchema();
 

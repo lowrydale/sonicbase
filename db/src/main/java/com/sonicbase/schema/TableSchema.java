@@ -323,7 +323,7 @@ public class TableSchema {
     return indexesById;
   }
 
-  public void deserialize(DataInputStream in, int serializationVersion) throws IOException {
+  public void deserialize(DataInputStream in, long serializationVersion) throws IOException {
     tableId = (int) DataUtil.readVLong(in, new DataUtil.ResultLength());
     int fieldCount = in.readInt();
     name = in.readUTF();

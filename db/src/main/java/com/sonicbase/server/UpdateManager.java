@@ -93,10 +93,15 @@ public class UpdateManager {
     return null;
   }
 
-  public ComObject populateIndex(ComObject cobj) {
-    String command = "DatabaseServer:ComObject:doPopulateIndex:";
-    cobj.put(ComObject.Tag.method, "doPopulateIndex");
-    server.getLongRunningCommands().addCommand(server.getLongRunningCommands().createSingleCommand(command, cobj.serialize()));
+  public ComObject populateIndex(ComObject cobj, boolean replayedCommand) {
+    if (false && replayedCommand) {
+      doPopulateIndex(cobj);
+    }
+    else {
+      String command = "DatabaseServer:ComObject:doPopulateIndex:";
+      cobj.put(ComObject.Tag.method, "doPopulateIndex");
+      server.getLongRunningCommands().addCommand(server.getLongRunningCommands().createSingleCommand(command, cobj.serialize()));
+    }
     return null;
   }
 
@@ -152,12 +157,33 @@ public class UpdateManager {
                 if (keyInfo.getIndexSchema().getKey().equals(indexName)) {
                   while (true) {
                     try {
-                      server.getDatabaseClient().insertKey(dbName, tableName, keyInfo, primaryKeyIndexName, primaryKey.getKey());
+                      String command = "DatabaseServer:ComObject:insertIndexEntryByKey:";
+
+//                      int tableId = server.getCommon().getTables(dbName).get(tableName).getTableId();
+//                      int indexId = server.getCommon().getTables(dbName).get(tableName).getIndexes().get(keyInfo.getIndexSchema().getKey()).getIndexId();
+//                      cobj = DatabaseClient.serializeInsertKey(server.getCommon(), dbName, tableId, indexId, tableName, keyInfo,
+//                          primaryKeyIndexName, primaryKey.getKey());
+//
+//                      cobj.put(ComObject.Tag.dbName, dbName);
+//                      cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
+//                      cobj.put(ComObject.Tag.method, "insertIndexEntryByKey");
+//                      cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
+//                      cobj.put(ComObject.Tag.isExcpliciteTrans, false);
+//                      cobj.put(ComObject.Tag.isCommitting, false);
+//                      cobj.put(ComObject.Tag.transactionId, 0L);
+//
+//                      insertIndexEntryByKey(cobj, false);
+//
+                      server.getDatabaseClient().insertKey(dbName, tableName, keyInfo, primaryKeyIndexName,
+                          primaryKey.getKey(), server.getShard(), server.getReplica());
                       break;
                     }
                     catch (SchemaOutOfSyncException e) {
                       continue;
                     }
+//                    catch (IOException e) {
+//                      throw new DatabaseException(e);
+//                    }
                   }
                 }
               }

@@ -31,11 +31,11 @@ public class SnapshotManager {
   public Logger logger;
 
   public static final int SNAPSHOT_BUCKET_COUNT = 128;
-  public static final int SNAPSHOT_SERIALIZATION_VERSION = 22;
-  public static final int SNAPSHOT_SERIALIZATION_VERSION_22 = 22;
-  public static final int SNAPSHOT_SERIALIZATION_VERSION_21 = 21;
-  public static final int SNAPSHOT_SERIALIZATION_VERSION_20 = 20;
-  public static final int SNAPSHOT_SERIALIZATION_VERSION_19 = 19;
+  public static final long SNAPSHOT_SERIALIZATION_VERSION = 22;
+  public static final long SNAPSHOT_SERIALIZATION_VERSION_22 = 22;
+  public static final long SNAPSHOT_SERIALIZATION_VERSION_21 = 21;
+  public static final long SNAPSHOT_SERIALIZATION_VERSION_20 = 20;
+  public static final long SNAPSHOT_SERIALIZATION_VERSION_19 = 19;
 
   private final DatabaseServer server;
   private long lastSnapshot = -1;
@@ -329,7 +329,7 @@ public class SnapshotManager {
             for (String dbName : dbNames) {
               runSnapshot(dbName);
             }
-            server.getCommon().saveSchema(server.getDataDir());
+            server.getCommon().saveSchema(server.getClient(), server.getDataDir());
           }
           catch (InterruptedException e) {
             break;

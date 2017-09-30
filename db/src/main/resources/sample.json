@@ -1,14 +1,101 @@
-java -Dclass=com.lowryengineering.BenchmarkLDBM -Dp1= -Dp2= -Dp3= -Dp4= -Dp5= -Dp6= -Dp7= -Dp8= -Dp9=com.lowryengineering.BenchmarkLDBM0 -Dp10=com.lowryengineering.BenchmarkLDBM1 -Dp11=com.lowryengineering.BenchmarkLDBM2 -Dp12=com.lowryengineering.BenchmarkLDBM3 -Dp13=com.lowryengineering.BenchmarkLDBM4 -showversion -server -XX:+UseG1GC -verbose:gc -Xloggc:/data/logs/gc.log -XX:NewSize=256m -XX:MaxNewSize=460m -XX:PermSize=256m -XX:MaxPermSize=356m -XX:+CMSClassUnloadingEnabled -XX:+PrintGCDetails -XX:+UseCompressedOops -XX:+UseG1GC -XX:-UseLargePagesIndividualAllocation -XX:+HeapDumpOnOutOfMemoryError -Djava.net.preferIPv4Stack=true -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:-OmitStackTraceInFastThrow -XX:-UseLoopPredicate -Xmx58000m -XX:MaxDirectMemorySize=2g -Dfamilysearch.search.disable.foreign.node.registration -Dfamilysearch.search.disable.central.log -Dlog4j.configurationFile=log4j.xml -Djava.io.tmpdir:/data/tmp -Dunified.configuration.bootstrap.properties=../conf/us-bootstrap.properties -cp /home/ubuntu/database/target/:/home/ubuntu/database/lib/activation-1.1.jar:/home/ubuntu/database/lib/airmap-1.0.2.jar:/home/ubuntu/database/lib/airmap.jar:/home/ubuntu/database/lib/antlr-4.2-complete.jar:/home/ubuntu/database/lib/antlr-4.2.jar:/home/ubuntu/database/lib/antlr-runtime-3.0.1.jar:/home/ubuntu/database/lib/antlr-runtime-3.0.1-sources.jar:/home/ubuntu/database/lib/antlr-runtime-3.5.3-SNAPSHOT.jar:/home/ubuntu/database/lib/aws-java-sdk-1.7.2.jar:/home/ubuntu/database/lib/bsh-2.0b4.jar:/home/ubuntu/database/lib/c3p0-0.9.1.2.jar:/home/ubuntu/database/lib/c3p0-0.9.2.jar:/home/ubuntu/database/lib/cassandra-thrift-1.1.0.jar:/home/ubuntu/database/lib/commons-beanutils-1.7.0.jar:/home/ubuntu/database/lib/commons-beanutils-core-1.8.0.jar:/home/ubuntu/database/lib/commons-codec-1.3.jar:/home/ubuntu/database/lib/commons-collections-3.2.1.jar:/home/ubuntu/database/lib/commons-configuration-1.6.jar:/home/ubuntu/database/lib/commons-dbcp-2.0.jar:/home/ubuntu/database/lib/commons-dbcp2-2.0.jar:/home/ubuntu/database/lib/commons-digester-1.8.jar:/home/ubuntu/database/lib/commons-httpclient-3.1.0.jar:/home/ubuntu/database/lib/commons-httpclient-3.1.jar:/home/ubuntu/database/lib/commons-lang-2.4.jar:/home/ubuntu/database/lib/commons-lang3-3.3.2.jar:/home/ubuntu/database/lib/commons-logging-1.1.1.jar:/home/ubuntu/database/lib/commons-pool2-2.2.jar:/home/ubuntu/database/lib/commons-pool-2.2.jar:/home/ubuntu/database/lib/cookcc-0.3.3.jar:/home/ubuntu/database/lib/disruptor-3.3.0.jar:/home/ubuntu/database/lib/fastdb-1.3.jar:/home/ubuntu/database/lib/FastInfoset-1.2.2.jar:/home/ubuntu/database/lib/fastutil-6.5.12.jar:/home/ubuntu/database/lib/fdb-sql-parser-1.5.0-SNAPSHOT.jar:/home/ubuntu/database/lib/google-http-client-1.17.0-rc.jar:/home/ubuntu/database/lib/gson-2.2.3.jar:/home/ubuntu/database/lib/guava-14.0.1.jar:/home/ubuntu/database/lib/hamster-1.3.jar:/home/ubuntu/database/lib/hamsterdb-2.1.10.jar:/home/ubuntu/database/lib/hawtjni-runtime-1.10.jar:/home/ubuntu/database/lib/hector-core-1.1-2.jar:/home/ubuntu/database/lib/hppc-0.5.3.jar:/home/ubuntu/database/lib/httpclient-4.2.jar:/home/ubuntu/database/lib/httpcore-4.2.jar:/home/ubuntu/database/lib/jackson-annotations-2.1.1.jar:/home/ubuntu/database/lib/jackson-core-2.1.1.jar:/home/ubuntu/database/lib/jackson-databind-2.1.1.jar:/home/ubuntu/database/lib/JavaEWAH-0.6.11.jar:/home/ubuntu/database/lib/javax.servlet-api-3.1.0.jar:/home/ubuntu/database/lib/jcommander-1.27.jar:/home/ubuntu/database/lib/jetty-6.1.25.jar:/home/ubuntu/database/lib/jetty-http-9.3.0.M2.jar:/home/ubuntu/database/lib/jetty-io-9.3.0.M2.jar:/home/ubuntu/database/lib/jetty-server-9.3.0.M2.jar:/home/ubuntu/database/lib/jetty-util-6.1.25.jar:/home/ubuntu/database/lib/jetty-util-9.3.0.M2.jar:/home/ubuntu/database/lib/jnicli.jar:/home/ubuntu/database/lib/joda-time-2.7.jar:/home/ubuntu/database/lib/jsap-2.1.jar:/home/ubuntu/database/lib/json-simple-1.1.1.jar:/home/ubuntu/database/lib/jsqlparser-0.7.0.jar:/home/ubuntu/database/lib/jsqlparser.jar:/home/ubuntu/database/lib/jsr105-api-1.0.1.jar:/home/ubuntu/database/lib/jsr105-impl-1.0.2.jar:/home/ubuntu/database/lib/junit-3.8.1.jar:/home/ubuntu/database/lib/ldbm-1.3.jar:/home/ubuntu/database/lib/ldbmosx-1.3.jar:/home/ubuntu/database/lib/libthrift-0.7.0.jar:/home/ubuntu/database/lib/lmax-3.3.0.jar:/home/ubuntu/database/lib/lmdbjni-0.4.1-SNAPSHOT.jar:/home/ubuntu/database/lib/lmdbjni64-0.4.1-SNAPSHOT.jar:/home/ubuntu/database/lib/lmdbjni-linux64-0.4.1-SNAPSHOT.jar:/home/ubuntu/database/lib/lmdbjni-osx64-0.4.1-SNAPSHOT.jar:/home/ubuntu/database/lib/log4j-api-2.0-beta9.jar:/home/ubuntu/database/lib/log4j-core-2.0-beta9.jar:/home/ubuntu/database/lib/lz4-1.3-SNAPSHOT.jar:/home/ubuntu/database/lib/lz4-lzo-1.3.jar:/home/ubuntu/database/lib/mail-1.4.jar:/home/ubuntu/database/lib/mapdb-2.0.0-SNAPSHOT.jar:/home/ubuntu/database/lib/mapdb-2.0.0-SNAPSHOT-sources.jar:/home/ubuntu/database/lib/mapdb-2.0.jar:/home/ubuntu/database/lib/maven-artifact-3.0.jar:/home/ubuntu/database/lib/maven-plugin-annotations-3.2.jar:/home/ubuntu/database/lib/mina-2.0.9.jar:/home/ubuntu/database/lib/mina-codec-3.0.0-M2.jar:/home/ubuntu/database/lib/mina-core-2.0.9.jar:/home/ubuntu/database/lib/mina-core-3.0.0-M2.jar:/home/ubuntu/database/lib/mysql-connector-java-5.1.6.jar:/home/ubuntu/database/lib/netty-all-4.0.14.Final.jar:/home/ubuntu/database/lib/org.postgresql.jdbc4-8.3-603.jar:/home/ubuntu/database/lib/parser-1.5.0.jar:/home/ubuntu/database/lib/plexus-utils-2.0.4.jar:/home/ubuntu/database/lib/postgresql-9.1-901-1.jdbc4.jar:/home/ubuntu/database/lib/rabbitmq-client-3.2.3.jar:/home/ubuntu/database/lib/rabbitmq-client.jar:/home/ubuntu/database/lib/servlet-api-2.5-20081211.jar:/home/ubuntu/database/lib/servlet-api-2.5.jar:/home/ubuntu/database/lib/slf4j-1.7.7.jar:/home/ubuntu/database/lib/slf4j-api-1.6.1.jar:/home/ubuntu/database/lib/slf4j-api-1.7.7.jar:/home/ubuntu/database/lib/slf4j-simple-1.6.1.jar:/home/ubuntu/database/lib/snakeyaml-1.6.jar:/home/ubuntu/database/lib/snaptree-0.2.jar:/home/ubuntu/database/lib/speed4j-0.9.jar:/home/ubuntu/database/lib/sqlite4java-1.3.jar:/home/ubuntu/database/lib/sqlite4java.jar:/home/ubuntu/database/lib/stax-api-1.0-2.jar:/home/ubuntu/database/lib/testng-6.8.jar:/home/ubuntu/database/lib/trove-3.1a1.jar:/home/ubuntu/database/lib/tuscany-assembly-1.6.jar:/home/ubuntu/database/lib/tuscany-contribution-1.6.jar:/home/ubuntu/database/lib/tuscany-core-spi-1.6.jar:/home/ubuntu/database/lib/tuscany-databinding-1.6.jar:/home/ubuntu/database/lib/tuscany-databinding-fastinfoset-1.6.jar:/home/ubuntu/database/lib/tuscany-definitions-1.6.jar:/home/ubuntu/database/lib/tuscany-extensibility-1.6.jar:/home/ubuntu/database/lib/tuscany-interface-1.6.jar:/home/ubuntu/database/lib/tuscany-monitor-1.6.jar:/home/ubuntu/database/lib/tuscany-policy-1.6.jar:/home/ubuntu/database/lib/tuscany-sca-api-1.6.jar:/home/ubuntu/database/lib/tuscany-sca-api-extension-1.6.jar:/home/ubuntu/database/lib/tuscany-xsd-1.6.jar:/home/ubuntu/database/lib/uuid-3.2.0.jar:/home/ubuntu/database/lib/uuid-3.2.jar:/home/ubuntu/database/lib/voltdb-5.2.jar:/home/ubuntu/database/lib/voltdbclient-5.2.jar:/home/ubuntu/database/lib/wstx-asl-3.2.4.jar:/home/ubuntu/database/lib/XmlSchema-1.4.2.jar:/jre/lib/rt.jar:/jre/lib/alt-rt.jar:/jre/lib/deploy.jar:/jre/lib/alt-string.jar:/jre/lib/ext/dnsns.jar:/jre/lib/ext/sunjce_provider.jar:/jre/lib/ext/sunpkcs11.jar:/jre/lib/javaws.jar:/jre/lib/jce.jar:/jre/lib/jsse.jar:/jre/lib/management-agent.jar:/jre/lib/plugin.jar:/jre/lib/resources.jar: com.lowryengineering.BenchmarkLDBM
-OpenJDK 64-Bit Server VM warning: Max heap size too large for Compressed Oops
-java version "1.7.0_75"
-OpenJDK Runtime Environment (IcedTea 2.5.4) (7u75-2.5.4-1~trusty1)
-OpenJDK 64-Bit Server VM (build 24.75-b04, mixed mode)
-
-Exception in thread "main" java.lang.UnsatisfiedLinkError: Could not load library. Reasons: [no lmdbjni64-0.4.1-SNAPSHOT in java.library.path, no lmdbjni-0.4.1-SNAPSHOT in java.library.path, no lmdbjni in java.library.path]
-at org.fusesource.hawtjni.runtime.Library.doLoad(Library.java:182)
-at org.fusesource.hawtjni.runtime.Library.load(Library.java:140)
-at org.fusesource.lmdbjni.JNI.<clinit>(JNI.java:41)
-at org.fusesource.lmdbjni.Env.create(Env.java:57)
-at org.fusesource.lmdbjni.Env.<init>(Env.java:45)
-at com.lowryengineering.BenchmarkLDBM.main(BenchmarkLDBM.java:26)
-ubuntu@ip-172-31-40-236:~/database/bin$
+{
+  "id": "PAY-55468146TM822913JLHCIFUI",
+  "intent": "sale",
+  "state": "approved",
+  "cart": "2XH67050JJ797443F",
+  "payer": {
+    "payment_method": "paypal",
+    "status": "UNVERIFIED",
+    "payer_info": {
+      "email": "lowrydale@gmail.com",
+      "first_name": "Dale",
+      "last_name": "Lowry",
+      "payer_id": "NMBQM3DMVRG8U",
+      "shipping_address": {
+        "recipient_name": "Dale Lowry",
+        "line1": "5078 West Black Granite Way",
+        "city": "West Valley City",
+        "state": "UT",
+        "postal_code": "84120",
+        "country_code": "US"
+      },
+      "phone": "3852369443",
+      "country_code": "US"
+    }
+  },
+  "transactions": [
+    {
+      "amount": {
+        "total": "0.48",
+        "currency": "USD",
+        "details": {
+          "subtotal": "0.48"
+        }
+      },
+      "payee": {
+        "merchant_id": "UXNDVMR8XSA98"
+      },
+      "item_list": {
+        "items": [],
+        "shipping_address": {
+          "recipient_name": "Dale Lowry",
+          "line1": "5078 West Black Granite Way",
+          "city": "West Valley City",
+          "state": "UT",
+          "postal_code": "84120",
+          "country_code": "US"
+        }
+      },
+      "related_resources": [
+        {
+          "sale": {
+            "id": "13T06725R5399734E",
+            "state": "completed",
+            "amount": {
+              "total": "0.48",
+              "currency": "USD",
+              "details": {
+                "subtotal": "0.48"
+              }
+            },
+            "payment_mode": "INSTANT_TRANSFER",
+            "protection_eligibility": "ELIGIBLE",
+            "protection_eligibility_type": "ITEM_NOT_RECEIVED_ELIGIBLE,UNAUTHORIZED_PAYMENT_ELIGIBLE",
+            "transaction_fee": {
+              "value": "0.31",
+              "currency": "USD"
+            },
+            "parent_payment": "PAY-55468146TM822913JLHCIFUI",
+            "create_time": "2017-09-22T03:26:24Z",
+            "update_time": "2017-09-22T03:26:24Z",
+            "links": [
+              {
+                "href": "https://api.paypal.com/v1/payments/sale/13T06725R5399734E",
+                "rel": "self",
+                "method": "GET"
+              },
+              {
+                "href": "https://api.paypal.com/v1/payments/sale/13T06725R5399734E/refund",
+                "rel": "refund",
+                "method": "POST"
+              },
+              {
+                "href": "https://api.paypal.com/v1/payments/payment/PAY-55468146TM822913JLHCIFUI",
+                "rel": "parent_payment",
+                "method": "GET"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "create_time": "2017-09-22T03:26:24Z",
+  "links": [
+    {
+      "href": "https://api.paypal.com/v1/payments/payment/PAY-55468146TM822913JLHCIFUI",
+      "rel": "self",
+      "method": "GET"
+    }
+  ]
+}

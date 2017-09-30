@@ -4,7 +4,7 @@
   <groupId>com.sonicbase</groupId>
   <artifactId>sonicbase-root</artifactId>
   <packaging>pom</packaging>
-  <version>1.2.4</version>
+  <version>1.2.5</version>
   <name>sonicbase-root</name>
   <url>http://maven.apache.org</url>
   <build>

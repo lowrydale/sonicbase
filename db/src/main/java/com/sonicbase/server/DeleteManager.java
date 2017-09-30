@@ -46,7 +46,7 @@ public class DeleteManager {
       File file = new File(getReplicaRoot(), dateStr + ".bin");
       while (file.exists()) {
         Random rand = new Random(System.currentTimeMillis());
-        file = new File(getReplicaRoot() + dateStr + "-" + rand.nextInt(50000) + ".bin");
+        file = new File(getReplicaRoot(), dateStr + "-" + rand.nextInt(50000) + ".bin");
       }
       file.getParentFile().mkdirs();
       TableSchema tableSchema = databaseServer.getCommon().getTables(dbName).get(tableName);
@@ -69,6 +69,7 @@ public class DeleteManager {
 
   public void doDeletes(boolean ignoreVersion) {
     try {
+      int countDeleted = 0;
       synchronized (this) {
         File dir = getReplicaRoot();
         if (dir.exists()) {
@@ -119,6 +120,7 @@ public class DeleteManager {
                   }
                   continue;
                 }
+                countDeleted++;
                 batch.add(key);
                 if (batch.size() > 100_000) {
                   final List<Object[]> currBatch = batch;
@@ -200,6 +202,7 @@ public class DeleteManager {
           }
         }
       }
+      //System.out.println("deletes - finished: count=" + countDeleted + ", shard=" + databaseServer.getShard() + ", replica=" + databaseServer.getReplica());
     }
     catch (Exception e) {
       logger.error("Error performing deletes", e);

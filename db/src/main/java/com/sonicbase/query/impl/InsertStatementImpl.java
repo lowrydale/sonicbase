@@ -7,6 +7,7 @@ import com.sonicbase.query.InsertStatement;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class InsertStatementImpl extends StatementImpl implements InsertStatement {
   private final DatabaseClient client;
@@ -72,9 +73,11 @@ public class InsertStatementImpl extends StatementImpl implements InsertStatemen
 //        throw new Exception("Unexpected column type: " + expression.getClass().getName());
 //      }
 
+
+
   @Override
   public void addValue(String columnName, Object value) {
-    columnNames.add(columnName.toLowerCase());
+    columnNames.add(client.toLower(columnName));
     values.add(value);
   }
 

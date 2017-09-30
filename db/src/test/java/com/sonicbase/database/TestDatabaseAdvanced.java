@@ -1258,4 +1258,46 @@ public class TestDatabaseAdvanced {
     assertEquals(ret.getLong(1), 0);
   }
 
+  @Test
+  public void testColumnsInKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id from persons where id = 2 order by id desc");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 2);
+    assertFalse(ret.next());
+  }
+
+  @Test
+    public void testColumnsInKeyRange() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id from persons where id < 5 order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 0);
+    ret.next();
+    assertEquals(ret.getLong("id"), 1);
+    ret.next();
+    assertEquals(ret.getLong("id"), 2);
+    ret.next();
+    assertEquals(ret.getLong("id"), 3);
+    ret.next();
+    assertEquals(ret.getLong("id"), 4);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testColumnsInKeyRangeTwoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id from persons where id < 5 and id > 1 order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 2);
+    ret.next();
+    assertEquals(ret.getLong("id"), 3);
+    ret.next();
+    assertEquals(ret.getLong("id"), 4);
+    assertFalse(ret.next());
+  }
+
 }

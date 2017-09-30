@@ -636,9 +636,9 @@ public class ResultSetImpl implements ResultSet {
   }
 
   private Object getField(String[] label) {
-    label[1] = label[1].toLowerCase();
+    label[1] = DatabaseClient.toLower(label[1]);
     if (label[0] != null) {
-      label[0] = label[0].toLowerCase();
+      label[0] = DatabaseClient.toLower(label[0]);
     }
     if (label[0] != null) {
       for (int i = 0; i < selectContext.getTableNames().length; i++) {
@@ -691,7 +691,7 @@ public class ResultSetImpl implements ResultSet {
     }
     String[] actualColumn = getActualColumn(columnLabel);
     Object ret = getField(actualColumn);
-    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(columnLabel.toLowerCase());
+    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
 
     String retString = getString(ret);
 
@@ -814,7 +814,7 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnLabel);
     Object ret = getField(actualColumn);
 
-    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(columnLabel.toLowerCase());
+    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
 
     return getByte(ret, function == null ? null : function.getName());
   }
@@ -856,7 +856,7 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnLabel);
     Object ret = getField(actualColumn);
 
-    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(columnLabel.toLowerCase());
+    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
 
     Short retString1 = getShort(ret, function == null ? null : function.getName());
     if (retString1 != null) {
@@ -910,7 +910,7 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnLabel);
     Object retObj = getField(actualColumn);
 
-    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(columnLabel.toLowerCase());
+    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
 
     return getInt(retObj, function);
   }
@@ -977,7 +977,7 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnLabel);
     Object retObj = getField(actualColumn);
 
-    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(columnLabel.toLowerCase());
+    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
     return getLong(retObj, function);
   }
 
@@ -1098,7 +1098,7 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnLabel);
     Object retObj = getField(actualColumn);
 
-    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(columnLabel.toLowerCase());
+    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
     return getFloat(retObj, function);
   }
 
@@ -1162,7 +1162,7 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnLabel);
     Object retObj = getField(actualColumn);
 
-    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(columnLabel.toLowerCase());
+    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
     return getDouble(retObj, function);
   }
 
@@ -1318,7 +1318,7 @@ public class ResultSetImpl implements ResultSet {
     List<ColumnImpl> columns = selectStatement.getSelectColumns();
 
     ColumnImpl column = columns.get(columnIndex - 1);
-    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(column.getColumnName().toLowerCase());
+    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(column.getColumnName()));
 
     Object ret = getField(columnIndex);
 
@@ -1345,7 +1345,7 @@ public class ResultSetImpl implements ResultSet {
     List<ColumnImpl> columns = selectStatement.getSelectColumns();
     ColumnImpl column = columns.get(columnIndex - 1);
     String columnName = column.getColumnName();
-    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(column.getColumnName().toLowerCase());
+    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(column.getColumnName()));
 
     String[] actualColumn = getActualColumn(columnName);
     Object ret = getField(actualColumn);
@@ -1423,7 +1423,7 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnLabel);
     Object ret = getField(actualColumn);
 
-    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(columnLabel.toLowerCase());
+    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
     return getDouble(ret, function);
   }
 
@@ -1439,7 +1439,7 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnLabel);
     Object ret = getField(actualColumn);
 
-    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(columnLabel.toLowerCase());
+    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
     return getFloat(ret, function);
   }
 

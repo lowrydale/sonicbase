@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class CommandHandler {
   private Logger logger;
 
+  private final BulkImportManager bulkImportManager;
   private final DeleteManager deleteManager;
   private final SnapshotManager snapshotManager;
   private final UpdateManager updateManager;
@@ -41,9 +42,10 @@ public class CommandHandler {
   private AtomicInteger testWriteCallCount = new AtomicInteger();
 
 
-  public CommandHandler(DatabaseServer server, DeleteManager deleteManager, SnapshotManager snapshotManager, UpdateManager updateManager, TransactionManager transactionManager, ReadManager readManager, LogManager logManager, SchemaManager schemaManager) {
+  public CommandHandler(DatabaseServer server, BulkImportManager bulkImportManager, DeleteManager deleteManager, SnapshotManager snapshotManager, UpdateManager updateManager, TransactionManager transactionManager, ReadManager readManager, LogManager logManager, SchemaManager schemaManager) {
     this.server = server;
     this.common = server.getCommon();
+    this.bulkImportManager = bulkImportManager;
     this.deleteManager = deleteManager;
     this.snapshotManager = snapshotManager;
     this.updateManager = updateManager;
@@ -332,23 +334,27 @@ public class CommandHandler {
   }
 
   public ComObject cancelBulkImport(final ComObject cobj, boolean replayedCommand) {
-    return server.cancelBulkImport(cobj);
+    return bulkImportManager.cancelBulkImport(cobj);
   }
 
   public ComObject getBulkImportProgress(final ComObject cobj, boolean replayedCommand) {
-    return server.getBulkImportProgress(cobj);
+    return bulkImportManager.getBulkImportProgress(cobj);
   }
 
   public ComObject getBulkImportProgressOnServer(final ComObject cobj, boolean replayedCommand) {
-    return server.getBulkImportProgressOnServer(cobj);
+    return bulkImportManager.getBulkImportProgressOnServer(cobj);
   }
 
   public ComObject startBulkImportOnServer(ComObject cobj, boolean replayedCommand) {
-    return server.startBulkImportOnServer(cobj);
+    return bulkImportManager.startBulkImportOnServer(cobj);
+  }
+
+  public ComObject coordinateBulkImportForTable(final ComObject cobj, boolean replayedCommand) {
+    return bulkImportManager.coordinateBulkImportForTable(cobj);
   }
 
   public ComObject startBulkImport(ComObject cobj, boolean replayedCommand) {
-    return server.startBulkImport(cobj);
+    return bulkImportManager.startBulkImport(cobj);
   }
 
   public ComObject licenseCheckin(ComObject cobj, boolean replayedCommand) {
@@ -453,7 +459,7 @@ public class CommandHandler {
     for (int shard = 0; shard < server.getShardCount(); shard++) {
       common.getServersConfig().getShards()[shard].getReplicas()[replicaToKill].setDead(true);
     }
-    common.saveSchema(server.getDataDir());
+    common.saveSchema(server.getClient(), server.getDataDir());
     server.pushSchema();
 
     server.setReplicaDeadForRestart(replicaToKill);
@@ -466,7 +472,7 @@ public class CommandHandler {
     for (int shard = 0; shard < server.getShardCount(); shard++) {
       common.getServersConfig().getShards()[shard].getReplicas()[replicaToMarkAlive].setDead(false);
     }
-    common.saveSchema(server.getDataDir());
+    common.saveSchema(server.getClient(), server.getDataDir());
     server.pushSchema();
 
     server.setReplicaDeadForRestart(-1);
@@ -479,7 +485,7 @@ public class CommandHandler {
 
     logger.info("promoting to master: shard=" + shard + ", replica=" + replica);
     common.getServersConfig().getShards()[shard].setMasterReplica(replica);
-    common.saveSchema(server.getDataDir());
+    common.saveSchema(server.getClient(), server.getDataDir());
     server.pushSchema();
     return null;
   }
@@ -634,7 +640,7 @@ public class CommandHandler {
     synchronized (common) {
       if (tempCommon.getSchemaVersion() > common.getSchemaVersion()) {
         common.deserializeSchema(cobj.getByteArray(ComObject.Tag.schemaBytes));
-        common.saveSchema(server.getDataDir());
+        common.saveSchema(server.getClient(), server.getDataDir());
       }
     }
     return null;
@@ -961,6 +967,13 @@ public class CommandHandler {
     }
   }
 
+  public ComObject saveSchema(ComObject cobj, boolean replayedCommand) {
+//    byte[] bytes = cobj.getByteArray(ComObject.Tag.schemaBytes);
+//    server.getCommon().saveSchema(bytes, server.getDataDir());
+
+    return null;
+  }
+
   public ComObject truncateTable(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
@@ -1166,6 +1179,9 @@ public class CommandHandler {
 
   public ComObject rebalanceOrderedIndex(ComObject cobj, boolean replayedCommand) {
     //schema lock below
+    if (replayedCommand) {
+      return null;
+    }
     return server.getRepartitioner().rebalanceOrderedIndex(cobj);
   }
 
@@ -1212,7 +1228,7 @@ public class CommandHandler {
 
 //    common.getSchemaReadLock(dbName).lock();
 //    try {
-    return updateManager.populateIndex(cobj);
+    return updateManager.populateIndex(cobj, replayedCommand);
 //    }
 //    finally {
 //      common.getSchemaReadLock(dbName).unlock();

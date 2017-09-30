@@ -7,6 +7,10 @@ if [ $5 == "4-dale" ]
 then
   export MODE=yprof
 fi
+if [ $5 == "4-dale-2" ]
+then
+  export MODE=yprof
+fi
 
 if [ ${4:0:1} != "/" ]
 then

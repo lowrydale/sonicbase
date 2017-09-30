@@ -1107,7 +1107,9 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       for (int i = 0; i < key.length; i++) {
         if (key[i] != null) {
           for (int j = 0; j < key[i].length; j++) {
-            ret += key[i][j].hashCode();
+            //if (key[i][j] != null) {
+              ret += key[i][j].hashCode();
+            //}
           }
         }
       }

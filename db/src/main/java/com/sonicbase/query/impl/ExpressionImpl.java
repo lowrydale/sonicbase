@@ -9,6 +9,7 @@ import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.Expression;
+import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.PreparedIndexLookupNotFoundException;
@@ -1582,6 +1583,42 @@ public abstract class ExpressionImpl implements Expression {
             prepared.lastTimeUsed = System.currentTimeMillis();
           }
 
+          String[] cfields = tableSchema.getPrimaryKey();
+          int[] keyOffsets = new int[cfields.length];
+          for (int i = 0; i < keyOffsets.length; i++) {
+            keyOffsets[i] = tableSchema.getFieldOffset(cfields[i]);
+          }
+
+          boolean keyContainsColumns = true;
+          if (columns == null || columns.size() == 0 || counters != null) {
+            keyContainsColumns = false;
+          }
+          else {
+            List<Integer> array = new ArrayList<>();
+            for (ColumnImpl column : columns) {
+              if (column.getTableName() == null || column.getTableName().equals(tableSchema.getName())) {
+                Integer o = tableSchema.getFieldOffset(column.getColumnName());
+                if (o == null) {
+                  continue;
+                }
+                array.add(o);
+              }
+            }
+            for (Integer columnOffset : array) {
+              boolean cfound = false;
+              for (int i = 0; i < keyOffsets.length; i++) {
+                if (columnOffset == keyOffsets[i]) {
+                  cfound = true;
+                }
+              }
+              if (!cfound) {
+                keyContainsColumns = false;
+                break;
+              }
+            }
+          }
+
+
           Object[] lastKey = null;
           boolean justSwitched = false;
           int attempt = 0;
@@ -1708,6 +1745,7 @@ public abstract class ExpressionImpl implements Expression {
 
             prepared.serversPrepared[localShard][replica] = true;
 
+
             int calledShard = localShard;
             if (previousSchemaVersion < common.getSchemaVersion()) {
               throw new SchemaOutOfSyncException();
@@ -1754,11 +1792,14 @@ public abstract class ExpressionImpl implements Expression {
 
             Object[][][] currRetKeys = null;
             ComArray keys = retObj.getArray(ComObject.Tag.keys);
-            if (keys != null) {
+            if (keys != null && keys.getArray().size() != 0) {
               currRetKeys = new Object[keys.getArray().size()][][];
+              DataType.Type[] types = DatabaseCommon.deserializeKeyPrep(tableSchema, (byte[])keys.getArray().get(0));
+
               for (int k = 0; k < keys.getArray().size(); k++) {
                 keyBytes = (byte[])keys.getArray().get(k);
-                Object[] key = DatabaseCommon.deserializeKey(common.getTables(dbName).get(tableSchema.getName()), keyBytes);
+               //Object[] key = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
+                Object[] key = DatabaseCommon.deserializeKey(tableSchema, types,  new DataInputStream(new ByteArrayInputStream(keyBytes)));
                 currRetKeys[k] = new Object[][]{key};
                 if (debug) {
                   System.out.println("hit key: shard=" + calledShard + ", replica=" + replica);
@@ -1868,16 +1909,32 @@ public abstract class ExpressionImpl implements Expression {
               }
             }
             if (retKeys != null) {
-              List<IdEntry> keysToRead = new ArrayList<>();
-              for (int i = 0; i < retKeys.length; i++) {
-                Object[][] id = retKeys[i];
+              if (keyContainsColumns) {
+                for (int i = 0; i < retKeys.length; i++) {
+                  Object[][] key = retKeys[i];
+                  Record keyRecord = new Record(tableSchema);
+                  Object[] rfields = new Object[tableSchema.getFields().size()];
+                  keyRecord.setFields(rfields);
+                  for (int j = 0; j < keyOffsets.length; j++) {
+                    keyRecord.getFields()[keyOffsets[j]] = key[0][j];
+                  }
 
-                if (!recordCache.containsKey(tableSchema.getName(), id[0])) {
-                  keysToRead.add(new ExpressionImpl.IdEntry(i, id[0]));
+                  recordCache.put(tableSchema.getName(), key[0], new CachedRecord(keyRecord, null));
                 }
+
               }
-              doReadRecords(dbName, client, count, forceSelectOnServer, tableSchema, keysToRead, indexColumns,
-                  columns, recordCache, viewVersion);
+              else {
+                List<IdEntry> keysToRead = new ArrayList<>();
+                for (int i = 0; i < retKeys.length; i++) {
+                  Object[][] id = retKeys[i];
+
+                  if (!recordCache.containsKey(tableSchema.getName(), id[0])) {
+                    keysToRead.add(new ExpressionImpl.IdEntry(i, id[0]));
+                  }
+                }
+                doReadRecords(dbName, client, count, forceSelectOnServer, tableSchema, keysToRead, indexColumns,
+                    columns, recordCache, viewVersion);
+              }
             }
           }
           else {

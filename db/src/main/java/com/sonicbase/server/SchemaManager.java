@@ -92,7 +92,7 @@ public class SchemaManager {
 
     tableSchema.addIndex(indexName, isUnique, fields, partitions, highIndexId);
 
-    server.getCommon().updateTable(dbName, server.getDataDir(), tableSchema);
+    server.getCommon().updateTable(server.getClient(), dbName, server.getDataDir(), tableSchema);
 
     doCreateIndex(dbName, tableSchema, indexName, fields);
 
@@ -132,7 +132,7 @@ public class SchemaManager {
 
       server.getIndices().put(dbName, new Indices());
       server.getCommon().addDatabase(dbName);
-      server.getCommon().saveSchema(server.getDataDir());
+      server.getCommon().saveSchema(server.getClient(), server.getDataDir());
 
       if (masterSlave.equals("master")) {
         for (int i = 0; i < server.getShardCount(); i++) {
@@ -171,7 +171,7 @@ public class SchemaManager {
 
     server.getIndices().put(dbName, new Indices());
     server.getCommon().addDatabase(dbName);
-    server.getCommon().saveSchema(server.getDataDir());
+    server.getCommon().saveSchema(server.getClient(), server.getDataDir());
 
     return null;
   }
@@ -190,7 +190,7 @@ public class SchemaManager {
 
       server.getCommon().getSchemaWriteLock(dbName).lock();
       try {
-        server.getCommon().dropTable(dbName, tableName, server.getDataDir());
+        server.getCommon().dropTable(server.getClient(), dbName, tableName, server.getDataDir());
         server.getIndices().get(dbName).getIndices().remove(tableName);
       }
       finally {
@@ -310,12 +310,12 @@ public class SchemaManager {
         highTableId++;
         schema.setTableId(highTableId);
 
-        server.getCommon().addTable(dbName, server.getDataDir(), schema);
+        server.getCommon().addTable(server.getClient(), dbName, server.getDataDir(), schema);
 
         String[] primaryKeyFields = primaryKey.toArray(new String[primaryKey.size()]);
         createIndex(dbName, tableName.toLowerCase(), "_primarykey", true, primaryKeyFields);
 
-        server.getCommon().saveSchema(server.getDataDir());
+        server.getCommon().saveSchema(server.getClient(), server.getDataDir());
       }
       finally {
         server.getCommon().getSchemaWriteLock(dbName).unlock();
@@ -368,7 +368,7 @@ public class SchemaManager {
         }
       }
 
-      server.getCommon().saveSchema(server.getDataDir());
+      server.getCommon().saveSchema(server.getClient(), server.getDataDir());
 
       server.pushSchema();
 
@@ -400,7 +400,7 @@ public class SchemaManager {
       tableSchema.addField(fieldSchema);
       tableSchema.markChangesComplete();
 
-      server.getCommon().saveSchema(server.getDataDir());
+      server.getCommon().saveSchema(server.getClient(), server.getDataDir());
 
       server.pushSchema();
 
@@ -425,7 +425,7 @@ public class SchemaManager {
     }
 
     server.getCommon().deserializeSchema(cobj.getByteArray(ComObject.Tag.schemaBytes));
-    server.getCommon().saveSchema(server.getDataDir());
+    server.getCommon().saveSchema(server.getClient(), server.getDataDir());
 
     String tableName = cobj.getString(ComObject.Tag.tableName);
     TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
@@ -480,7 +480,7 @@ public class SchemaManager {
         }
 
         createdIndices = createIndex(dbName, table.get(), indexName, isUnique, fields);
-        server.getCommon().saveSchema(server.getDataDir());
+        server.getCommon().saveSchema(server.getClient(), server.getDataDir());
       }
       finally {
         server.getCommon().getSchemaWriteLock(dbName).unlock();
@@ -586,7 +586,7 @@ public class SchemaManager {
      }
 
      server.getCommon().deserializeSchema(cobj.getByteArray(ComObject.Tag.schemaBytes));
-     server.getCommon().saveSchema(server.getDataDir());
+     server.getCommon().saveSchema(server.getClient(), server.getDataDir());
 
      String tableName = cobj.getString(ComObject.Tag.tableName);
      ComArray array = cobj.getArray(ComObject.Tag.indices);
@@ -630,7 +630,7 @@ public class SchemaManager {
           server.getCommon().getTables(dbName).get(table).getIndices().remove(indexSchema.getName());
         }
 
-        server.getCommon().saveSchema(server.getDataDir());
+        server.getCommon().saveSchema(server.getClient(), server.getDataDir());
 
         cobj = new ComObject();
         cobj.put(ComObject.Tag.dbName, dbName);

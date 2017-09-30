@@ -1013,8 +1013,10 @@ public class LogManager {
                 final byte[] buffer = minSource.buffer;
                 final long sequence0 = minSource.sequence0;
                 final long sequence1 = minSource.sequence1;
-                executor.submit(new Runnable() {
-                  public void run() {
+//                System.out.println("shard=" + server.getShard() + ", replica=" + server.getReplica() +
+//                    ", command=" + command + ", s0=" + sequence0 + ", s1=" + sequence1);
+//                executor.submit(new Runnable() {
+//                  public void run() {
                     try {
                       server.handleCommand(command, buffer, sequence0, sequence1, true, false, null, null);
                       countProcessed.incrementAndGet();
@@ -1032,8 +1034,8 @@ public class LogManager {
                     finally {
                       countFinished.incrementAndGet();
                     }
-                  }
-                });
+//                  }
+//                });
 
                 if (!minSource.take(server, logger)) {
                   sources.remove(minOffset);

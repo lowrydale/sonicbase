@@ -1,5 +1,5 @@
 
-var COOKIE_LIFE = 15;
+var COOKIE_LIFE = 60;
 
 function isFramed() {
     var sPageURL = window.location.search.substring(1);

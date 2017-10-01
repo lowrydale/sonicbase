@@ -394,7 +394,7 @@ public class ReadManager {
       }
       else {
         prepared = new PreparedIndexLookup();
-        preparedIndexLookups.put(preparedId, prepared);
+        //preparedIndexLookups.put(preparedId, prepared);
       }
       prepared.lastTimeUsed = System.currentTimeMillis();
       int count = 0;
@@ -1829,9 +1829,16 @@ public class ReadManager {
         if (retRecords.size() >= count || retKeys.size() >= count) {
           break;
         }
-
         for (Map.Entry<Object[], Object> currEntry : entries) {
           entry = currEntry;
+
+//          if (indexSchema.getLastPartitions() != null && indexSchema.getLastPartitions()[server.getShard()].getUpperKey() != null &&
+//              DatabaseCommon.compareKey(indexSchema.getComparators(),
+//                  indexSchema.getLastPartitions()[server.getShard()].getUpperKey(), entry.getKey()) == -1) {
+//            entry = null;
+//            break outer;
+//          }
+
           if (currEntry == null) {
             break outer;
           }

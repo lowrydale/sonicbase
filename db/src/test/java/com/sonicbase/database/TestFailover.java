@@ -48,7 +48,7 @@ public class TestFailover {
       JsonArray array = config.putArray("licenseKeys");
       array.add(DatabaseServer.FOUR_SERVER_LICENSE);
 
-      FileUtils.deleteDirectory(new File("/data/database"));
+      FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
       DatabaseServer.getServers().clear();
 

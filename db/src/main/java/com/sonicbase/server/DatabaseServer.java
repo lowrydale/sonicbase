@@ -1881,10 +1881,15 @@ public class DatabaseServer {
       Thread.sleep(5000);
       snapshotManager.deleteSnapshots();
 
-      File file = new File(getDataDir(), "result-sets");
+      File file = new File(getDataDir(), "result-sets/" + getShard() + "/" + getReplica());
       FileUtils.deleteDirectory(file);
 
       logManager.deleteLogs();
+
+      synchronized (common) {
+        getClient().syncSchema();
+        common.saveSchema(getClient(), getDataDir());
+      }
 
       return null;
     }
@@ -1894,6 +1899,7 @@ public class DatabaseServer {
   }
 
   public ComObject doRestoreFileSystem(final ComObject cobj) {
+
     Thread thread = new Thread(new Runnable() {
       @Override
       public void run() {
@@ -1910,25 +1916,21 @@ public class DatabaseServer {
           longRunningCommands.restoreFileSystem(directory, subDirectory);
           snapshotManager.restoreFileSystem(directory, subDirectory);
 
-          File file = new File(directory, subDirectory);
-          file = new File(file, "snapshot/" + getShard() + "/0/schema.bin");
-          BufferedInputStream in = new BufferedInputStream(new FileInputStream(file));
-          ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-          IOUtils.copy(in, bytesOut);
-//          common.clearSchema();
+//          File file = new File(directory, subDirectory);
+//          file = new File(file, "snapshot/" + getShard() + "/0/schema.bin");
+//          BufferedInputStream in = new BufferedInputStream(new FileInputStream(file));
+//          ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+//          IOUtils.copy(in, bytesOut);
+//
 //          synchronized (common) {
 //            common.deserializeSchema(bytesOut.toByteArray());
 //            common.saveSchema(getClient(), getDataDir());
 //          }
           logManager.restoreFileSystem(directory, subDirectory);
 
-//          if (shard != 0 || common.getServersConfig().getShards()[0].masterReplica != replica) {
-//            getClient().syncSchema();
-//          }
-
           prepareDataFromRestore();
 
-          deleteManager.forceDeletes();
+          //deleteManager.forceDeletes();
 
 //          synchronized (common) {
 //            if (shard != 0 || common.getServersConfig().getShards()[0].masterReplica != replica) {
@@ -1985,15 +1987,7 @@ public class DatabaseServer {
           deleteManager.restoreAWS(bucket, prefix, subDirectory);
           longRunningCommands.restoreAWS(bucket, prefix, subDirectory);
           snapshotManager.restoreAWS(bucket, prefix, subDirectory);
-          String key = prefix + "/" + subDirectory + "/snapshot/" + getShard() + "/0/schema.bin";
-          byte[] bytes = awsClient.downloadBytes(bucket, key);
-          synchronized (common) {
-            common.deserializeSchema(bytes);
-            common.saveSchema(getClient(), getDataDir());
-          }
           logManager.restoreAWS(bucket, prefix, subDirectory);
-
-          getClient().syncSchema();
 
           prepareDataFromRestore();
 
@@ -2108,7 +2102,41 @@ public class DatabaseServer {
       finalRestoreException = null;
       doingRestore = true;
 
-      common.clearSchema();
+      JsonDict backup = config.getDict("backup");
+      if (backupConfig == null) {
+        backupConfig = backup;
+      }
+      String type = backupConfig.getString("type");
+
+      if (type.equals("AWS")) {
+        String bucket = backupConfig.getString("bucket");
+        String prefix = backupConfig.getString("prefix");
+
+        String key = prefix + "/" + subDirectory + "/snapshot/" + getShard() + "/0/schema.bin";
+        byte[] bytes = awsClient.downloadBytes(bucket, key);
+        synchronized (common) {
+          common.deserializeSchema(bytes);
+          common.saveSchema(getClient(), getDataDir());
+        }
+      }
+      else if (type.equals("fileSystem")) {
+        String currDirectory = backupConfig.getString("directory");
+        currDirectory = currDirectory.replace("$HOME", System.getProperty("user.home"));
+
+        File file = new File(currDirectory, subDirectory);
+        file = new File(file, "snapshot/" + getShard() + "/0/schema.bin");
+        BufferedInputStream in = new BufferedInputStream(new FileInputStream(file));
+        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+        IOUtils.copy(in, bytesOut);
+
+        synchronized (common) {
+          common.deserializeSchema(bytesOut.toByteArray());
+          common.saveSchema(getClient(), getDataDir());
+        }
+      }
+      //pushSchema();
+
+      //common.clearSchema();
 
       // delete snapshots and logs
       // enter recovery mode (block commands)
@@ -2119,30 +2147,6 @@ public class DatabaseServer {
       String command = "DatabaseServer:ComObject:prepareForRestore:";
       byte[][] ret = getDatabaseClient().sendToAllShards(null, 0, command, cobj, DatabaseClient.Replica.all, true);
 
-      JsonDict backup = config.getDict("backup");
-      if (backupConfig == null) {
-        backupConfig = backup;
-      }
-      String type = backupConfig.getString("type");
-
-
-      if (type.equals("fileSystem")) {
-        String currDirectory = backupConfig.getString("directory");
-        currDirectory = currDirectory.replace("$HOME", System.getProperty("user.home"));
-
-        File file = new File(currDirectory, subDirectory);
-        file = new File(file, "snapshot/" + getShard() + "/0/schema.bin");
-        BufferedInputStream in = new BufferedInputStream(new FileInputStream(file));
-        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-        IOUtils.copy(in, bytesOut);
-
-
-        synchronized (common) {
-          common.deserializeSchema(bytesOut.toByteArray());
-          common.saveSchema(getClient(), getDataDir());
-        }
-      }
-      pushSchema();
 
 
       if (type.equals("AWS")) {
@@ -2233,6 +2237,13 @@ public class DatabaseServer {
           Thread.sleep(1000);
         }
       }
+      cobj = new ComObject();
+      cobj.put(ComObject.Tag.dbName, "test");
+      cobj.put(ComObject.Tag.schemaVersion, getClient().getCommon().getSchemaVersion());
+      cobj.put(ComObject.Tag.method, "forceDeletes");
+      command = "DatabaseServer:ComObject:forceDeletes:";
+      getClient().sendToAllShards(null, 0, command, cobj, DatabaseClient.Replica.all);
+
     }
     catch (Exception e) {
       finalRestoreException = e;
@@ -2343,7 +2354,7 @@ public class DatabaseServer {
           innerIndex.clear();
         }
       }
-      common.getTables(dbName).clear();
+      //common.getTables(dbName).clear();
     }
     //common.saveSchema(dataDir);
   }

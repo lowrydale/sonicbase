@@ -1,5 +1,5 @@
 {
-  "dataDirectory": "/data/database",
+  "dataDirectory": "$HOME/db/database",
   "installDirectory": "$HOME/test-sonicbase",
   "partitionCountForRecordIndex" : 10000,
   "subPartitionsForIdIndex" : 10,
@@ -9,7 +9,7 @@
   "maxProcessMemory": "90%",
   "backup" : {
     "type" : "fileSystem",
-    "directory": "/data/db-backup",
+    "directory": "$HOME/db/db-backup",
     "period": "daily",
     "time": "23:00",
     "maxBackupCount": 10,

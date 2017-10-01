@@ -56,8 +56,7 @@ public class TestDatabase {
       JsonArray array = config.putArray("licenseKeys");
       array.add(DatabaseServer.FOUR_SERVER_LICENSE);
 
-      FileUtils.deleteDirectory(new File("/data/database"));
-      FileUtils.deleteDirectory(new File("/data/db-backup"));
+      FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
       DatabaseServer.getServers().clear();
 
@@ -376,6 +375,7 @@ public class TestDatabase {
 //        }
 //      }
 
+
 //      for (DatabaseServer server : dbServers) {
 //        server.purgeMemory();
 //      }
@@ -385,11 +385,22 @@ public class TestDatabase {
 //        server.recoverFromSnapshot();
 //        server.getLogManager().applyQueues();
 //      }
+//
+//      while (true) {
+//        if (client.isRepartitioningComplete("test")) {
+//          break;
+//        }
+//        Thread.sleep(1000);
+//      }
+//
+//      for (DatabaseServer server : dbServers) {
+//        server.shutdownRepartitioner();
+//      }
 
 
       JsonDict backupConfig = new JsonDict("{\n" +
           "    \"type\" : \"fileSystem\",\n" +
-          "    \"directory\": \"/data/db-backup\",\n" +
+          "    \"directory\": \"$HOME/db/backup\",\n" +
           "    \"period\": \"daily\",\n" +
           "    \"time\": \"23:00\",\n" +
           "    \"maxBackupCount\": 10,\n" +
@@ -419,7 +430,7 @@ public class TestDatabase {
 
       Thread.sleep(5000);
 
-      File file = new File("/data/db-backup");
+      File file = new File(System.getProperty("user.home"), "/db/backup");
       File[] dirs = file.listFiles();
 
       client.startRestore(dirs[0].getName());
@@ -445,7 +456,7 @@ public class TestDatabase {
 //      client.beginRebalance("test", "persons", "_1__primarykey");
 //
 
-      Thread.sleep(10_000);
+      //Thread.sleep(10_000);
 
       //client.syncSchema();
 
@@ -645,7 +656,7 @@ public class TestDatabase {
     stmt.executeUpdate();
   }
 
-    @Test
+  @Test
   public void testDualKey() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("create table dualKey (id BIGINT, id2 BIGINT, PRIMARY KEY (id, id2))");
     stmt.executeUpdate();
@@ -740,11 +751,11 @@ public class TestDatabase {
     List<String> primaryKey = new ArrayList<>();
     primaryKey.add("id");
     tableSchema.setPrimaryKey(primaryKey);
-    common.addTable(client, "test", "/data/database", tableSchema);
-    common.saveSchema(client, "/data/database");
+    common.addTable(client, "test", DatabaseServer.getServers().get(0).get(0).getDataDir(), tableSchema);
+    common.saveSchema(client, DatabaseServer.getServers().get(0).get(0).getDataDir());
 
     common.getTables("test").clear();
-    common.loadSchema("/data/database");
+    common.loadSchema(DatabaseServer.getServers().get(0).get(0).getDataDir());
 
     assertEquals(common.getTables("test").size(), 1);
   }
@@ -3377,7 +3388,7 @@ public class TestDatabase {
     String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(new FileInputStream("config/config-4-servers-large.json")));
     final JsonDict config = new JsonDict(configStr);
 
-    FileUtils.deleteDirectory(new File("/data/database"));
+    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
     DatabaseServer.getServers().clear();
 
@@ -3472,7 +3483,7 @@ public class TestDatabase {
     String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(new FileInputStream("config/config-4-servers-large.json")));
     final JsonDict config = new JsonDict(configStr);
 
-    FileUtils.deleteDirectory(new File("/data/database"));
+    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
     DatabaseServer.getServers().clear();
 
@@ -3561,7 +3572,7 @@ public class TestDatabase {
     String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(new FileInputStream("config/config-4-servers-large.json")));
     final JsonDict config = new JsonDict(configStr);
 
-    FileUtils.deleteDirectory(new File("/data/database"));
+    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
     DatabaseServer.getServers().clear();
 

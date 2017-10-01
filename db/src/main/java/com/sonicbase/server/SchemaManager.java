@@ -230,7 +230,12 @@ public class SchemaManager {
     server.getCommon().getSchemaWriteLock(dbName).lock();
     try {
       byte[] bytes = cobj.getByteArray(ComObject.Tag.schemaBytes);
-      server.getCommon().deserializeSchema(bytes);
+      DatabaseCommon tmpCommon = new DatabaseCommon();
+      tmpCommon.deserializeSchema(bytes);
+      if (tmpCommon.getSchemaVersion() > server.getCommon().getSchemaVersion()) {
+        server.getCommon().deserializeSchema(bytes);
+        server.getCommon().saveSchema(server.getClient(), server.getDataDir());
+      }
       String tableName = cobj.getString(ComObject.Tag.tableName);
       TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
       Map<String, IndexSchema> indices = tableSchema.getIndexes();
@@ -301,6 +306,10 @@ public class SchemaManager {
         schema.setFields(actualFields);
         schema.setName(tableName.toLowerCase());
         schema.setPrimaryKey(primaryKey);
+        TableSchema existingSchema = server.getCommon().getTables(dbName).get(tableName);
+        if (existingSchema != null) {
+          schema.setIndices(existingSchema.getIndices());
+        }
 
         Map<Integer, TableSchema> tables = server.getCommon().getTablesById(dbName);
         int highTableId = 0;
@@ -424,8 +433,12 @@ public class SchemaManager {
       return null;
     }
 
-    server.getCommon().deserializeSchema(cobj.getByteArray(ComObject.Tag.schemaBytes));
-    server.getCommon().saveSchema(server.getClient(), server.getDataDir());
+    DatabaseCommon tmpCommon = new DatabaseCommon();
+    tmpCommon.deserializeSchema(cobj.getByteArray(ComObject.Tag.schemaBytes));
+    if (tmpCommon.getSchemaVersion() > server.getCommon().getSchemaVersion()) {
+      server.getCommon().deserializeSchema(cobj.getByteArray(ComObject.Tag.schemaBytes));
+      server.getCommon().saveSchema(server.getClient(), server.getDataDir());
+    }
 
     String tableName = cobj.getString(ComObject.Tag.tableName);
     TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
@@ -585,8 +598,12 @@ public class SchemaManager {
        return null;
      }
 
-     server.getCommon().deserializeSchema(cobj.getByteArray(ComObject.Tag.schemaBytes));
-     server.getCommon().saveSchema(server.getClient(), server.getDataDir());
+     DatabaseCommon tmpCommon = new DatabaseCommon();
+     tmpCommon.deserializeSchema(cobj.getByteArray(ComObject.Tag.schemaBytes));
+     if (tmpCommon.getSchemaVersion() > server.getCommon().getSchemaVersion()) {
+       server.getCommon().deserializeSchema(cobj.getByteArray(ComObject.Tag.schemaBytes));
+       server.getCommon().saveSchema(server.getClient(), server.getDataDir());
+     }
 
      String tableName = cobj.getString(ComObject.Tag.tableName);
      ComArray array = cobj.getArray(ComObject.Tag.indices);

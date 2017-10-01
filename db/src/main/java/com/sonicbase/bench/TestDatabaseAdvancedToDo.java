@@ -36,7 +36,7 @@ public class TestDatabaseAdvancedToDo {
     String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")));
     final JsonDict config = new JsonDict(configStr);
 
-    FileUtils.deleteDirectory(new File("/data/database"));
+    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
     DatabaseServer.getServers().clear();
 

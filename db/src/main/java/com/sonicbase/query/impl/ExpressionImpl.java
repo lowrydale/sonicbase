@@ -1569,16 +1569,16 @@ public abstract class ExpressionImpl implements Expression {
           PreparedIndexLookup prepared = null;
           synchronized (preparedIndexLookups) {
             if (leftOperator == BinaryExpression.Operator.equal && rightValue == null) {
-              prepared = preparedIndexLookups.get(preparedKeyStr);
+              //prepared = preparedIndexLookups.get(preparedKeyStr);
             }
             if (prepared == null) {
               prepared = new PreparedIndexLookup();
-              prepared.preparedId = client.allocateId(dbName);
+              //prepared.preparedId = client.allocateId(dbName);
               prepared.serversPrepared = new boolean[client.getShardCount()][];
               for (int i = 0; i < prepared.serversPrepared.length; i++) {
                 prepared.serversPrepared[i] = new boolean[client.getReplicaCount()];
               }
-              preparedIndexLookups.put(preparedKeyStr, prepared);
+              //preparedIndexLookups.put(preparedKeyStr, prepared);
             }
             prepared.lastTimeUsed = System.currentTimeMillis();
           }
@@ -1743,7 +1743,7 @@ public abstract class ExpressionImpl implements Expression {
             byte[] lookupRet = client.send(null, localShard, 0, command, cobj, DatabaseClient.Replica.def);
             //ctx.stop();
 
-            prepared.serversPrepared[localShard][replica] = true;
+            //prepared.serversPrepared[localShard][replica] = true;
 
 
             int calledShard = localShard;
@@ -1772,7 +1772,9 @@ public abstract class ExpressionImpl implements Expression {
                 }
                 else {
                   if (nextKey == null) {
-                    localShard = nextShard = selectedShards.get(i + 1);
+                     localShard = nextShard = selectedShards.get(i + 1);
+//                    nextKey = indexSchema.getCurrPartitions()[localShard - 1].getUpperKey();
+
                     switchedShards = true;
                     //System.out.println("nextKey == null, nextShard=" + localShard);
                   }
@@ -1807,13 +1809,31 @@ public abstract class ExpressionImpl implements Expression {
               }
             }
 
+//            if (nextKey == null && keys.getArray().size() != 0) {
+//              nextKey = currRetKeys[keys.getArray().size() - 1];
+//            }
+
             ComArray records = retObj.getArray(ComObject.Tag.records);
             Record[] currRetRecords = new Record[records == null ? 0 : records.getArray().size()];
             if (currRetRecords.length > 0) {
+              String[] primaryKeyFields = null;
+              int[] primaryKeyOffsets = null;
+              for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
+                if (entry.getValue().isPrimaryKey()) {
+                  primaryKeyFields = entry.getValue().getFields();
+                  primaryKeyOffsets = new int[primaryKeyFields.length];
+                  for (int i = 0; i < primaryKeyFields.length; i++) {
+                    primaryKeyOffsets[i] = tableSchema.getFieldOffset(primaryKeyFields[i]);
+                  }
+                  break;
+                }
+              }
+
               for (int k = 0; k < currRetRecords.length; k++) {
                 byte[] recordBytes = (byte[])records.getArray().get(k);
                 try {
                   currRetRecords[k] = new Record(dbName, client.getCommon(), recordBytes);
+
                   if (debug) {
                     System.out.println("hit record: shard=" + calledShard + ", replica=" + replica);
                   }
@@ -1821,6 +1841,13 @@ public abstract class ExpressionImpl implements Expression {
                 catch (Exception e) {
                   throw e;
                 }
+              }
+              if (nextKey == null && currRetRecords.length != 0) {
+                Object[] key = new Object[primaryKeyFields.length];
+                for (int j = 0; j < primaryKeyFields.length; j++) {
+                  key[j] = currRetRecords[currRetRecords.length - 1].getFields()[primaryKeyOffsets[j]];
+                }
+                nextKey = key;
               }
             }
 
@@ -1996,10 +2023,10 @@ public abstract class ExpressionImpl implements Expression {
       return true;
     }
     while (true) {
-      if (e.getMessage() == null) {
-        break;
-      }
-      if (e.getMessage().contains("PreparedIndexLookupNotFoundException")) {
+//      if (e.getMessage() == null) {
+//        break;
+//      }
+      if (e.getMessage() != null && e.getMessage().contains("PreparedIndexLookupNotFoundException")) {
         return true;
       }
       e = e.getCause();

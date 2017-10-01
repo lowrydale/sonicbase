@@ -123,6 +123,10 @@ public class TableSchema {
     }
   }
 
+  public void setIndices(Map<String, IndexSchema> indices) {
+    this.indexes = indices;
+  }
+
   class PreviousFields {
     long schemaVersion;
     List<FieldSchema> fields = new ArrayList<>();

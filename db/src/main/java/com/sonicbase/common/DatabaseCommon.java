@@ -128,20 +128,25 @@ public class DatabaseCommon {
   public void saveSchema(byte[] bytes, String dataDir) {
     try {
       internalWriteLock.lock();
-      String dataRoot = new File(dataDir, "snapshot/" + shard + "/" + replica).getAbsolutePath();
-      File schemaFile = new File(dataRoot, "schema.bin");
-      if (schemaFile.exists()) {
-        schemaFile.delete();
-      }
+        String dataRoot = new File(dataDir, "snapshot/" + shard + "/" + replica).getAbsolutePath();
+        File schemaFile = new File(dataRoot, "schema.bin");
+        if (schemaFile.exists()) {
+          schemaFile.delete();
+        }
 
-      deserializeSchema(bytes);
+        schemaFile.getParentFile().mkdirs();
+        try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(schemaFile)))) {
+          if (getShard() == 0 &&
+              getServersConfig().getShards()[0].getMasterReplica() == getReplica()) {
+            this.schemaVersion++;
+            //          schema.get(dbName).incrementSchemaVersion();
+          }
+          serializeSchema(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+        }
 
-      schemaFile.getParentFile().mkdirs();
-      try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(schemaFile)))) {
-        serializeSchema(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-      }
-      loadSchema(dataDir);
-      logger.info("Saved schema - postLoad: dir=" + dataRoot);
+
+        loadSchema(dataDir);
+        logger.info("Saved schema - postLoad: dir=" + dataRoot);
 
     }
     catch (IOException e) {
@@ -330,11 +335,13 @@ public class DatabaseCommon {
   }
 
   public static Object[] deserializeKey(TableSchema tableSchema, DataInputStream in) throws EOFException {
+
+    int indexId = -1;
     try {
       long serializationVersion = DataUtil.readVLong(in);
       DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
       DataUtil.readVLong(in, resultLength);
-      int indexId = (int) DataUtil.readVLong(in, resultLength);
+      indexId = (int) DataUtil.readVLong(in, resultLength);
       //logger.info("tableId=" + tableId + " indexId=" + indexId + ", indexCount=" + tableSchema.getIndices().size());
       IndexSchema indexSchema = tableSchema.getIndexesById().get(indexId);
       String[] columns = indexSchema.getFields();
@@ -446,6 +453,9 @@ public class DatabaseCommon {
       throw e;
     }
     catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+    catch (Exception e) {
       throw new DatabaseException(e);
     }
   }
@@ -1064,7 +1074,14 @@ public class DatabaseCommon {
   }
 
 
+  public Map<String, Schema> getDataases() {
+    return schema;
+  }
+
   public void addDatabase(String dbName) {
+    if (schema.get(dbName) != null) {
+      return;
+    }
     schema.put(dbName, new Schema());
     createSchemaLocks(dbName);
   }

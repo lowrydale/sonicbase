@@ -62,6 +62,11 @@
         <appender-ref ref="roll"/>
     </logger>
 
+    <logger name="com.sonicbase.logger" additivity="false">
+        <level value="info"/>
+        <appender-ref ref="console"/>
+    </logger>
+
     <logger name="com.sonicbase.errorLogger" additivity="false">
         <level value="error"/>
         <appender-ref ref="roll-errors" />

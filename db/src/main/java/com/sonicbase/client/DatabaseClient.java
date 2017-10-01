@@ -1609,6 +1609,13 @@ public class DatabaseClient {
   public Object executeQuery(String dbName, QueryType queryType, String sql, ParameterHandler parms, boolean debug) throws SQLException {
     while (true) {
       try {
+        
+        if (!common.getDataases().containsKey(dbName)) {
+          syncSchema();
+          if (!common.getDataases().containsKey(dbName)) {
+            throw new DatabaseException("Database does not exist: dbName=" + dbName);
+          }
+        }
         Statement statement;
         if (toLower(sql.substring(0, "describe".length())).startsWith("describe")) {
           return doDescribe(dbName, sql);
@@ -3675,7 +3682,7 @@ public class DatabaseClient {
   private Object syncSchemaMutex = new Object();
 
   public void syncSchema(long serverVersion) {
-    synchronized (syncSchemaMutex) {
+    synchronized (common) {
       if (serverVersion > common.getSchemaVersion()) {
         syncSchema();
       }
@@ -3683,7 +3690,7 @@ public class DatabaseClient {
   }
 
   public void syncSchema() {
-    synchronized (syncSchemaMutex) {
+    synchronized (common) {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());

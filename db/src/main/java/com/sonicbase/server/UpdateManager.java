@@ -181,6 +181,9 @@ public class UpdateManager {
                     catch (SchemaOutOfSyncException e) {
                       continue;
                     }
+                    catch (Exception e) {
+                      throw new DatabaseException(e);
+                    }
 //                    catch (IOException e) {
 //                      throw new DatabaseException(e);
 //                    }
@@ -327,7 +330,8 @@ public class UpdateManager {
       String tableName = server.getCommon().getTablesById(dbName).get(cobj.getInt(ComObject.Tag.tableId)).getName();
       String indexName = null;
       try {
-        indexName = server.getCommon().getTablesById(dbName).get(cobj.getInt(ComObject.Tag.tableId)).getIndexesById().get(cobj.getInt(ComObject.Tag.indexId)).getName();
+        IndexSchema indexSchema = server.getCommon().getTablesById(dbName).get(cobj.getInt(ComObject.Tag.tableId)).getIndexesById().get(cobj.getInt(ComObject.Tag.indexId));
+        indexName = indexSchema.getName();
       }
       catch (Exception e) {
         throw e;

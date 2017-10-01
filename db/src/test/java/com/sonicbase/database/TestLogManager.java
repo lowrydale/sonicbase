@@ -36,9 +36,9 @@ public class TestLogManager {
      JsonArray array = config.putArray("licenseKeys");
      array.add(DatabaseServer.FOUR_SERVER_LICENSE);
 
-     FileUtils.deleteDirectory(new File("/data/database"));
+    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
-     DatabaseServer.getServers().clear();
+    DatabaseServer.getServers().clear();
 
      final DatabaseServer[] dbServers = new DatabaseServer[4];
      ThreadPoolExecutor executor = new ThreadPoolExecutor(128, 128, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());

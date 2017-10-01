@@ -30,7 +30,7 @@ public class LogManager {
   private static final String UTF8_STR = "utf-8";
   private final List<LogProcessor> logProcessors = new ArrayList<>();
   private final List<LogProcessor> peerLogProcessors = new ArrayList<>();
-  private Logger logger;
+  private static Logger logger;
   private final DatabaseServer databaseServer;
   private final ThreadPoolExecutor executor;
 
@@ -783,8 +783,8 @@ public class LogManager {
           logger.error("Error closing stream", e1);
         }
       }
-      catch (IOException e) {
-        logger.error("Error reading log entry", e);
+      catch (Exception e) {
+        logger.error("Error reading log entry: command=" + command, e);
         command = null;
         buffer = null;
         sequence1 = -1;

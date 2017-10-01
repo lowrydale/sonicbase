@@ -1638,15 +1638,17 @@ public class Repartitioner extends Thread {
                 }
               }
               else {
-                for (int i = 0; i < content.length; i++) {
-                  Record.setDbViewFlags(content[i], (short)0 );
-                  Record.setDbViewNumber(content[i],0);// common.getSchemaVersion() - 2);
-                }
-                //toFree.add(entry.value);
-                Object newValue = databaseServer.toUnsafeFromRecords(content);
-                index.put(entry.key, newValue);
-                databaseServer.freeUnsafeIds(entry.value);
+                if (indexSchema.isPrimaryKey()) {
+                  for (int i = 0; i < content.length; i++) {
+                    Record.setDbViewFlags(content[i], (short) 0);
+                    Record.setDbViewNumber(content[i], 0);// common.getSchemaVersion() - 2);
+                  }
+                  //toFree.add(entry.value);
+                  Object newValue = databaseServer.toUnsafeFromRecords(content);
+                  index.put(entry.key, newValue);
+                  databaseServer.freeUnsafeIds(entry.value);
 
+                }
                 content = null;
               }
             }

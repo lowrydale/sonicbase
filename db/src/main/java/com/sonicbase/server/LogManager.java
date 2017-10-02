@@ -261,11 +261,14 @@ public class LogManager {
       for (File file : files) {
         if (sliceFiles.contains(file.getAbsolutePath())) {
           File destFile = new File(destDir, file.getName());
-          FileUtils.copyFile(file, destFile);
+          StreamUtils.copyFile(file, destFile);
         }
       }
     }
   }
+
+
+
 
   private void backupLogDirToAWS(AWSClient awsClient, String logSlicePoint, String bucket, String prefix, String destDir, File srcDir) throws IOException {
     File[] files = srcDir.listFiles();

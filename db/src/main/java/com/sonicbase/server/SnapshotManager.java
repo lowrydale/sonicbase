@@ -9,6 +9,7 @@ import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.DataUtil;
+import com.sonicbase.util.StreamUtils;
 import org.apache.commons.io.FileUtils;
 
 import java.io.*;
@@ -530,7 +531,7 @@ public class SnapshotManager {
       file.getParentFile().mkdirs();
 
       File sourceFile = new File(getSnapshotReplicaDir(), "schema.bin");
-      FileUtils.copyFile(sourceFile, file);
+      StreamUtils.copyFile(sourceFile, file);
 
 
       file = new File(directory, subDirectory);
@@ -539,7 +540,7 @@ public class SnapshotManager {
 
       sourceFile = new File(getSnapshotReplicaDir(), "config.bin");
       if (sourceFile.exists()) {
-        FileUtils.copyFile(sourceFile, file);
+        StreamUtils.copyFile(sourceFile, file);
       }
     }
     catch (Exception e) {

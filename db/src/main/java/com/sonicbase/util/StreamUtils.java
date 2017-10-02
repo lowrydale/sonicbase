@@ -62,4 +62,14 @@ public class StreamUtils {
     return out.toByteArray();
   }
 
+  public static void copyFile(File srcFile, File destFile) throws IOException {
+    destFile.delete();
+    destFile.getParentFile().mkdirs();
+
+    try (BufferedInputStream in = new BufferedInputStream(new FileInputStream(srcFile));
+      BufferedOutputStream out = new BufferedOutputStream((new FileOutputStream(destFile)))) {
+      IOUtils.copy(in, out);
+    }
+  }
+
 }

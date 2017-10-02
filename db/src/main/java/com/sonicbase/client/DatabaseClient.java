@@ -498,7 +498,7 @@ public class DatabaseClient {
       }
 
       for (InsertRequest request : batch.get()) {
-        List<PreparedInsert> inserts = prepareInsert(request, nonTransId);
+        List<PreparedInsert> inserts = prepareInsert(request, new ArrayList<KeyInfo>(), new AtomicLong(-1L), nonTransId);
         for (PreparedInsert insert : inserts) {
           if (insert.keyInfo.indexSchema.getValue().isPrimaryKey()) {
             withRecordPrepared.add(insert);
@@ -2832,7 +2832,8 @@ public class DatabaseClient {
     public String indexName;
   }
 
-  public List<PreparedInsert> prepareInsert(InsertRequest request, long nonTransId) throws UnsupportedEncodingException, SQLException {
+  public List<PreparedInsert> prepareInsert(InsertRequest request,
+                                            List<KeyInfo> completed, AtomicLong recordId, long nonTransId) throws UnsupportedEncodingException, SQLException {
     List<PreparedInsert> ret = new ArrayList<>();
 
     String dbName = request.dbName;
@@ -2848,12 +2849,20 @@ public class DatabaseClient {
     }
     int tableId = tableSchema.getTableId();
 
-    long id = 0;
+    long id = -1;
     for (IndexSchema indexSchema : tableSchema.getIndexes().values()) {
       if (indexSchema.isPrimaryKey() && indexSchema.getFields()[0].equals("_id")) {
-        id = allocateId(dbName);
+        if (recordId.get() == -1L) {
+          id = allocateId(dbName);
+        }
+        else {
+          id = recordId.get();
+        }
+        recordId.set(id);
+        break;
       }
     }
+
 
     long transId = 0;
     if (!isExplicitTrans.get()) {
@@ -2876,7 +2885,6 @@ public class DatabaseClient {
 
 
     int primaryKeyCount = 0;
-    List<KeyInfo> completed = new ArrayList<>();
     KeyInfo primaryKey = new KeyInfo();
     try {
       tableSchema = common.getTables(dbName).get(tableName);
@@ -2952,6 +2960,8 @@ public class DatabaseClient {
     request.insertStatement = insertStatement;
     request.parms = parms;
     int insertCountCompleted = 0;
+    List<KeyInfo> completed = new ArrayList<>();
+    AtomicLong recordId = new AtomicLong(-1L);
     while (true) {
       try {
         if (batch.get() != null) {
@@ -2963,23 +2973,29 @@ public class DatabaseClient {
              nonTransId = allocateId(dbName);
           }
 
-          List<PreparedInsert> inserts = prepareInsert(request, nonTransId);
-          for (int i = 0; i < inserts.size(); i++) {
-            if (i < insertCountCompleted) {
-              continue;
-            }
-            PreparedInsert insert = inserts.get(i);
+          List<PreparedInsert> inserts = prepareInsert(request, completed, recordId, nonTransId);
+          List<PreparedInsert> insertsWithRecords = new ArrayList<>();
+          List<PreparedInsert> insertsWithKey = new ArrayList<>();
+          for (PreparedInsert insert : inserts) {
             if (insert.keyInfo.indexSchema.getValue().isPrimaryKey()) {
-              insertKeyWithRecord(dbName, insertStatement.getTableName(), insert.keyInfo, insert.record);
+              insertsWithRecords.add(insert);
             }
             else {
-              insertKey(dbName, insertStatement.getTableName(), insert.keyInfo, insert.primaryKeyIndexName,
-                  insert.primaryKey, -1, -1);
+              insertsWithKey.add(insert);
             }
-            insertCountCompleted++;
-            if (previousSchemaVersion != common.getSchemaVersion()) {
-              throw new SchemaOutOfSyncException();
-            }
+          }
+
+          for (int i = 0; i < insertsWithRecords.size(); i++) {
+            PreparedInsert insert = insertsWithRecords.get(i);
+            insertKeyWithRecord(dbName, insertStatement.getTableName(), insert.keyInfo, insert.record);
+            completed.add(insert.keyInfo);
+          }
+
+          for (int i = 0; i < insertsWithKey.size(); i++) {
+            PreparedInsert insert = insertsWithKey.get(i);
+            insertKey(dbName, insertStatement.getTableName(), insert.keyInfo, insert.primaryKeyIndexName,
+                insert.primaryKey, -1, -1);
+            completed.add(insert.keyInfo);
           }
         }
         break;
@@ -3223,9 +3239,7 @@ public class DatabaseClient {
 
           selectedShards = Repartitioner.findOrderedPartitionForRecord(false, true, fieldOffsets, common, tableSchema,
               indexSchema.getKey(), null, BinaryExpression.Operator.equal, null, key, null);
-          //        List<Integer> selectedShards = new ArrayList<>();
-          //        selectedShards.add(0);
-          //        selectedShards.add(1);
+
           for (int partition : selectedShards) {
             boolean found = false;
             int shard = lastPartitions[partition].getShardOwning();
@@ -3240,11 +3254,7 @@ public class DatabaseClient {
               ret.add(new KeyInfo(shard, key, indexSchema, false));
             }
           }
-        }
-//        for (int i = 0; i < 2; i++) {
-//          int shard = partitions[i].getShardOwning();
-//          ret.add(new KeyInfo(shard, key, indexSchema));
-//        }
+         }
       }
     }
     return ret;

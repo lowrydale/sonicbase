@@ -14,6 +14,7 @@ import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.SnapshotManager;
 import com.sonicbase.util.DataUtil;
+import sun.tools.jconsole.ProxyClient;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -125,7 +126,7 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
               cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
               cobj.put(ComObject.Tag.tableName, tableName);
               cobj.put(ComObject.Tag.method, "deleteIndexEntry");
-              byte[] bytes = record.serialize(client.getCommon());
+              byte[] bytes = record.serialize(client.getCommon(), SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
               cobj.put(ComObject.Tag.recordBytes, bytes);
 
               client.sendToAllShards(null, rand.nextLong(), command, cobj, DatabaseClient.Replica.def);

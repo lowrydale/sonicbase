@@ -479,7 +479,7 @@ public class DatabaseClient {
     try {
       final Object mutex = new Object();
       final List<PreparedInsert> withRecordPrepared = new ArrayList<>();
-      final List<PreparedInsert> prepared = new ArrayList<>();
+      final List<PreparedInsert> preparedKeys = new ArrayList<>();
       long nonTransId = 0;
       while (true) {
         try {
@@ -504,7 +504,7 @@ public class DatabaseClient {
             withRecordPrepared.add(insert);
           }
           else {
-            prepared.add(insert);
+            preparedKeys.add(insert);
           }
         }
       }
@@ -566,9 +566,9 @@ public class DatabaseClient {
               cobjs1.get(insert.keyInfo.shard).getArray(ComObject.Tag.insertObjects).getArray().add(obj);
               withRecordProcessed.get(insert.keyInfo.shard).add(insert);
             }
-            for (PreparedInsert insert : prepared) {
+            for (PreparedInsert insert : preparedKeys) {
               ComObject obj = serializeInsertKey(getCommon(), insert.dbName, insert.tableId, insert.indexId, insert.tableName, insert.keyInfo,
-                  insert.primaryKeyIndexName, insert.primaryKey);
+                  insert.primaryKeyIndexName, insert.primaryKey, insert.keyRecord);
               cobjs2.get(insert.keyInfo.shard).getArray(ComObject.Tag.insertObjects).getArray().add(obj);
               processed.get(insert.keyInfo.shard).add(insert);
             }
@@ -632,7 +632,7 @@ public class DatabaseClient {
                 send(null, offset, rand.nextLong(), command2, cobjs2.get(offset), DatabaseClient.Replica.def);
 
                 for (PreparedInsert insert : processed.get(offset)) {
-                  prepared.remove(insert);
+                  preparedKeys.remove(insert);
                 }
 
                 return null;
@@ -671,7 +671,7 @@ public class DatabaseClient {
                 }
               }
 
-              for (PreparedInsert insert : prepared) {
+              for (PreparedInsert insert : preparedKeys) {
                 List<KeyInfo> keys = getKeys(common, common.getTables(insert.dbName).get(insert.tableSchema.getName()), insert.columnNames, insert.values, insert.id);
                 for (KeyInfo key : keys) {
                   if (key.indexSchema.getKey().equals(insert.indexName)) {
@@ -1035,12 +1035,12 @@ public class DatabaseClient {
         throw e;
       }
       synchronized (this) {
-        Long serverVersion = null;
+        Integer serverVersion = null;
         if (msg != null) {
           int pos = msg.indexOf("currVer:");
           if (pos != -1) {
             int pos2 = msg.indexOf(":", pos + "currVer:".length());
-            serverVersion = Long.valueOf(msg.substring(pos + "currVer:".length(), pos2));
+            serverVersion = Integer.valueOf(msg.substring(pos + "currVer:".length(), pos2));
           }
         }
 
@@ -2567,13 +2567,17 @@ public class DatabaseClient {
     return updateStatement.execute(dbName, null);
   }
 
-  public void insertKey(String dbName, String tableName, KeyInfo keyInfo, String primaryKeyIndexName, Object[] primaryKey, int shard, int replica) {
+  public void insertKey(String dbName, String tableName, KeyInfo keyInfo, String primaryKeyIndexName, Object[] primaryKey, KeyRecord keyRecord, int shard, int replica) {
     try {
       String command = "DatabaseServer:ComObject:insertIndexEntryByKey:";
 
       int tableId = common.getTables(dbName).get(tableName).getTableId();
       int indexId = common.getTables(dbName).get(tableName).getIndexes().get(keyInfo.indexSchema.getKey()).getIndexId();
-      ComObject cobj = serializeInsertKey(getCommon(), dbName, tableId, indexId, tableName, keyInfo, primaryKeyIndexName, primaryKey);
+      ComObject cobj = serializeInsertKey(getCommon(), dbName, tableId, indexId, tableName, keyInfo, primaryKeyIndexName,
+          primaryKey, keyRecord);
+
+      byte[] keyRecordBytes = keyRecord.serialize(SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+      cobj.put(ComObject.Tag.keyRecordBytes, keyRecordBytes);
 
       cobj.put(ComObject.Tag.dbName, dbName);
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
@@ -2599,7 +2603,7 @@ public class DatabaseClient {
 
   public static ComObject serializeInsertKey(DatabaseCommon common, String dbName, int tableId, int indexId,
                                              String tableName, KeyInfo keyInfo,
-                                              String primaryKeyIndexName, Object[] primaryKey) throws IOException {
+                                             String primaryKeyIndexName, Object[] primaryKey, KeyRecord keyRecord) throws IOException {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.serializationVersion, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
 //    cobj.put(ComObject.Tag.dbName, dbName);
@@ -2613,6 +2617,8 @@ public class DatabaseClient {
 //    cobj.put(ComObject.Tag.transactionId, getTransactionId());
     byte[] keyBytes = DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), keyInfo.indexSchema.getKey(), keyInfo.key);
     cobj.put(ComObject.Tag.keyBytes, keyBytes);
+    byte[] keyRecordBytes = keyRecord.serialize(SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+    cobj.put(ComObject.Tag.keyRecordBytes, keyRecordBytes);
     byte[] primaryKeyBytes = DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), primaryKeyIndexName, primaryKey);
     cobj.put(ComObject.Tag.primaryKeyBytes, primaryKeyBytes);
 
@@ -2684,7 +2690,7 @@ public class DatabaseClient {
 //    cobj.put(ComObject.Tag.isExcpliciteTrans, isExplicitTrans());
 //    cobj.put(ComObject.Tag.isCommitting, isCommitting());
 //    cobj.put(ComObject.Tag.transactionId, getTransactionId());
-    byte[] recordBytes = record.serialize(common);
+    byte[] recordBytes = record.serialize(common, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
     cobj.put(ComObject.Tag.recordBytes, recordBytes);
     cobj.put(ComObject.Tag.keyBytes, DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), keyInfo.indexSchema.getKey(), keyInfo.key));
 
@@ -2830,6 +2836,7 @@ public class DatabaseClient {
     public List<Object> values;
     public long id;
     public String indexName;
+    public KeyRecord keyRecord;
   }
 
   public List<PreparedInsert> prepareInsert(InsertRequest request,
@@ -2939,6 +2946,12 @@ public class DatabaseClient {
         insert.tableName = tableName;
         insert.primaryKeyIndexName = primaryKey.indexSchema.getKey();
         insert.primaryKey = primaryKey.key;
+        if (!keyInfo.indexSchema.getValue().isPrimaryKey()) {
+          KeyRecord keyRecord = new KeyRecord();
+          keyRecord.setKey((long)primaryKey.key[0]);
+          keyRecord.setDbViewNumber(common.getSchemaVersion());
+          insert.keyRecord = keyRecord;
+        }
         insert.tableSchema = tableSchema;
         insert.columnNames = columnNames;
         insert.values = values;
@@ -2954,7 +2967,7 @@ public class DatabaseClient {
   }
 
   public int doInsert(String dbName, InsertStatementImpl insertStatement, ParameterHandler parms) throws IOException, SQLException {
-    long previousSchemaVersion = common.getSchemaVersion();
+    int previousSchemaVersion = common.getSchemaVersion();
     InsertRequest request = new InsertRequest();
     request.dbName = dbName;
     request.insertStatement = insertStatement;
@@ -2994,7 +3007,7 @@ public class DatabaseClient {
           for (int i = 0; i < insertsWithKey.size(); i++) {
             PreparedInsert insert = insertsWithKey.get(i);
             insertKey(dbName, insertStatement.getTableName(), insert.keyInfo, insert.primaryKeyIndexName,
-                insert.primaryKey, -1, -1);
+                insert.primaryKey, insert.keyRecord, -1, -1);
             completed.add(insert.keyInfo);
           }
         }
@@ -3691,7 +3704,7 @@ public class DatabaseClient {
 
   private Object syncSchemaMutex = new Object();
 
-  public void syncSchema(long serverVersion) {
+  public void syncSchema(int serverVersion) {
     synchronized (common) {
       if (serverVersion > common.getSchemaVersion()) {
         syncSchema();

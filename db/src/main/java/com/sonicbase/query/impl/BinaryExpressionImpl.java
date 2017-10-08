@@ -94,7 +94,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     rightExpression.setDebug(debug);
   }
 
-  public void setViewVersion(long viewVersion) {
+  public void setViewVersion(int viewVersion) {
     super.setViewVersion(viewVersion);
     leftExpression.setViewVersion(viewVersion);
     rightExpression.setViewVersion(viewVersion);

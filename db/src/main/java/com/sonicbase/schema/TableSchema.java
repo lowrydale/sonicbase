@@ -87,21 +87,21 @@ public class TableSchema {
     return comparators;
   }
 
-  public List<FieldSchema> getFieldsForVersion(long schemaVersion, long serializationVersion) {
-    if (schemaVersion == serializationVersion || previousFields.size() == 0) {
+  public List<FieldSchema> getFieldsForVersion(int schemaVersion, int serializedVersion) {
+    if (schemaVersion == serializedVersion || previousFields.size() == 0) {
       return fields;
     }
     for (int i = 0; i < previousFields.size(); i++) {
       PreviousFields prev = previousFields.get(i);
-      if (serializationVersion == prev.schemaVersion) {
+      if (serializedVersion == prev.schemaVersion) {
         return prev.fields;
       }
-      if (serializationVersion < prev.schemaVersion) {
+      if (serializedVersion < prev.schemaVersion) {
         PreviousFields prevPrev = i + 1 < previousFields.size() ? previousFields.get(i + 1) : null;
         if (prevPrev == null) {
           return prev.fields;
         }
-        if (serializationVersion > prevPrev.schemaVersion) {
+        if (serializedVersion > prevPrev.schemaVersion) {
           return prev.fields;
         }
       }
@@ -128,13 +128,13 @@ public class TableSchema {
   }
 
   class PreviousFields {
-    long schemaVersion;
+    int schemaVersion;
     List<FieldSchema> fields = new ArrayList<>();
   }
 
   List<PreviousFields> previousFields = new ArrayList<>();
 
-  public void saveFields(long schemaVersion) {
+  public void saveFields(int schemaVersion) {
     PreviousFields prev = new PreviousFields();
     prev.schemaVersion = schemaVersion;
     for (FieldSchema fieldSchema : fields) {
@@ -266,7 +266,7 @@ public class TableSchema {
     }
     out.writeInt(previousFields.size());
     for (PreviousFields prev : previousFields) {
-      out.writeLong(prev.schemaVersion);
+      out.writeInt(prev.schemaVersion);
       out.writeInt(prev.fields.size());
       for (FieldSchema fieldSchema : prev.fields) {
         fieldSchema.serialize(out);
@@ -327,7 +327,7 @@ public class TableSchema {
     return indexesById;
   }
 
-  public void deserialize(DataInputStream in, long serializationVersion) throws IOException {
+  public void deserialize(DataInputStream in, short serializationVersion) throws IOException {
     tableId = (int) DataUtil.readVLong(in, new DataUtil.ResultLength());
     int fieldCount = in.readInt();
     name = in.readUTF();
@@ -340,7 +340,7 @@ public class TableSchema {
     int prevCount = in.readInt();
     for (int i = 0; i < prevCount; i++) {
       PreviousFields prev = new PreviousFields();
-      prev.schemaVersion = in.readLong();
+      prev.schemaVersion = in.readInt();
       prev.fields = new ArrayList<>();
       int count = in.readInt();
       for (int j = 0; j < count; j++) {

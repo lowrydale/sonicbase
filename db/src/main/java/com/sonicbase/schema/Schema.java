@@ -31,7 +31,7 @@ public class Schema {
   public void serialize(DataOutputStream out) {
     try {
       synchronized (schemaMutex) {
-        out.writeLong(SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+        out.writeShort(SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
         out.writeInt(tables.size());
         for (TableSchema table : tables.values()) {
           table.serialize(out);
@@ -63,7 +63,7 @@ public class Schema {
 
   public void deserialize(DataInputStream in) {
     try {
-      long serializationVersion = in.readLong();
+      short serializationVersion = in.readShort();
       synchronized (schemaMutex) {
         int tableCount = in.readInt();
         //tables.clear();

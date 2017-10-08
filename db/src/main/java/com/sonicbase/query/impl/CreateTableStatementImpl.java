@@ -107,7 +107,7 @@ public class CreateTableStatementImpl implements CreateTableStatement {
       int count = in.readInt();
       for (int i = 0; i < count; i++) {
         FieldSchema fieldSchema = new FieldSchema();
-        fieldSchema.deserialize(in, (int)serializationVersion);
+        fieldSchema.deserialize(in, (short)serializationVersion);
         fields.add(fieldSchema);
       }
       count = in.readInt();

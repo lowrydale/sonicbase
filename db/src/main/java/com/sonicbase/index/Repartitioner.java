@@ -1539,9 +1539,16 @@ public class Repartitioner extends Thread {
               databaseServer.freeUnsafeIds(value);
             }
             else {
-              Object currValue = index.remove(key);
-              //toFree.add(currValue);
-              databaseServer.freeUnsafeIds(currValue);
+              byte[][] newContent = new byte[content.length][];
+              for (int i = 0; i < content.length; i++) {
+                KeyRecord.setDbViewFlags(content[i], Record.DB_VIEW_FLAG_DELETING);
+                KeyRecord.setDbViewNumber(content[i], common.getSchemaVersion());
+                newContent[i] = content[i];
+              }
+              //toFree.add(value);
+              Object newValue = databaseServer.toUnsafeFromRecords(newContent);
+              index.put(key, newValue);
+              databaseServer.freeUnsafeIds(value);
             }
           }
         }
@@ -1636,6 +1643,20 @@ public class Repartitioner extends Thread {
                   index.put(entry.key, newValue);
                   databaseServer.freeUnsafeIds(entry.value);
                 }
+                else {
+                  byte[][] newContent = new byte[content.length][];
+                  for (int i = 0; i < content.length; i++) {
+                    byte[] newBytes = new byte[content[i].length];
+                    System.arraycopy(content[i], 0, newBytes, 0, content[i].length);
+                    KeyRecord.setDbViewFlags(newBytes, Record.DB_VIEW_FLAG_DELETING);
+                    KeyRecord.setDbViewNumber(newBytes, common.getSchemaVersion());
+                    newContent[i] = newBytes;
+                  }
+                  //toFree.add(entry.value);
+                  Object newValue = databaseServer.toUnsafeFromRecords(newContent);
+                  index.put(entry.key, newValue);
+                  databaseServer.freeUnsafeIds(entry.value);
+                }
               }
               else {
                 if (indexSchema.isPrimaryKey()) {
@@ -1648,6 +1669,16 @@ public class Repartitioner extends Thread {
                   index.put(entry.key, newValue);
                   databaseServer.freeUnsafeIds(entry.value);
 
+                }
+                else {
+                  for (int i = 0; i < content.length; i++) {
+                    KeyRecord.setDbViewFlags(content[i], (short) 0);
+                    KeyRecord.setDbViewNumber(content[i], 0);// common.getSchemaVersion() - 2);
+                  }
+                  //toFree.add(entry.value);
+                  Object newValue = databaseServer.toUnsafeFromRecords(content);
+                  index.put(entry.key, newValue);
+                  databaseServer.freeUnsafeIds(entry.value);
                 }
                 content = null;
               }

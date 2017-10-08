@@ -168,7 +168,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
    */
   public void deserialize(DataInputStream in, String dbName) {
     try {
-      long serializationVersion = DataUtil.readVLong(in);
+      short serializationVersion = (short)DataUtil.readVLong(in);
       fromTable = in.readUTF();
       expression = ExpressionImpl.deserializeExpression(in);
       int count = in.readInt();
@@ -780,7 +780,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
         cobj.put(ComObject.Tag.method, "serverSelect");
         cobj.put(ComObject.Tag.dbName, dbName);
 
-        long previousSchemaVersion = client.getCommon().getSchemaVersion();
+        int previousSchemaVersion = client.getCommon().getSchemaVersion();
         String command = "DatabaseServer:ComObject:serverSelect:";
 
         byte[] recordRet = client.send(null, Math.abs(ThreadLocalRandom.current().nextInt() % client.getShardCount()),
@@ -936,7 +936,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     else {
       while (true) {
         try {
-          long previousSchemaVersion = client.getCommon().getSchemaVersion();
+          int previousSchemaVersion = client.getCommon().getSchemaVersion();
           int shardCount = client.getShardCount();
           for (int shard = 0; shard < shardCount; shard++) {
             ComObject cobj = new ComObject();

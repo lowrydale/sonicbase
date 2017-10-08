@@ -37,6 +37,7 @@ public class DiskBasedResultSet {
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
   @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public DiskBasedResultSet(
+      short serializationVersion,
       String dbName,
       DatabaseServer databaseServer,
       String[] tableNames, ResultSetImpl resultSet, int count, SelectStatementImpl select) {
@@ -158,7 +159,7 @@ public class DiskBasedResultSet {
         begin = System.currentTimeMillis();
         ResultSetImpl.sortResults(dbName, server.getClient().getCommon(), select, batchRecords, tableNames);
         logger.info("sorted in-memory results: duration=" + (System.currentTimeMillis() - begin));
-        writeRecordsToFile(file, batchRecords, fileOffset++);
+        writeRecordsToFile(serializationVersion, file, batchRecords, fileOffset++);
         batch.clear();
       }
     }
@@ -167,10 +168,10 @@ public class DiskBasedResultSet {
       batchRecords[i] = batch.get(i);
     }
     ResultSetImpl.sortResults(dbName, server.getClient().getCommon(), select, batchRecords, tableNames);
-    writeRecordsToFile(file, batchRecords, fileOffset++);
+    writeRecordsToFile(serializationVersion, file, batchRecords, fileOffset++);
     batch.clear();
 
-    mergeSort(dbName, file);
+    mergeSort(serializationVersion, dbName, file);
 
     updateAccessTime(file);
   }
@@ -234,9 +235,9 @@ public class DiskBasedResultSet {
     }
   }
 
-  private void mergeSort(String dbName, File file) {
+  private void mergeSort(short serializationVersion, String dbName, File file) {
 
-    mergeNFiles(dbName, file, file.listFiles());
+    mergeNFiles(serializationVersion, dbName, file, file.listFiles());
 //    while (true) {
 //      File[] files = file.listFiles();
 //      if (files.length == 1) {
@@ -258,7 +259,7 @@ public class DiskBasedResultSet {
 //    }
   }
 
-  private void mergeTwoFiles(String dbName, File file, File file1, File file2, boolean lastTwoFiles) throws Exception {
+  private void mergeTwoFiles(short serializationVersion, String dbName, File file, File file1, File file2, boolean lastTwoFiles) throws Exception {
     String name = "tmp";
     if (lastTwoFiles) {
       name = "page-0";
@@ -339,7 +340,7 @@ public class DiskBasedResultSet {
           if (row2 == null) {
             break;
           }
-          out = writeRow(row2, out, rowNumber, page, file, resultLength);
+          out = writeRow(serializationVersion, row2, out, rowNumber, page, file, resultLength);
           row2 = null;
           continue;
         }
@@ -347,24 +348,24 @@ public class DiskBasedResultSet {
           if (row1 == null) {
             break;
           }
-          out = writeRow(row1, out, rowNumber, page, file, resultLength);
+          out = writeRow(serializationVersion, row1, out, rowNumber, page, file, resultLength);
           row1 = null;
           continue;
         }
 
         int compareValue = comparator.compare(row1, row2);
         if (compareValue == 0) {
-          out = writeRow(row1, out, rowNumber, page, file, resultLength);
-          out = writeRow(row2, out, rowNumber, page, file, resultLength);
+          out = writeRow(serializationVersion, row1, out, rowNumber, page, file, resultLength);
+          out = writeRow(serializationVersion, row2, out, rowNumber, page, file, resultLength);
           row1 = null;
           row2 = null;
         }
         else if (compareValue == 1) {
-          out = writeRow(row2, out, rowNumber, page, file, resultLength);
+          out = writeRow(serializationVersion, row2, out, rowNumber, page, file, resultLength);
           row2 = null;
         }
         else {
-          out = writeRow(row1, out, rowNumber, page, file, resultLength);
+          out = writeRow(serializationVersion, row1, out, rowNumber, page, file, resultLength);
           row1 = null;
         }
       }
@@ -386,7 +387,7 @@ public class DiskBasedResultSet {
     private Record[] row;
   }
 
-  private void mergeNFiles(String dbName, File dir, File[] files) {
+  private void mergeNFiles(short serializationVersion, String dbName, File dir, File[] files) {
     try {
       String name = "page-0";
       File outFile = new File(dir, name);
@@ -480,7 +481,7 @@ public class DiskBasedResultSet {
           }
           List<MergeRow> toAdd = new ArrayList<>();
           for (MergeRow row : first.getValue()) {
-            out = writeRow(row.row, out, rowNumber, page, dir, resultLength);
+            out = writeRow(serializationVersion, row.row, out, rowNumber, page, dir, resultLength);
             Record[] nextRow = readRow(dbName, inStreams.get(row.streamOffset), resultLength);
             if (nextRow != null) {
               MergeRow mergeRow = new MergeRow();
@@ -516,7 +517,7 @@ public class DiskBasedResultSet {
     }
   }
 
-  private DataOutputStream writeRow(
+  private DataOutputStream writeRow(short serializationVersion,
       Record[] row, DataOutputStream out, AtomicInteger rowNumber, AtomicInteger page,
       File file, DataUtil.ResultLength resultLength)  {
     try {
@@ -526,7 +527,7 @@ public class DiskBasedResultSet {
         }
         else {
           out.writeBoolean(true);
-          byte[] bytes = row[i].serialize(server.getCommon());
+          byte[] bytes = row[i].serialize(server.getCommon(), serializationVersion);
           DataUtil.writeVLong(out, bytes.length, resultLength);
           out.write(bytes);
         }
@@ -575,7 +576,7 @@ public class DiskBasedResultSet {
     return resultSetId;
   }
 
-  private void writeRecordsToFile(File file, ExpressionImpl.CachedRecord[][] records, int fileOffset) {
+  private void writeRecordsToFile(short serializationVersion, File file, ExpressionImpl.CachedRecord[][] records, int fileOffset) {
     try {
 
       File subFile = new File(file, String.valueOf(fileOffset));
@@ -592,7 +593,7 @@ public class DiskBasedResultSet {
             else {
               out.writeBoolean(true);
               Record rec = record.getRecord();//record.serialize(server.getCommon());
-              byte[] bytes = rec.serialize(server.getCommon());
+              byte[] bytes = rec.serialize(server.getCommon(), serializationVersion);
               DataUtil.writeVLong(out, bytes.length, resultLength);
               out.write(bytes);
             }

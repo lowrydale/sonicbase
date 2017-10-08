@@ -1,15 +1,13 @@
 package com.sonicbase.server;
 
-import com.sonicbase.common.AWSClient;
-import com.sonicbase.common.DatabaseCommon;
-import com.sonicbase.common.Logger;
-import com.sonicbase.common.Record;
+import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
 import com.sonicbase.index.Repartitioner;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.util.DataUtil;
 import com.sonicbase.util.ISO8601;
 import org.apache.commons.io.FileUtils;
 
@@ -51,10 +49,11 @@ public class DeleteManager {
       file.getParentFile().mkdirs();
       TableSchema tableSchema = databaseServer.getCommon().getTables(dbName).get(tableName);
       try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file)))) {
+        DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
         out.writeUTF(dbName);
         out.writeUTF(tableName);
         out.writeUTF(indexName);
-        out.writeLong(databaseServer.getCommon().getSchemaVersion() + 1);
+        out.writeInt(databaseServer.getCommon().getSchemaVersion() + 1);
         for (Object[] key : keysToDelete) {
           out.write(DatabaseCommon.serializeKey(tableSchema, indexName, key));
         }
@@ -84,19 +83,20 @@ public class DeleteManager {
             List<Future> futures = new ArrayList<>();
             counterStream.set(new LogManager.ByteCounterStream(new FileInputStream(files[0])));
             try (DataInputStream in = new DataInputStream(new BufferedInputStream(counterStream.get()))) {
+              short serializationVersion = (short)DataUtil.readVLong(in);
               String dbName = in.readUTF();
               String tableName = in.readUTF();
               TableSchema tableSchema = databaseServer.getCommon().getTables(dbName).get(tableName);
 
               String indexName = in.readUTF();
-              IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
+              final IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
               String[] indexFields = indexSchema.getFields();
               int[] fieldOffsets = new int[indexFields.length];
               for (int k = 0; k < indexFields.length; k++) {
                 fieldOffsets[k] = tableSchema.getFieldOffset(indexFields[k]);
               }
 
-              long schemaVersionToDeleteAt = in.readLong();
+              long schemaVersionToDeleteAt = in.readInt();
               if (!ignoreVersion && schemaVersionToDeleteAt > databaseServer.getCommon().getSchemaVersion()) {
                 return;
               }
@@ -134,11 +134,22 @@ public class DeleteManager {
                           Object value = index.get(currKey);
                           byte[][] content = databaseServer.fromUnsafeToRecords(value);
                           if (content != null) {
-                            if ((Record.DB_VIEW_FLAG_DELETING & Record.getDbViewFlags(content[0])) != 0) {
-                              Object toFree = index.remove(currKey);
-                              if (toFree != null) {
-                                //  toFreeBatch.add(toFree);
-                                databaseServer.freeUnsafeIds(toFree);
+                            if (indexSchema.isPrimaryKey()) {
+                              if ((Record.DB_VIEW_FLAG_DELETING & Record.getDbViewFlags(content[0])) != 0) {
+                                Object toFree = index.remove(currKey);
+                                if (toFree != null) {
+                                  //  toFreeBatch.add(toFree);
+                                  databaseServer.freeUnsafeIds(toFree);
+                                }
+                              }
+                            }
+                            else {
+                              if ((Record.DB_VIEW_FLAG_DELETING & KeyRecord.getDbViewFlags(content[0])) != 0) {
+                                Object toFree = index.remove(currKey);
+                                if (toFree != null) {
+                                  //  toFreeBatch.add(toFree);
+                                  databaseServer.freeUnsafeIds(toFree);
+                                }
                               }
                             }
                           }
@@ -176,11 +187,22 @@ public class DeleteManager {
                     Object value = index.get(currKey);
                     byte[][] content = databaseServer.fromUnsafeToRecords(value);
                     if (content != null) {
-                      if ((Record.DB_VIEW_FLAG_DELETING & Record.getDbViewFlags(content[0])) != 0) {
-                        Object toFree = index.remove(currKey);
-                        if (toFree != null) {
-                          //toFreeBatch.add(toFree);
-                          databaseServer.freeUnsafeIds(toFree);
+                      if (indexSchema.isPrimaryKey()) {
+                        if ((Record.DB_VIEW_FLAG_DELETING & Record.getDbViewFlags(content[0])) != 0) {
+                          Object toFree = index.remove(currKey);
+                          if (toFree != null) {
+                            //toFreeBatch.add(toFree);
+                            databaseServer.freeUnsafeIds(toFree);
+                          }
+                        }
+                      }
+                      else {
+                        if ((Record.DB_VIEW_FLAG_DELETING & KeyRecord.getDbViewFlags(content[0])) != 0) {
+                          Object toFree = index.remove(currKey);
+                          if (toFree != null) {
+                            //toFreeBatch.add(toFree);
+                            databaseServer.freeUnsafeIds(toFree);
+                          }
                         }
                       }
                     }

@@ -417,6 +417,7 @@ public class LogManager {
       byte[] buffer = command.getBytes(UTF8_STR);
 
       DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
       DataUtil.writeVLong(out, sequence0, resultLength);
       DataUtil.writeVLong(out, sequence1, resultLength);
       out.writeInt(buffer.length);
@@ -803,6 +804,7 @@ public class LogManager {
     }
 
     private NettyServer.Request readRequest(DatabaseServer server) throws IOException {
+      short serializationVersion = (short)DataUtil.readVLong(in, resultLength);
       sequence0 = DataUtil.readVLong(in, resultLength);
       sequence1 = DataUtil.readVLong(in, resultLength);
       int size = in.readInt();
@@ -1103,6 +1105,7 @@ public class LogManager {
           DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
           long sequenceNumber = getNextSequencenNum();
           logRequest.getSequences1()[i] = sequenceNumber;
+          DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
           DataUtil.writeVLong(out, System.currentTimeMillis(), resultLength);
           DataUtil.writeVLong(out, sequenceNumber, resultLength);
           out.writeInt(buffer.length);
@@ -1154,6 +1157,7 @@ public class LogManager {
           sequence1 = getNextSequencenNum();
         }
 
+        DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
         DataUtil.writeVLong(out, sequence0, resultLength);
         DataUtil.writeVLong(out, sequence1, resultLength);
         out.writeInt(buffer.length);

@@ -230,6 +230,7 @@ public class LongRunningCommands {
     }
 
     public void serialize(DataOutputStream out) throws IOException {
+      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
       out.writeUTF(command);
       if (body == null) {
         DataUtil.writeVLong(out, 0);
@@ -241,6 +242,7 @@ public class LongRunningCommands {
     }
 
     public void deserialize(DataInputStream in) throws IOException {
+      short serializationVersion = (short)DataUtil.readVLong(in);
       command = in.readUTF();
       int len = (int)DataUtil.readVLong(in);
       if (len != 0) {
@@ -296,7 +298,7 @@ public class LongRunningCommands {
   public void deserialize(DataInputStream in) throws IOException {
     synchronized (commands) {
       commands.clear();
-      long serializationVersion = DataUtil.readVLong(in);
+      short serializationVersion = (short)DataUtil.readVLong(in);
       long count = DataUtil.readVLong(in);
       for (int i = 0; i < count; i++) {
         SingleCommand command = new SingleCommand(this);

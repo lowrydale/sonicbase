@@ -72,7 +72,7 @@ public class FieldSchema {
     out.writeInt(mapToOffset);
   }
 
-  public void deserialize(DataInputStream in, long serializationVersion) throws IOException {
+  public void deserialize(DataInputStream in, short serializationVersion) throws IOException {
     name = in.readUTF();
     type = DataType.Type.valueOf(in.readInt());
     width = in.readInt();

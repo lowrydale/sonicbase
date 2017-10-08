@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -43,7 +42,7 @@ public class DatabaseCommon {
   private ReadWriteLock internalReadWriteLock = new ReentrantReadWriteLock();
   private Lock internalReadLock = internalReadWriteLock.readLock();
   private Lock internalWriteLock = internalReadWriteLock.writeLock();
-  private long schemaVersion;
+  private int schemaVersion;
   private boolean haveProLicense;
   private int[] masterReplicas;
   private boolean[][] deadNodes;
@@ -197,7 +196,7 @@ public class DatabaseCommon {
     }
   }
 
-  public byte[] serializeSchema(long serializationVersionNumber) throws IOException {
+  public byte[] serializeSchema(short serializationVersionNumber) throws IOException {
     ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
     DataOutputStream out = new DataOutputStream(bytesOut);
     serializeSchema(out, serializationVersionNumber);
@@ -205,9 +204,9 @@ public class DatabaseCommon {
     return bytesOut.toByteArray();
   }
 
-  public void serializeSchema(DataOutputStream out, long serializationVersionNumber) throws IOException {
+  public void serializeSchema(DataOutputStream out, short serializationVersionNumber) throws IOException {
     DataUtil.writeVLong(out, serializationVersionNumber);
-    out.writeLong(this.schemaVersion);
+    out.writeInt(this.schemaVersion);
     if (serializationVersionNumber >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION_21) {
       out.writeBoolean(haveProLicense);
     }
@@ -279,8 +278,8 @@ public class DatabaseCommon {
 
     try {
       internalWriteLock.lock();
-      long serializationVersion = DataUtil.readVLong(in);
-      this.schemaVersion = in.readLong();
+      short serializationVersion = (short)DataUtil.readVLong(in);
+      this.schemaVersion = in.readInt();
       if (serializationVersion >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION_21) {
         this.haveProLicense = in.readBoolean();
       }
@@ -338,7 +337,7 @@ public class DatabaseCommon {
 
     int indexId = -1;
     try {
-      long serializationVersion = DataUtil.readVLong(in);
+      short serializationVersion = (short)DataUtil.readVLong(in);
       DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
       DataUtil.readVLong(in, resultLength);
       indexId = (int) DataUtil.readVLong(in, resultLength);
@@ -462,7 +461,7 @@ public class DatabaseCommon {
 
   public static DataType.Type[] deserializeKeyPrep(TableSchema tableSchema, byte[] bytes) throws IOException {
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
-    long serializationVersion = DataUtil.readVLong(in);
+    short serializationVersion = (short)DataUtil.readVLong(in);
     DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
     DataUtil.readVLong(in, resultLength);
     int indexId = (int) DataUtil.readVLong(in, resultLength);
@@ -484,7 +483,7 @@ public class DatabaseCommon {
 
   public static Object[] deserializeKey(TableSchema tableSchema, DataType.Type[] types, DataInputStream in) throws EOFException {
     try {
-      long serializationVersion = DataUtil.readVLong(in);
+      short serializationVersion = (short)DataUtil.readVLong(in);
       DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
       DataUtil.readVLong(in, resultLength);
       int indexId = (int) DataUtil.readVLong(in, resultLength);
@@ -746,16 +745,14 @@ public class DatabaseCommon {
   }
 
   public static void serializeFields(
-      Object[] fields, DataOutputStream outerOut, TableSchema tableSchema, long schemaVersion, boolean serializeHeader) throws IOException {
+      Object[] fields, DataOutputStream outerOut, TableSchema tableSchema, int schemaVersion, boolean serializeHeader) throws IOException {
 
     ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
     DataOutputStream out = new DataOutputStream(bytesOut);
     DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-    //  if (serializeHeader) {
-    DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+
     DataUtil.writeVLong(out, schemaVersion);
-    //  }
-    // DataUtil.writeVLong(out, fields.length, resultLength);
+
     int offset = 0;
     byte[] buffer = new byte[16];
     for (Object field : fields) {
@@ -895,24 +892,17 @@ public class DatabaseCommon {
   }
 
   public static Object[] deserializeFields(
-      String dbName, DatabaseCommon common, byte[] bytes, int byteOffset, TableSchema tableSchema, long schemaVersion,
-      Set<Integer> columns, AtomicLong serializedSchemaVersion, boolean deserializeHeader) throws IOException {
+      String dbName, DatabaseCommon common, byte[] bytes, int byteOffset, TableSchema tableSchema, int schemaVersion,
+      int dbViewNumber, Set<Integer> columns, boolean deserializeHeader) throws IOException {
     DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
     List<FieldSchema> currFieldList = tableSchema.getFields();
     List<FieldSchema> serializedFieldList = null;
-//    if (deserializeHeader) {
-    long serializationVersion = DataUtil.readVLong(bytes, byteOffset, resultLength);
+
+    int serializedVersion = (int)DataUtil.readVLong(bytes, byteOffset, resultLength);;
     byteOffset += resultLength.getLength();
-    serializedSchemaVersion.set(DataUtil.readVLong(bytes, byteOffset, resultLength));
-    byteOffset += resultLength.getLength();
-    serializedFieldList = tableSchema.getFieldsForVersion(schemaVersion, serializedSchemaVersion.get());
-    // int fieldCount = (int) DataUtil.readVLong(bytes, byteOffset, resultLength);
-//    }
-//    else {
-//     // int fieldCount = (int) DataUtil.readVLong(bytes, byteOffset, resultLength);
-//      serializedFieldList = tableSchema.getFieldsForVersion(schemaVersion, serializedSchemaVersion.get());
-//    }
-//    byteOffset += resultLength.getLength();
+
+    serializedFieldList = tableSchema.getFieldsForVersion(schemaVersion, serializedVersion);
+
     Object[] fields = new Object[currFieldList.size()];
     int offset = 0;
     boolean isCurrentSchema = currFieldList == serializedFieldList;
@@ -1086,7 +1076,7 @@ public class DatabaseCommon {
     createSchemaLocks(dbName);
   }
 
-  public byte[] serializeConfig(long serializationVersionNumber) throws IOException {
+  public byte[] serializeConfig(short serializationVersionNumber) throws IOException {
     ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
     DataOutputStream out = new DataOutputStream(bytesOut);
     DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
@@ -1100,7 +1090,7 @@ public class DatabaseCommon {
   }
 
   public void deserializeConfig(DataInputStream in) throws IOException {
-    long serializationVersion = DataUtil.readVLong(in);
+    short serializationVersion = (short)DataUtil.readVLong(in);
     serversConfig = new DatabaseServer.ServersConfig(in, serializationVersion);
   }
 
@@ -1123,7 +1113,7 @@ public class DatabaseCommon {
     }
   }
 
-  public long getSchemaVersion() {
+  public int getSchemaVersion() {
     return schemaVersion;
   }
 
@@ -1167,7 +1157,7 @@ public class DatabaseCommon {
     return haveProLicense;
   }
 
-  public void setSchemaVersion(long schemaVersion) {
+  public void setSchemaVersion(int schemaVersion) {
     this.schemaVersion = schemaVersion;
   }
 

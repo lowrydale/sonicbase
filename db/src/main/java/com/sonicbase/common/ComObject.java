@@ -49,7 +49,8 @@ public class ComObject {
     bigDecimalType(11),
     dateType(12),
     timeType(13),
-    timeStampType(14);
+    timeStampType(14),
+    shortType(15);
 
     final int tag;
 
@@ -74,7 +75,7 @@ public class ComObject {
   }
 
   public enum Tag {
-    serializationVersion(1, longType),
+    serializationVersion(1, shortType),
     tableName(2, stringType),
     indexName(3, stringType),
     id(4, longType),
@@ -100,7 +101,7 @@ public class ComObject {
     longKey(24, longType),
     records(25, arrayType),
     retKeys(26, arrayType),
-    schemaVersion(27, longType),
+    schemaVersion(27, intType),
     preparedId(28, longType),
     isPrepared(29, booleanType),
     count(30, intType),
@@ -216,7 +217,9 @@ public class ComObject {
     preProcessException(140, stringType),
     nextKey(149, byteArrayType),
     lowerKey(150, byteArrayType),
-    whereClause(151, stringType);
+    whereClause(151, stringType),
+    keyRecordBytes(152, byteArrayType),
+    keyRecords(153, arrayType);
 
     public final int tag;
 
@@ -233,7 +236,7 @@ public class ComObject {
   }
 
   public ComObject() {
-    put(ComObject.Tag.serializationVersion, (long)SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+    put(ComObject.Tag.serializationVersion, (short)SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
   }
 
   public ComObject(byte[] bytes) {
@@ -264,6 +267,10 @@ public class ComObject {
     map.put(tag.tag, (Object)value);
   }
 
+  public void put(Tag tag, short value) {
+    map.put(tag.tag, (Object)value);
+  }
+
   public void put(Tag tag, float value) {
     map.put(tag.tag, (Object)value);
   }
@@ -286,6 +293,10 @@ public class ComObject {
 
   public Long getLong(Tag tag) {
     return (Long)map.get(tag.tag);
+  }
+
+  public Short getShort(Tag tag) {
+    return (Short)map.get(tag.tag);
   }
 
   public Integer getInt(Tag tag) {
@@ -353,6 +364,9 @@ public class ComObject {
         Object value = null;
         if (type.tag == intType.tag) {
           value = (int)DataUtil.readVLong(in);
+        }
+        else if (type.tag == shortType.tag) {
+          value = (short)DataUtil.readVLong(in);
         }
         else if (type.tag == longType.tag) {
           value = DataUtil.readVLong(in);
@@ -439,6 +453,9 @@ public class ComObject {
         DataUtil.writeVLong(out, tagObj.type.tag);
         if (tagObj.type.tag == intType.tag) {
           DataUtil.writeVLong(out, (Integer) value);
+        }
+        else if (tagObj.type.tag == shortType.tag) {
+          DataUtil.writeVLong(out, (Short) value);
         }
         else if (tagObj.type.tag == longType.tag) {
           if (value instanceof Integer) {

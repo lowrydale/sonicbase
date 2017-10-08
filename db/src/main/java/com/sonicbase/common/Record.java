@@ -3,6 +3,7 @@ package com.sonicbase.common;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.server.SnapshotManager;
 import com.sonicbase.util.DataUtil;
 
 import java.io.*;
@@ -20,13 +21,12 @@ public class Record {
   private TableSchema tableSchema;
   private long id;
   private Object[] fields;
-  private long dbViewNumber;
+  private int dbViewNumber;
   private long transId;
   private short dbViewFlags;
   private long sequence0;
   private long sequence1;
   private long sequence2;
-  private AtomicLong serializedSchemaVersion = new AtomicLong();
 
   public static short DB_VIEW_FLAG_DELETING = 0x1;
   public static short DB_VIEW_FLAG_ADDING = 0x2;
@@ -58,7 +58,7 @@ public class Record {
     return dbViewFlags;
   }
 
-  public void recoverFromSnapshot(String dbName, DatabaseCommon common, byte[] bytes, int serializationVersion, Set<Integer> columns, boolean readHeader) {
+  public void recoverFromSnapshot(String dbName, DatabaseCommon common, byte[] bytes, Set<Integer> columns, boolean readHeader) {
     try {
       DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
       int byteOffset = 0;
@@ -68,24 +68,26 @@ public class Record {
 //        byteOffset += headerLen;
 //      }
 //      else {
-        DataInputStream sin = new DataInputStream(new ByteArrayInputStream(bytes, byteOffset, 8 * 6 + 2));
+        DataInputStream sin = new DataInputStream(new ByteArrayInputStream(bytes, byteOffset, 8 * 7 + 2));
+        short serializationVersion = sin.readShort();
         sequence0 = sin.readLong();
         sequence1 = sin.readLong();
         sequence2 = sin.readLong();
-        byteOffset += 8 * 3;
+        byteOffset += 2 + 8 * 3;
 
-        dbViewNumber = sin.readLong();
+        dbViewNumber = sin.readInt();
         dbViewFlags = sin.readShort();
         transId = sin.readLong();
         id = sin.readLong();
-        byteOffset += 8 + 2 + 8 + 8;
+        byteOffset += 4 + 2 + 8 + 8;
 
       this.tableSchema = common.getTablesById(dbName).get((int) DataUtil.readVLong(bytes, byteOffset, resultLength));
       byteOffset += resultLength.getLength();
 
-       int len = (int)DataUtil.readVLong(bytes, byteOffset, resultLength);
+      int len = (int)DataUtil.readVLong(bytes, byteOffset, resultLength);
       byteOffset += resultLength.getLength();
-      fields = DatabaseCommon.deserializeFields(dbName, common, bytes, byteOffset, tableSchema, common.getSchemaVersion(), columns, serializedSchemaVersion, true);
+      fields = DatabaseCommon.deserializeFields(dbName, common, bytes, byteOffset, tableSchema,
+          common.getSchemaVersion(), dbViewNumber, columns, true);
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -112,19 +114,19 @@ public class Record {
     DataOutputStream out = new DataOutputStream(bytesOut);
     try {
       out.writeShort(dbViewFlag);
-      System.arraycopy(bytesOut.toByteArray(), 0, bytes, 24 + 8, 2);
+      System.arraycopy(bytesOut.toByteArray(), 0, bytes, 2 + 3 * 8 + 4, 2);
     }
     catch (IOException e) {
       throw new DatabaseException(e);
     }
   }
 
-  public static void setDbViewNumber(byte[] bytes, long schemaVersion) {
+  public static void setDbViewNumber(byte[] bytes, int schemaVersion) {
     ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
     DataOutputStream out = new DataOutputStream(bytesOut);
     try {
-      out.writeLong(schemaVersion);
-      System.arraycopy(bytesOut.toByteArray(), 0, bytes, 24, 8);
+      out.writeInt(schemaVersion);
+      System.arraycopy(bytesOut.toByteArray(), 0, bytes,  2 + 3 * 8, 4);
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -132,10 +134,10 @@ public class Record {
   }
 
   public static long getDbViewNumber(byte[] bytes) {
-    int offset = 8 * 3; //sequence numbers
-    DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes, offset, 8));
+    int offset = 2 + 8 * 3; //serialization version + sequence numbers
+    DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes, offset, 4));
     try {
-      return in.readLong();
+      return in.readInt();
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -144,8 +146,8 @@ public class Record {
 
   public static long getDbViewFlags(byte[] bytes) {
     DataUtil.ResultLength resultLen = new DataUtil.ResultLength();
-    int offset = 8 * 3; //sequence numbers
-    offset += 8;//viewNum
+    int offset = 2 + 8 * 3; //serialization version + sequence numbers
+    offset += 4;//viewNum
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes, offset, bytes.length - offset));
     try {
       return in.readShort();
@@ -171,7 +173,7 @@ public class Record {
     return dbViewNumber;
   }
 
-  public void setDbViewNumber(long dbViewNumber) {
+  public void setDbViewNumber(int dbViewNumber) {
     this.dbViewNumber = dbViewNumber;
   }
 
@@ -207,16 +209,17 @@ public class Record {
     return sequence2;
   }
 
-  public void snapshot(DataOutputStream out, DatabaseCommon common) throws IOException {
+  public void snapshot(DataOutputStream out, DatabaseCommon common, short serializationVersion) throws IOException {
     DataUtil.ResultLength resultLen = new DataUtil.ResultLength();
     ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
     DataOutputStream headerOut = new DataOutputStream(bytesOut);
 
+    headerOut.writeShort(serializationVersion);
     headerOut.writeLong(sequence0);
     headerOut.writeLong(sequence1);
     headerOut.writeLong(sequence2);
 
-    headerOut.writeLong(dbViewNumber);
+    headerOut.writeInt(dbViewNumber);
     headerOut.writeShort(dbViewFlags);
     headerOut.writeLong(transId);
     headerOut.writeLong(id);
@@ -258,11 +261,11 @@ public class Record {
     return tableSchema;
   }
 
-  public byte[] serialize(DatabaseCommon common) {
+  public byte[] serialize(DatabaseCommon common, short serializationVersion) {
     try {
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
-      snapshot(out, common);
+      snapshot(out, common, serializationVersion);
       out.close();
       return bytesOut.toByteArray();
     }
@@ -272,19 +275,11 @@ public class Record {
   }
 
   public void deserialize(String dbName, DatabaseCommon common, byte[] bytes, Set<Integer> columns, boolean readHeader) {
-    recoverFromSnapshot(dbName, common, bytes, 0, columns, readHeader);
+    recoverFromSnapshot(dbName, common, bytes, columns, readHeader);
   }
 
   public void deserialize(String dbName, DatabaseCommon common, byte[] bytes, Set<Integer> columns) {
-    recoverFromSnapshot(dbName, common, bytes, 0, columns, true);
-  }
-
-  public static long getTableId(byte[] record) {
-    return DataUtil.readVLong(record, 0, new DataUtil.ResultLength());
-  }
-
-  public long getSerializedSchemaVersion() {
-    return serializedSchemaVersion.get();
+    recoverFromSnapshot(dbName, common, bytes, columns, true);
   }
 
 }

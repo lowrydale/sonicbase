@@ -728,7 +728,7 @@ public class CommandHandler {
   }
 
   public ComObject getConfig(ComObject cobj, boolean replayedCommand) {
-    long serializationVersionNumber = cobj.getLong(ComObject.Tag.serializationVersion);
+    short serializationVersionNumber = cobj.getShort(ComObject.Tag.serializationVersion);
     try {
       byte[] bytes = common.serializeConfig(serializationVersionNumber);
       ComObject retObj = new ComObject();
@@ -741,7 +741,7 @@ public class CommandHandler {
   }
 
   public ComObject getSchema(ComObject cobj, boolean replayedCommand) {
-    long serializationVersionNumber = cobj.getLong(ComObject.Tag.serializationVersion);
+    short serializationVersionNumber = cobj.getShort(ComObject.Tag.serializationVersion);
     try {
       ComObject retObj = new ComObject();
 

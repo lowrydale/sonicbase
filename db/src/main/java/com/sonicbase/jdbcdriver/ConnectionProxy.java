@@ -127,7 +127,7 @@ public class ConnectionProxy implements Connection {
     return clients.get(url).client.getShardCount();
   }
 
-  public long getSchemaVersion() {
+  public int getSchemaVersion() {
     return clients.get(url).client.getCommon().getSchemaVersion();
   }
 

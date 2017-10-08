@@ -50,8 +50,9 @@ public class ParenthesisImpl extends ExpressionImpl {
   public void serialize(DataOutputStream out) {
     try {
       super.serialize(out);
-      out.writeInt(expression.getType().getId());
-      expression.serialize(out);
+      ExpressionImpl.serializeExpression(expression, out);
+//      out.writeInt(expression.getType().getId());
+//      expression.serialize(out);
       out.writeBoolean(isNot);
     }
     catch (IOException e) {

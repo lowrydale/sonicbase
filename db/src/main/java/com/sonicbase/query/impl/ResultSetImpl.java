@@ -1789,7 +1789,7 @@ public class ResultSetImpl implements ResultSet {
             if (retRecords[i][j] == null) {
               //todo: batch these reads
               Record record = doReadRecord(actualIds[i][j], nextReturn.getTableNames()[j]);
-              retRecords[i][j] = new ExpressionImpl.CachedRecord(record, record.serialize(databaseClient.getCommon()));
+              retRecords[i][j] = new ExpressionImpl.CachedRecord(record, record.serialize(databaseClient.getCommon(), SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION));
             }
           }
         }

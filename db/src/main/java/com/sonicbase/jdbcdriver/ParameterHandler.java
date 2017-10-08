@@ -3,6 +3,7 @@ package com.sonicbase.jdbcdriver;
 
 import com.sonicbase.common.ComObject;
 import com.sonicbase.query.DatabaseException;
+import com.sonicbase.server.SnapshotManager;
 import com.sonicbase.util.DataUtil;
 import com.sonicbase.util.StreamUtils;
 
@@ -319,6 +320,7 @@ public class ParameterHandler {
   }
 
   public void serialize(DataOutputStream out) throws IOException {
+    DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
     int count = currParmsByIndex.size();
     out.writeInt(count);
     for (int i = 1; i < count + 1; i++) {
@@ -340,6 +342,7 @@ public class ParameterHandler {
   public void deserialize(DataInputStream in) {
 
     try {
+      short serializationVersion = (short)DataUtil.readVLong(in);
       int count = in.readInt();
       for (int i = 0; i < count; i++) {
         int len = (int)DataUtil.readVLong(in);

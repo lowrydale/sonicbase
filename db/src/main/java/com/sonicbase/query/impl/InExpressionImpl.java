@@ -125,8 +125,10 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
       for (ExpressionImpl expression : expressionList) {
         ExpressionImpl.serializeExpression(expression, out);
       }
-      out.writeInt(leftExpression.getType().getId());
-      leftExpression.serialize(out);
+      ExpressionImpl.serializeExpression(leftExpression, out);
+//      out.writeShort(SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+//      out.writeInt(leftExpression.getType().getId());
+//      leftExpression.serialize(out);
       out.writeBoolean(isNot);
       if (tableName == null) {
         out.writeByte(0);
@@ -163,11 +165,11 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
       leftExpression = ExpressionImpl.deserializeExpression(in);
       isNot = in.readBoolean();
 
-      if (this.serializationVersion >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION_22) {
+      //if (this.serializationVersion >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION_22) {
         if (1 == in.readByte()) {
           tableName = in.readUTF();
         }
-      }
+      //}
     }
     catch (IOException e) {
       throw new DatabaseException(e);

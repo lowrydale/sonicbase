@@ -13,8 +13,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 public class GroupByContext {
   private List<FieldContext> fieldContexts;
@@ -155,7 +153,7 @@ public class GroupByContext {
           byte[] buffer = new byte[len];
           in.readFully(buffer);
           groupValues[k] = DatabaseCommon.deserializeFields(dbName, common, buffer, 0,
-              fieldContexts.get(k).tableSchema, common.getSchemaVersion(), null, new AtomicLong(),
+              fieldContexts.get(k).tableSchema, common.getSchemaVersion(), common.getSchemaVersion(), null,
               true)[0];
         }
         Counter counter = new Counter();

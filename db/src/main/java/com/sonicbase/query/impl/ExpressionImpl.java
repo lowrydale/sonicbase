@@ -45,14 +45,14 @@ public abstract class ExpressionImpl implements Expression {
   private List<ColumnImpl> columns;
   protected boolean debug;
   private Integer replica;
-  private long viewVersion;
+  private int viewVersion;
   private int dbViewNum;
   private Counter[] counters;
   private Limit limit;
   private GroupByContext groupByContext;
   protected String dbName;
   private boolean forceSelectOnServer;
-  protected long serializationVersion;
+  protected short serializationVersion;
   private int lastShard;
   private boolean isCurrPartitions;
 
@@ -65,7 +65,7 @@ public abstract class ExpressionImpl implements Expression {
     return groupByContext;
   }
 
-  public long getViewVersion() {
+  public int getViewVersion() {
     return viewVersion;
   }
 
@@ -126,7 +126,7 @@ public abstract class ExpressionImpl implements Expression {
     this.debug = debug;
   }
 
-  public void setViewVersion(long viewVersion) {
+  public void setViewVersion(int viewVersion) {
     this.viewVersion = viewVersion;
   }
 
@@ -373,7 +373,6 @@ public abstract class ExpressionImpl implements Expression {
 
   public void serialize(DataOutputStream out) {
     try {
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
       out.writeInt(nextShard);
     }
     catch (IOException e) {
@@ -390,7 +389,6 @@ public abstract class ExpressionImpl implements Expression {
    */
   public void deserialize(DataInputStream in) {
     try {
-      this.serializationVersion = DataUtil.readVLong(in);
       nextShard = in.readInt();
     }
     catch (IOException e) {
@@ -432,6 +430,7 @@ public abstract class ExpressionImpl implements Expression {
    */
   public static void serializeExpression(ExpressionImpl expression, DataOutputStream out) {
     try {
+      out.writeShort(SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
       out.writeInt(expression.getType().getId());
       expression.serialize(out);
     }
@@ -451,6 +450,7 @@ public abstract class ExpressionImpl implements Expression {
    */
   public static ExpressionImpl deserializeExpression(DataInputStream in) {
     try {
+      short serializationVersion = in.readShort();
       int type = in.readInt();
       switch (ExpressionImpl.typesById.get(type)) {
         case column:
@@ -762,7 +762,7 @@ public abstract class ExpressionImpl implements Expression {
 
   public static HashMap<Integer, Object[][]> readRecords(
       String dbName, final DatabaseClient client, int pageSize, boolean forceSelectOnServer, final TableSchema tableSchema,
-      List<IdEntry> keysToRead, String[] columns, List<ColumnImpl> selectColumns, RecordCache recordCache, long viewVersion) {
+      List<IdEntry> keysToRead, String[] columns, List<ColumnImpl> selectColumns, RecordCache recordCache, int viewVersion) {
 
     columns = new String[selectColumns.size()];
     for (int i = 0; i < selectColumns.size(); i++) {
@@ -777,7 +777,7 @@ public abstract class ExpressionImpl implements Expression {
 
   public static HashMap<Integer, Object[][]> doReadRecords(
       final String dbName, final DatabaseClient client, final int pageSize, final boolean forceSelectOnServer, final TableSchema tableSchema, List<IdEntry> keysToRead, String[] columns, final List<ColumnImpl> selectColumns,
-      final RecordCache recordCache, final long viewVersion) {
+      final RecordCache recordCache, final int viewVersion) {
     try {
       int[] fieldOffsets = null;
       Comparator[] comparators = null;
@@ -920,7 +920,7 @@ public abstract class ExpressionImpl implements Expression {
   public static Record doReadRecord(
       String dbName, DatabaseClient client, boolean forceSelectOnServer, RecordCache recordCache, Object[] key,
       String tableName, List<ColumnImpl> columns, Expression expression,
-      ParameterHandler parms, long viewVersion, boolean debug) {
+      ParameterHandler parms, int viewVersion, boolean debug) {
 //    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
 //    DataOutputStream out = new DataOutputStream(bytesOut);
 //    out.writeUTF(tableName);
@@ -989,7 +989,7 @@ public abstract class ExpressionImpl implements Expression {
   public static Record doReadRecord(
       String dbName, DatabaseClient client, boolean forceSelectOnServer, ParameterHandler parms, Expression expression, RecordCache recordCache, Object[] key,
       String tableName,
-      List<ColumnImpl> columns, long viewVersion, boolean debug) {
+      List<ColumnImpl> columns, int viewVersion, boolean debug) {
 
 
     TableSchema tableSchema = client.getCommon().getTables(dbName).get(tableName);
@@ -1127,11 +1127,11 @@ public abstract class ExpressionImpl implements Expression {
       final String dbName, final DatabaseCommon common, final DatabaseClient client, final boolean forceSelectOnServer, final int count, final TableSchema tableSchema,
       final BinaryExpression.Operator operator,
       final Map.Entry<String, IndexSchema> indexSchema, final List<ColumnImpl> columns, final List<IdEntry> srcValues, final int shard,
-      AtomicReference<String> usedIndex, final RecordCache recordCache, final long viewVersion) {
+      AtomicReference<String> usedIndex, final RecordCache recordCache, final int viewVersion) {
 
     Timer.Context ctx = DatabaseClient.BATCH_INDEX_LOOKUP_STATS.time();
     try {
-      final long previousSchemaVersion = common.getSchemaVersion();
+      final int previousSchemaVersion = common.getSchemaVersion();
 
       //todo: get replica count
       //final int replica = ThreadLocalRandom.current().nextInt(0, 2);
@@ -1202,12 +1202,12 @@ public abstract class ExpressionImpl implements Expression {
               if (previousSchemaVersion < common.getSchemaVersion()) {
                 throw new SchemaOutOfSyncException();
               }
-              AtomicLong serializedSchemaVersion = null;
+              AtomicInteger serializedSchemaVersion = null;
               Record headerRecord = null;
 //              ByteArrayInputStream bytes = new ByteArrayInputStream(lookupRet);
 //              DataInputStream in = new DataInputStream(bytes);
               ComObject retObj = new ComObject(lookupRet);
-              long serializationVersion = retObj.getLong(ComObject.Tag.serializationVersion);
+              short serializationVersion = retObj.getShort(ComObject.Tag.serializationVersion);
               Map<Integer, Object[][]> retKeys = new HashMap<>();
               Map<Integer, Record[]> retRecords = new HashMap<>();
               ComArray retKeysArray = retObj.getArray(ComObject.Tag.retKeys);
@@ -1395,7 +1395,7 @@ public abstract class ExpressionImpl implements Expression {
       Object[] originalLeftValue,
       Object[] originalRightValue,
       List<ColumnImpl> columns, String columnName, int shard, RecordCache recordCache,
-      AtomicReference<String> usedIndex, boolean evaluateExpression, long viewVersion, Counter[] counters,
+      AtomicReference<String> usedIndex, boolean evaluateExpression, int viewVersion, Counter[] counters,
       GroupByContext groupByContext, boolean debug, AtomicLong currOffset, Limit limit, Offset offset) {
 
     Timer.Context ctx = DatabaseClient.INDEX_LOOKUP_STATS.time();
@@ -1415,7 +1415,8 @@ public abstract class ExpressionImpl implements Expression {
         boolean currPartitions = false;
         List<Integer> selectedShards = null;
         int currShardOffset = 0;
-        long previousSchemaVersion = common.getSchemaVersion();
+        int previousSchemaVersion = common.getSchemaVersion();
+        KeyRecord[][] retKeyRecords = null;
         Object[][][] retKeys;
         Record[] recordRet = null;
         Object[] nextKey = null;
@@ -1439,6 +1440,7 @@ public abstract class ExpressionImpl implements Expression {
         if (shouldIndex) {
 
           retKeys = null;
+          retKeyRecords = null;
 
           String[] indexFields = indexSchema.getFields();
           int[] fieldOffsets = new int[indexFields.length];
@@ -1590,7 +1592,7 @@ public abstract class ExpressionImpl implements Expression {
           }
 
           boolean keyContainsColumns = true;
-          if (columns == null || columns.size() == 0 || counters != null) {
+          if (true || columns == null || columns.size() == 0 || counters != null) {
             keyContainsColumns = false;
           }
           else {
@@ -1808,10 +1810,25 @@ public abstract class ExpressionImpl implements Expression {
                 }
               }
             }
+            if (nextKey == null && keys.getArray().size() != 0) {
+              nextKey = currRetKeys[keys.getArray().size() - 1][0];
+            }
 
-//            if (nextKey == null && keys.getArray().size() != 0) {
-//              nextKey = currRetKeys[keys.getArray().size() - 1];
-//            }
+            KeyRecord[][] currRetKeyRecords = null;
+            ComArray keyRecords = retObj.getArray(ComObject.Tag.keyRecords);
+            if (keyRecords != null && keyRecords.getArray().size() != 0) {
+              currRetKeyRecords = new KeyRecord[keyRecords.getArray().size()][];
+              currRetKeys = new Object[keyRecords.getArray().size()][][];
+
+              for (int k = 0; k < keyRecords.getArray().size(); k++) {
+                keyBytes = (byte[])keyRecords.getArray().get(k);
+                KeyRecord keyRecord = new KeyRecord(keyBytes);
+                currRetKeyRecords[k] = new KeyRecord[]{keyRecord};
+
+                Object[] key = new Object[]{keyRecord.getKey()};
+                currRetKeys[k] = new Object[][]{key};
+              }
+            }
 
             ComArray records = retObj.getArray(ComObject.Tag.records);
             Record[] currRetRecords = new Record[records == null ? 0 : records.getArray().size()];
@@ -1852,9 +1869,12 @@ public abstract class ExpressionImpl implements Expression {
             }
 
             recordRet = aggregateResults(recordRet, currRetRecords);
-
-
             retKeys = aggregateResults(retKeys, currRetKeys);
+            retKeyRecords = aggregateResults(retKeyRecords, currRetKeyRecords);
+
+            if (recordRet == null && retKeys == null && retKeyRecords == null) {
+              nextKey = localLeftValue;
+            }
 
             if (switchedShards && logger.isDebugEnabled()) {
               //long id = (Long) currRetRecords[currRetRecords.length - 1].getFields()[tableSchema.getFieldOffset("id")];
@@ -1935,32 +1955,36 @@ public abstract class ExpressionImpl implements Expression {
                 break;
               }
             }
-            if (retKeys != null) {
+            if (retKeys != null || retKeyRecords != null) {
               if (keyContainsColumns) {
-                for (int i = 0; i < retKeys.length; i++) {
-                  Object[][] key = retKeys[i];
-                  Record keyRecord = new Record(tableSchema);
-                  Object[] rfields = new Object[tableSchema.getFields().size()];
-                  keyRecord.setFields(rfields);
-                  for (int j = 0; j < keyOffsets.length; j++) {
-                    keyRecord.getFields()[keyOffsets[j]] = key[0][j];
+                if (retKeys != null) {
+                  for (int i = 0; i < retKeys.length; i++) {
+                    Object[][] key = retKeys[i];
+                    Record keyRecord = new Record(tableSchema);
+                    Object[] rfields = new Object[tableSchema.getFields().size()];
+                    keyRecord.setFields(rfields);
+                    for (int j = 0; j < keyOffsets.length; j++) {
+                      keyRecord.getFields()[keyOffsets[j]] = key[0][j];
+                    }
+
+                    recordCache.put(tableSchema.getName(), key[0], new CachedRecord(keyRecord, null));
                   }
-
-                  recordCache.put(tableSchema.getName(), key[0], new CachedRecord(keyRecord, null));
                 }
-
               }
               else {
-                List<IdEntry> keysToRead = new ArrayList<>();
-                for (int i = 0; i < retKeys.length; i++) {
-                  Object[][] id = retKeys[i];
+                if (retKeyRecords != null) {
+                  List<IdEntry> keysToRead = new ArrayList<>();
+                  for (int i = 0; i < retKeyRecords.length; i++) {
+                    KeyRecord[] id = retKeyRecords[i];
 
-                  if (!recordCache.containsKey(tableSchema.getName(), id[0])) {
-                    keysToRead.add(new ExpressionImpl.IdEntry(i, id[0]));
+                    Object[] key = new Object[]{id[0].getKey()};
+                    if (!recordCache.containsKey(tableSchema.getName(), key)) {
+                      keysToRead.add(new ExpressionImpl.IdEntry(i, key));
+                    }
                   }
+                  doReadRecords(dbName, client, count, forceSelectOnServer, tableSchema, keysToRead, indexColumns,
+                      columns, recordCache, viewVersion);
                 }
-                doReadRecords(dbName, client, count, forceSelectOnServer, tableSchema, keysToRead, indexColumns,
-                    columns, recordCache, viewVersion);
               }
             }
           }
@@ -2090,7 +2114,7 @@ public abstract class ExpressionImpl implements Expression {
       int localShard = shard;
       Object[] localNextKey = nextKey;
       DatabaseCommon common = client.getCommon();
-      long previousSchemaVersion = common.getSchemaVersion();
+      int previousSchemaVersion = common.getSchemaVersion();
 
       List<Integer> selectedShards = new ArrayList<>();
       for (int i = 0; i < client.getShardCount(); i++) {
@@ -2216,6 +2240,7 @@ public abstract class ExpressionImpl implements Expression {
           }
         }
 
+        Object[] tmpKey = null;
         ComArray keyArray = retObj.getArray(ComObject.Tag.keys);
         Object[][][] currRetKeys = null;
         if (keyArray != null) {
@@ -2224,7 +2249,12 @@ public abstract class ExpressionImpl implements Expression {
             keyBytes = (byte[])keyArray.getArray().get(k);
             Object[] key = DatabaseCommon.deserializeKey(common.getTables(dbName).get(tableSchema.getName()), keyBytes);
             currRetKeys[k] = new Object[][]{key};
+            tmpKey = key;
           }
+        }
+
+        if (localNextKey == null) {
+          localNextKey = tmpKey;
         }
 
         ComArray recordArray = retObj.getArray(ComObject.Tag.records);
@@ -2366,7 +2396,28 @@ public abstract class ExpressionImpl implements Expression {
     return retArray;
   }
 
+  static KeyRecord[][] aggregateResults(KeyRecord[][] records1, KeyRecord[][] records2) {
+    if (records1 == null || records1.length == 0) {
+      if (records2 == null || records2.length == 0) {
+        return null;
+      }
+      return records2;
+    }
+    if (records2 == null || records2.length == 0) {
+      if (records1 == null || records1.length == 0) {
+        return null;
+      }
+      return records1;
+    }
+
+    KeyRecord[][] retArray = new KeyRecord[records1.length + records2.length][];
+    System.arraycopy(records1, 0, retArray, 0, records1.length);
+    System.arraycopy(records2, 0, retArray, records1.length, records2.length);
+
+    return retArray;
+  }
   static Object[][] aggregateResults(Object[][] records1, Object[][] records2) {
+
     if (records1 == null || records1.length == 0) {
       if (records2 == null || records2.length == 0) {
         return null;

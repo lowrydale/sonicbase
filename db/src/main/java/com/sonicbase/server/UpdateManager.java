@@ -4,11 +4,9 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
 import com.sonicbase.index.Repartitioner;
-import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
-import com.sonicbase.schema.Schema;
 import com.sonicbase.schema.TableSchema;
 
 import java.io.*;
@@ -39,7 +37,7 @@ public class UpdateManager {
   public ComObject deleteIndexEntry(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     String tableName = cobj.getString(ComObject.Tag.tableName);
-    long schemaVersion = cobj.getLong(ComObject.Tag.schemaVersion);
+    int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
     if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
       throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
     }
@@ -47,7 +45,7 @@ public class UpdateManager {
     TableSchema tableSchema = server.getCommon().getSchema(dbName).getTables().get(tableName);
     Record record = new Record(tableSchema);
     byte[] recordBytes = cobj.getByteArray(ComObject.Tag.recordBytes);
-    long serializationVersion = cobj.getLong(ComObject.Tag.serializationVersion);
+    short serializationVersion = cobj.getShort(ComObject.Tag.serializationVersion);
     record.deserialize(dbName, server.getCommon(), recordBytes, null);
     List<FieldSchema> fieldSchemas = tableSchema.getFields();
 
@@ -174,8 +172,11 @@ public class UpdateManager {
 //
 //                      insertIndexEntryByKey(cobj, false);
 //
+                      KeyRecord keyRecord = new KeyRecord();
+                      keyRecord.setKey((long)primaryKey.getKey()[0]);
+                      keyRecord.setDbViewNumber(server.getCommon().getSchemaVersion());
                       server.getDatabaseClient().insertKey(dbName, tableName, keyInfo, primaryKeyIndexName,
-                          primaryKey.getKey(), server.getShard(), server.getReplica());
+                          primaryKey.getKey(), keyRecord, server.getShard(), server.getReplica());
                       break;
                     }
                     catch (SchemaOutOfSyncException e) {
@@ -219,7 +220,7 @@ public class UpdateManager {
                                            AtomicBoolean isExplicitTransRet, AtomicLong transactionIdRet, boolean isCommitting) {
     try {
       String dbName = cobj.getString(ComObject.Tag.dbName);
-      long schemaVersion = cobj.getLong(ComObject.Tag.schemaVersion);
+      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
       if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
@@ -235,7 +236,7 @@ public class UpdateManager {
       }
 
       TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
-      long serializationVersion = cobj.getLong(ComObject.Tag.serializationVersion);
+      short serializationVersion = cobj.getShort(ComObject.Tag.serializationVersion);
       byte[] keyBytes = cobj.getByteArray(ComObject.Tag.keyBytes);
       byte[] primaryKeyBytes = cobj.getByteArray(ComObject.Tag.primaryKeyBytes);
       Object[] key = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
@@ -320,12 +321,12 @@ public class UpdateManager {
       }
 
       String dbName = outerCobj.getString(ComObject.Tag.dbName);
-      long schemaVersion = outerCobj.getLong(ComObject.Tag.schemaVersion);
+      int schemaVersion = outerCobj.getInt(ComObject.Tag.schemaVersion);
       if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
 
-      long serializationVersion = cobj.getLong(ComObject.Tag.serializationVersion);
+      short serializationVersion = cobj.getShort(ComObject.Tag.serializationVersion);
 
       String tableName = server.getCommon().getTablesById(dbName).get(cobj.getInt(ComObject.Tag.tableId)).getName();
       String indexName = null;
@@ -346,13 +347,13 @@ public class UpdateManager {
 
       TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
       Object[] key = DatabaseCommon.deserializeKey(tableSchema, cobj.getByteArray(ComObject.Tag.keyBytes));
-      byte[] primaryKeyBytes = cobj.getByteArray(ComObject.Tag.primaryKeyBytes);
+      byte[] KeyRecordBytes = cobj.getByteArray(ComObject.Tag.keyRecordBytes);//cobj.getByteArray(ComObject.Tag.primaryKeyBytes);
       IndexSchema indexSchema = tableSchema.getIndexes().get(indexName);
-
+      KeyRecord keyRecord = new KeyRecord(KeyRecordBytes);
 
       Index index = server.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexName);
 
-      Object[] primaryKey = DatabaseCommon.deserializeKey(tableSchema, primaryKeyBytes);
+      Object[] primaryKey = new Object[]{keyRecord.getKey()};//DatabaseCommon.deserializeKey(tableSchema, KeyRecordBytes);
 
       AtomicBoolean shouldExecute = new AtomicBoolean();
       AtomicBoolean shouldDeleteLock = new AtomicBoolean();
@@ -360,7 +361,7 @@ public class UpdateManager {
       server.getTransactionManager().preHandleTransaction(dbName, tableName, indexName, isExplicitTrans, isCommitting, transactionId, primaryKey, shouldExecute, shouldDeleteLock);
 
       if (shouldExecute.get()) {
-        doInsertKey(key, primaryKeyBytes, tableName, index, indexSchema);
+        doInsertKey(key, KeyRecordBytes, tableName, index, indexSchema);
       }
 
       //    else {
@@ -430,7 +431,7 @@ public class UpdateManager {
   private AtomicLong lastReset = new AtomicLong(System.currentTimeMillis());
 
   public ComObject batchInsertIndexEntryByKeyWithRecord(final ComObject cobj, final boolean replayedCommand) {
-    long schemaVersion = cobj.getLong(ComObject.Tag.schemaVersion);
+    int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
     if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
       throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
     }
@@ -637,7 +638,7 @@ public class UpdateManager {
       }
 
       String dbName = outerCobj.getString(ComObject.Tag.dbName);
-      long schemaVersion = outerCobj.getLong(ComObject.Tag.schemaVersion);
+      int schemaVersion = outerCobj.getInt(ComObject.Tag.schemaVersion);
       if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
@@ -663,7 +664,7 @@ public class UpdateManager {
       out.writeLong(sequence2);
       out.close();
 
-      System.arraycopy(bytesOut.toByteArray(), 0, recordBytes, 0, 8 * 3);
+      System.arraycopy(bytesOut.toByteArray(), 0, recordBytes, 2, 8 * 3);
 
       byte[] keyBytes = cobj.getByteArray(ComObject.Tag.keyBytes);
       Object[] primaryKey = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
@@ -761,7 +762,7 @@ public class UpdateManager {
 
   public ComObject rollback(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
-    long schemaVersion = cobj.getLong(ComObject.Tag.schemaVersion);
+    int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
     if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
       throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
     }
@@ -785,7 +786,7 @@ public class UpdateManager {
     long sequence1 = cobj.getLong(ComObject.Tag.sequence1);
 
     String dbName = cobj.getString(ComObject.Tag.dbName);
-    long schemaVersion = cobj.getLong(ComObject.Tag.schemaVersion);
+    int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
     if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
       throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
     }
@@ -861,7 +862,7 @@ public class UpdateManager {
                                   AtomicBoolean isExplicitTransRet, AtomicLong transactionIdRet, boolean isCommitting) {
     try {
       String dbName = cobj.getString(ComObject.Tag.dbName);
-      long schemaVersion = cobj.getLong(ComObject.Tag.schemaVersion);
+      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
       if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
@@ -898,7 +899,7 @@ public class UpdateManager {
       record.setSequence1(sequence1);
       record.setSequence2(0);
 
-      bytes = record.serialize(server.getCommon());
+      bytes = record.serialize(server.getCommon(), SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
 
       if (shouldExecute.get()) {
         //because this is the primary key index we won't have more than one index entry for the key
@@ -1065,6 +1066,7 @@ public class UpdateManager {
               long sequence0 = in.readLong();
               long sequence1 = in.readLong();
               in = new DataInputStream(new ByteArrayInputStream(recordBytes));
+              in.readShort(); //serializationVersion
               long rsequence0 = in.readLong();
               long rsequence1 = in.readLong();
               if (sequence0 == rsequence0 && sequence1 == rsequence1) {
@@ -1181,7 +1183,7 @@ public class UpdateManager {
       String dbName = cobj.getString(ComObject.Tag.dbName);
       String tableName = cobj.getString(ComObject.Tag.tableName);
       String indexName = cobj.getString(ComObject.Tag.indexName);
-      long schemaVersion = cobj.getLong(ComObject.Tag.schemaVersion);
+      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
       if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
@@ -1207,7 +1209,7 @@ public class UpdateManager {
 
   public ComObject truncateTable(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
-    long schemaVersion = cobj.getLong(ComObject.Tag.schemaVersion);
+    int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
     if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
       throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
     }
@@ -1291,17 +1293,18 @@ public class UpdateManager {
         if (ids.length == 1) {
           boolean mismatch = false;
           if (!indexName.equals(primaryKeyIndexName)) {
-            try {
-              Object[] lhsKey = DatabaseCommon.deserializeKey(schema, new DataInputStream(new ByteArrayInputStream(ids[0])));
+//            try {
+              KeyRecord keyRecord = new KeyRecord(ids[0]);
+              Object[] lhsKey = new Object[]{keyRecord.getKey()}; //DatabaseCommon.deserializeKey(schema, new DataInputStream(new ByteArrayInputStream(ids[0])));
               for (int i = 0; i < lhsKey.length; i++) {
                 if (0 != comparators[i].compare(lhsKey[i], primaryKey[i])) {
                   mismatch = true;
                 }
               }
-            }
-            catch (EOFException e) {
-              throw new DatabaseException(e);
-            }
+//            }
+//            catch (EOFException e) {
+//              throw new DatabaseException(e);
+//            }
           }
           if (!mismatch) {
             value = index.remove(key);
@@ -1316,17 +1319,18 @@ public class UpdateManager {
           boolean found = false;
           for (byte[] currValue : ids) {
             boolean mismatch = false;
-            try {
-              Object[] lhsKey = DatabaseCommon.deserializeKey(schema, new DataInputStream(new ByteArrayInputStream(currValue)));
+//            try {
+              KeyRecord keyRecord = new KeyRecord(currValue);
+              Object[] lhsKey = new Object[]{keyRecord.getKey()}; // DatabaseCommon.deserializeKey(schema, new DataInputStream(new ByteArrayInputStream(currValue)));
               for (int i = 0; i < lhsKey.length; i++) {
                 if (0 != comparators[i].compare(lhsKey[i], primaryKey[i])) {
                   mismatch = true;
                 }
               }
-            }
-            catch (EOFException e) {
-              throw new DatabaseException(e);
-            }
+//            }
+//            catch (EOFException e) {
+//              throw new DatabaseException(e);
+//            }
 
             if (mismatch) {
               newValues[offset++] = currValue;

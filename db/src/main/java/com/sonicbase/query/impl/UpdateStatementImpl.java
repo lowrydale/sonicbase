@@ -1,10 +1,7 @@
 package com.sonicbase.query.impl;
 
 import com.sonicbase.client.DatabaseClient;
-import com.sonicbase.common.ComObject;
-import com.sonicbase.common.DatabaseCommon;
-import com.sonicbase.common.Record;
-import com.sonicbase.common.SchemaOutOfSyncException;
+import com.sonicbase.common.*;
 import com.sonicbase.index.Repartitioner;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
@@ -13,6 +10,7 @@ import com.sonicbase.query.UpdateStatement;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.server.SnapshotManager;
 
 import java.sql.SQLException;
 import java.util.*;
@@ -204,7 +202,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
               cobj.put(ComObject.Tag.isCommitting, client.isCommitting());
               cobj.put(ComObject.Tag.transactionId, client.getTransactionId());
               cobj.put(ComObject.Tag.primaryKeyBytes, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), newPrimaryKey));
-              cobj.put(ComObject.Tag.bytes, record.serialize(client.getCommon()));
+              cobj.put(ComObject.Tag.bytes, record.serialize(client.getCommon(), SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION));
 
               client.send(null, selectedShards.get(0), rand.nextLong(), command, cobj, DatabaseClient.Replica.def);
 
@@ -238,8 +236,11 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
                 ConcurrentSkipListMap<Object[], DatabaseClient.KeyInfo> prevMap = orderedKeyInfosPrevious.get(newEntry.getKey());
                 if (prevMap == null) {
                   for (Map.Entry<Object[], DatabaseClient.KeyInfo> innerNewEntry : newEntry.getValue().entrySet()) {
+                    KeyRecord keyRecord = new KeyRecord();
+                    keyRecord.setKey((long)newPrimaryKey[0]);
+                    keyRecord.setDbViewNumber(client.getCommon().getSchemaVersion());
                     client.insertKey(dbName, tableSchema.getName(), innerNewEntry.getValue(), indexSchema.getName(),
-                        newPrimaryKey, -1, -1);
+                        newPrimaryKey, keyRecord, -1, -1);
                   }
                 }
                 else {
@@ -248,8 +249,11 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
                       if (innerNewEntry.getValue().getIndexSchema().getKey().equals(indexSchema.getName())) {
                         continue;
                       }
+                      KeyRecord keyRecord = new KeyRecord();
+                      keyRecord.setKey((long)newPrimaryKey[0]);
+                      keyRecord.setDbViewNumber(client.getCommon().getSchemaVersion());
                       client.insertKey(dbName, tableSchema.getName(), innerNewEntry.getValue(), indexSchema.getName(),
-                          newPrimaryKey, -1, -1);
+                          newPrimaryKey, keyRecord, -1, -1);
                     }
                   }
                 }

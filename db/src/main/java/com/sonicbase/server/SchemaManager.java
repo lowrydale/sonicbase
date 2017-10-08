@@ -184,7 +184,7 @@ public class SchemaManager {
       return null;
     }
     try {
-      long serializationVersionNumber = cobj.getLong(ComObject.Tag.serializationVersion);
+      short serializationVersionNumber = cobj.getShort(ComObject.Tag.serializationVersion);
       String dbName = cobj.getString(ComObject.Tag.dbName);
       String tableName = cobj.getString(ComObject.Tag.tableName);
 
@@ -260,7 +260,7 @@ public class SchemaManager {
           masterSlave.equals("slave")) {
         return null;
       }
-      long serializationVersionNumber = cobj.getLong(ComObject.Tag.serializationVersion);
+      short serializationVersionNumber = cobj.getShort(ComObject.Tag.serializationVersion);
       String dbName = cobj.getString(ComObject.Tag.dbName);
 
       String tableName = null;
@@ -362,7 +362,7 @@ public class SchemaManager {
   public ComObject dropColumn(ComObject cobj) {
 
     try {
-      long serializationVersionNumber = cobj.getLong(ComObject.Tag.serializationVersion);
+      short serializationVersionNumber = cobj.getShort(ComObject.Tag.serializationVersion);
       String dbName = cobj.getString(ComObject.Tag.dbName);
       String tableName = cobj.getString(ComObject.Tag.tableName).toLowerCase();
       String columnName = cobj.getString(ComObject.Tag.columnName).toLowerCase();
@@ -394,7 +394,7 @@ public class SchemaManager {
   public ComObject addColumn(ComObject cobj) {
 
     try {
-      long serializationVersionNumber = cobj.getLong(ComObject.Tag.serializationVersion);
+      short serializationVersionNumber = cobj.getShort(ComObject.Tag.serializationVersion);
       String dbName = cobj.getString(ComObject.Tag.dbName);
       String tableName = cobj.getString(ComObject.Tag.tableName).toLowerCase();
       String columnName = cobj.getString(ComObject.Tag.columnName).toLowerCase();
@@ -456,7 +456,7 @@ public class SchemaManager {
 
   public ComObject createIndex(ComObject cobj, boolean replayedCommand) {
     try {
-      long schemaVersion = cobj.getLong(ComObject.Tag.schemaVersion);
+      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
       String dbName = cobj.getString(ComObject.Tag.dbName);
       if (schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
@@ -487,7 +487,7 @@ public class SchemaManager {
 
           if (server.getCommon().getTables(dbName).get(table.get()).getIndexes().containsKey(fullIndexName.toLowerCase())) {
             ComObject retObj = new ComObject();
-            retObj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(cobj.getLong(ComObject.Tag.serializationVersion)));
+            retObj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(cobj.getShort(ComObject.Tag.serializationVersion)));
             return retObj;
           }
         }
@@ -579,7 +579,7 @@ public class SchemaManager {
       }
 
       ComObject retObj = new ComObject();
-      retObj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(cobj.getLong(ComObject.Tag.serializationVersion)));
+      retObj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(cobj.getShort(ComObject.Tag.serializationVersion)));
       return retObj;
     }
     catch (IOException e) {
@@ -623,8 +623,8 @@ public class SchemaManager {
           return null;
         }
 
-        long serializationVersionNumber = cobj.getLong(ComObject.Tag.serializationVersion);
-        long schemaVersion = cobj.getLong(ComObject.Tag.schemaVersion);
+        short serializationVersionNumber = cobj.getShort(ComObject.Tag.serializationVersion);
+        int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
         String dbName = cobj.getString(ComObject.Tag.dbName);
         if (schemaVersion < server.getSchemaVersion()) {
           throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");

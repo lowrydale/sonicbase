@@ -2213,7 +2213,7 @@ public class DatabaseServer {
 
       synchronized (common) {
         if (shard != 0 || common.getServersConfig().getShards()[0].masterReplica != replica) {
-          long schemaVersion = common.getSchemaVersion() + 100;
+          int schemaVersion = common.getSchemaVersion() + 100;
           common.setSchemaVersion(schemaVersion);
         }
         common.saveSchema(getClient(), getDataDir());
@@ -2296,7 +2296,7 @@ public class DatabaseServer {
     }
   }
 
-  public long getSchemaVersion() {
+  public int getSchemaVersion() {
     return common.getSchemaVersion();
   }
 
@@ -2508,7 +2508,7 @@ public class DatabaseServer {
       return port;
     }
 
-    public Host(DataInputStream in, long serializationVersionNumber) throws IOException {
+    public Host(DataInputStream in, short serializationVersionNumber) throws IOException {
       publicAddress = in.readUTF();
       privateAddress = in.readUTF();
       port = in.readInt();
@@ -2517,7 +2517,7 @@ public class DatabaseServer {
       }
     }
 
-    public void serialize(DataOutputStream out, long serializationVersionNumber) throws IOException {
+    public void serialize(DataOutputStream out, short serializationVersionNumber) throws IOException {
       out.writeUTF(publicAddress);
       out.writeUTF(privateAddress);
       out.writeInt(port);
@@ -2545,7 +2545,7 @@ public class DatabaseServer {
       this.replicas = hosts;
     }
 
-    public Shard(DataInputStream in, long serializationVersionNumber) throws IOException {
+    public Shard(DataInputStream in, short serializationVersionNumber) throws IOException {
       int count = in.readInt();
       replicas = new Host[count];
       for (int i = 0; i < replicas.length; i++) {
@@ -2556,7 +2556,7 @@ public class DatabaseServer {
       }
     }
 
-    public void serialize(DataOutputStream out, long serializationVersionNumber) throws IOException {
+    public void serialize(DataOutputStream out, short serializationVersionNumber) throws IOException {
       out.writeInt(replicas.length);
       for (Host host : replicas) {
         host.serialize(out, serializationVersionNumber);
@@ -2595,7 +2595,7 @@ public class DatabaseServer {
     private Shard[] shards;
     private boolean clientIsInternal;
 
-    public ServersConfig(byte[] bytes, long serializationVersion) throws IOException {
+    public ServersConfig(byte[] bytes, short serializationVersion) throws IOException {
       this(new DataInputStream(new ByteArrayInputStream(bytes)), serializationVersion);
     }
 
@@ -2604,7 +2604,7 @@ public class DatabaseServer {
      * DON"T MODIFY THIS SERIALIZATION
      * ###############################
      */
-    public ServersConfig(DataInputStream in, long serializationVersion) throws IOException {
+    public ServersConfig(DataInputStream in, short serializationVersion) throws IOException {
       if (serializationVersion >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION_21) {
         cluster = in.readUTF();
       }
@@ -2621,7 +2621,7 @@ public class DatabaseServer {
      * DON"T MODIFY THIS SERIALIZATION
      * ###############################
      */
-    public byte[] serialize(long serializationVersionNumber) throws IOException {
+    public byte[] serialize(short serializationVersionNumber) throws IOException {
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
       serialize(out, serializationVersionNumber);
@@ -2629,7 +2629,7 @@ public class DatabaseServer {
       return bytesOut.toByteArray();
     }
 
-    public void serialize(DataOutputStream out, long serializationVersionNumber) throws IOException {
+    public void serialize(DataOutputStream out, short serializationVersionNumber) throws IOException {
       out.writeUTF(cluster);
       out.writeInt(shards.length);
       for (Shard shard : shards) {
@@ -3903,7 +3903,7 @@ public class DatabaseServer {
 
   public ComObject updateServersConfig(ComObject cobj) {
     try {
-      long serializationVersion = cobj.getLong(ComObject.Tag.serializationVersion);
+      short serializationVersion = cobj.getShort(ComObject.Tag.serializationVersion);
       ServersConfig serversConfig = new ServersConfig(cobj.getByteArray(ComObject.Tag.serversConfig), serializationVersion);
 
       common.setServersConfig(serversConfig);
@@ -4777,7 +4777,7 @@ public class DatabaseServer {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      long schemaVersion = cobj.getLong(ComObject.Tag.schemaVersion);
+      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
       if (schemaVersion < getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + common.getSchemaVersion() + ":");
       }
@@ -4805,7 +4805,7 @@ public class DatabaseServer {
     common.getSchemaReadLock(dbName).lock();
     try {
       logger.info("Requesting next record id - begin");
-      long schemaVersion = cobj.getLong(ComObject.Tag.schemaVersion);
+      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
       if (schemaVersion < getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + common.getSchemaVersion() + ":");
       }

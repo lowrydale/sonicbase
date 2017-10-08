@@ -21,7 +21,7 @@ public class TestComObject {
 
     ComObject cobj = new ComObject();
 
-    cobj.put(ComObject.Tag.serializationVersion, 5544332211L);
+    cobj.put(ComObject.Tag.serializationVersion, (short)554);
     cobj.put(ComObject.Tag.tableName, "myTable");
     cobj.put(ComObject.Tag.isExcpliciteTrans, true);
     cobj.put(ComObject.Tag.recordLength, 999);
@@ -31,7 +31,7 @@ public class TestComObject {
 
     cobj = new ComObject();
     cobj.deserialize(bytes);
-    assertEquals((long)cobj.getLong(ComObject.Tag.serializationVersion), 5544332211L);
+    assertEquals((short)cobj.getShort(ComObject.Tag.serializationVersion), 554);
     assertEquals(cobj.getString(ComObject.Tag.tableName), "myTable");
     assertEquals((boolean)cobj.getBoolean(ComObject.Tag.isExcpliciteTrans), true);
     assertEquals((int)cobj.getInt(ComObject.Tag.recordLength), 999);

@@ -928,6 +928,12 @@ public class NettyServer {
               logger.info("running snapshot loop");
               databaseServer.getSnapshotManager().runSnapshotLoop();
 
+              try {
+                databaseServer.getStreamManager().startStreaming(null);
+              }
+              catch (Exception e) {
+                logger.error("Error starting streaming", e);
+              }
               isRunning.set(true);
             }
             catch (Exception e) {

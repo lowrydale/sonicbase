@@ -1,5 +1,5 @@
--injars       db/target/sonicbase-core-unobfuscated-1.2.5.jar
--outjars      db/target/sonicbase-core-1.2.5.jar
+-injars       db/target/sonicbase-core-unobfuscated-1.2.6.jar
+-outjars      db/target/sonicbase-core-1.2.6.jar
 -libraryjars  <java.home>/lib/rt.jar
 -printmapping sonicbase-obfuscate.map
 
@@ -22,6 +22,11 @@
 -keep public class com.sonicbase.misc.RecordValidator {
       public static void main(java.lang.String[]);
 }
+
+-keep public class com.sonicbase.queue.AWSSQSMessageQueueConsumer
+-keep public class com.sonicbase.queue.KafkaMessageQueueConsumer
+-keep public class com.sonicbase.queue.MessageQueueConsumer
+-keep public class com.sonicbase.queue.Message
 -keep public class com.sonicbase.research.socket.NettyServer$MyChannelInitializer
 -keep public class com.sonicbase.research.socket.NettyServer$ServerHandler
 -keep public class com.sonicbase.jdbcdriver.Driver

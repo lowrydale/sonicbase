@@ -1,14 +1,16 @@
 package com.sonicbase.server;
 
-import com.sonicbase.common.AWSClient;
-import com.sonicbase.common.DatabaseCommon;
-import com.sonicbase.common.Logger;
+import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
 import com.sonicbase.index.Indices;
+import com.sonicbase.index.Repartitioner;
+import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.DataUtil;
+import com.sonicbase.util.JsonDict;
 import com.sonicbase.util.StreamUtils;
 import org.apache.commons.io.FileUtils;
 
@@ -32,7 +34,8 @@ public class SnapshotManager {
   public Logger logger;
 
   public static final int SNAPSHOT_BUCKET_COUNT = 128;
-  public static final short SNAPSHOT_SERIALIZATION_VERSION = 22;
+  public static final short SNAPSHOT_SERIALIZATION_VERSION = 23;
+  public static final short SNAPSHOT_SERIALIZATION_VERSION_23 = 23;
   public static final short SNAPSHOT_SERIALIZATION_VERSION_22 = 22;
   public static final short SNAPSHOT_SERIALIZATION_VERSION_21 = 21;
   public static final short SNAPSHOT_SERIALIZATION_VERSION_20 = 20;
@@ -344,6 +347,37 @@ public class SnapshotManager {
     snapshotThread.start();
   }
 
+  public void deleteRecord(String dbName, String tableName, TableSchema tableSchema, IndexSchema indexSchema, Object[] key, byte[] record, int[] fieldOffsets) {
+
+    List<Integer> selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false,
+        fieldOffsets, server.getClient().getCommon(), tableSchema,
+        indexSchema.getName(), null, BinaryExpression.Operator.equal, null, key, null);
+    if (selectedShards.size() == 0) {
+      throw new DatabaseException("No shards selected for query");
+    }
+
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.serializationVersion, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+    cobj.put(ComObject.Tag.keyBytes, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), key));
+    cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
+    cobj.put(ComObject.Tag.dbName, dbName);
+    cobj.put(ComObject.Tag.tableName, tableName);
+    cobj.put(ComObject.Tag.indexName, indexSchema.getName());
+    cobj.put(ComObject.Tag.method, "deleteRecord");
+    String command = "DatabaseServer:ComObject:deleteRecord:";
+    server.getClient().send("DatabaseServer:deleteRecord", selectedShards.get(0), 0, command, cobj, DatabaseClient.Replica.def);
+
+    command = "DatabaseServer:ComObject:deleteIndexEntry:";
+    cobj = new ComObject();
+    cobj.put(ComObject.Tag.dbName, dbName);
+    cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
+    cobj.put(ComObject.Tag.tableName, tableName);
+    cobj.put(ComObject.Tag.method, "deleteIndexEntry");
+    cobj.put(ComObject.Tag.recordBytes, record);
+
+    server.getClient().sendToAllShards(null, 0, command, cobj, DatabaseClient.Replica.def);
+  }
+
   public void runSnapshot(String dbName) throws IOException, InterruptedException, ParseException {
     lastSnapshot = System.currentTimeMillis();
     long lastTimeStartedSnapshot = System.currentTimeMillis();
@@ -367,6 +401,13 @@ public class SnapshotManager {
       out.write(String.valueOf(SNAPSHOT_SERIALIZATION_VERSION).getBytes());
     }
 
+    JsonDict config = server.getConfig();
+    JsonDict expire = config.getDict("expireRecords");
+    Long deleteIfOlder = null;
+    if (expire != null) {
+      long duration = expire.getLong("durationMinutes");
+      deleteIfOlder = System.currentTimeMillis() - duration * 60;
+    }
     final AtomicLong countSaved = new AtomicLong();
     final AtomicLong lastLogged = new AtomicLong(System.currentTimeMillis());
 
@@ -377,6 +418,13 @@ public class SnapshotManager {
       tableCount.incrementAndGet();
       for (final Map.Entry<String, IndexSchema> indexEntry : tableEntry.getValue().getIndices().entrySet()) {
         indexCount.incrementAndGet();
+
+        String[] indexFields = indexEntry.getValue().getFields();
+        int[] fieldOffsets = new int[indexFields.length];
+        for (int k = 0; k < indexFields.length; k++) {
+          fieldOffsets[k] = tableEntry.getValue().getFieldOffset(indexFields[k]);
+        }
+
         final long subBegin = System.currentTimeMillis();
         final AtomicLong savedCount = new AtomicLong();
         final Index index = server.getIndices(dbName).getIndices().get(tableEntry.getKey()).get(indexEntry.getKey());
@@ -403,7 +451,8 @@ public class SnapshotManager {
               else {
                 if (isPrimaryKey) {
                   records = server.fromUnsafeToRecords(currValue);
-                } else {
+                }
+                else {
                   records = server.fromUnsafeToKeys(currValue);
                 }
               }
@@ -415,6 +464,15 @@ public class SnapshotManager {
 
               DataUtil.writeVLong(outStreams[bucket], records.length, resultLength);
               for (byte[] record : records) {
+
+                if (deleteIfOlder != null) {
+                  long updateTime = Record.getUpdateTime(record);
+                  if (updateTime < deleteIfOlder) {
+                    deleteRecord(dbName, tableEntry.getKey(), tableEntry.getValue(), indexEntry.getValue(),
+                        entry.getKey(), record, fieldOffsets);
+                  }
+                }
+
                 DataUtil.writeVLong(outStreams[bucket], record.length, resultLength);
                 outStreams[bucket].write(record);
 

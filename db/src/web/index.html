@@ -122,9 +122,21 @@
   <div style="margin-left: 2em; margin-right: 2em; font-size: 16px;">
     <h1>
       <div class="mylink">
-    Download Free Version Now
-      <a href="#" onclick="freeDownload('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-1.2.5.tgz')">tgz</a>&nbsp;&nbsp;<a href="#" onclick="freeDownload('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-1.2.5.zip')">zip</a>
-      <a href="license-agreement.html" style="font-size:12px">license agreement</a>
+        <table border=0 cellpadding=4>
+          <tr>
+            <td>
+              Download Free Version Now
+            </td>
+            <td>
+                <a href="#" onclick="freeDownload('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-1.2.6.tgz')">mac/linux - tgz</a><br/>
+                <a href="#" onclick="freeDownload('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-1.2.6.zip')">windows - zip</a>
+            </td>
+            <td>
+              <a href="license-agreement.html" style="font-size:12px">license agreement</a>
+
+            </td>
+          </tr>
+        </table>
       </div>
     </h1>
     <br/><br/>
@@ -144,25 +156,20 @@
     <h2>Performance</h2>
     With a 32 server, 4 billion record cluster with replication factor equals 1 we achieved 4.4 million batch record inserts per second and
     49 million range-based record reads per second. With SonicBase you can achieve linear scalability.
-    <h2>New Features</h2>
-    <div style="margin-left: 2em; margin-right: 2em; font-size: 16px;">
-
-    <h3>Automatic Bulk Import</h3>
+    <h2>Automatic Bulk Import (new)</h2>
     <div class="mylink">
       We have added the ability to automatically load your SonicBase database from another JDBC compliant database. This will allow
-    you to quickly load SonicBase and do analytics on your data. See <a href="docs/automated-bulk-import.html">Automated Bulk Import</a>.
+    you to quickly load SonicBase and do analytics on your data. See <a href="docs/automated-bulk-import.html">Automated Bulk Import Documentation</a>.
     </div>
+    <h2>Message Queue Integration (new)</h2>
+    <div class="mylink">
+      You can  connect to Kafka, Amazon Web Services Simple Queue Service and custom message providers. The message queue
+      consumer can load your SonicBase
+      database in real-time, while you perform analytics functions on your SonicBase database. See <a href="docs/message-queue-integration.html">Message Queue Integration Documentation</a>.
     </div>
-    <h2>Coming Soon</h2>
-
-    <div style="margin-left: 2em; margin-right: 2em; font-size: 16px;">
-
-    <h3>Streaming Analytics</h3>
-      You will be able to connect to a streaming source such as Kafka or AWS Simple Queuing Service and load your SonicBase
-      database in real-time, while you perform analytics functions on your SonicBase database. Optionally, you will be able
-      to automatically remove data that has been in the database for a specified amount of time. This will allow you to continuously
+      <h2>Coming Soon</h2>
+      You will be able to automatically remove data that has been in the database for a specified amount of time. This will allow you to continuously
       injest data into the database without running out of space.
-    </div>
 
 <h2>
   <br/>

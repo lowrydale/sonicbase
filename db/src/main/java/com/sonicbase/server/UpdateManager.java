@@ -666,6 +666,13 @@ public class UpdateManager {
 
       System.arraycopy(bytesOut.toByteArray(), 0, recordBytes, 2, 8 * 3);
 
+      bytesOut = new ByteArrayOutputStream();
+      out = new DataOutputStream(bytesOut);
+      out.writeLong(System.currentTimeMillis());
+      out.close();
+
+      System.arraycopy(bytesOut.toByteArray(), 0, recordBytes, 2 + 8 * 3 + 4 + 2 + 8 + 8, 8);
+
       byte[] keyBytes = cobj.getByteArray(ComObject.Tag.keyBytes);
       Object[] primaryKey = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
 
@@ -898,6 +905,7 @@ public class UpdateManager {
       record.setSequence0(sequence0);
       record.setSequence1(sequence1);
       record.setSequence2(0);
+      record.setUpdateTime(System.currentTimeMillis());
 
       bytes = record.serialize(server.getCommon(), SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
 

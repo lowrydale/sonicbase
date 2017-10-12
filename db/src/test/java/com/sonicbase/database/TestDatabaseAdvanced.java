@@ -2,7 +2,11 @@ package com.sonicbase.database;
 
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
+import com.sonicbase.schema.FieldSchema;
+import com.sonicbase.schema.TableSchema;
+import com.sonicbase.server.BulkImportManager;
 import com.sonicbase.server.DatabaseServer;
+import com.sonicbase.server.StreamManager;
 import com.sonicbase.util.JsonArray;
 import com.sonicbase.util.JsonDict;
 import com.sonicbase.util.StreamUtils;
@@ -208,6 +212,64 @@ public class TestDatabaseAdvanced {
 
     executor.shutdownNow();
   }
+
+
+  @Test
+  public void testJson() throws SQLException {
+    String dbName = "test";
+    String tableName = "persons";
+    final TableSchema tableSchema = ((ConnectionProxy)conn).getTables(dbName).get(tableName);
+    final List<FieldSchema> fields = tableSchema.getFields();
+
+    final StringBuilder fieldsStr = new StringBuilder();
+    final StringBuilder parmsStr = new StringBuilder();
+    boolean first = true;
+    for (FieldSchema field : fields) {
+      if (field.getName().equals("_id")) {
+        continue;
+      }
+      if (first) {
+        first = false;
+      }
+      else {
+        fieldsStr.append(",");
+        parmsStr.append(",");
+      }
+      fieldsStr.append(field.getName());
+      parmsStr.append("?");
+    }
+
+    PreparedStatement stmt = conn.prepareStatement("insert into " + tableName + " (" + fieldsStr.toString() +
+        ") VALUES (" + parmsStr.toString() + ")");
+
+
+    JsonDict recordJson = new JsonDict();
+    recordJson.put("id", 1000000);
+    recordJson.put("socialSecurityNumber", "529-17-2010");
+    recordJson.put("relatives", "xxxyyyxxx");
+    recordJson.put("restricted", true);
+    recordJson.put("gender", "m");
+
+    Object[] record = StreamManager.getCurrRecordFromJson(recordJson, fields);
+    BulkImportManager.setFieldsInInsertStatement(stmt, record, fields);
+
+    assertEquals(stmt.executeUpdate(), 1);
+
+    stmt = conn.prepareStatement("select * from persons where id = 1000000");
+    ResultSet ret = stmt.executeQuery();
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 1000000);
+    assertEquals(ret.getString("socialsecuritynumber"), "529-17-2010");
+    assertEquals(ret.getString("relatives"), "xxxyyyxxx");
+    assertEquals(ret.getBoolean("restricted"), true);
+    assertEquals(ret.getString("gender"), "m");
+
+
+    stmt = conn.prepareStatement("delete from persons where id=1000000");
+    stmt.executeUpdate();
+  }
+
+
 
   @Test
   public void testAlias() throws SQLException {

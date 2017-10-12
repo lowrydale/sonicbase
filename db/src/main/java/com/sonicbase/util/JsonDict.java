@@ -325,4 +325,7 @@ public class JsonDict {
     dict.remove(key);
   }
 
+  public void putObject(String key, Object value) {
+    dict.put(key, value);
+  }
 }

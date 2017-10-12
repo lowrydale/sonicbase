@@ -332,6 +332,14 @@ public class CommandHandler {
     return existingSequenceNumber;
   }
 
+  public ComObject startStreaming(final ComObject cobj, boolean replayedCommand) {
+    return server.getStreamManager().startStreaming(cobj);
+  }
+
+  public ComObject stopStreaming(final ComObject cobj, boolean replayedCommand) {
+    return server.getStreamManager().stopStreaming(cobj);
+  }
+
   public ComObject cancelBulkImport(final ComObject cobj, boolean replayedCommand) {
     return bulkImportManager.cancelBulkImport(cobj);
   }

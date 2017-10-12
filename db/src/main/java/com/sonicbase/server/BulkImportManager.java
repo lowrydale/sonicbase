@@ -1,4 +1,3 @@
-/* © 2017 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
 import com.sonicbase.client.DatabaseClient;
@@ -371,7 +370,8 @@ public class BulkImportManager {
                           futures.add(executor.submit(new Runnable() {
                             @Override
                             public void run() {
-                              insertRecords(insertConn, countProcessed, countFinished, batchToProcess, tableName, fields, fieldsStr, parmsStr);
+                              insertRecords(insertConn, countProcessed, countFinished, batchToProcess, tableName,
+                                  fields, fieldsStr, parmsStr);
                             }
                           }));
                         }
@@ -440,6 +440,9 @@ public class BulkImportManager {
 
     int offset = 0;
     for (FieldSchema field : fields) {
+      if (field.getName().equals("_id")) {
+        continue;
+      }
       switch (field.getType()) {
         case BIT: {
           boolean value = rs.getBoolean(field.getName());
@@ -554,28 +557,28 @@ public class BulkImportManager {
         }
         break;
         case BINARY: {
-          Blob value = rs.getBlob(field.getName());
+          byte[] value = rs.getBytes(field.getName());
           if (!rs.wasNull()) {
             currRecord[offset] = value;
           }
         }
         break;
         case VARBINARY: {
-          Blob value = rs.getBlob(field.getName());
+          byte[] value = rs.getBytes(field.getName());
           if (!rs.wasNull()) {
             currRecord[offset] = value;
           }
         }
         break;
         case LONGVARBINARY: {
-          Blob value = rs.getBlob(field.getName());
+          byte[] value = rs.getBytes(field.getName());
           if (!rs.wasNull()) {
             currRecord[offset] = value;
           }
         }
         break;
         case BLOB: {
-          Blob value = rs.getBlob(field.getName());
+          byte[] value = rs.getBytes(field.getName());
           if (!rs.wasNull()) {
             currRecord[offset] = value;
           }
@@ -1088,6 +1091,269 @@ public class BulkImportManager {
     }
   }
 
+  public static void setFieldsInInsertStatement(PreparedStatement insertStmt, Object[] currRecord, List<FieldSchema> fields) {
+    try {
+      int parmOffset = 1;
+      int fieldOffset = 0;
+      for (FieldSchema field : fields) {
+        if (field.getName().equals("_id")) {
+          //fieldOffset++;
+          continue;
+        }
+        switch (field.getType()) {
+          case BIT: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setBoolean(parmOffset, (Boolean) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.BIT);
+            }
+          }
+          break;
+          case TINYINT: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setByte(parmOffset, (Byte) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.TINYINT);
+            }
+          }
+          break;
+          case SMALLINT: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setShort(parmOffset, (Short) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.SMALLINT);
+            }
+          }
+          break;
+          case INTEGER: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setInt(parmOffset, (Integer) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.INTEGER);
+            }
+          }
+          break;
+          case BIGINT: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setLong(parmOffset, (Long) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.BIGINT);
+            }
+          }
+          break;
+          case FLOAT: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setDouble(parmOffset, (Double) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.FLOAT);
+            }
+          }
+          break;
+          case REAL: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setFloat(parmOffset, (Float) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.REAL);
+            }
+          }
+          break;
+          case DOUBLE: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setDouble(parmOffset, (Double) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.DOUBLE);
+            }
+          }
+          break;
+          case NUMERIC: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setBigDecimal(parmOffset, (BigDecimal) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.NUMERIC);
+            }
+          }
+          break;
+          case DECIMAL: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setBigDecimal(parmOffset, (BigDecimal) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.DECIMAL);
+            }
+          }
+          break;
+          case CHAR: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setString(parmOffset, (String) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.CHAR);
+            }
+          }
+          break;
+          case VARCHAR: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setString(parmOffset, (String) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.VARCHAR);
+            }
+          }
+          break;
+          case LONGVARCHAR: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setString(parmOffset, (String) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.LONGVARCHAR);
+            }
+          }
+          break;
+          case DATE: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setDate(parmOffset, (java.sql.Date) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.DATE);
+            }
+          }
+          break;
+          case TIME: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setTime(parmOffset, (java.sql.Time) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.TIME);
+            }
+          }
+          break;
+          case TIMESTAMP: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setTimestamp(parmOffset, (Timestamp) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.TIMESTAMP);
+            }
+          }
+          break;
+          case BINARY: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setBytes(parmOffset, (byte[]) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.BINARY);
+            }
+          }
+          break;
+          case VARBINARY: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setBytes(parmOffset, (byte[]) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.VARBINARY);
+            }
+          }
+          break;
+          case LONGVARBINARY: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setBytes(parmOffset, (byte[]) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.LONGVARBINARY);
+            }
+          }
+          break;
+          case BLOB: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setBytes(parmOffset, (byte[]) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.BLOB);
+            }
+          }
+          break;
+          case CLOB: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setString(parmOffset, (String) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.CLOB);
+            }
+          }
+          break;
+          case BOOLEAN: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setBoolean(parmOffset, (Boolean) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.BOOLEAN);
+            }
+          }
+          break;
+          case ROWID: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setLong(parmOffset, (Long) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.ROWID);
+            }
+          }
+          break;
+          case NCHAR: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setString(parmOffset, (String) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.NCHAR);
+            }
+          }
+          break;
+          case NVARCHAR: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setString(parmOffset, (String) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.NVARCHAR);
+            }
+          }
+          break;
+          case LONGNVARCHAR: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setString(parmOffset, (String) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.LONGNVARCHAR);
+            }
+          }
+          break;
+          case NCLOB: {
+            if (currRecord[fieldOffset] != null) {
+              insertStmt.setString(parmOffset, (String) currRecord[fieldOffset]);
+            }
+            else {
+              insertStmt.setNull(parmOffset, Types.NCLOB);
+            }
+          }
+          break;
+        }
+        parmOffset++;
+        fieldOffset++;
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
   private void insertRecords(Connection insertConn, AtomicLong countProcessed, AtomicInteger countFinished, List<Object[]> currBatch, String tableName,
                              List<FieldSchema> fields, StringBuilder fieldsStr, StringBuilder parmsStr) {
     PreparedStatement insertStmt = null;
@@ -1098,261 +1364,8 @@ public class BulkImportManager {
       for (int i = 0; i < 10; i++) {
         try {
           for (Object[] currRecord : currBatch) {
-            int parmOffset = 1;
-            int fieldOffset = 0;
-            for (FieldSchema field : fields) {
-              if (field.getName().equals("_id")) {
-                fieldOffset++;
-                continue;
-              }
-              switch (field.getType()) {
-                case BIT: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setBoolean(parmOffset, (Boolean) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.BIT);
-                  }
-                }
-                break;
-                case TINYINT: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setByte(parmOffset, (Byte) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.TINYINT);
-                  }
-                }
-                break;
-                case SMALLINT: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setShort(parmOffset, (Short) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.SMALLINT);
-                  }
-                }
-                break;
-                case INTEGER: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setInt(parmOffset, (Integer) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.INTEGER);
-                  }
-                }
-                break;
-                case BIGINT: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setLong(parmOffset, (Long) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.BIGINT);
-                  }
-                }
-                break;
-                case FLOAT: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setDouble(parmOffset, (Double) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.FLOAT);
-                  }
-                }
-                break;
-                case REAL: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setFloat(parmOffset, (Float) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.REAL);
-                  }
-                }
-                break;
-                case DOUBLE: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setDouble(parmOffset, (Double) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.DOUBLE);
-                  }
-                }
-                break;
-                case NUMERIC: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setBigDecimal(parmOffset, (BigDecimal) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.NUMERIC);
-                  }
-                }
-                break;
-                case DECIMAL: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setBigDecimal(parmOffset, (BigDecimal) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.DECIMAL);
-                  }
-                }
-                break;
-                case CHAR: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setString(parmOffset, (String) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.CHAR);
-                  }
-                }
-                break;
-                case VARCHAR: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setString(parmOffset, (String) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.VARCHAR);
-                  }
-                }
-                break;
-                case LONGVARCHAR: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setString(parmOffset, (String) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.LONGVARCHAR);
-                  }
-                }
-                break;
-                case DATE: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setDate(parmOffset, (java.sql.Date) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.DATE);
-                  }
-                }
-                break;
-                case TIME: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setTime(parmOffset, (java.sql.Time) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.TIME);
-                  }
-                }
-                break;
-                case TIMESTAMP: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setTimestamp(parmOffset, (Timestamp) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.TIMESTAMP);
-                  }
-                }
-                break;
-                case BINARY: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setBlob(parmOffset, (Blob) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.BINARY);
-                  }
-                }
-                break;
-                case VARBINARY: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setBlob(parmOffset, (Blob) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.VARBINARY);
-                  }
-                }
-                break;
-                case LONGVARBINARY: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setBlob(parmOffset, (Blob) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.LONGVARBINARY);
-                  }
-                }
-                break;
-                case BLOB: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setBlob(parmOffset, (Blob) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.BLOB);
-                  }
-                }
-                break;
-                case CLOB: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setString(parmOffset, (String) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.CLOB);
-                  }
-                }
-                break;
-                case BOOLEAN: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setBoolean(parmOffset, (Boolean) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.BOOLEAN);
-                  }
-                }
-                break;
-                case ROWID: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setLong(parmOffset, (Long) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.ROWID);
-                  }
-                }
-                break;
-                case NCHAR: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setString(parmOffset, (String) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.NCHAR);
-                  }
-                }
-                break;
-                case NVARCHAR: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setString(parmOffset, (String) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.NVARCHAR);
-                  }
-                }
-                break;
-                case LONGNVARCHAR: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setString(parmOffset, (String) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.LONGNVARCHAR);
-                  }
-                }
-                break;
-                case NCLOB: {
-                  if (currRecord[fieldOffset] != null) {
-                    insertStmt.setString(parmOffset, (String) currRecord[fieldOffset]);
-                  }
-                  else {
-                    insertStmt.setNull(parmOffset, Types.NCLOB);
-                  }
-                }
-                break;
-              }
-              parmOffset++;
-              fieldOffset++;
-            }
+            setFieldsInInsertStatement(insertStmt, currRecord, fields);
+
             insertStmt.addBatch();
           }
           insertStmt.executeBatch();

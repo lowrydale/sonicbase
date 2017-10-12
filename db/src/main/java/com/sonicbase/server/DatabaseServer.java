@@ -128,6 +128,7 @@ public class DatabaseServer {
   private String disableDate;
   private Boolean multipleLicenseServers;
   private BulkImportManager bulkImportManager;
+  private StreamManager streamManager;
 
   @SuppressWarnings("restriction")
   private static Unsafe getUnsafe() {
@@ -372,7 +373,17 @@ public class DatabaseServer {
     this.disableNow = false;
     this.haveProLicense = true;
     //startMasterLicenseValidator();
+
+    try {
+      checkLicense(new AtomicBoolean(false), new AtomicBoolean(true));
+    }
+    catch (Exception e) {
+      logger.error("Error checking license", e);
+    }
+
     startLicenseValidator();
+
+    this.streamManager = new StreamManager(this);
 
     //startMasterMonitor();
 
@@ -1095,6 +1106,10 @@ public class DatabaseServer {
     return logger;
   }
 
+  public StreamManager getStreamManager() {
+    return streamManager;
+  }
+
 
   private static class NullX509TrustManager implements X509TrustManager {
     public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
@@ -1332,39 +1347,7 @@ public class DatabaseServer {
         while (true) {
           boolean hadError = false;
           try {
-            int cores = Runtime.getRuntime().availableProcessors();
-
-            ComObject cobj = new ComObject();
-            cobj.put(ComObject.Tag.dbName, "__none__");
-            cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-            cobj.put(ComObject.Tag.method, "licenseCheckin");
-            cobj.put(ComObject.Tag.shard, shard);
-            cobj.put(ComObject.Tag.replica, replica);
-            cobj.put(ComObject.Tag.coreCount, cores);
-            String command = "DatabaseServer:ComObject:licenseCheckin:";
-            byte[] ret = null;
-            if (0 == shard && common.getServersConfig().getShards()[0].getMasterReplica() == replica) {
-              ret = licenseCheckin(cobj).serialize();
-            }
-            else {
-              ret = client.get().sendToMaster(command, cobj);
-            }
-            ComObject retObj = new ComObject(ret);
-
-            DatabaseServer.this.haveProLicense = retObj.getBoolean(ComObject.Tag.inCompliance);
-            DatabaseServer.this.disableNow = retObj.getBoolean(ComObject.Tag.disableNow);
-            DatabaseServer.this.disableDate = retObj.getString(ComObject.Tag.disableDate);
-            DatabaseServer.this.multipleLicenseServers = retObj.getBoolean(ComObject.Tag.multipleLicenseServers);
-
-            logger.info("licenseCheckin: lastHaveProLicense=" + lastHaveProLicense.get() + ", haveProLicense=" + haveProLicense +
-                ", disableNow=" + disableNow + ", disableDate=" + disableDate + ", multipleLicenseServers=" + multipleLicenseServers);
-            if (haventSet.get() || lastHaveProLicense.get() != haveProLicense) {
-              common.setHaveProLicense(haveProLicense);
-              common.saveSchema(getClient(), dataDir);
-              lastHaveProLicense.set(haveProLicense);
-              haventSet.set(true);
-              logger.info("Saving schema with haveProLicense=" + haveProLicense);
-            }
+            checkLicense(lastHaveProLicense, haventSet);
           }
           catch (Exception e) {
             hadError = true;
@@ -1394,6 +1377,42 @@ public class DatabaseServer {
       }
     });
     thread.start();
+  }
+
+  private void checkLicense(AtomicBoolean lastHaveProLicense, AtomicBoolean haventSet) {
+    int cores = Runtime.getRuntime().availableProcessors();
+
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.dbName, "__none__");
+    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+    cobj.put(ComObject.Tag.method, "licenseCheckin");
+    cobj.put(ComObject.Tag.shard, shard);
+    cobj.put(ComObject.Tag.replica, replica);
+    cobj.put(ComObject.Tag.coreCount, cores);
+    String command = "DatabaseServer:ComObject:licenseCheckin:";
+    byte[] ret = null;
+    if (0 == shard && common.getServersConfig().getShards()[0].getMasterReplica() == replica) {
+      ret = licenseCheckin(cobj).serialize();
+    }
+    else {
+      ret = client.get().sendToMaster(command, cobj);
+    }
+    ComObject retObj = new ComObject(ret);
+
+    DatabaseServer.this.haveProLicense = retObj.getBoolean(ComObject.Tag.inCompliance);
+    DatabaseServer.this.disableNow = retObj.getBoolean(ComObject.Tag.disableNow);
+    DatabaseServer.this.disableDate = retObj.getString(ComObject.Tag.disableDate);
+    DatabaseServer.this.multipleLicenseServers = retObj.getBoolean(ComObject.Tag.multipleLicenseServers);
+
+    logger.info("licenseCheckin: lastHaveProLicense=" + lastHaveProLicense.get() + ", haveProLicense=" + haveProLicense +
+        ", disableNow=" + disableNow + ", disableDate=" + disableDate + ", multipleLicenseServers=" + multipleLicenseServers);
+    if (haventSet.get() || lastHaveProLicense.get() != haveProLicense) {
+      common.setHaveProLicense(haveProLicense);
+      common.saveSchema(getClient(), dataDir);
+      lastHaveProLicense.set(haveProLicense);
+      haventSet.set(true);
+      logger.info("Saving schema with haveProLicense=" + haveProLicense);
+    }
   }
 
   public ComObject licenseCheckin(ComObject cobj) {

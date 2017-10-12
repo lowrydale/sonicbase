@@ -1,10 +1,13 @@
 package com.sonicbase.common;
 
+import com.amazonaws.ClientConfiguration;
+import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.*;
 import com.amazonaws.services.s3.transfer.TransferManager;
+import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.util.JsonDict;
@@ -92,6 +95,30 @@ public class AWSClient {
       BasicAWSCredentials awsCredentials = new BasicAWSCredentials(accessKey, secretKey);
 
       return new AmazonS3Client(awsCredentials);
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public AmazonSQSClient getSQSClient() {
+    final ClientConfiguration config = new ClientConfiguration();
+    config.setMaxConnections(10);
+    config.setRequestTimeout(20_000);
+    config.setConnectionTimeout(60_000);
+
+    File installDir = getInstallDir();
+    String cluster = client.getCluster();
+    File keysFile = new File(installDir, "/keys/" + cluster + "-awskeys");
+    if (!keysFile.exists()) {
+      throw new DatabaseException(cluster + "-awskeys file not found");
+    }
+    try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(keysFile)))) {
+      String accessKey = reader.readLine();
+      String secretKey = reader.readLine();
+
+      BasicAWSCredentials awsCredentials = new BasicAWSCredentials(accessKey, secretKey);
+      return new AmazonSQSClient(awsCredentials, config);
     }
     catch (IOException e) {
       throw new DatabaseException(e);

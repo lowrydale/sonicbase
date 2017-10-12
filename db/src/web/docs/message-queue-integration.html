@@ -1,0 +1,249 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>SonicBase - Features</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="desription" content="A list of features that SonicBase supports. Fetures of the free and pro version are listed.">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="../javascript/main.js"></script>
+</head>
+
+<body>
+<div class="container">
+    <header id="myHeader">
+        <div class="mobile">
+            <a href="../index.html">
+                <h4 class="logo">SonicBase™</h4>
+            </a>
+        </div>
+
+        <div class="desktop">
+            <a href="../index.html">
+                <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+            </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+        </div>
+    </header>
+
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+
+    <div style="margin-left: 4em;">
+
+        <br/><br/><br/>
+        <h1>Overview</h1>
+        With SonicBase you can consume messages from an external data source. This is very useful where SonicBase
+        is used as an analytics database. The current messaging platforms that are supported include Kafka and Amazon Web Services Message
+        Queue Service. Additionally, we support custom message providers. To initiate an upsert or a delete you will publish a
+        message to your queue in the format specified below.
+        <h1>Configuration</h1>
+        You configure message queue integration in the cluster config file. In the configuration you create a "queue" section where you specify
+        an array of "consumer"s. Each consumer has a "className", "threadCount" and provider specific config.
+
+        <h2>Example</h2>
+        {<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;"dataDirectory": "$HOME/db-data",<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;"installDirectory": "$HOME/sonicbase",<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;"compressRecords": false,<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;"useUnsafe": true,<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;"maxJavaHeap": "60%",<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;"user": "ubuntu",<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;"clientIsPrivate": false,<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;"queue": {<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"consumers": [<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"className": "com.sonicbase.queue.AWSSQSMessageQueueConsumer",<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"threadCount": 16,<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"url": "https://sqs.us-east-1.amazonaws.com/892217715566/benchmark-queue2"<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;},<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"className": "com.sonicbase.queue.KafkaMessageQueueConsumer",<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"threadCount": 16,<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"servers: "localhost:9092"<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"topic: "test"<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+        }<br/>
+        <h1>Message Format</h1>
+        <h2>Header</h2>
+        The outermost part of the json must contain the following fields:<br/>
+        <lu>
+            <li>database - the name of the database for the affected records</li>
+            <li>table - the name of the table to for the affected records</li>
+            <li>action - the action to take on the records. The action may ether be "upsert" or "delete"</li>
+        </lu>
+        <br/>
+        The "records" section contains an array of records to act on. For "upsert", the records contain the fields you
+        want to store on the record. For "delete", the record contains the fields you want the candidate record to match.<br/>
+        <br/>
+        Binary fields must be base64 encoded.
+
+        <h2>Example Message</h2>
+        {<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;"database": "test",<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;"table": "persons",<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;"action": "upsert",<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;"records": [<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"id": 123,<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"name": "bob"<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;},<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"id": 124,<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"name": "sue"<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;},<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;]<br/>
+        }<br/>
+        <h1>Administration</h1>
+        In order for AWS integration to work you must have a file named "&lt;cluster&gt;-awskeys" located in the
+        "keys" subdirectory of the install directory. This file contains the accesskey on the first line and the
+        secret key on the second line.
+
+        <h2>Start Consuming</h2>
+        When the cluster starts, consuming will automatically start if consumers are configured. To start consuming after
+        stopping it, type "start queue consumers" in the admin client.
+        <h2>Stop Consuming</h2>
+        In the admin client type "stop queue consumers" to stop consuming across the cluster.
+
+        <h1>Custom Message Providers</h1>
+        You can hook into any messaging system by providing a custom provider. Your class must implement the following
+        interface located in sonicbase-&lt;version&gt;.jar.<br/><br/>
+
+        public interface MessageQueueConsumer {<br/><br/>
+
+        &nbsp;&nbsp;&nbsp;&nbsp;void init(String cluster, String jsonConfig, String jsonQueueConfig);<br/><br/>
+
+        &nbsp;&nbsp;&nbsp;&nbsp;List<Message> getMessages();<br/><br/>
+
+        &nbsp;&nbsp;&nbsp;&nbsp;void acknowledgeMessage(Message message);<br/><br/>
+
+        &nbsp;&nbsp;&nbsp;&nbsp;void shutdown();<br/><br/>
+        }<br/><br/>
+        "init" is called once per thread to give you a chance to create your thread-specifice consumer.<br/>
+        <br/>
+        "getMessages" is called for you to return messages from your provider.<br/>
+        <br/>
+        "acknowledgeMessage" is called for you to acknowledge the message with your provider if applicable.<br/>
+        <br/>
+        "shutdown" is called for you to disconnect from your provider.<br/>
+        <br/>
+        The supporting class "Message" is shown below. You may create a derived class from Message to store other
+        message details specific to your provider (like ticket).<br/>
+        <br/>
+        public class Message {<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;private String body;<br/><br/>
+
+        &nbsp;&nbsp;&nbsp;&nbsp;public Message() { }<br/><br/>
+
+        &nbsp;&nbsp;&nbsp;&nbsp;public Message(String body) {<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.body = body;<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;}<br/><br/>
+
+        &nbsp;&nbsp;&nbsp;&nbsp;public void setBody(String body) {<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.body = body;<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;}<br/><br/>
+
+        &nbsp;&nbsp;&nbsp;&nbsp;public String getBody() {<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return body;<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;}
+        }
+
+        <h1>Example Provider</h1>
+        Below is an example provider that is based on the Amazon Web Services Simple Queue Service provider built into
+        SonicBase.<br/>
+        <code><pre>
+
+public class AWSSQSMessageQueueConsumer implements MessageQueueConsumer {<br/>
+
+    private String url;<br/>
+    private AmazonSQSClient sqsClient;<br/>
+    private boolean shutdown;<br/>
+
+    class AWSMessage extends com.sonicbase.queue.Message {<br/>
+        private final com.amazonaws.services.sqs.model.Message message;<br/>
+        private com.amazonaws.services.sqs.model.Message awsMessage;<br/>
+
+        public AWSMessage(com.amazonaws.services.sqs.model.Message message, String body) {<br/>
+            super(body);<br/>
+            this.message = message;<br/>
+        }
+    }
+
+    public File getInstallDir(JsonDict config) {<br/>
+        String dir = config.getString("installDirectory");<br/>
+        return new File(dir.replace("$HOME", System.getProperty("user.home")));<br/>
+    }
+
+    @Override<br/>
+    public void shutdown() {<br/>
+        this.shutdown = true;<br/>
+    }<br/>
+
+    @Override<br/>
+    public void init(String cluster, String jsonConfig, String jsonQueueConfig) {<br/>
+        final ClientConfiguration clientConfig = new ClientConfiguration();<br/>
+        clientConfig.setMaxConnections(10);<br/>
+        clientConfig.setRequestTimeout(20_000);<br/>
+        clientConfig.setConnectionTimeout(60_000);<br/>
+
+        JsonDict config = new JsonDict(jsonConfig);<br/>
+        File installDir = getInstallDir(config);<br/>
+        File keysFile = new File(installDir, "/keys/" + cluster + "-awskeys");<br/>
+        if (!keysFile.exists()) {<br/>
+            throw new DatabaseException(cluster + "-awskeys file not found");<br/>
+        }
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(keysFile)))) {<br/>
+            String accessKey = reader.readLine();<br/>
+            String secretKey = reader.readLine();<br/>
+
+            BasicAWSCredentials awsCredentials = new BasicAWSCredentials(accessKey, secretKey);<br/>
+            sqsClient = new AmazonSQSClient(awsCredentials, clientConfig);<br/>
+        }<br/>
+        catch (IOException e) {<br/>
+            throw new DatabaseException(e);<br/>
+        }<br/>
+        JsonDict queueConfig = new JsonDict(jsonQueueConfig);<br/>
+        url = queueConfig.getString("url");<br/>
+    }<br/>
+
+    @Override<br/>
+    public List&lt;com.sonicbase.queue.Message&gt; getMessages() {<br/>
+        ReceiveMessageRequest request = new ReceiveMessageRequest(url);<br/>
+        request.setMaxNumberOfMessages(10);<br/>
+        request.setWaitTimeSeconds(10);<br/>
+        ReceiveMessageResult receivedMessages = sqsClient.receiveMessage(request.withMessageAttributeNames("All"));<br/>
+
+        List&lt;com.amazonaws.services.sqs.model.Message&gt; innerMessages = receivedMessages.getMessages();<br/>
+        List&lt;com.sonicbase.queue.Message&gt; resultMessages = new ArrayList<>();<br/>
+        for (com.amazonaws.services.sqs.model.Message message : innerMessages) {<br/>
+            resultMessages.add(new AWSMessage(message, message.getBody()));<br/>
+        }<br/>
+        return resultMessages;<br/>
+    }<br/>
+
+    @Override<br/>
+    public void acknowledgeMessage(com.sonicbase.queue.Message message) {<br/>
+        sqsClient.deleteMessage(url, ((AWSMessage)message).message.getReceiptHandle());<br/>
+    }<br/>
+    }<br/>
+
+
+            </pre></code>
+
+    </div>
+</div>
+</body>
+</html>

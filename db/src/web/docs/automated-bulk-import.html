@@ -65,6 +65,10 @@
         <br/>
         Importing a table with no primary key will be slower than a table that has a primary key.
 
+        <h1>JDBC Driver</h1>
+        In order for bulk import to work you need to place the jdbc driver for your source database in the "lib" directory
+        under the sonicbase install directory. You then need to deploy to the cluster. On Windows, this is a manual process. On
+        Linux and Mac you type "deploy cluster" in the admin client.
         <h1>Bulk Import Status</h1>
         To monitor the status of the import type "bulk import status" in the admin client. This will list all the tables in your
         database and their import status.

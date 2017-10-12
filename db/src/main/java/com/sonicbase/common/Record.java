@@ -27,6 +27,7 @@ public class Record {
   private long sequence0;
   private long sequence1;
   private long sequence2;
+  private long updateTime;
 
   public static short DB_VIEW_FLAG_DELETING = 0x1;
   public static short DB_VIEW_FLAG_ADDING = 0x2;
@@ -68,7 +69,7 @@ public class Record {
 //        byteOffset += headerLen;
 //      }
 //      else {
-        DataInputStream sin = new DataInputStream(new ByteArrayInputStream(bytes, byteOffset, 8 * 7 + 2));
+        DataInputStream sin = new DataInputStream(new ByteArrayInputStream(bytes, byteOffset, 2 + 8 * 3 + 4 + 2 + 8 + 8 + 8));
         short serializationVersion = sin.readShort();
         sequence0 = sin.readLong();
         sequence1 = sin.readLong();
@@ -80,6 +81,12 @@ public class Record {
         transId = sin.readLong();
         id = sin.readLong();
         byteOffset += 4 + 2 + 8 + 8;
+
+      if (serializationVersion >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION_23) {
+        updateTime = sin.readLong();
+        byteOffset += 8;
+      }
+
 
       this.tableSchema = common.getTablesById(dbName).get((int) DataUtil.readVLong(bytes, byteOffset, resultLength));
       byteOffset += resultLength.getLength();
@@ -144,6 +151,19 @@ public class Record {
     }
   }
 
+  public static long getUpdateTime(byte[] bytes) {
+    DataUtil.ResultLength resultLen = new DataUtil.ResultLength();
+    int offset = 2 + 8 * 3 + 4 + 2 + 8 + 8; //serialization version + sequence numbers
+    DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes, offset, bytes.length - offset));
+    try {
+      return in.readLong();
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+
+  }
+
   public static long getDbViewFlags(byte[] bytes) {
     DataUtil.ResultLength resultLen = new DataUtil.ResultLength();
     int offset = 2 + 8 * 3; //serialization version + sequence numbers
@@ -155,6 +175,14 @@ public class Record {
     catch (IOException e) {
       throw new DatabaseException(e);
     }
+  }
+
+  public void setUpdateTime(long updateTime) {
+    this.updateTime = updateTime;
+  }
+
+  public long getUpdateTime() {
+    return updateTime;
   }
 
   public short getDbViewFlags() {
@@ -223,6 +251,10 @@ public class Record {
     headerOut.writeShort(dbViewFlags);
     headerOut.writeLong(transId);
     headerOut.writeLong(id);
+
+    if (serializationVersion >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION_23) {
+      headerOut.writeLong(updateTime);
+    }
 
     headerOut.close();
     byte[] bytes = bytesOut.toByteArray();

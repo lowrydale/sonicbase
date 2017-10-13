@@ -8,6 +8,10 @@
 	<meta name="description" content="Shown is the SQL syntax for creating tables in SonicBase.">
 	<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
 	<script type="text/javascript" src="../javascript/main.js"></script>
+
+	<link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+	<script src="../javascript/highlight.min.js"></script>
+	<script>hljs.initHighlightingOnLoad();</script>
 </head>
 
 <body>
@@ -71,8 +75,9 @@ Creates a table to store records in.<br/>
 <br/>
 <h3>Example</h3>
 
-create table persons (name VARCHAR, age INT, ssn VARCHAR, PRIMARY_KEY(ssn))<br/>
-
+		<pre class="java"><code>
+	create table persons (name VARCHAR, age INT, ssn VARCHAR, PRIMARY_KEY(ssn))<br/>
+</code></pre>
 <br/>
 </div>
 </div>

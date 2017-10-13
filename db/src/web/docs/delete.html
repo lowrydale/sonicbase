@@ -8,6 +8,10 @@
 	<meta name="description" content="Shown is the SQL syntax for deleting records from a SonicBase table.">
 	<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
 	<script type="text/javascript" src="../javascript/main.js"></script>
+
+	<link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+	<script src="../javascript/highlight.min.js"></script>
+	<script>hljs.initHighlightingOnLoad();</script>
 </head>
 
 <body>
@@ -40,7 +44,7 @@
 	</script>
 
 
-	<div style="margin-left: 4em;">
+	<div style="margin-left: 4em;margin-right: 4em;">
 <h1>SQL Delete Statement</h1>
 Delete records from a table.<br/>
 <h3>Syntax</h3><table class="border-table" border="1"><tr><td> <table class="syntax-table" cellpadding="4">
@@ -68,8 +72,9 @@ Delete records from a table.<br/>
 
 <h3>Example</h3>
 
-delete from persons where name="bob";
-
+		<pre class="SQL"><code>
+	delete from persons where name="bob";<br/>
+</code></pre>
 <br/>
 </div>
 </div>

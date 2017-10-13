@@ -9,7 +9,9 @@
 	<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
 	<script type="text/javascript" src="../javascript/main.js"></script>
 
-
+	<link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+	<script src="../javascript/highlight.min.js"></script>
+	<script>hljs.initHighlightingOnLoad();</script>
 </head>
 
 <body>
@@ -42,7 +44,7 @@
 		}
 	</script>
 
-<div style="margin-left: 4em;">
+<div style="margin-left: 4em;margin-right: 4em;">
 <h1>SQL Update Statement</h1>
 <br/>
 Update records in a table.<br/>
@@ -73,10 +75,11 @@ Update records in a table.<br/>
 <br/>
 
 <h3>Example</h3>
-PreparedStatement stmt = conn.prepareStatement("update persons set name='john' where name=?");<br/>
-stmt.setString(1, "bob");<br/>
-stmt.executeUpdate();<br/>
-
+	<pre class="java"><code>
+	PreparedStatement stmt = conn.prepareStatement("update persons set name='john' where name=?");
+	stmt.setString(1, "bob");
+	stmt.executeUpdate();<br/>
+</code></pre>
 <br/>
 </div>
 </div>

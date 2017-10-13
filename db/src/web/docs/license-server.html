@@ -8,6 +8,10 @@
     <meta name="description" content="SonicBase license server is use to monitor and manage licenses for the pro version of SonicBase.">
     <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
     <script type="text/javascript" src="../javascript/main.js"></script>
+
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
 </head>
 
 <body>
@@ -39,7 +43,7 @@
     </script>
 
 
-    <div style="margin-left: 4em;">
+    <div style="margin-left: 4em;margin-right: 4em;">
         <h1>License Server</h1>
         To run the Pro version of SonicBase, you must run a license server. That license server must be reachable from
         all your database servers and it must be able to reach SonicBase.com on port 443. There is one license server
@@ -56,16 +60,17 @@
         <h1>Configuration</h1>
         To configure the license server, you must create a file named "config-license-server.json" in the config directory.
         Below is an example of the contents of the config file.<br/>
-        {<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;"installDirectory": "$HOME/sonicbase",<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;"user": "ubuntu",<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;"server": {<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"publicAddress": "localhost",<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"privateAddress": "localhost",<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"port": 8443<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;}<br/>
-        }<br/>
-
+        <pre class="java"><code>
+    {
+        "installDirectory": "$HOME/sonicbase",
+        "user": "ubuntu",
+        "server": {
+            "publicAddress": "localhost",
+            "privateAddress": "localhost",
+            "port": 8443
+        }
+    }<br/>
+</code></pre>
         <h1>Commands</h1>
         <h2>Deploy License Server</h2>
         From the administration client, type "deploy license server" to deploy code to the license server. Note that this

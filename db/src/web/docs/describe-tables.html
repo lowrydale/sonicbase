@@ -8,6 +8,10 @@
     <meta name="description" content="SonicBase syntax for listing the tables.">
     <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
     <script type="text/javascript" src="../javascript/main.js"></script>
+
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
 </head>
 
 <body>
@@ -40,7 +44,7 @@
     </script>
 
 
-    <div style="margin-left: 4em;">
+    <div style="margin-left: 4em;margin-right: 4em;">
 <h1>SQL Describe Tables Statement</h1>
 Lists the tables in the current database.<br/>
 
@@ -59,11 +63,13 @@ Lists the tables in the current database.<br/>
 <br/>
 
 <h3>Example</h3>
-PreparedStatement stmt = conn.prepareStatement("describe tables")<br/>
-ResultSet rs = stmt.executeQuery();<br/>
-while (rs.next()) {<br/>
-&nbsp;&nbsp;System.out.println(rs.getString(1))<br/>
-}
+        <pre class="java"><code>
+    PreparedStatement stmt = conn.prepareStatement("describe tables")
+    ResultSet rs = stmt.executeQuery();
+    while (rs.next()) {
+        System.out.println(rs.getString(1));
+    }<br/>
+            </code></pre>
 <br/>
 </div>
 </div>

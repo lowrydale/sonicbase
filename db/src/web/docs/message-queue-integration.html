@@ -7,7 +7,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="desription" content="A list of features that SonicBase supports. Fetures of the free and pro version are listed.">
     <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+
+
     <script type="text/javascript" src="../javascript/main.js"></script>
+
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+
 </head>
 
 <body>
@@ -39,8 +46,7 @@
         }
     </script>
 
-
-    <div style="margin-left: 4em;">
+    <div style="margin-left: 4em;margin-right: 4em;">
 
         <br/><br/><br/>
         <h1>Overview</h1>
@@ -53,30 +59,32 @@
         an array of "consumer"s. Each consumer has a "className", "threadCount" and provider specific config.
 
         <h2>Example</h2>
-        {<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;"dataDirectory": "$HOME/db-data",<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;"installDirectory": "$HOME/sonicbase",<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;"compressRecords": false,<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;"useUnsafe": true,<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;"maxJavaHeap": "60%",<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;"user": "ubuntu",<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;"clientIsPrivate": false,<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;"queue": {<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"consumers": [<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"className": "com.sonicbase.queue.AWSSQSMessageQueueConsumer",<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"threadCount": 16,<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"url": "https://sqs.us-east-1.amazonaws.com/892217715566/benchmark-queue2"<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;},<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"className": "com.sonicbase.queue.KafkaMessageQueueConsumer",<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"threadCount": 16,<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"servers: "localhost:9092"<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"topic: "test"<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;}<br/>
-        }<br/>
+        <pre class="JSON"><code>
+    {
+        "dataDirectory": "$HOME/db-data",
+        "installDirectory": "$HOME/sonicbase",
+        "compressRecords": false,
+        "useUnsafe": true,
+        "maxJavaHeap": "60%",
+        "user": "ubuntu",
+        "clientIsPrivate": false,
+        "queue": {
+            "consumers": [
+                {
+                    "className": "com.sonicbase.queue.AWSSQSMessageQueueConsumer",
+                    "threadCount": 16,
+                    "url": "https://sqs.us-east-1.amazonaws.com/892217715566/benchmark-queue2"
+                },
+                {
+                    "className": "com.sonicbase.queue.KafkaMessageQueueConsumer",
+                    "threadCount": 16,
+                    "servers: "localhost:9092"
+                    "topic: "test"
+                }
+            ]
+        }
+    }
+            </code></pre>
         <h1>Message Format</h1>
         <h2>Header</h2>
         The outermost part of the json must contain the following fields:<br/>
@@ -92,21 +100,23 @@
         Binary fields must be base64 encoded.
 
         <h2>Example Message</h2>
-        {<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;"database": "test",<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;"table": "persons",<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;"action": "upsert",<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;"records": [<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"id": 123,<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"name": "bob"<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;},<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"id": 124,<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"name": "sue"<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;},<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;]<br/>
-        }<br/>
+        <pre class="JSON"><code>
+    {
+        "database": "test",
+        "table": "persons",
+        "action": "upsert",
+        "records": [
+            {
+                "id": 123,
+                "name": "bob"
+            },
+            {
+                "id": 124,
+                "name": "sue"
+            },
+        ]
+    }
+            </code></pre>
         <h1>Administration</h1>
         In order for AWS integration to work you must have a file named "&lt;cluster&gt;-awskeys" located in the
         "keys" subdirectory of the install directory. This file contains the accesskey on the first line and the
@@ -122,16 +132,18 @@
         You can hook into any messaging system by providing a custom provider. Your class must implement the following
         interface located in sonicbase-&lt;version&gt;.jar.<br/><br/>
 
-        public interface MessageQueueConsumer {<br/><br/>
+        <pre class="java"><code>
+    public interface MessageQueueConsumer {<br/>
 
-        &nbsp;&nbsp;&nbsp;&nbsp;void init(String cluster, String jsonConfig, String jsonQueueConfig);<br/><br/>
+        void init(String cluster, String jsonConfig, String jsonQueueConfig);<br/>
 
-        &nbsp;&nbsp;&nbsp;&nbsp;List<Message> getMessages();<br/><br/>
+        List&lt;Message&gt; getMessages();<br/>
 
-        &nbsp;&nbsp;&nbsp;&nbsp;void acknowledgeMessage(Message message);<br/><br/>
+        void acknowledgeMessage(Message message);<br/>
 
-        &nbsp;&nbsp;&nbsp;&nbsp;void shutdown();<br/><br/>
-        }<br/><br/>
+        void shutdown();<br/>
+    }<br/>
+            </code></pre>
         "init" is called once per thread to give you a chance to create your thread-specifice consumer.<br/>
         <br/>
         "getMessages" is called for you to return messages from your provider.<br/>
@@ -141,107 +153,110 @@
         "shutdown" is called for you to disconnect from your provider.<br/>
         <br/>
         The supporting class "Message" is shown below. You may create a derived class from Message to store other
-        message details specific to your provider (like ticket).<br/>
+        message details specific to your provider (like receipt).<br/>
         <br/>
-        public class Message {<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;private String body;<br/><br/>
+        <pre class="java"><code>
+    public class Message {
+        private String body;<br/>
 
-        &nbsp;&nbsp;&nbsp;&nbsp;public Message() { }<br/><br/>
+        public Message() { }<br/>
 
-        &nbsp;&nbsp;&nbsp;&nbsp;public Message(String body) {<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.body = body;<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;}<br/><br/>
+        public Message(String body) {
+            this.body = body;
+        }<br/>
 
-        &nbsp;&nbsp;&nbsp;&nbsp;public void setBody(String body) {<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.body = body;<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;}<br/><br/>
+        public void setBody(String body) {
+            this.body = body;
+        }<br/>
 
-        &nbsp;&nbsp;&nbsp;&nbsp;public String getBody() {<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return body;<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;}
+        public String getBody() {
+            return body;
         }
+    }
+</code></pre>
 
-        <h1>Example Provider</h1>
+        <h1>Example Custom Provider</h1>
         Below is an example provider that is based on the Amazon Web Services Simple Queue Service provider built into
-        SonicBase.<br/>
-        <code><pre>
+        SonicBase. For your provider to work, you must place the jar containing your code and any dependencies in the "lib"
+        directory under the install directory and deploy it across the cluster.<br/>
+        <pre class="java"><code>
 
-public class AWSSQSMessageQueueConsumer implements MessageQueueConsumer {<br/>
+public class AWSSQSMessageQueueConsumer implements MessageQueueConsumer {
 
-    private String url;<br/>
-    private AmazonSQSClient sqsClient;<br/>
-    private boolean shutdown;<br/>
+    private String url;
+    private AmazonSQSClient sqsClient;
+    private boolean shutdown;
 
-    class AWSMessage extends com.sonicbase.queue.Message {<br/>
-        private final com.amazonaws.services.sqs.model.Message message;<br/>
+    class AWSMessage extends com.sonicbase.queue.Message {
+        private final com.amazonaws.services.sqs.model.Message message;
         private com.amazonaws.services.sqs.model.Message awsMessage;<br/>
 
-        public AWSMessage(com.amazonaws.services.sqs.model.Message message, String body) {<br/>
-            super(body);<br/>
-            this.message = message;<br/>
+        public AWSMessage(com.amazonaws.services.sqs.model.Message message, String body) {
+            super(body);
+            this.message = message;
         }
     }
 
-    public File getInstallDir(JsonDict config) {<br/>
-        String dir = config.getString("installDirectory");<br/>
-        return new File(dir.replace("$HOME", System.getProperty("user.home")));<br/>
-    }
-
-    @Override<br/>
-    public void shutdown() {<br/>
-        this.shutdown = true;<br/>
+    public File getInstallDir(JsonDict config) {
+        String dir = config.getString("installDirectory");
+        return new File(dir.replace("$HOME", System.getProperty("user.home")));
     }<br/>
 
-    @Override<br/>
-    public void init(String cluster, String jsonConfig, String jsonQueueConfig) {<br/>
-        final ClientConfiguration clientConfig = new ClientConfiguration();<br/>
-        clientConfig.setMaxConnections(10);<br/>
-        clientConfig.setRequestTimeout(20_000);<br/>
+    @Override
+    public void shutdown() {
+        this.shutdown = true;
+    }<br/>
+
+    @Override
+    public void init(String cluster, String jsonConfig, String jsonQueueConfig) {
+        final ClientConfiguration clientConfig = new ClientConfiguration();
+        clientConfig.setMaxConnections(10);
+        clientConfig.setRequestTimeout(20_000);
         clientConfig.setConnectionTimeout(60_000);<br/>
 
-        JsonDict config = new JsonDict(jsonConfig);<br/>
-        File installDir = getInstallDir(config);<br/>
-        File keysFile = new File(installDir, "/keys/" + cluster + "-awskeys");<br/>
-        if (!keysFile.exists()) {<br/>
-            throw new DatabaseException(cluster + "-awskeys file not found");<br/>
+        JsonDict config = new JsonDict(jsonConfig);
+        File installDir = getInstallDir(config);
+        File keysFile = new File(installDir, "/keys/" + cluster + "-awskeys");
+        if (!keysFile.exists()) {
+            throw new DatabaseException(cluster + "-awskeys file not found");
         }
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(keysFile)))) {<br/>
-            String accessKey = reader.readLine();<br/>
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(keysFile)))) {
+            String accessKey = reader.readLine();
             String secretKey = reader.readLine();<br/>
 
-            BasicAWSCredentials awsCredentials = new BasicAWSCredentials(accessKey, secretKey);<br/>
-            sqsClient = new AmazonSQSClient(awsCredentials, clientConfig);<br/>
-        }<br/>
-        catch (IOException e) {<br/>
-            throw new DatabaseException(e);<br/>
-        }<br/>
-        JsonDict queueConfig = new JsonDict(jsonQueueConfig);<br/>
-        url = queueConfig.getString("url");<br/>
+            BasicAWSCredentials awsCredentials = new BasicAWSCredentials(accessKey, secretKey);
+            sqsClient = new AmazonSQSClient(awsCredentials, clientConfig);
+        }
+        catch (IOException e) {
+            throw new DatabaseException(e);
+        }
+        JsonDict queueConfig = new JsonDict(jsonQueueConfig);
+        url = queueConfig.getString("url");
     }<br/>
 
-    @Override<br/>
-    public List&lt;com.sonicbase.queue.Message&gt; getMessages() {<br/>
-        ReceiveMessageRequest request = new ReceiveMessageRequest(url);<br/>
-        request.setMaxNumberOfMessages(10);<br/>
-        request.setWaitTimeSeconds(10);<br/>
+    @Override
+    public List&lt;com.sonicbase.queue.Message&gt; getMessages() {
+        ReceiveMessageRequest request = new ReceiveMessageRequest(url);
+        request.setMaxNumberOfMessages(10);
+        request.setWaitTimeSeconds(10);
         ReceiveMessageResult receivedMessages = sqsClient.receiveMessage(request.withMessageAttributeNames("All"));<br/>
 
-        List&lt;com.amazonaws.services.sqs.model.Message&gt; innerMessages = receivedMessages.getMessages();<br/>
-        List&lt;com.sonicbase.queue.Message&gt; resultMessages = new ArrayList<>();<br/>
-        for (com.amazonaws.services.sqs.model.Message message : innerMessages) {<br/>
-            resultMessages.add(new AWSMessage(message, message.getBody()));<br/>
-        }<br/>
-        return resultMessages;<br/>
+        List&lt;com.amazonaws.services.sqs.model.Message&gt; innerMessages = receivedMessages.getMessages();
+        List&lt;com.sonicbase.queue.Message&gt; resultMessages = new ArrayList<>();
+        for (com.amazonaws.services.sqs.model.Message message : innerMessages) {
+            resultMessages.add(new AWSMessage(message, message.getBody()));
+        }
+        return resultMessages;
     }<br/>
 
-    @Override<br/>
-    public void acknowledgeMessage(com.sonicbase.queue.Message message) {<br/>
-        sqsClient.deleteMessage(url, ((AWSMessage)message).message.getReceiptHandle());<br/>
-    }<br/>
-    }<br/>
+    @Override
+    public void acknowledgeMessage(com.sonicbase.queue.Message message) {
+        sqsClient.deleteMessage(url, ((AWSMessage)message).message.getReceiptHandle());
+    }
+}<br/>
 
 
-            </pre></code>
+            </code></pre>
 
     </div>
 </div>

@@ -8,6 +8,10 @@
 	<meta name="description" content="SonicBase SQL syntax for order-by expressions. This allows you to specify how the results are sorted.">
 	<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
 	<script type="text/javascript" src="../javascript/main.js"></script>
+
+	<link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+	<script src="../javascript/highlight.min.js"></script>
+	<script>hljs.initHighlightingOnLoad();</script>
 </head>
 
 <body>
@@ -40,7 +44,7 @@
 	</script>
 
 
-	<div style="margin-left: 4em;">
+	<div style="margin-left: 4em;margin-right: 4em;">
 <h1>SQL Select With Order By Statement</h1>
 Reads records from the database and returns them in the specified sort order.<br/>
 <br/>
@@ -67,8 +71,9 @@ You may sort on any number of columns. Each column added to the query is nested 
 <br/>
 <br/>
 <h3>Example</h3>
-
-select * from persons order by name asc, age desc<br/>
+<pre class="SQL"><code>
+	select * from persons order by name asc, age desc<br/>
+	</code></pre>
 <br/>
 <table class="syntax-table" border="1" cellpadding=2 cellspacing="0">
 	<tbody>

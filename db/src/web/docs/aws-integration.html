@@ -10,6 +10,10 @@
     <meta name="description" content="Intructions on how to use the SonicBase integration with AWS. Configuration files may be automatically created based on AWS tags.">
     <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
     <script type="text/javascript" src="../javascript/main.js"></script>
+
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
 </head>
 <body>
 <div class="container">
@@ -41,7 +45,7 @@
     </script>
 
 
-    <div style="margin-left: 4em;">
+    <div style="margin-left: 4em;margin-right: 4em;">
 <h1>Config Builder</h1>
 SonicBase will automatically create a config file based on the servers tagged in AWS. Machines
 you desire to be servers need the tag "sonicbase-server" with a value of the name of the cluster.
@@ -54,15 +58,16 @@ To build your config file type "build config" in the client.<br/>
         It is recommended that you instantiate the servers using the AWS api. You can then easily tag all your
         servers and clients with code like the following:<br/><br/>
 
-        ArrayList<Tag> requestTags = new ArrayList<Tag>();<br/>
-        requestTags.add(new Tag("sonicbase-server, "my-cluster"));<br/>
+        <pre class="java"><code>
+        ArrayList&lt;Tag&gt; requestTags = new ArrayList&lt;<>&gt;();
+        requestTags.add(new Tag("sonicbase-server, "my-cluster"));
 <br/>
-        CreateTagsRequest createTagsRequest_requests = new CreateTagsRequest();<br/>
-        createTagsRequest_requests.setResources(instanceIds);<br/>
-        createTagsRequest_requests.setTags(requestTags);<br/>
+        CreateTagsRequest createTagsRequest_requests = new CreateTagsRequest();
+        createTagsRequest_requests.setResources(instanceIds);
+        createTagsRequest_requests.setTags(requestTags);
 <br/>
         ec2.createTags(createTagsRequest_requests);<br/>
-
+</code></pre>
         <h1>Prerequisites</h1>
 In order for AWS integration to work you must have a file named "&lt;cluster&gt;-awskeys" located in the
         "keys" subdirectory of the install directory.

@@ -8,6 +8,10 @@
     <meta name="SonicBase SQL select syntax. Description and examples of basic select clauses.">
     <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
     <script type="text/javascript" src="../javascript/main.js"></script>
+
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
 </head>
 
 <body>
@@ -40,7 +44,7 @@
     </script>
 
 
-    <div style="margin-left: 4em;">
+    <div style="margin-left: 4em;margin-right: 4em;">
 <h1>SQL Select Statement</h1>
 Reads records from the database.<br/>
 <br/>
@@ -70,7 +74,9 @@ Reads records from the database.<br/>
 </table>
 
         <h3>Example</h3>
-<p>select * from persons where name='bob' and age&gt;=30</p>
+        <pre class="SQL"><code>
+    select * from persons where name='bob' and age&gt;=30<br/>
+            </code></pre>
         <table class="border-table" border="1"><tr><td> <table class="syntax-table" border="1" cellpadding=2 cellspacing="0">
   <tbody>
     <tr class="syntax-main">

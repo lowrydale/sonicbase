@@ -8,6 +8,12 @@
     <meta name="description" content="Shown is the SQL syntax for limiting the number of results for a given query.">
     <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
     <script type="text/javascript" src="../javascript/main.js"></script>
+
+
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+
 </head>
 
 <body>
@@ -40,7 +46,7 @@
     </script>
 
 
-    <div style="margin-left: 4em;">
+    <div style="margin-left: 4em;margin-right: 4em;">
 <h1>SQL Select With Limit Statement</h1>
 <br/>
 Limits the number of results to return
@@ -64,10 +70,12 @@ Limits the number of results to return
 </table>
 
         <h3>Example</h3>
-PreparedStatement stmt = conn.prepareStatement("select * from persons where id < ? and id > ? limit 3");<br/>
-stmt.setLong(1, 100);<br/>
-stmt.setLong(2, 2);<br/>
-ResultSet ret = stmt.executeQuery();<br/>
+        <pre class="java"><code>
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where id < ? and id > ? limit 3");
+    stmt.setLong(1, 100);
+    stmt.setLong(2, 2);
+    ResultSet ret = stmt.executeQuery();
+            </code></pre>
 </div>
 </div>
 </body>

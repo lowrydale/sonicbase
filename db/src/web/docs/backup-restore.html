@@ -9,6 +9,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
     <script type="text/javascript" src="../javascript/main.js"></script>
+
+
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+
 </head>
 <body>
 <div class="container">
@@ -46,34 +52,38 @@
         The following configuration is used for a filesystem backup. The backup directory can
         be located on a shared drive or be a local drive. If the directory is shared you must
         specify this with the "sharedDirectory" setting.<br/>
-        {<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;"dataDirectory": "$HOME/db-data",<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;"installDirectory": "$HOME/sonicbase",<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;...<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;"backup": {<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"type": "fileSystem",<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"directory": "$HOME/db-backup",<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"sharedDirectory": true,<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"maxBackupCount": 10<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"cronSchedule": "0 0 * * *"<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;}<br/>
-        }<br/>
+        <pre class="JSON"><code>
+    {
+        "dataDirectory": "$HOME/db-data",
+        "installDirectory": "$HOME/sonicbase",
+        ...
+        "backup": {
+            "type": "fileSystem",
+            "directory": "$HOME/db-backup",
+            "sharedDirectory": true,
+            "maxBackupCount": 10,
+            "cronSchedule": "0 0 * * *"
+        }
+    }
+</code></pre>
 
         <h2>AWS Backup</h2>
         The following configuration is used for the AWS backup. Files will be backed up to S3 using
         the specified bucket and prefix.<br/>
-        {<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;"dataDirectory": "$HOME/db-data",<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;"installDirectory": "$HOME/sonicbase",<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;...<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;"backup": {<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"type": "AWS",<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"bucket": "bucket-name",<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"prefix": "backups",<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"maxBackupCount": 10<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"cronSchedule": "0 0 * * *"<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;}<br/>
-        }<br/>
+        <pre class="JSON"><code>
+    {
+        "dataDirectory": "$HOME/db-data",
+        "installDirectory": "$HOME/sonicbase",
+        ...
+        "backup": {
+            "type": "AWS",
+            "bucket": "bucket-name",
+            "prefix": "backups",
+            "maxBackupCount": 10
+            "cronSchedule": "0 0 * * *"
+        }
+    }
+</code></pre>
         <br/>
         In order for AWS integration to work you must have a file named "&lt;cluster&gt;-awskeys" located in the
         "keys" subdirectory of the install directory. This file contains the accesskey on the first line and the

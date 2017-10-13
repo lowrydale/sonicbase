@@ -8,6 +8,10 @@
     <meta name="description" content="SonicBases syntax for describing shards. A count of records per shard is provided. Also the keys that deliniate the shards are provided.">
     <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
     <script type="text/javascript" src="../javascript/main.js"></script>
+
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
 </head>
 
 <body>
@@ -40,7 +44,7 @@
     </script>
 
 
-    <div style="margin-left: 4em;">
+    <div style="margin-left: 4em;margin-right: 4em;">
 <h1>SQL Describe Shards Statement</h1>
 Describes the shards. Sizes of the indices in each shard are returned. Also the keys that define
 the boundaries for each shard are returned<br/>
@@ -60,11 +64,13 @@ the boundaries for each shard are returned<br/>
 <br/>
 
 <h3>Example</h3>
-PreparedStatement stmt = conn.prepareStatement("describe shards")<br/>
-ResultSet rs = stmt.executeQuery();<br/>
-while (rs.next()) {<br/>
-&nbsp;&nbsp;System.out.println(rs.getString(1))<br/>
-}
+        <pre class="java"><code>
+    PreparedStatement stmt = conn.prepareStatement("describe shards")
+    ResultSet rs = stmt.executeQuery();
+    while (rs.next()) {
+        System.out.println(rs.getString(1))
+    }<br/>
+            </code></pre>
 <br/>
 </div>
 </div>

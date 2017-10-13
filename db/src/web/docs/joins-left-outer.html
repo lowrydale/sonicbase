@@ -8,6 +8,10 @@
     <meta name="description" content="Shown is the SQL syntax for a join where all records in the left table are returned. If there is no matching record on the right then null is returned for the right side.">
     <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
     <script type="text/javascript" src="../javascript/main.js"></script>
+
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
 </head>
 <body>
 <div class="container">
@@ -38,7 +42,7 @@
     </script>
 
 
-    <div style="margin-left: 4em;">
+    <div style="margin-left: 4em;margin-right: 4em;">
 <h1>SQL Left Outer Join Statement</h1>
 <br/>
 Performs a join where all records in the left table are returned. If there is no matching record on
@@ -65,12 +69,13 @@ the right then null is returned for the right side.
 </table>
 
 <h3>Example</h3>
-PreparedStatement stmt = conn.prepareStatement(<br/>
-"select persons.id, persons.socialsecuritynumber, memberships.membershipname, memberships.personid from persons
-left outer join Memberships on persons.id = Memberships.PersonId where memberships.personid<2  order by memberships.personid desc");<br/>
-<br/>
-ResultSet ret = stmt.executeQuery();<br/>
-
+        <pre class="java"><code>
+    PreparedStatement stmt = conn.prepareStatement(
+        "select persons.id, persons.socialsecuritynumber, memberships.membershipname, memberships.personid from persons
+        left outer join Memberships on persons.id = Memberships.PersonId where memberships.personid<2  order by memberships.personid desc");
+    <br/>
+    ResultSet ret = stmt.executeQuery();<br/>
+</code></pre>
 
 </div>
 </div>

@@ -8,6 +8,11 @@
 	<meta name="description" content="Shown is the SQL syntax for inserting records into a table.">
 	<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
 	<script type="text/javascript" src="../javascript/main.js"></script>
+
+
+	<link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+	<script src="../javascript/highlight.min.js"></script>
+	<script>hljs.initHighlightingOnLoad();</script>
 </head>
 
 <body>
@@ -40,7 +45,7 @@
 	</script>
 
 
-	<div style="margin-left: 4em;">
+	<div style="margin-left: 4em;margin-right: 4em;">
 <h1>SQL Insert Statement</h1>
 <br/>
 Inserts a record into a table<br/>
@@ -67,11 +72,12 @@ Inserts a record into a table<br/>
 <br/>
 <h3>Example</h3>
 
-PreparedStatement stmt = conn.prepareStatement("insert into persons (name, age, occupation) values ('bob', ?, ?)")<br/>
-stmt.setInt(1, 30);<br/>
-stmt.setString(2, "artist");<br/>
-stmt.executeUpdate();<br/>
-
+		<pre class="java"><code>
+	PreparedStatement stmt = conn.prepareStatement("insert into persons (name, age, occupation) values ('bob', ?, ?)")
+	stmt.setInt(1, 30);
+	stmt.setString(2, "artist");
+	stmt.executeUpdate();<br/>
+</code></pre>
 <br/>
 </div>
 </div>

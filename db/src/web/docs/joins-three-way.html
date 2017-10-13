@@ -8,6 +8,10 @@
     <meta name="description" content="Shown is the SQL syntax for a join between 3 tables.">
     <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
     <script type="text/javascript" src="../javascript/main.js"></script>
+
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
 </head>
 
 <body>
@@ -39,7 +43,7 @@
     </script>
 
 
-    <div style="margin-left: 4em;">
+    <div style="margin-left: 4em;margin-right: 4em;">
 <h1>SQL Three Way Join Statement</h1>
 <br/>
 Performs a join between three tables.
@@ -65,13 +69,14 @@ Performs a join between three tables.
 </table>
 
 <h3>Example</h3>
-PreparedStatement stmt = conn.prepareStatement(<br/>
-"select id, socialsecuritynumber, memberships.personId, memberships.membershipname, resorts.resortname
-from persons inner join Memberships on persons.id = Memberships.PersonId inner join resorts on memberships.resortid = resorts.resortId
-where persons.id<2  order by persons.id desc, memberships.membershipname desc, resorts.resortname asc");<br/>
-<br/>
-ResultSet ret = stmt.executeQuery();<br/>
-
+        <pre class="java"><code>
+    PreparedStatement stmt = conn.prepareStatement(
+        "select id, socialsecuritynumber, memberships.personId, memberships.membershipname, resorts.resortname
+        from persons inner join Memberships on persons.id = Memberships.PersonId inner join resorts on memberships.resortid = resorts.resortId
+        where persons.id<2  order by persons.id desc, memberships.membershipname desc, resorts.resortname asc");
+    <br/>
+    ResultSet ret = stmt.executeQuery();<br/>
+</code></pre>
 </div>
 </div>
 </body>

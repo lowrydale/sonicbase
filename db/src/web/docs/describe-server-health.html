@@ -8,6 +8,10 @@
     <meta name="description" content="SonicBase syntax or getting health information about the servers.">
     <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
     <script type="text/javascript" src="../javascript/main.js"></script>
+
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
 </head>
 
 <body>
@@ -40,7 +44,7 @@
     </script>
 
 
-    <div style="margin-left: 4em;">
+    <div style="margin-left: 4em;margin-right: 4em;">
 <h1>SQL Describe Server Health Statement</h1>
 Returns health status from all the servers.
 <br/>
@@ -59,16 +63,17 @@ Returns health status from all the servers.
 </table>
 <br/>
 <h3>Example</h3>
-PreparedStatement stmt = conn.prepareStatement("describe server health")<br/>
-ResultSet rs = stmt.executeQuery();<br/>
-while (rs.next()) {<br/>
-
-&nbsp;&nbsp;System.out.println("Host: " + rs.getString("host"))<br/>
-&nbsp;&nbsp;System.out.println("Shard: " + rs.getString("shard"))<br/>
-&nbsp;&nbsp;System.out.println("Replica: " + rs.getString("replica"))<br/>
-&nbsp;&nbsp;System.out.println("Dead: " + rs.getString("dead"))<br/>
-&nbsp;&nbsp;System.out.println("Master: " + rs.getString("master"))<br/>
-}
+        <pre class="java"><code>
+    PreparedStatement stmt = conn.prepareStatement("describe server health")
+    ResultSet rs = stmt.executeQuery();
+    while (rs.next()) {
+        System.out.println("Host: " + rs.getString("host"))
+        System.out.println("Shard: " + rs.getString("shard"))
+        System.out.println("Replica: " + rs.getString("replica"))
+        System.out.println("Dead: " + rs.getString("dead"))
+        System.out.println("Master: " + rs.getString("master"))
+    }<br/>
+            </code></pre>
 <br/>
 </div>
 </div>

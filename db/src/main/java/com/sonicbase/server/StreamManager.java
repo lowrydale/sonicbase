@@ -26,12 +26,53 @@ public class StreamManager {
   private ConcurrentHashMap<String, Connection> connections = new ConcurrentHashMap<>();
   private List<Thread> threads = new ArrayList<>();
   private boolean shutdown = false;
+  private boolean pauseStreaming = false;
 
-  public StreamManager(DatabaseServer server) {
+  public StreamManager(final DatabaseServer server) {
     this.server = server;
     logger = new Logger(server.getDatabaseClient(), server.getShard(), server.getReplica());
 
     logger.info("initializing StreamManager");
+
+    Thread thread = new Thread(new Runnable(){
+      @Override
+      public void run() {
+        while (true) {
+          try {
+            DatabaseServer.ServersConfig servers = server.getCommon().getServersConfig();
+            DatabaseServer.Shard[] shards = servers.getShards();
+            boolean allShardsAlive = true;
+            outer:
+            for (DatabaseServer.Shard shard : shards) {
+              DatabaseServer.Host[] hosts = shard.getReplicas();
+              boolean alive = false;
+              for (DatabaseServer.Host host : hosts) {
+                if (!host.isDead()) {
+                  alive = true;
+                  break;
+                }
+              }
+              if (!alive) {
+                pauseStreaming = true;
+                allShardsAlive = false;
+                break outer;
+              }
+            }
+            if (allShardsAlive) {
+              pauseStreaming = false;
+            }
+            Thread.sleep(1000);
+          }
+          catch (InterruptedException e) {
+            break;
+          }
+          catch (Exception e) {
+            logger.error("Error in Queue Health Detector", e);
+          }
+        }
+      }
+    });
+    thread.start();
   }
 
   public ComObject startStreaming(ComObject cobj) {
@@ -43,7 +84,7 @@ public class StreamManager {
     logger.info("Starting queue consumers: queue notNull=" + (queueDict != null));
     if (queueDict != null) {
       if (!server.getCommon().haveProLicense()) {
-        throw new InsufficientLicense("You must have a pro license to use streaming");
+        throw new InsufficientLicense("You must have a pro license to use message queue integration");
       }
       logger.info("Starting queues. Have license");
 
@@ -68,6 +109,9 @@ public class StreamManager {
 
                   int errorCountInARow = 0;
                   while (true) {
+                    while (pauseStreaming) {
+                      Thread.sleep(1000);
+                    }
                     try {
                       List<com.sonicbase.queue.Message> messages = consumer.getMessages();
                       processMessages(consumer, messages);

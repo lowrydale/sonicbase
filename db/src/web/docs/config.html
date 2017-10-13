@@ -10,6 +10,12 @@
  <meta name="description" content="Instructions and examples on how create the configuration files needed by SonicBase.">
  <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
  <script type="text/javascript" src="../javascript/main.js"></script>
+
+
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+
 </head>
 <body>
 <div class="container">
@@ -52,33 +58,35 @@ The config file must be named "config-&lt;cluster name&gt;.json".
 <br/>
 
 <h1>Example</h1>
-{<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;"dataDirectory": "$HOME/db-data",<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;"installDirectory": "$HOME/sonicbase",<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;"compressRecords": false,<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;"useUnsafe": true,<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;"maxJavaHeap": "60%",<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;"user": "ubuntu",<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;"clientIsPrivate": false,<br/>
-     &nbsp;&nbsp;&nbsp;&nbsp;"shards" : [<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"replicas": [<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"privateAddress": "localhost",<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"publicAddress": "localhost",<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"port": 9010<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;"clients" : [<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"privateAddress": "localhost",<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"publicAddress": "localhost",<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"port": 8080<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;]<br/>
-}<br/>
-
+     <pre class="JSON"><code>
+    {
+        "dataDirectory": "$HOME/db-data",
+        "installDirectory": "$HOME/sonicbase",
+        "compressRecords": false,
+        "useUnsafe": true,
+        "maxJavaHeap": "60%",
+        "user": "ubuntu",
+        "clientIsPrivate": false,
+        "shards" : [
+            {
+                "replicas": [
+                    {
+                        "privateAddress": "localhost",
+                        "publicAddress": "localhost",
+                        "port": 9010
+                    }
+                ]
+            },
+         ],
+        "clients" : [
+            {
+                "privateAddress": "localhost",
+                "publicAddress": "localhost",
+                "port": 8080
+            }
+        ]
+    }
+</code></pre>
 <h1>Elements</h1>
   <b>dataDirectory</b> - path to the location of the database files. Note on Windows you will need to escape the
   backslashes so the value can be stored in the json file.<br/>

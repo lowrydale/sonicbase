@@ -1,7 +1,11 @@
 package com.sonicbase.database;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
+import com.sonicbase.queue.LocalMessageQueueConsumer;
+import com.sonicbase.queue.Message;
 import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.util.JsonArray;
 import com.sonicbase.util.JsonDict;
@@ -95,6 +99,73 @@ public class TestDataTypes {
 
     //test insert
 
+    for (int i = 0; i < recordCount; i++) {
+      stmt = conn.prepareStatement("insert into persons (id, socialSecurityNumber, relatives, restricted, gender, int, bool, smallInt, char, float, double, blob, numeric, decimal, bin, date, time, timestamp, tinyint, bit, real, nchar, nvarchar, longnvarchar, longvarchar, longvarbinary) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      stmt.setLong(1, i);
+      stmt.setString(2, "933-28-" + i);
+      stmt.setString(3, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+      stmt.setBoolean(4, false);
+      stmt.setString(5, "m");
+      stmt.setInt(6, i);
+      stmt.setBoolean(7, i % 2 == 0);
+      stmt.setInt(8, i);
+      stmt.setString(9, "char-" + i);
+      stmt.setDouble(10, i + 0.2d);
+      stmt.setDouble(11, i + 0.2d);
+      ByteArrayInputStream in = new ByteArrayInputStream(("testing blob-" + String.valueOf(i)).getBytes("utf-8"));
+      stmt.setBlob(12, in);
+      stmt.setBigDecimal(13, new BigDecimal(i + ".01"));
+      stmt.setBigDecimal(14, new BigDecimal(i + ".01"));
+      stmt.setBytes(15, ("testing blob-" + String.valueOf(i)).getBytes("utf-8"));
+      Date date = new Date(1920 - 1900, 10, i);
+      stmt.setDate(16, date);
+      Time time = new Time(10, 12, i);
+      stmt.setTime(17, time);
+      Timestamp timestamp = new Timestamp(1990 - 1900, 11, 13, 1, 2, i, 0);
+      stmt.setTimestamp(18, timestamp);
+      stmt.setByte(19, (byte) i);
+      stmt.setBoolean(20, i % 2 == 0);
+      stmt.setFloat(21, i + 0.2f);
+      stmt.setString(22, "933-28-" + i);
+      stmt.setString(23, "933-28-" + i);
+      stmt.setString(24, "933-28-" + i);
+      stmt.setString(25, "933-28-" + i);
+      in = new ByteArrayInputStream(("testing blob-" + String.valueOf(i)).getBytes("utf-8"));
+      stmt.setBlob(26, in);
+      assertEquals(stmt.executeUpdate(), 1);
+      ids.add((long) i);
+    }
+
+    int recordsConsumed = 0;
+    LocalMessageQueueConsumer consumer = new LocalMessageQueueConsumer();
+    List<Message> msgs = consumer.receive();
+    recordsConsumed += countRecords(msgs);
+    String body = msgs.get(0).getBody();
+    System.out.println(body);
+    JsonDict dict = new JsonDict(body);
+    assertEquals("test", dict.getString("database"));
+    assertEquals("persons", dict.getString("table"));
+    assertEquals("insert", dict.getString("action"));
+    JsonDict record = dict.getArray("records").getDict(0);
+    assertNotNull(record.getLong("_sequence0"));
+    assertNotNull(record.getLong("_sequence1"));
+    assertNotNull(record.getLong("_sequence2"));
+    record.remove("_sequence0");
+    record.remove("_sequence1");
+    record.remove("_sequence2");
+    assertJsonEquals(record.toString(),
+        "{\"date\":\"1920-10-31\",\"bool\":true,\"gender\":\"m\",\"longnvarchar\":\"933-28-0\",\"bin\":\"dGVzdGluZyBibG9iLTA=\",\"numeric\":0.01,\"float\":0.2,\"bit\":true,\"smallint\":0,\"nvarchar\":\"933-28-0\",\"longvarbinary\":\"dGVzdGluZyBibG9iLTA=\",\"id\":0,\"timestamp\":\"1990-12-13 01:02:00.0\",\"double\":0.2,\"tinyint\":0,\"real\":0.2,\"relatives\":\"12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901\",\"int\":0,\"longvarchar\":\"933-28-0\",\"socialsecuritynumber\":\"933-28-0\",\"blob\":\"dGVzdGluZyBibG9iLTA=\",\"restricted\":false,\"char\":\"char-0\",\"nchar\":\"933-28-0\",\"time\":\"10:12:00\",\"decimal\":0.01}");
+
+    while (true) {
+      msgs = consumer.receive();
+      if (msgs == null || msgs.size() == 0) {
+        break;
+      }
+      recordsConsumed += countRecords(msgs);
+    }
+
+    assertEquals(recordsConsumed, recordCount);
+
     stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");
     stmt.setLong(1, 1000);
     stmt.setString(2, "resort-1000");
@@ -115,42 +186,6 @@ public class TestDataTypes {
       }
     }
 
-    for (int i = 0; i < recordCount; i++) {
-      stmt = conn.prepareStatement("insert into persons (id, socialSecurityNumber, relatives, restricted, gender, int, bool, smallInt, char, float, double, blob, numeric, decimal, bin, date, time, timestamp, tinyint, bit, real, nchar, nvarchar, longnvarchar, longvarchar, longvarbinary) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-      stmt.setLong(1, i);
-      stmt.setString(2, "933-28-" + i);
-      stmt.setString(3, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
-      stmt.setBoolean(4, false);
-      stmt.setString(5, "m");
-      stmt.setInt(6, i);
-      stmt.setBoolean(7, i % 2 == 0);
-      stmt.setInt(8, i);
-      stmt.setString(9, "char-" + i);
-      stmt.setDouble(10, i + 0.2d);
-      stmt.setDouble(11, i + 0.2d);
-      ByteArrayInputStream in = new ByteArrayInputStream(("testing blob-" + String.valueOf(i)).getBytes("utf-8"));
-      stmt.setBlob(12, in);
-      stmt.setBigDecimal(13, new BigDecimal(i + ".01"));
-      stmt.setBigDecimal(14, new BigDecimal(i + ".01"));
-      stmt.setBytes(15, ("testing blob-" + String.valueOf(i)).getBytes("utf-8"));
-      Date date = new Date(i, i, i);
-      stmt.setDate(16, date);
-      Time time = new Time(i, i, i);
-      stmt.setTime(17, time);
-      Timestamp timestamp = new Timestamp(1990, 12, 13, 1, 2, i, 0);
-      stmt.setTimestamp(18, timestamp);
-      stmt.setByte(19, (byte) i);
-      stmt.setBoolean(20, i % 2 == 0);
-      stmt.setFloat(21, i + 0.2f);
-      stmt.setString(22, "933-28-" + i);
-      stmt.setString(23, "933-28-" + i);
-      stmt.setString(24, "933-28-" + i);
-      stmt.setString(25, "933-28-" + i);
-      in = new ByteArrayInputStream(("testing blob-" + String.valueOf(i)).getBytes("utf-8"));
-      stmt.setBlob(26, in);
-      assertEquals(stmt.executeUpdate(), 1);
-      ids.add((long) i);
-    }
 
     for (int i = 0; i < recordCount; i++) {
       stmt = conn.prepareStatement("insert into persons (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
@@ -181,6 +216,28 @@ public class TestDataTypes {
 //    assertEquals(client.getPartitionSize(2, "persons", "_1__primarykey"), 9);
 //    assertEquals(client.getPartitionSize(3, "persons", "_1__primarykey"), 8);
 
+  }
+
+  private int countRecords(List<Message> msgs) {
+      int count = 0;
+      for (Message msg : msgs) {
+        try {
+          JsonDict dict = new JsonDict(msg.getBody());
+          JsonArray array = dict.getArray("records");
+          count += array.size();
+        }
+        catch (Exception e) {
+          System.out.println("bad json=" + msg.getBody());
+        }
+      }
+      return count;
+  }
+
+  public static void assertJsonEquals(String lhs, String rhs) {
+    JsonParser parser = new JsonParser();
+    JsonElement o1 = parser.parse(lhs);
+    JsonElement o2 = parser.parse(rhs);
+    assertEquals(o1, o2);
   }
 
   @Test
@@ -247,15 +304,15 @@ public class TestDataTypes {
     assertEquals(blob, "testing blob-4");
 
     Date date = ret.getDate("date");
-    Date lhsDate = new Date(4, 4, 4);
+    Date lhsDate = new Date(1920 - 1900, 10, 4);
     assertEquals(date, lhsDate);
 
     Time time = ret.getTime("time");
-    Time lhsTime = new Time(4, 4, 4);
+    Time lhsTime = new Time(10, 12, 4);
     assertEquals(time, lhsTime);
 
     Timestamp timestamp = ret.getTimestamp("timestamp");
-    Timestamp lhsTimestamp = new Timestamp(1990, 12, 13, 1, 2, 4, 0);
+    Timestamp lhsTimestamp = new Timestamp(1990 - 1900, 11, 13, 1, 2, 4, 0);
     assertEquals(timestamp, lhsTimestamp);
 
     assertEquals(ret.getString("nchar"), "933-28-4");
@@ -327,15 +384,15 @@ public class TestDataTypes {
     assertEquals(new String(bytes, "utf-8"), "testing blob-4");
 
     date = ret.getDate(12);
-    lhsDate = new Date(4, 4, 4);
+    lhsDate = new Date(1920-1900, 10, 4);
     assertEquals(date, lhsDate);
 
     time = ret.getTime(13);
-    lhsTime = new Time(4, 4, 4);
+    lhsTime = new Time(10, 12, 4);
     assertEquals(time, lhsTime);
 
     timestamp = ret.getTimestamp(14);
-    lhsTimestamp = new Timestamp(1990, 12, 13, 1, 2, 4, 0);
+    lhsTimestamp = new Timestamp(1990 - 1900, 11, 13, 1, 2, 4, 0);
     assertEquals(timestamp, lhsTimestamp);
 
     assertEquals(ret.getLong(15), 4);

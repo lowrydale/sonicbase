@@ -23,6 +23,11 @@
       public static void main(java.lang.String[]);
 }
 
+-keep public class com.sonicbase.queue.LocalMessageQueueProducer
+-keep public class com.sonicbase.queue.AWSSQSMessageQueueProducer
+-keep public class com.sonicbase.queue.KafkaMessageQueueProducer
+-keep public class com.sonicbase.queue.MessageQueueProducer
+-keep public class com.sonicbase.queue.LocalMessageQueueConsumer
 -keep public class com.sonicbase.queue.AWSSQSMessageQueueConsumer
 -keep public class com.sonicbase.queue.KafkaMessageQueueConsumer
 -keep public class com.sonicbase.queue.MessageQueueConsumer

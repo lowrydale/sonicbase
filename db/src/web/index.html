@@ -162,10 +162,16 @@
     you to quickly load SonicBase and do analytics on your data. See <a href="docs/automated-bulk-import.html">Automated Bulk Import Documentation</a>.
     </div>
     <h2>Message Queue Integration (new)</h2>
+    <h3>Consumers</h3>
     <div class="mylink">
-      You can  connect to Kafka, Amazon Web Services Simple Queue Service and custom message providers. The message queue
+      You can connect to Kafka, Amazon Web Services Simple Queue Service and custom message providers. The message queue
       consumer can load your SonicBase
-      database in real-time, while you perform analytics functions on your SonicBase database. See <a href="docs/message-queue-integration.html">Message Queue Integration Documentation</a>.
+      database in real-time, while you perform analytics functions on your SonicBase database. See <a href="docs/message-queue-integration-consumer.html">Message Queue Integration Documentation for Consumers</a>.
+    </div>
+    <h3>Producers</h3>
+    <div class="mylink">
+    You can hook Kafka, Amazon Web Services Simple Queue Service and custom message provider into SonicBase so that all inserts, updates and deletes will be published into your
+    message queue. See <a href="docs/message-queue-integration-producer.html">Message Queue Integration Documentation for Producers</a>.
     </div>
       <h2>Coming Soon</h2>
       You will be able to automatically remove data that has been in the database for a specified amount of time. This will allow you to continuously

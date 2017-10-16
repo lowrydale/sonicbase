@@ -1,4 +1,3 @@
-/* © 2017 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.queue;
 
 import com.sonicbase.query.DatabaseException;
@@ -44,5 +43,10 @@ public class KafkaMessageQueueProducer implements MessageQueueProducer {
     catch (Exception e) {
       throw new DatabaseException(e);
     }
+  }
+
+  @Override
+  public void shutdown() {
+
   }
 }

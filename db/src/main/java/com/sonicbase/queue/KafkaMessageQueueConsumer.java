@@ -40,7 +40,7 @@ public class KafkaMessageQueueConsumer implements MessageQueueConsumer {
   }
 
   @Override
-  public List<Message> getMessages() {
+  public List<Message> receive() {
     ConsumerRecords<String, String> records = consumer.poll(100);
     List<com.sonicbase.queue.Message> resultMessages = new ArrayList<>();
     for (ConsumerRecord<String, String> record : records) {

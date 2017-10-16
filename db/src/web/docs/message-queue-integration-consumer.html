@@ -137,16 +137,16 @@
 
         void init(String cluster, String jsonConfig, String jsonQueueConfig);<br/>
 
-        List&lt;Message&gt; getMessages();<br/>
+        List&lt;Message&gt; receive();<br/>
 
         void acknowledgeMessage(Message message);<br/>
 
         void shutdown();<br/>
     }<br/>
             </code></pre>
-        "init" is called once per thread to give you a chance to create your thread-specifice consumer.<br/>
+        "init" is called once per thread to give you a chance to create your thread-specific consumer.<br/>
         <br/>
-        "getMessages" is called for you to return messages from your provider.<br/>
+        "receive" is called for you to return messages from your provider.<br/>
         <br/>
         "acknowledgeMessage" is called for you to acknowledge the message with your provider if applicable.<br/>
         <br/>
@@ -180,6 +180,7 @@
         SonicBase. For your provider to work, you must place the jar containing your code and any dependencies in the "lib"
         directory under the install directory and deploy it across the cluster.<br/>
         <pre class="java"><code>
+package com.sonicbase.queue;<br/>
 
 public class AWSSQSMessageQueueConsumer implements MessageQueueConsumer {
 
@@ -235,7 +236,7 @@ public class AWSSQSMessageQueueConsumer implements MessageQueueConsumer {
     }<br/>
 
     @Override
-    public List&lt;com.sonicbase.queue.Message&gt; getMessages() {
+    public List&lt;com.sonicbase.queue.Message&gt; receive() {
         ReceiveMessageRequest request = new ReceiveMessageRequest(url);
         request.setMaxNumberOfMessages(10);
         request.setWaitTimeSeconds(10);

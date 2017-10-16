@@ -15,6 +15,14 @@
     "maxBackupCount": 10,
     "sharedDirectory": true
   },
+  "queue": {
+    "producers": [
+      {
+        "className": "com.sonicbase.queue.LocalMessageQueueProducer",
+        "maxBatchSize": 5
+      }
+    ]
+  },
   "shards" : [
     {
       "replicas": [

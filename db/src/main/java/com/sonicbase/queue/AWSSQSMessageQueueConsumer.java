@@ -65,7 +65,7 @@ public class AWSSQSMessageQueueConsumer implements MessageQueueConsumer {
   }
 
   @Override
-  public List<Message> getMessages() {
+  public List<Message> receive() {
     ReceiveMessageRequest request = new ReceiveMessageRequest(url);
     request.setMaxNumberOfMessages(10);
     request.setWaitTimeSeconds(10);

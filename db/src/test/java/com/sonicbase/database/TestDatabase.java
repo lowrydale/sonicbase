@@ -9,6 +9,8 @@ import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.impl.ColumnImpl;
 import com.sonicbase.query.impl.ExpressionImpl;
 import com.sonicbase.query.impl.SelectContextImpl;
+import com.sonicbase.queue.LocalMessageQueueConsumer;
+import com.sonicbase.queue.Message;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
@@ -37,6 +39,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.sonicbase.database.TestDataTypes.assertJsonEquals;
 import static org.testng.Assert.*;
 
 public class TestDatabase {
@@ -3282,6 +3285,14 @@ public class TestDatabase {
   @Test
   public void testBatchInsertNoKey() throws SQLException, InterruptedException {
 
+    LocalMessageQueueConsumer consumer = new LocalMessageQueueConsumer();
+    while (true) {
+      List<Message> msgs = consumer.receive();
+      if (msgs == null || msgs.size() == 0) {
+        break;
+      }
+    }
+
     client.syncSchema();
     conn.setAutoCommit(false);
     PreparedStatement stmt = conn.prepareStatement("insert into nokey (id, id2) VALUES (?, ?)");
@@ -3295,6 +3306,15 @@ public class TestDatabase {
     }
     stmt.executeBatch();
     conn.commit();
+
+    List<Message> msgs = consumer.receive();
+    String actual  = msgs.get(0).getBody();
+    JsonDict dict = new JsonDict(actual);
+    assertEquals(dict.getArray("records").size(), 5);
+    actual  = msgs.get(1).getBody();
+    dict = new JsonDict(actual);
+    assertEquals(dict.getArray("records").size(), 5);
+
 
     stmt = conn.prepareStatement("select * from nokey where id>=200000");
     ResultSet resultSet = stmt.executeQuery();
@@ -3753,8 +3773,24 @@ public class TestDatabase {
     assertTrue(rs.next());
     assertFalse(rs.next());
 
+    LocalMessageQueueConsumer consumer = new LocalMessageQueueConsumer();
+    while (true) {
+      List<Message> msgs = consumer.receive();
+      if (msgs == null || msgs.size() == 0) {
+        break;
+      }
+    }
     PreparedStatement stmt2 = conn.prepareStatement("delete from ToDeleteNoPrimaryKey where id=0");
     assertTrue(stmt2.execute());
+
+    List<Message> msgs = consumer.receive();
+    JsonDict dict = new JsonDict(msgs.get(0).getBody());
+    JsonArray array = dict.getArray("records");
+    JsonDict record = array.getDict(0);
+    record.remove("_sequence0");
+    record.remove("_sequence1");
+    record.remove("_sequence2");
+    assertJsonEquals(record.toString(), "{\"id2\":0,\"id\":0}");
 
     stmt = conn.prepareStatement("select * from ToDeleteNoPrimaryKey where id = 0");
     rs = stmt.executeQuery();

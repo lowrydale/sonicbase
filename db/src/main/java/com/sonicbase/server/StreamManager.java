@@ -9,8 +9,6 @@ import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.JsonArray;
 import com.sonicbase.util.JsonDict;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.common.TopicPartition;
 import sun.misc.BASE64Decoder;
 
 import java.math.BigDecimal;
@@ -83,58 +81,60 @@ public class StreamManager {
     JsonDict queueDict = config.getDict("queue");
     logger.info("Starting queue consumers: queue notNull=" + (queueDict != null));
     if (queueDict != null) {
-      if (!server.getCommon().haveProLicense()) {
+      if (!server.haveProLicense()) {
         throw new InsufficientLicense("You must have a pro license to use message queue integration");
       }
       logger.info("Starting queues. Have license");
 
       JsonArray streams = queueDict.getArray("consumers");
-      for (int i = 0; i < streams.size(); i++) {
-        try {
-          final JsonDict stream = streams.getDict(i);
-          final String className = stream.getString("className");
-          Integer threadCount = stream.getInt("threadCount");
-          if (threadCount == null) {
-            threadCount = 1;
-          }
-          logger.info("starting queue consumer: config=" + stream.toString());
-          for (int j = 0; j < threadCount; j++) {
-            Thread thread = new Thread(new Runnable() {
-              @Override
-              public void run() {
-                try {
-                  MessageQueueConsumer consumer = (MessageQueueConsumer) Class.forName(className).newInstance();
+      if (streams != null) {
+        for (int i = 0; i < streams.size(); i++) {
+          try {
+            final JsonDict stream = streams.getDict(i);
+            final String className = stream.getString("className");
+            Integer threadCount = stream.getInt("threadCount");
+            if (threadCount == null) {
+              threadCount = 1;
+            }
+            logger.info("starting queue consumer: config=" + stream.toString());
+            for (int j = 0; j < threadCount; j++) {
+              Thread thread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                  try {
+                    MessageQueueConsumer consumer = (MessageQueueConsumer) Class.forName(className).newInstance();
 
-                  consumer.init(server.getCluster(), config.toString(), stream.toString());
+                    consumer.init(server.getCluster(), config.toString(), stream.toString());
 
-                  int errorCountInARow = 0;
-                  while (true) {
-                    while (pauseStreaming) {
-                      Thread.sleep(1000);
-                    }
-                    try {
-                      List<com.sonicbase.queue.Message> messages = consumer.getMessages();
-                      processMessages(consumer, messages);
-                      errorCountInARow = 0;
-                    }
-                    catch (Exception e) {
-                      logger.error("Error getting messages: config=" + stream.toString(), e);
-                      errorCountInARow++;
-                      Thread.sleep(100 * Math.min(1000, errorCountInARow));
+                    int errorCountInARow = 0;
+                    while (true) {
+                      while (pauseStreaming) {
+                        Thread.sleep(1000);
+                      }
+                      try {
+                        List<com.sonicbase.queue.Message> messages = consumer.receive();
+                        processMessages(consumer, messages);
+                        errorCountInARow = 0;
+                      }
+                      catch (Exception e) {
+                        logger.error("Error getting messages: config=" + stream.toString(), e);
+                        errorCountInARow++;
+                        Thread.sleep(100 * Math.min(1000, errorCountInARow));
+                      }
                     }
                   }
+                  catch (Exception e) {
+                    logger.error("Error starting message queue consumer: config=" + stream.toString(), e);
+                  }
                 }
-                catch (Exception e) {
-                  logger.error("Error starting message queue consumer: config=" + stream.toString(), e);
-                }
-              }
-            });
-            threads.add(thread);
-            thread.start();
+              });
+              threads.add(thread);
+              thread.start();
+            }
           }
-        }
-        catch (Exception e) {
-          logger.error("Error starting message queue consumer", e);
+          catch (Exception e) {
+            logger.error("Error starting message queue consumer", e);
+          }
         }
       }
     }

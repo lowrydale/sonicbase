@@ -1,101 +1,40 @@
 {
-  "id": "PAY-55468146TM822913JLHCIFUI",
-  "intent": "sale",
-  "state": "approved",
-  "cart": "2XH67050JJ797443F",
-  "payer": {
-    "payment_method": "paypal",
-    "status": "UNVERIFIED",
-    "payer_info": {
-      "email": "lowrydale@gmail.com",
-      "first_name": "Dale",
-      "last_name": "Lowry",
-      "payer_id": "NMBQM3DMVRG8U",
-      "shipping_address": {
-        "recipient_name": "Dale Lowry",
-        "line1": "5078 West Black Granite Way",
-        "city": "West Valley City",
-        "state": "UT",
-        "postal_code": "84120",
-        "country_code": "US"
-      },
-      "phone": "3852369443",
-      "country_code": "US"
-    }
-  },
-  "transactions": [
+  "database": "test",
+  "table": "persons",
+  "action": "insert",
+  "records": [
     {
-      "amount": {
-        "total": "0.48",
-        "currency": "USD",
-        "details": {
-          "subtotal": "0.48"
-        }
-      },
-      "payee": {
-        "merchant_id": "UXNDVMR8XSA98"
-      },
-      "item_list": {
-        "items": [],
-        "shipping_address": {
-          "recipient_name": "Dale Lowry",
-          "line1": "5078 West Black Granite Way",
-          "city": "West Valley City",
-          "state": "UT",
-          "postal_code": "84120",
-          "country_code": "US"
-        }
-      },
-      "related_resources": [
-        {
-          "sale": {
-            "id": "13T06725R5399734E",
-            "state": "completed",
-            "amount": {
-              "total": "0.48",
-              "currency": "USD",
-              "details": {
-                "subtotal": "0.48"
-              }
-            },
-            "payment_mode": "INSTANT_TRANSFER",
-            "protection_eligibility": "ELIGIBLE",
-            "protection_eligibility_type": "ITEM_NOT_RECEIVED_ELIGIBLE,UNAUTHORIZED_PAYMENT_ELIGIBLE",
-            "transaction_fee": {
-              "value": "0.31",
-              "currency": "USD"
-            },
-            "parent_payment": "PAY-55468146TM822913JLHCIFUI",
-            "create_time": "2017-09-22T03:26:24Z",
-            "update_time": "2017-09-22T03:26:24Z",
-            "links": [
-              {
-                "href": "https://api.paypal.com/v1/payments/sale/13T06725R5399734E",
-                "rel": "self",
-                "method": "GET"
-              },
-              {
-                "href": "https://api.paypal.com/v1/payments/sale/13T06725R5399734E/refund",
-                "rel": "refund",
-                "method": "POST"
-              },
-              {
-                "href": "https://api.paypal.com/v1/payments/payment/PAY-55468146TM822913JLHCIFUI",
-                "rel": "parent_payment",
-                "method": "GET"
-              }
-            ]
-          }
-        }
-      ]
-    }
-  ],
-  "create_time": "2017-09-22T03:26:24Z",
-  "links": [
-    {
-      "href": "https://api.paypal.com/v1/payments/payment/PAY-55468146TM822913JLHCIFUI",
-      "rel": "self",
-      "method": "GET"
+      "_sequence0": 1508092808187,
+      "_sequence1": 12,
+      "_sequence2": 0,
+      "id": 0,
+      "int": 0,
+      "bool": true,
+      "char": "char-0",
+      "smallint": 0,
+      "tinyint": 0,
+      "float": 0.2,
+      "double": 0.2,
+      "socialsecuritynumber": "933-28-0",
+      "relatives": "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901",
+      "restricted": false,
+      "gender": "m",
+      "blob": "dGVzdGluZyBibG9iLTA=",
+      "numeric": 0.01,
+      "decimal": 0.01,
+      "bin": "dGVzdGluZyBibG9iLTA=",
+      "date": 1920-10-31,
+      "time": 10
+      :
+      12: 00,
+      "timestamp": "1990-12-13 01:02:00.0",
+      "bit": true,
+      "real": 0.2,
+      "nchar": "933-28-0",
+      "nvarchar": "933-28-0",
+      "longnvarchar": "933-28-0",
+      "longvarchar": "933-28-0",
+      "longvarbinary": "dGVzdGluZyBibG9iLTA="
     }
   ]
 }

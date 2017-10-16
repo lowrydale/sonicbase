@@ -1,9 +1,12 @@
-/* © 2017 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.queue;
 
 import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.BasicAWSCredentials;
+import com.amazonaws.services.sqs.AmazonSQSAsync;
+import com.amazonaws.services.sqs.AmazonSQSAsyncClient;
 import com.amazonaws.services.sqs.AmazonSQSClient;
+import com.amazonaws.services.sqs.buffered.AmazonSQSBufferedAsyncClient;
+import com.amazonaws.services.sqs.model.SendMessageRequest;
 import com.amazonaws.services.sqs.model.SendMessageResult;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.util.JsonDict;
@@ -24,7 +27,7 @@ public class AWSSQSMessageQueueProducer implements MessageQueueProducer {
   @Override
   public void init(String cluster, String jsonConfig, String jsonQueueConfig) {
     final ClientConfiguration clientConfig = new ClientConfiguration();
-    clientConfig.setMaxConnections(10);
+    clientConfig.setMaxConnections(1000);
     clientConfig.setRequestTimeout(20_000);
     clientConfig.setConnectionTimeout(60_000);
 
@@ -50,10 +53,19 @@ public class AWSSQSMessageQueueProducer implements MessageQueueProducer {
 
   @Override
   public void publish(String message) {
-    SendMessageResult result = sqsClient.sendMessage(url, message);
+    SendMessageRequest request = new SendMessageRequest();
+    request.setMessageBody(message);
+    request.setQueueUrl(url);
+    SendMessageResult result = sqsClient.sendMessage(request);
+
     if (result == null || StringUtils.isEmpty(result.getMessageId())) {
       throw new DatabaseException("Error sending message");
     }
+
+  }
+
+  @Override
+  public void shutdown() {
 
   }
 }

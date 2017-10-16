@@ -22,6 +22,8 @@ import org.apache.commons.lang.exception.ExceptionUtils;
 
 import java.io.*;
 import java.util.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -890,8 +892,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
 
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
   @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
-  private ResultSet countRecords(String dbName, String[] tableNames) throws DatabaseException {
-    long count = 0;
+  private ResultSet countRecords(final String dbName, String[] tableNames) throws DatabaseException {
     int tableIndex = 0;
     if (this.countTable != null) {
       for (int i = 0; i < tableNames.length; i++) {
@@ -915,6 +916,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       }
     }
     if (joins.size() != 0) {
+      long count = 0;
       while (true) {
         ExpressionImpl.NextReturn ids = next(dbName, null);
         if (ids == null || ids.getIds() == null) {
@@ -932,49 +934,61 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
           count += ids.getIds().length;
         }
       }
+      return new ResultSetImpl(dbName, client, this, count);
     }
     else {
       while (true) {
+        long count = 0;
         try {
-          int previousSchemaVersion = client.getCommon().getSchemaVersion();
+          final int previousSchemaVersion = client.getCommon().getSchemaVersion();
           int shardCount = client.getShardCount();
-          for (int shard = 0; shard < shardCount; shard++) {
-            ComObject cobj = new ComObject();
-            cobj.put(ComObject.Tag.serializationVersion, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-            if (expression instanceof AllRecordsExpressionImpl) {
-              expression = null;
-            }
-            if (expression != null) {
-              cobj.put(ComObject.Tag.legacyExpression, ExpressionImpl.serializeExpression(expression));
-            }
+          List<Future> futures = new ArrayList<>();
+          for (int i = 0; i < shardCount; i++) {
+            final int shard = i;
+            futures.add(client.getExecutor().submit(new Callable(){
+              @Override
+              public Object call() throws Exception {
+                ComObject cobj = new ComObject();
+                cobj.put(ComObject.Tag.serializationVersion, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+                if (expression instanceof AllRecordsExpressionImpl) {
+                  expression = null;
+                }
+                if (expression != null) {
+                  cobj.put(ComObject.Tag.legacyExpression, ExpressionImpl.serializeExpression(expression));
+                }
 
-            if (getParms() != null) {
-              cobj.put(ComObject.Tag.parms, getParms().serialize());
-            }
+                if (getParms() != null) {
+                  cobj.put(ComObject.Tag.parms, getParms().serialize());
+                }
 
-            if (this.countTable != null) {
-              cobj.put(ComObject.Tag.countTableName, this.countTable);
-            }
+                if (SelectStatementImpl.this.countTable != null) {
+                  cobj.put(ComObject.Tag.countTableName, SelectStatementImpl.this.countTable);
+                }
 
-            if (this.countColumn != null) {
-              cobj.put(ComObject.Tag.countColumn, this.countColumn);
-            }
+                if (SelectStatementImpl.this.countColumn != null) {
+                  cobj.put(ComObject.Tag.countColumn, SelectStatementImpl.this.countColumn);
+                }
 
-            cobj.put(ComObject.Tag.dbName, dbName);
-            cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-            cobj.put(ComObject.Tag.method, "countRecords");
-            cobj.put(ComObject.Tag.tableName, fromTable);
+                cobj.put(ComObject.Tag.dbName, dbName);
+                cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+                cobj.put(ComObject.Tag.method, "countRecords");
+                cobj.put(ComObject.Tag.tableName, fromTable);
 
-            String command = "DatabaseServer:ComObject:countRecords:";
-            byte[] lookupRet = client.send(null, shard, 0, command, cobj, DatabaseClient.Replica.master);
-            if (previousSchemaVersion < client.getCommon().getSchemaVersion()) {
-              throw new SchemaOutOfSyncException();
-            }
-            ComObject retObj = new ComObject(lookupRet);
-            long currCount = retObj.getLong(ComObject.Tag.countLong);
-            count += currCount;
+                String command = "DatabaseServer:ComObject:countRecords:";
+                byte[] lookupRet = client.send(null, shard, 0, command, cobj, DatabaseClient.Replica.master);
+                if (previousSchemaVersion < client.getCommon().getSchemaVersion()) {
+                  throw new SchemaOutOfSyncException();
+                }
+                ComObject retObj = new ComObject(lookupRet);
+                long currCount = retObj.getLong(ComObject.Tag.countLong);
+                return currCount;
+              }
+            }));
           }
-          break;
+          for (Future future : futures) {
+            count += (long)future.get();
+          }
+          return new ResultSetImpl(dbName, client, this, count);
         }
         catch (SchemaOutOfSyncException e) {
           try {
@@ -989,7 +1003,6 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
         }
       }
     }
-    return new ResultSetImpl(dbName, client, this, count);
   }
 
   public ExpressionImpl.NextReturn next(String dbName, Explain explain) throws DatabaseException {

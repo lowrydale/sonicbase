@@ -8,6 +8,10 @@
     <meta name="description" content="In this benchmark we create a range query that selects the entire database and we iterate over all the results on a 4, 8, 16 and 32 server cluster.">
     <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
     <script type="text/javascript" src="../javascript/main.js"></script>
+
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
 </head>
 
 <body>
@@ -44,12 +48,16 @@
 <h1>Range Query Benchmark</h1>
 In this benchmark we create a range query that selects the entire database and we iterate over all the results on a 4, 8, 16, and 32 server cluster.<br/>
 <br/>
-<p>PreparedStatement stmt = con.prepareStatement("select persons.id1, id2 from persons where id1 >= 0 order by id1 asc)<br/><br/>
-	ResultSet rs = stmt.executeQuery();<br/>
-	for (int i = 0; ; i++) {<br/>
-	&nbsp;&nbsp;&nbsp;&nbsp;rs.next();<br/>
-	}<br/>
-	
+        <pre class="java"><code>
+PreparedStatement stmt = con.prepareStatement("select persons.id1, id2 from persons where id1 >= 0 order by id1 asc);
+ResultSet rs = stmt.executeQuery();
+for (int i = 0; ; i++) {
+    if (!rs.next()) {
+        break;
+    }
+}
+            <br/>
+	</code></pre>
 		<div class="mylink">
 	<a href="benchmarks-schema.html?framed=true">Schema and Insert Code</a><br/><br/>
 	</div>

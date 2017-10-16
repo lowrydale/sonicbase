@@ -992,6 +992,19 @@ private static class InsertRequest {
         Object newValue = server.toUnsafeFromRecords(new byte[][]{bytes});
         synchronized (index.getMutex(primaryKey)) {
           Object value = index.get(primaryKey);
+          if (value != null) {
+            byte[][] content = server.fromUnsafeToRecords(value);
+            if (Record.DB_VIEW_FLAG_DELETING == Record.getDbViewFlags(content[0])) {
+              if (Record.DB_VIEW_FLAG_DELETING != Record.getDbViewFlags(bytes)) {
+                index.addAndGetCount(1);
+              }
+            }
+            else {
+              if (Record.DB_VIEW_FLAG_DELETING == Record.getDbViewFlags(bytes)) {
+                index.addAndGetCount(-1);
+              }
+            }
+          }
           index.put(primaryKey, newValue);
           if (value != null) {
             server.freeUnsafeIds(value);
@@ -1101,6 +1114,7 @@ private static class InsertRequest {
           newRecords[newRecords.length - 1] = primaryKeyBytes;
           Object address = server.toUnsafeFromRecords(newRecords);
           index.put(key, address);
+          index.addAndGetCount(1);
           server.freeUnsafeIds(existingValue);
         }
       }
@@ -1131,113 +1145,71 @@ private static class InsertRequest {
 
     //server.getRepartitioner().notifyAdded(key, tableName, indexName);
 
-
-    if (true) {
-      try {
-        Object newUnsafeRecords = server.toUnsafeFromRecords(new byte[][]{recordBytes});
-        synchronized (index.getMutex(key)) {
-          Object existingValue = index.put(key, newUnsafeRecords);
-          if (existingValue != null) {
-            //synchronized (index) {
-            boolean sameTrans = false;
-            byte[][] bytes = server.fromUnsafeToRecords(existingValue);
-            long transId = Record.getTransId(recordBytes);
-            boolean sameSequence = false;
-            for (byte[] innerBytes : bytes) {
-              if (Record.getTransId(innerBytes) == transId) {
-                sameTrans = true;
-                break;
-              }
-              DataInputStream in = new DataInputStream(new ByteArrayInputStream(innerBytes));
-              long sequence0 = in.readLong();
-              long sequence1 = in.readLong();
-              in = new DataInputStream(new ByteArrayInputStream(recordBytes));
-              in.readShort(); //serializationVersion
-              long rsequence0 = in.readLong();
-              long rsequence1 = in.readLong();
-              if (sequence0 == rsequence0 && sequence1 == rsequence1) {
-                sameSequence = true;
-                break;
-              }
-            }
-            if (!ignoreDuplicates && existingValue != null && !sameTrans && !sameSequence) {
-              index.put(key, existingValue);
-              server.freeUnsafeIds(newUnsafeRecords);
-              throw new DatabaseException("Unique constraint violated: table=" + tableName + ", index=" + indexName + ", key=" + DatabaseCommon.keyToString(key));
-            }
-
-            server.freeUnsafeIds(existingValue);
-          }
-        }
-        if (threadLocalIsBatchRequest.get() != null && threadLocalIsBatchRequest.get()) {
-          if (!producers.isEmpty()) {
-            MessageRequest request = new MessageRequest();
-            request.dbName = dbName;
-            request.tableName = tableName;
-            request.recordBytes = recordBytes;
-            request.updateType = UpdateType.insert;
-            threadLocalMessageRequests.get().add(request);
-          }
+    try {
+      Object newUnsafeRecords = server.toUnsafeFromRecords(new byte[][]{recordBytes});
+      synchronized (index.getMutex(key)) {
+        Object existingValue = index.put(key, newUnsafeRecords);
+        if (existingValue == null) {
+          index.addAndGetCount(1);
         }
         else {
-          publishInsertOrUpdate(dbName, tableName, recordBytes, UpdateType.insert);
-        }
-      }
-      catch (Exception e) {
-        throw new DatabaseException(e);
-      }
-    }
-    else {
-      Object newValue = server.toUnsafeFromRecords(new byte[][]{recordBytes});
-      synchronized (index.getMutex(key)) {
-        Object existingValue = index.get(key);
-        boolean sameTrans = false;
-        if (existingValue != null) {
+          //synchronized (index) {
+          boolean sameTrans = false;
           byte[][] bytes = server.fromUnsafeToRecords(existingValue);
           long transId = Record.getTransId(recordBytes);
+          boolean sameSequence = false;
           for (byte[] innerBytes : bytes) {
             if (Record.getTransId(innerBytes) == transId) {
               sameTrans = true;
               break;
             }
+            DataInputStream in = new DataInputStream(new ByteArrayInputStream(innerBytes));
+            long sequence0 = in.readLong();
+            long sequence1 = in.readLong();
+            in = new DataInputStream(new ByteArrayInputStream(recordBytes));
+            in.readShort(); //serializationVersion
+            long rsequence0 = in.readLong();
+            long rsequence1 = in.readLong();
+            if (sequence0 == rsequence0 && sequence1 == rsequence1) {
+              sameSequence = true;
+              break;
+            }
           }
-        }
-        if (!ignoreDuplicates && existingValue != null && !sameTrans) {
-          index.put(key, existingValue);
-          server.freeUnsafeIds(newValue);
-          throw new DatabaseException("Unique constraint violated: table=" + tableName + ", index=" + indexName + ", key=" + DatabaseCommon.keyToString(key));
-        }
-        //    if (existingValue == null) {
-        index.put(key, newValue);
-        if (existingValue != null) {
+          if (!ignoreDuplicates && existingValue != null && !sameTrans && !sameSequence) {
+            index.put(key, existingValue);
+            server.freeUnsafeIds(newUnsafeRecords);
+            throw new DatabaseException("Unique constraint violated: table=" + tableName + ", index=" + indexName + ", key=" + DatabaseCommon.keyToString(key));
+          }
+          if (Record.DB_VIEW_FLAG_DELETING == Record.getDbViewFlags(bytes[0])) {
+            if (Record.DB_VIEW_FLAG_DELETING != Record.getDbViewFlags(recordBytes)) {
+              index.addAndGetCount(1);
+            }
+          }
+          else if (Record.DB_VIEW_FLAG_DELETING == Record.getDbViewFlags(recordBytes)) {
+            index.addAndGetCount(-1);
+          }
           server.freeUnsafeIds(existingValue);
         }
       }
+      if (threadLocalIsBatchRequest.get() != null && threadLocalIsBatchRequest.get()) {
+        if (!producers.isEmpty()) {
+          MessageRequest request = new MessageRequest();
+          request.dbName = dbName;
+          request.tableName = tableName;
+          request.recordBytes = recordBytes;
+          request.updateType = UpdateType.insert;
+          threadLocalMessageRequests.get().add(request);
+        }
+      }
+      else {
+        if (Record.DB_VIEW_FLAG_DELETING != Record.getDbViewFlags(recordBytes)) {
+          publishInsertOrUpdate(dbName, tableName, recordBytes, UpdateType.insert);
+        }
+      }
     }
-
-
-    //    if (existingValue == null) {
-    //}
-    //    }
-    //    else {
-    //      byte[][] records = fromUnsafeToRecords(existingValue);
-    //      boolean replaced = false;
-    //      for (int i = 0; i < records.length; i++) {
-    //        if (Arrays.equals(records[i], primaryKeyBytes)) {
-    //          replaced = true;
-    //          break;
-    //        }
-    //      }
-    //      if (!replaced) {
-    //        //logger.info("Replacing: table=" + tableName + ", index=" + indexName + ", key=" + key[0]);
-    //        byte[][] newRecords = new byte[records.length + 1][];
-    //        System.arraycopy(records, 0, newRecords, 0, records.length);
-    //        newRecords[newRecords.length - 1] = recordBytes;
-    //        long address = toUnsafeFromRecords(newRecords);
-    //        freeUnsafeIds(existingValue);
-    //        index.put(key, address);
-    //      }
-    //    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
   }
 
 public enum UpdateType {
@@ -1613,7 +1585,9 @@ class MessageRequest {
         }
         while (true);
       }
+      index.setCount(0);
     }
+
     return null;
   }
 
@@ -1668,6 +1642,16 @@ class MessageRequest {
 //            }
           }
           if (!mismatch) {
+            if (indexName.equals(primaryKeyIndexName)) {
+              if (Record.DB_VIEW_FLAG_DELETING != Record.getDbViewFlags(ids[0])) {
+                index.addAndGetCount(-1);
+              }
+            }
+            else {
+              if (Record.DB_VIEW_FLAG_DELETING != KeyRecord.getDbViewFlags(ids[0])) {
+                index.addAndGetCount(-1);
+              }
+            }
             value = index.remove(key);
             if (value != null) {
               server.freeUnsafeIds(value);
@@ -1678,9 +1662,9 @@ class MessageRequest {
           byte[][] newValues = new byte[ids.length - 1][];
           int offset = 0;
           boolean found = false;
+          byte[] foundBytes = null;
           for (byte[] currValue : ids) {
             boolean mismatch = false;
-//            try {
             KeyRecord keyRecord = new KeyRecord(currValue);
             Object[] lhsKey = new Object[]{keyRecord.getKey()}; // DatabaseCommon.deserializeKey(schema, new DataInputStream(new ByteArrayInputStream(currValue)));
             for (int i = 0; i < lhsKey.length; i++) {
@@ -1688,19 +1672,26 @@ class MessageRequest {
                 mismatch = true;
               }
             }
-//            }
-//            catch (EOFException e) {
-//              throw new DatabaseException(e);
-//            }
 
             if (mismatch) {
               newValues[offset++] = currValue;
             }
             else {
               found = true;
+              foundBytes = currValue;
             }
           }
           if (found) {
+            if (indexName.equals(primaryKeyIndexName)) {
+              if (Record.DB_VIEW_FLAG_DELETING != Record.getDbViewFlags(foundBytes)) {
+                index.addAndGetCount(-1);
+              }
+            }
+            else {
+              if (Record.DB_VIEW_FLAG_DELETING != KeyRecord.getDbViewFlags(foundBytes)) {
+                index.addAndGetCount(-1);
+              }
+            }
             Object newValue = server.toUnsafeFromKeys(newValues);
             index.put(key, newValue);
             if (value != null) {

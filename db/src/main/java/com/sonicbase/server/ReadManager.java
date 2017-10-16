@@ -134,7 +134,7 @@ public class ReadManager {
     }
 
     if (countColumn == null && expression == null) {
-      count = index.size();
+      count = index.getCount();
     }
     else {
       Map.Entry<Object[], Object> entry = index.firstEntry();
@@ -152,6 +152,9 @@ public class ReadManager {
           }
         }
         for (byte[] bytes : records) {
+          if (Record.DB_VIEW_FLAG_DELETING == Record.getDbViewFlags(bytes)) {
+            continue;
+          }
           Record record = new Record(tableSchema);
           record.deserialize(dbName, server.getCommon(), bytes, null, true);
           boolean pass = true;

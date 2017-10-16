@@ -1108,6 +1108,26 @@ public class Repartitioner extends Thread {
                     for (MoveRequest request : list.moveRequests) {
                       if (request.shouldDeleteNow) {
                         synchronized (index.getMutex(request.key)) {
+                          if (isPrimaryKey) {
+                            byte[][] content = databaseServer.fromUnsafeToRecords(index.get(request.key));
+                            if (content != null) {
+                              for (byte[] bytes : content) {
+                                if (Record.DB_VIEW_FLAG_DELETING != Record.getDbViewFlags(bytes)) {
+                                  index.addAndGetCount(-1);
+                                }
+                              }
+                            }
+                          }
+                          else {
+                            byte[][] content = databaseServer.fromUnsafeToKeys(index.get(request.key));
+                            if (content != null) {
+                              for (byte[] bytes : content) {
+                                if (Record.DB_VIEW_FLAG_DELETING != KeyRecord.getDbViewFlags(bytes)) {
+                                  index.addAndGetCount(-1);
+                                }
+                              }
+                            }
+                          }
                           Object value = index.remove(request.key);
                           if (value != null) {
                             //toFree.add(value);
@@ -1529,6 +1549,9 @@ public class Repartitioner extends Thread {
             if (indexSchema.isPrimaryKey()) {
               byte[][] newContent = new byte[content.length][];
               for (int i = 0; i < content.length; i++) {
+                if (Record.DB_VIEW_FLAG_DELETING != Record.getDbViewFlags(content[i])) {
+                  index.addAndGetCount(-1);
+                }
                 Record.setDbViewFlags(content[i], Record.DB_VIEW_FLAG_DELETING);
                 Record.setDbViewNumber(content[i], common.getSchemaVersion());
                 newContent[i] = content[i];
@@ -1541,6 +1564,9 @@ public class Repartitioner extends Thread {
             else {
               byte[][] newContent = new byte[content.length][];
               for (int i = 0; i < content.length; i++) {
+                if (Record.DB_VIEW_FLAG_DELETING != KeyRecord.getDbViewFlags(content[i])) {
+                  index.addAndGetCount(-1);
+                }
                 KeyRecord.setDbViewFlags(content[i], Record.DB_VIEW_FLAG_DELETING);
                 KeyRecord.setDbViewNumber(content[i], common.getSchemaVersion());
                 newContent[i] = content[i];
@@ -1600,6 +1626,7 @@ public class Repartitioner extends Thread {
     int consecutiveErrors = 0;
     final List<Object> toFree = new ArrayList<>();
     int lockCount = 0;
+    AtomicInteger countDeleted = new AtomicInteger();
     try {
       for (MapEntry entry : toProcess) {
         try {
@@ -1633,12 +1660,15 @@ public class Repartitioner extends Thread {
                   byte[][] newContent = new byte[content.length][];
                   for (int i = 0; i < content.length; i++) {
                     byte[] newBytes = new byte[content[i].length];
+                    long existindDbFlags = Record.getDbViewFlags(content[i]);
+                    if (existindDbFlags != Record.DB_VIEW_FLAG_DELETING) {
+                      countDeleted.incrementAndGet();
+                    }
                     System.arraycopy(content[i], 0, newBytes, 0, content[i].length);
                     Record.setDbViewFlags(newBytes, Record.DB_VIEW_FLAG_DELETING);
                     Record.setDbViewNumber(newBytes, common.getSchemaVersion());
                     newContent[i] = newBytes;
                   }
-                  //toFree.add(entry.value);
                   Object newValue = databaseServer.toUnsafeFromRecords(newContent);
                   index.put(entry.key, newValue);
                   databaseServer.freeUnsafeIds(entry.value);
@@ -1647,6 +1677,10 @@ public class Repartitioner extends Thread {
                   byte[][] newContent = new byte[content.length][];
                   for (int i = 0; i < content.length; i++) {
                     byte[] newBytes = new byte[content[i].length];
+                    long existindDbFlags = KeyRecord.getDbViewFlags(content[i]);
+                    if (existindDbFlags != Record.DB_VIEW_FLAG_DELETING) {
+                      countDeleted.incrementAndGet();
+                    }
                     System.arraycopy(content[i], 0, newBytes, 0, content[i].length);
                     KeyRecord.setDbViewFlags(newBytes, Record.DB_VIEW_FLAG_DELETING);
                     KeyRecord.setDbViewNumber(newBytes, common.getSchemaVersion());
@@ -1745,6 +1779,8 @@ public class Repartitioner extends Thread {
     catch (Exception e) {
       throw new DatabaseException(e);
     }
+
+    index.addAndGetCount(-1 * countDeleted.get());
 
     for (MoveRequestList requestList : lists) {
       try {

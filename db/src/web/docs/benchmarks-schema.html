@@ -7,6 +7,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
     <script type="text/javascript" src="../javascript/main.js"></script>
+
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
 </head>
 
 <body>
@@ -82,15 +86,17 @@
 </table>
 
 <br/>
-for (int offset = 0; offset < 100000000; offset++) {<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;PreparedStatement stmt = conn.prepareStatement("insert into persons (id1, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;stmt.setLong(1, offset);<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;stmt.setLong(2, (offset + 100) % 2);<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;stmt.setString(3, "933-28-" + offset);<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;stmt.setBoolean(5, false);<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;stmt.setString(6, "m");<br/>
+        <pre class="java"><code>
+for (int offset = 0; offset < 100000000; offset++) {
+    PreparedStatement stmt = conn.prepareStatement("insert into persons (id1, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
+    stmt.setLong(1, offset);
+    stmt.setLong(2, (offset + 100) % 2);
+    stmt.setString(3, "933-28-" + offset);
+    stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+    stmt.setBoolean(5, false);
+    stmt.setString(6, "m");
 }<br/>
+            </code></pre>
 <br/>
 <br/>
 <h2>Memberships Table</h2>
@@ -128,17 +134,19 @@ for (int offset = 0; offset < 100000000; offset++) {<br/>
 <br/>
 <br/>
 
-&nbsp;&nbsp;&nbsp;&nbsp;for (int i = 0; i < 100000000; i++) {<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for (int j = 0; j < 2; j++) {<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stmt = conn.prepareStatement("insert into Memberships (personId, personId2, membershipName, resortId) VALUES (?, ?, ?, ?)");<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;long id1 = offset + i;<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;long id2 = j;<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stmt.setLong(1, id1);<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stmt.setLong(2, id2);<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stmt.setString(3, "membership-" + j);<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stmt.setLong(4, new long[]{1000, 2000}[j % 2]);<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+        <pre class="java"><code>
+for (int i = 0; i < 100000000; i++)
+    for (int j = 0; j < 2; j++) {
+        stmt = conn.prepareStatement("insert into Memberships (personId, personId2, membershipName, resortId) VALUES (?, ?, ?, ?)");
+        long id1 = offset + i;
+        long id2 = j;
+        stmt.setLong(1, id1);
+        stmt.setLong(2, id2);
+        stmt.setString(3, "membership-" + j);
+        stmt.setLong(4, new long[]{1000, 2000}[j % 2]);
+    }
+}<br/>
+            </code></pre>
 <br/><br/>
 
 <h2>Resorts Table</h2>
@@ -166,15 +174,17 @@ for (int offset = 0; offset < 100000000; offset++) {<br/>
 </table>
 
 <br/>
-&nbsp;&nbsp;&nbsp;&nbsp;PreparedStatement stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;stmt.setLong(1, 1000);<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;stmt.setString(2, "resort-1000");<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;assertEquals(stmt.executeUpdate(), 1);<br/>
+        <pre class="java"><code>
+PreparedStatement stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");
+stmt.setLong(1, 1000);
+stmt.setString(2, "resort-1000");
+assertEquals(stmt.executeUpdate(), 1);
 <br/>
-&nbsp;&nbsp;&nbsp;&nbsp;stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;stmt.setLong(1, 2000);<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;stmt.setString(2, "resort-2000");<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;assertEquals(stmt.executeUpdate(), 1);<br/>
+stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");
+stmt.setLong(1, 2000);
+stmt.setString(2, "resort-2000");
+assertEquals(stmt.executeUpdate(), 1);<br/>
+        </code></pre>
 <br/>
 </div>
 </div>

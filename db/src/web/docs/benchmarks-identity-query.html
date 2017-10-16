@@ -8,6 +8,10 @@
     <meta name="description" content="In this benchmark we read records by id from the database one record at a time on a 4, 8, 16, 32 server cluster.">
     <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
     <script type="text/javascript" src="../javascript/main.js"></script>
+
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
 </head>
 
 <body>
@@ -44,13 +48,14 @@
 <h1>Identity Query Benchmark</h1>
 In this benchmark we read records by id from the database one record at a time on a 4, 8, 16 and 32 server cluster.<br/>
 <br/>
-	for (int i = 0; ; i++) {<br/>
-	&nbsp;&nbsp;&nbsp;&nbsp;PreparedStatement stmt = con.prepareStatement("select id from persons where persons.id=?")<br/>
-	&nbsp;&nbsp;&nbsp;&nbsp;stmt.setLong(1, i);<br/>
-	&nbsp;&nbsp;&nbsp;&nbsp;ResultSet rs = stmt.executeQuery();<br/>
-	&nbsp;&nbsp;&nbsp;&nbsp;rs.next();<br/>
-	}<br/><br/>
-	
+        <pre class="java"><code>
+for (int i = 0; ; i++) {
+    PreparedStatement stmt = con.prepareStatement("select id from persons where persons.id=?")
+    stmt.setLong(1, i);<
+    ResultSet rs = stmt.executeQuery();
+    rs.next();
+}<br/>
+	</code></pre>
 		<div class="mylink">
 	<a href="benchmarks-schema.html?framed=true">Schema and Insert Code</a><br/><br/>
 	</div>

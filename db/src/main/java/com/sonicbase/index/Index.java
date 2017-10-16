@@ -29,6 +29,7 @@ public class Index {
   private Object[] mutexes = new Object[100_000];
 
   private boolean fastUtil = false;
+  private AtomicLong count = new AtomicLong();
 
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP", justification = "copying the returned data is too slow")
   public Comparator[] getComparators() {
@@ -436,6 +437,18 @@ public class Index {
       size.incrementAndGet();
     }
     return ret;
+  }
+
+  public long getCount() {
+    return count.get();
+  }
+
+  public void addAndGetCount(int count) {
+    this.count.addAndGet(count);
+  }
+
+  public void setCount(int count) {
+    this.count.set(count);
   }
 
   public interface Visitor {

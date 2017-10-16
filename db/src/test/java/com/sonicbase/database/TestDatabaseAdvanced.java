@@ -1279,7 +1279,7 @@ public class TestDatabaseAdvanced {
     ResultSet ret = stmt.executeQuery();
 
     ret.next();
-    assertEquals(ret.getLong(1), 7);
+    assertEquals(ret.getLong(1), 2);
   }
 
   @Test

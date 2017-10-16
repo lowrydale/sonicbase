@@ -250,6 +250,7 @@ public class SnapshotManager {
                                                   }
 
                                                   index.put(key, address);
+                                                  index.addAndGetCount(1);
 
                                                   countForFile++;
                                                   recoveredCount.incrementAndGet();

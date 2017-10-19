@@ -240,6 +240,9 @@ public class DataType {
       if (value instanceof Boolean) {
         return value;
       }
+      if (value instanceof byte[]) {
+        return new String((byte[])value).equalsIgnoreCase("true");
+      }
       long ret = (Long) longConverter.convert(value);
       return ret == 1;
     }
@@ -455,6 +458,12 @@ public class DataType {
       }
       if (o2 == null) {
         return 1;
+      }
+      if (!(o1 instanceof Boolean)) {
+        o1 = booleanConverter.convert(o1);
+      }
+      if (!(o2 instanceof Boolean)) {
+        o2 = booleanConverter.convert(o2);
       }
       if (!(o1 instanceof Boolean) || !(o2 instanceof Boolean)) {
         throw new DatabaseException("Incompatible datatypes: lhs=" + o1.getClass().getName() + ", rhs=" + o2.getClass());

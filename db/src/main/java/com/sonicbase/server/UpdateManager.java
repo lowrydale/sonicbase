@@ -89,12 +89,41 @@ public class UpdateManager {
   }
 
   public ComObject deleteIndexEntry(ComObject cobj, boolean replayedCommand) {
+
+    AtomicBoolean isExplicitTrans = new AtomicBoolean();
+    AtomicLong transactionId = new AtomicLong();
+
+
+    doDeleteIndexEntry(cobj, replayedCommand, isExplicitTrans, transactionId, false);
+
+    if (isExplicitTrans.get()) {
+      Transaction trans = server.getTransactionManager().getTransaction(transactionId.get());
+      String command = "DatabaseServer:ComObject:deleteIndexEntryByKey:";
+      trans.addOperation(deleteIndexEntry, command, cobj.serialize(), replayedCommand);
+    }
+
+    return null;
+  }
+
+  private void doDeleteIndexEntry(ComObject cobj, boolean replayedCommand, AtomicBoolean isExplicitTransRet,
+                                  AtomicLong transactionIdRet, boolean isCommitting) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     String tableName = cobj.getString(ComObject.Tag.tableName);
     int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
     if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
       throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
     }
+
+    boolean isExplicitTrans = cobj.getBoolean(ComObject.Tag.isExcpliciteTrans);
+    //boolean isCommitting = Boolean.valueOf(parts[9]);
+    long transactionId = cobj.getLong(ComObject.Tag.transactionId);
+    if (isExplicitTrans && isExplicitTransRet != null) {
+      isExplicitTransRet.set(true);
+      transactionIdRet.set(transactionId);
+    }
+
+    AtomicBoolean shouldExecute = new AtomicBoolean();
+    AtomicBoolean shouldDeleteLock = new AtomicBoolean();
 
     TableSchema tableSchema = server.getCommon().getSchema(dbName).getTables().get(tableName);
     Record record = new Record(tableSchema);
@@ -131,18 +160,29 @@ public class UpdateManager {
             }
           }
         }
-        Index index = server.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexSchema.getKey());
-        synchronized (index.getMutex(key)) {
-          Object obj = index.remove(key);
-          if (obj == null) {
-            continue;
+        if (indexSchema.getValue().isPrimaryKey()) {
+          server.getTransactionManager().preHandleTransaction(dbName, tableName, indexSchema.getKey(), isExplicitTrans, isCommitting,
+              transactionId, key, shouldExecute, shouldDeleteLock);
+        }
+
+        if (shouldExecute.get()) {
+          Index index = server.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexSchema.getKey());
+          synchronized (index.getMutex(key)) {
+            Object obj = index.remove(key);
+            if (obj == null) {
+              continue;
+            }
+            server.freeUnsafeIds(obj);
           }
-          server.freeUnsafeIds(obj);
+        }
+
+        if (indexSchema.getValue().isPrimaryKey()) {
+          if (shouldDeleteLock.get()) {
+            server.getTransactionManager().deleteLock(dbName, tableName, indexSchema.getKey(), transactionId, tableSchema, key);
+          }
         }
       }
     }
-
-    return null;
   }
 
   public ComObject populateIndex(ComObject cobj, boolean replayedCommand) {
@@ -265,7 +305,7 @@ public class UpdateManager {
     if (isExplicitTrans.get()) {
       Transaction trans = server.getTransactionManager().getTransaction(transactionId.get());
       String command = "DatabaseServer:ComObject:deleteIndexEntryByKey:";
-      trans.addOperation(delete, command, cobj.serialize(), replayedCommand);
+      trans.addOperation(deleteEntryByKey, command, cobj.serialize(), replayedCommand);
     }
     return ret;
   }
@@ -912,9 +952,16 @@ private static class InsertRequest {
             case update:
               doUpdateRecord(new ComObject(op.getBody()), op.getReplayed(), null, null, true);
               break;
-            case delete:
+            case deleteEntryByKey:
               doDeleteIndexEntryByKey(new ComObject(op.getBody()), op.getReplayed(), null, null, true);
               break;
+            case deleteRecord:
+              doDeleteRecord(new ComObject(op.getBody()), op.getReplayed(), null, null, true);
+              break;
+            case deleteIndexEntry:
+              doDeleteIndexEntry(new ComObject(op.getBody()), op.getReplayed(), null, null, true);
+              break;
+
           }
         }
         catch (EOFException e) {
@@ -1503,17 +1550,53 @@ class MessageRequest {
 
   public ComObject deleteRecord(ComObject cobj, boolean replayedCommand) {
     try {
-      String dbName = cobj.getString(ComObject.Tag.dbName);
-      String tableName = cobj.getString(ComObject.Tag.tableName);
-      String indexName = cobj.getString(ComObject.Tag.indexName);
-      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
-      if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
-        throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
+      AtomicBoolean isExplicitTrans = new AtomicBoolean();
+      AtomicLong transactionId = new AtomicLong();
+
+      doDeleteRecord(cobj, replayedCommand, isExplicitTrans, transactionId, false);
+
+      if (isExplicitTrans.get()) {
+        Transaction trans = server.getTransactionManager().getTransaction(transactionId.get());
+        String command = "DatabaseServer:ComObject:deleteIndexEntryByKey:";
+        trans.addOperation(deleteRecord, command, cobj.serialize(), replayedCommand);
       }
 
-      TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
-      byte[] keyBytes = cobj.getByteArray(ComObject.Tag.keyBytes);
-      Object[] key = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
+      return null;
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  private void doDeleteRecord(ComObject cobj, boolean replayedCommand, AtomicBoolean isExplicitTransRet,
+                              AtomicLong transactionIdRet, boolean isCommitting) throws EOFException {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
+    String tableName = cobj.getString(ComObject.Tag.tableName);
+    String indexName = cobj.getString(ComObject.Tag.indexName);
+    int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
+    if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
+      throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
+    }
+
+    boolean isExplicitTrans = cobj.getBoolean(ComObject.Tag.isExcpliciteTrans);
+    //boolean isCommitting = Boolean.valueOf(parts[9]);
+    long transactionId = cobj.getLong(ComObject.Tag.transactionId);
+    if (isExplicitTrans && isExplicitTransRet != null) {
+      isExplicitTransRet.set(true);
+      transactionIdRet.set(transactionId);
+    }
+
+    AtomicBoolean shouldExecute = new AtomicBoolean();
+    AtomicBoolean shouldDeleteLock = new AtomicBoolean();
+
+    TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
+    byte[] keyBytes = cobj.getByteArray(ComObject.Tag.keyBytes);
+    Object[] key = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
+
+    server.getTransactionManager().preHandleTransaction(dbName, tableName, indexName, isExplicitTrans,
+        isCommitting, transactionId, key, shouldExecute, shouldDeleteLock);
+
+    if (shouldExecute.get()) {
 
       byte[][] bytes = null;
       Index index = server.getIndices(dbName).getIndices().get(tableName).get(indexName);
@@ -1528,15 +1611,16 @@ class MessageRequest {
       }
 
       if (bytes != null) {
-        for (byte[] innerBytes : bytes) {
-          publishInsertOrUpdate(dbName, tableName, innerBytes, UpdateType.delete);
+        if (tableSchema.getIndices().get(indexName).isPrimaryKey()) {
+          for (byte[] innerBytes : bytes) {
+            publishInsertOrUpdate(dbName, tableName, innerBytes, UpdateType.delete);
+          }
         }
       }
-
-      return null;
     }
-    catch (Exception e) {
-      throw new DatabaseException(e);
+
+    if (shouldDeleteLock.get()) {
+      server.getTransactionManager().deleteLock(dbName, tableName, indexName, transactionId, tableSchema, key);
     }
   }
 

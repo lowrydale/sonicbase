@@ -1,7 +1,10 @@
 package com.sonicbase.database;
 
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.KeyRecord;
+import com.sonicbase.index.Index;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
+import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.util.JsonArray;
 import com.sonicbase.util.JsonDict;
@@ -12,15 +15,14 @@ import org.testng.annotations.Test;
 
 import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.UnsupportedEncodingException;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 /**
  * Responsible for
@@ -108,6 +110,77 @@ public class TestTransactions {
     assertEquals(count, 1);
 
     conn.commit();
+
+  }
+
+  @Test
+  public void testDelete() throws SQLException, InterruptedException, UnsupportedEncodingException {
+    PreparedStatement stmt = conn.prepareStatement("create table secondary_delete (id BIGINT, make VARCHAR(1024), model VARCHAR(1024))");
+    stmt.executeUpdate();
+
+    stmt = conn.prepareStatement("create index make_model on secondary_delete(make, model)");
+    stmt.executeUpdate();
+
+    for (int i = 0; i < recordCount; i++) {
+      stmt = conn.prepareStatement("insert into secondary_delete (id, make, model) VALUES (?, ?, ?)");
+      stmt.setLong(1, i);
+      stmt.setString(2, "make-" + i);
+      stmt.setString(3, "model-" + i);
+      assertEquals(stmt.executeUpdate(), 1);
+    }
+
+
+    conn.setAutoCommit(false);
+
+    Index index = DatabaseServer.getServers().get(0).get(0).getIndices().get("test").getIndices().get("secondary_delete").get("_2_make_model");
+    Object value = index.get(new Object[]{"make-0".getBytes("utf-8")});
+    byte[][] keys = DatabaseServer.getServers().get(0).get(0).fromUnsafeToKeys(value);
+
+    index = DatabaseServer.getServers().get(0).get(0).getIndices().get("test").getIndices().get("secondary_delete").get("_1__primarykey");
+    TableSchema tableSchema = DatabaseServer.getServers().get(0).get(0).getCommon().getTables("test").get("secondary_delete");
+    KeyRecord keyRecord = new KeyRecord(keys[0]);
+    value = index.get(new Object[]{keyRecord.getKey()});
+    assertNotNull(value);
+
+    stmt = conn.prepareStatement("delete from secondary_delete where make=? and model=?");
+    stmt.setString(1,"make-0");
+    stmt.setString(2,"model-0");
+    stmt.executeUpdate();
+
+    Thread thread = new Thread(new Runnable(){
+      @Override
+      public void run() {
+        try {
+          PreparedStatement stmt = conn.prepareStatement("select * from secondary_delete where make='make-0'");
+          ResultSet rs = stmt.executeQuery();
+          assertTrue(rs.next());
+        }
+        catch (SQLException e) {
+          e.printStackTrace();
+        }
+
+      }
+    });
+    thread.start();
+    thread.join();
+
+//    stmt = conn.prepareStatement("select * from secondary_delete where make='make-0'");
+//    ResultSet rs = stmt.executeQuery();
+//    assertFalse(rs.next());
+
+    conn.commit();
+
+    index = DatabaseServer.getServers().get(0).get(0).getIndices().get("test").getIndices().get("secondary_delete").get("_2_make_model");
+    value = index.get(new Object[]{"make-0".getBytes("utf-8")});
+    assertEquals(value, null);
+
+    index = DatabaseServer.getServers().get(0).get(0).getIndices().get("test").getIndices().get("secondary_delete").get("_1__primarykey");
+    value = index.get(new Object[]{keyRecord.getKey()});
+    assertNull(value);
+
+    stmt = conn.prepareStatement("select * from secondary_delete where make='make-0'");
+    ResultSet rs = stmt.executeQuery();
+    assertFalse(rs.next());
 
   }
 

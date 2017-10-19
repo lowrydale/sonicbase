@@ -24,7 +24,9 @@ public class TransactionManager {
     batchInsert,
     insert,
     update,
-    delete
+    deleteRecord,
+    deleteIndexEntry,
+    deleteEntryByKey
   }
 
   private final DatabaseServer server;
@@ -184,7 +186,8 @@ public class TransactionManager {
 
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP2", justification = "copying the passed in data is too slow")
   @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
-  public void preHandleTransaction(String dbName, String tableName, String indexName, boolean isExplicitTrans, boolean isCommitting, long transactionId, Object[] primaryKey,
+  public void preHandleTransaction(String dbName, String tableName, String indexName, boolean isExplicitTrans,
+                                   boolean isCommitting, long transactionId, Object[] primaryKey,
                                    AtomicBoolean shouldExecute,
                                    AtomicBoolean shouldDeleteLock) {
     ConcurrentSkipListMap<Object[], RecordLock> tableLocks = null;

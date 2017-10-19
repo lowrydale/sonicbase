@@ -113,6 +113,9 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
               cobj.put(ComObject.Tag.dbName, dbName);
               cobj.put(ComObject.Tag.tableName, tableName);
               cobj.put(ComObject.Tag.indexName, indexSchema.getName());
+              cobj.put(ComObject.Tag.isExcpliciteTrans, client.isExplicitTrans());
+              cobj.put(ComObject.Tag.isCommitting, client.isCommitting());
+              cobj.put(ComObject.Tag.transactionId, client.getTransactionId());
               cobj.put(ComObject.Tag.method, "deleteRecord");
               String command = "DatabaseServer:ComObject:deleteRecord:";
               client.send("DatabaseServer:deleteRecord", selectedShards.get(0), rand.nextLong(), command, cobj, DatabaseClient.Replica.def);
@@ -122,6 +125,9 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
               cobj.put(ComObject.Tag.dbName, dbName);
               cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
               cobj.put(ComObject.Tag.tableName, tableName);
+              cobj.put(ComObject.Tag.isExcpliciteTrans, client.isExplicitTrans());
+              cobj.put(ComObject.Tag.isCommitting, client.isCommitting());
+              cobj.put(ComObject.Tag.transactionId, client.getTransactionId());
               cobj.put(ComObject.Tag.method, "deleteIndexEntry");
               byte[] bytes = record.serialize(client.getCommon(), SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
               cobj.put(ComObject.Tag.recordBytes, bytes);

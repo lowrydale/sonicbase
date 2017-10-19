@@ -22,6 +22,9 @@
 -keep public class com.sonicbase.misc.RecordValidator {
       public static void main(java.lang.String[]);
 }
+-keep public class com.sonicbase.misc.TestTableScan {
+      public static void main(java.lang.String[]);
+}
 
 -keep public class com.sonicbase.queue.LocalMessageQueueProducer
 -keep public class com.sonicbase.queue.AWSSQSMessageQueueProducer

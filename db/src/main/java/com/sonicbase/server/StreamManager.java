@@ -1,5 +1,10 @@
 package com.sonicbase.server;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.InsufficientLicense;
 import com.sonicbase.common.Logger;
@@ -7,14 +12,14 @@ import com.sonicbase.query.DatabaseException;
 import com.sonicbase.queue.MessageQueueConsumer;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.util.JsonArray;
-import com.sonicbase.util.JsonDict;
 import sun.misc.BASE64Decoder;
 
 import java.math.BigDecimal;
 import java.sql.*;
-import java.sql.Date;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class StreamManager {
@@ -77,8 +82,8 @@ public class StreamManager {
     stopStreaming(cobj);
     shutdown = false;
 
-    final JsonDict config = server.getConfig();
-    JsonDict queueDict = config.getDict("queue");
+    final ObjectNode config = server.getConfig();
+    ObjectNode queueDict = (ObjectNode) config.get("queue");
     logger.info("Starting queue consumers: queue notNull=" + (queueDict != null));
     if (queueDict != null) {
       if (!server.haveProLicense()) {
@@ -86,13 +91,13 @@ public class StreamManager {
       }
       logger.info("Starting queues. Have license");
 
-      JsonArray streams = queueDict.getArray("consumers");
+      ArrayNode streams = queueDict.withArray("consumers");
       if (streams != null) {
         for (int i = 0; i < streams.size(); i++) {
           try {
-            final JsonDict stream = streams.getDict(i);
-            final String className = stream.getString("className");
-            Integer threadCount = stream.getInt("threadCount");
+            final ObjectNode stream = (ObjectNode) streams.get(i);
+            final String className = stream.get("className").asText();
+            Integer threadCount = stream.get("threadCount").asInt();
             if (threadCount == null) {
               threadCount = 1;
             }
@@ -144,11 +149,12 @@ public class StreamManager {
   private void processMessages(MessageQueueConsumer consumer, List<com.sonicbase.queue.Message> messages) {
     for (com.sonicbase.queue.Message messageObj : messages) {
       try {
-        JsonDict message = new JsonDict(messageObj.getBody());
-        String dbName = message.getString("database");
+        ObjectMapper mapper = new ObjectMapper();
+        ObjectNode message = (ObjectNode) mapper.readTree(messageObj.getBody());
+        String dbName = message.get("database").asText();
         initConnection(dbName);
-        String tableName = message.getString("table");
-        String action = message.getString("action");
+        String tableName = message.get("table").asText();
+        String action = message.get("action").asText();
         final TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
         final List<FieldSchema> fields = tableSchema.getFields();
         if (action.equals("upsert")) {
@@ -175,9 +181,9 @@ public class StreamManager {
               ") VALUES (" + parmsStr.toString() + ")");
           try {
 
-            JsonArray records = message.getArray("records");
+            ArrayNode records = message.withArray("records");
             for (int i = 0; i < records.size(); i++) {
-              JsonDict json = records.getDict(i);
+              ObjectNode json = (ObjectNode) records.get(i);
               Object[] record = getCurrRecordFromJson(json, fields);
               BulkImportManager.setFieldsInInsertStatement(stmt, record, fields);
 
@@ -190,14 +196,16 @@ public class StreamManager {
           }
         }
         else if (action.equals("delete")) {
-          JsonArray records = message.getArray("records");
+          ArrayNode records = message.withArray("records");
           for (int i = 0; i < records.size(); i++) {
-            JsonDict json = records.getDict(i);
+            ObjectNode json = (ObjectNode) records.get(i);
 
             List<FieldSchema> specifiedFields = new ArrayList<>();
             String str = "delete from " + tableName + " where ";
             int offset = 0;
-            for (Map.Entry<String, Object> entry : json.getEntrySet()) {
+            Iterator<Map.Entry<String, JsonNode>> iterator = json.fields();
+            while (iterator.hasNext()) {
+              Map.Entry<String, JsonNode> entry = iterator.next();
               if (offset != 0) {
                 str += " AND ";
               }
@@ -249,15 +257,15 @@ public class StreamManager {
 
   private Connection doInitConnection(String dbName) {
     try {
-      JsonDict dict = server.getConfig();
-      JsonDict databaseDict = dict;
-      JsonArray array = databaseDict.getArray("shards");
-      JsonDict replicaDict = array.getDict(0);
-      JsonArray replicasArray = replicaDict.getArray("replicas");
-      final String address = databaseDict.getBoolean("clientIsPrivate") ?
-          replicasArray.getDict(0).getString("privateAddress") :
-          replicasArray.getDict(0).getString("publicAddress");
-      final int port = replicasArray.getDict(0).getInt("port");
+      ObjectNode dict = server.getConfig();
+      ObjectNode databaseDict = dict;
+      ArrayNode array = databaseDict.withArray("shards");
+      ObjectNode replicaDict = (ObjectNode) array.get(0);
+      ArrayNode replicasArray = replicaDict.withArray("replicas");
+      final String address = databaseDict.get("clientIsPrivate").asBoolean() ?
+          replicasArray.get(0).get("privateAddress").asText() :
+          replicasArray.get(0).get("publicAddress").asText();
+      final int port = replicasArray.get(0).get("port").asInt();
 
       Class.forName("com.sonicbase.jdbcdriver.Driver");
       return DriverManager.getConnection("jdbc:sonicbase:" + address + ":" + port + "/" + dbName);
@@ -267,11 +275,13 @@ public class StreamManager {
     }
   }
 
-  public static Object[] getCurrRecordFromJson(JsonDict json, List<FieldSchema> fields) throws SQLException {
+  public static Object[] getCurrRecordFromJson(ObjectNode json, List<FieldSchema> fields) throws SQLException {
 
-    JsonDict newJson = new JsonDict();
-    for (Map.Entry<String, Object> entry : json.getEntrySet()) {
-      newJson.putObject(entry.getKey().toLowerCase(), entry.getValue());
+    ObjectNode newJson = new ObjectNode(JsonNodeFactory.instance);
+    Iterator<Map.Entry<String, JsonNode>> iterator = json.fields();
+    while (iterator.hasNext()) {
+      Map.Entry<String, JsonNode> entry = iterator.next();
+      newJson.put(entry.getKey().toLowerCase(), entry.getValue());
     }
     json = newJson;
 
@@ -285,191 +295,272 @@ public class StreamManager {
         }
         switch (field.getType()) {
           case BIT: {
-            Boolean value = json.getBoolean(fieldName);
-            if (value != null) {
-              currRecord[offset] = value;
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              Boolean value = node.asBoolean();
+              if (value != null) {
+                currRecord[offset] = value;
+              }
             }
           }
           break;
           case TINYINT: {
-            Integer value = json.getInt(fieldName);
-            if (value != null) {
-              currRecord[offset] = (byte) (int) value;
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              Integer value = node.asInt();
+              if (value != null) {
+                currRecord[offset] = (byte) (int) value;
+              }
             }
           }
           break;
           case SMALLINT: {
-            Integer value = json.getInt(fieldName);
-            if (value != null) {
-              currRecord[offset] = (short) (int) value;
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              Integer value = node.asInt();
+              if (value != null) {
+                currRecord[offset] = (short) (int) value;
+              }
             }
           }
           break;
           case INTEGER: {
-            Integer value = json.getInt(fieldName);
-            if (value != null) {
-              currRecord[offset] = value;
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              Integer value = node.asInt();
+              if (value != null) {
+                currRecord[offset] = value;
+              }
             }
           }
           break;
           case BIGINT: {
-            Long value = json.getLong(fieldName);
-            if (value != null) {
-              currRecord[offset] = value;
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              Long value = node.asLong();
+              if (value != null) {
+                currRecord[offset] = value;
+              }
             }
           }
           break;
           case FLOAT: {
-            Double value = json.getDouble(fieldName);
-            if (value != null) {
-              currRecord[offset] = value;
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              Double value = node.asDouble();
+              if (value != null) {
+                currRecord[offset] = value;
+              }
             }
           }
           break;
           case REAL: {
-            Double value = json.getDouble(fieldName);
-            if (value != null) {
-              currRecord[offset] = (float) (double) value;
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              Double value = node.asDouble();
+              if (value != null) {
+                currRecord[offset] = (float) (double) value;
+              }
             }
           }
           break;
           case DOUBLE: {
-            Double value = json.getDouble(fieldName);
-            if (value != null) {
-              currRecord[offset] = value;
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              Double value = node.asDouble();
+              if (value != null) {
+                currRecord[offset] = value;
+              }
             }
           }
           break;
           case NUMERIC: {
-            String value = json.getString(fieldName);
-            if (value != null) {
-              currRecord[offset] = new BigDecimal(value);
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              String value = node.asText();
+              if (value != null) {
+                currRecord[offset] = new BigDecimal(value);
+              }
             }
           }
           break;
           case DECIMAL: {
-            String value = json.getString(fieldName);
-            if (value != null) {
-              currRecord[offset] = new BigDecimal(value);
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              String value = node.asText();
+              if (value != null) {
+                currRecord[offset] = new BigDecimal(value);
+              }
             }
           }
           break;
           case CHAR: {
-            String value = json.getString(fieldName);
-            if (value != null) {
-              currRecord[offset] = value;
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              String value = node.asText();
+              if (value != null) {
+                currRecord[offset] = value;
+              }
             }
           }
           break;
           case VARCHAR: {
-            String value = json.getString(fieldName);
-            if (value != null) {
-              currRecord[offset] = value;
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              String value = node.asText();
+              if (value != null) {
+                currRecord[offset] = value;
+              }
             }
           }
           break;
           case LONGVARCHAR: {
-            String value = json.getString(fieldName);
-            if (value != null) {
-              currRecord[offset] = value;
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              String value = node.asText();
+              if (value != null) {
+                currRecord[offset] = value;
+              }
             }
           }
           break;
           case DATE: {
-            String value = json.getString(fieldName);
-            if (value != null) {
-              currRecord[offset] = Date.valueOf(value);
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              String value = node.asText();
+              if (value != null) {
+                currRecord[offset] = Date.valueOf(value);
+              }
             }
           }
           break;
           case TIME: {
-            String value = json.getString(fieldName);
-            if (value != null) {
-              currRecord[offset] = Time.valueOf(value);
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              String value = node.asText();
+              if (value != null) {
+                currRecord[offset] = Time.valueOf(value);
+              }
             }
           }
           break;
           case TIMESTAMP: {
-            String value = json.getString(fieldName);
-            if (value != null) {
-              currRecord[offset] = Timestamp.valueOf(value);
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              String value = node.asText();
+              if (value != null) {
+                currRecord[offset] = Timestamp.valueOf(value);
+              }
             }
           }
           break;
           case BINARY: {
-            String value = json.getString(fieldName);
-            if (value != null) {
-              currRecord[offset] = new BASE64Decoder().decodeBuffer(value);
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              String value = node.asText();
+              if (value != null) {
+                currRecord[offset] = new BASE64Decoder().decodeBuffer(value);
+              }
             }
           }
           break;
           case VARBINARY: {
-            String value = json.getString(fieldName);
-            if (value != null) {
-              currRecord[offset] = new BASE64Decoder().decodeBuffer(value);
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              String value = node.asText();
+              if (value != null) {
+                currRecord[offset] = new BASE64Decoder().decodeBuffer(value);
+              }
             }
           }
           break;
           case LONGVARBINARY: {
-            String value = json.getString(fieldName);
-            if (value != null) {
-              currRecord[offset] = new BASE64Decoder().decodeBuffer(value);
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              String value = node.asText();
+              if (value != null) {
+                currRecord[offset] = new BASE64Decoder().decodeBuffer(value);
+              }
             }
           }
           break;
           case BLOB: {
-            String value = json.getString(fieldName);
-            if (value != null) {
-              currRecord[offset] = new BASE64Decoder().decodeBuffer(value);
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              String value = node.asText();
+              if (value != null) {
+                currRecord[offset] = new BASE64Decoder().decodeBuffer(value);
+              }
             }
           }
           break;
           case CLOB: {
-            String value = json.getString(fieldName);
-            if (value != null) {
-              currRecord[offset] = value;
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              String value = node.asText();
+              if (value != null) {
+                currRecord[offset] = value;
+              }
             }
           }
           break;
           case BOOLEAN: {
-            Boolean value = json.getBoolean(fieldName);
-            if (value != null) {
-              currRecord[offset] = value;
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              Boolean value = node.asBoolean();
+              if (value != null) {
+                currRecord[offset] = value;
+              }
             }
           }
           break;
           case ROWID: {
-            Long value = json.getLong(fieldName);
-            if (value != null) {
-              currRecord[offset] = value;
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              Long value = node.asLong();
+              if (value != null) {
+                currRecord[offset] = value;
+              }
             }
           }
           break;
           case NCHAR: {
-            String value = json.getString(fieldName);
-            if (value != null) {
-              currRecord[offset] = value;
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              String value = node.asText();
+              if (value != null) {
+                currRecord[offset] = value;
+              }
             }
           }
           break;
           case NVARCHAR: {
-            String value = json.getString(fieldName);
-            if (value != null) {
-              currRecord[offset] = value;
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              String value = node.asText();
+              if (value != null) {
+                currRecord[offset] = value;
+              }
             }
           }
           break;
           case LONGNVARCHAR: {
-            String value = json.getString(fieldName);
-            if (value != null) {
-              currRecord[offset] = value;
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              String value = node.asText();
+              if (value != null) {
+                currRecord[offset] = value;
+              }
             }
           }
           break;
           case NCLOB: {
-            String value = json.getString(fieldName);
-            if (value != null) {
-              currRecord[offset] = value;
+            JsonNode node = json.get(fieldName);
+            if (node != null) {
+              String value = node.asText();
+              if (value != null) {
+                currRecord[offset] = value;
+              }
             }
           }
           break;

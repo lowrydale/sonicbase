@@ -1,13 +1,13 @@
 package com.sonicbase.database;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.common.ComObject;
-import com.sonicbase.query.DatabaseException;
-import com.sonicbase.research.socket.NettyServer;
 import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.server.LogManager;
-import com.sonicbase.util.JsonArray;
-import com.sonicbase.util.JsonDict;
-import com.sonicbase.util.StreamUtils;
+import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.util.FileUtils;
 import org.testng.annotations.Test;
 
@@ -32,7 +32,7 @@ public class TestLongManagerLostEntries {
   AtomicInteger countPlayed = new AtomicInteger();
 
   class MonitorServer extends DatabaseServer {
-    public byte[] handleCommand(final String command, final byte[] body, long logSequence0, long logSequence1,
+    public byte[] invokeMethod(final byte[] body, long logSequence0, long logSequence1,
                                 boolean replayedCommand, boolean enableQueuing, AtomicLong timeLogging, AtomicLong handlerTime) {
       if (replayedCommand) {
         if (countPlayed.incrementAndGet() % 10000 == 0) {
@@ -44,19 +44,21 @@ public class TestLongManagerLostEntries {
           System.out.println("Value already set");
         }
       }
-      return super.handleCommand(command, body, logSequence0, logSequence1, replayedCommand, enableQueuing, timeLogging, handlerTime);
+      return super.invokeMethod(body, logSequence0, logSequence1, replayedCommand, enableQueuing, timeLogging, handlerTime);
     }
   }
 
   @Test
   public void test() throws IOException, InterruptedException {
-    String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")));
-    final JsonDict config = new JsonDict(configStr);
-
-    JsonArray array = config.putArray("licenseKeys");
-    array.add(DatabaseServer.FOUR_SERVER_LICENSE);
+    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
+    ObjectMapper mapper = new ObjectMapper();
+    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+
+    ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
+    array.add(DatabaseServer.FOUR_SERVER_LICENSE);
+    config.put("licenseKeys", array);
 
     DatabaseServer.getServers().clear();
 
@@ -91,7 +93,6 @@ public class TestLongManagerLostEntries {
     AtomicLong timeLogging = new AtomicLong();
     List<DatabaseServer.LogRequest> requests = new ArrayList<>();
     for (int i = 0; i < countToProcess; i++) {
-      String command = "DatabaseServer:ComObject:echoWrite:";
       if (i % 1000 == 0) {
         Thread.sleep(100);
       }
@@ -101,7 +102,7 @@ public class TestLongManagerLostEntries {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.countLong, (long)i);
       cobj.put(ComObject.Tag.method, "echoWrite");
-      requests.add(logManager.logRequest(command, cobj.serialize(), true, "echoWrite", (long)i, (long)i, timeLogging));
+      requests.add(logManager.logRequest(cobj.serialize(), true, "echoWrite", (long)i, (long)i, timeLogging));
     }
 
     for (DatabaseServer.LogRequest request : requests) {

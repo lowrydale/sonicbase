@@ -1,7 +1,7 @@
 package com.sonicbase.schema;
 
-import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.query.DatabaseException;
+import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.server.SnapshotManager;
 
 import java.io.DataInputStream;
@@ -31,7 +31,7 @@ public class Schema {
   public void serialize(DataOutputStream out) {
     try {
       synchronized (schemaMutex) {
-        out.writeShort(SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+        out.writeShort(DatabaseServer.SERIALIZATION_VERSION);
         out.writeInt(tables.size());
         for (TableSchema table : tables.values()) {
           table.serialize(out);

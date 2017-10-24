@@ -1,20 +1,20 @@
 package com.sonicbase.database;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.server.DatabaseServer;
-import com.sonicbase.util.JsonArray;
-import com.sonicbase.util.JsonDict;
-import com.sonicbase.util.StreamUtils;
+import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.util.FileUtils;
 import org.junit.Test;
 
 import java.io.BufferedInputStream;
 import java.io.File;
-import java.io.IOException;
 import java.sql.*;
-import java.text.ParseException;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -32,7 +32,7 @@ public class TestSnapshotManagerLostEntries {
   int recordCount = 10_000_000;
 
   class MonitorServer extends DatabaseServer {
-    public byte[] handleCommand(final String command, final byte[] body, long logSequence0, long logSequence1,
+    public byte[] invokeMethod(final byte[] body, long logSequence0, long logSequence1,
                                 boolean replayedCommand, boolean enableQueuing, AtomicLong timeLogging, AtomicLong handlerTime) {
       if (replayedCommand) {
         if (countPlayed.incrementAndGet() % 10000 == 0) {
@@ -44,20 +44,22 @@ public class TestSnapshotManagerLostEntries {
           System.out.println("Value already set");
         }
       }
-      return super.handleCommand(command, body, logSequence0, logSequence1, replayedCommand, enableQueuing, timeLogging, handlerTime);
+      return super.invokeMethod(body, logSequence0, logSequence1, replayedCommand, enableQueuing, timeLogging, handlerTime);
     }
   }
 
 
   @Test
   public void test() throws Exception {
-    String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")));
-    final JsonDict config = new JsonDict(configStr);
-
-    JsonArray array = config.putArray("licenseKeys");
-    array.add(DatabaseServer.FOUR_SERVER_LICENSE);
+    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
+    ObjectMapper mapper = new ObjectMapper();
+    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+
+    ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
+    array.add(DatabaseServer.FOUR_SERVER_LICENSE);
+    config.put("licenseKeys", array);
 
     DatabaseServer.getServers().clear();
 
@@ -122,11 +124,15 @@ public class TestSnapshotManagerLostEntries {
 
   @Test
   public void validate() throws Exception {
-    String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")));
-    final JsonDict config = new JsonDict(configStr);
+    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
+    ObjectMapper mapper = new ObjectMapper();
+    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
 
-    JsonArray array = config.putArray("licenseKeys");
+    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+
+    ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
     array.add(DatabaseServer.FOUR_SERVER_LICENSE);
+    config.put("licenseKeys", array);
 
     final DatabaseServer[] dbServers = new DatabaseServer[4];
 

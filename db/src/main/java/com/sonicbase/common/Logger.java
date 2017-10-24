@@ -49,9 +49,8 @@ public class Logger {
                 String exception = ExceptionUtils.getFullStackTrace(error.e);
                 cobj.put(ComObject.Tag.exception, exception);
               }
-              String command = "DatabaseServer:ComObject:logError:";
               int masterReplica = error.client.getCommon().getServersConfig().getShards()[0].getMasterReplica();
-              byte[] ret = error.client.send(null, 0, masterReplica, command, cobj, DatabaseClient.Replica.specified, true);
+              byte[] ret = error.client.send(null, 0, masterReplica, cobj, DatabaseClient.Replica.specified, true);
             }
             catch (InterruptedException e) {
               break;

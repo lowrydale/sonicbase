@@ -307,7 +307,6 @@ public class DatabaseSocketClient {
   private Map<String, ArrayBlockingQueue<Request>> requestQueues = new HashMap<>();
 
   public static class Request {
-    private String command;
     private byte[] body;
     private byte[] response;
     private CountDownLatch latch = new CountDownLatch(1);
@@ -320,10 +319,6 @@ public class DatabaseSocketClient {
 
     public byte[] getResponse() {
       return response;
-    }
-
-    public void setCommand(String command) {
-      this.command = command;
     }
 
     public void setBody(byte[] body) {
@@ -494,7 +489,7 @@ public class DatabaseSocketClient {
       Util.writeRawLittleEndian32(requestCount, intBuff);
       bytesOut.write(intBuff);
       for (Request currRequest : requests) {
-        serializeSingleRequest(bytesOut, currRequest.command, currRequest.body);
+        serializeSingleRequest(bytesOut, currRequest.body);
       }
       bytesOut.close();
       byte[] body = bytesOut.toByteArray();
@@ -615,7 +610,8 @@ public class DatabaseSocketClient {
             processResponse(bytesIn, currRequest);
           }
           catch (Exception t) {
-            System.out.println("Error processing response: command=" + currRequest.command);
+            System.out.println("Error processing response: method=" +
+                new ComObject(currRequest.body).getString(ComObject.Tag.method));
             throw new DeadServerException(t);
           }
         }
@@ -749,22 +745,11 @@ public class DatabaseSocketClient {
     }
   }
 
-  private static void serializeSingleRequest(ByteArrayOutputStream bytesOut, String command, byte[] body) throws IOException {
+  private static void serializeSingleRequest(ByteArrayOutputStream bytesOut, byte[] body) throws IOException {
     byte[] intBuff = new byte[4];
-    byte[] commandBytes = command.getBytes("utf-8");
-    Util.writeRawLittleEndian32(commandBytes.length, intBuff);
+    Util.writeRawLittleEndian32(body.length, intBuff);
     bytesOut.write(intBuff);
-    if (body == null) {
-      Util.writeRawLittleEndian32(0, intBuff);
-    }
-    else {
-      Util.writeRawLittleEndian32(body.length, intBuff);
-    }
-    bytesOut.write(intBuff);
-    bytesOut.write(commandBytes);
-    if (body != null) {
-      bytesOut.write(body);
-    }
+    bytesOut.write(body);
   }
 
   private static final int BATCH_THREAD_COUNT = 2;
@@ -786,7 +771,7 @@ public class DatabaseSocketClient {
 
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP2", justification = "copying the passed in data is too slow")
   @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
-  public byte[] do_send(String batchKey, String command, byte[] body, String hostPort) {
+  public byte[] do_send(String batchKey, byte[] body, String hostPort) {
     try {
       if (ENABLE_BATCH) {
         ArrayBlockingQueue<Request> queue = null;
@@ -800,7 +785,6 @@ public class DatabaseSocketClient {
         }
         Request request = new Request();
         request.batchKey = batchKey;
-        request.command = command;
         request.body = body;
 
         batchKey = null; //disabling batch
@@ -840,11 +824,13 @@ public class DatabaseSocketClient {
     }
     catch (DeadServerException e) {
       String[] parts = hostPort.split(":");
-      throw new DeadServerException("Server error: host=" + parts[0] + ", port=" + parts[1] + ", command=" + command, e);
+      throw new DeadServerException("Server error: host=" + parts[0] + ", port=" + parts[1] +
+          ", method=" + new ComObject(body).getString(ComObject.Tag.method), e);
     }
     catch (Exception e) {
       String[] parts = hostPort.split(":");
-      throw new DatabaseException("Server error: host=" + parts[0] + ", port=" + parts[1] + ", command=" + command, e);
+      throw new DatabaseException("Server error: host=" + parts[0] + ", port=" + parts[1] +
+          ", method=" + new ComObject(body).getString(ComObject.Tag.method), e);
     }
   }
 

@@ -1,5 +1,9 @@
 package com.sonicbase.database;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.sonicbase.client.DatabaseClient;
@@ -7,9 +11,7 @@ import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.queue.LocalMessageQueueConsumer;
 import com.sonicbase.queue.Message;
 import com.sonicbase.server.DatabaseServer;
-import com.sonicbase.util.JsonArray;
-import com.sonicbase.util.JsonDict;
-import com.sonicbase.util.StreamUtils;
+import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.util.FileUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -36,13 +38,15 @@ public class TestDataTypes {
 
   @BeforeClass
   public void beforeClass() throws Exception {
-    String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")));
-    final JsonDict config = new JsonDict(configStr);
+    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
+    ObjectMapper mapper = new ObjectMapper();
+    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
-    JsonArray array = config.putArray("licenseKeys");
+    ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
     array.add(DatabaseServer.FOUR_SERVER_LICENSE);
+    config.put("licenseKeys", array);
 
     DatabaseServer.getServers().clear();
 
@@ -142,14 +146,15 @@ public class TestDataTypes {
     recordsConsumed += countRecords(msgs);
     String body = msgs.get(0).getBody();
     System.out.println(body);
-    JsonDict dict = new JsonDict(body);
-    assertEquals("test", dict.getString("database"));
-    assertEquals("persons", dict.getString("table"));
-    assertEquals("insert", dict.getString("action"));
-    JsonDict record = dict.getArray("records").getDict(0);
-    assertNotNull(record.getLong("_sequence0"));
-    assertNotNull(record.getLong("_sequence1"));
-    assertNotNull(record.getLong("_sequence2"));
+    ObjectMapper mapper = new ObjectMapper();
+    ObjectNode dict = (ObjectNode) mapper.readTree(body);
+    assertEquals("test", dict.get("database").asText());
+    assertEquals("persons", dict.get("table").asText());
+    assertEquals("insert", dict.get("action").asText());
+    ObjectNode record = (ObjectNode) dict.withArray("records").get(0);
+    assertNotNull(record.get("_sequence0").asLong());
+    assertNotNull(record.get("_sequence1").asLong());
+    assertNotNull(record.get("_sequence2").asLong());
     record.remove("_sequence0");
     record.remove("_sequence1");
     record.remove("_sequence2");
@@ -222,8 +227,9 @@ public class TestDataTypes {
       int count = 0;
       for (Message msg : msgs) {
         try {
-          JsonDict dict = new JsonDict(msg.getBody());
-          JsonArray array = dict.getArray("records");
+          ObjectMapper mapper = new ObjectMapper();
+          ObjectNode dict = (ObjectNode) mapper.readTree(msg.getBody());
+          ArrayNode array = dict.withArray("records");
           count += array.size();
         }
         catch (Exception e) {
@@ -286,7 +292,7 @@ public class TestDataTypes {
     assertEquals(ret.getFloat("double"), 4.2f);
 
     InputStream in = ret.getBinaryStream("blob");
-    String blob = StreamUtils.inputStreamToString(in);
+    String blob = IOUtils.toString(in, "utf-8");
     assertEquals(blob, "testing blob-4");
     byte[] bytes = ret.getBytes("blob");
     assertEquals(new String(bytes, "utf-8"), "testing blob-4");
@@ -300,7 +306,7 @@ public class TestDataTypes {
     bytes = ret.getBytes("bin");
     assertEquals(new String(bytes, "utf-8"), "testing blob-4");
     in = ret.getBinaryStream("bin");
-    blob = StreamUtils.inputStreamToString(in);
+    blob = IOUtils.toString(in, "utf-8");
     assertEquals(blob, "testing blob-4");
 
     Date date = ret.getDate("date");
@@ -324,7 +330,7 @@ public class TestDataTypes {
     assertEquals(ret.getString("longvarchar"), "933-28-4");
 
     in = ret.getBinaryStream("longvarbinary");
-    blob = StreamUtils.inputStreamToString(in);
+    blob = IOUtils.toString(in, "utf-8");
     assertEquals(blob, "testing blob-4");
     bytes = ret.getBytes("longvarbinary");
     assertEquals(new String(bytes, "utf-8"), "testing blob-4");
@@ -366,7 +372,7 @@ public class TestDataTypes {
     assertEquals(ret.getFloat(7), 4.2f);
 
     in = ret.getBinaryStream(8);
-    blob = StreamUtils.inputStreamToString(in);
+    blob = IOUtils.toString(in, "utf-8");
     assertEquals(blob, "testing blob-4");
     bytes = ret.getBytes(8);
     assertEquals(new String(bytes, "utf-8"), "testing blob-4");
@@ -378,7 +384,7 @@ public class TestDataTypes {
     assertEquals(new BigDecimal("4.01"), bd);
 
     in = ret.getBinaryStream(11);
-    blob = StreamUtils.inputStreamToString(in);
+    blob = IOUtils.toString(in, "utf-8");
     assertEquals(blob, "testing blob-4");
     bytes = ret.getBytes(11);
     assertEquals(new String(bytes, "utf-8"), "testing blob-4");
@@ -414,7 +420,7 @@ public class TestDataTypes {
     assertEquals(ret.getString(21), "933-28-4");
 
     in = ret.getBinaryStream(22);
-    blob = StreamUtils.inputStreamToString(in);
+    blob = IOUtils.toString(in, "utf-8");
     assertEquals(blob, "testing blob-4");
     bytes = ret.getBytes(22);
     assertEquals(new String(bytes, "utf-8"), "testing blob-4");
@@ -493,7 +499,7 @@ public class TestDataTypes {
     ResultSet ret = stmt.executeQuery();
 
     ret.next();
-    assertEquals(StreamUtils.readerToString(ret.getCharacterStream("id")), "4");
+    assertEquals(IOUtils.toString(ret.getCharacterStream("id")), "4");
 
     assertEquals(ret.getString("name"), "name-4");
     ret.next();
@@ -522,7 +528,7 @@ public class TestDataTypes {
     ResultSet ret = stmt.executeQuery();
 
     ret.next();
-    assertEquals(StreamUtils.inputStreamToString(ret.getBinaryStream("id")), "4");
+    assertEquals(IOUtils.toString(ret.getBinaryStream("id"), "utf-8"), "4");
 
     assertEquals(ret.getString("name"), "name-4");
     ret.next();
@@ -1001,23 +1007,23 @@ public class TestDataTypes {
 
     ret.next();
     clob = ret.getClob("id");
-    assertEquals(StreamUtils.readerToString(clob.getCharacterStream()), "5");
+    assertEquals(IOUtils.toString(clob.getCharacterStream()), "5");
     assertEquals(ret.getInt("id2"), 5);
     assertEquals(ret.getString("name"), "name-5");
     ret.next();
     clob = ret.getClob(1);
-    assertEquals(StreamUtils.readerToString(clob.getCharacterStream()), "4");
+    assertEquals(IOUtils.toString(clob.getCharacterStream()), "4");
     clob = ret.getClob("id");
-    assertEquals(StreamUtils.readerToString(clob.getCharacterStream()), "4");
+    assertEquals(IOUtils.toString(clob.getCharacterStream()), "4");
     ret.next();
     clob = ret.getClob("id");
-    assertEquals(StreamUtils.readerToString(clob.getCharacterStream()), "3");
+    assertEquals(IOUtils.toString(clob.getCharacterStream()), "3");
     ret.next();
     clob = ret.getClob("id");
-    assertEquals(StreamUtils.readerToString(clob.getCharacterStream()), "2");
+    assertEquals(IOUtils.toString(clob.getCharacterStream()), "2");
     ret.next();
     clob = ret.getClob("id");
-    assertEquals(StreamUtils.readerToString(clob.getCharacterStream()), "1");
+    assertEquals(IOUtils.toString(clob.getCharacterStream()), "1");
   }
 
   @Test
@@ -1043,23 +1049,23 @@ public class TestDataTypes {
 
     ret.next();
     nclob = ret.getNClob("id");
-    assertEquals(StreamUtils.readerToString(nclob.getCharacterStream()), "5");
+    assertEquals(IOUtils.toString(nclob.getCharacterStream()), "5");
     assertEquals(ret.getInt("id2"), 5);
     assertEquals(ret.getString("name"), "name-5");
     ret.next();
     nclob = ret.getNClob(1);
-    assertEquals(StreamUtils.readerToString(nclob.getCharacterStream()), "4");
+    assertEquals(IOUtils.toString(nclob.getCharacterStream()), "4");
     nclob = ret.getNClob("id");
-    assertEquals(StreamUtils.readerToString(nclob.getCharacterStream()), "4");
+    assertEquals(IOUtils.toString(nclob.getCharacterStream()), "4");
     ret.next();
     nclob = ret.getNClob("id");
-    assertEquals(StreamUtils.readerToString(nclob.getCharacterStream()), "3");
+    assertEquals(IOUtils.toString(nclob.getCharacterStream()), "3");
     ret.next();
     nclob = ret.getNClob("id");
-    assertEquals(StreamUtils.readerToString(nclob.getCharacterStream()), "2");
+    assertEquals(IOUtils.toString(nclob.getCharacterStream()), "2");
     ret.next();
     nclob = ret.getNClob("id");
-    assertEquals(StreamUtils.readerToString(nclob.getCharacterStream()), "1");
+    assertEquals(IOUtils.toString(nclob.getCharacterStream()), "1");
   }
 }
 

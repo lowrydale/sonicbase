@@ -1,6 +1,8 @@
 package com.sonicbase.queue;
 
-import com.sonicbase.util.JsonDict;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.sonicbase.query.DatabaseException;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -24,19 +26,25 @@ public class KafkaMessageQueueConsumer implements MessageQueueConsumer {
 
   @Override
   public void init(String cluster, String jsonConfig, String jsonQueueConfig) {
-    JsonDict queueConfig = new JsonDict(jsonQueueConfig);
-    String servers = queueConfig.getString("servers");
-    String topic = queueConfig.getString("topic");
-    Properties props = new Properties();
-    props.put("bootstrap.servers", servers);
-    props.put("group.id", "sonicbase-queue");
-    props.put("enable.auto.commit", "true");
-    props.put("auto.commit.interval.ms", "1000");
-    props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-    props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-    consumer = new KafkaConsumer<>(props);
-    consumer.subscribe(Arrays.asList(topic));
-    consumer.seekToBeginning(new ArrayList<TopicPartition>());
+    try {
+      ObjectMapper mapper = new ObjectMapper();
+      ObjectNode queueConfig = (ObjectNode) mapper.readTree(jsonQueueConfig);
+      String servers = queueConfig.get("servers").asText();
+      String topic = queueConfig.get("topic").asText();
+      Properties props = new Properties();
+      props.put("bootstrap.servers", servers);
+      props.put("group.id", "sonicbase-queue");
+      props.put("enable.auto.commit", "true");
+      props.put("auto.commit.interval.ms", "1000");
+      props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+      props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+      consumer = new KafkaConsumer<>(props);
+      consumer.subscribe(Arrays.asList(topic));
+      consumer.seekToBeginning(new ArrayList<TopicPartition>());
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
   }
 
   @Override

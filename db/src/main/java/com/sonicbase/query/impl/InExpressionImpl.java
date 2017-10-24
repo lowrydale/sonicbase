@@ -165,7 +165,7 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
       leftExpression = ExpressionImpl.deserializeExpression(in);
       isNot = in.readBoolean();
 
-      //if (this.serializationVersion >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION_22) {
+      //if (this.serializationVersion >= SnapshotManager.SERIALIZATION_VERSION_22) {
         if (1 == in.readByte()) {
           tableName = in.readUTF();
         }

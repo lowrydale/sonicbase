@@ -3,7 +3,6 @@ package com.sonicbase.misc;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.research.socket.NettyServer;
 import com.sonicbase.socket.DatabaseSocketClient;
-import org.testng.annotations.Test;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -41,7 +40,6 @@ public class TestSocket {
             cobj.put(ComObject.Tag.count, 10);
             cobj.put(ComObject.Tag.method, "echo");
             request.setBody(cobj.serialize());
-            request.setCommand("DatabaseServer:ComObject:echo");
             requests.add(request);
             DatabaseSocketClient.sendBatch("localhost", 9010, requests);
             byte[] response = requests.get(0).getResponse();

@@ -1,14 +1,10 @@
 package com.sonicbase.common;
 
 import com.sonicbase.query.DatabaseException;
-import com.sonicbase.schema.FieldSchema;
-import com.sonicbase.schema.TableSchema;
-import com.sonicbase.util.DataUtil;
+import org.apache.giraph.utils.Varint;
 
 import java.io.*;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * User: lowryda
@@ -31,34 +27,28 @@ public class KeyRecord {
   }
 
   public static long readFlags(byte[] bytes) {
-    DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-    int byteOffset = 0; //sequence numbers
-    //int headerLen = (int)DataUtil.readVLong(bytes, byteOffset, resultLength);
-    byteOffset += resultLength.getLength();
+    try {
+      DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
+      Varint.readSignedVarLong(in);
+      Varint.readSignedVarLong(in);
 
-    DataUtil.readVLong(bytes, byteOffset, resultLength);
-    byteOffset += resultLength.getLength();
-    DataUtil.readVLong(bytes, byteOffset, resultLength);
-    byteOffset += resultLength.getLength();
-    long dbViewFlags = DataUtil.readVLong(bytes, byteOffset, resultLength);
-
-    return dbViewFlags;
+      return Varint.readSignedVarLong(in);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
   }
 
   public void deserialize(byte[] bytes) {
     try {
-      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-      int byteOffset = 0;
-      byteOffset += resultLength.getLength();
-      DataInputStream sin = new DataInputStream(new ByteArrayInputStream(bytes, byteOffset, 8 * 6 + 2));
+
+      DataInputStream sin = new DataInputStream(new ByteArrayInputStream(bytes));
       short serializationVersion = sin.readShort();
-      byteOffset += 2;
 
       dbViewNumber = sin.readInt();
       dbViewFlags = sin.readShort();
-      byteOffset += 4 + 2;
 
-      key = DataUtil.readVLong(bytes, byteOffset, resultLength);
+      key = Varint.readSignedVarLong(sin);
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -105,7 +95,7 @@ public class KeyRecord {
   }
 
   public static long getDbViewFlags(byte[] bytes) {
-    DataUtil.ResultLength resultLen = new DataUtil.ResultLength();
+    AtomicInteger resultLen = new AtomicInteger();
     int offset = 2; //serialization version
     offset += 4;  //viewNum
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes, offset, 2));
@@ -121,7 +111,7 @@ public class KeyRecord {
     out.writeShort(serializationVersion);
     out.writeInt(dbViewNumber);
     out.writeShort(dbViewFlags);
-    DataUtil.writeVLong(out, key);
+    Varint.writeSignedVarLong(key, out);
   }
 
 

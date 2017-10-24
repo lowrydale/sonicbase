@@ -2,14 +2,12 @@ package com.sonicbase.server;
 
 import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
-import com.sonicbase.index.Repartitioner;
-import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.util.DataUtil;
-import com.sonicbase.util.ISO8601;
+import com.sonicbase.util.DateUtils;
 import org.apache.commons.io.FileUtils;
+import org.apache.giraph.utils.Varint;
 
 import java.io.*;
 import java.util.*;
@@ -40,7 +38,7 @@ public class DeleteManager {
 
   public void saveDeletes(String dbName, String tableName, String indexName, ConcurrentLinkedQueue<Object[]> keysToDelete) {
     try {
-      String dateStr = ISO8601.to8601String(new Date(System.currentTimeMillis()));
+      String dateStr = DateUtils.toString(new Date(System.currentTimeMillis()));
       File file = new File(getReplicaRoot(), dateStr + ".bin");
       while (file.exists()) {
         Random rand = new Random(System.currentTimeMillis());
@@ -49,7 +47,7 @@ public class DeleteManager {
       file.getParentFile().mkdirs();
       TableSchema tableSchema = databaseServer.getCommon().getTables(dbName).get(tableName);
       try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file)))) {
-        DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+        Varint.writeSignedVarLong(DatabaseServer.SERIALIZATION_VERSION, out);
         out.writeUTF(dbName);
         out.writeUTF(tableName);
         out.writeUTF(indexName);
@@ -83,7 +81,7 @@ public class DeleteManager {
             List<Future> futures = new ArrayList<>();
             counterStream.set(new LogManager.ByteCounterStream(new FileInputStream(files[0])));
             try (DataInputStream in = new DataInputStream(new BufferedInputStream(counterStream.get()))) {
-              short serializationVersion = (short)DataUtil.readVLong(in);
+              short serializationVersion = (short)Varint.readSignedVarLong(in);
               String dbName = in.readUTF();
               String tableName = in.readUTF();
               TableSchema tableSchema = databaseServer.getCommon().getTables(dbName).get(tableName);

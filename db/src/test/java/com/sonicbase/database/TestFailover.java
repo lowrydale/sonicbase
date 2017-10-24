@@ -1,14 +1,16 @@
 package com.sonicbase.database;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.query.impl.ColumnImpl;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.server.DatabaseServer;
-import com.sonicbase.util.JsonArray;
-import com.sonicbase.util.JsonDict;
-import com.sonicbase.util.StreamUtils;
+import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.util.FileUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -42,13 +44,15 @@ public class TestFailover {
   @BeforeClass
   public void beforeClass() throws Exception {
     try {
-      String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")));
-      final JsonDict config = new JsonDict(configStr);
-
-      JsonArray array = config.putArray("licenseKeys");
-      array.add(DatabaseServer.FOUR_SERVER_LICENSE);
+      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
+      ObjectMapper mapper = new ObjectMapper();
+      final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+
+      ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
+      array.add(DatabaseServer.FOUR_SERVER_LICENSE);
+      config.put("licenseKeys", array);
 
       DatabaseServer.getServers().clear();
 
@@ -160,7 +164,9 @@ public class TestFailover {
       //    stmt.executeUpdate();
 
       while (true) {
-        byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().sendToMaster("DatabaseServer:areAllLongRunningCommandsComplete:1:test", null);
+        ComObject cobj = new ComObject();
+        cobj.put(ComObject.Tag.method, "areAllLongRunningCommandsComplete");
+        byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().sendToMaster(cobj);
         if (new String(bytes).equals("true")) {
           break;
         }
@@ -257,7 +263,7 @@ public class TestFailover {
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
       cobj.put(ComObject.Tag.method, "testWrite");
-      client.send(null, 1, 1, "DatabaseServer:ComObject:testWrite:", cobj, DatabaseClient.Replica.specified);
+      client.send(null, 1, 1, cobj, DatabaseClient.Replica.specified);
 
       assertTrue(dbServers[1][0].getLogManager().hasLogsForPeer(1));
 

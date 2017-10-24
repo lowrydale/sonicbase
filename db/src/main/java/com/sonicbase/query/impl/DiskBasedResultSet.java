@@ -6,12 +6,12 @@ import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
-import com.sonicbase.util.DataUtil;
-import com.sonicbase.util.ISO8601;
+import com.sonicbase.util.DateUtils;
 import org.anarres.lzo.LzoDecompressor1x;
 import org.anarres.lzo.LzoInputStream;
 import org.anarres.lzo.LzoOutputStream;
 import org.apache.commons.io.FileUtils;
+import org.apache.giraph.utils.Varint;
 
 import java.io.*;
 import java.util.*;
@@ -185,8 +185,8 @@ public class DiskBasedResultSet {
         if (timeFile.exists()) {
           try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(timeFile)))) {
             String str = reader.readLine();
-            Calendar cal = ISO8601.from8601String(str);
-            long updateTime = cal.getTimeInMillis();
+            Date date = DateUtils.fromString(str);
+            long updateTime = date.getTime();
             if (updateTime < System.currentTimeMillis() - 24 * 60 * 60 * 1000) {
               FileUtils.deleteDirectory(resultSet);
               logger.info("Deleted old disk-based result set: dir=" + resultSet.getAbsolutePath());
@@ -203,7 +203,7 @@ public class DiskBasedResultSet {
 
   private void updateAccessTime(File file) {
     synchronized (this) {
-      String str = ISO8601.fromDate(new Date(System.currentTimeMillis()));
+      String str = DateUtils.fromDate(new Date(System.currentTimeMillis()));
       File timeFile = new File(file, "time-accessed.txt");
       file.mkdirs();
       try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(timeFile)))) {
@@ -326,21 +326,20 @@ public class DiskBasedResultSet {
 
       AtomicInteger page = new AtomicInteger();
       AtomicInteger rowNumber = new AtomicInteger();
-      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
       Record[] row1 = null;
       Record[] row2 = null;
       while (true) {
         if (row1 == null) {
-          row1 = readRow(dbName, in1, resultLength);
+          row1 = readRow(dbName, in1);
         }
         if (row2 == null) {
-          row2 = readRow(dbName, in2, resultLength);
+          row2 = readRow(dbName, in2);
         }
         if (row1 == null) {
           if (row2 == null) {
             break;
           }
-          out = writeRow(serializationVersion, row2, out, rowNumber, page, file, resultLength);
+          out = writeRow(serializationVersion, row2, out, rowNumber, page, file);
           row2 = null;
           continue;
         }
@@ -348,24 +347,24 @@ public class DiskBasedResultSet {
           if (row1 == null) {
             break;
           }
-          out = writeRow(serializationVersion, row1, out, rowNumber, page, file, resultLength);
+          out = writeRow(serializationVersion, row1, out, rowNumber, page, file);
           row1 = null;
           continue;
         }
 
         int compareValue = comparator.compare(row1, row2);
         if (compareValue == 0) {
-          out = writeRow(serializationVersion, row1, out, rowNumber, page, file, resultLength);
-          out = writeRow(serializationVersion, row2, out, rowNumber, page, file, resultLength);
+          out = writeRow(serializationVersion, row1, out, rowNumber, page, file);
+          out = writeRow(serializationVersion, row2, out, rowNumber, page, file);
           row1 = null;
           row2 = null;
         }
         else if (compareValue == 1) {
-          out = writeRow(serializationVersion, row2, out, rowNumber, page, file, resultLength);
+          out = writeRow(serializationVersion, row2, out, rowNumber, page, file);
           row2 = null;
         }
         else {
-          out = writeRow(serializationVersion, row1, out, rowNumber, page, file, resultLength);
+          out = writeRow(serializationVersion, row1, out, rowNumber, page, file);
           row1 = null;
         }
       }
@@ -454,10 +453,10 @@ public class DiskBasedResultSet {
         };
 
         ConcurrentSkipListMap<MergeRow, List<MergeRow>> currRows = new ConcurrentSkipListMap<MergeRow, List<MergeRow>>(comparator);
-        DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+
         for (int i = 0; i < inStreams.size(); i++) {
           DataInputStream in = inStreams.get(i);
-          Record[] row = readRow(dbName, in, resultLength);
+          Record[] row = readRow(dbName, in);
           if (row == null) {
             continue;
           }
@@ -481,8 +480,8 @@ public class DiskBasedResultSet {
           }
           List<MergeRow> toAdd = new ArrayList<>();
           for (MergeRow row : first.getValue()) {
-            out = writeRow(serializationVersion, row.row, out, rowNumber, page, dir, resultLength);
-            Record[] nextRow = readRow(dbName, inStreams.get(row.streamOffset), resultLength);
+            out = writeRow(serializationVersion, row.row, out, rowNumber, page, dir);
+            Record[] nextRow = readRow(dbName, inStreams.get(row.streamOffset));
             if (nextRow != null) {
               MergeRow mergeRow = new MergeRow();
               mergeRow.row = nextRow;
@@ -519,7 +518,7 @@ public class DiskBasedResultSet {
 
   private DataOutputStream writeRow(short serializationVersion,
       Record[] row, DataOutputStream out, AtomicInteger rowNumber, AtomicInteger page,
-      File file, DataUtil.ResultLength resultLength)  {
+      File file)  {
     try {
       for (int i = 0; i < row.length; i++) {
         if (row[i] == null) {
@@ -528,7 +527,7 @@ public class DiskBasedResultSet {
         else {
           out.writeBoolean(true);
           byte[] bytes = row[i].serialize(server.getCommon(), serializationVersion);
-          DataUtil.writeVLong(out, bytes.length, resultLength);
+          Varint.writeSignedVarLong(bytes.length, out);
           out.write(bytes);
         }
       }
@@ -546,12 +545,12 @@ public class DiskBasedResultSet {
     }
   }
 
-  private Record[] readRow(String dbName, DataInputStream in, DataUtil.ResultLength resultLength) {
+  private Record[] readRow(String dbName, DataInputStream in) {
     try {
       Record[] ret = new Record[tableNames.length];
       for (int i = 0; i < tableNames.length; i++) {
         if (in.readBoolean()) {
-          int len = (int) DataUtil.readVLong(in, resultLength);
+          int len = (int) Varint.readSignedVarLong(in);
           byte[] bytes = new byte[len];
           in.readFully(bytes);
           ret[i] = new Record(dbName, server.getClient().getCommon(), bytes);
@@ -583,7 +582,6 @@ public class DiskBasedResultSet {
       try (BufferedOutputStream bufferedOut = new BufferedOutputStream(new LzoOutputStream(new FileOutputStream(subFile)));
         DataOutputStream out = new DataOutputStream(bufferedOut)) {
 
-        DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
         for (int i = 0; i < records.length; i++) {
           for (int j = 0; j < records[0].length; j++) {
             ExpressionImpl.CachedRecord record = records[i][j];
@@ -594,7 +592,7 @@ public class DiskBasedResultSet {
               out.writeBoolean(true);
               Record rec = record.getRecord();//record.serialize(server.getCommon());
               byte[] bytes = rec.serialize(server.getCommon(), serializationVersion);
-              DataUtil.writeVLong(out, bytes.length, resultLength);
+              Varint.writeSignedVarLong(bytes.length, out);
               out.write(bytes);
             }
           }
@@ -640,14 +638,14 @@ public class DiskBasedResultSet {
     try (BufferedInputStream bufferedIn = new BufferedInputStream(new LzoInputStream(new FileInputStream(subFile), new LzoDecompressor1x()));
          DataInputStream in = new DataInputStream(bufferedIn)) {
 
-      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+      AtomicInteger AtomicInteger = new AtomicInteger();
 
       //    //skip to the right page
       //    try {
       //      for (int i = 0; i < pageNumber * count; i++) {
       //        for (int j = 0; j < tableNames.length; j++) {
       //          if (in.readBoolean()) {
-      //            int len = (int) DataUtil.readVLong(in, resultLength);
+      //            int len = (int) Varint.readSignedVarLong(in, AtomicInteger);
       //            byte[] bytes = new byte[len];
       //            in.readFully(bytes);
       //          }
@@ -664,7 +662,7 @@ public class DiskBasedResultSet {
           byte[][] row = new byte[tableNames.length][];
           for (int j = 0; j < tableNames.length; j++) {
             if (in.readBoolean()) {
-              int len = (int) DataUtil.readVLong(in, resultLength);
+              int len = (int) Varint.readSignedVarLong(in);
               byte[] bytes = new byte[len];
               in.readFully(bytes);
               row[j] = bytes;

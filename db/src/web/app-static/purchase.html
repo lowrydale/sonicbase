@@ -144,12 +144,14 @@
 
                         env: 'production', // sandbox | production
 
+                        locale: 'en_US',
+
                         // Specify the style of the button
 
                         style: {
-                            label: 'pay',
+                            label: 'paypal',
                             size:  'small', // small | medium | large | responsive
-                            shape: 'rect',   // pill | rect
+                            shape: 'pill',   // pill | rect
                             color: 'gold'   // gold | blue | silver | black
                         },
 
@@ -161,6 +163,7 @@
                             production: 'AeRg5Va0HldG2957ue5KD8hayAn7RoENW4jhrwPrqTj25R1nQlscMQ9QJ3gvwgl76b4n2y6kISfHoGUG'
                         },
 
+                        commit: true,
                         // Wait for the PayPal button to be clicked
 
 //                        return actions.payment.create({

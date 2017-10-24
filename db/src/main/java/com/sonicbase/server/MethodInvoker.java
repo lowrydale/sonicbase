@@ -1,13 +1,9 @@
 package com.sonicbase.server;
 
-import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
-import com.sonicbase.index.Repartitioner;
 import com.sonicbase.query.DatabaseException;
-import com.sonicbase.schema.IndexSchema;
-import com.sonicbase.schema.TableSchema;
 import com.sonicbase.socket.DeadServerException;
-import com.sonicbase.util.StreamUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 
 import java.io.File;
@@ -17,14 +13,13 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Created by lowryda on 7/28/17.
  */
-public class CommandHandler {
+public class MethodInvoker {
   private Logger logger;
 
   private final BulkImportManager bulkImportManager;
@@ -41,7 +36,7 @@ public class CommandHandler {
   private AtomicInteger testWriteCallCount = new AtomicInteger();
 
 
-  public CommandHandler(DatabaseServer server, BulkImportManager bulkImportManager, DeleteManager deleteManager, SnapshotManager snapshotManager, UpdateManager updateManager, TransactionManager transactionManager, ReadManager readManager, LogManager logManager, SchemaManager schemaManager) {
+  public MethodInvoker(DatabaseServer server, BulkImportManager bulkImportManager, DeleteManager deleteManager, SnapshotManager snapshotManager, UpdateManager updateManager, TransactionManager transactionManager, ReadManager readManager, LogManager logManager, SchemaManager schemaManager) {
     this.server = server;
     this.common = server.getCommon();
     this.bulkImportManager = bulkImportManager;
@@ -105,38 +100,17 @@ public class CommandHandler {
     //priorityCommands.add("doPopulateIndex");
   }
 
-  public byte[] handleCommand(final String command, final byte[] body, boolean replayedCommand, boolean enableQueuing) {
-    return handleCommand(command, body, -1L, -1L, replayedCommand, enableQueuing, null, null);
-  }
-
-  public byte[] handleCommand(final String command, final byte[] body, long logSequence0, long logSequence1,
-                              boolean replayedCommand, boolean enableQueuing, AtomicLong timeLogging, AtomicLong handlerTime) {
+  public byte[] invokeMethod(final byte[] requestBytes, long logSequence0, long logSequence1,
+                             boolean replayedCommand, boolean enableQueuing, AtomicLong timeLogging, AtomicLong handlerTime) {
     try {
       if (shutdown) {
         throw new DatabaseException("Shutdown in progress");
       }
-      if (command == null) {
-        logger.error("null command");
-        throw new DatabaseException();
-      }
-      int pos = command.indexOf(':');
-      int pos2 = command.indexOf(':', pos + 1);
-      String methodStr = null;
-      if (pos2 == -1) {
-        methodStr = command.substring(pos + 1);
-      }
-      else {
-        methodStr = command.substring(pos + 1, pos2);
-      }
+      ComObject request = new ComObject(requestBytes);
+      String methodStr = request.getString(ComObject.Tag.method);
 
       if (server.isApplyingQueuesAndInteractive()) {
         replayedCommand = true;
-      }
-
-      ComObject cobj = null;
-      if (methodStr.equals("ComObject")) {
-        cobj = new ComObject(body);
-        methodStr = cobj.getString(ComObject.Tag.method);
       }
 
       if (server.shouldDisableNow() && server.isUsingMultipleReplicas()) {
@@ -156,16 +130,17 @@ public class CommandHandler {
 //        out.write(body);
 //      }
 //      out.close();
-//      String queueCommand = "DatabaseServer:queueForOtherServer:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__:" + i;
+//      String queueCommand = "DatabaseServer:queueForOtherServer:1:" + SnapshotManager.SERIALIZATION_VERSION + ":1:__none__:" + i;
 //      replicas[common.getServersConfig().getShards()[shard].getMasterReplica()].do_send(
 //          null, queueCommand, bytesOut.toByteArray())
 //
       if (methodStr.equals("queueForOtherServer")) {
         try {
-          String[] parts = command.split(":");
-          int replica = Integer.valueOf(parts[6]);
-          cobj = new ComObject(body);
-          logManager.logRequestForPeer(cobj.getString(ComObject.Tag.command), body, System.currentTimeMillis(), logManager.getNextSequencenNum(), replica);
+          ComObject header = request.getObject(ComObject.Tag.header);
+          int replica = header.getInt(ComObject.Tag.replica);
+          String innerMethod = header.getString(ComObject.Tag.method);
+          request.put(ComObject.Tag.method, innerMethod);
+          logManager.logRequestForPeer(requestBytes, System.currentTimeMillis(), logManager.getNextSequencenNum(), replica);
           return null;
         }
         catch (Exception e) {
@@ -173,37 +148,33 @@ public class CommandHandler {
         }
       }
 
-      Long existingSequence0 = getExistingSequence0(command);
-      Long existingSequence1 = getExistingSequence1(command);
+      Long existingSequence0 = getExistingSequence0(request);
+      Long existingSequence1 = getExistingSequence1(request);
 
-      DatabaseServer.LogRequest logRequest = logManager.logRequest(command, body, enableQueuing, methodStr, existingSequence0, existingSequence1, timeLogging);
+      DatabaseServer.LogRequest logRequest = logManager.logRequest(requestBytes, enableQueuing, methodStr, existingSequence0, existingSequence1, timeLogging);
       ComObject ret = null;
 
       if (!replayedCommand && !server.isRunning() && !priorityCommands.contains(methodStr)) {
-        throw new DeadServerException("Server not running: command=" + command);
+        throw new DeadServerException("Server not running: method=" + methodStr);
       }
 
       List<ReplicaFuture> futures = new ArrayList<>();
       long sequence0 = logRequest == null ? logSequence0 : logRequest.getSequences0()[0];
       long sequence1 = logRequest == null ? logSequence1 : logRequest.getSequences1()[0];
-      final String newCommand0 = logRequest == null ? command : command + ":xx_sn0_xx=" + sequence0;
-      final String newCommand = logRequest == null ? newCommand0 : newCommand0 + ":xx_sn1_xx=" + sequence1;
+
+      ComObject newMessage = new ComObject(requestBytes);
+      if (logRequest != null) {
+        newMessage.put(ComObject.Tag.sequence0, sequence0);
+        newMessage.put(ComObject.Tag.sequence1, sequence1);
+      }
       if (!server.onlyQueueCommands() || !enableQueuing) {
         DatabaseServer.Shard currShard = common.getServersConfig().getShards()[server.getShard()];
-        int replPos = command.indexOf("xx_repl_xx");
         try {
           long handleBegin = System.nanoTime();
-          if (cobj != null) {
-            cobj.put(ComObject.Tag.sequence0, sequence0);
-            cobj.put(ComObject.Tag.sequence1, sequence1);
-            methodStr = cobj.getString(ComObject.Tag.method);
-            Method method = getClass().getMethod(methodStr, ComObject.class, boolean.class);
-            ret = (ComObject) method.invoke(this, cobj, replayedCommand);
-          }
-          else {
-            Method method = getClass().getMethod(methodStr, String.class, byte[].class, boolean.class);
-            ret = (ComObject) method.invoke(this, command, body, replayedCommand);
-          }
+          request.put(ComObject.Tag.sequence0, sequence0);
+          request.put(ComObject.Tag.sequence1, sequence1);
+          Method method = getClass().getMethod(methodStr, ComObject.class, boolean.class);
+          ret = (ComObject) method.invoke(this, request, replayedCommand);
           if (handlerTime != null) {
             handlerTime.addAndGet(System.nanoTime() - handleBegin);
           }
@@ -230,19 +201,6 @@ public class CommandHandler {
           if (e.getCause() instanceof SchemaOutOfSyncException) {
             throw (SchemaOutOfSyncException)e.getCause();
           }
-
-//          boolean schemaOutOfSync = false;
-//          int index = ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class);
-//          if (-1 != index) {
-//            schemaOutOfSync = true;
-//          }
-//          else if (e.getMessage() != null && e.getMessage().contains("SchemaOutOfSyncException")) {
-//            schemaOutOfSync = true;
-//          }
-//
-//          if (!schemaOutOfSync) {
-//            logger.error("Error processing request", e);
-//          }
           throw new DatabaseException(e);
         }
 
@@ -253,7 +211,7 @@ public class CommandHandler {
           catch (Exception e) {
             int index = ExceptionUtils.indexOfThrowable(e, DeadServerException.class);
             if (-1 != index) {
-              logManager.logRequestForPeer(newCommand, body, sequence0, sequence1, future.replica);
+              logManager.logRequestForPeer(newMessage.serialize(), sequence0, sequence1, future.replica);
             }
             else {
               logger.error("Error sending command to slave", e);
@@ -283,53 +241,17 @@ public class CommandHandler {
       if (e.getCause() instanceof SchemaOutOfSyncException) {
         throw new DatabaseException(e);
       }
-      logger.error("Error handling command: command=" + command, e);
+      logger.error("Error handling command: method=" + new ComObject(requestBytes).getString(ComObject.Tag.method), e);
       throw new DatabaseException(e);
     }
   }
 
-  private Long getExistingSequence0(String command) {
-    Long existingSequenceNumber = null;
-    int snPos = command.indexOf("xx_sn0_xx=");
-    if (snPos != -1) {
-      String sn = null;
-      try {
-        int endPos = command.indexOf(":", snPos);
-        if (endPos == -1) {
-          sn = command.substring(snPos + "xx_sn0_xx=".length());
-        }
-        else {
-          sn = command.substring(snPos + "xx_sn0_xx=".length(), endPos);
-        }
-        existingSequenceNumber = Long.valueOf(sn);
-      }
-      catch (Exception e) {
-        logger.error("Error getting sequenceNum: command=" + command + ", error=" + e.getMessage());
-      }
-    }
-    return existingSequenceNumber;
+  private Long getExistingSequence0(ComObject request) {
+    return request.getLong(ComObject.Tag.sequence0);
   }
 
-  private Long getExistingSequence1(String command) {
-    Long existingSequenceNumber = null;
-    int snPos = command.indexOf("xx_sn1_xx=");
-    if (snPos != -1) {
-      try {
-        String sn = null;
-        int endPos = command.indexOf(":", snPos);
-        if (endPos == -1) {
-          sn = command.substring(snPos + "xx_sn1_xx=".length());
-        }
-        else {
-          sn = command.substring(snPos + "xx_sn1_xx=".length(), endPos);
-        }
-        existingSequenceNumber = Long.valueOf(sn);
-      }
-      catch (Exception e) {
-        logger.error("Error getting sequenceNum: command=" + command + ", error=" + e.getMessage());
-      }
-    }
-    return existingSequenceNumber;
+  private Long getExistingSequence1(ComObject request) {
+    return request.getLong(ComObject.Tag.sequence1);
   }
 
   public ComObject startStreaming(final ComObject cobj, boolean replayedCommand) {
@@ -573,7 +495,7 @@ public class CommandHandler {
         return null;
       }
       try (FileInputStream fileIn = new FileInputStream(file)) {
-        String ret = StreamUtils.inputStreamToString(fileIn);
+        String ret = IOUtils.toString(fileIn, "utf-8");
         ComObject retObj = new ComObject();
         retObj.put(ComObject.Tag.fileContent, ret);
         return retObj;
@@ -1256,9 +1178,4 @@ public class CommandHandler {
     readManager.expirePreparedStatement(preparedId);
     return null;
   }
-
-
-
-
-
 }

@@ -1,11 +1,16 @@
 package com.sonicbase.database;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.BinaryExpression;
+import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.ColumnImpl;
 import com.sonicbase.query.impl.ExpressionImpl;
 import com.sonicbase.query.impl.SelectContextImpl;
@@ -14,11 +19,9 @@ import com.sonicbase.queue.Message;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
-import com.sonicbase.util.JsonArray;
-import com.sonicbase.util.JsonDict;
-import com.sonicbase.util.StreamUtils;
 import com.sun.jersey.core.util.Base64;
 import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.util.FileUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -53,13 +56,15 @@ public class TestDatabase {
   @BeforeClass
   public void beforeClass() throws Exception {
     try {
-      String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")));
-      final JsonDict config = new JsonDict(configStr);
-
-      JsonArray array = config.putArray("licenseKeys");
-      array.add(DatabaseServer.FOUR_SERVER_LICENSE);
+      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
+      ObjectMapper mapper = new ObjectMapper();
+      final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+
+      ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
+      array.add(DatabaseServer.FOUR_SERVER_LICENSE);
+      config.put("licenseKeys", array);
 
       DatabaseServer.getServers().clear();
 
@@ -234,7 +239,7 @@ public class TestDatabase {
       while (true) {
         ComObject cobj = new ComObject();
         cobj.put(ComObject.Tag.method, "areAllLongRunningCommandsComplete");
-        byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().sendToMaster("DatabaseServer:ComObject:areAllLongRunningCommandsComplete:1:test", cobj);
+        byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().sendToMaster(cobj);
         ComObject retObj = new ComObject(bytes);
         if (retObj.getBoolean(ComObject.Tag.isComplete)) {
           break;
@@ -336,48 +341,6 @@ public class TestDatabase {
 
       //Thread.sleep(10000);
 
-//      JsonDict backupConfig = new JsonDict("{\n" +
-//          "    \"type\" : \"AWS\",\n" +
-//          "    \"bucket\": \"sonicbase-test-backup\",\n" +
-//          "    \"prefix\": \"backups\",\n" +
-//          "    \"period\": \"daily\",\n" +
-//          "    \"time\": \"23:00\",\n" +
-//          "    \"maxBackupCount\": 10\n" +
-//          "  }");
-//
-//      for (DatabaseServer dbServer : dbServers) {
-//        dbServer.setBackupConfig(backupConfig);
-//      }
-//
-//      client.startBackup();
-//      while (true) {
-//        Thread.sleep(1000);
-//        if (client.isBackupComplete()) {
-//          break;
-//        }
-//      }
-//
-//      ComObject cobj = new ComObject();
-//      cobj.put(ComObject.Tag.dbName, "__none__");
-//      cobj.put(ComObject.Tag.method, "getLastBackupDir");
-//      cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-//      String command = "DatabaseServer:ComObject:getLastBackupDir:";
-//      byte[] ret = client.send(null, 0, 0, command, cobj.serialize(), DatabaseClient.Replica.master);
-//      ComObject retObj = new ComObject(ret);
-//      String dir = retObj.getString(ComObject.Tag.directory);
-//
-//
-//      File file = new File("/data/db-backup");
-//      File[] dirs = file.listFiles();
-//
-//      client.startRestore(dir);
-//      while (true) {
-//        Thread.sleep(1000);
-//        if (client.isRestoreComplete()) {
-//          break;
-//        }
-//      }
-
 
 //      for (DatabaseServer server : dbServers) {
 //        server.purgeMemory();
@@ -401,7 +364,7 @@ public class TestDatabase {
 //      }
 
 
-      JsonDict backupConfig = new JsonDict("{\n" +
+      ObjectNode backupConfig = (ObjectNode) mapper.readTree("{\n" +
           "    \"type\" : \"fileSystem\",\n" +
           "    \"directory\": \"$HOME/db/backup\",\n" +
           "    \"period\": \"daily\",\n" +
@@ -467,8 +430,7 @@ public class TestDatabase {
       cobj.put(ComObject.Tag.dbName, "test");
       cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
       cobj.put(ComObject.Tag.method, "forceDeletes");
-      String command = "DatabaseServer:ComObject:forceDeletes:";
-      client.sendToAllShards(null, 0, command, cobj, DatabaseClient.Replica.all);
+      client.sendToAllShards(null, 0, cobj, DatabaseClient.Replica.all);
 
      // Thread.sleep(10000);
       executor.shutdownNow();
@@ -3307,27 +3269,33 @@ public class TestDatabase {
     stmt.executeBatch();
     conn.commit();
 
-    List<Message> msgs = consumer.receive();
-    String actual  = msgs.get(0).getBody();
-    JsonDict dict = new JsonDict(actual);
-    assertEquals(dict.getArray("records").size(), 5);
-    actual  = msgs.get(1).getBody();
-    dict = new JsonDict(actual);
-    assertEquals(dict.getArray("records").size(), 5);
+    try {
+      List<Message> msgs = consumer.receive();
+      String actual = msgs.get(0).getBody();
+      ObjectMapper mapper = new ObjectMapper();
+      ObjectNode dict = (ObjectNode) mapper.readTree(actual);
+      assertEquals(dict.withArray("records").size(), 5);
+      actual = msgs.get(1).getBody();
+      dict = (ObjectNode) mapper.readTree(actual);
+      assertEquals(dict.withArray("records").size(), 5);
 
 
-    stmt = conn.prepareStatement("select * from nokey where id>=200000");
-    ResultSet resultSet = stmt.executeQuery();
-    for (int i = 0; i < 10; i++){
-      assertTrue(resultSet.next());
-      assertTrue(resultSet.next());
+      stmt = conn.prepareStatement("select * from nokey where id>=200000");
+      ResultSet resultSet = stmt.executeQuery();
+      for (int i = 0; i < 10; i++) {
+        assertTrue(resultSet.next());
+        assertTrue(resultSet.next());
+      }
+      assertFalse(resultSet.next());
+
+      for (int i = 0; i < 10; i++) {
+        stmt = conn.prepareStatement("delete from nokey where id=?");
+        stmt.setLong(1, 200000 + i);
+        stmt.executeUpdate();
+      }
     }
-    assertFalse(resultSet.next());
-
-    for (int i = 0; i < 10; i++) {
-      stmt = conn.prepareStatement("delete from nokey where id=?");
-      stmt.setLong(1, 200000 + i);
-      stmt.executeUpdate();
+    catch (Exception e) {
+      throw new DatabaseException(e);
     }
   }
 
@@ -3405,10 +3373,15 @@ public class TestDatabase {
 
   @Test(enabled = false)
   public void testPaging() throws Exception {
-    String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(new FileInputStream("config/config-4-servers-large.json")));
-    final JsonDict config = new JsonDict(configStr);
+    String configStr = IOUtils.toString(new BufferedInputStream(new FileInputStream("config/config-4-servers-large.json")), "utf-8");
+    ObjectMapper mapper = new ObjectMapper();
+    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+
+    ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
+    array.add(DatabaseServer.FOUR_SERVER_LICENSE);
+    config.put("licenseKeys", array);
 
     DatabaseServer.getServers().clear();
 
@@ -3500,10 +3473,15 @@ public class TestDatabase {
 
   @Test(enabled = false)
   public void testMultiValue() throws Exception {
-    String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(new FileInputStream("config/config-4-servers-large.json")));
-    final JsonDict config = new JsonDict(configStr);
+    String configStr = IOUtils.toString(new BufferedInputStream(new FileInputStream("config/config-4-servers-large.json")), "utf-8");
+    ObjectMapper mapper = new ObjectMapper();
+    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+
+    ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
+    array.add(DatabaseServer.FOUR_SERVER_LICENSE);
+    config.put("licenseKeys", array);
 
     DatabaseServer.getServers().clear();
 
@@ -3589,10 +3567,15 @@ public class TestDatabase {
 
   @Test(enabled = false)
   public void testDescending() throws Exception {
-    String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(new FileInputStream("config/config-4-servers-large.json")));
-    final JsonDict config = new JsonDict(configStr);
+    String configStr = IOUtils.toString(new BufferedInputStream(new FileInputStream("config/config-4-servers-large.json")), "utf-8");
+    ObjectMapper mapper = new ObjectMapper();
+    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+
+    ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
+    array.add(DatabaseServer.FOUR_SERVER_LICENSE);
+    config.put("licenseKeys", array);
 
     DatabaseServer.getServers().clear();
 
@@ -3783,18 +3766,24 @@ public class TestDatabase {
     PreparedStatement stmt2 = conn.prepareStatement("delete from ToDeleteNoPrimaryKey where id=0");
     assertTrue(stmt2.execute());
 
-    List<Message> msgs = consumer.receive();
-    JsonDict dict = new JsonDict(msgs.get(0).getBody());
-    JsonArray array = dict.getArray("records");
-    JsonDict record = array.getDict(0);
-    record.remove("_sequence0");
-    record.remove("_sequence1");
-    record.remove("_sequence2");
-    assertJsonEquals(record.toString(), "{\"id2\":0,\"id\":0}");
+    try {
+      List<Message> msgs = consumer.receive();
+      ObjectMapper mapper = new ObjectMapper();
+      ObjectNode dict = (ObjectNode) mapper.readTree(msgs.get(0).getBody());
+      ArrayNode array = dict.withArray("records");
+      ObjectNode record = (ObjectNode) array.get(0);
+      record.remove("_sequence0");
+      record.remove("_sequence1");
+      record.remove("_sequence2");
+      assertJsonEquals(record.toString(), "{\"id2\":0,\"id\":0}");
 
-    stmt = conn.prepareStatement("select * from ToDeleteNoPrimaryKey where id = 0");
-    rs = stmt.executeQuery();
-    assertFalse(rs.next());
+      stmt = conn.prepareStatement("select * from ToDeleteNoPrimaryKey where id = 0");
+      rs = stmt.executeQuery();
+      assertFalse(rs.next());
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
   }
 
   @Test

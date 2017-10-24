@@ -3,14 +3,12 @@ package com.sonicbase.common;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.server.SnapshotManager;
-import com.sonicbase.util.DataUtil;
+import com.sonicbase.server.DatabaseServer;
+import org.apache.giraph.utils.Varint;
 
 import java.io.*;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * User: lowryda
@@ -45,55 +43,40 @@ public class Record {
   }
 
   public static long readFlags(byte[] bytes) {
-    DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-    int byteOffset = 0; //sequence numbers
-    //int headerLen = (int)DataUtil.readVLong(bytes, byteOffset, resultLength);
-    byteOffset += resultLength.getLength();
+    try {
+      DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
 
-    DataUtil.readVLong(bytes, byteOffset, resultLength);
-    byteOffset += resultLength.getLength();
-    DataUtil.readVLong(bytes, byteOffset, resultLength);
-    byteOffset += resultLength.getLength();
-    long dbViewFlags = DataUtil.readVLong(bytes, byteOffset, resultLength);
+      Varint.readSignedVarLong(in);
+      Varint.readSignedVarLong(in);
 
-    return dbViewFlags;
+      return Varint.readSignedVarLong(in);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
   }
 
   public void recoverFromSnapshot(String dbName, DatabaseCommon common, byte[] bytes, Set<Integer> columns, boolean readHeader) {
     try {
-      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-      int byteOffset = 0;
-//      int headerLen = (int)DataUtil.readVLong(bytes, byteOffset, resultLength);
-      byteOffset += resultLength.getLength();
-//      if (!readHeader) {
-//        byteOffset += headerLen;
-//      }
-//      else {
-        DataInputStream sin = new DataInputStream(new ByteArrayInputStream(bytes, byteOffset, 2 + 8 * 3 + 4 + 2 + 8 + 8 + 8));
+        DataInputStream sin = new DataInputStream(new ByteArrayInputStream(bytes));
         short serializationVersion = sin.readShort();
         sequence0 = sin.readLong();
         sequence1 = sin.readLong();
         sequence2 = sin.readLong();
-        byteOffset += 2 + 8 * 3;
 
         dbViewNumber = sin.readInt();
         dbViewFlags = sin.readShort();
         transId = sin.readLong();
         id = sin.readLong();
-        byteOffset += 4 + 2 + 8 + 8;
 
-      if (serializationVersion >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION_23) {
+      if (serializationVersion >= DatabaseServer.SERIALIZATION_VERSION_23) {
         updateTime = sin.readLong();
-        byteOffset += 8;
       }
 
+      this.tableSchema = common.getTablesById(dbName).get((int) Varint.readSignedVarLong(sin));
 
-      this.tableSchema = common.getTablesById(dbName).get((int) DataUtil.readVLong(bytes, byteOffset, resultLength));
-      byteOffset += resultLength.getLength();
-
-      int len = (int)DataUtil.readVLong(bytes, byteOffset, resultLength);
-      byteOffset += resultLength.getLength();
-      fields = DatabaseCommon.deserializeFields(dbName, common, bytes, byteOffset, tableSchema,
+      int len = (int)Varint.readSignedVarLong(sin);
+      fields = DatabaseCommon.deserializeFields(dbName, common, sin, tableSchema,
           common.getSchemaVersion(), dbViewNumber, columns, true);
     }
     catch (IOException e) {
@@ -102,18 +85,19 @@ public class Record {
   }
 
   public static long getTransId(byte[] bytes) {
-    DataUtil.ResultLength resultLen = new DataUtil.ResultLength();
-    int offset = 8 * 3; //sequence numbers
+    try {
+      int offset = 8 * 3; //sequence numbers
 
-//    DataUtil.readVLong(bytes, offset, resultLen);
-//    offset += resultLen.getLength();
-    DataUtil.readVLong(bytes, offset, resultLen);
-    offset += resultLen.getLength();
-    DataUtil.readVLong(bytes, offset, resultLen);
-    offset += resultLen.getLength();
-    DataUtil.readVLong(bytes, offset, resultLen);
-    offset += resultLen.getLength();
-    return DataUtil.readVLong(bytes, offset, resultLen);
+      DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
+      in.skipBytes(offset);
+      Varint.readSignedVarLong(in);
+      Varint.readSignedVarLong(in);
+      Varint.readSignedVarLong(in);
+      return Varint.readSignedVarLong(in);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
   }
 
   public static void setDbViewFlags(byte[] bytes, short dbViewFlag) {
@@ -152,7 +136,6 @@ public class Record {
   }
 
   public static long getUpdateTime(byte[] bytes) {
-    DataUtil.ResultLength resultLen = new DataUtil.ResultLength();
     int offset = 2 + 8 * 3 + 4 + 2 + 8 + 8; //serialization version + sequence numbers
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes, offset, bytes.length - offset));
     try {
@@ -165,7 +148,6 @@ public class Record {
   }
 
   public static long getDbViewFlags(byte[] bytes) {
-    DataUtil.ResultLength resultLen = new DataUtil.ResultLength();
     int offset = 2 + 8 * 3; //serialization version + sequence numbers
     offset += 4;//viewNum
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes, offset, bytes.length - offset));
@@ -238,7 +220,6 @@ public class Record {
   }
 
   public void snapshot(DataOutputStream out, DatabaseCommon common, short serializationVersion) throws IOException {
-    DataUtil.ResultLength resultLen = new DataUtil.ResultLength();
     ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
     DataOutputStream headerOut = new DataOutputStream(bytesOut);
 
@@ -252,15 +233,15 @@ public class Record {
     headerOut.writeLong(transId);
     headerOut.writeLong(id);
 
-    if (serializationVersion >= SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION_23) {
+    if (serializationVersion >= DatabaseServer.SERIALIZATION_VERSION_23) {
       headerOut.writeLong(updateTime);
     }
 
     headerOut.close();
     byte[] bytes = bytesOut.toByteArray();
-    //DataUtil.writeVLong(out, bytes.length);
+    //Varint.writeSignedVarLong(out, bytes.length);
     out.write(bytes);
-    DataUtil.writeVLong(out, tableSchema.getTableId(), resultLen);
+    Varint.writeSignedVarLong(tableSchema.getTableId(), out);
     DatabaseCommon.serializeFields(fields, out, tableSchema, common.getSchemaVersion(), true);
   }
 

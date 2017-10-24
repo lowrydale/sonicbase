@@ -12,13 +12,13 @@ import com.sonicbase.query.Expression;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.server.PreparedIndexLookupNotFoundException;
-import com.sonicbase.server.SnapshotManager;
-import com.sonicbase.util.DataUtil;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.sf.jsqlparser.statement.select.Limit;
 import net.sf.jsqlparser.statement.select.Offset;
 import org.apache.commons.lang.exception.ExceptionUtils;
+import org.apache.giraph.utils.Varint;
 
 import java.io.*;
 import java.util.*;
@@ -156,7 +156,6 @@ public abstract class ExpressionImpl implements Expression {
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
     cobj.put(ComObject.Tag.method, "evaluateCounterGetKeys");
-    String command = "DatabaseServer:ComObject:evaluateCounterGetKeys:";
 
     String batchKey = "DatabaseServer:evaluateCounterGetKeys";
 
@@ -164,7 +163,7 @@ public abstract class ExpressionImpl implements Expression {
     int shardCount = common.getServersConfig().getShardCount();
 
     for (int i = 0; i < shardCount; i++) {
-      byte[] ret = client.send(batchKey, i, 0, command, cobj, DatabaseClient.Replica.def);
+      byte[] ret = client.send(batchKey, i, 0, cobj, DatabaseClient.Replica.def);
       ComObject retObj = new ComObject(ret);
 
       byte[] minKeyBytes = retObj.getByteArray(ComObject.Tag.minKey);
@@ -261,7 +260,6 @@ public abstract class ExpressionImpl implements Expression {
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
     cobj.put(ComObject.Tag.method, "evaluateCounterWithRecord");
-    String command = "DatabaseServer:ComObject:evaluateCounterWithRecord:";
 
     String batchKey = "DatabaseServer:evaluateCounterWithRecord";
 
@@ -284,7 +282,7 @@ public abstract class ExpressionImpl implements Expression {
     List<Integer> selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false, fieldOffsets, client.getCommon(), tableSchema,
         indexName, null, BinaryExpression.Operator.equal, null, key, null);
 
-    byte[] ret = client.send(batchKey, selectedShards.get(0), 0, command, cobj, DatabaseClient.Replica.def);
+    byte[] ret = client.send(batchKey, selectedShards.get(0), 0, cobj, DatabaseClient.Replica.def);
     ComObject retObj = new ComObject(ret);
     Counter retCounter = new Counter();
     byte[] counterBytes = retObj.getByteArray(ComObject.Tag.legacyCounter);
@@ -430,7 +428,7 @@ public abstract class ExpressionImpl implements Expression {
    */
   public static void serializeExpression(ExpressionImpl expression, DataOutputStream out) {
     try {
-      out.writeShort(SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+      out.writeShort(DatabaseServer.SERIALIZATION_VERSION);
       out.writeInt(expression.getType().getId());
       expression.serialize(out);
     }
@@ -542,7 +540,7 @@ public abstract class ExpressionImpl implements Expression {
 //          final ByteArrayOutputStream[] bytesOut = new ByteArrayOutputStream[threadCount];
 //          DataOutputStream[] out = new DataOutputStream[threadCount];
 //          List<Future> futures = new ArrayList<>();
-//          DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+//          AtomicInteger resultLength = new AtomicInteger();
 //          int l = 0;
 //          for (int j = 0; j < threadCount; j++) {
 //            int count = (j == (threadCount - 1) ? records.size() - l : records.size() / threadCount);
@@ -561,8 +559,8 @@ public abstract class ExpressionImpl implements Expression {
 //            int k = l;
 //            for (; k < l + count; k++) {
 //              RecordToRead record = records.get(k);
-//              DataUtil.writeVLong(out[j], record.tableId, resultLength);
-//              DataUtil.writeVLong(out[j], record.id, resultLength);
+//              Varint.writeSignedVarLong(out[j], record.tableId, resultLength);
+//              Varint.writeSignedVarLong(out[j], record.id, resultLength);
 //            }
 //            out[j].close();
 //            l = k;
@@ -1148,12 +1146,12 @@ public abstract class ExpressionImpl implements Expression {
           public BatchLookupReturn call() {
             try {
               ComObject cobj = new ComObject();
-              cobj.put(ComObject.Tag.serializationVersion, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+              cobj.put(ComObject.Tag.serializationVersion, DatabaseServer.SERIALIZATION_VERSION);
               cobj.put(ComObject.Tag.tableName, tableSchema.getName());
               cobj.put(ComObject.Tag.indexName, indexSchema.getKey());
               cobj.put(ComObject.Tag.leftOperator, operator.getId());
 
-              DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+              AtomicInteger AtomicInteger = new AtomicInteger();
 
               ComArray columnArray = cobj.putArray(ComObject.Tag.columnOffsets, ComObject.Type.intType);
               writeColumns(tableSchema, columns, columnArray);
@@ -1197,8 +1195,7 @@ public abstract class ExpressionImpl implements Expression {
               cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
               cobj.put(ComObject.Tag.count, count);
               cobj.put(ComObject.Tag.method, "batchIndexLookup");
-              String command = "DatabaseServer:ComObject:batchIndexLookup:";
-              byte[] lookupRet = client.send(null, shard, -1, command, cobj, DatabaseClient.Replica.def);
+              byte[] lookupRet = client.send(null, shard, -1, cobj, DatabaseClient.Replica.def);
               if (previousSchemaVersion < common.getSchemaVersion()) {
                 throw new SchemaOutOfSyncException();
               }
@@ -1365,9 +1362,7 @@ public abstract class ExpressionImpl implements Expression {
                 cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
                 cobj.put(ComObject.Tag.method, "expirePreparedStatement");
                 cobj.put(ComObject.Tag.preparedId, prepared.getValue().preparedId);
-                String command = "DatabaseServer:ComObject:expirePreparedStatement:";
-
-                client.sendToAllShards(null, 0, command, cobj, DatabaseClient.Replica.def);
+                client.sendToAllShards(null, 0, cobj, DatabaseClient.Replica.def);
               }
             }
             Thread.sleep(10 * 1000);
@@ -1739,10 +1734,9 @@ public abstract class ExpressionImpl implements Expression {
             cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
             cobj.put(ComObject.Tag.dbName, dbName);
             cobj.put(ComObject.Tag.method, "indexLookup");
-            String command = "DatabaseServer:ComObject:indexLookup:";
 
             //Timer.Context ctx = INDEX_LOOKUP_SEND_STATS.time();
-            byte[] lookupRet = client.send(null, localShard, 0, command, cobj, DatabaseClient.Replica.def);
+            byte[] lookupRet = client.send(null, localShard, 0, cobj, DatabaseClient.Replica.def);
             //ctx.stop();
 
             //prepared.serversPrepared[localShard][replica] = true;
@@ -2064,9 +2058,9 @@ public abstract class ExpressionImpl implements Expression {
 
 
   private static void writeColumns(
-      TableSchema tableSchema, List<ColumnImpl> columns, DataOutputStream out, DataUtil.ResultLength resultLength) throws IOException {
+      TableSchema tableSchema, List<ColumnImpl> columns, DataOutputStream out) throws IOException {
     if (columns == null) {
-      DataUtil.writeVLong(out, 0, resultLength);
+      Varint.writeSignedVarLong(0, out);
     }
     else {
       int count = 0;
@@ -2077,7 +2071,7 @@ public abstract class ExpressionImpl implements Expression {
           }
         }
       }
-      DataUtil.writeVLong(out, count, resultLength);
+      Varint.writeSignedVarLong(count, out);
 
       for (ColumnImpl column : columns) {
         if (column.getTableName() == null || column.getTableName().equals(tableSchema.getName())) {
@@ -2085,7 +2079,7 @@ public abstract class ExpressionImpl implements Expression {
           if (offset == null) {
             continue;
           }
-          DataUtil.writeVLong(out, offset, resultLength);
+          Varint.writeSignedVarLong(offset, out);
         }
       }
     }
@@ -2147,7 +2141,7 @@ public abstract class ExpressionImpl implements Expression {
         while (nextShard != -2 && (retKeys == null || retKeys.length < count)) {
           ComObject cobj = new ComObject();
           cobj.put(ComObject.Tag.tableId, tableSchema.getTableId());
-          //DataUtil.writeVLong(out, indexSchema == null ? -1 : indexSchema.getIndexId(), resultLength);
+          //Varint.writeSignedVarLong(out, indexSchema == null ? -1 : indexSchema.getIndexId(), resultLength);
           if (parms != null) {
             cobj.put(ComObject.Tag.parms, parms.serialize());
           }
@@ -2212,8 +2206,7 @@ public abstract class ExpressionImpl implements Expression {
           cobj.put(ComObject.Tag.dbName, dbName);
           cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
           cobj.put(ComObject.Tag.method, "indexLookupExpression");
-          String command = "DatabaseServer:ComObject:indexLookupExpression:";
-          byte[] lookupRet = client.send(null, localShard, 0, command, cobj, DatabaseClient.Replica.def);
+          byte[] lookupRet = client.send(null, localShard, 0, cobj, DatabaseClient.Replica.def);
           if (previousSchemaVersion < common.getSchemaVersion()) {
             throw new SchemaOutOfSyncException();
           }

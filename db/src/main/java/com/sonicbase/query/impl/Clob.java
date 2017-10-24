@@ -1,6 +1,6 @@
 package com.sonicbase.query.impl;
 
-import com.sonicbase.util.StreamUtils;
+import org.apache.commons.io.IOUtils;
 
 import java.io.*;
 import java.sql.SQLException;
@@ -70,7 +70,7 @@ public class Clob implements java.sql.Clob {
       return -1;
     }
     try {
-      String str = StreamUtils.readerToString(searchstr.getCharacterStream());
+      String str = IOUtils.toString(searchstr.getCharacterStream());
       return data.indexOf(str, (int)start);
     }
     catch (IOException e) {

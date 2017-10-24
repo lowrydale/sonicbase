@@ -4,7 +4,7 @@ import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.util.DataUtil;
+import org.apache.giraph.utils.Varint;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -149,10 +149,8 @@ public class GroupByContext {
         GroupCounter groupCounter = new GroupCounter();
         Object[] groupValues = new Object[fieldContexts.size()];
         for (int k = 0; k < groupValues.length; k++) {
-          int len = (int) DataUtil.readVLong(in);
-          byte[] buffer = new byte[len];
-          in.readFully(buffer);
-          groupValues[k] = DatabaseCommon.deserializeFields(dbName, common, buffer, 0,
+          int len = (int) Varint.readSignedVarLong(in);
+          groupValues[k] = DatabaseCommon.deserializeFields(dbName, common, in,
               fieldContexts.get(k).tableSchema, common.getSchemaVersion(), common.getSchemaVersion(), null,
               true)[0];
         }

@@ -1,5 +1,9 @@
 package com.sonicbase.database.basics;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.Record;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
@@ -10,9 +14,7 @@ import com.sonicbase.query.impl.SelectContextImpl;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
-import com.sonicbase.util.JsonDict;
-import com.sonicbase.util.StreamUtils;
-import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.testng.annotations.Test;
 
 import java.io.BufferedInputStream;
@@ -38,10 +40,15 @@ public class TestPartsOfJoin {
 
   @Test(enabled=false)
    public void testBasics() throws Exception {
-    String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")));
-    final JsonDict config = new JsonDict(configStr);
+    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
+    ObjectMapper mapper = new ObjectMapper();
+    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
 
-    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+    org.codehaus.plexus.util.FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+
+    ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
+    array.add(DatabaseServer.FOUR_SERVER_LICENSE);
+    config.put("licenseKeys", array);
 
     DatabaseServer.getServers().clear();
 

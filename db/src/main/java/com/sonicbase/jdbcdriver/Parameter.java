@@ -1,7 +1,7 @@
 package com.sonicbase.jdbcdriver;
 
-import com.sonicbase.util.DataUtil;
-import com.sonicbase.util.StreamUtils;
+import org.apache.commons.io.IOUtils;
+import org.apache.giraph.utils.Varint;
 
 import java.io.*;
 import java.sql.SQLException;
@@ -77,10 +77,10 @@ public class Parameter {
     private long length = -1L;
 
     public CharacterStream(Reader value) throws IOException {
-      super(StreamUtils.readerToString(value).getBytes("utf-8"));
+      super(IOUtils.toString(value).getBytes("utf-8"));
     }
     public CharacterStream(Reader value, long length) throws IOException {
-      super(StreamUtils.readerToString(value).getBytes("utf-8"));
+      super(IOUtils.toString(value).getBytes("utf-8"));
       this.length = length;
     }
 
@@ -526,8 +526,7 @@ public class Parameter {
     }
 
     public static ParameterBase deserialize(DataInputStream in) throws IOException {
-      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-      int len = (int) DataUtil.readVLong(in, resultLength);
+      int len = (int) Varint.readSignedVarLong(in);
       byte[] buffer = new byte[len];
       in.readFully(buffer);
       java.lang.String str = new java.lang.String(buffer, "utf-8");
@@ -538,8 +537,7 @@ public class Parameter {
       super.serialize(out, b);
       java.lang.String strValue = getValue().toPlainString();
       byte[] bytes = strValue.getBytes("utf-8");
-      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-      DataUtil.writeVLong(out, bytes.length, resultLength);
+      Varint.writeSignedVarLong(bytes.length, out);
       out.write(bytes);
     }
   }

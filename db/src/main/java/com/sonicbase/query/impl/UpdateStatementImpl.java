@@ -10,6 +10,7 @@ import com.sonicbase.query.UpdateStatement;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.server.SnapshotManager;
 
 import java.sql.SQLException;
@@ -190,8 +191,6 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
                 throw new Exception("No shards selected for query");
               }
 
-              String command = "DatabaseServer:ComObject:updateRecord:";
-
               ComObject cobj = new ComObject();
               cobj.put(ComObject.Tag.dbName, dbName);
               cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
@@ -202,9 +201,9 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
               cobj.put(ComObject.Tag.isCommitting, client.isCommitting());
               cobj.put(ComObject.Tag.transactionId, client.getTransactionId());
               cobj.put(ComObject.Tag.primaryKeyBytes, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), newPrimaryKey));
-              cobj.put(ComObject.Tag.bytes, record.serialize(client.getCommon(), SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION));
+              cobj.put(ComObject.Tag.bytes, record.serialize(client.getCommon(), DatabaseServer.SERIALIZATION_VERSION));
 
-              client.send(null, selectedShards.get(0), rand.nextLong(), command, cobj, DatabaseClient.Replica.def);
+              client.send(null, selectedShards.get(0), rand.nextLong(), cobj, DatabaseClient.Replica.def);
 
               //update keys
 

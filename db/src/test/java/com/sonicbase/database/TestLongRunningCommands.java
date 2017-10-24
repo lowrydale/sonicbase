@@ -1,13 +1,14 @@
 package com.sonicbase.database;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.common.ComObject;
-import com.sonicbase.server.CommandHandler;
+import com.sonicbase.server.MethodInvoker;
 import com.sonicbase.server.DatabaseServer;
-import com.sonicbase.server.LongRunningCommands;
-import com.sonicbase.server.SnapshotManager;
-import com.sonicbase.util.JsonArray;
-import com.sonicbase.util.JsonDict;
-import com.sonicbase.util.StreamUtils;
+import com.sonicbase.server.LongRunningCalls;
+import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.util.FileUtils;
 import org.testng.annotations.Test;
 
@@ -25,13 +26,15 @@ public class TestLongRunningCommands {
 
   @Test
   public void test() throws IOException, InterruptedException {
-    String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")));
-    final JsonDict config = new JsonDict(configStr);
-
-    JsonArray array = config.putArray("licenseKeys");
-    array.add(DatabaseServer.FOUR_SERVER_LICENSE);
+    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
+    ObjectMapper mapper = new ObjectMapper();
+    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+
+    ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
+    array.add(DatabaseServer.FOUR_SERVER_LICENSE);
+    config.put("licenseKeys", array);
 
     DatabaseServer.getServers().clear();
 
@@ -40,9 +43,10 @@ public class TestLongRunningCommands {
     server.disableLogProcessor();
     server.shutdownRepartitioner();
 
-    LongRunningCommands.SingleCommand command = server.getLongRunningCommands().createSingleCommand("DatabaseServer:echo:1:" +
-        SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:test:10", null);
-    //LongRunningCommands.SingleCommand command2 = server.getLongRunningCommands().createSingleCommand("DatabaseServer:echo2:1:1:test:10", null);
+    ComObject cobj  = new ComObject();
+    cobj.put(ComObject.Tag.method, "echo");
+    LongRunningCalls.SingleCommand command = server.getLongRunningCommands().createSingleCommand(cobj.serialize());
+    //LongRunningCalls.SingleCommand command2 = server.getLongRunningCommands().createSingleCommand("DatabaseServer:echo2:1:1:test:10", null);
     server.getLongRunningCommands().addCommand(command);
     //server.getLongRunningCommands().addCommand(command2);
 
@@ -55,11 +59,10 @@ public class TestLongRunningCommands {
 //    }
     Thread.sleep(1000);
 
-    server.getLongRunningCommands().addCommand(server.getLongRunningCommands().createSingleCommand(
-        "DatabaseServer:echo:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:test:11", null));
+    server.getLongRunningCommands().addCommand(server.getLongRunningCommands().createSingleCommand(cobj.serialize()));
 
     while (true) {
-      if (CommandHandler.echoCount.get() == 11) {
+      if (MethodInvoker.echoCount.get() == 11) {
         System.out.println("Echoed");
         break;
       }
@@ -81,15 +84,15 @@ public class TestLongRunningCommands {
 
     assertEquals(server.getLongRunningCommands().getCommandCount(), 0);
 
-    ComObject cobj = new ComObject();
+    cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, "__none__");
     cobj.put(ComObject.Tag.schemaVersion, 1L);
     cobj.put(ComObject.Tag.method, "block");
-    server.getLongRunningCommands().addCommand(server.getLongRunningCommands().createSingleCommand("DatabaseServer:ComObject:block:", cobj.serialize()));
+    server.getLongRunningCommands().addCommand(server.getLongRunningCommands().createSingleCommand(cobj.serialize()));
 
     Thread.sleep(1000);
 
-    int count = CommandHandler.blockCount.get();
+    int count = MethodInvoker.blockCount.get();
 
     server = new DatabaseServer();
     server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true), null, true);
@@ -98,7 +101,7 @@ public class TestLongRunningCommands {
 
     Thread.sleep(1000);
 
-    assertEquals(CommandHandler.blockCount.get(), count + 1);
+    assertEquals(MethodInvoker.blockCount.get(), count + 1);
 
   }
 }

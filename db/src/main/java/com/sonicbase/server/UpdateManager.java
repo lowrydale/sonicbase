@@ -1,5 +1,7 @@
 package com.sonicbase.server;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
@@ -9,8 +11,6 @@ import com.sonicbase.queue.MessageQueueProducer;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.util.JsonArray;
-import com.sonicbase.util.JsonDict;
 import com.sun.jersey.json.impl.writer.JsonEncoder;
 import sun.misc.BASE64Encoder;
 
@@ -54,8 +54,8 @@ public class UpdateManager {
   }
 
   private void initMessageQueueProducers() {
-    final JsonDict config = server.getConfig();
-    JsonDict queueDict = config.getDict("queue");
+    final ObjectNode config = server.getConfig();
+    ObjectNode queueDict = (ObjectNode) config.get("queue");
     logger.info("Starting queue consumers: queue notNull=" + (queueDict != null));
     if (queueDict != null) {
       if (!server.haveProLicense()) {
@@ -63,12 +63,12 @@ public class UpdateManager {
       }
       logger.info("Starting queues. Have license");
 
-      JsonArray streams = queueDict.getArray("producers");
+      ArrayNode streams = queueDict.withArray("producers");
       for (int i = 0; i < streams.size(); i++) {
         try {
-          final JsonDict stream = streams.getDict(i);
-          final String className = stream.getString("className");
-          Integer maxBatchSize = stream.getInt("maxBatchSize");
+          final ObjectNode stream = (ObjectNode) streams.get(i);
+          final String className = stream.get("className").asText();
+          Integer maxBatchSize = stream.get("maxBatchSize").asInt();
           if (maxBatchSize == null) {
             maxBatchSize = 10;
           }
@@ -190,9 +190,9 @@ public class UpdateManager {
       doPopulateIndex(cobj);
     }
     else {
-      String command = "DatabaseServer:ComObject:doPopulateIndex:";
       cobj.put(ComObject.Tag.method, "doPopulateIndex");
-      server.getLongRunningCommands().addCommand(server.getLongRunningCommands().createSingleCommand(command, cobj.serialize()));
+      server.getLongRunningCommands().addCommand(
+          server.getLongRunningCommands().createSingleCommand(cobj.serialize()));
     }
     return null;
   }
@@ -1031,7 +1031,7 @@ private static class InsertRequest {
       record.setSequence2(0);
       record.setUpdateTime(System.currentTimeMillis());
 
-      bytes = record.serialize(server.getCommon(), SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+      bytes = record.serialize(server.getCommon(), DatabaseServer.SERIALIZATION_VERSION);
 
       if (shouldExecute.get()) {
         //because this is the primary key index we won't have more than one index entry for the key
@@ -1455,18 +1455,6 @@ class MessageRequest {
       catch (Exception e) {
         logger.error("Error publishing message", e);
       }
-//      TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
-//      Record record = new Record(dbName, server.getCommon(), recordBytes);
-//      JsonDict recordJson = getJsonFromRecord(tableSchema, record);
-//      JsonDict message = new JsonDict();
-//      message.put("database", dbName);
-//      message.put("table", tableName);
-//      message.put("action", updateType.name());
-//      JsonArray records = message.putArray("records");
-//      records.addDict(recordJson);
-//      for (MessageQueueProducer producer : producers) {
-//        producer.publish(message.toString());
-//      }
     }
   }
 

@@ -1,7 +1,7 @@
 package com.sonicbase.common;
 
 import com.sonicbase.query.DatabaseException;
-import com.sonicbase.util.DataUtil;
+import org.apache.giraph.utils.Varint;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -54,35 +54,35 @@ public class ComArray {
 
   public void serialize(DataOutputStream out) {
     try {
-      DataUtil.writeVLong(out, nestedType.tag);
-      DataUtil.writeVLong(out, array.size());
+      Varint.writeSignedVarLong(nestedType.tag, out);
+      Varint.writeSignedVarLong(array.size(), out);
       for (Object obj : array) {
         if (nestedType.tag == ComObject.Type.objectType.tag) {
           byte[] bytes = ((ComObject)obj).serialize();
-          DataUtil.writeVLong(out, bytes.length);
+          Varint.writeSignedVarLong(bytes.length, out);
           out.write(bytes);
         }
         else if (nestedType.tag == ComObject.Type.longType.tag) {
           if (obj instanceof Integer) {
-            DataUtil.writeVLong(out, (Integer)obj);
+            Varint.writeSignedVarLong((Integer)obj, out);
           }
           else {
-            DataUtil.writeVLong(out, (Long) obj);
+            Varint.writeSignedVarLong((Long) obj, out);
           }
         }
         else if (nestedType.tag == ComObject.Type.intType.tag) {
-          DataUtil.writeVLong(out, (Integer)obj);
+          Varint.writeSignedVarLong((Integer)obj, out);
         }
         else if (nestedType.tag == ComObject.Type.booleanType.tag) {
           out.writeBoolean((Boolean)obj);
         }
         else if (nestedType.tag == ComObject.Type.stringType.tag) {
           byte[] bytes = ((String)obj).getBytes("utf-8");
-          DataUtil.writeVLong(out, bytes.length);
+          Varint.writeSignedVarLong(bytes.length, out);
           out.write(bytes);
         }
         else if (nestedType.tag == ComObject.Type.byteArrayType.tag) {
-          DataUtil.writeVLong(out, ((byte[])obj).length);
+          Varint.writeSignedVarLong(((byte[])obj).length, out);
           out.write((byte[])obj);
         }
         else if (nestedType.tag == ComObject.Type.arrayType.tag) {
@@ -102,17 +102,17 @@ public class ComArray {
         }
         else if (nestedType.tag == bigDecimalType.tag) {
           byte[] bytes = ((BigDecimal) obj).toPlainString().getBytes("utf-8");
-          DataUtil.writeVLong(out, bytes.length);
+          Varint.writeSignedVarLong(bytes.length, out);
           out.write(bytes);
         }
         else if (nestedType.tag == dateType.tag) {
-          DataUtil.writeVLong(out, ((java.sql.Date)obj).getTime());
+          Varint.writeSignedVarLong(((java.sql.Date)obj).getTime(), out);
         }
         else if (nestedType.tag == timeType.tag) {
-          DataUtil.writeVLong(out, ((java.sql.Time)obj).getTime());
+          Varint.writeSignedVarLong(((java.sql.Time)obj).getTime(), out);
         }
         else if (nestedType.tag == timeStampType.tag) {
-          DataUtil.writeVLong(out, ((java.sql.Timestamp)obj).getTime());
+          Varint.writeSignedVarLong(((java.sql.Timestamp)obj).getTime(), out);
         }
       }
     }
@@ -124,11 +124,11 @@ public class ComArray {
   private void deserialize(DataInputStream in) {
     try {
       array.clear();
-      nestedType = new ComObject.DynamicType((int)DataUtil.readVLong(in));
-      int count = (int)DataUtil.readVLong(in);
+      nestedType = new ComObject.DynamicType((int)Varint.readSignedVarLong(in));
+      int count = (int)Varint.readSignedVarLong(in);
       for (int i = 0; i < count; i++) {
         if (nestedType.tag == ComObject.Type.objectType.tag) {
-          int len = (int)DataUtil.readVLong(in);
+          int len = (int)Varint.readSignedVarLong(in);
           byte[] bytes = new byte[len];
           in.readFully(bytes);
           ComObject obj = new ComObject();
@@ -136,13 +136,13 @@ public class ComArray {
           array.add(obj);
         }
         else if (nestedType.tag == ComObject.Type.longType.tag) {
-          array.add(DataUtil.readVLong(in));
+          array.add(Varint.readSignedVarLong(in));
         }
         else if (nestedType.tag == ComObject.Type.intType.tag) {
-          array.add((int)DataUtil.readVLong(in));
+          array.add((int)Varint.readSignedVarLong(in));
         }
         else if (nestedType.tag == ComObject.Type.stringType.tag) {
-          int len = (int)DataUtil.readVLong(in);
+          int len = (int)Varint.readSignedVarLong(in);
           byte[] bytes = new byte[len];
           in.readFully(bytes);
           String value = new String(bytes, "utf-8");
@@ -152,7 +152,7 @@ public class ComArray {
           array.add(in.readBoolean());
         }
         else if (nestedType.tag == ComObject.Type.byteArrayType.tag) {
-          int len = (int)DataUtil.readVLong(in);
+          int len = (int)Varint.readSignedVarLong(in);
           byte[] bytes = new byte[len];
           in.readFully(bytes);
           array.add(bytes);
@@ -174,22 +174,22 @@ public class ComArray {
           array.add(in.readDouble());
         }
         else if (nestedType.tag == bigDecimalType.tag) {
-          int len = (int)DataUtil.readVLong(in);
+          int len = (int)Varint.readSignedVarLong(in);
           byte[] bytes = new byte[len];
           in.readFully(bytes);
           String str = new String(bytes, "utf-8");
           array.add(new java.math.BigDecimal(str));
         }
         else if (nestedType.tag == dateType.tag) {
-          java.sql.Date date = new java.sql.Date(DataUtil.readVLong(in));
+          java.sql.Date date = new java.sql.Date(Varint.readSignedVarLong(in));
           array.add(date);
         }
         else if (nestedType.tag == timeType.tag) {
-          java.sql.Time time = new java.sql.Time(DataUtil.readVLong(in));
+          java.sql.Time time = new java.sql.Time(Varint.readSignedVarLong(in));
           array.add(time);
         }
         else if (nestedType.tag == timeStampType.tag) {
-          java.sql.Timestamp timestamp = new java.sql.Timestamp(DataUtil.readVLong(in));
+          java.sql.Timestamp timestamp = new java.sql.Timestamp(Varint.readSignedVarLong(in));
           array.add(timestamp);
         }
       }

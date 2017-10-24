@@ -6,12 +6,11 @@ import com.sonicbase.common.ComArray;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Logger;
 import com.sonicbase.query.DatabaseException;
-import com.sonicbase.util.DataUtil;
-import com.sonicbase.util.ISO8601;
-import com.sonicbase.util.StreamUtils;
+import com.sonicbase.util.DateUtils;
 import com.sonicbase.research.socket.NettyServer;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.giraph.utils.Varint;
 
 import java.io.*;
 import java.text.ParseException;
@@ -28,8 +27,8 @@ import java.util.zip.GZIPInputStream;
 public class LogManager {
 
   private static final String UTF8_STR = "utf-8";
-  private final List<LogProcessor> logProcessors = new ArrayList<>();
-  private final List<LogProcessor> peerLogProcessors = new ArrayList<>();
+  private final List<LogWriter> logWriters = new ArrayList<>();
+  private final List<LogWriter> peerLogWriters = new ArrayList<>();
   private static Logger logger;
   private final DatabaseServer databaseServer;
   private final ThreadPoolExecutor executor;
@@ -66,9 +65,9 @@ public class LogManager {
     }
     int logThreadCount = 4;//64;
     for (int i = 0; i < logThreadCount; i++) {
-      LogProcessor logProcessor = new LogProcessor(i, -1, logRequests, server.getDataDir(), server.getShard(), server.getReplica());
-      logProcessors.add(logProcessor);
-      Thread thread = new Thread(logProcessor);
+      LogWriter logWriter = new LogWriter(i, -1, logRequests, server.getDataDir(), server.getShard(), server.getReplica());
+      logWriters.add(logWriter);
+      Thread thread = new Thread(logWriter);
       thread.start();
     }
   }
@@ -77,9 +76,9 @@ public class LogManager {
     synchronized (peerLogRequests) {
       if (!peerLogRequests.containsKey(replicaNum)) {
         peerLogRequests.put(replicaNum, new ArrayBlockingQueue<DatabaseServer.LogRequest>(1000));
-        LogProcessor logProcessor = new LogProcessor(0, replicaNum, peerLogRequests.get(replicaNum), server.getDataDir(), server.getShard(), server.getReplica());
-        peerLogProcessors.add(logProcessor);
-        Thread thread = new Thread(logProcessor);
+        LogWriter logWriter = new LogWriter(0, replicaNum, peerLogRequests.get(replicaNum), server.getDataDir(), server.getShard(), server.getReplica());
+        peerLogWriters.add(logWriter);
+        Thread thread = new Thread(logWriter);
         thread.start();
       }
     }
@@ -99,7 +98,7 @@ public class LogManager {
       try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
         String seq = null;
         try {
-          seq = StreamUtils.readerToString(reader);
+          seq = IOUtils.toString(reader);
           seq = seq.trim();
           logSequenceNumber.set(Long.valueOf(seq));
         }
@@ -157,8 +156,7 @@ public class LogManager {
           cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
           cobj.put(ComObject.Tag.method, "setMaxSequenceNum");
           cobj.put(ComObject.Tag.sequenceNumber, maxAllocatedLogSequenceNumber.get());
-          String command = "DatabaseServer:ComObject:setMaxSequenceNum:";
-          server.getClient().send(null, server.getShard(), replica, command, cobj, DatabaseClient.Replica.specified, true);
+          server.getClient().send(null, server.getShard(), replica, cobj, DatabaseClient.Replica.specified, true);
         }
         catch (Exception e) {
           logger.error("Error setting maxSequenceNum: shard=" + server.getShard() + ", replica=" + replica);
@@ -167,7 +165,7 @@ public class LogManager {
     }
   }
 
-  public void enableLogProcessor(boolean enable) {
+  public void enableLogWriter(boolean enable) {
   }
 
   public void replayLogs() {
@@ -201,12 +199,12 @@ public class LogManager {
         }
       }
 
-      for (LogProcessor logProcessor : logProcessors) {
-        logProcessor.closeAndCreateLog();
+      for (LogWriter logWriter : logWriters) {
+        logWriter.closeAndCreateLog();
       }
 
-      for (LogProcessor logProcessor : peerLogProcessors) {
-        logProcessor.closeAndCreateLog();
+      for (LogWriter logWriter : peerLogWriters) {
+        logWriter.closeAndCreateLog();
       }
 
       return sliceFiles.toString();
@@ -261,14 +259,11 @@ public class LogManager {
       for (File file : files) {
         if (sliceFiles.contains(file.getAbsolutePath())) {
           File destFile = new File(destDir, file.getName());
-          StreamUtils.copyFile(file, destFile);
+          FileUtils.copyFile(file, destFile);
         }
       }
     }
   }
-
-
-
 
   private void backupLogDirToAWS(AWSClient awsClient, String logSlicePoint, String bucket, String prefix, String destDir, File srcDir) throws IOException {
     File[] files = srcDir.listFiles();
@@ -408,28 +403,23 @@ public class LogManager {
     logger.info("Deleted peer logs: count=" + count + ", dir=" + dir.getAbsolutePath());
   }
 
-  public void logRequestForPeer(String command, byte[] body, long sequence0, long sequence1, int deadReplica) {
+  public void logRequestForPeer(byte[] request, long sequence0, long sequence1, int deadReplica) {
     startLoggingForPeer(deadReplica);
 
     try {
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
-      byte[] buffer = command.getBytes(UTF8_STR);
 
-      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-      DataUtil.writeVLong(out, sequence0, resultLength);
-      DataUtil.writeVLong(out, sequence1, resultLength);
-      out.writeInt(buffer.length);
-      out.write(buffer);
-      out.writeInt(body == null ? 0 : body.length);
-      if (body != null && body.length != 0) {
-        out.write(body);
-      }
-      DatabaseServer.LogRequest request = new DatabaseServer.LogRequest(1);
-      request.setBuffer(bytesOut.toByteArray());
-      peerLogRequests.get(deadReplica).put(request);
-      request.getLatch().await();
+      Varint.writeSignedVarLong(DatabaseServer.SERIALIZATION_VERSION, out);
+      Varint.writeSignedVarLong(sequence0, out);
+      Varint.writeSignedVarLong(sequence1, out);
+      out.writeInt(request.length);
+      out.write(request);
+
+      DatabaseServer.LogRequest logRequest = new DatabaseServer.LogRequest(1);
+      logRequest.setBuffer(bytesOut.toByteArray());
+      peerLogRequests.get(deadReplica).put(logRequest);
+      logRequest.getLatch().await();
     }
     catch (InterruptedException | IOException e) {
       throw new DatabaseException(e);
@@ -473,18 +463,16 @@ public class LogManager {
   }
 
   private static class QueueEntry {
-    private String command;
-    private byte[] body;
+    private byte[] request;
 
     @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP2", justification = "copying the passed in data is too slow")
     @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
-    public QueueEntry(String command, byte[] body) {
-      this.command = command;
-      this.body = body;
+    public QueueEntry(byte[] request) {
+      this.request = request;
     }
   }
 
-  public class LogProcessor implements Runnable {
+  public class LogWriter implements Runnable {
     private final int offset;
     private final ArrayBlockingQueue<DatabaseServer.LogRequest> currLogRequests;
     private final String dataDir;
@@ -494,7 +482,7 @@ public class LogManager {
     private long currQueueTime = 0;
     private DataOutputStream writer = null;
 
-    public LogProcessor(
+    public LogWriter(
         int offset, int peerReplicaNum, ArrayBlockingQueue<DatabaseServer.LogRequest> logRequests,
         String dataDir, int shard, int replica) {
       this.offset = offset;
@@ -639,7 +627,6 @@ public class LogManager {
     cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
     cobj.put(ComObject.Tag.method, "sendLogsToPeer");
     cobj.put(ComObject.Tag.replica, server.getReplica());
-    String command = "DatabaseServer:ComObject:sendLogsToPeer:";
     AtomicBoolean isHealthy = new AtomicBoolean();
     try {
       server.checkHealthOfServer(server.getShard(), replica, isHealthy, false);
@@ -648,7 +635,7 @@ public class LogManager {
       return;
     }
     if (isHealthy.get()) {
-      byte[] ret = server.getClient().send(null, server.getShard(), replica, command, cobj, DatabaseClient.Replica.specified);
+      byte[] ret = server.getClient().send(null, server.getShard(), replica, cobj, DatabaseClient.Replica.specified);
       ComObject retObj = new ComObject(ret);
       ComArray filenames = retObj.getArray(ComObject.Tag.filenames);
       if (filenames != null) {
@@ -660,8 +647,8 @@ public class LogManager {
           cobj.put(ComObject.Tag.method, "getLogFile");
           cobj.put(ComObject.Tag.replica, server.getReplica());
           cobj.put(ComObject.Tag.filename, filename);
-          command = "DatabaseServer:ComObject:getLogFile:";
-          ret = server.getClient().send(null, server.getShard(), replica, command, cobj, DatabaseClient.Replica.specified);
+
+          ret = server.getClient().send(null, server.getShard(), replica, cobj, DatabaseClient.Replica.specified);
           retObj = new ComObject(ret);
           byte[] bytes = retObj.getByteArray(ComObject.Tag.binaryFileContent);
 
@@ -673,8 +660,7 @@ public class LogManager {
         cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
         cobj.put(ComObject.Tag.method, "deletePeerLogs");
         cobj.put(ComObject.Tag.replica, server.getReplica());
-        command = "DatabaseServer:ComObject:deletePeerLogs:";
-        ret = server.getClient().send(null, server.getShard(), replica, command, cobj, DatabaseClient.Replica.specified);
+        ret = server.getClient().send(null, server.getShard(), replica, cobj, DatabaseClient.Replica.specified);
 
       }
     }
@@ -710,10 +696,8 @@ public class LogManager {
     DataInputStream in;
     long sequence1;
     long sequence0;
-    String command;
     byte[] buffer;
     List<NettyServer.Request> requests;
-    DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
     public int offset;
 
     public LogSource(File file, DatabaseServer server, Logger logger) throws IOException {
@@ -741,7 +725,7 @@ public class LogManager {
 
     public boolean take(DatabaseServer server, Logger logger) {
       readNext(server, logger);
-      return command != null || requests != null;
+      return buffer != null;
     }
 
     public void readNext(DatabaseServer server, Logger logger) {
@@ -749,7 +733,6 @@ public class LogManager {
         int count = in.readInt();
         if (count == 1) {
           NettyServer.Request request = readRequest(server);
-          command = request.getCommand();
           buffer = request.getBody();
           sequence0 = request.getSequence0();
           sequence1 = request.getSequence1();
@@ -769,13 +752,11 @@ public class LogManager {
           }
           sequence0 = lowestSequence0;
           sequence1 = lowestSequence1;
-          command = null;
           buffer = null;
           throw new DatabaseException("Processing batch");
         }
       }
       catch (EOFException e) {
-        command = null;
         buffer = null;
         sequence1 = -1;
         sequence0 = -1;
@@ -788,8 +769,7 @@ public class LogManager {
         }
       }
       catch (Exception e) {
-        logger.error("Error reading log entry: command=" + command, e);
-        command = null;
+        logger.error("Error reading log entry", e);
         buffer = null;
         sequence1 = -1;
         sequence0 = -1;
@@ -804,28 +784,10 @@ public class LogManager {
     }
 
     private NettyServer.Request readRequest(DatabaseServer server) throws IOException {
-      short serializationVersion = (short)DataUtil.readVLong(in, resultLength);
-      sequence0 = DataUtil.readVLong(in, resultLength);
-      sequence1 = DataUtil.readVLong(in, resultLength);
+      short serializationVersion = (short)Varint.readSignedVarLong(in);
+      sequence0 = Varint.readSignedVarLong(in);
+      sequence1 = Varint.readSignedVarLong(in);
       int size = in.readInt();
-      byte[] commandBuffer = new byte[size];
-      in.readFully(commandBuffer);
-      String command = new String(commandBuffer, UTF8_STR);
-      // String[] parts = command.split(":");
-      // StringBuilder builder = new StringBuilder();
-//      for (int i = 0; i < parts.length; i++) {
-//        if (i != 0) {
-//          builder.append(":");
-//        }
-//        if (i == 3) {
-//          builder.append(server.getCommon().getSchemaVersion());
-//        }
-//        else {
-//          builder.append(parts[i]);
-//        }
-//      }
-//      command = builder.toString();
-      size = in.readInt();
       byte[] buffer = size == 0 ? null : new byte[size];
       if (buffer != null) {
         in.readFully(buffer);
@@ -835,7 +797,6 @@ public class LogManager {
       }
 
       NettyServer.Request ret = new NettyServer.Request();
-      ret.setCommand(command);
       ret.setBody(buffer);
       ret.setSequence0(sequence0);
       ret.setSequence1(sequence1);
@@ -844,10 +805,6 @@ public class LogManager {
 
     public void close() throws IOException {
       in.close();
-    }
-
-    public String getCommand() {
-      return command;
     }
 
     public byte[] getBuffer() {
@@ -986,7 +943,7 @@ public class LogManager {
                 executor.submit(new Runnable() {
                   public void run() {
                     try {
-                      server.handleCommand(request.getCommand(), request.getBody(), request.getSequence0(),
+                      server.invokeMethod(request.getBody(), request.getSequence0(),
                           request.getSequence1(), true, false, null, null);
                       countProcessed.incrementAndGet();
                       if (System.currentTimeMillis() - lastLogged.get() > 2000) {
@@ -998,7 +955,7 @@ public class LogManager {
                       }
                     }
                     catch (Exception e) {
-                      logger.error("Error replaying command: command=" + minSource.command, e);
+                      logger.error("Error replaying request", e);
                     }
                     finally {
                       countFinished.incrementAndGet();
@@ -1008,47 +965,40 @@ public class LogManager {
                 throw new DatabaseException("Processing batch");
               }
               else {
-                if (minSource.command == null) {
+                if (minSource.buffer == null) {
                   sources.remove(minOffset);
                   continue;
                 }
 
                 countSubmitted.incrementAndGet();
-                final String command = minSource.command;
                 final byte[] buffer = minSource.buffer;
                 final long sequence0 = minSource.sequence0;
                 final long sequence1 = minSource.sequence1;
-//                System.out.println("shard=" + server.getShard() + ", replica=" + server.getReplica() +
-//                    ", command=" + command + ", s0=" + sequence0 + ", s1=" + sequence1);
-//                executor.submit(new Runnable() {
-//                  public void run() {
-                    try {
-                      server.handleCommand(command, buffer, sequence0, sequence1, true, false, null, null);
-                      countProcessed.incrementAndGet();
-                      if (System.currentTimeMillis() - lastLogged.get() > 2000) {
-                        lastLogged.set(System.currentTimeMillis());
-                        logger.info("applyQueues - progress: count=" + countProcessed.get() +
-                            ", countBatched=" + countBatched.get() +
-                            ", avgBatchSize=" + (countProcessed.get() / batchCount.get()) +
-                            ", rate=" + (double) countProcessed.get() / (double) (System.currentTimeMillis() - begin) * 1000d);
-                      }
-                    }
-                    catch (Exception e) {
-                      logger.error("Error replaying command", e);
-                    }
-                    finally {
-                      countFinished.incrementAndGet();
-                    }
-//                  }
-//                });
 
+                try {
+                  server.invokeMethod(buffer, sequence0, sequence1, true, false, null, null);
+                  countProcessed.incrementAndGet();
+                  if (System.currentTimeMillis() - lastLogged.get() > 2000) {
+                    lastLogged.set(System.currentTimeMillis());
+                    logger.info("applyQueues - progress: count=" + countProcessed.get() +
+                        ", countBatched=" + countBatched.get() +
+                        ", avgBatchSize=" + (countProcessed.get() / batchCount.get()) +
+                        ", rate=" + (double) countProcessed.get() / (double) (System.currentTimeMillis() - begin) * 1000d);
+                  }
+                }
+                catch (Exception e) {
+                  logger.error("Error replaying request", e);
+                }
+                finally {
+                  countFinished.incrementAndGet();
+                }
                 if (!minSource.take(server, logger)) {
                   sources.remove(minOffset);
                 }
               }
             }
             catch (Exception t) {
-              logger.error("Error replaying command: command=" + minSource.command, t);
+              logger.error("Error replaying request", t);
             }
           }
           if (countSubmitted.get() > 0) {
@@ -1062,7 +1012,7 @@ public class LogManager {
             }
           }
           if (countFinished.get() == 0) {
-            logger.info("Processed no commands: shard=" + server.getShard() + ", replica=" + server.getReplica());
+            logger.info("Processed no requests: shard=" + server.getShard() + ", replica=" + server.getReplica());
           }
         }
         finally {
@@ -1074,64 +1024,12 @@ public class LogManager {
             source.close();
           }
         }
-        logger.info("applyQueue commandCount=" + countProcessed.get());
+        logger.info("applyQueue requestCount=" + countProcessed.get());
       }
     }
   }
 
-  public DatabaseServer.LogRequest dont_use_logRequests(List<NettyServer.Request> requests, boolean enableQueuing) throws IOException, InterruptedException {
-    if (enableQueuing) {
-      DatabaseServer.LogRequest logRequest = new DatabaseServer.LogRequest(requests.size());
-      List<byte[]> serializedCommands = new ArrayList<>();
-      for (int i = 0; i < requests.size(); i++) {
-        NettyServer.Request request = requests.get(i);
-        String command = request.getCommand();
-        byte[] body = request.getBody();
-        int pos = command.indexOf(':');
-        int pos2 = command.indexOf(':', pos + 1);
-        String methodStr = null;
-        if (pos2 == -1) {
-          methodStr = command.substring(pos + 1);
-        }
-        else {
-          methodStr = command.substring(pos + 1, pos2);
-        }
-        if (DatabaseClient.getWriteVerbs().contains(methodStr)) {
-
-          ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-          DataOutputStream out = new DataOutputStream(bytesOut);
-          byte[] buffer = command.getBytes(UTF8_STR);
-
-          DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
-          long sequenceNumber = getNextSequencenNum();
-          logRequest.getSequences1()[i] = sequenceNumber;
-          DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-          DataUtil.writeVLong(out, System.currentTimeMillis(), resultLength);
-          DataUtil.writeVLong(out, sequenceNumber, resultLength);
-          out.writeInt(buffer.length);
-          out.write(buffer);
-          out.writeInt(body == null ? 0 : body.length);
-          if (body != null && body.length != 0) {
-            out.write(body);
-          }
-          serializedCommands.add(bytesOut.toByteArray());
-
-//          logRequest = new DatabaseServer.LogRequest();
-//          logRequest.setBuffer(bytesOut.toByteArray());//setBuffers(serializedCommands);
-//          logRequests.put(logRequest);
-        }
-      }
-      if (serializedCommands.size() != 0) {
-        logRequest.setBuffers(serializedCommands);
-        logRequests.put(logRequest);
-        return logRequest;
-      }
-    }
-    return null;
-  }
-
-
-  public DatabaseServer.LogRequest logRequest(String command, byte[] body, boolean enableQueuing, String methodStr,
+  public DatabaseServer.LogRequest logRequest(byte[] body, boolean enableQueuing, String methodStr,
                                               Long existingSequence0, Long existingSequence1, AtomicLong timeLogging) {
     DatabaseServer.LogRequest request = null;
     try {
@@ -1139,9 +1037,7 @@ public class LogManager {
         request = new DatabaseServer.LogRequest(1);
         ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bytesOut);
-        byte[] buffer = command.getBytes(UTF8_STR);
 
-        DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
         long sequence1 = 0;
         long sequence0 = 0;
         if (existingSequence0 != null) {
@@ -1157,21 +1053,18 @@ public class LogManager {
           sequence1 = getNextSequencenNum();
         }
 
-        DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
-        DataUtil.writeVLong(out, sequence0, resultLength);
-        DataUtil.writeVLong(out, sequence1, resultLength);
-        out.writeInt(buffer.length);
-        out.write(buffer);
-        out.writeInt(body == null ? 0 : body.length);
-        if (body != null && body.length != 0) {
-          out.write(body);
-        }
+        Varint.writeSignedVarLong(DatabaseServer.SERIALIZATION_VERSION, out);
+        Varint.writeSignedVarLong(sequence0, out);
+        Varint.writeSignedVarLong(sequence1, out);
+        out.writeInt(body.length);
+        out.write(body);
+
         request.getSequences0()[0] = sequence0;
         request.getSequences1()[0] = sequence1;
         request.setBuffer(bytesOut.toByteArray());
         request.setBegin(System.nanoTime());
         request.setTimeLogging(timeLogging);
-//        logProcessors.get(0).logRequests(Collections.singletonList(request));
+//        logWriters.get(0).logRequests(Collections.singletonList(request));
 //        if (request.getTimeLogging() != null) {
 //          request.getTimeLogging().addAndGet(System.nanoTime() - request.getBegin());
 //        }
@@ -1210,7 +1103,7 @@ public class LogManager {
               int pos2 = name.lastIndexOf('.');
               String dateStr = name.substring(pos + 1, pos2);
               dateStr = dateStr.replace('_', ':');
-              Date fileDate = ISO8601.from8601String(dateStr).getTime();
+              Date fileDate = DateUtils.fromString(dateStr);
               long fileTime = fileDate.getTime();
               if (fileTime < lastSnapshot - (60 * 1000) && file.exists() && !file.delete()) {
                 throw new DatabaseException("Error deleting file: file=" + file.getAbsolutePath());

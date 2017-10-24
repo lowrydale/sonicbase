@@ -2,7 +2,7 @@ package com.sonicbase.schema;
 
 import com.sonicbase.common.ExcludeRename;
 import com.sonicbase.query.DatabaseException;
-import com.sonicbase.util.StreamUtils;
+import org.apache.commons.io.IOUtils;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -135,7 +135,7 @@ public class DataType {
       else if (value instanceof InputStream) {
         ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
         try {
-          StreamUtils.copyStream((InputStream) value, bytesOut);
+          IOUtils.copy((InputStream) value, bytesOut);
           bytesOut.close();
         }
         catch (IOException e) {

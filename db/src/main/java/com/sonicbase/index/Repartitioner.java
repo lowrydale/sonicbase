@@ -1,5 +1,7 @@
 package com.sonicbase.index;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.query.BinaryExpression;
@@ -11,8 +13,7 @@ import com.sonicbase.schema.Schema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.socket.DeadServerException;
-import com.sonicbase.util.JsonDict;
-import com.sonicbase.util.StreamUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 
 import java.io.*;
@@ -350,10 +351,9 @@ public class Repartitioner extends Thread {
                   cobj.put(ComObject.Tag.tableName, finalTableName);
                   cobj.put(ComObject.Tag.indexName, indexName);
                   cobj.put(ComObject.Tag.method, "rebalanceOrderedIndex");
-                  String command = "DatabaseServer:ComObject:rebalanceOrderedIndex:";
                   Random rand = new Random(System.currentTimeMillis());
                   try {
-                    byte[] ret = databaseServer.getDatabaseClient().send(null, shard, rand.nextLong(), command,
+                    byte[] ret = databaseServer.getDatabaseClient().send(null, shard, rand.nextLong(),
                         cobj, DatabaseClient.Replica.master);
                     ComObject retObj = new ComObject(ret);
                     masters[shard] = retObj.getInt(ComObject.Tag.replica);
@@ -376,12 +376,11 @@ public class Repartitioner extends Thread {
               boolean areAllComplete = true;
               for (int shard = 0; shard < databaseServer.getShardCount(); shard++) {
                 try {
-                  String command = "DatabaseServer:ComObject:isShardRepartitioningComplete:";
                   ComObject cobj = new ComObject();
                   cobj.put(ComObject.Tag.dbName, "__none__");
                   cobj.put(ComObject.Tag.schemaVersion, databaseServer.getCommon().getSchemaVersion());
                   cobj.put(ComObject.Tag.method, "isShardRepartitioningComplete");
-                  byte[] bytes = databaseServer.getClient().send(null, shard, masters[shard], command, cobj, DatabaseClient.Replica.specified);
+                  byte[] bytes = databaseServer.getClient().send(null, shard, masters[shard], cobj, DatabaseClient.Replica.specified);
                   ComObject retObj = new ComObject(bytes);
                   long count = retObj.getLong(ComObject.Tag.countLong);
                   String exception = retObj.getString(ComObject.Tag.exception);
@@ -480,7 +479,6 @@ public class Repartitioner extends Thread {
 
   public void stopShardsFromRepartitioning() {
     logger.info("stopShardsFromRepartitioning - begin");
-    final String command = "DatabaseServer:ComObject:stopRepartitioning:";
     final ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, "__none__");
     cobj.put(ComObject.Tag.method, "stopRepartitioning");
@@ -494,7 +492,7 @@ public class Repartitioner extends Thread {
           @Override
           public Object call() throws Exception {
             try {
-              databaseServer.getClient().send(null, localShard, localReplica, command, cobj, DatabaseClient.Replica.specified);
+              databaseServer.getClient().send(null, localShard, localReplica, cobj, DatabaseClient.Replica.specified);
             }
             catch (Exception e) {
               logger.error("Error stopping repartitioning on server: shard=" + localShard + ", replica=" + localReplica);
@@ -720,7 +718,7 @@ public class Repartitioner extends Thread {
 //    try {
 //      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
 //      DataOutputStream out = new DataOutputStream(bytesOut);
-//      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+//      Varint.writeSignedVarLong(out, SnapshotManager.SERIALIZATION_VERSION);
 //      boolean finished = isRepartitioningRecordsByIdComplete();
 //      out.writeBoolean(finished);
 //      return bytesOut.toByteArray();
@@ -751,7 +749,7 @@ public class Repartitioner extends Thread {
 //    try {
 //      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
 //      DataOutputStream out = new DataOutputStream(bytesOut);
-//      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+//      Varint.writeSignedVarLong(out, SnapshotManager.SERIALIZATION_VERSION);
 //      boolean finished = isDeletingComplete();
 //      out.writeBoolean(finished);
 //      return bytesOut.toByteArray();
@@ -772,12 +770,11 @@ public class Repartitioner extends Thread {
     cobj.put(ComObject.Tag.tableName, tableName);
     cobj.put(ComObject.Tag.indexName, indexName);
     cobj.put(ComObject.Tag.method, "getKeyAtOffset");
-    String command = "DatabaseServer:ComObject:getKeyAtOffset:";
     ComArray array = cobj.putArray(ComObject.Tag.offsets, ComObject.Type.longType);
     for (OffsetEntry offset : offsets) {
       array.add(offset.offset);
     }
-    byte[] ret = databaseServer.getDatabaseClient().send(null, shard, 0, command, cobj, DatabaseClient.Replica.master);
+    byte[] ret = databaseServer.getDatabaseClient().send(null, shard, 0, cobj, DatabaseClient.Replica.master);
 
     if (ret == null) {
       throw new IllegalStateException("Key not found on shard: shard=" + shard + ", table=" + tableName + ", index=" + indexName);
@@ -891,9 +888,8 @@ public class Repartitioner extends Thread {
     cobj.put(ComObject.Tag.tableName, tableName);
     cobj.put(ComObject.Tag.indexName, indexName);
     cobj.put(ComObject.Tag.method, "getPartitionSize");
-    String command = "DatabaseServer:ComObject:getPartitionSize:";
     Random rand = new Random(System.currentTimeMillis());
-    byte[] ret = databaseServer.getDatabaseClient().send(null, shard, rand.nextLong(), command,
+    byte[] ret = databaseServer.getDatabaseClient().send(null, shard, rand.nextLong(),
         cobj, DatabaseClient.Replica.master);
     ComObject retObj = new ComObject(ret);
     return retObj.getLong(ComObject.Tag.size);
@@ -1032,9 +1028,9 @@ public class Repartitioner extends Thread {
   public ComObject rebalanceOrderedIndex(ComObject cobj) {
     isShardRepartitioningComplete = false;
 
-    String command = "DatabaseServer:ComObject:doRebalanceOrderedIndex:";
     cobj.put(ComObject.Tag.method, "doRebalanceOrderedIndex");
-    databaseServer.getLongRunningCommands().addCommand(databaseServer.getLongRunningCommands().createSingleCommand(command, cobj.serialize()));
+    databaseServer.getLongRunningCommands().addCommand(
+        databaseServer.getLongRunningCommands().createSingleCommand(cobj.serialize()));
     ComObject retObj = new ComObject();
     retObj.put(ComObject.Tag.replica, databaseServer.getReplica());
     return retObj;
@@ -1500,9 +1496,8 @@ public class Repartitioner extends Thread {
             return currObj.getArray(ComObject.Tag.keys).getArray().size();
           }
           else {
-            String command = "DatabaseServer:ComObject:deleteMovedRecords:";
             databaseServer.getDatabaseClient().send(null, databaseServer.getShard(), replica,
-                command, currObj, DatabaseClient.Replica.specified);
+                currObj, DatabaseClient.Replica.specified);
             return currObj.getArray(ComObject.Tag.keys).getArray().size();
           }
         }
@@ -1954,8 +1949,7 @@ public class Repartitioner extends Thread {
             ", destShard=" + shard, e);
       }
     }
-    String command = "DatabaseServer:ComObject:moveIndexEntries:";
-    databaseServer.getDatabaseClient().send(null, shard, 0, command, cobj, DatabaseClient.Replica.def);
+    databaseServer.getDatabaseClient().send(null, shard, 0, cobj, DatabaseClient.Replica.def);
     countMoved.addAndGet(count);
   }
 
@@ -2414,8 +2408,7 @@ public static class GlobalIndexCounts {
             cobj.put(ComObject.Tag.dbName, dbName);
             cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
             cobj.put(ComObject.Tag.method, "getIndexCounts");
-            String command = "DatabaseServer:ComObject:getIndexCounts:";
-            byte[] response = client.send(null, shard, 0, command, cobj, DatabaseClient.Replica.master);
+            byte[] response = client.send(null, shard, 0, cobj, DatabaseClient.Replica.master);
             synchronized (ret) {
               ComObject retObj = new ComObject(response);
               ComArray tables = retObj.getArray(ComObject.Tag.tables);
@@ -2595,17 +2588,17 @@ public static class GlobalIndexCounts {
       if (!file.exists()) {
         file = new File(System.getProperty("user.dir"), "src/main/resources/config/config-" + databaseServer.getCluster() + ".json");
       }
-      String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(new FileInputStream(file)));
-      //logger.info("Config: " + configStr);
-      JsonDict config = new JsonDict(configStr);
+      String configStr = IOUtils.toString(new BufferedInputStream(new FileInputStream(file)), "utf-8");
+      ObjectMapper mapper = new ObjectMapper();
+      ObjectNode config = (ObjectNode) mapper.readTree(configStr);
 
       boolean isInternal = false;
-      if (config.hasKey("clientIsPrivate")) {
-        isInternal = config.getBoolean("clientIsPrivate");
+      if (config.has("clientIsPrivate")) {
+        isInternal = config.get("clientIsPrivate").asBoolean();
       }
 
-      DatabaseServer.ServersConfig newConfig = new DatabaseServer.ServersConfig(databaseServer.getCluster(), config.getArray("shards"),
-          config.getArray("shards").getDict(0).getArray("replicas").size(), isInternal);
+      DatabaseServer.ServersConfig newConfig = new DatabaseServer.ServersConfig(databaseServer.getCluster(),
+          config.withArray("shards"), config.withArray("shards").get(0).withArray("replicas").size(), isInternal);
       DatabaseServer.Shard[] newShards = newConfig.getShards();
 
       synchronized (common) {

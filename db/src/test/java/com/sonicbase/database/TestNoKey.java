@@ -1,13 +1,15 @@
 
 package com.sonicbase.database;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.server.DatabaseServer;
-import com.sonicbase.util.JsonArray;
-import com.sonicbase.util.JsonDict;
-import com.sonicbase.util.StreamUtils;
+import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.util.FileUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -40,13 +42,15 @@ public class TestNoKey {
   @BeforeClass
   public void beforeClass() throws Exception {
     try {
-      String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")));
-      final JsonDict config = new JsonDict(configStr);
-
-      JsonArray array = config.putArray("licenseKeys");
-      array.add(DatabaseServer.FOUR_SERVER_LICENSE);
+      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
+      ObjectMapper mapper = new ObjectMapper();
+      final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+
+      ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
+      array.add(DatabaseServer.FOUR_SERVER_LICENSE);
+      config.put("licenseKeys", array);
 
       DatabaseServer.getServers().clear();
 
@@ -126,7 +130,7 @@ public class TestNoKey {
       while (true) {
         ComObject cobj = new ComObject();
         cobj.put(ComObject.Tag.method, "areAllLongRunningCommandsComplete");
-        byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().sendToMaster("DatabaseServer:ComObject:areAllLongRunningCommandsComplete:1:test", cobj);
+        byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().sendToMaster(cobj);
         ComObject retObj = new ComObject(bytes);
         if (retObj.getBoolean(ComObject.Tag.isComplete)) {
           break;
@@ -165,29 +169,6 @@ public class TestNoKey {
 //      dbServers[3].replayLogs();
 
 
-//      JsonDict backupConfig = new JsonDict("{\n" +
-//          "    \"type\" : \"fileSystem\",\n" +
-//          "    \"directory\": \"/data/db-backup\",\n" +
-//          "    \"period\": \"daily\",\n" +
-//          "    \"time\": \"23:00\",\n" +
-//          "    \"maxBackupCount\": 10,\n" +
-//          "    \"sharedDirectory\": true\n" +
-//          "  }");
-//
-//      for (DatabaseServer dbServer : dbServers) {
-//        dbServer.setBackupConfig(backupConfig);
-//      }
-//
-//      client.startBackup();
-//      while (true) {
-//        Thread.sleep(1000);
-//        if (client.isBackupComplete()) {
-//          break;
-//        }
-//      }
-//
-//      Thread.sleep(5000);
-//
 //      File file = new File("/data/db-backup");
 //      File[] dirs = file.listFiles();
 //

@@ -3,15 +3,12 @@ package com.sonicbase.server;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.index.Indices;
-import com.sonicbase.index.Repartitioner;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.CreateTableStatementImpl;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.util.DataUtil;
-import javafx.scene.control.Tab;
 
 import java.io.*;
 import java.util.*;
@@ -139,8 +136,7 @@ public class SchemaManager {
           cobj.put(ComObject.Tag.slave, true);
           cobj.put(ComObject.Tag.masterSlave, "slave");
           cobj.put(ComObject.Tag.method, "createDatabaseSlave");
-          String command = "DatabaseServer:ComObject:createDatabaseSlave:";
-          server.getDatabaseClient().send(null, i, 0, command, cobj, DatabaseClient.Replica.def);
+          server.getDatabaseClient().send(null, i, 0, cobj, DatabaseClient.Replica.def);
         }
         server.pushSchema();
       }
@@ -202,8 +198,7 @@ public class SchemaManager {
         for (int i = 0; i < server.getShardCount(); i++) {
 
           cobj.put(ComObject.Tag.masterSlave, "slave");
-          String command = "DatabaseServer:ComObject:dropTable:";
-          byte[] ret = server.getDatabaseClient().send(null, i, rand.nextLong(), command, cobj, DatabaseClient.Replica.def);
+          byte[] ret = server.getDatabaseClient().send(null, i, rand.nextLong(), cobj, DatabaseClient.Replica.def);
         }
         server.pushSchema();
       }
@@ -339,14 +334,13 @@ public class SchemaManager {
 
           ComObject slaveObj = new ComObject();
 
-          slaveObj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION));
+          slaveObj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(DatabaseServer.SERIALIZATION_VERSION));
           slaveObj.put(ComObject.Tag.tableName, tableName);
           slaveObj.put(ComObject.Tag.dbName, dbName);
           slaveObj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
           slaveObj.put(ComObject.Tag.method, "createTableSlave");
           slaveObj.put(ComObject.Tag.masterSlave, "slave");
-          String command = "DatabaseServer:ComObject:createTableSlave:";
-          server.getDatabaseClient().send(null, i, rand.nextLong(), command, slaveObj, DatabaseClient.Replica.def);
+          server.getDatabaseClient().send(null, i, rand.nextLong(), slaveObj, DatabaseClient.Replica.def);
         }
       }
 
@@ -505,7 +499,7 @@ public class SchemaManager {
         cobj.put(ComObject.Tag.dbName, dbName);
         cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
         cobj.put(ComObject.Tag.method, "createIndexSlave");
-        cobj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION));
+        cobj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(DatabaseServer.SERIALIZATION_VERSION));
         cobj.put(ComObject.Tag.tableName, table.get());
         ComArray array = cobj.putArray(ComObject.Tag.indices, ComObject.Type.stringType);
         for (String currIndexName : createdIndices) {
@@ -514,8 +508,7 @@ public class SchemaManager {
         cobj.put(ComObject.Tag.masterSlave, "slave");
 
         for (int i = 0; i < server.getShardCount(); i++) {
-          String command = "DatabaseServer:ComObject:createIndexSlave:";
-          server.getDatabaseClient().send(null, i, 0, command, cobj, DatabaseClient.Replica.def);
+          server.getDatabaseClient().send(null, i, 0, cobj, DatabaseClient.Replica.def);
         }
       }
 
@@ -534,8 +527,7 @@ public class SchemaManager {
             cobj.put(ComObject.Tag.dbName, dbName);
             cobj.put(ComObject.Tag.schemaVersion, server.getClient().getCommon().getSchemaVersion());
             cobj.put(ComObject.Tag.method, "getIndexCounts");
-            String command = "DatabaseServer:ComObject:getIndexCounts:";
-            byte[] response = server.getClient().send(null, shard, 0, command, cobj, DatabaseClient.Replica.master);
+            byte[] response = server.getClient().send(null, shard, 0, cobj, DatabaseClient.Replica.master);
             ComObject retObj = new ComObject(response);
             ComArray tables = retObj.getArray(ComObject.Tag.tables);
             if (tables != null) {
@@ -563,8 +555,6 @@ public class SchemaManager {
 
         if (totalSize != 0) {
           for (String currIndexName : createdIndices) {
-
-            String command = "DatabaseServer:ComObject:populateIndex:";
             cobj = new ComObject();
             cobj.put(ComObject.Tag.dbName, dbName);
             cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
@@ -572,7 +562,7 @@ public class SchemaManager {
             cobj.put(ComObject.Tag.indexName, currIndexName);
             cobj.put(ComObject.Tag.method, "populateIndex");
             for (int i = 0; i < server.getShardCount(); i++) {
-              server.getDatabaseClient().send(null, i, 0, command, cobj, DatabaseClient.Replica.def);
+              server.getDatabaseClient().send(null, i, 0, cobj, DatabaseClient.Replica.def);
             }
           }
         }
@@ -653,7 +643,7 @@ public class SchemaManager {
         cobj.put(ComObject.Tag.dbName, dbName);
         cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
         cobj.put(ComObject.Tag.method, "dropIndexSlave");
-        cobj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION));
+        cobj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(DatabaseServer.SERIALIZATION_VERSION));
         cobj.put(ComObject.Tag.tableName, table);
         cobj.put(ComObject.Tag.masterSlave, "slave");
         ComArray array = cobj.putArray(ComObject.Tag.indices, ComObject.Type.stringType);
@@ -666,8 +656,7 @@ public class SchemaManager {
 //            if (i == 0 && server.getCommon().getServersConfig().getShards()[0].getMasterReplica() == j) {
 //              continue;
 //            }
-            String command = "DatabaseServer:ComObject:dropIndexSlave:";
-            server.getDatabaseClient().send(null, i, j, command, cobj, DatabaseClient.Replica.specified);
+            server.getDatabaseClient().send(null, i, j, cobj, DatabaseClient.Replica.specified);
           }
         }
 

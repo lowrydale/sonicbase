@@ -2,7 +2,7 @@ package com.sonicbase.schema;
 
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.ExcludeRename;
-import com.sonicbase.util.DataUtil;
+import org.apache.giraph.utils.Varint;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -258,7 +258,7 @@ public class TableSchema {
   }
 
   public void serialize(DataOutputStream out) throws IOException {
-    DataUtil.writeVLong(out, tableId, new DataUtil.ResultLength());
+    Varint.writeSignedVarLong(tableId, out);
     out.writeInt(fields.size());
     out.writeUTF(name);
     for (FieldSchema field : fields) {
@@ -328,7 +328,7 @@ public class TableSchema {
   }
 
   public void deserialize(DataInputStream in, short serializationVersion) throws IOException {
-    tableId = (int) DataUtil.readVLong(in, new DataUtil.ResultLength());
+    tableId = (int) Varint.readSignedVarLong(in);
     int fieldCount = in.readInt();
     name = in.readUTF();
     for (int i = 0; i < fieldCount; i++) {

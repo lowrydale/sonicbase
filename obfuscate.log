@@ -15,7 +15,7 @@ Please review your source code to ensure that the dangerous methods are not inte
 to act on classes which have been obfuscated.
 -->
 <!--
-     Your class com.sonicbase.server.CommandHandler calls the java.lang.Class method java.lang.reflect.Method getMethod(java.lang.String, java.lang.Class[])
+     Your class com.sonicbase.server.MethodInvoker calls the java.lang.Class method java.lang.reflect.Method getMethod(java.lang.String, java.lang.Class[])
 -->
 <!--
      Your class com.sonicbase.server.DatabaseServer calls the java.lang.Class method java.lang.reflect.Field getDeclaredField(java.lang.String)
@@ -1083,116 +1083,116 @@ to act on classes which have been obfuscated.
   <class name="com.sonicbase.client.ReconfigureResults"/>
   <method class="com.sonicbase.client.ReconfigureResults" name="boolean isHandedOffToMaster()"/>
   <method class="com.sonicbase.client.ReconfigureResults" name="int getShardCount()"/>
-  <class name="com.sonicbase.server.CommandHandler"/>
-  <field class="com.sonicbase.server.CommandHandler" name="echo2Count"/>
-  <field class="com.sonicbase.server.CommandHandler" name="echoCount"/>
-  <field class="com.sonicbase.server.CommandHandler" name="blockCount"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject pushMaxSequenceNum(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject isBackupComplete(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject getRecoverProgress(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject getFile(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject prepareToComeAlive(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject dropColumn(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject getOSStats(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject deleteMovedRecords(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject deleteRecord(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject markReplicaDead(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject echo2(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject insertIndexEntryByKeyWithRecord(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject areAllLongRunningCommandsComplete(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject getLogFile(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject populateIndex(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject countRecords(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject rollback(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject prepareForRestore(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject truncateTable(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject healthCheckPriority(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject indexLookupExpression(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject isServerReloadFinished(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject createIndexSlave(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject promoteToMaster(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject moveIndexEntries(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject stopRepartitioning(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject indexLookup(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject logError(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="byte[] handleCommand(java.lang.String, byte[], boolean, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject dropTable(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject sendLogsToPeer(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject createIndex(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject setMaxSequenceNum(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject createDatabase(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject doRestoreFileSystem(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject batchIndexLookup(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject getKeyAtOffset(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject forceDeletes(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject closeResultSet(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject insertIndexEntryByKey(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject evaluateCounter(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject doBackupFileSystem(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="byte[] startBackup(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject serverSelect(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject beginRebalance(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="int getTestWriteCallCount()"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject promoteEntireReplicaToMaster(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject getLastBackupDir(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject doBackupAWS(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject finishServerReloadForSource(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject updateSchema(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject getIndexCounts(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject prepareForBackup(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject healthCheck(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject abortTransaction(java.lang.String, byte[], boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="byte[] noOp(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject updateServersConfig(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject echo(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject electNewMaster(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject serverSelectDelete(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="byte[] sendQueueFile(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject isEntireBackupComplete(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject startRestore(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject deletePeerLogs(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject notifyRepartitioningComplete(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject promoteToMasterAndPushSchema(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject reloadServer(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject isShardRepartitioningComplete(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject createTable(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject dropIndexSlave(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject prepareSourceForServerReload(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="void setRepartitioner(com.sonicbase.index.Repartitioner)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject isRepartitioningComplete(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject testWrite(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject expirePreparedStatement(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject doPopulateIndex(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject isEntireRestoreComplete(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject getDatabaseFile(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject getConfig(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject deleteIndexEntryByKey(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject updateRecord(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject block(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject rebalanceOrderedIndex(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject batchInsertIndexEntryByKey(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject addColumn(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject createTableSlave(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject isRestoreComplete(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject dropIndex(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject allocateRecordIds(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject commit(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject setMaxRecordId(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject reconfigureCluster(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject getDbNames(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject doRebalanceOrderedIndex(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject getSchema(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject doRestoreAWS(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject reserveNextIdFromReplica(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject getPartitionSize(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject markReplicaAlive(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="byte[] handleCommand(java.lang.String, byte[], long, long, boolean, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject finishRestore(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject finishBackup(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="void shutdown()"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject deleteIndexEntry(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject pushMaxRecordId(com.sonicbase.common.ComObject, boolean)"/>
-  <method class="com.sonicbase.server.CommandHandler" name="com.sonicbase.common.ComObject batchInsertIndexEntryByKeyWithRecord(com.sonicbase.common.ComObject, boolean)"/>
+  <class name="com.sonicbase.server.MethodInvoker"/>
+  <field class="com.sonicbase.server.MethodInvoker" name="echo2Count"/>
+  <field class="com.sonicbase.server.MethodInvoker" name="echoCount"/>
+  <field class="com.sonicbase.server.MethodInvoker" name="blockCount"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject pushMaxSequenceNum(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject isBackupComplete(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject getRecoverProgress(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject getFile(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject prepareToComeAlive(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject dropColumn(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject getOSStats(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject deleteMovedRecords(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject deleteRecord(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject markReplicaDead(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject echo2(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject insertIndexEntryByKeyWithRecord(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject areAllLongRunningCommandsComplete(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject getLogFile(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject populateIndex(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject countRecords(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject rollback(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject prepareForRestore(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject truncateTable(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject healthCheckPriority(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject indexLookupExpression(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject isServerReloadFinished(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject createIndexSlave(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject promoteToMaster(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject moveIndexEntries(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject stopRepartitioning(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject indexLookup(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject logError(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="byte[] handleCommand(java.lang.String, byte[], boolean, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject dropTable(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject sendLogsToPeer(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject createIndex(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject setMaxSequenceNum(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject createDatabase(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject doRestoreFileSystem(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject batchIndexLookup(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject getKeyAtOffset(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject forceDeletes(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject closeResultSet(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject insertIndexEntryByKey(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject evaluateCounter(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject doBackupFileSystem(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="byte[] startBackup(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject serverSelect(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject beginRebalance(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="int getTestWriteCallCount()"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject promoteEntireReplicaToMaster(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject getLastBackupDir(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject doBackupAWS(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject finishServerReloadForSource(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject updateSchema(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject getIndexCounts(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject prepareForBackup(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject healthCheck(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject abortTransaction(java.lang.String, byte[], boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="byte[] noOp(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject updateServersConfig(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject echo(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject electNewMaster(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject serverSelectDelete(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="byte[] sendQueueFile(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject isEntireBackupComplete(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject startRestore(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject deletePeerLogs(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject notifyRepartitioningComplete(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject promoteToMasterAndPushSchema(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject reloadServer(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject isShardRepartitioningComplete(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject createTable(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject dropIndexSlave(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject prepareSourceForServerReload(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="void setRepartitioner(com.sonicbase.index.Repartitioner)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject isRepartitioningComplete(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject testWrite(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject expirePreparedStatement(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject doPopulateIndex(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject isEntireRestoreComplete(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject getDatabaseFile(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject getConfig(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject deleteIndexEntryByKey(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject updateRecord(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject block(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject rebalanceOrderedIndex(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject batchInsertIndexEntryByKey(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject addColumn(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject createTableSlave(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject isRestoreComplete(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject dropIndex(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject allocateRecordIds(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject commit(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject setMaxRecordId(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject reconfigureCluster(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject getDbNames(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject doRebalanceOrderedIndex(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject getSchema(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject doRestoreAWS(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject reserveNextIdFromReplica(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject getPartitionSize(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject markReplicaAlive(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="byte[] handleCommand(java.lang.String, byte[], long, long, boolean, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject finishRestore(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject finishBackup(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="void shutdown()"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject deleteIndexEntry(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject pushMaxRecordId(com.sonicbase.common.ComObject, boolean)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="com.sonicbase.common.ComObject batchInsertIndexEntryByKeyWithRecord(com.sonicbase.common.ComObject, boolean)"/>
   <class name="com.sonicbase.schema.FieldSchema"/>
   <method class="com.sonicbase.schema.FieldSchema" name="void deserialize(java.io.DataInputStream, int)"/>
   <method class="com.sonicbase.schema.FieldSchema" name="com.sonicbase.schema.DataType$Type getType()"/>
@@ -1346,11 +1346,11 @@ to act on classes which have been obfuscated.
   <method class="com.sonicbase.util.JsonArray" name="boolean isArray(int)"/>
   <method class="com.sonicbase.util.JsonArray" name="void add(long[])"/>
   <method class="com.sonicbase.util.JsonArray" name="boolean isDict(int)"/>
-  <class name="com.sonicbase.util.ISO8601"/>
-  <method class="com.sonicbase.util.ISO8601" name="java.util.Calendar from8601String(java.lang.String)"/>
-  <method class="com.sonicbase.util.ISO8601" name="java.lang.String fromDate(java.util.Date)"/>
-  <method class="com.sonicbase.util.ISO8601" name="java.lang.String to8601String(java.util.Date)"/>
-  <method class="com.sonicbase.util.ISO8601" name="java.lang.String fromCalendar(java.util.Calendar)"/>
+  <class name="com.sonicbase.util.DateUtils"/>
+  <method class="com.sonicbase.util.DateUtils" name="java.util.Calendar from8601String(java.lang.String)"/>
+  <method class="com.sonicbase.util.DateUtils" name="java.lang.String fromDate(java.util.Date)"/>
+  <method class="com.sonicbase.util.DateUtils" name="java.lang.String to8601String(java.util.Date)"/>
+  <method class="com.sonicbase.util.DateUtils" name="java.lang.String fromCalendar(java.util.Calendar)"/>
   <class name="com.sonicbase.util.JsonDict"/>
   <method class="com.sonicbase.util.JsonDict" name="com.sonicbase.util.JsonArray putArray(java.lang.String, com.sonicbase.util.JsonArray)"/>
   <method class="com.sonicbase.util.JsonDict" name="java.lang.Boolean getBoolean(java.lang.String)"/>
@@ -2840,28 +2840,28 @@ to act on classes which have been obfuscated.
   <method class="com.sonicbase.server.SchemaManager" name="com.sonicbase.common.ComObject createDatabase(com.sonicbase.common.ComObject, boolean)" map="E"/>
   <method class="com.sonicbase.server.SchemaManager" name="com.sonicbase.common.ComObject dropColumn(com.sonicbase.common.ComObject)" map="E"/>
   <class name="com.sonicbase.server.PreparedIndexLookupNotFoundException" map="C"/>
-  <class name="com.sonicbase.server.CommandHandler$ReplicaFuture" map="_A"/>
-  <field class="com.sonicbase.server.CommandHandler$ReplicaFuture" name="this$0" map="A"/>
-  <field class="com.sonicbase.server.CommandHandler$ReplicaFuture" name="future" map="B"/>
-  <field class="com.sonicbase.server.CommandHandler$ReplicaFuture" name="replica" map="C"/>
-  <method class="com.sonicbase.server.CommandHandler$ReplicaFuture" name="int access$100(com.sonicbase.server.CommandHandler$ReplicaFuture)" map="A"/>
-  <method class="com.sonicbase.server.CommandHandler$ReplicaFuture" name="java.util.concurrent.Future access$000(com.sonicbase.server.CommandHandler$ReplicaFuture)" map="B"/>
-  <field class="com.sonicbase.server.CommandHandler" name="transactionManager" map="A"/>
-  <field class="com.sonicbase.server.CommandHandler" name="snapshotManager" map="B"/>
-  <field class="com.sonicbase.server.CommandHandler" name="testWriteCallCount" map="C"/>
-  <field class="com.sonicbase.server.CommandHandler" name="repartitioner" map="D"/>
-  <field class="com.sonicbase.server.CommandHandler" name="server" map="E"/>
-  <field class="com.sonicbase.server.CommandHandler" name="shutdown" map="F"/>
-  <field class="com.sonicbase.server.CommandHandler" name="priorityCommands" map="G"/>
-  <field class="com.sonicbase.server.CommandHandler" name="updateManager" map="H"/>
-  <field class="com.sonicbase.server.CommandHandler" name="common" map="I"/>
-  <field class="com.sonicbase.server.CommandHandler" name="schemaManager" map="J"/>
-  <field class="com.sonicbase.server.CommandHandler" name="readManager" map="K"/>
-  <field class="com.sonicbase.server.CommandHandler" name="logManager" map="L"/>
-  <field class="com.sonicbase.server.CommandHandler" name="logger" map="M"/>
-  <field class="com.sonicbase.server.CommandHandler" name="deleteManager" map="N"/>
-  <method class="com.sonicbase.server.CommandHandler" name="java.lang.Long getExistingSequence1(java.lang.String)" map="A"/>
-  <method class="com.sonicbase.server.CommandHandler" name="java.lang.Long getExistingSequence0(java.lang.String)" map="B"/>
+  <class name="com.sonicbase.server.MethodInvoker$ReplicaFuture" map="_A"/>
+  <field class="com.sonicbase.server.MethodInvoker$ReplicaFuture" name="this$0" map="A"/>
+  <field class="com.sonicbase.server.MethodInvoker$ReplicaFuture" name="future" map="B"/>
+  <field class="com.sonicbase.server.MethodInvoker$ReplicaFuture" name="replica" map="C"/>
+  <method class="com.sonicbase.server.MethodInvoker$ReplicaFuture" name="int access$100(com.sonicbase.server.MethodInvoker$ReplicaFuture)" map="A"/>
+  <method class="com.sonicbase.server.MethodInvoker$ReplicaFuture" name="java.util.concurrent.Future access$000(com.sonicbase.server.MethodInvoker$ReplicaFuture)" map="B"/>
+  <field class="com.sonicbase.server.MethodInvoker" name="transactionManager" map="A"/>
+  <field class="com.sonicbase.server.MethodInvoker" name="snapshotManager" map="B"/>
+  <field class="com.sonicbase.server.MethodInvoker" name="testWriteCallCount" map="C"/>
+  <field class="com.sonicbase.server.MethodInvoker" name="repartitioner" map="D"/>
+  <field class="com.sonicbase.server.MethodInvoker" name="server" map="E"/>
+  <field class="com.sonicbase.server.MethodInvoker" name="shutdown" map="F"/>
+  <field class="com.sonicbase.server.MethodInvoker" name="priorityCommands" map="G"/>
+  <field class="com.sonicbase.server.MethodInvoker" name="updateManager" map="H"/>
+  <field class="com.sonicbase.server.MethodInvoker" name="common" map="I"/>
+  <field class="com.sonicbase.server.MethodInvoker" name="schemaManager" map="J"/>
+  <field class="com.sonicbase.server.MethodInvoker" name="readManager" map="K"/>
+  <field class="com.sonicbase.server.MethodInvoker" name="logManager" map="L"/>
+  <field class="com.sonicbase.server.MethodInvoker" name="logger" map="M"/>
+  <field class="com.sonicbase.server.MethodInvoker" name="deleteManager" map="N"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="java.lang.Long getExistingSequence1(java.lang.String)" map="A"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="java.lang.Long getExistingSequence0(java.lang.String)" map="B"/>
   <class name="com.sonicbase.server.UpdateManager$1" map="1"/>
   <field class="com.sonicbase.server.UpdateManager$1" name="$SwitchMap$com$sonicbase$server$TransactionManager$OperationType" map="A"/>
   <class name="com.sonicbase.server.UpdateManager" map="D"/>
@@ -2901,7 +2901,7 @@ to act on classes which have been obfuscated.
   <field class="com.sonicbase.server.SnapshotManager$3" name="val$tableEntry" map="o"/>
   <field class="com.sonicbase.server.SnapshotManager$3" name="this$0" map="p"/>
   <field class="com.sonicbase.server.SnapshotManager$3" name="val$lastLogged" map="q"/>
-  <field class="com.sonicbase.server.SnapshotManager$3" name="val$resultLength" map="r"/>
+  <field class="com.sonicbase.server.SnapshotManager$3" name="val$AtomicInteger" map="r"/>
   <field class="com.sonicbase.server.SnapshotManager$3" name="val$index" map="s"/>
   <field class="com.sonicbase.server.SnapshotManager$3" name="val$countSaved" map="t"/>
   <field class="com.sonicbase.server.SnapshotManager$3" name="val$subBegin" map="u"/>
@@ -3019,19 +3019,19 @@ to act on classes which have been obfuscated.
   <method class="com.sonicbase.server.DeleteManager" name="void restoreFileSystem(java.lang.String, java.lang.String)" map="B"/>
   <method class="com.sonicbase.server.DeleteManager" name="void forceDeletes()" map="C"/>
   <method class="com.sonicbase.server.DeleteManager" name="void doDeletes()" map="D"/>
-  <class name="com.sonicbase.server.LogManager$LogProcessor" map="_A"/>
-  <field class="com.sonicbase.server.LogManager$LogProcessor" name="replica" map="A"/>
-  <field class="com.sonicbase.server.LogManager$LogProcessor" name="currLogRequests" map="B"/>
-  <field class="com.sonicbase.server.LogManager$LogProcessor" name="writer" map="C"/>
-  <field class="com.sonicbase.server.LogManager$LogProcessor" name="offset" map="D"/>
-  <field class="com.sonicbase.server.LogManager$LogProcessor" name="this$0" map="E"/>
-  <field class="com.sonicbase.server.LogManager$LogProcessor" name="peerReplicaNum" map="F"/>
-  <field class="com.sonicbase.server.LogManager$LogProcessor" name="dataDir" map="G"/>
-  <field class="com.sonicbase.server.LogManager$LogProcessor" name="currQueueTime" map="H"/>
-  <field class="com.sonicbase.server.LogManager$LogProcessor" name="shard" map="I"/>
-  <method class="com.sonicbase.server.LogManager$LogProcessor" name="void access$000(com.sonicbase.server.LogManager$LogProcessor)" map="A"/>
-  <method class="com.sonicbase.server.LogManager$LogProcessor" name="void closeAndCreateLog()" map="A"/>
-  <method class="com.sonicbase.server.LogManager$LogProcessor" name="void run()" map="run"/>
+  <class name="com.sonicbase.server.LogManager$LogWriter" map="_A"/>
+  <field class="com.sonicbase.server.LogManager$LogWriter" name="replica" map="A"/>
+  <field class="com.sonicbase.server.LogManager$LogWriter" name="currLogRequests" map="B"/>
+  <field class="com.sonicbase.server.LogManager$LogWriter" name="writer" map="C"/>
+  <field class="com.sonicbase.server.LogManager$LogWriter" name="offset" map="D"/>
+  <field class="com.sonicbase.server.LogManager$LogWriter" name="this$0" map="E"/>
+  <field class="com.sonicbase.server.LogManager$LogWriter" name="peerReplicaNum" map="F"/>
+  <field class="com.sonicbase.server.LogManager$LogWriter" name="dataDir" map="G"/>
+  <field class="com.sonicbase.server.LogManager$LogWriter" name="currQueueTime" map="H"/>
+  <field class="com.sonicbase.server.LogManager$LogWriter" name="shard" map="I"/>
+  <method class="com.sonicbase.server.LogManager$LogWriter" name="void access$000(com.sonicbase.server.LogManager$LogWriter)" map="A"/>
+  <method class="com.sonicbase.server.LogManager$LogWriter" name="void closeAndCreateLog()" map="A"/>
+  <method class="com.sonicbase.server.LogManager$LogWriter" name="void run()" map="run"/>
   <class name="com.sonicbase.server.LogManager$2" map="2"/>
   <field class="com.sonicbase.server.LogManager$2" name="val$sequence1" map="A"/>
   <field class="com.sonicbase.server.LogManager$2" name="val$sequence0" map="B"/>
@@ -3048,7 +3048,7 @@ to act on classes which have been obfuscated.
   <class name="com.sonicbase.server.LogManager$LogSource" map="_B"/>
   <field class="com.sonicbase.server.LogManager$LogSource" name="requests" map="A"/>
   <field class="com.sonicbase.server.LogManager$LogSource" name="filename" map="B"/>
-  <field class="com.sonicbase.server.LogManager$LogSource" name="resultLength" map="C"/>
+  <field class="com.sonicbase.server.LogManager$LogSource" name="AtomicInteger" map="C"/>
   <field class="com.sonicbase.server.LogManager$LogSource" name="command" map="D"/>
   <field class="com.sonicbase.server.LogManager$LogSource" name="totalBytes" map="E"/>
   <field class="com.sonicbase.server.LogManager$LogSource" name="offset" map="F"/>

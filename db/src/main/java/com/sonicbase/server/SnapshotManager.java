@@ -1,5 +1,6 @@
 package com.sonicbase.server;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
@@ -9,10 +10,8 @@ import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.util.DataUtil;
-import com.sonicbase.util.JsonDict;
-import com.sonicbase.util.StreamUtils;
 import org.apache.commons.io.FileUtils;
+import org.apache.giraph.utils.Varint;
 
 import java.io.*;
 import java.text.ParseException;
@@ -23,9 +22,10 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 
 public class SnapshotManager {
+
+  public static final int SNAPSHOT_PARTITION_COUNT = 128;
 
   private static final String SNAPSHOT_STR = "snapshot/";
   private static final String INDEX_STR = ", index=";
@@ -33,19 +33,9 @@ public class SnapshotManager {
   private static final String DURATION_STR = ", duration(s)=";
   public Logger logger;
 
-  public static final int SNAPSHOT_BUCKET_COUNT = 128;
-  public static final short SNAPSHOT_SERIALIZATION_VERSION = 23;
-  public static final short SNAPSHOT_SERIALIZATION_VERSION_23 = 23;
-  public static final short SNAPSHOT_SERIALIZATION_VERSION_22 = 22;
-  public static final short SNAPSHOT_SERIALIZATION_VERSION_21 = 21;
-  public static final short SNAPSHOT_SERIALIZATION_VERSION_20 = 20;
-  public static final short SNAPSHOT_SERIALIZATION_VERSION_19 = 19;
-
   private final DatabaseServer server;
   private long lastSnapshot = -1;
-  private ConcurrentHashMap<Integer, Integer> lockedSnapshots = new ConcurrentHashMap<Integer, Integer>();
   private boolean enableSnapshot = true;
-  private boolean pauseSnapshotRolling;
   private boolean isRecovering;
 
   public SnapshotManager(DatabaseServer databaseServer) {
@@ -53,26 +43,10 @@ public class SnapshotManager {
     this.logger = new Logger(databaseServer.getDatabaseClient());
   }
 
-  public void unlockSnapshot(int highestSnapshot) {
-    lockedSnapshots.remove(highestSnapshot);
-  }
-
-  public String lockSnapshot(String dbName) {
-    String dataRoot = getSnapshotRootDir(dbName);
-    File dataRootDir = new File(dataRoot);
-    dataRootDir.mkdirs();
-
-    int highestSnapshot = getHighestSafeSnapshotVersion(dataRootDir, logger);
-
-    lockedSnapshots.put(highestSnapshot, highestSnapshot);
-
-    return new File(dataRootDir, String.valueOf(highestSnapshot)).getAbsolutePath();
-  }
-
-  public static int getHighestSafeSnapshotVersion(File dataRootDir, Logger logger) {
+  public static int getHighestCommittedSnapshotVersion(File snapshotRootDir, Logger logger) {
     int highestSnapshot = -1;
     try {
-      String[] dirs = dataRootDir.list();
+      String[] dirs = snapshotRootDir.list();
       if (dirs != null) {
         for (String dir : dirs) {
           int pos = dir.indexOf('.');
@@ -96,8 +70,8 @@ public class SnapshotManager {
     return highestSnapshot;
   }
 
-  private int getHighestUnsafeSnapshotVersion(File dataRootDir) {
-    String[] dirs = dataRootDir.list();
+  private int getHighestUnCommittedSnapshotVersion(File snapshotRootDir) {
+    String[] dirs = snapshotRootDir.list();
     int highestSnapshot = -1;
     if (dirs != null) {
       for (String dir : dirs) {
@@ -165,7 +139,7 @@ public class SnapshotManager {
         }
       }
 
-      int highestSnapshot = getHighestSafeSnapshotVersion(dataRootDir, logger);
+      int highestSnapshot = getHighestCommittedSnapshotVersion(dataRootDir, logger);
 
       if (highestSnapshot == -1) {
         return;
@@ -175,7 +149,7 @@ public class SnapshotManager {
 
       logger.info("Recover from snapshot: dir=" + snapshotDir.getAbsolutePath());
 
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(SNAPSHOT_BUCKET_COUNT, SNAPSHOT_BUCKET_COUNT, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+      ThreadPoolExecutor executor = new ThreadPoolExecutor(SNAPSHOT_PARTITION_COUNT, SNAPSHOT_PARTITION_COUNT, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
       final AtomicLong recoveredCount = new AtomicLong();
       recoveredCount.set(0);
@@ -225,7 +199,6 @@ public class SnapshotManager {
                                               int countForFile = 0;
                                               try (DataInputStream inStream = new DataInputStream(new BufferedInputStream(new ByteCounterStream(finishedBytes, new FileInputStream(indexFile))))) {
                                                 boolean isPrimaryKey = indexSchema.isPrimaryKey();
-                                                DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
                                                 while (true) {
 
                                                   if (!inStream.readBoolean()) {
@@ -233,10 +206,10 @@ public class SnapshotManager {
                                                   }
                                                   Object[] key = DatabaseCommon.deserializeKey(tableSchema, inStream);
 
-                                                  int count = (int) DataUtil.readVLong(inStream, resultLength);
+                                                  int count = (int) Varint.readSignedVarLong(inStream);
                                                   byte[][] records = new byte[count][];
                                                   for (int i = 0; i < records.length; i++) {
-                                                    int len = (int) DataUtil.readVLong(inStream, resultLength);
+                                                    int len = (int) Varint.readSignedVarLong(inStream);
                                                     records[i] = new byte[len];
                                                     inStream.readFully(records[i]);
                                                   }
@@ -358,17 +331,15 @@ public class SnapshotManager {
     }
 
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.serializationVersion, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+    cobj.put(ComObject.Tag.serializationVersion, DatabaseServer.SERIALIZATION_VERSION);
     cobj.put(ComObject.Tag.keyBytes, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), key));
     cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.tableName, tableName);
     cobj.put(ComObject.Tag.indexName, indexSchema.getName());
     cobj.put(ComObject.Tag.method, "deleteRecord");
-    String command = "DatabaseServer:ComObject:deleteRecord:";
-    server.getClient().send("DatabaseServer:deleteRecord", selectedShards.get(0), 0, command, cobj, DatabaseClient.Replica.def);
+    server.getClient().send("DatabaseServer:deleteRecord", selectedShards.get(0), 0, cobj, DatabaseClient.Replica.def);
 
-    command = "DatabaseServer:ComObject:deleteIndexEntry:";
     cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
@@ -376,7 +347,7 @@ public class SnapshotManager {
     cobj.put(ComObject.Tag.method, "deleteIndexEntry");
     cobj.put(ComObject.Tag.recordBytes, record);
 
-    server.getClient().sendToAllShards(null, 0, command, cobj, DatabaseClient.Replica.def);
+    server.getClient().sendToAllShards(null, 0, cobj, DatabaseClient.Replica.def);
   }
 
   public void runSnapshot(String dbName) throws IOException, InterruptedException, ParseException {
@@ -387,26 +358,26 @@ public class SnapshotManager {
     logger.info("Snapshot - begin");
 
     //todo: may want to gzip this
-    String dataRoot = getSnapshotRootDir(dbName);
-    File dataRootDir = new File(dataRoot);
-    dataRootDir.mkdirs();
-    int highestSnapshot = getHighestUnsafeSnapshotVersion(dataRootDir);
 
-    File file = new File(dataRoot, String.valueOf(highestSnapshot + 1) + ".in-process");
+    File snapshotRootDir = new File(getSnapshotRootDir(dbName));
+    snapshotRootDir.mkdirs();
+    int highestSnapshot = getHighestUnCommittedSnapshotVersion(snapshotRootDir);
+
+    File file = new File(snapshotRootDir, String.valueOf(highestSnapshot + 1) + ".tmp");
     file.mkdirs();
 
     logger.info("Snapshot to: dir=" + file.getAbsolutePath());
 
     File versionFile = new File(file, "version.txt");
     try (BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(versionFile))) {
-      out.write(String.valueOf(SNAPSHOT_SERIALIZATION_VERSION).getBytes());
+      out.write(String.valueOf(DatabaseServer.SERIALIZATION_VERSION).getBytes());
     }
 
-    JsonDict config = server.getConfig();
-    JsonDict expire = config.getDict("expireRecords");
+    ObjectNode config = server.getConfig();
+    ObjectNode expire = (ObjectNode) config.get("expireRecords");
     Long deleteIfOlder = null;
     if (expire != null) {
-      long duration = expire.getLong("durationMinutes");
+      long duration = expire.get("durationMinutes").asLong();
       deleteIfOlder = System.currentTimeMillis() - duration * 60;
     }
     final AtomicLong countSaved = new AtomicLong();
@@ -414,7 +385,6 @@ public class SnapshotManager {
 
     final AtomicInteger tableCount = new AtomicInteger();
     final AtomicInteger indexCount = new AtomicInteger();
-    final DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
     for (final Map.Entry<String, TableSchema> tableEntry : server.getCommon().getTables(dbName).entrySet()) {
       tableCount.incrementAndGet();
       for (final Map.Entry<String, IndexSchema> indexEntry : tableEntry.getValue().getIndices().entrySet()) {
@@ -430,7 +400,7 @@ public class SnapshotManager {
         final AtomicLong savedCount = new AtomicLong();
         final Index index = server.getIndices(dbName).getIndices().get(tableEntry.getKey()).get(indexEntry.getKey());
 
-        final DataOutputStream[] outStreams = new DataOutputStream[SNAPSHOT_BUCKET_COUNT];
+        final DataOutputStream[] outStreams = new DataOutputStream[SNAPSHOT_PARTITION_COUNT];
         try {
           for (int i = 0; i < outStreams.length; i++) {
             File currFile = new File(file, tableEntry.getKey() + "/" + indexEntry.getKey() + "/" + i + ".bin");
@@ -441,7 +411,7 @@ public class SnapshotManager {
           final boolean isPrimaryKey = indexEntry.getValue().isPrimaryKey();
           Map.Entry<Object[], Object> entry = index.firstEntry();
           while (entry != null) {
-            int bucket = (int) (countSaved.incrementAndGet() % SNAPSHOT_BUCKET_COUNT);
+            int bucket = (int) (countSaved.incrementAndGet() % SNAPSHOT_PARTITION_COUNT);
 
             byte[][] records = null;
             synchronized (index.getMutex(entry.getKey())) {
@@ -463,7 +433,7 @@ public class SnapshotManager {
               byte[] keyBytes = DatabaseCommon.serializeKey(tableEntry.getValue(), indexEntry.getKey(), entry.getKey());
               outStreams[bucket].write(keyBytes);
 
-              DataUtil.writeVLong(outStreams[bucket], records.length, resultLength);
+              Varint.writeSignedVarLong(records.length, outStreams[bucket]);
               for (byte[] record : records) {
 
                 if (deleteIfOlder != null) {
@@ -474,7 +444,7 @@ public class SnapshotManager {
                   }
                 }
 
-                DataUtil.writeVLong(outStreams[bucket], record.length, resultLength);
+                Varint.writeSignedVarLong(record.length, outStreams[bucket]);
                 outStreams[bucket].write(record);
 
                 savedCount.incrementAndGet();
@@ -508,11 +478,7 @@ public class SnapshotManager {
       }
     }
 
-    File snapshotDir = new File(dataRoot, String.valueOf(highestSnapshot + 1));
-
-    while (pauseSnapshotRolling) {
-      Thread.sleep(10000);
-    }
+    File snapshotDir = new File(snapshotRootDir, String.valueOf(highestSnapshot + 1));
 
     file.renameTo(snapshotDir);
 
@@ -529,12 +495,11 @@ public class SnapshotManager {
   }
 
   private void deleteOldSnapshots(String dbName) throws IOException, InterruptedException, ParseException {
-    String dataRoot = getSnapshotRootDir(dbName);
-    File dataRootDir = new File(dataRoot);
-    dataRootDir.mkdirs();
-    int highestSnapshot = getHighestSafeSnapshotVersion(dataRootDir, logger);
+    File snapshotRootDir = new File(getSnapshotRootDir(dbName));
+    snapshotRootDir.mkdirs();
+    int highestSnapshot = getHighestCommittedSnapshotVersion(snapshotRootDir, logger);
 
-    for (String dirStr : dataRootDir.list()) {
+    for (String dirStr : snapshotRootDir.list()) {
       int dirNum = -1;
       try {
         dirNum = Integer.valueOf(dirStr);
@@ -542,15 +507,12 @@ public class SnapshotManager {
       catch (Exception t) {
         //expected numeric format problems
       }
-      if (dirStr.contains("in-process") || (dirNum != -1 && dirNum < (highestSnapshot))) {
-        if (!lockedSnapshots.containsKey(dirNum)) {
-          File dir = new File(dataRootDir, dirStr);
-          logger.info("Deleting snapshot: " + dir.getAbsolutePath());
-          FileUtils.deleteDirectory(dir);
-        }
+      if (dirStr.contains("tmp") || (dirNum != -1 && dirNum < (highestSnapshot))) {
+        File dir = new File(snapshotRootDir, dirStr);
+        logger.info("Deleting snapshot: " + dir.getAbsolutePath());
+        FileUtils.deleteDirectory(dir);
       }
     }
-
   }
 
   public void enableSnapshot(boolean enable) {
@@ -566,10 +528,6 @@ public class SnapshotManager {
     if (enable) {
       runSnapshotLoop();
     }
-  }
-
-  public void pauseSnapshotRolling(boolean pause) {
-    this.pauseSnapshotRolling = pause;
   }
 
   public void deleteSnapshots() {
@@ -590,7 +548,7 @@ public class SnapshotManager {
       file.getParentFile().mkdirs();
 
       File sourceFile = new File(getSnapshotReplicaDir(), "schema.bin");
-      StreamUtils.copyFile(sourceFile, file);
+      FileUtils.copyFile(sourceFile, file);
 
 
       file = new File(directory, subDirectory);
@@ -599,7 +557,7 @@ public class SnapshotManager {
 
       sourceFile = new File(getSnapshotReplicaDir(), "config.bin");
       if (sourceFile.exists()) {
-        StreamUtils.copyFile(sourceFile, file);
+        FileUtils.copyFile(sourceFile, file);
       }
     }
     catch (Exception e) {
@@ -680,9 +638,6 @@ public class SnapshotManager {
     }
   }
 
-  public void abortSnapshot() {
-  }
-
   public void getFilesForCurrentSnapshot(List<String> files) {
     File replicaDir = getSnapshotReplicaDir();
     getFilesFromDirectory(replicaDir, files);
@@ -702,26 +657,26 @@ public class SnapshotManager {
     }
   }
 
-  public void deleteInProcessDirs() {
+  public void deleteTempDirs() {
     try {
       File dir = getSnapshotReplicaDir();
-      doDeleteInProcessDirs(dir);
+      doDeleteTempDirs(dir);
     }
     catch (Exception e) {
 
     }
   }
 
-  private void doDeleteInProcessDirs(File dir) throws IOException {
+  private void doDeleteTempDirs(File dir) throws IOException {
     File[] files = dir.listFiles();
     if (files != null) {
       for (File file : files) {
         if (file.isDirectory()) {
-          if (file.getName().contains("in-process")) {
+          if (file.getName().contains("tmp")) {
             FileUtils.deleteDirectory(file);
           }
           else {
-            doDeleteInProcessDirs(file);
+            doDeleteTempDirs(file);
           }
         }
       }

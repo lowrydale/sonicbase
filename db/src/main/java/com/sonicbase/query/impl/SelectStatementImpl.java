@@ -11,14 +11,14 @@ import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.server.ReadManager;
-import com.sonicbase.server.SnapshotManager;
-import com.sonicbase.util.DataUtil;
 import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
 import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.statement.select.Limit;
 import net.sf.jsqlparser.statement.select.Offset;
 import org.apache.commons.lang.exception.ExceptionUtils;
+import org.apache.giraph.utils.Varint;
 
 import java.io.*;
 import java.util.*;
@@ -113,7 +113,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
    */
   public void serialize(DataOutputStream out) {
     try {
-      DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+      Varint.writeSignedVarLong(DatabaseServer.SERIALIZATION_VERSION, out);
       out.writeUTF(fromTable);
       ExpressionImpl.serializeExpression(expression, out);
       out.writeInt(orderByExpressions.size());
@@ -127,19 +127,17 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       out.writeBoolean(serverSelect);
       out.writeBoolean(serverSort);
 
-      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+      Varint.writeSignedVarLong(serverSelectPageNumber, out);
+      Varint.writeSignedVarLong(serverSelectShardNumber, out);
+      Varint.writeSignedVarLong(serverSelectReplicaNumber, out);
+      Varint.writeSignedVarLong(serverSelectResultSetId, out);
 
-      DataUtil.writeVLong(out, serverSelectPageNumber, resultLength);
-      DataUtil.writeVLong(out, serverSelectShardNumber, resultLength);
-      DataUtil.writeVLong(out, serverSelectReplicaNumber, resultLength);
-      DataUtil.writeVLong(out, serverSelectResultSetId, resultLength);
-
-      DataUtil.writeVLong(out, tableNames.length, resultLength);
+      Varint.writeSignedVarLong(tableNames.length, out);
       for (int i = 0; i < tableNames.length; i++) {
         out.writeUTF(tableNames[i]);
       }
 
-      DataUtil.writeVLong(out, joins.size(), resultLength);
+      Varint.writeSignedVarLong(joins.size(), out);
       for (Join join : joins) {
         join.serialize(out);
       }
@@ -170,7 +168,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
    */
   public void deserialize(DataInputStream in, String dbName) {
     try {
-      short serializationVersion = (short)DataUtil.readVLong(in);
+      short serializationVersion = (short)Varint.readSignedVarLong(in);
       fromTable = in.readUTF();
       expression = ExpressionImpl.deserializeExpression(in);
       int count = in.readInt();
@@ -190,14 +188,12 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       serverSelect = in.readBoolean();
       serverSort = in.readBoolean();
 
-      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+      serverSelectPageNumber = (int) Varint.readSignedVarLong(in);
+      serverSelectShardNumber = (int) Varint.readSignedVarLong(in);
+      serverSelectReplicaNumber = (int) Varint.readSignedVarLong(in);
+      serverSelectResultSetId = Varint.readSignedVarLong(in);
 
-      serverSelectPageNumber = (int) DataUtil.readVLong(in, resultLength);
-      serverSelectShardNumber = (int) DataUtil.readVLong(in, resultLength);
-      serverSelectReplicaNumber = (int) DataUtil.readVLong(in, resultLength);
-      serverSelectResultSetId = DataUtil.readVLong(in, resultLength);
-
-      int tableCount = (int) DataUtil.readVLong(in, resultLength);
+      int tableCount = (int) Varint.readSignedVarLong(in);
       tableNames = new String[tableCount];
       for (int i = 0; i < tableNames.length; i++) {
         tableNames[i] = in.readUTF();
@@ -210,7 +206,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       expression.setOrderByExpressions(orderByExpressions);
 
       joins.clear();
-      int joinCount = (int) DataUtil.readVLong(in, resultLength);
+      int joinCount = (int) Varint.readSignedVarLong(in);
       for (int i = 0; i < joinCount; i++) {
         Join join = new Join();
         join.deserialize(in);
@@ -783,10 +779,9 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
         cobj.put(ComObject.Tag.dbName, dbName);
 
         int previousSchemaVersion = client.getCommon().getSchemaVersion();
-        String command = "DatabaseServer:ComObject:serverSelect:";
 
         byte[] recordRet = client.send(null, Math.abs(ThreadLocalRandom.current().nextInt() % client.getShardCount()),
-            Math.abs(ThreadLocalRandom.current().nextLong()), command, cobj, DatabaseClient.Replica.def);
+            Math.abs(ThreadLocalRandom.current().nextLong()), cobj, DatabaseClient.Replica.def);
         if (previousSchemaVersion < client.getCommon().getSchemaVersion()) {
           throw new SchemaOutOfSyncException();
         }
@@ -949,7 +944,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
               @Override
               public Object call() throws Exception {
                 ComObject cobj = new ComObject();
-                cobj.put(ComObject.Tag.serializationVersion, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+                cobj.put(ComObject.Tag.serializationVersion, DatabaseServer.SERIALIZATION_VERSION);
                 if (expression instanceof AllRecordsExpressionImpl) {
                   expression = null;
                 }
@@ -974,8 +969,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                 cobj.put(ComObject.Tag.method, "countRecords");
                 cobj.put(ComObject.Tag.tableName, fromTable);
 
-                String command = "DatabaseServer:ComObject:countRecords:";
-                byte[] lookupRet = client.send(null, shard, 0, command, cobj, DatabaseClient.Replica.master);
+                byte[] lookupRet = client.send(null, shard, 0, cobj, DatabaseClient.Replica.master);
                 if (previousSchemaVersion < client.getCommon().getSchemaVersion()) {
                   throw new SchemaOutOfSyncException();
                 }

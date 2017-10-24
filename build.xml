@@ -48,12 +48,10 @@
                       <include name="com.sonicbase.schema.DataType$$Type"/>
                       <include name="com.sonicbase.query.DatabaseException"/>
                       <include name="com.sonicbase.common.LicenseOutOfComplianceException"/>
-                      <include name="com.sonicbase.server.CommandHandler"/>
+                      <include name="com.sonicbase.server.MethodInvoker"/>
                       <include name="com.sonicbase.common.WindowsTerminal"/>
                       <include name="com.sonicbase.query.impl.ResultSetImpl"/>
-                      <include name="com.sonicbase.util.ISO8601"/>
-                      <include name="com.sonicbase.util.JsonDict"/>
-                      <include name="com.sonicbase.util.JsonArray"/>
+                      <include name="com.sonicbase.util.DateUtils"/>
                       <include name="com.sonicbase.util.StreamUtils"/>
                       <include name="com.sonicbase.common.SchemaOutOfSyncException"/>
                   </patternset>

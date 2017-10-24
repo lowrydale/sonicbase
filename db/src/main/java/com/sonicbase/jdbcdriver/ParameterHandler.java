@@ -1,11 +1,10 @@
 package com.sonicbase.jdbcdriver;
 
 
-import com.sonicbase.common.ComObject;
 import com.sonicbase.query.DatabaseException;
-import com.sonicbase.server.SnapshotManager;
-import com.sonicbase.util.DataUtil;
-import com.sonicbase.util.StreamUtils;
+import com.sonicbase.server.DatabaseServer;
+import org.apache.commons.io.IOUtils;
+import org.apache.giraph.utils.Varint;
 
 import java.io.*;
 import java.math.BigDecimal;
@@ -271,7 +270,9 @@ public class ParameterHandler {
   public void setBinaryStream(int parameterIndex, InputStream x) throws SQLException {
     byte[] bytes = null;
     try {
-      bytes = StreamUtils.inputStreamToBytes(x);
+      ByteArrayOutputStream out = new ByteArrayOutputStream();
+      IOUtils.copy(x, out);
+      bytes = out.toByteArray();
       x.read(bytes);
     }
     catch (IOException ex) {
@@ -300,7 +301,11 @@ public class ParameterHandler {
 
   public void setBlob(int parameterIndex, InputStream inputStream) throws SQLException {
     try {
-      getCurrParmsByIndex().put(parameterIndex, new Parameter.Blob(StreamUtils.inputStreamToBytes(inputStream)));
+      ByteArrayOutputStream out = new ByteArrayOutputStream();
+      IOUtils.copy(inputStream, out);
+      byte[] bytes = out.toByteArray();
+
+      getCurrParmsByIndex().put(parameterIndex, new Parameter.Blob(bytes));
     }
     catch (IOException e) {
       throw new SQLException(e);
@@ -320,7 +325,7 @@ public class ParameterHandler {
   }
 
   public void serialize(DataOutputStream out) throws IOException {
-    DataUtil.writeVLong(out, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+    Varint.writeSignedVarLong(DatabaseServer.SERIALIZATION_VERSION, out);
     int count = currParmsByIndex.size();
     out.writeInt(count);
     for (int i = 1; i < count + 1; i++) {
@@ -330,7 +335,7 @@ public class ParameterHandler {
       parm.serialize(parmOut, true);
       parmOut.close();
       byte[] bytes = bytesOut.toByteArray();
-      DataUtil.writeVLong(out, bytes.length);
+      Varint.writeSignedVarLong(bytes.length, out);
       out.write(bytes);
     }
   }
@@ -342,10 +347,10 @@ public class ParameterHandler {
   public void deserialize(DataInputStream in) {
 
     try {
-      short serializationVersion = (short)DataUtil.readVLong(in);
+      short serializationVersion = (short)Varint.readSignedVarLong(in);
       int count = in.readInt();
       for (int i = 0; i < count; i++) {
-        int len = (int)DataUtil.readVLong(in);
+        int len = (int)Varint.readSignedVarLong(in);
         byte[] bytes = new byte[len];
         in.readFully(bytes);
         DataInputStream innerIn = new DataInputStream(new ByteArrayInputStream(bytes));

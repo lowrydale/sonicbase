@@ -36,7 +36,6 @@ public class TestSocket {
       cobj.put(ComObject.Tag.count, 10);
       cobj.put(ComObject.Tag.method, "echo");
       request.setBody(cobj.serialize());
-      request.setCommand("DatabaseServer:ComObject:echo");
       requests.add(request);
       DatabaseSocketClient.sendBatch("localhost", 9010, requests);
       byte[] response = requests.get(0).getResponse();

@@ -1,12 +1,14 @@
 package com.sonicbase.database;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
-import com.sonicbase.server.DatabaseServer;
-import com.sonicbase.util.JsonArray;
-import com.sonicbase.util.JsonDict;
-import com.sonicbase.util.StreamUtils;
 import com.sonicbase.research.socket.NettyServer;
+import com.sonicbase.server.DatabaseServer;
+import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.util.FileUtils;
 import org.testng.annotations.Test;
 
@@ -18,7 +20,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 /**
  * Responsible for
@@ -30,10 +33,12 @@ public class TestLogManager {
 
   @Test
   public void test() throws IOException, ExecutionException, InterruptedException, ClassNotFoundException, SQLException {
-    String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")));
-     final JsonDict config = new JsonDict(configStr);
+    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
+    ObjectMapper mapper = new ObjectMapper();
+     final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
 
-     JsonArray array = config.putArray("licenseKeys");
+     ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
+     config.put("licenseKeys", array);
      array.add(DatabaseServer.FOUR_SERVER_LICENSE);
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));

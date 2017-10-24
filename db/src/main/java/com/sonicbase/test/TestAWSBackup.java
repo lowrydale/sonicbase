@@ -1,16 +1,18 @@
 package com.sonicbase.test;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.query.impl.ColumnImpl;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.server.DatabaseServer;
-import com.sonicbase.util.JsonArray;
-import com.sonicbase.util.JsonDict;
-import com.sonicbase.util.StreamUtils;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -38,11 +40,13 @@ public class TestAWSBackup {
 
   public static void main(String[] args) throws Exception {
     try {
-      String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(TestAWSBackup.class.getResourceAsStream("/config/config-4-servers.json")));
-      final JsonDict config = new JsonDict(configStr);
+      String configStr = IOUtils.toString(new BufferedInputStream(TestAWSBackup.class.getResourceAsStream("/config/config-4-servers.json")), "utf-8");
+      ObjectMapper mapper = new ObjectMapper();
+      final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
 
-      JsonArray array = config.putArray("licenseKeys");
+      ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
       array.add(DatabaseServer.FOUR_SERVER_LICENSE);
+      config.put("licenseKeys", array);
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -192,7 +196,10 @@ public class TestAWSBackup {
       stmt.executeUpdate();
 
       while (true) {
-        byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().sendToMaster("DatabaseServer:areAllLongRunningCommandsComplete:1:test", null);
+        ComObject cobj = new ComObject();
+        cobj.put(ComObject.Tag.method, "areAllLongRunningCommandsComplete");
+
+        byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().sendToMaster(cobj);
         if (new String(bytes).equals("true")) {
           break;
         }
@@ -249,7 +256,7 @@ public class TestAWSBackup {
 
       //Thread.sleep(10000);
 
-      JsonDict backupConfig = new JsonDict("{\n" +
+      ObjectNode backupConfig = (ObjectNode) mapper.readTree("{\n" +
           "    \"type\" : \"AWS\",\n" +
           "    \"bucket\": \"sonicbase-test-backup\",\n" +
           "    \"prefix\": \"backups\",\n" +
@@ -276,8 +283,7 @@ public class TestAWSBackup {
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.method, "getLastBackupDir");
       cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-      String command = "DatabaseServer:ComObject:getLastBackupDir:";
-      byte[] ret = client.send(null, 0, 0, command, cobj, DatabaseClient.Replica.master);
+      byte[] ret = client.send(null, 0, 0, cobj, DatabaseClient.Replica.master);
       ComObject retObj = new ComObject(ret);
       String dir = retObj.getString(ComObject.Tag.directory);
 
@@ -306,8 +312,7 @@ public class TestAWSBackup {
       cobj.put(ComObject.Tag.dbName, "test");
       cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
       cobj.put(ComObject.Tag.method, "forceDeletes");
-      command = "DatabaseServer:ComObject:forceDeletes:";
-      client.sendToAllShards(null, 0, command, cobj, DatabaseClient.Replica.all);
+      client.sendToAllShards(null, 0, cobj, DatabaseClient.Replica.all);
 
       executor.shutdownNow();
     }

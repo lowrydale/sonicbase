@@ -9,9 +9,9 @@ import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.server.ReadManager;
 import com.sonicbase.server.SnapshotManager;
-import com.sonicbase.util.DataUtil;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.LongValue;
 import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
@@ -626,10 +626,9 @@ public class ResultSetImpl implements ResultSet {
       cobj.put(ComObject.Tag.schemaVersion, databaseClient.getCommon().getSchemaVersion());
       cobj.put(ComObject.Tag.method, "serverSelectDelete");
       cobj.put(ComObject.Tag.id, selectStatement.getServerSelectResultSetId());
-      String command = "DatabaseServer:ComObject:serverSelectDelete:";
 
       byte[] recordRet = databaseClient.send(null, selectStatement.getServerSelectShardNumber(),
-          selectStatement.getServerSelectReplicaNumber(), command, cobj, DatabaseClient.Replica.specified);
+          selectStatement.getServerSelectReplicaNumber(), cobj, DatabaseClient.Replica.specified);
 
     }
 
@@ -1652,10 +1651,8 @@ public class ResultSetImpl implements ResultSet {
         cobj.put(ComObject.Tag.count, ReadManager.SELECT_PAGE_SIZE);
         cobj.put(ComObject.Tag.method, "serverSelect");
 
-        String command = "DatabaseServer:ComObject:serverSelect:";
-
         byte[] recordRet = databaseClient.send(null, selectStatement.getServerSelectShardNumber(),
-            selectStatement.getServerSelectReplicaNumber(), command, cobj, DatabaseClient.Replica.specified);
+            selectStatement.getServerSelectReplicaNumber(), cobj, DatabaseClient.Replica.specified);
 
         ComObject retObj = new ComObject(recordRet);
         selectStatement.deserialize(retObj.getByteArray(ComObject.Tag.legacySelectStatement), dbName);
@@ -1789,7 +1786,7 @@ public class ResultSetImpl implements ResultSet {
             if (retRecords[i][j] == null) {
               //todo: batch these reads
               Record record = doReadRecord(actualIds[i][j], nextReturn.getTableNames()[j]);
-              retRecords[i][j] = new ExpressionImpl.CachedRecord(record, record.serialize(databaseClient.getCommon(), SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION));
+              retRecords[i][j] = new ExpressionImpl.CachedRecord(record, record.serialize(databaseClient.getCommon(), DatabaseServer.SERIALIZATION_VERSION));
             }
           }
         }

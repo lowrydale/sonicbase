@@ -4,17 +4,16 @@ import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.Logger;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.SnapshotManager;
-import com.sonicbase.util.DataUtil;
+import org.apache.giraph.utils.Varint;
 
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static com.sonicbase.server.SnapshotManager.SNAPSHOT_BUCKET_COUNT;
+import static com.sonicbase.server.SnapshotManager.SNAPSHOT_PARTITION_COUNT;
 
 /**
  * Created by lowryda on 9/4/17.
@@ -40,7 +39,7 @@ public class FindIdInSnapshot {
 
     File snapshotBaseDir = new File(dataRoot, "snapshot/" + shard + "/" + replica + "/" +
         dbName);
-    int highestSnapshot = SnapshotManager.getHighestSafeSnapshotVersion(snapshotBaseDir, logger);
+    int highestSnapshot = SnapshotManager.getHighestCommittedSnapshotVersion(snapshotBaseDir, logger);
 
     if (highestSnapshot == -1) {
       System.out.println("highestSnapshot=-1");
@@ -49,7 +48,7 @@ public class FindIdInSnapshot {
 
     final File snapshotDir = new File(snapshotBaseDir, String.valueOf(highestSnapshot));
 
-    ThreadPoolExecutor executor = new ThreadPoolExecutor(SNAPSHOT_BUCKET_COUNT, SNAPSHOT_BUCKET_COUNT, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+    ThreadPoolExecutor executor = new ThreadPoolExecutor(SNAPSHOT_PARTITION_COUNT, SNAPSHOT_PARTITION_COUNT, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
     final AtomicLong recoveredCount = new AtomicLong();
     recoveredCount.set(0);
@@ -80,7 +79,6 @@ public class FindIdInSnapshot {
                                       @Override
                                       public Boolean call() throws Exception {
                                         try (DataInputStream inStream = new DataInputStream(new BufferedInputStream(new FileInputStream(indexFile)))) {
-                                          DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
                                           while (true) {
 
                                             if (!inStream.readBoolean()) {
@@ -93,10 +91,10 @@ public class FindIdInSnapshot {
                                               found.set(true);
                                               break;
                                             }
-                                            int count = (int) DataUtil.readVLong(inStream, resultLength);
+                                            int count = (int) Varint.readSignedVarLong(inStream);
                                             byte[][] records = new byte[count][];
                                             for (int i = 0; i < records.length; i++) {
-                                              int len = (int) DataUtil.readVLong(inStream, resultLength);
+                                              int len = (int) Varint.readSignedVarLong(inStream);
                                               records[i] = new byte[len];
                                               inStream.readFully(records[i]);
                                             }

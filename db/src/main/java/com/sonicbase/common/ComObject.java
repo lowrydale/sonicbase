@@ -1,19 +1,17 @@
 package com.sonicbase.common;
 
 import com.sonicbase.query.DatabaseException;
-import com.sonicbase.server.SnapshotManager;
-import com.sonicbase.util.DataUtil;
+import com.sonicbase.server.DatabaseServer;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import org.apache.giraph.utils.Varint;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.math.BigDecimal;
-import java.sql.Types;
 import java.util.Iterator;
-import java.util.Map;
 
 import static com.sonicbase.common.ComObject.Type.*;
 
@@ -219,7 +217,9 @@ public class ComObject {
     lowerKey(150, byteArrayType),
     whereClause(151, stringType),
     keyRecordBytes(152, byteArrayType),
-    keyRecords(153, arrayType);
+    keyRecords(153, arrayType),
+    header(154, objectType),
+    replicationMaster(155, intType);
 
     public final int tag;
 
@@ -236,7 +236,7 @@ public class ComObject {
   }
 
   public ComObject() {
-    put(ComObject.Tag.serializationVersion, (short)SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+    put(ComObject.Tag.serializationVersion, (short) DatabaseServer.SERIALIZATION_VERSION);
   }
 
   public ComObject(byte[] bytes) {
@@ -257,6 +257,14 @@ public class ComObject {
       builder.append("[").append(ComObject.getTag( entryObj.getIntKey()).name()).append("=").append(entryObj.getValue()).append("]");
     }
     return builder.toString();
+  }
+
+  public boolean containsTag(Tag tag) {
+    return map.containsKey(tag.tag);
+  }
+
+  public void put(Tag tag, ComObject value) {
+    map.put(tag.tag, value);
   }
 
   public void put(Tag tag, long value) {
@@ -355,24 +363,24 @@ public class ComObject {
   public void deserialize(DataInputStream in) {
     try {
       map.clear();
-      int count = (int) DataUtil.readVLong(in);
+      int count = (int) Varint.readSignedVarLong(in);
       for (int i = 0; i < count; i++) {
-        int tag = (int)DataUtil.readVLong(in);
-        int typeTag = (int)DataUtil.readVLong(in);
+        int tag = (int) Varint.readSignedVarLong(in);
+        int typeTag = (int)Varint.readSignedVarLong(in);
         DynamicType type = typesByTag.get(typeTag);
 
         Object value = null;
         if (type.tag == intType.tag) {
-          value = (int)DataUtil.readVLong(in);
+          value = (int)Varint.readSignedVarLong(in);
         }
         else if (type.tag == shortType.tag) {
-          value = (short)DataUtil.readVLong(in);
+          value = (short)Varint.readSignedVarLong(in);
         }
         else if (type.tag == longType.tag) {
-          value = DataUtil.readVLong(in);
+          value = Varint.readSignedVarLong(in);
         }
         else if (type.tag == stringType.tag) {
-          int len = (int)DataUtil.readVLong(in);
+          int len = (int)Varint.readSignedVarLong(in);
           byte[] bytes = new byte[len];
           in.readFully(bytes);
           value = new String(bytes, "utf-8");
@@ -381,7 +389,7 @@ public class ComObject {
           value = in.readBoolean();
         }
         else if (type.tag == byteArrayType.tag) {
-          int len = (int)DataUtil.readVLong(in);
+          int len = (int)Varint.readSignedVarLong(in);
           byte[] bytes = new byte[len];
           in.readFully(bytes);
           value = bytes;
@@ -405,22 +413,22 @@ public class ComObject {
           value = in.readDouble();
         }
         else if (type.tag == bigDecimalType.tag) {
-          int len = (int)DataUtil.readVLong(in);
+          int len = (int)Varint.readSignedVarLong(in);
           byte[] bytes = new byte[len];
           in.readFully(bytes);
           String str = new String(bytes, "utf-8");
           value = new java.math.BigDecimal(str);
         }
         else if (type.tag == dateType.tag) {
-          java.sql.Date date = new java.sql.Date(DataUtil.readVLong(in));
+          java.sql.Date date = new java.sql.Date(Varint.readSignedVarLong(in));
           value = date;
         }
         else if (type.tag == timeType.tag) {
-          java.sql.Time time = new java.sql.Time(DataUtil.readVLong(in));
+          java.sql.Time time = new java.sql.Time(Varint.readSignedVarLong(in));
           value = time;
         }
         else if (type.tag == timeStampType.tag) {
-          java.sql.Timestamp timestamp = new java.sql.Timestamp(DataUtil.readVLong(in));
+          java.sql.Timestamp timestamp = new java.sql.Timestamp(Varint.readSignedVarLong(in));
           value = timestamp;
         }
 
@@ -439,7 +447,7 @@ public class ComObject {
     try {
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
-      DataUtil.writeVLong(out, map.size());
+      Varint.writeSignedVarLong(map.size(), out);
       Iterator<Int2ObjectMap.Entry<Object>> iterator = map.int2ObjectEntrySet().fastIterator();
       while (iterator.hasNext()) {
         Int2ObjectMap.Entry<Object> entry = iterator.next();
@@ -449,25 +457,25 @@ public class ComObject {
         if (tagObj == null) {
           throw new DatabaseException("Tag not defined: tag=" + tag);
         }
-        DataUtil.writeVLong(out, tag);
-        DataUtil.writeVLong(out, tagObj.type.tag);
+        Varint.writeSignedVarLong(tag, out);
+        Varint.writeSignedVarLong(tagObj.type.tag, out);
         if (tagObj.type.tag == intType.tag) {
-          DataUtil.writeVLong(out, (Integer) value);
+          Varint.writeSignedVarLong((Integer) value, out);
         }
         else if (tagObj.type.tag == shortType.tag) {
-          DataUtil.writeVLong(out, (Short) value);
+          Varint.writeSignedVarLong((Short) value, out);
         }
         else if (tagObj.type.tag == longType.tag) {
           if (value instanceof Integer) {
-            DataUtil.writeVLong(out, (Integer)value);
+            Varint.writeSignedVarLong((Integer)value, out);
           }
           else {
-            DataUtil.writeVLong(out, (Long) value);
+            Varint.writeSignedVarLong((Long) value, out);
           }
         }
         else if (tagObj.type.tag == stringType.tag) {
           byte[] bytes = ((String) value).getBytes("utf-8");
-          DataUtil.writeVLong(out, bytes.length);
+          Varint.writeSignedVarLong(bytes.length, out);
           out.write(bytes);
         }
         else if (tagObj.type.tag == booleanType.tag) {
@@ -475,7 +483,7 @@ public class ComObject {
         }
         else if (tagObj.type.tag == byteArrayType.tag) {
           byte[] bytes = (byte[])value;
-          DataUtil.writeVLong(out, bytes.length);
+          Varint.writeSignedVarLong(bytes.length, out);
           out.write(bytes);
         }
         else if (tagObj.type.tag == arrayType.tag) {
@@ -498,17 +506,17 @@ public class ComObject {
         }
         else if (tagObj.type.tag == bigDecimalType.tag) {
           byte[] bytes = ((BigDecimal) value).toPlainString().getBytes("utf-8");
-          DataUtil.writeVLong(out, bytes.length);
+          Varint.writeSignedVarLong(bytes.length, out);
           out.write(bytes);
         }
         else if (tagObj.type.tag == dateType.tag) {
-          DataUtil.writeVLong(out, ((java.sql.Date)value).getTime());
+          Varint.writeSignedVarLong(((java.sql.Date)value).getTime(), out);
         }
         else if (tagObj.type.tag == timeType.tag) {
-          DataUtil.writeVLong(out, ((java.sql.Time)value).getTime());
+          Varint.writeSignedVarLong(((java.sql.Time)value).getTime(), out);
         }
         else if (tagObj.type.tag == timeStampType.tag) {
-          DataUtil.writeVLong(out, ((java.sql.Timestamp)value).getTime());
+          Varint.writeSignedVarLong(((java.sql.Timestamp)value).getTime(), out);
         }
       }
 

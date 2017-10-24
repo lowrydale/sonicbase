@@ -1,17 +1,17 @@
 package com.sonicbase.common;
 
 import com.amazonaws.ClientConfiguration;
-import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.*;
 import com.amazonaws.services.s3.transfer.TransferManager;
 import com.amazonaws.services.sqs.AmazonSQSClient;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.query.DatabaseException;
-import com.sonicbase.util.JsonDict;
-import com.sonicbase.util.StreamUtils;
+import org.apache.commons.io.IOUtils;
 
 import java.io.*;
 import java.util.*;
@@ -57,15 +57,16 @@ public class AWSClient {
     }
   }
 
-  private JsonDict getConfig() {
+  private ObjectNode getConfig() {
     try {
       String cluster = client.getCluster();
       File file = new File(System.getProperty("user.dir"), "config/config-" + cluster + ".json");
       if (!file.exists()) {
         file = new File(System.getProperty("user.dir"), "db/src/main/resources/config/config-" + cluster + ".json");
       }
-      String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(new FileInputStream(file)));
-      return new JsonDict(configStr);
+      String configStr = IOUtils.toString(new BufferedInputStream(new FileInputStream(file)), "utf-8");
+      ObjectMapper mapper = new ObjectMapper();
+      return (ObjectNode) mapper.readTree(configStr);
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -74,8 +75,8 @@ public class AWSClient {
 
   public File getInstallDir() {
     if (installDir == null) {
-      JsonDict config = getConfig();
-      String dir = config.getString("installDirectory");
+      ObjectNode config = getConfig();
+      String dir = config.get("installDirectory").asText();
       installDir = new File(dir.replace("$HOME", System.getProperty("user.home")));
     }
     return installDir;
@@ -237,7 +238,7 @@ public class AWSClient {
       destFile.getParentFile().mkdirs();
       try (InputStream objectData = object.getObjectContent();
            BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(destFile))) {
-        StreamUtils.copyStream(objectData, out);
+        IOUtils.copy(objectData, out);
       }
     }
     catch (Exception e) {
@@ -253,7 +254,7 @@ public class AWSClient {
       destFile.getParentFile().mkdirs();
       try (InputStream objectData = object.getObjectContent();
            BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(destFile))) {
-        StreamUtils.copyStream(objectData, out);
+        IOUtils.copy(objectData, out);
       }
     }
     catch (Exception e) {
@@ -268,7 +269,7 @@ public class AWSClient {
           new GetObjectRequest(bucket, key));
       try (InputStream objectData = object.getObjectContent();
            ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-        StreamUtils.copyStream(objectData, out);
+        IOUtils.copy(objectData, out);
         return out.toByteArray();
       }
     }

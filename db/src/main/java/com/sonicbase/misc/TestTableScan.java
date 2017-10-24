@@ -1,11 +1,15 @@
 /* © 2017 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.misc;
 
-import com.sonicbase.util.JsonArray;
-import com.sonicbase.util.JsonDict;
-import com.sonicbase.util.StreamUtils;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.apache.commons.io.IOUtils;
 
-import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.sql.*;
 
 public class TestTableScan {
@@ -23,16 +27,17 @@ public class TestTableScan {
     else {
       System.out.println("Loaded config default dir");
     }
-    String configStr = StreamUtils.inputStreamToString(new BufferedInputStream(new FileInputStream(file)));
+    String configStr = IOUtils.toString(new BufferedInputStream(new FileInputStream(file)), "utf-8");
 
-    JsonDict dict = new JsonDict(configStr);
-    JsonDict databaseDict = dict;
-    JsonArray array = databaseDict.getArray("shards");
-    JsonDict replica = array.getDict(0);
-    JsonArray replicasArray = replica.getArray("replicas");
-    String address = replicasArray.getDict(0).getString("publicAddress");
-    if (databaseDict.getBoolean("clientIsPrivate")) {
-      address = replicasArray.getDict(0).getString("privateAddress");
+    ObjectMapper mapper = new ObjectMapper();
+    ObjectNode dict = (ObjectNode) mapper.readTree(configStr);
+    ObjectNode databaseDict = dict;
+    ArrayNode array = databaseDict.withArray("shards");
+    ObjectNode replica = (ObjectNode) array.get(0);
+    ArrayNode replicasArray = replica.withArray("replicas");
+    String address = replicasArray.get(0).get("publicAddress").asText();
+    if (databaseDict.get("clientIsPrivate").asBoolean()) {
+      address = replicasArray.get(0).get("privateAddress").asText();
     }
     System.out.println("Using address: address=" + address);
 

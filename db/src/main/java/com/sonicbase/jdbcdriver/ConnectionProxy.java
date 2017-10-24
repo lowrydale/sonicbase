@@ -151,13 +151,13 @@ public class ConnectionProxy implements Connection {
   }
 
   public byte[] send(String batchKey,
-                     int shard, long auth_user, String command, ComObject body, Replica replica) {
-    return clients.get(url).client.send(batchKey, shard, auth_user, command, body, replica.cliReplica);
+                     int shard, long auth_user, ComObject body, Replica replica) {
+    return clients.get(url).client.send(batchKey, shard, auth_user, body, replica.cliReplica);
   }
 
   public byte[] send(String batchKey,
-                     int shard, long auth_user, String command, ComObject body, Replica replica, boolean ignoreDeath) {
-    return clients.get(url).client.send(batchKey, shard, auth_user, command, body, replica.cliReplica, ignoreDeath);
+                     int shard, long auth_user, ComObject body, Replica replica, boolean ignoreDeath) {
+    return clients.get(url).client.send(batchKey, shard, auth_user,  body, replica.cliReplica, ignoreDeath);
   }
 
   public int getMasterReplica(int shard) {
@@ -176,8 +176,8 @@ public class ConnectionProxy implements Connection {
     return clients.get(url).client.reconfigureCluster();
   }
 
-  public byte[] sendToMaster(String command, ComObject body) {
-    return clients.get(url).client.sendToMaster(command, body);
+  public byte[] sendToMaster(ComObject body) {
+    return clients.get(url).client.sendToMaster(body);
   }
 
     public void syncSchema() {

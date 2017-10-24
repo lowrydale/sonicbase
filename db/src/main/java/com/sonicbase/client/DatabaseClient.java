@@ -1,6 +1,9 @@
 package com.sonicbase.client;
 
 import com.codahale.metrics.MetricRegistry;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpRequest;
@@ -16,13 +19,9 @@ import com.sonicbase.query.impl.*;
 import com.sonicbase.schema.*;
 import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.server.ReadManager;
-import com.sonicbase.server.SnapshotManager;
 import com.sonicbase.socket.DatabaseSocketClient;
 import com.sonicbase.socket.DeadServerException;
-import com.sonicbase.util.ISO8601;
-import com.sonicbase.util.JsonArray;
-import com.sonicbase.util.JsonDict;
-import com.sonicbase.util.StreamUtils;
+import com.sonicbase.util.DateUtils;
 import net.sf.jsqlparser.expression.*;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.operators.conditional.AndExpression;
@@ -44,6 +43,7 @@ import net.sf.jsqlparser.statement.insert.Insert;
 import net.sf.jsqlparser.statement.select.*;
 import net.sf.jsqlparser.statement.truncate.Truncate;
 import net.sf.jsqlparser.statement.update.Update;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 
 import javax.net.ssl.*;
@@ -336,8 +336,7 @@ public class DatabaseClient {
         cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
         cobj.put(ComObject.Tag.method, "commit");
         cobj.put(ComObject.Tag.transactionId, transactionId.get());
-        String command = "DatabaseServer:ComObject:commit:";
-        sendToAllShards(null, 0, command, cobj, DatabaseClient.Replica.def);
+        sendToAllShards(null, 0, cobj, DatabaseClient.Replica.def);
 
         isExplicitTrans.set(false);
         transactionOps.set(null);
@@ -366,8 +365,7 @@ public class DatabaseClient {
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
     cobj.put(ComObject.Tag.method, "rollback");
     cobj.put(ComObject.Tag.transactionId, transactionId.get());
-    String command = "DatabaseServer:ComObject:rollback:";
-    sendToAllShards(null, 0, command, cobj, DatabaseClient.Replica.def);
+    sendToAllShards(null, 0, cobj, DatabaseClient.Replica.def);
 
     isExplicitTrans.set(false);
     transactionOps.set(null);
@@ -392,9 +390,8 @@ public class DatabaseClient {
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
     cobj.put(ComObject.Tag.method, "createDatabase");
     cobj.put(ComObject.Tag.masterSlave, "master");
-    String command = "DatabaseServer:ComObject:createDatabase:";
 
-    sendToMaster(command, cobj);
+    sendToMaster(cobj);
   }
 
   public String debugRecord(String dbName, String tableName, String indexName, String key) {
@@ -516,7 +513,6 @@ public class DatabaseClient {
           }
 
           String dbName = batch.get().get(0).dbName;
-          final String command = "DatabaseServer:ComObject:batchInsertIndexEntryByKeyWithRecord:";
 
           final List<List<PreparedInsert>> withRecordProcessed = new ArrayList<>();
           final List<List<PreparedInsert>> processed = new ArrayList<>();
@@ -588,7 +584,7 @@ public class DatabaseClient {
                 if (cobjs1.get(offset).getArray(ComObject.Tag.insertObjects).getArray().size() == 0) {
                   return null;
                 }
-                byte[] ret = send(null, offset, 0, command, cobjs1.get(offset), DatabaseClient.Replica.def);
+                byte[] ret = send(null, offset, 0, cobjs1.get(offset), DatabaseClient.Replica.def);
                 if (ret == null) {
                   throw new FailedToInsertException("No response for key insert");
                 }
@@ -613,7 +609,6 @@ public class DatabaseClient {
           for (Future future : futures) {
             future.get();
           }
-          final String command2 = "DatabaseServer:ComObject:batchInsertIndexEntryByKey:";
 
           futures = new ArrayList<>();
           for (int i = 0; i < bytesOut.size(); i++) {
@@ -629,7 +624,7 @@ public class DatabaseClient {
                 if (cobjs2.get(offset).getArray(ComObject.Tag.insertObjects).getArray().size() == 0) {
                   return null;
                 }
-                send(null, offset, rand.nextLong(), command2, cobjs2.get(offset), DatabaseClient.Replica.def);
+                send(null, offset, rand.nextLong(), cobjs2.get(offset), DatabaseClient.Replica.def);
 
                 for (PreparedInsert insert : processed.get(offset)) {
                   preparedKeys.remove(insert);
@@ -709,18 +704,16 @@ public class DatabaseClient {
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
       cobj.put(ComObject.Tag.method, "healthCheck");
-      String command = "DatabaseServer:ComObject:healthCheck:";
 
       try {
-        byte[] bytes = sendToMaster(command, cobj);
+        byte[] bytes = sendToMaster(cobj);
         ComObject retObj = new ComObject(bytes);
         if (retObj.getString(ComObject.Tag.status).equals("{\"status\" : \"ok\"}")) {
           ComObject rcobj = new ComObject();
           rcobj.put(ComObject.Tag.dbName, "__none__");
           rcobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
           rcobj.put(ComObject.Tag.method, "reconfigureCluster");
-          command = "DatabaseServer:ComObject:reconfigureCluster:";
-          bytes = sendToMaster(command, null);
+          bytes = sendToMaster(null);
           retObj = new ComObject(bytes);
           int count = retObj.getInt(ComObject.Tag.count);
           return new ReconfigureResults(true, count);
@@ -772,11 +765,11 @@ public class DatabaseClient {
       return socketClient;
     }
 
-    public byte[] do_send(String batchKey, String command, ComObject body) {
-      return socketClient.do_send(batchKey, command, body.serialize(), hostPort);
+    public byte[] do_send(String batchKey, ComObject body) {
+      return socketClient.do_send(batchKey, body.serialize(), hostPort);
     }
-    public byte[] do_send(String batchKey, String command, byte[] body) {
-      return socketClient.do_send(batchKey, command, body, hostPort);
+    public byte[] do_send(String batchKey, byte[] body) {
+      return socketClient.do_send(batchKey, body, hostPort);
     }
   }
 
@@ -820,12 +813,11 @@ public class DatabaseClient {
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
       cobj.put(ComObject.Tag.method, "getConfig");
-      String command = "DatabaseServer:ComObject:getConfig:";
       try {
         byte[] ret = null;
         int receivedReplica = -1;
         try {
-          ret = send(null, 0, 0, command, cobj, Replica.specified);
+          ret = send(null, 0, 0, cobj, Replica.specified);
           receivedReplica = 0;
         }
         catch (Exception e) {
@@ -834,7 +826,7 @@ public class DatabaseClient {
         if (ret == null) {
           for (int replica = 1; replica < getReplicaCount(); replica++) {
             try {
-              ret = send(null, 0, replica, command, cobj, Replica.specified);
+              ret = send(null, 0, replica, cobj, Replica.specified);
               receivedReplica = replica;
               break;
             }
@@ -888,21 +880,22 @@ public class DatabaseClient {
 
   public byte[][] sendToAllShards(
       final String batchKey,
-      final long auth_user, final String command, final ComObject body, final Replica replica) {
-    return sendToAllShards(batchKey, auth_user, command, body, replica, false);
+      final long auth_user, final ComObject body, final Replica replica) {
+    return sendToAllShards(batchKey, auth_user, body, replica, false);
   }
 
   public byte[][] sendToAllShards(
       final String batchKey,
-      final long auth_user, final String command, final ComObject body, final Replica replica, final boolean ignoreDeath) {
+      final long auth_user, final ComObject body, final Replica replica, final boolean ignoreDeath) {
     List<Future<byte[]>> futures = new ArrayList<Future<byte[]>>();
     try {
+      final byte[] bodyBytes = body.serialize();
       for (int i = 0; i < servers.length; i++) {
         final int shard = i;
         futures.add(executor.submit(new Callable<byte[]>() {
           @Override
           public byte[] call() {
-            return send(batchKey, shard, auth_user, command, body, replica, ignoreDeath);
+            return send(batchKey, shard, auth_user, new ComObject(bodyBytes), replica, ignoreDeath);
           }
         }));
       }
@@ -916,7 +909,7 @@ public class DatabaseClient {
       throw e;
     }
     catch (Exception e) {
-      handleSchemaOutOfSyncException(command, e);
+      handleSchemaOutOfSyncException(e);
       throw new DatabaseException(e);
     }
     finally {
@@ -934,20 +927,20 @@ public class DatabaseClient {
   }
 
   public byte[] send(String batchKey,
-                     int shard, long auth_user, String command, ComObject body, Replica replica) {
-    return send(batchKey, shard, auth_user, command, body, replica, false);
+                     int shard, long auth_user, ComObject body, Replica replica) {
+    return send(batchKey, shard, auth_user, body, replica, false);
   }
 
   public byte[] send(String batchKey,
-                     int shard, long auth_user, String command, ComObject body, Replica replica, boolean ignoreDeath) {
+                     int shard, long auth_user, ComObject body, Replica replica, boolean ignoreDeath) {
 //    DatabaseServer server = DatabaseServer.getServers().get(shard).get(0);
 //    while (true) {
 //      try {
 //        if (server != null) {
-//          return server.handleCommand(command, body, false);
+//          return server.invokeMethod(command, body, false);
 //        }
 
-    return send(batchKey, servers[shard], shard, auth_user, command, body, replica, ignoreDeath);
+    return send(batchKey, servers[shard], shard, auth_user, body, replica, ignoreDeath);
 //      }
 //      catch (Exception e) {
 //        command = handleSchemaOutOfSyncException(command, e);
@@ -955,14 +948,14 @@ public class DatabaseClient {
 //    }
   }
 
-  public byte[] sendToMaster(String command, ComObject body) {
+  public byte[] sendToMaster(ComObject body) {
     while (true) {
       int masterReplica = 0;
       if (common.getServersConfig() != null) {
         masterReplica = common.getServersConfig().getShards()[0].getMasterReplica();
       }
       try {
-        return send(null, servers[0], 0, masterReplica, command, body, Replica.specified);
+        return send(null, servers[0], 0, masterReplica, body, Replica.specified);
       }
       catch (DeadServerException e1) {
         throw e1;
@@ -979,10 +972,9 @@ public class DatabaseClient {
           cobj.put(ComObject.Tag.dbName, "__none__");
           cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
           cobj.put(ComObject.Tag.method, "getSchema");
-          String getCommand = "DatabaseServer:ComObject:getSchema:";
           try {
 
-            byte[] ret = send(null, 0, i, getCommand, cobj, Replica.specified);
+            byte[] ret = send(null, 0, i, cobj, Replica.specified);
             if (ret != null) {
               ComObject retObj = new ComObject(ret);
               byte[] bytes = retObj.getByteArray(ComObject.Tag.schemaBytes);
@@ -1005,7 +997,7 @@ public class DatabaseClient {
     }
   }
 
-  private String handleSchemaOutOfSyncException(String command, Exception e) {
+  private void handleSchemaOutOfSyncException(Exception e) {
     try {
       boolean schemaOutOfSync = false;
       String msg = null;
@@ -1050,24 +1042,7 @@ public class DatabaseClient {
         }
       }
 
-      //if (previousVersion < common.getSchemaVersion()) {
       throw new SchemaOutOfSyncException();
-      //}
-
-//      String newCommand = "";
-//      String[] parts = command.split(":");
-//      for (int i = 0; i < parts.length; i++) {
-//        if (i != 0) {
-//          newCommand += ":";
-//        }
-//        if (i == 3) {
-//          newCommand += common.getSchema().getVersion();
-//        }
-//        else {
-//          newCommand += parts[i];
-//        }
-//      }
-//      return newCommand;
     }
     catch (SchemaOutOfSyncException e1) {
       throw e1;
@@ -1085,23 +1060,18 @@ public class DatabaseClient {
 
   public byte[] send(
       String batchKey, Server[] replicas, int shard, long auth_user,
-      String command, ComObject body, Replica replica) {
-    return send(batchKey, replicas, shard, auth_user, command, body, replica, false);
+      ComObject body, Replica replica) {
+    return send(batchKey, replicas, shard, auth_user, body, replica, false);
   }
 
   public byte[] send(
       String batchKey, Server[] replicas, int shard, long auth_user,
-      String command, ComObject body, Replica replica, boolean ignoreDeath) {
+      ComObject body, Replica replica, boolean ignoreDeath) {
     try {
       if (body == null) {
         body = new ComObject();
       }
-      String localCommand = command;
-      int pos = localCommand.indexOf(":");
-      int pos2 = localCommand.indexOf(":", pos + 1);
-      String verb = localCommand.substring(pos + 1, pos2);
-      int pos3 = localCommand.indexOf(":", pos2 + 1);
-      String verb2 = localCommand.substring(pos2 + 1, pos3);
+      String method = body.getString(ComObject.Tag.method);
 
       byte[] ret = null;
       for (int attempt = 0; attempt < 1; attempt++) {
@@ -1125,17 +1095,16 @@ public class DatabaseClient {
               for (int i = 0; i < replicas.length; i++) {
                 Server server = replicas[i];
                 if (server.dead) {
-                  throw new DeadServerException("Host=" + server.hostPort + ", command=" + localCommand);
+                  throw new DeadServerException("Host=" + server.hostPort + ", method=" + method);
                 }
                 DatabaseServer dbserver = getLocalDbServer(shard, i);
                 if (dbserver != null) {
                   local = true;
-                  ret = dbserver.handleCommand(localCommand, body.serialize(), false, true);
+                  ret = dbserver.invokeMethod(body.serialize(), false, true);
                 }
                 else {
                   DatabaseSocketClient.Request request = new DatabaseSocketClient.Request();
                   request.setBatchKey(batchKey);
-                  request.setCommand(localCommand);
                   request.setBody(body.serialize());
                   request.setHostPort(server.hostPort);
                   request.setSocketClient(server.socketClient);
@@ -1152,7 +1121,7 @@ public class DatabaseClient {
             }
             catch (Exception e) {
               try {
-                localCommand = handleSchemaOutOfSyncException(localCommand, e);
+                handleSchemaOutOfSyncException(e);
               }
               catch (Exception t) {
                 throw t;
@@ -1173,12 +1142,12 @@ public class DatabaseClient {
             DatabaseServer dbserver = getLocalDbServer(shard, 0);
             try {
               if (!ignoreDeath && currReplica.dead) {
-                throw new DeadServerException("Host=" + currReplica.hostPort + ", command=" + localCommand);
+                throw new DeadServerException("Host=" + currReplica.hostPort + ", method=" + method);
               }
               if (dbserver != null) {
-                return dbserver.handleCommand(localCommand, body.serialize(), false, true);
+                return dbserver.invokeMethod(body.serialize(), false, true);
               }
-              return currReplica.do_send(batchKey, localCommand, body);
+              return currReplica.do_send(batchKey, body);
             }
             catch (Exception e) {
               syncSchema();
@@ -1188,20 +1157,20 @@ public class DatabaseClient {
               dbserver = getLocalDbServer(shard, 0);
               try {
                 if (!ignoreDeath && currReplica.dead) {
-                  throw new DeadServerException("Host=" + currReplica.hostPort + ", command=" + localCommand);
+                  throw new DeadServerException("Host=" + currReplica.hostPort + ", method=" + method);
                 }
                 if (dbserver != null) {
-                  return dbserver.handleCommand(localCommand, body.serialize(), false, true);
+                  return dbserver.invokeMethod(body.serialize(), false, true);
                 }
-                return currReplica.do_send(batchKey, localCommand, body);
+                return currReplica.do_send(batchKey, body);
               }
               catch (DeadServerException e1) {
                 throw e;
               }
               catch (Exception e1) {
-                e = new DatabaseException("Host=" + currReplica.hostPort + ", command=" + localCommand, e1);
+                e = new DatabaseException("Host=" + currReplica.hostPort + ", method=" + method, e1);
                 handleDeadServer(e1, currReplica);
-                localCommand = handleSchemaOutOfSyncException(localCommand, e1);
+                handleSchemaOutOfSyncException(e1);
               }
             }
           }
@@ -1209,17 +1178,26 @@ public class DatabaseClient {
             DatabaseServer dbserver = getLocalDbServer(shard, (int) auth_user);
             boolean skip = false;
             if (!ignoreDeath && replicas[(int)auth_user].dead) {
-              if (writeVerbs.contains(verb) || writeVerbs.contains(verb2)) {
-                body.put(ComObject.Tag.command, localCommand);
-                String queueCommand = "DatabaseServer:queueForOtherServer:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__:" + (int) auth_user;
+              if (writeVerbs.contains(method)) {
+                ComObject header = new ComObject();
+                header.put(ComObject.Tag.method, body.getString(ComObject.Tag.method));
+                if (body.containsTag(ComObject.Tag.replica)) {
+                  header.put(ComObject.Tag.replica, body.getString(ComObject.Tag.replica));
+                }
+                body.put(ComObject.Tag.header, header);
+
+                body.put(ComObject.Tag.method, "queueForOtherServer");
+                body.put(ComObject.Tag.replica, auth_user);
+
+                //String queueCommand = "DatabaseServer:queueForOtherServer:1:" + SnapshotManager.SERIALIZATION_VERSION + ":1:__none__:" + (int) auth_user;
 
                 int masterReplica = common.getServersConfig().getShards()[shard].getMasterReplica();
                 dbserver = getLocalDbServer(shard, masterReplica);
                 if (dbserver != null) {
-                  dbserver.handleCommand(queueCommand, body.serialize(), false, true);
+                  dbserver.invokeMethod(body.serialize(), false, true);
                 }
                 else {
-                  replicas[masterReplica].do_send(null, queueCommand, body);
+                  replicas[masterReplica].do_send(null, body);
                 }
                 skip = true;
               }
@@ -1227,18 +1205,18 @@ public class DatabaseClient {
             if (!skip) {
               try {
                 if (dbserver != null) {
-                  return dbserver.handleCommand(localCommand, body.serialize(), false, true);
+                  return dbserver.invokeMethod(body.serialize(), false, true);
                 }
-                return replicas[(int) auth_user].do_send(batchKey, localCommand, body);
+                return replicas[(int) auth_user].do_send(batchKey, body);
               }
               catch (DeadServerException e) {
                 throw e;
               }
               catch (Exception e) {
-                e = new DatabaseException("Host=" + replicas[(int) auth_user].hostPort + ", command=" + localCommand, e);
+                e = new DatabaseException("Host=" + replicas[(int) auth_user].hostPort + ", method=" + method, e);
                 try {
                   handleDeadServer(e, replicas[(int) auth_user]);
-                  localCommand = handleSchemaOutOfSyncException(localCommand, e);
+                  handleSchemaOutOfSyncException(e);
                 }
                 catch (Exception t) {
                   throw t;
@@ -1247,8 +1225,7 @@ public class DatabaseClient {
             }
           }
           else if (replica == Replica.def) {
-            byte[] bytes = body.serialize();
-            if (write_verbs.contains(verb) || write_verbs.contains(verb2)) {
+            if (write_verbs.contains(method)) {
               while (true) {
                 int masterReplica = common.getServersConfig().getShards()[shard].getMasterReplica();
                 Server currReplica = replicas[masterReplica];
@@ -1256,22 +1233,23 @@ public class DatabaseClient {
                  //int successCount = 0;
                   if (!ignoreDeath && replicas[masterReplica].dead) {
                     logger.error("dead server: master=" + masterReplica);
-                    throw new DeadServerException("Host=" + currReplica.hostPort + ", command=" + localCommand);
+                    throw new DeadServerException("Host=" + currReplica.hostPort + ", method=" + method);
                   }
-                  localCommand += ":xx_repl_xx" + masterReplica;
+                  body.put(ComObject.Tag.replicationMaster, masterReplica);
                   DatabaseServer dbserver = getLocalDbServer(shard, masterReplica);
                   if (dbserver != null) {
-                    ret = dbserver.handleCommand(localCommand, bytes, false, true);
+                    ret = dbserver.invokeMethod(body.serialize(),false, true);
                   }
                   else {
-                    ret = currReplica.do_send(batchKey, localCommand, bytes);
+                    ret = currReplica.do_send(batchKey, body.serialize());
                   }
 
-                  String newCommand = localCommand;
+                  body.remove(ComObject.Tag.replicationMaster);
+
                   if (ret != null) {
                     ComObject retObj = new ComObject(ret);
-                    final String newCommand0 = localCommand + ":xx_sn0_xx=" + retObj.getLong(ComObject.Tag.sequence0);
-                    newCommand = newCommand0 + ":xx_sn1_xx=" + retObj.getLong(ComObject.Tag.sequence1);
+                    body.put(ComObject.Tag.sequence0, retObj.getLong(ComObject.Tag.sequence0));
+                    body.put(ComObject.Tag.sequence1, retObj.getLong(ComObject.Tag.sequence1));
                   }
                   for (int i = 0; i < getReplicaCount(); i++) {
                     if (i == masterReplica) {
@@ -1284,17 +1262,26 @@ public class DatabaseClient {
                       boolean skip = false;
                       if (!ignoreDeath && dead) {
                         try {
-                          if (writeVerbs.contains(verb) || writeVerbs.contains(verb2)) {
-                            body.put(ComObject.Tag.command, newCommand);
-                            String queueCommand = "DatabaseServer:queueForOtherServer:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__:" + (int) auth_user;
+                          if (writeVerbs.contains(method)) {
+                            ComObject header = new ComObject();
+                            header.put(ComObject.Tag.method, body.getString(ComObject.Tag.method));
+                            if (body.containsTag(ComObject.Tag.replica)) {
+                              header.put(ComObject.Tag.replica, body.getString(ComObject.Tag.replica));
+                            }
+                            body.put(ComObject.Tag.header, header);
+
+                            body.put(ComObject.Tag.method, "queueForOtherServer");
+                            body.put(ComObject.Tag.replica, auth_user);
+
+                            //String queueCommand = "DatabaseServer:queueForOtherServer:1:" + SnapshotManager.SERIALIZATION_VERSION + ":1:__none__:" + (int) auth_user;
 
                             masterReplica = common.getServersConfig().getShards()[shard].getMasterReplica();
                             dbserver = getLocalDbServer(shard, masterReplica);
                             if (dbserver != null) {
-                              dbserver.handleCommand(queueCommand, body.serialize(), false, true);
+                              dbserver.invokeMethod(body.serialize(), false, true);
                             }
                             else {
-                              replicas[masterReplica].do_send(null, queueCommand, body.serialize());
+                              replicas[masterReplica].do_send(null, body.serialize());
                             }
                             skip = true;
                           }
@@ -1319,10 +1306,10 @@ public class DatabaseClient {
                       if (!skip) {
                         try {
                           if (dbserver != null) {
-                            dbserver.handleCommand(newCommand, bytes, false, true);
+                            dbserver.invokeMethod(body.serialize(), false, true);
                           }
                           else {
-                            currReplica.do_send(batchKey, newCommand, bytes);
+                            currReplica.do_send(batchKey, body.serialize());
                           }
                         }
                         catch (Exception e) {
@@ -1364,8 +1351,8 @@ public class DatabaseClient {
                   continue;
                 }
                 catch (Exception e) {
-                  e = new DatabaseException("Host=" + currReplica.hostPort + ", command=" + localCommand, e);
-                  localCommand = handleSchemaOutOfSyncException(localCommand, e);
+                  e = new DatabaseException("Host=" + currReplica.hostPort + ", method=" + method, e);
+                  handleSchemaOutOfSyncException(e);
                 }
               }
             }
@@ -1381,10 +1368,10 @@ public class DatabaseClient {
                     try {
                       DatabaseServer dbserver = getLocalDbServer(shard, replicaOffset);
                       if (dbserver != null) {
-                        return dbserver.handleCommand(localCommand, body.serialize(), false, true);
+                        return dbserver.invokeMethod(body.serialize(), false, true);
                       }
                       else {
-                        return replicas[replicaOffset].do_send(batchKey, localCommand, body);
+                        return replicas[replicaOffset].do_send(batchKey, body);
                       }
                       //success = true;
                     }
@@ -1392,7 +1379,7 @@ public class DatabaseClient {
                       Server currReplica = replicas[replicaOffset];
                       try {
                         handleDeadServer(e, replicas[replicaOffset]);
-                        localCommand = handleSchemaOutOfSyncException(localCommand, e);
+                        handleSchemaOutOfSyncException(e);
                         //rand--;
                         lastException = e;
                       }
@@ -1410,9 +1397,9 @@ public class DatabaseClient {
               }
               if (!success) {
                 if (lastException != null) {
-                  throw new DatabaseException("Failed to send to any replica: command=" + localCommand, lastException);
+                  throw new DatabaseException("Failed to send to any replica: method=" + method, lastException);
                 }
-                throw new DatabaseException("Failed to send to any replica: command=" + localCommand);
+                throw new DatabaseException("Failed to send to any replica: method=" + method);
               }
             }
           }
@@ -1464,7 +1451,7 @@ public class DatabaseClient {
 //          try {
 //            Thread.sleep(10000);
 //
-//            String command = "DatabaseServer:healthCheck:1:" + SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION + ":1:__none__";
+//            String command = "DatabaseServer:healthCheck:1:" + SnapshotManager.SERIALIZATION_VERSION + ":1:__none__";
 //
 //            byte[] bytes = replica.do_send(null, command, null);
 //            if (new String(bytes, "utf-8").equals("{\"status\" : \"ok\"}")) {
@@ -1517,8 +1504,7 @@ public class DatabaseClient {
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
       cobj.put(ComObject.Tag.method, "isEntireBackupComplete");
-      String command = "DatabaseServer:ComObject:isEntireBackupComplete:";
-      byte[] ret = send(null, 0, 0, command, cobj, DatabaseClient.Replica.master);
+      byte[] ret = send(null, 0, 0, cobj, DatabaseClient.Replica.master);
       ComObject retObj = new ComObject(ret);
       return retObj.getBoolean(ComObject.Tag.isComplete);
     }
@@ -1533,8 +1519,7 @@ public class DatabaseClient {
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
       cobj.put(ComObject.Tag.method, "isEntireRestoreComplete");
-      String command = "DatabaseServer:ComObject:isEntireRestoreComplete:";
-      byte[] ret = send(null, 0, 0, command, cobj, DatabaseClient.Replica.master);
+      byte[] ret = send(null, 0, 0, cobj, DatabaseClient.Replica.master);
       ComObject retObj = new ComObject(ret);
       return retObj.getBoolean(ComObject.Tag.isComplete);
     }
@@ -1550,8 +1535,7 @@ public class DatabaseClient {
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
       cobj.put(ComObject.Tag.method, "startRestore");
       cobj.put(ComObject.Tag.directory, subDir);
-      String command = "DatabaseServer:ComObject:startRestore:";
-      byte[] ret = send(null, 0, 0, command, cobj, DatabaseClient.Replica.master);
+      byte[] ret = send(null, 0, 0, cobj, DatabaseClient.Replica.master);
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -1563,8 +1547,7 @@ public class DatabaseClient {
     cobj.put(ComObject.Tag.dbName, "__none__");
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
     cobj.put(ComObject.Tag.method, "startBackup");
-    String command = "DatabaseServer:ComObject:startBackup:";
-    byte[] ret = send(null, 0, 0, command, cobj, DatabaseClient.Replica.master);
+    byte[] ret = send(null, 0, 0, cobj, DatabaseClient.Replica.master);
   }
 
   public void doCreateIndex(String dbName, CreateIndexStatementImpl statement) throws IOException {
@@ -1576,7 +1559,6 @@ public class DatabaseClient {
     cobj.put(ComObject.Tag.tableName, statement.getTableName());
     cobj.put(ComObject.Tag.indexName, statement.getName());
     cobj.put(ComObject.Tag.isUnique, statement.isUnique());
-    String command = "DatabaseServer:ComObject:createIndex:";
     StringBuilder builder = new StringBuilder();
     boolean first = true;
     for (String field : statement.getColumns()) {
@@ -1590,7 +1572,7 @@ public class DatabaseClient {
 
     cobj.put(ComObject.Tag.fieldsStr, builder.toString());
 
-    byte[] ret = sendToMaster(command, cobj);
+    byte[] ret = sendToMaster(cobj);
     ComObject retObj = new ComObject(ret);
     common.deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
   }
@@ -1839,16 +1821,17 @@ public class DatabaseClient {
 
   public static Integer getLicenseDaysLeft() {
     try {
-      String json = StreamUtils.inputStreamToString(DatabaseClient.class.getResourceAsStream("/config-license-server.json"));
-      JsonDict config = new JsonDict(json);
+      String json = IOUtils.toString(DatabaseClient.class.getResourceAsStream("/config-license-server.json"), "utf-8");
+      ObjectMapper mapper = new ObjectMapper();
+      ObjectNode config = (ObjectNode) mapper.readTree(json);
 
-      com.google.api.client.http.HttpResponse response = restGet("https://" + config.getDict("server").getString("publicAddress") + ":" +
-          config.getDict("server").getInt("port") + "/license/currUsage");
-      JsonDict dict = new JsonDict(StreamUtils.inputStreamToString(response.getContent()));
+      com.google.api.client.http.HttpResponse response = restGet("https://" + config.get("server").get("publicAddress").asText() + ":" +
+          config.get("server").get("port").asInt() + "/license/currUsage");
+      ObjectNode dict = (ObjectNode) mapper.readTree(IOUtils.toString(response.getContent(), "utf-8"));
       StringBuilder builder = new StringBuilder();
-      String disableDate = dict.getString("disableDate");
-      Calendar cal = ISO8601.from8601String(disableDate);
-      long disableDateLong = cal.getTimeInMillis();
+      String disableDate = dict.get("disableDate").asText();
+      Date date = DateUtils.fromString(disableDate);
+      long disableDateLong = date.getTime();
 
       return (int)((disableDateLong - System.currentTimeMillis()) / 24 / 60 / 60 / 1000);
     }
@@ -1890,27 +1873,28 @@ public class DatabaseClient {
        * end of the fix
        */
 
-      String json = StreamUtils.inputStreamToString(DatabaseClient.class.getResourceAsStream("/config-license-server.json"));
-      JsonDict config = new JsonDict(json);
+      String json = IOUtils.toString(DatabaseClient.class.getResourceAsStream("/config-license-server.json"), "utf-8");
+      ObjectMapper mapper = new ObjectMapper();
+      ObjectNode config = (ObjectNode) mapper.readTree(json);
 
-      URL url = new URL("https://" + config.getDict("server").getString("publicAddress") + ":" +
-          config.getDict("server").getInt("port") + "/license/currUsage");
+      URL url = new URL("https://" + config.get("server").get("publicAddress").asText() + ":" +
+          config.get("server").get("port").asInt() + "/license/currUsage");
       URLConnection con = url.openConnection();
       InputStream in = new BufferedInputStream(con.getInputStream());
 
 //      HttpResponse response = restGet("https://" + config.getDict("server").getString("publicAddress") + ":" +
 //          config.getDict("server").getInt("port") + "/license/currUsage");
-      JsonDict dict = new JsonDict(StreamUtils.inputStreamToString(in));
+      ObjectNode dict = (ObjectNode) mapper.readTree(IOUtils.toString(in, "utf-8"));
       StringBuilder builder = new StringBuilder();
-      builder.append("total cores in use=" + dict.getInt("totalCores") + "\n");
-      builder.append("total allocated cores=" + dict.getInt("allocatedCores") + "\n");
-      builder.append("in compliance=" + dict.getBoolean("inCompliance") + "\n");
-      builder.append("disabling now=" + dict.getBoolean("disableNow") + "\n");
-      builder.append("disabling date=" + dict.getString("disableDate") + "\n");
-      builder.append("multiple license servers=" + dict.getBoolean("multipleLicenseServers") + "\n");
-      JsonArray servers = dict.getArray("clusters");
+      builder.append("total cores in use=" + dict.get("totalCores").asInt() + "\n");
+      builder.append("total allocated cores=" + dict.get("allocatedCores").asInt() + "\n");
+      builder.append("in compliance=" + dict.get("inCompliance").asBoolean() + "\n");
+      builder.append("disabling now=" + dict.get("disableNow").asBoolean() + "\n");
+      builder.append("disabling date=" + dict.get("disableDate").asText() + "\n");
+      builder.append("multiple license servers=" + dict.get("multipleLicenseServers").asBoolean() + "\n");
+      ArrayNode servers = dict.withArray("clusters");
       for (int i = 0; i < servers.size(); i++) {
-        builder.append(servers.getDict(i).getString("cluster") + "=" + servers.getDict(i).getInt("cores") + "\n");
+        builder.append(servers.get(i).get("cluster").asText() + "=" + servers.get(i).get("cores").asInt() + "\n");
       }
 
       String ret = builder.toString();
@@ -1978,10 +1962,9 @@ public class DatabaseClient {
           cobj.put(ComObject.Tag.dbName, "__none__");
           cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
           cobj.put(ComObject.Tag.method, "getSchema");
-          String command = "DatabaseServer:ComObject:getSchema:";
           byte[] ret = null;
           try {
-            ret = send(null, j, i, command, cobj, Replica.specified);
+            ret = send(null, j, i, cobj, Replica.specified);
             ComObject retObj = new ComObject(ret);
             DatabaseCommon tmpCommon = new DatabaseCommon();
             tmpCommon.deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
@@ -2024,8 +2007,8 @@ public class DatabaseClient {
                 cobj.put(ComObject.Tag.dbName, "__none__");
                 cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
                 cobj.put(ComObject.Tag.method, "getOSStats");
-                String command = "DatabaseServer:ComObject:getOSStats:";
-                byte[] ret = send(null, shard, replica, command, cobj, DatabaseClient.Replica.specified);
+
+                byte[] ret = send(null, shard, replica, cobj, DatabaseClient.Replica.specified);
                 ComObject retObj = new ComObject(ret);
 
                 double resGig = retObj.getDouble(ComObject.Tag.resGig);
@@ -2130,7 +2113,7 @@ public class DatabaseClient {
         //            public Entry call() throws Exception {
         //              byte[] currRet = send(null, currShard, 0, command, null, DatabaseClient.Replica.master);
         //              DataInputStream in = new DataInputStream(new ByteArrayInputStream(currRet));
-        //              long serializationVersion = DataUtil.readVLong(in);
+        //              long serializationVersion = Varint.readSignedVarLong(in);
         //              long count = in.readLong();
         //              return new Entry(table.getKey(), indexSchema.getKey(), currShard, "Table=" + table.getKey() + ", Index=" + indexSchema.getKey() +
         //                  ", Shard=" + currShard + ", count=" + count + "\n");
@@ -2194,8 +2177,7 @@ public class DatabaseClient {
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
     cobj.put(ComObject.Tag.method, "getRepartitionerState");
-    String command = "DatabaseServer:ComObject:getRepartitionerState:";
-    byte[] ret = sendToMaster(command, cobj);
+    byte[] ret = sendToMaster(cobj);
     ComObject retObj = new ComObject(ret);
 
     StringBuilder builder = new StringBuilder();
@@ -2327,8 +2309,7 @@ public class DatabaseClient {
     cobj.put(ComObject.Tag.columnName, columnName);
     cobj.put(ComObject.Tag.method, "dropColumn");
     cobj.put(ComObject.Tag.masterSlave, "master");
-    String command = "DatabaseServer:ComObject:dropColumn:";
-    byte[] ret = sendToMaster(command, cobj);
+    byte[] ret = sendToMaster(cobj);
     ComObject retObj = new ComObject(ret);
     common.deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
   }
@@ -2343,8 +2324,7 @@ public class DatabaseClient {
     cobj.put(ComObject.Tag.columnName, columnName);
     cobj.put(ComObject.Tag.dataType, type.getDataType());
     cobj.put(ComObject.Tag.masterSlave, "master");
-    String command = "DatabaseServer:ComObject:addColumn:";
-    byte[] ret = sendToMaster(command, cobj);
+    byte[] ret = sendToMaster(cobj);
     ComObject retObj = new ComObject(ret);
     common.deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
   }
@@ -2361,8 +2341,7 @@ public class DatabaseClient {
       cobj.put(ComObject.Tag.method, "dropTable");
       cobj.put(ComObject.Tag.masterSlave, "master");
       cobj.put(ComObject.Tag.tableName, table);
-      String command = "DatabaseServer:ComObject:dropTable:";
-      byte[] ret = sendToMaster(command, cobj);
+      byte[] ret = sendToMaster(cobj);
       ComObject retObj = new ComObject(ret);
       byte[] bytes = retObj.getByteArray(ComObject.Tag.schemaBytes);
       common.deserializeSchema(bytes);
@@ -2378,8 +2357,7 @@ public class DatabaseClient {
       cobj.put(ComObject.Tag.tableName, tableName);
       cobj.put(ComObject.Tag.indexName, indexName);
       cobj.put(ComObject.Tag.masterSlave, "master");
-      String command = "DatabaseServer:ComObject:dropIndex:";
-      byte[] ret = send(null, 0, 0, command, cobj, DatabaseClient.Replica.master);
+      byte[] ret = send(null, 0, 0, cobj, DatabaseClient.Replica.master);
       ComObject retObj = new ComObject(ret);
       common.deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
     }
@@ -2403,16 +2381,14 @@ public class DatabaseClient {
     cobj.put(ComObject.Tag.method, "truncateTable");
     cobj.put(ComObject.Tag.tableName, table);
     cobj.put(ComObject.Tag.phase, "secondary");
-    String command = "DatabaseServer:ComObject:truncateTable:";
 
     Random rand = new Random(System.currentTimeMillis());
-    sendToAllShards(null, rand.nextLong(), command, cobj, Replica.def);
+    sendToAllShards(null, rand.nextLong(), cobj, Replica.def);
 
     cobj.put(ComObject.Tag.phase, "primary");
-    command = "DatabaseServer:ComObject:truncateTable:";
 
     rand = new Random(System.currentTimeMillis());
-    sendToAllShards(null, rand.nextLong(), command, cobj, Replica.def);
+    sendToAllShards(null, rand.nextLong(), cobj, Replica.def);
   }
 
   private Object doCreateIndex(String dbName, CreateIndex stmt) throws IOException {
@@ -2515,8 +2491,6 @@ public class DatabaseClient {
 
   public int doCreateTable(String dbName, CreateTableStatementImpl createTableStatement) {
     try {
-      String command = "DatabaseServer:ComObject:createTable:";
-
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, dbName);
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
@@ -2524,7 +2498,7 @@ public class DatabaseClient {
       cobj.put(ComObject.Tag.masterSlave, "master");
       cobj.put(ComObject.Tag.createTableStatement, createTableStatement.serialize());
 
-      byte[] ret = sendToMaster(command, cobj);
+      byte[] ret = sendToMaster(cobj);
       ComObject retObj = new ComObject(ret);
       common.deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
 
@@ -2569,14 +2543,12 @@ public class DatabaseClient {
 
   public void insertKey(String dbName, String tableName, KeyInfo keyInfo, String primaryKeyIndexName, Object[] primaryKey, KeyRecord keyRecord, int shard, int replica) {
     try {
-      String command = "DatabaseServer:ComObject:insertIndexEntryByKey:";
-
       int tableId = common.getTables(dbName).get(tableName).getTableId();
       int indexId = common.getTables(dbName).get(tableName).getIndexes().get(keyInfo.indexSchema.getKey()).getIndexId();
       ComObject cobj = serializeInsertKey(getCommon(), dbName, tableId, indexId, tableName, keyInfo, primaryKeyIndexName,
           primaryKey, keyRecord);
 
-      byte[] keyRecordBytes = keyRecord.serialize(SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+      byte[] keyRecordBytes = keyRecord.serialize(DatabaseServer.SERIALIZATION_VERSION);
       cobj.put(ComObject.Tag.keyRecordBytes, keyRecordBytes);
 
       cobj.put(ComObject.Tag.dbName, dbName);
@@ -2593,7 +2565,7 @@ public class DatabaseClient {
 //        }
 //      }
 //      else {
-        send("DatabaseServer:insertIndexEntryByKey", keyInfo.shard, rand.nextLong(), command, cobj, DatabaseClient.Replica.def);
+        send("DatabaseServer:insertIndexEntryByKey", keyInfo.shard, rand.nextLong(), cobj, DatabaseClient.Replica.def);
 //      }
     }
     catch (IOException e) {
@@ -2605,7 +2577,7 @@ public class DatabaseClient {
                                              String tableName, KeyInfo keyInfo,
                                              String primaryKeyIndexName, Object[] primaryKey, KeyRecord keyRecord) throws IOException {
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.serializationVersion, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+    cobj.put(ComObject.Tag.serializationVersion, DatabaseServer.SERIALIZATION_VERSION);
 //    cobj.put(ComObject.Tag.dbName, dbName);
 //    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
     cobj.put(ComObject.Tag.tableId, tableId);
@@ -2617,7 +2589,7 @@ public class DatabaseClient {
 //    cobj.put(ComObject.Tag.transactionId, getTransactionId());
     byte[] keyBytes = DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), keyInfo.indexSchema.getKey(), keyInfo.key);
     cobj.put(ComObject.Tag.keyBytes, keyBytes);
-    byte[] keyRecordBytes = keyRecord.serialize(SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+    byte[] keyRecordBytes = keyRecord.serialize(DatabaseServer.SERIALIZATION_VERSION);
     cobj.put(ComObject.Tag.keyRecordBytes, keyRecordBytes);
     byte[] primaryKeyBytes = DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), primaryKeyIndexName, primaryKey);
     cobj.put(ComObject.Tag.primaryKeyBytes, primaryKeyBytes);
@@ -2633,8 +2605,6 @@ public class DatabaseClient {
 
   public void insertKeyWithRecord(String dbName, String tableName, KeyInfo keyInfo, Record record) {
     try {
-      String command = "DatabaseServer:ComObject:insertIndexEntryByKeyWithRecord:";
-
       int tableId = common.getTables(dbName).get(tableName).getTableId();
       int indexId = common.getTables(dbName).get(tableName).getIndexes().get(keyInfo.indexSchema.getKey()).getIndexId();
       ComObject cobj = serializeInsertKeyWithRecord(dbName, tableId, indexId, tableName, keyInfo, record);
@@ -2650,7 +2620,7 @@ public class DatabaseClient {
       Exception lastException = null;
       //for (int i = 0; i < replicaCount; i++) {
       try {
-        byte[] ret = send(null, keyInfo.shard, 0, command, cobj, DatabaseClient.Replica.def);
+        byte[] ret = send(null, keyInfo.shard, 0, cobj, DatabaseClient.Replica.def);
         if (ret == null) {
           throw new FailedToInsertException("No response for key insert");
         }
@@ -2679,7 +2649,7 @@ public class DatabaseClient {
   private ComObject serializeInsertKeyWithRecord(String dbName, int tableId, int indexId, String tableName,
                                                  KeyInfo keyInfo, Record record) throws IOException {
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.serializationVersion, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+    cobj.put(ComObject.Tag.serializationVersion, DatabaseServer.SERIALIZATION_VERSION);
 //    cobj.put(ComObject.Tag.dbName, dbName);
 //    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
     cobj.put(ComObject.Tag.indexId, indexId);
@@ -2690,7 +2660,7 @@ public class DatabaseClient {
 //    cobj.put(ComObject.Tag.isExcpliciteTrans, isExplicitTrans());
 //    cobj.put(ComObject.Tag.isCommitting, isCommitting());
 //    cobj.put(ComObject.Tag.transactionId, getTransactionId());
-    byte[] recordBytes = record.serialize(common, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+    byte[] recordBytes = record.serialize(common, DatabaseServer.SERIALIZATION_VERSION);
     cobj.put(ComObject.Tag.recordBytes, recordBytes);
     cobj.put(ComObject.Tag.keyBytes, DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), keyInfo.indexSchema.getKey(), keyInfo.key));
 
@@ -2698,7 +2668,6 @@ public class DatabaseClient {
   }
 
   public void deleteKey(String dbName, String tableName, KeyInfo keyInfo, String primaryKeyIndexName, Object[] primaryKey) {
-    String command = "DatabaseServer:ComObject:deleteIndexEntryByKey:";
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
@@ -2710,11 +2679,11 @@ public class DatabaseClient {
     cobj.put(ComObject.Tag.isCommitting, isCommitting());
     cobj.put(ComObject.Tag.transactionId, getTransactionId());
 
-    cobj.put(ComObject.Tag.serializationVersion, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+    cobj.put(ComObject.Tag.serializationVersion, DatabaseServer.SERIALIZATION_VERSION);
     cobj.put(ComObject.Tag.keyBytes, DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), keyInfo.indexSchema.getKey(), keyInfo.key));
     cobj.put(ComObject.Tag.primaryKeyBytes, DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), primaryKeyIndexName, primaryKey));
 
-    send("DatabaseServer:deleteIndexEntryByKey", keyInfo.shard, rand.nextLong(), command, cobj, DatabaseClient.Replica.def);
+    send("DatabaseServer:deleteIndexEntryByKey", keyInfo.shard, rand.nextLong(), cobj, DatabaseClient.Replica.def);
   }
 
   public void populateOrderedKeyInfo(
@@ -3039,8 +3008,7 @@ public class DatabaseClient {
         cobj.put(ComObject.Tag.dbName, dbName);
         cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
         cobj.put(ComObject.Tag.method, "allocateRecordIds");
-        String command = "DatabaseServer:ComObject:allocateRecordIds:";
-        byte[] ret = sendToMaster(command, cobj);
+        byte[] ret = sendToMaster(cobj);
         ComObject retObj = new ComObject(ret);
         nextId.set(retObj.getLong(ComObject.Tag.nextId));
         maxAllocatedId.set(retObj.getLong(ComObject.Tag.maxId));
@@ -3618,8 +3586,7 @@ public class DatabaseClient {
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
     cobj.put(ComObject.Tag.method, "isRepartitioningComplete");
-    String command = "DatabaseServer:ComObject:isRepartitioningComplete:";
-    byte[] bytes = sendToMaster(command, cobj);
+    byte[] bytes = sendToMaster(cobj);
     ComObject retObj = new ComObject(bytes);
     return retObj.getBoolean(ComObject.Tag.finished);
   }
@@ -3635,8 +3602,7 @@ public class DatabaseClient {
     cobj.put(ComObject.Tag.tableName, tableName);
     cobj.put(ComObject.Tag.indexName, indexName);
     cobj.put(ComObject.Tag.method, "getPartitionSize");
-    String command = "DatabaseServer:ComObject:getPartitionSize:";
-    byte[] bytes = send(null, shard, replica, command, cobj, DatabaseClient.Replica.specified);
+    byte[] bytes = send(null, shard, replica, cobj, DatabaseClient.Replica.specified);
     ComObject retObj = new ComObject(bytes);
     return retObj.getLong(ComObject.Tag.size);
   }
@@ -3659,7 +3625,7 @@ public class DatabaseClient {
 //        byte[] ret = send(selectShard(0), auth_user, command, null, DatabaseClient.Replica.def, 20000, selectedHost);
 //        long id = Long.valueOf(new String(ret, "utf-8"));
 //
-//        DataUtil.writeVLong(out, 0, new DataUtil.ResultLength());
+//        Varint.writeSignedVarLong(out, 0, new AtomicInteger());
 //        common.serializeFields(fields, out, tableSchema);
 //        out.close();
 //        body = bytesOut.toByteArray();
@@ -3718,12 +3684,11 @@ public class DatabaseClient {
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
       cobj.put(ComObject.Tag.method, "getSchema");
-      String command = "DatabaseServer:ComObject:getSchema:";
       try {
 
         byte[] ret = null;
         try {
-          ret = sendToMaster(command, cobj);
+          ret = sendToMaster(cobj);
         }
         catch (Exception e) {
           logger.error("Error getting schema from master", e);
@@ -3738,7 +3703,7 @@ public class DatabaseClient {
               continue;
             }
             try {
-              ret = send(null, 0, replica, command, cobj, Replica.specified);
+              ret = send(null, 0, replica, cobj, Replica.specified);
               break;
             }
             catch (Exception e) {
@@ -3789,9 +3754,8 @@ public class DatabaseClient {
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
       cobj.put(ComObject.Tag.method, "getConfig");
-      String command = "DatabaseServer:ComObject:getConfig:";
 
-      byte[] ret = send(null, selectShard(0), auth_user, command, cobj, DatabaseClient.Replica.def);
+      byte[] ret = send(null, selectShard(0), auth_user, cobj, DatabaseClient.Replica.def);
       ComObject retObj = new ComObject(ret);
       common.deserializeConfig(retObj.getByteArray(ComObject.Tag.configBytes));
     }
@@ -3806,7 +3770,6 @@ public class DatabaseClient {
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
     cobj.put(ComObject.Tag.method, "beginRebalance");
     cobj.put(ComObject.Tag.force, false);
-    String command = "DatabaseServer:ComObject:beginRebalance:";
-    sendToMaster(command, cobj);
+    sendToMaster(cobj);
   }
 }

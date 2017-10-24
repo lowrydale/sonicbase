@@ -1,5 +1,7 @@
 package com.sonicbase.server;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComArray;
 import com.sonicbase.common.ComObject;
@@ -10,9 +12,7 @@ import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.util.ExceptionUtil;
-import com.sonicbase.util.JsonArray;
-import com.sonicbase.util.JsonDict;
+import org.apache.commons.lang.exception.ExceptionUtils;
 
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
@@ -221,15 +221,15 @@ public class BulkImportManager {
             final AtomicLong countProcessed = importCountProcessed.get(dbName + ":" + tableName);
             final AtomicInteger countSubmitted = new AtomicInteger();
             final AtomicInteger countFinished = new AtomicInteger();
-            JsonDict dict = server.getConfig();
-            JsonDict databaseDict = dict;
-            JsonArray array = databaseDict.getArray("shards");
-            JsonDict replicaDict = array.getDict(0);
-            JsonArray replicasArray = replicaDict.getArray("replicas");
-            final String address = databaseDict.getBoolean("clientIsPrivate") ?
-                replicasArray.getDict(0).getString("privateAddress") :
-                replicasArray.getDict(0).getString("publicAddress");
-            final int port = replicasArray.getDict(0).getInt("port");
+            ObjectNode dict = server.getConfig();
+            ObjectNode databaseDict = dict;
+            ArrayNode array = databaseDict.withArray("shards");
+            ObjectNode replicaDict = (ObjectNode) array.get(0);
+            ArrayNode replicasArray = replicaDict.withArray("replicas");
+            final String address = databaseDict.get("clientIsPrivate").asBoolean() ?
+                replicasArray.get(0).get("privateAddress").asText() :
+                replicasArray.get(0).get("publicAddress").asText();
+            final int port = replicasArray.get(0).get("port").asInt();
 
             Class.forName("com.sonicbase.jdbcdriver.Driver");
             final Connection insertConn = DriverManager.getConnection("jdbc:sonicbase:" + address + ":" + port + "/" + dbName);
@@ -394,7 +394,7 @@ public class BulkImportManager {
                   catch (Exception e) {
                     logger.error("Error importing records", e);
 
-                    String exceptionStr = ExceptionUtil.getStackTrace(e);
+                    String exceptionStr = ExceptionUtils.getStackTrace(e);
                     importException.put(dbName + ":" + tableName, exceptionStr);
                   }
                   finally {
@@ -420,7 +420,7 @@ public class BulkImportManager {
           catch (Exception e) {
             logger.error("Error importing records", e);
 
-            String exceptionStr = ExceptionUtil.getStackTrace(e);
+            String exceptionStr = ExceptionUtils.getStackTrace(e);
             importException.put(dbName + ":" + tableName, exceptionStr);
           }
           finally {
@@ -746,7 +746,7 @@ public class BulkImportManager {
           catch (Exception e) {
             logger.error("Error importing records", e);
 
-            String exceptionStr = ExceptionUtil.getStackTrace(e);
+            String exceptionStr = ExceptionUtils.getStackTrace(e);
             preProcessException.put(dbName + ":" + tableName, exceptionStr);
 
             throw new DatabaseException(e);
@@ -780,7 +780,6 @@ public class BulkImportManager {
     importCountExpected.put(dbName + ":" + tableName, cobj.getLong(ComObject.Tag.expectedCount));
     cancelBulkImport.put(dbName + ":" + tableName, new AtomicBoolean(false));
     try {
-      String command = "DatabaseServer:ComObject:startBulkImportOnServer:";
       cobj.put(ComObject.Tag.method, "startBulkImportOnServer");
       cobj.put(ComObject.Tag.tableName, tableName);
       for (int shard = 0; shard < server.getShardCount(); shard++) {
@@ -789,7 +788,7 @@ public class BulkImportManager {
             continue;
           }
           cobj.put(ComObject.Tag.shouldProcess, false);
-          byte[] bytes = server.getClient().send(null, shard, replica, command, cobj, DatabaseClient.Replica.specified);
+          byte[] bytes = server.getClient().send(null, shard, replica, cobj, DatabaseClient.Replica.specified);
         }
       }
 
@@ -825,15 +824,15 @@ public class BulkImportManager {
       ThreadPoolExecutor executor = new ThreadPoolExecutor(8, 8, 10_000, TimeUnit.MILLISECONDS,
           new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
       try {
-        JsonDict dict = server.getConfig();
-        JsonDict databaseDict = dict;
-        JsonArray array = databaseDict.getArray("shards");
-        JsonDict replicaDict = array.getDict(0);
-        JsonArray replicasArray = replicaDict.getArray("replicas");
-        final String address = databaseDict.getBoolean("clientIsPrivate") ?
-            replicasArray.getDict(0).getString("privateAddress") :
-            replicasArray.getDict(0).getString("publicAddress");
-        final int port = replicasArray.getDict(0).getInt("port");
+        ObjectNode dict = server.getConfig();
+        ObjectNode databaseDict = dict;
+        ArrayNode array = databaseDict.withArray("shards");
+        ObjectNode replicaDict = (ObjectNode) array.get(0);
+        ArrayNode replicasArray = replicaDict.withArray("replicas");
+        final String address = databaseDict.get("clientIsPrivate").asBoolean() ?
+            replicasArray.get(0).get("privateAddress").asText() :
+            replicasArray.get(0).get("publicAddress").asText();
+        final int port = replicasArray.get(0).get("port").asInt();
 
         Class.forName("com.sonicbase.jdbcdriver.Driver");
         final Connection insertConn = DriverManager.getConnection("jdbc:sonicbase:" + address + ":" + port + "/" + dbName);
@@ -883,7 +882,7 @@ public class BulkImportManager {
     catch (Exception e) {
       logger.error("Error importing records", e);
 
-      String exceptionStr = ExceptionUtil.getStackTrace(e);
+      String exceptionStr = ExceptionUtils.getStackTrace(e);
       importException.put(dbName + ":" + tableName, exceptionStr);
     }
   }
@@ -980,7 +979,6 @@ public class BulkImportManager {
     cobj.put(ComObject.Tag.expectedCount, countPer);
     logger.info("bulkImport got keys");
 
-    String command = "DatabaseServer:ComObject:startBulkImportOnServer:";
     cobj.put(ComObject.Tag.method, "startBulkImportOnServer");
     cobj.put(ComObject.Tag.shouldProcess, true);
 
@@ -1015,7 +1013,7 @@ public class BulkImportManager {
         for (int replica = 0; replica < server.getReplicationFactor(); replica++) {
           if (!cancelBulkImport.get(dbName + ":" + tableName).get()) {
             if (!assigned.contains(shard + ":" + replica)) {
-              byte[] bytes = server.getClient().send(null, shard, replica, command,
+              byte[] bytes = server.getClient().send(null, shard, replica,
                   requests.get(requestOffset), DatabaseClient.Replica.specified);
               ComObject retObj = new ComObject(bytes);
               if (retObj.getBoolean(ComObject.Tag.accepted)) {
@@ -1409,7 +1407,6 @@ public class BulkImportManager {
 
     try {
       ComObject cobj = new ComObject();
-      String command = "DatabaseServer:ComObject:getBulkImportProgressOnServer:";
       cobj.put(ComObject.Tag.method, "getBulkImportProgressOnServer");
       for (final String tableName : server.getCommon().getTables(dbName).keySet()) {
         ConcurrentHashMap<String, BulkImportStatus> tableStatus = null;
@@ -1422,7 +1419,7 @@ public class BulkImportManager {
 
       for (int i = 0; i < server.getShardCount(); i++) {
         for (int j = 0; j < server.getReplicationFactor(); j++) {
-          byte[] bytes = server.getClient().send(null, i, j, command, cobj, DatabaseClient.Replica.specified);
+          byte[] bytes = server.getClient().send(null, i, j, cobj, DatabaseClient.Replica.specified);
           ComObject retObj = new ComObject(bytes);
 
           ComArray array = retObj.getArray(ComObject.Tag.statuses);
@@ -1543,7 +1540,6 @@ public class BulkImportManager {
                 for (int shard = 0; shard < server.getShardCount(); shard++) {
                   for (int replica = 0; replica < server.getReplicationFactor(); replica++) {
                     //  if (offset == coordinatesCalled.get()) {
-                    String command = "DatabaseServer:ComObject:coordinateBulkImportForTable:";
                     ComObject cobj = new ComObject(cobjBytes);
                     cobj.put(ComObject.Tag.method, "coordinateBulkImportForTable");
                     cobj.put(ComObject.Tag.tableName, tableName);
@@ -1555,7 +1551,7 @@ public class BulkImportManager {
                       logger.info("bulkImport setting shouldProcess=true");
                       cobj.put(ComObject.Tag.shouldProcess, true);
                     }
-                    byte[] bytes = server.getClient().send(null, shard, replica, command, cobj, DatabaseClient.Replica.specified);
+                    byte[] bytes = server.getClient().send(null, shard, replica, cobj, DatabaseClient.Replica.specified);
                     ComObject retObj = new ComObject(bytes);
                     if (retObj.getBoolean(ComObject.Tag.accepted)) {
                       logger.info("bulkImport successfully started coordinateBulkImportForTable: db=" + dbName + ", table=" + tableName +
@@ -1586,7 +1582,7 @@ public class BulkImportManager {
             }
             catch (Exception e) {
               logger.error("Error importing table", e);
-              String exceptionStr = ExceptionUtil.getStackTrace(e);
+              String exceptionStr = ExceptionUtils.getStackTrace(e);
               preProcessException.put(dbName + ":" + tableName, exceptionStr);
             }
           }

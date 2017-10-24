@@ -13,7 +13,7 @@ import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.util.DataUtil;
+import org.apache.giraph.utils.Varint;
 
 import java.io.*;
 import java.util.*;
@@ -208,13 +208,13 @@ public class ReadManager {
 
       TableSchema tableSchema = server.getCommon().getSchema(dbName).getTables().get(tableName);
       IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
-      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+      AtomicInteger AtomicInteger = new AtomicInteger();
 
       Index index = server.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexName);
       Boolean ascending = null;
 
       ComObject retObj = new ComObject();
-      retObj.put(ComObject.Tag.serializationVersion, SnapshotManager.SNAPSHOT_SERIALIZATION_VERSION);
+      retObj.put(ComObject.Tag.serializationVersion, DatabaseServer.SERIALIZATION_VERSION);
 
       int leftOperatorId = cobj.getInt(ComObject.Tag.leftOperator);
       BinaryExpression.Operator leftOperator = BinaryExpression.Operator.getOperator(leftOperatorId);
@@ -236,7 +236,7 @@ public class ReadManager {
         }
       }
 
-      //out.writeInt(SNAPSHOT_SERIALIZATION_VERSION);
+      //out.writeInt(SERIALIZATION_VERSION);
 
       ComArray keys = cobj.getArray(ComObject.Tag.keys);
       ComArray retKeysArray = retObj.putArray(ComObject.Tag.retKeys, ComObject.Type.objectType);
@@ -390,7 +390,7 @@ public class ReadManager {
       }
 
       short serializationVersion = cobj.getShort(ComObject.Tag.serializationVersion);
-      DataUtil.ResultLength resultLength = new DataUtil.ResultLength();
+      AtomicInteger AtomicInteger = new AtomicInteger();
       long preparedId = cobj.getLong(ComObject.Tag.preparedId);
       boolean isPrepared = cobj.getBoolean(ComObject.Tag.isPrepared);
 
@@ -701,20 +701,20 @@ public class ReadManager {
     }
   }
 
-  private Set<Integer> getSimpleColumnOffsets(DataInputStream in, DataUtil.ResultLength resultLength, String tableName, TableSchema tableSchema) throws IOException {
-    int count = (int) DataUtil.readVLong(in, resultLength);
+  private Set<Integer> getSimpleColumnOffsets(DataInputStream in, String tableName, TableSchema tableSchema) throws IOException {
+    int count = (int) Varint.readSignedVarLong(in);
     Set<Integer> columnOffsets = new HashSet<>();
     for (int i = 0; i < count; i++) {
-      columnOffsets.add((int) DataUtil.readVLong(in, resultLength));
+      columnOffsets.add((int) Varint.readSignedVarLong(in));
     }
     return columnOffsets;
   }
 
   private Set<Integer> getColumnOffsets(
-      DataInputStream in, DataUtil.ResultLength resultLength, String tableName,
+      DataInputStream in, String tableName,
       TableSchema tableSchema) throws IOException {
     Set<Integer> columnOffsets = new HashSet<>();
-    int columnCount = (int) DataUtil.readVLong(in, resultLength);
+    int columnCount = (int) Varint.readSignedVarLong(in);
     for (int i = 0; i < columnCount; i++) {
       ColumnImpl column = new ColumnImpl();
       if (in.readBoolean()) {

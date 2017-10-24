@@ -3,13 +3,16 @@ package com.sonicbase.database;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.Record;
 import com.sonicbase.index.Index;
-import com.sonicbase.util.ISO8601;
+import com.sonicbase.util.DateUtils;
+import org.apache.giraph.utils.Varint;
 import org.testng.annotations.Test;
 
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.channels.SocketChannel;
+import java.text.ParseException;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -21,7 +24,22 @@ import static org.testng.Assert.assertEquals;
  */
 public class TestLite {
 
+  @Test
+  public  void testDateFormat() throws ParseException {
+    Date date = new Date(System.currentTimeMillis());
+    String str = DateUtils.fromDate(date);
+    System.out.println(str);
+    date = DateUtils.fromString(str);
+    System.out.println(date.getYear() + "-" + date.getMonth() + "-" + date.getDate() + ", " + date.getHours() + ":" +
+      date.getMinutes() + ":" + date.getSeconds());
+  }
 
+  @Test
+  public void testVarint() throws IOException {
+    long len = Varint.sizeOfSignedVarLong(125);
+    System.out.println(len);
+
+  }
   @Test
   public void testDelete() throws InterruptedException {
     final ConcurrentSkipListMap<Long, Long> map = new ConcurrentSkipListMap<>();
@@ -124,7 +142,7 @@ public class TestLite {
 }
   @Test
   public void test() {
-    System.out.println(ISO8601.to8601String(new Date(System.currentTimeMillis())));
+    System.out.println(DateUtils.toString(new Date(System.currentTimeMillis())));
   }
 
   @Test

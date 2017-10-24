@@ -1,7 +1,8 @@
 package com.sonicbase.queue;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.query.DatabaseException;
-import com.sonicbase.util.JsonDict;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -17,21 +18,27 @@ public class KafkaMessageQueueProducer implements MessageQueueProducer {
   @Override
   public void init(String cluster, String jsonConfig, String jsonQueueConfig) {
 
-    JsonDict queueConfig = new JsonDict(jsonQueueConfig);
-    String servers = queueConfig.getString("servers");
-    this.topic = queueConfig.getString("topic");
+    try {
+      ObjectMapper mapper = new ObjectMapper();
+      ObjectNode queueConfig = (ObjectNode) mapper.readTree(jsonQueueConfig);
+      String servers = queueConfig.get("servers").asText();
+      this.topic = queueConfig.get("topic").asText();
 
-    Properties props = new Properties();
-    props.put("bootstrap.servers", servers);
-    props.put("acks", "all");
-    props.put("retries", 0);
-    props.put("batch.size", 16384);
-    props.put("linger.ms", 1);
-    props.put("buffer.memory", 33554432);
-    props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
-    props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
+      Properties props = new Properties();
+      props.put("bootstrap.servers", servers);
+      props.put("acks", "all");
+      props.put("retries", 0);
+      props.put("batch.size", 16384);
+      props.put("linger.ms", 1);
+      props.put("buffer.memory", 33554432);
+      props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
+      props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
 
-    producer = new KafkaProducer<>(props);
+      producer = new KafkaProducer<>(props);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
   }
 
   @Override

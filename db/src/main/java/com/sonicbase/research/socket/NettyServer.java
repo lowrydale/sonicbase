@@ -1,11 +1,11 @@
 package com.sonicbase.research.socket;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.common.Logger;
 import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.socket.DatabaseSocketClient;
 import com.sonicbase.socket.Util;
-import com.sonicbase.util.JsonDict;
-import com.sonicbase.util.StreamUtils;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -18,6 +18,7 @@ import net.jpountz.lz4.LZ4Compressor;
 import net.jpountz.lz4.LZ4Factory;
 import net.jpountz.lz4.LZ4FastDecompressor;
 import org.apache.commons.cli.*;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 
 import java.io.*;
@@ -49,7 +50,6 @@ public class NettyServer {
   private int port;
   private static String cluster;
   private DatabaseServer databaseServer = null;
-  private RequestHandler dlqServer;
   private ChannelFuture f;
   private EventLoopGroup bossGroup;
   private EventLoopGroup workerGroup;
@@ -57,30 +57,15 @@ public class NettyServer {
   private AtomicLong totalResponseSize = new AtomicLong();
   private AtomicLong totalTimeProcessing = new AtomicLong();
 
-  interface RequestHandler {
-    String handleCommand(String command, String jsonStr) throws InterruptedException;
-
-    String handleCommandOld(String command, String jsonStr) throws InterruptedException;
-  }
-
   public static class Request {
-    private String command;
     private byte[] body;
     public CountDownLatch latch = new CountDownLatch(1);
     private byte[] response;
     private long sequence0;
     private long sequence1;
 
-    public String getCommand() {
-      return command;
-    }
-
     public byte[] getBody() {
       return body;
-    }
-
-    public void setCommand(String command) {
-      this.command = command;
     }
 
     public void setBody(byte[] body) {
@@ -178,18 +163,11 @@ public class NettyServer {
   public static Request deserializeRequest(InputStream from, byte[] intBuff) {
     try {
       from.read(intBuff);
-      int len = Util.readRawLittleEndian32(intBuff);
-      from.read(intBuff);
       int bodyLen = Util.readRawLittleEndian32(intBuff);
 
       if (bodyLen > 1024 * 1024 * 1024) {
         throw new com.sonicbase.query.DatabaseException("Invalid inner body length: " + bodyLen);
       }
-      if (len > 1024 * 1024 * 1024) {
-        throw new com.sonicbase.query.DatabaseException("Invalid command length: " + len);
-      }
-      byte[] b = new byte[len];
-      from.read(b);
       byte[] body = new byte[bodyLen];
       if (bodyLen != 0) {
         from.read(body);
@@ -198,9 +176,7 @@ public class NettyServer {
         body = null;
       }
 
-      final String command = new String(b, 0, len, UTF8_STR);
       Request request = new Request();
-      request.command = command;
       request.body = body;
       return request;
     }
@@ -227,7 +203,6 @@ public class NettyServer {
     private ByteBuf destBuff = alloc.directBuffer(1024);
     private ByteBuf respBuffer = alloc.directBuffer(1024);
     private byte[] intBuff = new byte[4];
-    private String command;
     private List<ByteBuf> buffers = new ArrayList<>();
 
     public ServerHandler() {
@@ -568,7 +543,7 @@ public class NettyServer {
     }
 
     private void processError(String respStr, List<byte[]> buffers, Throwable t) throws IOException {
-      logger.error("Error processing command", t);
+      logger.error("Error processing request", t);
       StringBuilder errorResponse = new StringBuilder();
       errorResponse.append("Response: ").append(respStr).append("\n");
       t.fillInStackTrace();
@@ -595,7 +570,7 @@ public class NettyServer {
 
     byte[] doProcessRequest(Request request) {
       try {
-        byte[] ret = processRequest(request.command, request.body);
+        byte[] ret = processRequest(request.body);
 
         int size = 0;
         if (ret != null) {
@@ -658,36 +633,15 @@ public class NettyServer {
     private List<DatabaseServer.Response> processRequests(List<Request> requests, AtomicLong timeLogging, AtomicLong handlerTime) throws IOException {
       List<DatabaseServer.Response> ret = new ArrayList<>();
       for (Request request : requests) {
-        byte[] retBody = getDatabaseServer().handleCommand(request.command, request.body, -1L, -1L, false, true, timeLogging, handlerTime);
+        byte[] retBody = getDatabaseServer().invokeMethod(request.body, -1L, -1L, false, true, timeLogging, handlerTime);
         DatabaseServer.Response response = new DatabaseServer.Response(retBody);
         ret.add(response);
       }
       return ret;
     }
 
-    private byte[] processRequest(String command, byte[] body) {
-      int pos = command.indexOf(':');
-      String subSystem = "";
-      String actualCommand = command;
-      if (pos != -1) {
-        subSystem = command.substring(0, pos);
-        int jsonPos = command.indexOf("{");
-        if (jsonPos != -1) {
-          actualCommand = command.substring(0, jsonPos - 1);
-        }
-      }
-
-      byte[] ret = null;
-
-      if (subSystem.equals("DatabaseServer")) {
-        ret = getDatabaseServer().handleCommand(actualCommand, body, -1L, -1L, false, true, timeLogging, handlerTime);
-      }
-      //              else if (subSystem.equals("IdMapServer")) {
-      //                respStr = NettyServer.getIdMapServer().handleCommand(command, jsonStr);
-      //              }
-
-
-      return ret;
+    private byte[] processRequest(byte[] body) {
+      return getDatabaseServer().invokeMethod(body, -1L, -1L, false, true, timeLogging, handlerTime);
     }
 
     private byte[] returnException(String respStr, Throwable t) {
@@ -746,7 +700,9 @@ public class NettyServer {
 
   public static byte[] uncompress(byte[] b) throws IOException {
     GZIPInputStream in = new GZIPInputStream(new ByteArrayInputStream(b));
-    return StreamUtils.inputStreamToBytes(in);
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    IOUtils.copy(in, out);
+    return out.toByteArray();
   }
 
   public void setDatabaseServer(DatabaseServer databaseServer) {
@@ -760,7 +716,7 @@ public class NettyServer {
 //
 //    for (int i = 0; i < logRequests.length; i++) {
 //      logRequests[i] = new ArrayBlockingQueue<>(2000);
-//      Thread thread = new Thread(new LogProcessor(i, logRequests[i], databaseServer.getDataDir(), databaseServer.getShard(), databaseServer.getReplica()));
+//      Thread thread = new Thread(new LogWriter(i, logRequests[i], databaseServer.getDataDir(), databaseServer.getShard(), databaseServer.getReplica()));
 //      thread.start();
 //    }
 //        File file = new File(databaseServer.getDataDir(), "queue/" + databaseServer.getShard()+ "/" + databaseServer.getReplica());
@@ -771,14 +727,6 @@ public class NettyServer {
 
   public DatabaseServer getDatabaseServer() {
     return this.databaseServer;
-  }
-
-  public RequestHandler getDlqServer() {
-    return this.dlqServer;
-  }
-
-  public void setDlqServer(RequestHandler server) {
-    this.dlqServer = server;
   }
 
   class MyChannelInitializer extends ChannelInitializer<SocketChannel> { // (4)
@@ -864,16 +812,17 @@ public class NettyServer {
       String configStr = null;
       InputStream in = NettyServer.class.getResourceAsStream("/config/config-" + cluster + ".json");
       if (in != null) {
-        configStr = StreamUtils.inputStreamToString(new BufferedInputStream(in));
+        configStr = IOUtils.toString(new BufferedInputStream(in), "utf-8");
       }
       else {
         File file = new File(System.getProperty("user.dir"), "config/config-" + cluster + ".json");
         if (!file.exists()) {
           file = new File(System.getProperty("user.dir"), "db/src/main/resources/config/config-" + cluster + ".json");
         }
-        configStr = StreamUtils.inputStreamToString(new BufferedInputStream(new FileInputStream(file)));
+        configStr = IOUtils.toString(new BufferedInputStream(new FileInputStream(file)), "utf-8");
       }
-      JsonDict config = new JsonDict(configStr);
+      ObjectMapper mapper = new ObjectMapper();
+      ObjectNode config = (ObjectNode) mapper.readTree(configStr);
       String role = line.getOptionValue("role");
 
 
@@ -988,6 +937,6 @@ public class NettyServer {
 
   public static String getHelpPage(NettyServer server) throws IOException {
     InputStream in = server.getClass().getResourceAsStream("rest-help.html");
-    return StreamUtils.inputStreamToString(in);
+    return IOUtils.toString(in, "utf-8");
   }
 }

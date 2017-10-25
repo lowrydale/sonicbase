@@ -5,11 +5,11 @@
     <parent>
         <artifactId>sonicbase-root</artifactId>
         <groupId>com.sonicbase</groupId>
-        <version>1.2.6</version>
+        <version>1.2.7</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <packaging>jar</packaging>
-    <version>1.2.6</version>
+    <version>1.2.7</version>
     <name>sonicbase</name>
     <artifactId>sonicbase</artifactId>
 
@@ -69,9 +69,21 @@
         <dependency>
             <groupId>com.sonicbase</groupId>
             <artifactId>sonicbase-core</artifactId>
-            <version>1.2.6</version>
+            <version>1.2.7</version>
             <!--<scope>system</scope>-->
             <!--<systemPath>/Users/lowryda/Dropbox/git/sonicbase/db/target/sonicbase-core-0.9.2.2.jar</systemPath>-->
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.giraph</groupId>
+            <artifactId>giraph-core</artifactId>
+            <version>1.2.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.9.2</version>
         </dependency>
 
         <dependency>

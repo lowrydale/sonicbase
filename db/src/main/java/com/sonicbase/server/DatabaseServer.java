@@ -1195,13 +1195,13 @@ public class DatabaseServer {
             logger.error("Error checking licenses", e);
           }
         }
-        }
+          }
     });
+      masterLicenseValidatorThread.start();
     }
     catch (Exception e) {
       logger.error("Error validating licenses", e);
     }
-    masterLicenseValidatorThread.start();
   }
 
   private void doValidateLicense(String address, AtomicInteger licensePort, AtomicBoolean lastHaveProLicense, AtomicBoolean haventSet) throws IOException {

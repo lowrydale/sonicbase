@@ -734,26 +734,26 @@ com.sonicbase.common.DatabaseCommon -> com.sonicbase.common.b:
     462:479:com.sonicbase.schema.DataType$Type[] deserializeKeyPrep(com.sonicbase.schema.TableSchema,byte[]) -> b
     484:595:java.lang.Object[] deserializeKey(com.sonicbase.schema.TableSchema,com.sonicbase.schema.DataType$Type[],java.io.DataInputStream) -> a
     601:739:byte[] serializeKey(com.sonicbase.schema.TableSchema,java.lang.String,java.lang.Object[]) -> a
-    746:889:void serializeFields(java.lang.Object[],java.io.DataOutputStream,com.sonicbase.schema.TableSchema,int,boolean) -> a
-    894:1009:java.lang.Object[] deserializeFields(java.lang.String,com.sonicbase.common.DatabaseCommon,java.io.DataInputStream,com.sonicbase.schema.TableSchema,int,int,java.util.Set,boolean) -> a
-    1013:1013:int getShard() -> a
-    1017:1017:int getReplica() -> b
-    1021:1036:void setServersConfig(com.sonicbase.server.DatabaseServer$ServersConfig) -> a
-    1039:1039:com.sonicbase.server.DatabaseServer$ServersConfig getServersConfig() -> c
-    1044:1044:java.util.Map getDataases() -> d
-    1048:1053:void addDatabase(java.lang.String) -> g
-    1056:1061:byte[] serializeConfig(short) -> b
-    1065:1066:void deserializeConfig(byte[]) -> b
-    1069:1071:void deserializeConfig(java.io.DataInputStream) -> b
-    1075:1090:void saveServersConfig(java.lang.String) -> h
-    1093:1093:int getSchemaVersion() -> e
-    1097:1099:void dropTable(com.sonicbase.client.DatabaseClient,java.lang.String,java.lang.String,java.lang.String) -> a
-    1103:1119:java.lang.String keyToString(java.lang.Object[]) -> a
-    1124:1125:void setSchema(java.lang.String,com.sonicbase.schema.Schema) -> a
-    1129:1130:void setHaveProLicense(boolean) -> a
-    1133:1133:boolean haveProLicense() -> f
-    1137:1138:void setSchemaVersion(int) -> c
-    1141:1142:void clearSchema() -> g
+    746:888:void serializeFields(java.lang.Object[],java.io.DataOutputStream,com.sonicbase.schema.TableSchema,int,boolean) -> a
+    893:1011:java.lang.Object[] deserializeFields(java.lang.String,com.sonicbase.common.DatabaseCommon,java.io.DataInputStream,com.sonicbase.schema.TableSchema,int,int,java.util.Set,boolean) -> a
+    1015:1015:int getShard() -> a
+    1019:1019:int getReplica() -> b
+    1023:1038:void setServersConfig(com.sonicbase.server.DatabaseServer$ServersConfig) -> a
+    1041:1041:com.sonicbase.server.DatabaseServer$ServersConfig getServersConfig() -> c
+    1046:1046:java.util.Map getDataases() -> d
+    1050:1055:void addDatabase(java.lang.String) -> g
+    1058:1063:byte[] serializeConfig(short) -> b
+    1067:1068:void deserializeConfig(byte[]) -> b
+    1071:1073:void deserializeConfig(java.io.DataInputStream) -> b
+    1077:1092:void saveServersConfig(java.lang.String) -> h
+    1095:1095:int getSchemaVersion() -> e
+    1099:1101:void dropTable(com.sonicbase.client.DatabaseClient,java.lang.String,java.lang.String,java.lang.String) -> a
+    1105:1121:java.lang.String keyToString(java.lang.Object[]) -> a
+    1126:1127:void setSchema(java.lang.String,com.sonicbase.schema.Schema) -> a
+    1131:1132:void setHaveProLicense(boolean) -> a
+    1135:1135:boolean haveProLicense() -> f
+    1139:1140:void setSchemaVersion(int) -> c
+    1143:1144:void clearSchema() -> g
 com.sonicbase.common.ExcludeRename -> com.sonicbase.common.c:
     boolean exclude() -> a
     boolean applyToMembers() -> b
@@ -5097,21 +5097,21 @@ com.sonicbase.server.SnapshotManager -> com.sonicbase.server.i:
     283:283:java.lang.String getSnapshotRootDir(java.lang.String) -> c
     288:322:void runSnapshotLoop() -> c
     326:351:void deleteRecord(java.lang.String,java.lang.String,com.sonicbase.schema.TableSchema,com.sonicbase.schema.IndexSchema,java.lang.Object[],byte[],int[]) -> a
-    354:495:void runSnapshot(java.lang.String) -> b
-    498:516:void deleteOldSnapshots(java.lang.String) -> d
-    519:531:void enableSnapshot(boolean) -> a
-    534:542:void deleteSnapshots() -> d
-    546:566:void backupFileSystemSchema(java.lang.String,java.lang.String) -> a
-    570:582:void backupFileSystem(java.lang.String,java.lang.String) -> b
-    586:601:void restoreFileSystem(java.lang.String,java.lang.String) -> c
-    604:615:void backupAWSSchema(java.lang.String,java.lang.String,java.lang.String) -> a
-    618:623:void backupAWS(java.lang.String,java.lang.String,java.lang.String) -> b
-    627:639:void restoreAWS(java.lang.String,java.lang.String,java.lang.String) -> c
-    642:644:void getFilesForCurrentSnapshot(java.util.List) -> a
-    647:658:void getFilesFromDirectory(java.io.File,java.util.List) -> a
-    662:668:void deleteTempDirs() -> e
-    671:684:void doDeleteTempDirs(java.io.File) -> b
-    687:687:boolean isRecovering() -> f
+    354:508:void runSnapshot(java.lang.String) -> b
+    511:529:void deleteOldSnapshots(java.lang.String) -> d
+    532:544:void enableSnapshot(boolean) -> a
+    547:555:void deleteSnapshots() -> d
+    559:579:void backupFileSystemSchema(java.lang.String,java.lang.String) -> a
+    583:595:void backupFileSystem(java.lang.String,java.lang.String) -> b
+    599:614:void restoreFileSystem(java.lang.String,java.lang.String) -> c
+    617:628:void backupAWSSchema(java.lang.String,java.lang.String,java.lang.String) -> a
+    631:636:void backupAWS(java.lang.String,java.lang.String,java.lang.String) -> b
+    640:652:void restoreAWS(java.lang.String,java.lang.String,java.lang.String) -> c
+    655:657:void getFilesForCurrentSnapshot(java.util.List) -> a
+    660:671:void getFilesFromDirectory(java.io.File,java.util.List) -> a
+    675:681:void deleteTempDirs() -> e
+    684:697:void doDeleteTempDirs(java.io.File) -> b
+    700:700:boolean isRecovering() -> f
     26:26:java.util.concurrent.atomic.AtomicLong access$000(com.sonicbase.server.SnapshotManager) -> a
     26:26:com.sonicbase.server.DatabaseServer access$100(com.sonicbase.server.SnapshotManager) -> b
     26:26:long access$200(com.sonicbase.server.SnapshotManager) -> c
@@ -5135,20 +5135,36 @@ com.sonicbase.server.SnapshotManager$2 -> com.sonicbase.server.i$2:
     com.sonicbase.server.SnapshotManager this$0 -> a
     288:288:void <init>(com.sonicbase.server.SnapshotManager) -> <init>
     293:319:void run() -> run
+com.sonicbase.server.SnapshotManager$3 -> com.sonicbase.server.i$3:
+    java.util.concurrent.atomic.AtomicLong val$countSaved -> a
+    com.sonicbase.index.Index val$index -> b
+    boolean val$isPrimaryKey -> c
+    java.io.DataOutputStream[] val$outStreams -> d
+    java.util.Map$Entry val$tableEntry -> e
+    java.util.Map$Entry val$indexEntry -> f
+    java.lang.Long val$deleteIfOlder -> g
+    java.lang.String val$dbName -> h
+    int[] val$fieldOffsets -> i
+    java.util.concurrent.atomic.AtomicLong val$savedCount -> j
+    java.util.concurrent.atomic.AtomicLong val$lastLogged -> k
+    long val$subBegin -> l
+    com.sonicbase.server.SnapshotManager this$0 -> m
+    418:418:void <init>(com.sonicbase.server.SnapshotManager,java.util.concurrent.atomic.AtomicLong,com.sonicbase.index.Index,boolean,java.io.DataOutputStream[],java.util.Map$Entry,java.util.Map$Entry,java.lang.Long,java.lang.String,int[],java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong,long) -> <init>
+    421:471:boolean visit(java.lang.Object[],java.lang.Object) -> a
 com.sonicbase.server.SnapshotManager$ByteCounterStream -> com.sonicbase.server.i$a:
     java.io.FileInputStream stream -> b
     java.util.concurrent.atomic.AtomicLong finishedBytes -> c
     com.sonicbase.server.SnapshotManager this$0 -> a
-    694:697:void <init>(com.sonicbase.server.SnapshotManager,java.util.concurrent.atomic.AtomicLong,java.io.FileInputStream) -> <init>
-    700:701:void reset() -> reset
-    704:704:boolean markSupported() -> markSupported
-    708:709:void mark(int) -> mark
-    712:712:long skip(long) -> skip
-    716:716:int available() -> available
-    720:721:void close() -> close
-    724:728:int read(byte[]) -> read
-    732:736:int read(byte[],int,int) -> read
-    741:745:int read() -> read
+    707:710:void <init>(com.sonicbase.server.SnapshotManager,java.util.concurrent.atomic.AtomicLong,java.io.FileInputStream) -> <init>
+    713:714:void reset() -> reset
+    717:717:boolean markSupported() -> markSupported
+    721:722:void mark(int) -> mark
+    725:725:long skip(long) -> skip
+    729:729:int available() -> available
+    733:734:void close() -> close
+    737:741:int read(byte[]) -> read
+    745:749:int read(byte[],int,int) -> read
+    754:758:int read() -> read
 com.sonicbase.server.StreamManager -> com.sonicbase.server.j:
     com.sonicbase.common.Logger logger -> a
     com.sonicbase.server.DatabaseServer server -> b

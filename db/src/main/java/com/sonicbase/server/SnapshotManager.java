@@ -350,7 +350,7 @@ public class SnapshotManager {
     server.getClient().sendToAllShards(null, 0, cobj, DatabaseClient.Replica.def);
   }
 
-  public void runSnapshot(String dbName) throws IOException, InterruptedException, ParseException {
+  public void runSnapshot(final String dbName) throws IOException, InterruptedException, ParseException {
     lastSnapshot = System.currentTimeMillis();
     long lastTimeStartedSnapshot = System.currentTimeMillis();
 
@@ -375,10 +375,13 @@ public class SnapshotManager {
 
     ObjectNode config = server.getConfig();
     ObjectNode expire = (ObjectNode) config.get("expireRecords");
-    Long deleteIfOlder = null;
+    final Long deleteIfOlder;
     if (expire != null) {
       long duration = expire.get("durationMinutes").asLong();
       deleteIfOlder = System.currentTimeMillis() - duration * 60;
+    }
+    else {
+      deleteIfOlder = null;
     }
     final AtomicLong countSaved = new AtomicLong();
     final AtomicLong lastLogged = new AtomicLong(System.currentTimeMillis());
@@ -391,7 +394,7 @@ public class SnapshotManager {
         indexCount.incrementAndGet();
 
         String[] indexFields = indexEntry.getValue().getFields();
-        int[] fieldOffsets = new int[indexFields.length];
+        final int[] fieldOffsets = new int[indexFields.length];
         for (int k = 0; k < indexFields.length; k++) {
           fieldOffsets[k] = tableEntry.getValue().getFieldOffset(indexFields[k]);
         }
@@ -409,55 +412,65 @@ public class SnapshotManager {
           }
 
           final boolean isPrimaryKey = indexEntry.getValue().isPrimaryKey();
-          Map.Entry<Object[], Object> entry = index.firstEntry();
-          while (entry != null) {
-            int bucket = (int) (countSaved.incrementAndGet() % SNAPSHOT_PARTITION_COUNT);
+          Map.Entry<Object[], Object> first = index.firstEntry();
+          if (first != null) {
+            final Map.Entry<Object[], Object> last = index.lastEntry();
+            index.visitTailMap(first.getKey(), new Index.Visitor(){
+              @Override
+              public boolean visit(Object[] key, Object value) throws IOException {
+                int bucket = (int) (countSaved.incrementAndGet() % SNAPSHOT_PARTITION_COUNT);
 
-            byte[][] records = null;
-            synchronized (index.getMutex(entry.getKey())) {
-              Object currValue = index.get(entry.getKey());
-              if (currValue == null || currValue.equals(0L)) {
-                logger.error("null record: key=" + DatabaseCommon.keyToString(entry.getKey()));
-              }
-              else {
-                if (isPrimaryKey) {
-                  records = server.fromUnsafeToRecords(currValue);
-                }
-                else {
-                  records = server.fromUnsafeToKeys(currValue);
-                }
-              }
-            }
-            if (records != null) {
-              outStreams[bucket].writeBoolean(true);
-              byte[] keyBytes = DatabaseCommon.serializeKey(tableEntry.getValue(), indexEntry.getKey(), entry.getKey());
-              outStreams[bucket].write(keyBytes);
+//                if (DatabaseCommon.compareKey(index.getComparators(), key, last.getKey()) > 0) {
+//                  return false;
+//                }
 
-              Varint.writeSignedVarLong(records.length, outStreams[bucket]);
-              for (byte[] record : records) {
-
-                if (deleteIfOlder != null) {
-                  long updateTime = Record.getUpdateTime(record);
-                  if (updateTime < deleteIfOlder) {
-                    deleteRecord(dbName, tableEntry.getKey(), tableEntry.getValue(), indexEntry.getValue(),
-                        entry.getKey(), record, fieldOffsets);
+                byte[][] records = null;
+                synchronized (index.getMutex(key)) {
+                  Object currValue = index.get(key);
+                  if (currValue == null || currValue.equals(0L)) {
+                    logger.error("null record: key=" + DatabaseCommon.keyToString(key));
+                  }
+                  else {
+                    if (isPrimaryKey) {
+                      records = server.fromUnsafeToRecords(currValue);
+                    }
+                    else {
+                      records = server.fromUnsafeToKeys(currValue);
+                    }
                   }
                 }
+                if (records != null) {
+                  outStreams[bucket].writeBoolean(true);
+                  byte[] keyBytes = DatabaseCommon.serializeKey(tableEntry.getValue(), indexEntry.getKey(), key);
+                  outStreams[bucket].write(keyBytes);
 
-                Varint.writeSignedVarLong(record.length, outStreams[bucket]);
-                outStreams[bucket].write(record);
+                  Varint.writeSignedVarLong(records.length, outStreams[bucket]);
+                  for (byte[] record : records) {
 
-                savedCount.incrementAndGet();
-                if (System.currentTimeMillis() - lastLogged.get() > 2000) {
-                  lastLogged.set(System.currentTimeMillis());
-                  logger.info("Snapshot progress - records: count=" + savedCount + RATE_STR +
-                      ((float) savedCount.get() / (float) ((System.currentTimeMillis() - subBegin)) * 1000f) +
-                      DURATION_STR + (System.currentTimeMillis() - subBegin) / 1000f +
-                      ", table=" + tableEntry.getKey() + INDEX_STR + indexEntry.getKey());
+                    if (deleteIfOlder != null) {
+                      long updateTime = Record.getUpdateTime(record);
+                      if (updateTime < deleteIfOlder) {
+                        deleteRecord(dbName, tableEntry.getKey(), tableEntry.getValue(), indexEntry.getValue(),
+                            key, record, fieldOffsets);
+                      }
+                    }
+
+                    Varint.writeSignedVarLong(record.length, outStreams[bucket]);
+                    outStreams[bucket].write(record);
+
+                    savedCount.incrementAndGet();
+                    if (System.currentTimeMillis() - lastLogged.get() > 2000) {
+                      lastLogged.set(System.currentTimeMillis());
+                      logger.info("Snapshot progress - records: count=" + savedCount + RATE_STR +
+                          ((float) savedCount.get() / (float) ((System.currentTimeMillis() - subBegin)) * 1000f) +
+                          DURATION_STR + (System.currentTimeMillis() - subBegin) / 1000f +
+                          ", table=" + tableEntry.getKey() + INDEX_STR + indexEntry.getKey());
+                    }
+                  }
                 }
+                return true;
               }
-            }
-            entry = index.higherEntry(entry.getKey());
+            });
           }
 
           logger.info("Snapshot progress - finished index: count=" + savedCount + RATE_STR +

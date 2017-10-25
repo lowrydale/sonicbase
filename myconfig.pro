@@ -1,5 +1,5 @@
--injars       db/target/sonicbase-core-unobfuscated-1.2.6.jar
--outjars      db/target/sonicbase-core-1.2.6.jar
+-injars       db/target/sonicbase-core-unobfuscated-1.2.7.jar
+-outjars      db/target/sonicbase-core-1.2.7.jar
 -libraryjars  <java.home>/lib/rt.jar
 -printmapping sonicbase-obfuscate.map
 
@@ -153,15 +153,6 @@
     !private <methods>;
 }
 -keepclassmembers class com.sonicbase.util.DateUtils {
-    !private <methods>;
-}
--keepclassmembers class com.sonicbase.util.JsonDict {
-    !private <methods>;
-}
--keepclassmembers class com.sonicbase.util.JsonArray {
-    !private <methods>;
-}
--keepclassmembers class com.sonicbase.util.StreamUtils {
     !private <methods>;
 }
 -keepclassmembers class com.sonicbase.common.SchemaOutOfSyncException {

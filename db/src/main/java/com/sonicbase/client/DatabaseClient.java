@@ -2656,7 +2656,6 @@ public class DatabaseClient {
     cobj.put(ComObject.Tag.tableId, tableId);
 //    cobj.put(ComObject.Tag.tableName, tableName);
 //    cobj.put(ComObject.Tag.indexName, keyInfo.indexSchema.getKey());
-    cobj.put(ComObject.Tag.id, record.getId());
 //    cobj.put(ComObject.Tag.isExcpliciteTrans, isExplicitTrans());
 //    cobj.put(ComObject.Tag.isCommitting, isCommitting());
 //    cobj.put(ComObject.Tag.transactionId, getTransactionId());
@@ -2849,7 +2848,6 @@ public class DatabaseClient {
     }
     Record record = prepareRecordForInsert(request.insertStatement, tableSchema, id);
     record.setTransId(transId);
-    record.setId(id);
 
     Object[] fields = record.getFields();
     columnNames = new ArrayList<>();
@@ -2917,7 +2915,9 @@ public class DatabaseClient {
         insert.primaryKey = primaryKey.key;
         if (!keyInfo.indexSchema.getValue().isPrimaryKey()) {
           KeyRecord keyRecord = new KeyRecord();
-          keyRecord.setKey((long)primaryKey.key[0]);
+          byte[] primaryKeyBytes = DatabaseCommon.serializeKey(common.getTablesById(dbName).get(tableId),
+              insert.primaryKeyIndexName, primaryKey.key);
+          keyRecord.setPrimaryKey(primaryKeyBytes);
           keyRecord.setDbViewNumber(common.getSchemaVersion());
           insert.keyRecord = keyRecord;
         }
@@ -3152,7 +3152,8 @@ public class DatabaseClient {
     }
   }
 
-  public static List<KeyInfo> getKeys(DatabaseCommon common, TableSchema tableSchema, List<String> columnNames, List<Object> values, long id) {
+  public static List<KeyInfo> getKeys(DatabaseCommon common, TableSchema tableSchema, List<String> columnNames,
+                                      List<Object> values, long id) {
     List<KeyInfo> ret = new ArrayList<>();
     for (Map.Entry<String, IndexSchema> indexSchema : tableSchema.getIndices().entrySet()) {
       String[] fields = indexSchema.getValue().getFields();

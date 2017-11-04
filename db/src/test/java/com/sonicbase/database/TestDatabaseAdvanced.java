@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.KeyRecord;
 import com.sonicbase.index.Index;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
@@ -1394,7 +1395,8 @@ public class TestDatabaseAdvanced {
     index = DatabaseServer.getServers().get(0).get(0).getIndices().get("test").getIndices().get("secondary_delete").get("_1__primarykey");
     TableSchema tableSchema = DatabaseServer.getServers().get(0).get(0).getCommon().getTables("test").get("secondary_delete");
     KeyRecord keyRecord = new KeyRecord(keys[0]);
-    value = index.get(new Object[]{keyRecord.getKey()});
+    Object[] primaryKey = DatabaseCommon.deserializeKey(tableSchema, keyRecord.getPrimaryKey());
+    value = index.get(primaryKey);
     assertNotNull(value);
 
     stmt = conn.prepareStatement("delete from secondary_delete where make=? and model=?");
@@ -1413,7 +1415,8 @@ public class TestDatabaseAdvanced {
     assertEquals(value, null);
 
     index = DatabaseServer.getServers().get(0).get(0).getIndices().get("test").getIndices().get("secondary_delete").get("_1__primarykey");
-    value = index.get(new Object[]{keyRecord.getKey()});
+    primaryKey = DatabaseCommon.deserializeKey(tableSchema, keyRecord.getPrimaryKey());
+    value = index.get(primaryKey);
     assertNull(value);
   }
 

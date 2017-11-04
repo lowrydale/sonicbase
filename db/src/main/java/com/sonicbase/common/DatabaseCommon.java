@@ -91,7 +91,7 @@ public class DatabaseCommon {
     try {
       internalWriteLock.lock();
       try {
-        String dataRoot = new File(dataDir, "snapshot/" + shard + "/" + replica).getAbsolutePath();
+        String dataRoot = new File(dataDir, "delta/" + shard + "/" + replica).getAbsolutePath();
         File schemaFile = new File(dataRoot, "schema.bin");
         logger.info("Loading schema: file=" + schemaFile.getAbsolutePath());
         if (schemaFile.exists()) {
@@ -127,7 +127,7 @@ public class DatabaseCommon {
   public void saveSchema(byte[] bytes, String dataDir) {
     try {
       internalWriteLock.lock();
-        String dataRoot = new File(dataDir, "snapshot/" + shard + "/" + replica).getAbsolutePath();
+        String dataRoot = new File(dataDir, "delta/" + shard + "/" + replica).getAbsolutePath();
         File schemaFile = new File(dataRoot, "schema.bin");
         if (schemaFile.exists()) {
           schemaFile.delete();
@@ -158,7 +158,7 @@ public class DatabaseCommon {
   public void saveSchema(DatabaseClient client, String dataDir) {
     try {
       internalWriteLock.lock();
-      String dataRoot = new File(dataDir, "snapshot/" + shard + "/" + replica).getAbsolutePath();
+      String dataRoot = new File(dataDir, "delta/" + shard + "/" + replica).getAbsolutePath();
       File schemaFile = new File(dataRoot, "schema.bin");
       if (schemaFile.exists()) {
         schemaFile.delete();
@@ -1075,7 +1075,7 @@ public class DatabaseCommon {
   public void saveServersConfig(String dataDir) throws IOException {
     try {
       internalWriteLock.lock();
-      String dataRoot = new File(dataDir, "snapshot/" + shard + "/" + replica).getAbsolutePath();
+      String dataRoot = new File(dataDir, "delta/" + shard + "/" + replica).getAbsolutePath();
       File configFile = new File(dataRoot, "config.bin");
       if (configFile.exists()) {
         configFile.delete();

@@ -1198,7 +1198,7 @@ public class ReadManager {
 
       if ((ascending != null && !ascending)) {
         if (lessKey != null && lessOriginalKey != lessKey) {
-          if (lessOp.equals(BinaryExpression.Operator.less) || lessOp.equals(BinaryExpression.Operator.lessEqual)) {
+          if (lessOp.equals(BinaryExpression.Operator.less) /*|| lessOp.equals(BinaryExpression.Operator.lessEqual)*/) {
             boolean foundMatch = 0 == server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), lessKey);
             if (foundMatch) {
               entry = index.lowerEntry((entry.getKey()));
@@ -1216,7 +1216,7 @@ public class ReadManager {
       }
       else {
         if (greaterKey != null) {
-          if (greaterOp.equals(BinaryExpression.Operator.greater) || greaterOp.equals(BinaryExpression.Operator.greaterEqual)) {
+          if (greaterOp.equals(BinaryExpression.Operator.greater) /*|| greaterOp.equals(BinaryExpression.Operator.greaterEqual)*/) {
             boolean foundMatch = key != null && 0 == server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), greaterKey);
             if (foundMatch) {
               entry = index.higherEntry((entry.getKey()));
@@ -2392,7 +2392,7 @@ public class ReadManager {
           }
           else {
             KeyRecord keyRecord = new KeyRecord(records[0]);
-            maxKey = DatabaseCommon.serializeKey(tableSchema, indexName, new Object[]{keyRecord.getKey()});
+            maxKey = keyRecord.getPrimaryKey();
           }
         }
       }
@@ -2414,7 +2414,7 @@ public class ReadManager {
           }
           else {
             KeyRecord keyRecord = new KeyRecord(records[0]);
-            minKey = DatabaseCommon.serializeKey(tableSchema, indexName, new Object[]{keyRecord.getKey()});
+            minKey = keyRecord.getPrimaryKey();
           }
         }
       }

@@ -17,15 +17,13 @@ import java.util.Set;
  */
 public class Record {
   private TableSchema tableSchema;
-  private long id;
   private Object[] fields;
   private int dbViewNumber;
   private long transId;
   private short dbViewFlags;
   private long sequence0;
   private long sequence1;
-  private long sequence2;
-  private long updateTime;
+  private short sequence2;
 
   public static short DB_VIEW_FLAG_DELETING = 0x1;
   public static short DB_VIEW_FLAG_ADDING = 0x2;
@@ -42,36 +40,17 @@ public class Record {
     deserialize(dbName, common, bytes, columns, readHeader);
   }
 
-  public static long readFlags(byte[] bytes) {
-    try {
-      DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
-
-      Varint.readSignedVarLong(in);
-      Varint.readSignedVarLong(in);
-
-      return Varint.readSignedVarLong(in);
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-  }
-
   public void recoverFromSnapshot(String dbName, DatabaseCommon common, byte[] bytes, Set<Integer> columns, boolean readHeader) {
     try {
-        DataInputStream sin = new DataInputStream(new ByteArrayInputStream(bytes));
-        short serializationVersion = sin.readShort();
-        sequence0 = sin.readLong();
-        sequence1 = sin.readLong();
-        sequence2 = sin.readLong();
+      DataInputStream sin = new DataInputStream(new ByteArrayInputStream(bytes));
+      short serializationVersion = sin.readShort();
+      sequence0 = sin.readLong();
+      sequence1 = sin.readLong();
+      sequence2 = sin.readShort();
 
-        dbViewNumber = sin.readInt();
-        dbViewFlags = sin.readShort();
-        transId = sin.readLong();
-        id = sin.readLong();
-
-      if (serializationVersion >= DatabaseServer.SERIALIZATION_VERSION_23) {
-        updateTime = sin.readLong();
-      }
+      dbViewNumber = sin.readInt();
+      dbViewFlags = sin.readShort();
+      transId = Varint.readSignedVarLong(sin);
 
       this.tableSchema = common.getTablesById(dbName).get((int) Varint.readSignedVarLong(sin));
 
@@ -86,16 +65,27 @@ public class Record {
 
   public static long getTransId(byte[] bytes) {
     try {
-      int offset = 8 * 3; //sequence numbers
+      int offset = 2 + 8 + 8 + 2 + 4 + 2;
 
       DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
       in.skipBytes(offset);
-      Varint.readSignedVarLong(in);
-      Varint.readSignedVarLong(in);
-      Varint.readSignedVarLong(in);
       return Varint.readSignedVarLong(in);
     }
     catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public static void setSequences(byte[] recordBytes, long sequence0, long sequence1, short sequence2) {
+    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+    DataOutputStream out = new DataOutputStream(bytesOut);
+    try {
+      out.writeLong(sequence0);
+      out.writeLong(sequence1);
+      out.writeShort(sequence2);
+      System.arraycopy(bytesOut.toByteArray(), 0, recordBytes, 2, 8 + 8 + 2);
+    }
+    catch (IOException e) {
       throw new DatabaseException(e);
     }
   }
@@ -105,7 +95,7 @@ public class Record {
     DataOutputStream out = new DataOutputStream(bytesOut);
     try {
       out.writeShort(dbViewFlag);
-      System.arraycopy(bytesOut.toByteArray(), 0, bytes, 2 + 3 * 8 + 4, 2);
+      System.arraycopy(bytesOut.toByteArray(), 0, bytes, 2 + 8 + 8 + 2 + 4, 2);
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -117,7 +107,7 @@ public class Record {
     DataOutputStream out = new DataOutputStream(bytesOut);
     try {
       out.writeInt(schemaVersion);
-      System.arraycopy(bytesOut.toByteArray(), 0, bytes,  2 + 3 * 8, 4);
+      System.arraycopy(bytesOut.toByteArray(), 0, bytes,  2 + 8 + 8 + 2, 4);
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -125,7 +115,7 @@ public class Record {
   }
 
   public static long getDbViewNumber(byte[] bytes) {
-    int offset = 2 + 8 * 3; //serialization version + sequence numbers
+    int offset = 2 + 8 + 8 + 2; //serialization version + sequence numbers
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes, offset, 4));
     try {
       return in.readInt();
@@ -136,20 +126,34 @@ public class Record {
   }
 
   public static long getUpdateTime(byte[] bytes) {
-    int offset = 2 + 8 * 3 + 4 + 2 + 8 + 8; //serialization version + sequence numbers
-    DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes, offset, bytes.length - offset));
+    return getSequence0(bytes);
+  }
+
+  public static long getSequence1(byte[] bytes) {
+    int offset = 2 + 8;
+    DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes, offset, 8));
     try {
       return in.readLong();
     }
     catch (IOException e) {
       throw new DatabaseException(e);
     }
-
   }
 
+  public static long getSequence0(byte[] bytes) {
+    int offset = 2;
+    DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes, offset, 8));
+    try {
+      return in.readLong();
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+
   public static long getDbViewFlags(byte[] bytes) {
-    int offset = 2 + 8 * 3; //serialization version + sequence numbers
-    offset += 4;//viewNum
+    int offset = 2 + 8 + 8 + 2 + 4; //serialization version + sequence numbers
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes, offset, bytes.length - offset));
     try {
       return in.readShort();
@@ -159,12 +163,8 @@ public class Record {
     }
   }
 
-  public void setUpdateTime(long updateTime) {
-    this.updateTime = updateTime;
-  }
-
   public long getUpdateTime() {
-    return updateTime;
+    return sequence0;
   }
 
   public short getDbViewFlags() {
@@ -173,10 +173,6 @@ public class Record {
 
   public void setDbViewFlags(short dbViewFlags) {
     this.dbViewFlags = dbViewFlags;
-  }
-
-  public long getId() {
-    return id;
   }
 
   public long getDbViewNumber() {
@@ -211,11 +207,11 @@ public class Record {
     return sequence1;
   }
 
-  public void setSequence2(long value) {
+  public void setSequence2(short value) {
     this.sequence2 = value;
   }
 
-  public long getSequence2() {
+  public short getSequence2() {
     return sequence2;
   }
 
@@ -226,16 +222,11 @@ public class Record {
     headerOut.writeShort(serializationVersion);
     headerOut.writeLong(sequence0);
     headerOut.writeLong(sequence1);
-    headerOut.writeLong(sequence2);
+    headerOut.writeShort(sequence2);
 
     headerOut.writeInt(dbViewNumber);
     headerOut.writeShort(dbViewFlags);
-    headerOut.writeLong(transId);
-    headerOut.writeLong(id);
-
-    if (serializationVersion >= DatabaseServer.SERIALIZATION_VERSION_23) {
-      headerOut.writeLong(updateTime);
-    }
+    Varint.writeSignedVarLong(transId, headerOut);
 
     headerOut.close();
     byte[] bytes = bytesOut.toByteArray();
@@ -243,10 +234,6 @@ public class Record {
     out.write(bytes);
     Varint.writeSignedVarLong(tableSchema.getTableId(), out);
     DatabaseCommon.serializeFields(fields, out, tableSchema, common.getSchemaVersion(), true);
-  }
-
-  public void setId(long id) {
-    this.id = id;
   }
 
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")

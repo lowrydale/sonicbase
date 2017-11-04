@@ -633,7 +633,7 @@ public class NettyServer {
     private List<DatabaseServer.Response> processRequests(List<Request> requests, AtomicLong timeLogging, AtomicLong handlerTime) throws IOException {
       List<DatabaseServer.Response> ret = new ArrayList<>();
       for (Request request : requests) {
-        byte[] retBody = getDatabaseServer().invokeMethod(request.body, -1L, -1L, false, true, timeLogging, handlerTime);
+        byte[] retBody = getDatabaseServer().invokeMethod(request.body, -1L, (short) -1L, false, true, timeLogging, handlerTime);
         DatabaseServer.Response response = new DatabaseServer.Response(retBody);
         ret.add(response);
       }
@@ -641,7 +641,7 @@ public class NettyServer {
     }
 
     private byte[] processRequest(byte[] body) {
-      return getDatabaseServer().invokeMethod(body, -1L, -1L, false, true, timeLogging, handlerTime);
+      return getDatabaseServer().invokeMethod(body, -1L, (short) -1L, false, true, timeLogging, handlerTime);
     }
 
     private byte[] returnException(String respStr, Throwable t) {
@@ -875,7 +875,8 @@ public class NettyServer {
               databaseServer.startMasterMonitor();
 
               logger.info("running snapshot loop");
-              databaseServer.getSnapshotManager().runSnapshotLoop();
+              databaseServer.getDeltaManager().runSnapshotLoop();
+//              databaseServer.getSnapshotManager().runSnapshotLoop();
 
               try {
                 databaseServer.getStreamManager().startStreaming(null);

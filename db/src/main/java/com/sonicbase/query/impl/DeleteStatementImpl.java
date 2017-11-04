@@ -98,7 +98,8 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
             Record record = cachedRecord == null ? null : cachedRecord.getRecord();
             if (record == null) {
               boolean forceSelectOnServer = false;
-              record = expression.doReadRecord(dbName, client, forceSelectOnServer, recordCache, entry[0], tableName, null, null, null, client.getCommon().getSchemaVersion(), false);
+              record = expression.doReadRecord(dbName, client, forceSelectOnServer, recordCache, entry[0], tableName,
+                  null, null, null, client.getCommon().getSchemaVersion(), false);
             }
             if (record != null) {
               List<Integer> selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false, fieldOffsets, client.getCommon(), tableSchema,
@@ -123,6 +124,7 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
               cobj = new ComObject();
               cobj.put(ComObject.Tag.dbName, dbName);
               cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+              cobj.put(ComObject.Tag.primaryKeyBytes, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), entry[0]));
               cobj.put(ComObject.Tag.tableName, tableName);
               cobj.put(ComObject.Tag.isExcpliciteTrans, client.isExplicitTrans());
               cobj.put(ComObject.Tag.isCommitting, client.isCommitting());

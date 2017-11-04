@@ -11,7 +11,6 @@ import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
-import com.sonicbase.server.SnapshotManager;
 
 import java.sql.SQLException;
 import java.util.*;
@@ -236,7 +235,8 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
                 if (prevMap == null) {
                   for (Map.Entry<Object[], DatabaseClient.KeyInfo> innerNewEntry : newEntry.getValue().entrySet()) {
                     KeyRecord keyRecord = new KeyRecord();
-                    keyRecord.setKey((long)newPrimaryKey[0]);
+                    byte[] primaryKeyBytes = client.getCommon().serializeKey(tableSchema, innerNewEntry.getValue().getIndexSchema().getKey(), newPrimaryKey);
+                    keyRecord.setPrimaryKey(primaryKeyBytes);
                     keyRecord.setDbViewNumber(client.getCommon().getSchemaVersion());
                     client.insertKey(dbName, tableSchema.getName(), innerNewEntry.getValue(), indexSchema.getName(),
                         newPrimaryKey, keyRecord, -1, -1);
@@ -249,7 +249,9 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
                         continue;
                       }
                       KeyRecord keyRecord = new KeyRecord();
-                      keyRecord.setKey((long)newPrimaryKey[0]);
+                      byte[] primaryKeyBytes = client.getCommon().serializeKey(tableSchema,
+                          indexSchema.getName(), newPrimaryKey);
+                      keyRecord.setPrimaryKey(primaryKeyBytes);
                       keyRecord.setDbViewNumber(client.getCommon().getSchemaVersion());
                       client.insertKey(dbName, tableSchema.getName(), innerNewEntry.getValue(), indexSchema.getName(),
                           newPrimaryKey, keyRecord, -1, -1);

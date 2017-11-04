@@ -24,7 +24,7 @@ public class MethodInvoker {
 
   private final BulkImportManager bulkImportManager;
   private final DeleteManager deleteManager;
-  private final SnapshotManager snapshotManager;
+  private final DeltaManager deltaManager;
   private final UpdateManager updateManager;
   private final TransactionManager transactionManager;
   private final ReadManager readManager;
@@ -36,12 +36,13 @@ public class MethodInvoker {
   private AtomicInteger testWriteCallCount = new AtomicInteger();
 
 
-  public MethodInvoker(DatabaseServer server, BulkImportManager bulkImportManager, DeleteManager deleteManager, SnapshotManager snapshotManager, UpdateManager updateManager, TransactionManager transactionManager, ReadManager readManager, LogManager logManager, SchemaManager schemaManager) {
+  public MethodInvoker(DatabaseServer server, BulkImportManager bulkImportManager, DeleteManager deleteManager,
+                       DeltaManager deltaManager, UpdateManager updateManager, TransactionManager transactionManager, ReadManager readManager, LogManager logManager, SchemaManager schemaManager) {
     this.server = server;
     this.common = server.getCommon();
     this.bulkImportManager = bulkImportManager;
     this.deleteManager = deleteManager;
-    this.snapshotManager = snapshotManager;
+    this.deltaManager = deltaManager;
     this.updateManager = updateManager;
     this.transactionManager = transactionManager;
     this.readManager = readManager;
@@ -151,7 +152,8 @@ public class MethodInvoker {
       Long existingSequence0 = getExistingSequence0(request);
       Long existingSequence1 = getExistingSequence1(request);
 
-      DatabaseServer.LogRequest logRequest = logManager.logRequest(requestBytes, enableQueuing, methodStr, existingSequence0, existingSequence1, timeLogging);
+      DatabaseServer.LogRequest logRequest = logManager.logRequest(requestBytes, enableQueuing, methodStr,
+          existingSequence0, existingSequence1, timeLogging);
       ComObject ret = null;
 
       if (!replayedCommand && !server.isRunning() && !priorityCommands.contains(methodStr)) {
@@ -581,7 +583,7 @@ public class MethodInvoker {
 
   public ComObject finishServerReloadForSource(ComObject cobj, boolean replayedCommand) {
 
-    snapshotManager.enableSnapshot(true);
+    deltaManager.enableSnapshot(true);
 
     return null;
   }
@@ -625,9 +627,8 @@ public class MethodInvoker {
   public ComObject getRecoverProgress(ComObject cobj, boolean replayedCommand) {
 
     ComObject retObj = new ComObject();
-    if (snapshotManager.isRecovering()) {
-      retObj.put(ComObject.Tag.percentComplete, snapshotManager.getPercentRecoverComplete());
-      retObj.put(ComObject.Tag.stage, "recoveringSnapshot");
+    if (deltaManager.isRecovering()) {
+      deltaManager.getPercentRecoverComplete(retObj);
     }
     else if (!server.getDeleteManager().isForcingDeletes()) {
       retObj.put(ComObject.Tag.percentComplete, logManager.getPercentApplyQueuesComplete());
@@ -637,7 +638,7 @@ public class MethodInvoker {
       retObj.put(ComObject.Tag.percentComplete, server.getDeleteManager().getPercentDeleteComplete());
       retObj.put(ComObject.Tag.stage, "forcingDeletes");
     }
-    Exception error = snapshotManager.getErrorRecovering();
+    Exception error = deltaManager.getErrorRecovering();
     if (error != null) {
       retObj.put(ComObject.Tag.error, true);
     }
@@ -1040,7 +1041,7 @@ public class MethodInvoker {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return server.getRepartitioner().deleteMovedRecords(cobj);
+      return server.getRepartitioner().deleteMovedRecords(cobj, replayedCommand);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
@@ -1118,7 +1119,7 @@ public class MethodInvoker {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return server.getRepartitioner().moveIndexEntries(cobj);
+      return server.getRepartitioner().moveIndexEntries(cobj, replayedCommand);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();

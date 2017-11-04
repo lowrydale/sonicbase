@@ -334,7 +334,12 @@ public class Index {
       return longSkipIndex.get((long) key[0]);
     }
     else if (stringSkipIndex != null) {
-      return stringSkipIndex.get((byte[]) key[0]);
+      try {
+        return stringSkipIndex.get((byte[]) key[0]);
+      }
+      catch (Exception e) {
+        throw new DatabaseException(e);
+      }
     }
     else if (objectSkipIndex != null) {
       return objectSkipIndex.get(key);

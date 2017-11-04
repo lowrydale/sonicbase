@@ -206,6 +206,8 @@ public class SnapshotManager {
                                                   }
                                                   Object[] key = DatabaseCommon.deserializeKey(tableSchema, inStream);
 
+                                                  long updateTime = Varint.readUnsignedVarLong(inStream);
+
                                                   int count = (int) Varint.readSignedVarLong(inStream);
                                                   byte[][] records = new byte[count][];
                                                   for (int i = 0; i < records.length; i++) {
@@ -216,10 +218,10 @@ public class SnapshotManager {
 
                                                   Object address;
                                                   if (isPrimaryKey) {
-                                                    address = server.toUnsafeFromRecords(records);
+                                                    address = server.toUnsafeFromRecords(updateTime, records);
                                                   }
                                                   else {
-                                                    address = server.toUnsafeFromKeys(records);
+                                                    address = server.toUnsafeFromKeys(updateTime, records);
                                                   }
 
                                                   index.put(key, address);
@@ -408,7 +410,7 @@ public class SnapshotManager {
           for (int i = 0; i < outStreams.length; i++) {
             File currFile = new File(file, tableEntry.getKey() + "/" + indexEntry.getKey() + "/" + i + ".bin");
             currFile.getParentFile().mkdirs();
-            outStreams[i] = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(currFile)));
+            outStreams[i] = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(currFile), 65_000));
           }
 
           final boolean isPrimaryKey = indexEntry.getValue().isPrimaryKey();
@@ -425,6 +427,7 @@ public class SnapshotManager {
 //                }
 
                 byte[][] records = null;
+                long updateTime = 0;
                 synchronized (index.getMutex(key)) {
                   Object currValue = index.get(key);
                   if (currValue == null || currValue.equals(0L)) {
@@ -437,6 +440,7 @@ public class SnapshotManager {
                     else {
                       records = server.fromUnsafeToKeys(currValue);
                     }
+                    updateTime = server.getUpdateTime(currValue);
                   }
                 }
                 if (records != null) {
@@ -444,11 +448,13 @@ public class SnapshotManager {
                   byte[] keyBytes = DatabaseCommon.serializeKey(tableEntry.getValue(), indexEntry.getKey(), key);
                   outStreams[bucket].write(keyBytes);
 
+                  Varint.writeUnsignedVarLong(updateTime,  outStreams[bucket]);
+
                   Varint.writeSignedVarLong(records.length, outStreams[bucket]);
                   for (byte[] record : records) {
 
                     if (deleteIfOlder != null) {
-                      long updateTime = Record.getUpdateTime(record);
+                      updateTime = Record.getUpdateTime(record);
                       if (updateTime < deleteIfOlder) {
                         deleteRecord(dbName, tableEntry.getKey(), tableEntry.getValue(), indexEntry.getValue(),
                             key, record, fieldOffsets);
@@ -498,7 +504,7 @@ public class SnapshotManager {
     deleteOldSnapshots(dbName);
 
     try {
-      server.getLogManager().deleteOldLogs(lastTimeStartedSnapshot);
+      server.getLogManager().deleteOldLogs(lastTimeStartedSnapshot, false);
     }
     catch (Exception e) {
       logger.error("Error deleting old logs", e);

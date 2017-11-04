@@ -167,7 +167,8 @@ public class DatabaseServer {
   private String masterAddress;
   private int masterPort;
   private UpdateManager updateManager;
-  private SnapshotManager snapshotManager;
+  //private SnapshotManager snapshotManager;
+  private DeltaManager deltaManager;
   private TransactionManager transactionManager;
   private ReadManager readManager;
   private LogManager logManager;
@@ -302,15 +303,16 @@ public class DatabaseServer {
 
     this.deleteManager = new DeleteManager(this);
     this.updateManager = new UpdateManager(this);
-    this.snapshotManager = new SnapshotManager(this);
+    //this.snapshotManager = new SnapshotManager(this);
+    this.deltaManager = new DeltaManager(this);
     this.transactionManager = new TransactionManager(this);
     this.readManager = new ReadManager(this);
-    this.logManager = new LogManager(this);
+    this.logManager = new LogManager(this, new File(dataDir, "log"));
     this.schemaManager = new SchemaManager(this);
     this.bulkImportManager = new BulkImportManager(this);
     //recordsById = new IdIndex(!unitTest, (int) (long) databaseDict.getLong("subPartitionsForIdIndex"), (int) (long) databaseDict.getLong("initialIndexSize"), (int) (long) databaseDict.getLong("indexEntrySize"));
 
-    this.methodInvoker = new MethodInvoker(this, bulkImportManager, deleteManager, snapshotManager, updateManager, transactionManager, readManager, logManager, schemaManager);
+    this.methodInvoker = new MethodInvoker(this, bulkImportManager, deleteManager, deltaManager, updateManager, transactionManager, readManager, logManager, schemaManager);
     this.replicationFactor = shards.get(0).withArray("replicas").size();
 //    if (replicationFactor < 2) {
 //      throw new DatabaseException("Replication Factor must be at least two");
@@ -1104,6 +1106,9 @@ public class DatabaseServer {
     return streamManager;
   }
 
+  public DeltaManager getDeltaManager() {
+    return deltaManager;
+  }
 
   private static class NullX509TrustManager implements X509TrustManager {
     public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
@@ -1281,7 +1286,16 @@ public class DatabaseServer {
       }
     }
     catch (Exception e) {
-      throw new DatabaseException(e);
+      this.haveProLicense = false;
+      this.disableNow = true;
+      this.disableDate = null;
+      this.multipleLicenseServers = false;
+      common.setHaveProLicense(haveProLicense);
+      common.saveSchema(getClient(), dataDir);
+      lastHaveProLicense.set(haveProLicense);
+      haventSet.set(true);
+
+      logger.error("Error validating license");
     }
   }
 
@@ -1444,7 +1458,7 @@ public class DatabaseServer {
 
   public ComObject prepareForBackup(ComObject cobj) {
 
-    snapshotManager.enableSnapshot(false);
+    deltaManager.enableSnapshot(false);
 
     logSlicePoint = logManager.sliceLogs(true);
 
@@ -1471,10 +1485,13 @@ public class DatabaseServer {
           backupFileSystemSingleDir(directory, subDirectory, "nextRecordId");
           deleteManager.backupFileSystem(directory, subDirectory);
           longRunningCommands.backupFileSystem(directory, subDirectory);
-          snapshotManager.deleteTempDirs();
-          snapshotManager.backupFileSystem(directory, subDirectory);
+//          snapshotManager.deleteTempDirs();
+//          snapshotManager.backupFileSystem(directory, subDirectory);
+          deltaManager.deleteTempDirs();
+          deltaManager.backupFileSystem(directory, subDirectory);
           synchronized (common) {
-            snapshotManager.backupFileSystemSchema(directory, subDirectory);
+            //snapshotManager.backupFileSystemSchema(directory, subDirectory);
+            deltaManager.backupFileSystemSchema(directory, subDirectory);
           }
           logManager.backupFileSystem(directory, subDirectory, logSlicePoint);
 
@@ -1516,10 +1533,13 @@ public class DatabaseServer {
           backupAWSSingleDir(bucket, prefix, subDirectory, "nextRecordId");
           deleteManager.backupAWS(bucket, prefix, subDirectory);
           longRunningCommands.backupAWS(bucket, prefix, subDirectory);
-          snapshotManager.deleteTempDirs();
-          snapshotManager.backupAWS(bucket, prefix, subDirectory);
+          //snapshotManager.deleteTempDirs();
+          deltaManager.deleteTempDirs();
+          //snapshotManager.backupAWS(bucket, prefix, subDirectory);
+          deltaManager.backupAWS(bucket, prefix, subDirectory);
           synchronized (common) {
-            snapshotManager.backupAWSSchema(bucket, prefix, subDirectory);
+            //snapshotManager.backupAWSSchema(bucket, prefix, subDirectory);
+            deltaManager.backupAWSSchema(bucket, prefix, subDirectory);
           }
           logManager.backupAWS(bucket, prefix, subDirectory, logSlicePoint);
 
@@ -1571,7 +1591,7 @@ public class DatabaseServer {
           doDeleteFileSystemBackups(directory, maxBackupCount);
         }
       }
-      snapshotManager.enableSnapshot(true);
+      deltaManager.enableSnapshot(true);
       isBackupComplete = false;
       return null;
     }
@@ -1894,9 +1914,10 @@ public class DatabaseServer {
       purgeMemory();
 
       //isRunning.set(false);
-      snapshotManager.enableSnapshot(false);
+      deltaManager.enableSnapshot(false);
       Thread.sleep(5000);
-      snapshotManager.deleteSnapshots();
+      //snapshotManager.deleteSnapshots();
+      deltaManager.deleteSnapshots();
 
       File file = new File(getDataDir(), "result-sets/" + getShard() + "/" + getReplica());
       FileUtils.deleteDirectory(file);
@@ -1931,7 +1952,8 @@ public class DatabaseServer {
           restoreFileSystemSingleDir(directory, subDirectory, "nextRecordId");
           deleteManager.restoreFileSystem(directory, subDirectory);
           longRunningCommands.restoreFileSystem(directory, subDirectory);
-          snapshotManager.restoreFileSystem(directory, subDirectory);
+          //snapshotManager.restoreFileSystem(directory, subDirectory);
+          deltaManager.restoreFileSystem(directory, subDirectory);
 
 //          File file = new File(directory, subDirectory);
 //          file = new File(file, "snapshot/" + getShard() + "/0/schema.bin");
@@ -2003,7 +2025,8 @@ public class DatabaseServer {
           restoreAWSSingleDir(bucket, prefix, subDirectory, "nextRecordId");
           deleteManager.restoreAWS(bucket, prefix, subDirectory);
           longRunningCommands.restoreAWS(bucket, prefix, subDirectory);
-          snapshotManager.restoreAWS(bucket, prefix, subDirectory);
+          //snapshotManager.restoreAWS(bucket, prefix, subDirectory);
+          deltaManager.restoreAWS(bucket, prefix, subDirectory);
           logManager.restoreAWS(bucket, prefix, subDirectory);
 
           prepareDataFromRestore();
@@ -2055,7 +2078,7 @@ public class DatabaseServer {
 
   public ComObject finishRestore(ComObject cobj) {
     try {
-      snapshotManager.enableSnapshot(true);
+      deltaManager.enableSnapshot(true);
       //isRunning.set(true);
       isRestoreComplete = false;
       return null;
@@ -2068,7 +2091,7 @@ public class DatabaseServer {
 
   private void prepareDataFromRestore() throws Exception {
     for (String dbName : getDbNames(getDataDir())) {
-      getSnapshotManager().recoverFromSnapshot(dbName);
+      getDeltaManager().recoverFromSnapshot(dbName);
     }
     getLogManager().applyQueues();
   }
@@ -2129,7 +2152,7 @@ public class DatabaseServer {
         String bucket = backupConfig.get("bucket").asText();
         String prefix = backupConfig.get("prefix").asText();
 
-        String key = prefix + "/" + subDirectory + "/snapshot/" + getShard() + "/0/schema.bin";
+        String key = prefix + "/" + subDirectory + "/delta/" + getShard() + "/0/schema.bin";
         byte[] bytes = awsClient.downloadBytes(bucket, key);
         synchronized (common) {
           common.deserializeSchema(bytes);
@@ -2141,7 +2164,7 @@ public class DatabaseServer {
         currDirectory = currDirectory.replace("$HOME", System.getProperty("user.home"));
 
         File file = new File(currDirectory, subDirectory);
-        file = new File(file, "snapshot/" + getShard() + "/0/schema.bin");
+        file = new File(file, "delta/" + getShard() + "/0/schema.bin");
         BufferedInputStream in = new BufferedInputStream(new FileInputStream(file));
         ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
         IOUtils.copy(in, bytesOut);
@@ -2324,10 +2347,6 @@ public class DatabaseServer {
     return updateManager;
   }
 
-  public SnapshotManager getSnapshotManager() {
-    return snapshotManager;
-  }
-
   public LogManager getLogManager() {
     return logManager;
   }
@@ -2341,12 +2360,12 @@ public class DatabaseServer {
   }
 
   public void enableSnapshot(boolean enable) {
-    snapshotManager.enableSnapshot(enable);
+    deltaManager.enableSnapshot(enable);
   }
 
   public void runSnapshot() throws InterruptedException, ParseException, IOException {
     for (String dbName : getDbNames(dataDir)) {
-      snapshotManager.runSnapshot(dbName);
+      deltaManager.runSnapshot(dbName);
     }
     getCommon().saveSchema(getClient(), getDataDir());
 
@@ -2355,7 +2374,8 @@ public class DatabaseServer {
   public void recoverFromSnapshot() throws Exception {
     //common.loadSchema(dataDir);
     for (String dbName : getDbNames(dataDir)) {
-      snapshotManager.recoverFromSnapshot(dbName);
+//      snapshotManager.recoverFromSnapshot(dbName);
+      deltaManager.recoverFromSnapshot(dbName);
     }
   }
 
@@ -3599,7 +3619,7 @@ public class DatabaseServer {
     ComArray array = retObj.getArray(ComObject.Tag.dbNames);
     for (int i = 0; i < array.getArray().size(); i++) {
       String dbName = (String) array.getArray().get(i);
-      File file = new File(dataDir, "snapshot/" + shard + "/" + replica + "/" + dbName);
+      File file = new File(dataDir, "delta/" + shard + "/" + replica + "/" + dbName);
       file.mkdirs();
       logger.info("Received database name: name=" + dbName);
     }
@@ -3607,7 +3627,7 @@ public class DatabaseServer {
 
 
   public List<String> getDbNames(String dataDir) {
-    File file = new File(dataDir, "snapshot/" + shard + "/" + replica);
+    File file = new File(dataDir, "delta/" + shard + "/" + replica);
     String[] dirs = file.list();
     List<String> ret = new ArrayList<>();
     if (dirs != null) {
@@ -3752,7 +3772,7 @@ public class DatabaseServer {
     try {
       List<String> files = new ArrayList<>();
 
-      snapshotManager.enableSnapshot(false);
+      deltaManager.enableSnapshot(false);
       logSlicePoint = logManager.sliceLogs(true);
 
       BufferedReader reader = new BufferedReader(new StringReader(logSlicePoint));
@@ -3763,7 +3783,8 @@ public class DatabaseServer {
         }
         files.add(line);
       }
-      snapshotManager.getFilesForCurrentSnapshot(files);
+      //snapshotManager.getFilesForCurrentSnapshot(files);
+      deltaManager.getFilesForCurrentSnapshot(files);
 
       File file = new File(getDataDir(), "logSequenceNum/" + shard + "/" + replica + "/logSequenceNum.txt");
       if (file.exists()) {
@@ -3805,9 +3826,10 @@ public class DatabaseServer {
         try {
           isServerRoloadRunning = true;
           isRunning.set(false);
-          snapshotManager.enableSnapshot(false);
+          deltaManager.enableSnapshot(false);
           Thread.sleep(5000);
-          snapshotManager.deleteSnapshots();
+          //snapshotManager.deleteSnapshots();
+          deltaManager.deleteSnapshots();
 
           File file = new File(getDataDir(), "result-sets");
           FileUtils.deleteDirectory(file);
@@ -3827,7 +3849,7 @@ public class DatabaseServer {
           common.loadSchema(getDataDir());
           DatabaseServer.this.getClient().syncSchema();
           prepareDataFromRestore();
-          snapshotManager.enableSnapshot(true);
+          deltaManager.enableSnapshot(true);
           isRunning.set(true);
         }
         catch (Exception e) {
@@ -3883,8 +3905,8 @@ public class DatabaseServer {
 
         filename = fixReplica("deletes", filename);
         filename = fixReplica("lrc", filename);
-        filename = fixReplica("snapshot", filename);
-        filename = fixReplica("queue", filename);
+        filename = fixReplica("delta", filename);
+        filename = fixReplica("log", filename);
         filename = fixReplica("nextRecordId", filename);
         filename = fixReplica("logSequenceNum", filename);
 
@@ -4066,11 +4088,32 @@ public class DatabaseServer {
     }
   }
 
+  class IndexValue {
+    long updateTime;
+    byte[][] records;
+    byte[] bytes;
+
+    public IndexValue(long updateTime, byte[][] records) {
+      this.updateTime = updateTime;
+      this.records = records;
+    }
+
+    public IndexValue(long updateTime, byte[] bytes) {
+      this.updateTime = updateTime;
+      this.bytes = bytes;
+    }
+  }
+
   public Object toUnsafeFromRecords(byte[][] records) {
+    long seconds = (System.currentTimeMillis() - TIME_2017) / 1000;
+    return toUnsafeFromRecords(seconds, records);
+  }
+
+  public Object toUnsafeFromRecords(long updateTime, byte[][] records) {
     if (!useUnsafe) {
       try {
         if (!compressRecords) {
-          return records;
+          return new IndexValue(updateTime, records);
         }
         ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bytesOut);
@@ -4106,7 +4149,7 @@ public class DatabaseServer {
 
         System.arraycopy(lenBuffer, 0, bytes, 0, lenBuffer.length);
 
-        return bytes;
+        return new IndexValue(updateTime, bytes);
       }
       catch (Exception e) {
         throw new DatabaseException(e);
@@ -4162,7 +4205,15 @@ public class DatabaseServer {
         if (address == 0 || address == -1L) {
           throw new DatabaseException("Inserted null address *****************");
         }
-        return addressMap.addAddress(address);
+
+        long outerAddress = addressMap.addAddress(address);
+        bytesOut = new ByteArrayOutputStream();
+        out = new DataOutputStream(bytesOut);
+        Varint.writeUnsignedVarLong(updateTime, out);
+        Varint.writeUnsignedVarLong(outerAddress, out);
+
+        return bytesOut.toByteArray();
+
       }
       catch (IOException e) {
         throw new DatabaseException(e);
@@ -4172,11 +4223,19 @@ public class DatabaseServer {
 
   LZ4Factory factory = LZ4Factory.fastestInstance();
 
+  public static long TIME_2017 = new Date(2017 - 1900, 0, 1, 0, 0, 0).getTime();
+
   public Object toUnsafeFromKeys(byte[][] records) {
+    long seconds = (System.currentTimeMillis() - TIME_2017) / 1000;
+    return toUnsafeFromKeys(seconds, records);
+  }
+
+
+  public Object toUnsafeFromKeys(long updateTime, byte[][] records) {
     if (!useUnsafe) {
       try {
         if (!compressRecords) {
-          return records;
+          return new IndexValue(updateTime, records);
         }
         ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bytesOut);
@@ -4211,7 +4270,7 @@ public class DatabaseServer {
 
         System.arraycopy(lenBuffer, 0, bytes, 0, lenBuffer.length);
 
-        return bytes;
+        return new IndexValue(updateTime, bytes);
       }
       catch (Exception e) {
         throw new DatabaseException(e);
@@ -4263,7 +4322,14 @@ public class DatabaseServer {
         for (int i = lenBuffer.length; i < lenBuffer.length + bytes.length; i++) {
           unsafe.putByte(address + i, bytes[i - lenBuffer.length]);
         }
-        return addressMap.addAddress(address);
+
+        long outerAddress = addressMap.addAddress(address);
+        bytesOut = new ByteArrayOutputStream();
+        out = new DataOutputStream(bytesOut);
+        Varint.writeUnsignedVarLong(updateTime, out);
+        Varint.writeUnsignedVarLong(outerAddress, out);
+
+        return bytesOut.toByteArray();
       }
       catch (IOException e) {
         throw new DatabaseException(e);
@@ -4271,13 +4337,33 @@ public class DatabaseServer {
     }
   }
 
+  public long getUpdateTime(Object value) {
+    try {
+      if (value instanceof byte[]) {
+        DataInputStream in = new DataInputStream(new ByteArrayInputStream((byte[]) value));
+        return Varint.readUnsignedVarLong(in);
+      }
+      else {
+        return ((IndexValue)value).updateTime;
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
   public byte[][] fromUnsafeToRecords(Object obj) {
     try {
-      if (obj instanceof Long) {
-        synchronized (addressMap.getMutex((long) obj)) {
-          Long address = addressMap.getAddress((long) obj);
+      if (obj instanceof byte[]) {
+
+        DataInputStream in = new DataInputStream(new ByteArrayInputStream((byte[])obj));
+        long seconds = Varint.readUnsignedVarLong(in);
+        long outerAddress = Varint.readUnsignedVarLong(in);
+
+        synchronized (addressMap.getMutex(outerAddress)) {
+          Long address = addressMap.getAddress(outerAddress);
           if (address == null) {
-            System.out.println("null address ******************* outerAddress=" + (long) obj);
+            System.out.println("null address ******************* outerAddress=" + outerAddress);
             new Exception().printStackTrace();
             return null;
           }
@@ -4292,7 +4378,7 @@ public class DatabaseServer {
           lenBuffer[6] = unsafe.getByte(address + 6);
           lenBuffer[7] = unsafe.getByte(address + 7);
           ByteArrayInputStream bytesIn = new ByteArrayInputStream(lenBuffer);
-          DataInputStream in = new DataInputStream(bytesIn);
+          in = new DataInputStream(bytesIn);
           int count = in.readInt();
           int origLen = in.readInt();
           byte[] bytes = new byte[count];
@@ -4324,9 +4410,9 @@ public class DatabaseServer {
       }
       else {
         if (!compressRecords) {
-          return (byte[][]) obj;
+          return ((IndexValue)obj).records;
         }
-        byte[] bytes = (byte[]) obj;
+        byte[] bytes = ((IndexValue)obj).bytes;
         byte[] lenBuffer = new byte[8];
         System.arraycopy(bytes, 0, lenBuffer, 0, lenBuffer.length);
         ByteArrayInputStream bytesIn = new ByteArrayInputStream(lenBuffer);
@@ -4361,9 +4447,13 @@ public class DatabaseServer {
 
   public byte[][] fromUnsafeToKeys(Object obj) {
     try {
-      if (obj instanceof Long) {
-        synchronized (addressMap.getMutex((long) obj)) {
-          Long address = addressMap.getAddress((long) obj);
+      if (obj instanceof byte[]) {
+        DataInputStream in = new DataInputStream(new ByteArrayInputStream((byte[])obj));
+        long seconds = Varint.readUnsignedVarLong(in);
+        long outerAddress = Varint.readUnsignedVarLong(in);
+
+        synchronized (addressMap.getMutex(outerAddress)) {
+          Long address = addressMap.getAddress(outerAddress);
           if (address == null) {
             return null;
           }
@@ -4378,7 +4468,7 @@ public class DatabaseServer {
           lenBuffer[6] = unsafe.getByte(address + 6);
           lenBuffer[7] = unsafe.getByte(address + 7);
           ByteArrayInputStream bytesIn = new ByteArrayInputStream(lenBuffer);
-          DataInputStream in = new DataInputStream(bytesIn);
+          in = new DataInputStream(bytesIn);
           int count = in.readInt();
           int origLen = in.readInt();
           byte[] bytes = new byte[count];
@@ -4410,9 +4500,9 @@ public class DatabaseServer {
       }
       else {
         if (!compressRecords) {
-          return (byte[][]) obj;
+          return ((IndexValue)obj).records;
         }
-        byte[] bytes = (byte[]) obj;
+        byte[] bytes = ((IndexValue)obj).bytes;
         byte[] lenBuffer = new byte[8];
         System.arraycopy(bytes, 0, lenBuffer, 0, lenBuffer.length);
         ByteArrayInputStream bytesIn = new ByteArrayInputStream(lenBuffer);
@@ -4448,14 +4538,22 @@ public class DatabaseServer {
   }
 
   public void freeUnsafeIds(Object obj) {
-    if (obj instanceof Long) {
-      synchronized (addressMap.getMutex((long) obj)) {
-        Long address = addressMap.removeAddress((long) obj);
-        if (address == null || address == 0) {
-          return;
+    try {
+      if (obj instanceof byte[]) {
+        DataInputStream in = new DataInputStream(new ByteArrayInputStream((byte[]) obj));
+        long updateTIme = Varint.readUnsignedVarLong(in);
+        long outerAddress = Varint.readUnsignedVarLong(in);
+        synchronized (addressMap.getMutex(outerAddress)) {
+          Long address = addressMap.removeAddress(outerAddress);
+          if (address == null || address == 0) {
+            return;
+          }
+          unsafe.freeMemory(address);
         }
-        unsafe.freeMemory(address);
       }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
     }
   }
 
@@ -4557,7 +4655,7 @@ public class DatabaseServer {
   }
 
   public byte[] invokeMethod(final byte[] body, boolean replayedCommand, boolean enableQueuing) {
-    return invokeMethod(body, -1L, -1L, replayedCommand, enableQueuing, null, null);
+    return invokeMethod(body, -1L, (short) -1L, replayedCommand, enableQueuing, null, null);
   }
 
   public byte[] invokeMethod(final byte[] body, long logSequence0, long logSequence1,

@@ -12,6 +12,7 @@ import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.Schema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
+import com.sonicbase.server.DeleteManager;
 import com.sonicbase.socket.DeadServerException;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
@@ -1290,9 +1291,13 @@ public class Repartitioner extends Thread {
                 }
               }
             }
-            if (databaseServer.getShard() < databaseServer.getShardCount() - 1) {
-              if (currPartition.getUpperKey() != null) {
-                index.visitTailMap(currPartition.getUpperKey(), new Index.Visitor() {
+            //if (databaseServer.getShard() < databaseServer.getShardCount() - 1) {
+              //if (currPartition.getUpperKey() != null) {
+            Object[] upperKey = currPartition.getUpperKey();
+            if (upperKey == null) {
+              upperKey = index.lastEntry().getKey();
+            }
+                index.visitTailMap(upperKey, new Index.Visitor() {
                   @Override
                   public boolean visit(Object[] key, Object value) throws IOException {
                     countVisited.incrementAndGet();
@@ -1342,8 +1347,8 @@ public class Repartitioner extends Thread {
                         ", duration=" + (System.currentTimeMillis() - begin));
                   }
                 }
-              }
-            }
+              //}
+            //}
 
             if (countSubmitted.get() > 0) {
               while (countSubmitted.get() > countFinished.get() && shardRepartitionException == null) {
@@ -1370,7 +1375,7 @@ public class Repartitioner extends Thread {
               moveProcessor.shutdown();
             }
           }
-          //databaseServer.getDeleteManager().saveDeletes(dbName, tableName, indexName, keysToDelete);
+          //databaseServer.getDeleteManager().saveStandardDeletes(dbName, tableName, indexName, keysToDelete);
           deleteRecordsOnOtherReplicas(dbName, tableName, indexName, keysToDelete);
           executor.shutdownNow();
           logger.info("doRebalanceOrderedIndex finished: table=" + tableName + ", index=" + indexName + ", countVisited=" + countVisited.get() +
@@ -1421,7 +1426,8 @@ public class Repartitioner extends Thread {
     }
   }
 
-  private void deleteRecordsOnOtherReplicas(final String dbName, String tableName, String indexName, ConcurrentLinkedQueue<Object[]> keysToDelete) {
+  private void deleteRecordsOnOtherReplicas(final String dbName, String tableName, String indexName,
+                                            ConcurrentLinkedQueue<Object[]> keysToDelete) {
 
     ThreadPoolExecutor executor = new ThreadPoolExecutor(16, 16, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
     List<Future> futures = new ArrayList<>();
@@ -1492,7 +1498,7 @@ public class Repartitioner extends Thread {
         public Object call() throws Exception {
 
           if (false && replica == databaseServer.getReplica()) {
-            deleteMovedRecords(currObj);
+            deleteMovedRecords(currObj, false);
             return currObj.getArray(ComObject.Tag.keys).getArray().size();
           }
           else {
@@ -1505,76 +1511,56 @@ public class Repartitioner extends Thread {
     }
   }
 
-  public ComObject deleteMovedRecords(ComObject cobj) {
+  public ComObject deleteMovedRecords(ComObject cobj, boolean replayedCommand) {
     try {
-      ConcurrentLinkedQueue<Object[]> keysToDelete = new ConcurrentLinkedQueue<>();
+      ConcurrentLinkedQueue<DeleteManager.DeleteRequest> keysToDelete = new ConcurrentLinkedQueue<>();
+      final ConcurrentLinkedQueue<DeleteManager.DeleteRequest> keysToDeleteExpanded = new ConcurrentLinkedQueue<>();
+      final long sequence0 = cobj.getLong(ComObject.Tag.sequence0);
+      final long sequence1 = cobj.getLong(ComObject.Tag.sequence1);
       String dbName = cobj.getString(ComObject.Tag.dbName);
       String tableName = cobj.getString(ComObject.Tag.tableName);
       String indexName = cobj.getString(ComObject.Tag.indexName);
       TableSchema tableSchema = common.getTables(dbName).get(tableName);
-      IndexSchema indexSchema = tableSchema.getIndexes().get(indexName);
+      final IndexSchema indexSchema = tableSchema.getIndexes().get(indexName);
       ComArray keys = cobj.getArray(ComObject.Tag.keys);
       if (keys != null) {
         for (int i = 0; i < keys.getArray().size(); i++) {
           Object[] key = DatabaseCommon.deserializeKey(tableSchema, (byte[]) keys.getArray().get(i));
-          keysToDelete.add(key);
+          if (indexSchema.isPrimaryKey()) {
+            keysToDelete.add(new DeleteManager.DeleteRequestForRecord(key));
+          }
+          else {
+            keysToDelete.add(new DeleteManager.DeleteRequestForKeyRecord(key));
+          }
         }
       }
-      int count = 0;
+      final AtomicInteger count = new AtomicInteger();
       final List<Object> toFree = new ArrayList<>();
-      Index index = databaseServer.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
-      for (Object[] key : keysToDelete) {
-        synchronized (index.getMutex(key)) {
-//          Object toFree = index.remove(key);
-//          if (toFree != null) {
-//            //  toFreeBatch.add(toFree);
-//            databaseServer.freeUnsafeIds(toFree);
-//          }
-          Object value = index.get(key);
-          byte[][] content = null;
-          if (value != null) {
-            if (indexSchema.isPrimaryKey()) {
-              content = databaseServer.fromUnsafeToRecords(value);
-            }
-            else {
-              content = databaseServer.fromUnsafeToKeys(value);
-            }
-          }
-          if (content != null) {
-            if (indexSchema.isPrimaryKey()) {
-              byte[][] newContent = new byte[content.length][];
-              for (int i = 0; i < content.length; i++) {
-                if (Record.DB_VIEW_FLAG_DELETING != Record.getDbViewFlags(content[i])) {
-                  index.addAndGetCount(-1);
-                }
-                Record.setDbViewFlags(content[i], Record.DB_VIEW_FLAG_DELETING);
-                Record.setDbViewNumber(content[i], common.getSchemaVersion());
-                newContent[i] = content[i];
+      final Index index = databaseServer.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
+      if (replayedCommand) {
+        List<Future> futures = new ArrayList<>();
+        for (final DeleteManager.DeleteRequest request : keysToDelete) {
+          futures.add(databaseServer.getExecutor().submit(new Callable(){
+            @Override
+            public Object call() throws Exception {
+              doDeleteMovedEntry(keysToDeleteExpanded, indexSchema, index, request);
+              if (count.incrementAndGet() % 100000 == 0) {
+                logger.info("deleteMovedRecords progress: count=" + count.get());
               }
-              //toFree.add(value);
-              Object newValue = databaseServer.toUnsafeFromRecords(newContent);
-              index.put(key, newValue);
-              databaseServer.freeUnsafeIds(value);
+              return null;
             }
-            else {
-              byte[][] newContent = new byte[content.length][];
-              for (int i = 0; i < content.length; i++) {
-                if (Record.DB_VIEW_FLAG_DELETING != KeyRecord.getDbViewFlags(content[i])) {
-                  index.addAndGetCount(-1);
-                }
-                KeyRecord.setDbViewFlags(content[i], Record.DB_VIEW_FLAG_DELETING);
-                KeyRecord.setDbViewNumber(content[i], common.getSchemaVersion());
-                newContent[i] = content[i];
-              }
-              //toFree.add(value);
-              Object newValue = databaseServer.toUnsafeFromRecords(newContent);
-              index.put(key, newValue);
-              databaseServer.freeUnsafeIds(value);
-            }
-          }
+          }));
         }
-        if (count++ % 100000 == 0) {
-          logger.info("deleteMovedRecords progress: count=" + count);
+        for (Future future : futures) {
+          future.get();
+        }
+      }
+      else {
+        for (DeleteManager.DeleteRequest request : keysToDelete) {
+          doDeleteMovedEntry(keysToDeleteExpanded, indexSchema, index, request);
+          if (count.incrementAndGet() % 100000 == 0) {
+            logger.info("deleteMovedRecords progress: count=" + count.get());
+          }
         }
       }
 //      Timer timer = new Timer("Free memory");
@@ -1586,7 +1572,10 @@ public class Repartitioner extends Thread {
       }
 
       if (indexSchema.isPrimaryKey()) {
-        databaseServer.getDeleteManager().saveDeletes(dbName, tableName, indexName, keysToDelete);
+        databaseServer.getDeleteManager().saveDeletesForRecords(dbName, tableName, indexName, sequence0, sequence1, keysToDeleteExpanded);
+      }
+      else {
+        databaseServer.getDeleteManager().saveDeletesForKeyRecords(dbName, tableName, indexName, sequence0, sequence1, keysToDeleteExpanded);
       }
 
 //        }
@@ -1596,6 +1585,63 @@ public class Repartitioner extends Thread {
       throw new DatabaseException(e);
     }
     return null;
+  }
+
+  private void doDeleteMovedEntry(ConcurrentLinkedQueue<DeleteManager.DeleteRequest> keysToDeleteExpanded,
+                                  IndexSchema indexSchema, Index index, DeleteManager.DeleteRequest request) {
+    synchronized (index.getMutex(request.getKey())) {
+//          Object toFree = index.remove(key);
+//          if (toFree != null) {
+//            //  toFreeBatch.add(toFree);
+//            databaseServer.freeUnsafeIds(toFree);
+//          }
+      Object value = index.get(request.getKey());
+      byte[][] content = null;
+      if (value != null) {
+        if (indexSchema.isPrimaryKey()) {
+          content = databaseServer.fromUnsafeToRecords(value);
+        }
+        else {
+          content = databaseServer.fromUnsafeToKeys(value);
+        }
+      }
+      if (content != null) {
+        if (indexSchema.isPrimaryKey()) {
+          keysToDeleteExpanded.add(new DeleteManager.DeleteRequestForRecord(request.getKey()));
+
+          byte[][] newContent = new byte[content.length][];
+          for (int i = 0; i < content.length; i++) {
+            if (Record.DB_VIEW_FLAG_DELETING != Record.getDbViewFlags(content[i])) {
+              index.addAndGetCount(-1);
+            }
+            Record.setDbViewFlags(content[i], Record.DB_VIEW_FLAG_DELETING);
+            Record.setDbViewNumber(content[i], common.getSchemaVersion());
+            newContent[i] = content[i];
+          }
+          //toFree.add(value);
+          Object newValue = databaseServer.toUnsafeFromRecords(newContent);
+          index.put(request.getKey(), newValue);
+          databaseServer.freeUnsafeIds(value);
+        }
+        else {
+          byte[][] newContent = new byte[content.length][];
+          for (int i = 0; i < content.length; i++) {
+            if (Record.DB_VIEW_FLAG_DELETING != KeyRecord.getDbViewFlags(content[i])) {
+              index.addAndGetCount(-1);
+            }
+            KeyRecord.setDbViewFlags(content[i], Record.DB_VIEW_FLAG_DELETING);
+            KeyRecord.setDbViewNumber(content[i], common.getSchemaVersion());
+            newContent[i] = content[i];
+
+            keysToDeleteExpanded.add(new DeleteManager. DeleteRequestForKeyRecord(request.getKey(), KeyRecord.getPrimaryKey(content[i])));
+          }
+          //toFree.add(value);
+          Object newValue = databaseServer.toUnsafeFromRecords(newContent);
+          index.put(request.getKey(), newValue);
+          databaseServer.freeUnsafeIds(value);
+        }
+      }
+    }
   }
 
   class MoveRequestList {
@@ -1934,6 +1980,13 @@ public class Repartitioner extends Thread {
             Record.setDbViewFlags(recordBytes, Record.DB_VIEW_FLAG_ADDING);
           }
         }
+        else {
+          for (int i = 0; i < content.length; i++) {
+            byte[] recordBytes = content[i];
+            KeyRecord.setDbViewNumber(recordBytes, common.getSchemaVersion());
+            KeyRecord.setDbViewFlags(recordBytes, Record.DB_VIEW_FLAG_ADDING);
+          }
+        }
         ComArray records = innerObj.putArray(ComObject.Tag.records, ComObject.Type.byteArrayType);
         for (int i = 0; i < content.length; i++) {
           records.add(content[i]);
@@ -1953,7 +2006,7 @@ public class Repartitioner extends Thread {
     countMoved.addAndGet(count);
   }
 
-  public ComObject moveIndexEntries(ComObject cobj) {
+  public ComObject moveIndexEntries(ComObject cobj, boolean replayedCommand) {
     try {
         databaseServer.getBatchRepartCount().incrementAndGet();
         String dbName = cobj.getString(ComObject.Tag.dbName);
@@ -1995,7 +2048,7 @@ public class Repartitioner extends Thread {
         TableSchema tableSchema = common.getTables(dbName).get(tableName);
         Index index = databaseServer.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexName);
         IndexSchema indexSchema = common.getTables(dbName).get(tableName).getIndices().get(indexName);
-        databaseServer.getUpdateManager().doInsertKeys(dbName, moveRequests, index, tableName, indexSchema);
+        databaseServer.getUpdateManager().doInsertKeys(dbName, moveRequests, index, tableName, indexSchema, replayedCommand);
 
       return null;
     }

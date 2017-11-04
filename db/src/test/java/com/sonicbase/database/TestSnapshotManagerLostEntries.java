@@ -32,7 +32,7 @@ public class TestSnapshotManagerLostEntries {
   int recordCount = 10_000_000;
 
   class MonitorServer extends DatabaseServer {
-    public byte[] invokeMethod(final byte[] body, long logSequence0, long logSequence1,
+    public byte[] invokeMethod(final byte[] body, long logSequence0, short logSequence1,
                                 boolean replayedCommand, boolean enableQueuing, AtomicLong timeLogging, AtomicLong handlerTime) {
       if (replayedCommand) {
         if (countPlayed.incrementAndGet() % 10000 == 0) {

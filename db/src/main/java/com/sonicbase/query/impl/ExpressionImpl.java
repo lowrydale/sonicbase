@@ -1819,7 +1819,7 @@ public abstract class ExpressionImpl implements Expression {
                 KeyRecord keyRecord = new KeyRecord(keyBytes);
                 currRetKeyRecords[k] = new KeyRecord[]{keyRecord};
 
-                Object[] key = new Object[]{keyRecord.getKey()};
+                Object[] key = DatabaseCommon.deserializeKey(tableSchema, keyRecord.getPrimaryKey());
                 currRetKeys[k] = new Object[][]{key};
               }
             }
@@ -1971,7 +1971,7 @@ public abstract class ExpressionImpl implements Expression {
                   for (int i = 0; i < retKeyRecords.length; i++) {
                     KeyRecord[] id = retKeyRecords[i];
 
-                    Object[] key = new Object[]{id[0].getKey()};
+                    Object[] key = DatabaseCommon.deserializeKey(tableSchema, id[0].getPrimaryKey());
                     if (!recordCache.containsKey(tableSchema.getName(), key)) {
                       keysToRead.add(new ExpressionImpl.IdEntry(i, key));
                     }
@@ -2003,7 +2003,7 @@ public abstract class ExpressionImpl implements Expression {
                 retKeys[i] = new Object[][]{key};
               }
 
-              nextKey = key;
+              //nextKey = key;
 
               recordCache.put(tableSchema.getName(), key, new CachedRecord(record, null));
             }

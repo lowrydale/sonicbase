@@ -25,6 +25,12 @@ public final class DateUtils {
   public static Date fromString(final String iso8601string)
       throws ParseException {
     String[] patterns = new String[]{"yyyy-MM-dd'T'HH:mm:ss.SSSZ"};
-    return org.apache.commons.lang.time.DateUtils.parseDate(iso8601string, patterns);
+    try {
+      return org.apache.commons.lang.time.DateUtils.parseDate(iso8601string, patterns);
+    }
+    catch (Exception e) {
+      patterns = new String[]{"yyyy-MM-dd'T'HH:mm:ss"};
+      return org.apache.commons.lang.time.DateUtils.parseDate(iso8601string, patterns);
+    }
   }
 }

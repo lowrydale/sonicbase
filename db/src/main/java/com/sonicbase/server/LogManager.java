@@ -32,6 +32,7 @@ public class LogManager {
   private static Logger logger;
   private final DatabaseServer databaseServer;
   private final ThreadPoolExecutor executor;
+  private final File rootDir;
 
   private AtomicLong countLogged = new AtomicLong();
   private final DatabaseServer server;
@@ -47,9 +48,10 @@ public class LogManager {
   private boolean shouldSlice = false;
   private boolean didSlice = false;
 
-  public LogManager(DatabaseServer databaseServer) {
+  public LogManager(DatabaseServer databaseServer, File rootDir) {
     this.databaseServer = databaseServer;
     this.server = databaseServer;
+    this.rootDir = rootDir;
     logger = new Logger(databaseServer.getDatabaseClient());
     executor = new ThreadPoolExecutor(Runtime.getRuntime().availableProcessors() * 8,
         Runtime.getRuntime().availableProcessors() * 8, 10000, TimeUnit.MILLISECONDS,
@@ -65,7 +67,7 @@ public class LogManager {
     }
     int logThreadCount = 4;//64;
     for (int i = 0; i < logThreadCount; i++) {
-      LogWriter logWriter = new LogWriter(i, -1, logRequests, server.getDataDir(), server.getShard(), server.getReplica());
+      LogWriter logWriter = new LogWriter(i, -1, logRequests, rootDir, server.getShard(), server.getReplica());
       logWriters.add(logWriter);
       Thread thread = new Thread(logWriter);
       thread.start();
@@ -76,7 +78,7 @@ public class LogManager {
     synchronized (peerLogRequests) {
       if (!peerLogRequests.containsKey(replicaNum)) {
         peerLogRequests.put(replicaNum, new ArrayBlockingQueue<DatabaseServer.LogRequest>(1000));
-        LogWriter logWriter = new LogWriter(0, replicaNum, peerLogRequests.get(replicaNum), server.getDataDir(), server.getShard(), server.getReplica());
+        LogWriter logWriter = new LogWriter(0, replicaNum, peerLogRequests.get(replicaNum), rootDir, server.getShard(), server.getReplica());
         peerLogWriters.add(logWriter);
         Thread thread = new Thread(logWriter);
         thread.start();
@@ -85,7 +87,7 @@ public class LogManager {
   }
 
   public void skipToMaxSequenceNumber() throws IOException {
-    File file = new File(databaseServer.getDataDir(), "logSequenceNum/" + databaseServer.getShard() + "/" + databaseServer.getReplica() + "/logSequenceNum.txt");
+    File file = new File(rootDir, "logSequenceNum/" + databaseServer.getShard() + "/" + databaseServer.getReplica() + "/logSequenceNum.txt");
     file.getParentFile().mkdirs();
     if (!file.exists() || file.length() == 0) {
       logSequenceNumber.set(0);
@@ -120,7 +122,7 @@ public class LogManager {
       long sequenceNum = cobj.getLong(ComObject.Tag.sequenceNumber);
 
       maxAllocatedLogSequenceNumber.set(sequenceNum);
-      File file = new File(databaseServer.getDataDir(), "logSequenceNum/" + databaseServer.getShard() + "/" + databaseServer.getReplica() + "/logSequenceNum.txt");
+      File file = new File(rootDir, "logSequenceNum/" + databaseServer.getShard() + "/" + databaseServer.getReplica() + "/logSequenceNum.txt");
       file.getParentFile().mkdirs();
       try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
         writer.write(String.valueOf(maxAllocatedLogSequenceNumber.get()));
@@ -133,18 +135,7 @@ public class LogManager {
   }
 
   public long getNextSequencenNum() throws IOException {
-    synchronized (this) {
-      if (logSequenceNumber.get() == maxAllocatedLogSequenceNumber.get()) {
-        maxAllocatedLogSequenceNumber.set(logSequenceNumber.get() + SEQUENCE_NUM_ALLOC_COUNT);
-        File file = new File(databaseServer.getDataDir(), "logSequenceNum/" + databaseServer.getShard() + "/" + databaseServer.getReplica() + "/logSequenceNum.txt");
-        file.getParentFile().mkdirs();
-        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
-          writer.write(String.valueOf(maxAllocatedLogSequenceNumber.get()));
-        }
-        pushMaxSequenceNum();
-      }
-      return logSequenceNumber.incrementAndGet();
-    }
+    return System.nanoTime();
   }
 
   void pushMaxSequenceNum() {
@@ -475,7 +466,7 @@ public class LogManager {
   public class LogWriter implements Runnable {
     private final int offset;
     private final ArrayBlockingQueue<DatabaseServer.LogRequest> currLogRequests;
-    private final String dataDir;
+    private final File dataDir;
     private final int shard;
     private final int replica;
     private final int peerReplicaNum;
@@ -484,11 +475,11 @@ public class LogManager {
 
     public LogWriter(
         int offset, int peerReplicaNum, ArrayBlockingQueue<DatabaseServer.LogRequest> logRequests,
-        String dataDir, int shard, int replica) {
+        File rootDir, int shard, int replica) {
       this.offset = offset;
       this.peerReplicaNum = peerReplicaNum;
       this.currLogRequests = logRequests;
-      this.dataDir = dataDir;
+      this.dataDir = rootDir;
       this.shard = shard;
       this.replica = replica;
     }
@@ -667,7 +658,7 @@ public class LogManager {
   }
 
   private File getLogReplicaDir() {
-    return new File(server.getDataDir(), "queue/" + server.getShard() + "/" + server.getReplica());
+    return new File(rootDir, server.getShard() + "/" + server.getReplica());
   }
 
   public static class ByteCounterStream extends InputStream {
@@ -839,6 +830,62 @@ public class LogManager {
   }
 
   private List<LogSource> allCurrentSources = new ArrayList<>();
+
+  public interface LogVisitor {
+    boolean visit(byte[] buffer);
+  }
+
+  public List<File> getLogFiles() {
+    String dataRoot = getLogReplicaDir().getAbsolutePath();
+    File dataRootDir = new File(dataRoot, "self");
+    dataRootDir.mkdirs();
+
+    File[] files = dataRootDir.listFiles();
+    List<File> ret = new ArrayList<>();
+    if (files != null) {
+      for (File file : files) {
+        ret.add(file);
+      }
+    }
+    return ret;
+  }
+
+
+  public void visitQueueEntries(DataInputStream in, LogVisitor visitor) {
+    try {
+      while (true) {
+        try {
+          int count = in.readInt();
+          if (count == 1) {
+            short serializationVersion = (short) Varint.readSignedVarLong(in);
+            long sequence0 = Varint.readSignedVarLong(in);
+            long sequence1 = Varint.readSignedVarLong(in);
+            int size = in.readInt();
+            byte[] buffer = new byte[size];
+            in.readFully(buffer);
+            visitor.visit(buffer);
+          }
+          else {
+            for (int i = 0; i < count; i++) {
+              short serializationVersion = (short) Varint.readSignedVarLong(in);
+              long sequence0 = Varint.readSignedVarLong(in);
+              long sequence1 = Varint.readSignedVarLong(in);
+              int size = in.readInt();
+              byte[] buffer = new byte[size];
+              in.readFully(buffer);
+              visitor.visit(buffer);
+            }
+          }
+        }
+        catch (EOFException e) {
+          break;
+        }
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
 
   private void replayQueues(File dataRootDir, final String slicePoint, final boolean beforeSlice, boolean peerFiles) throws IOException {
     allCurrentSources.clear();
@@ -1079,7 +1126,7 @@ public class LogManager {
     }
   }
 
-  public void deleteOldLogs(long lastSnapshot) {
+  public void deleteOldLogs(long lastSnapshot, boolean exactDate) {
     synchronized (logLock) {
       if (lastSnapshot != -1) {
         File[] files = new File(getLogRoot(), "self").listFiles();
@@ -1100,13 +1147,20 @@ public class LogManager {
                 pos = name.indexOf('-');
               }
 
-              int pos2 = name.lastIndexOf('.');
+              int pos2 = name.indexOf('.');
               String dateStr = name.substring(pos + 1, pos2);
               dateStr = dateStr.replace('_', ':');
               Date fileDate = DateUtils.fromString(dateStr);
               long fileTime = fileDate.getTime();
-              if (fileTime < lastSnapshot - (60 * 1000) && file.exists() && !file.delete()) {
-                throw new DatabaseException("Error deleting file: file=" + file.getAbsolutePath());
+              if (exactDate) {
+                if (fileTime < lastSnapshot && file.exists() && !file.delete()) {
+                  throw new DatabaseException("Error deleting file: file=" + file.getAbsolutePath());
+                }
+              }
+              else {
+                if (fileTime < lastSnapshot - (10 * 1000) && file.exists() && !file.delete()) {
+                  throw new DatabaseException("Error deleting file: file=" + file.getAbsolutePath());
+                }
               }
             }
             catch (Exception e) {

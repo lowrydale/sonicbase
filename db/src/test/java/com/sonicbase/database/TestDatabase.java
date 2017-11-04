@@ -138,7 +138,7 @@ public class TestDatabase {
 
       stmt = conn.prepareStatement("create table nokey (id BIGINT, id2 BIGINT)");
       stmt.executeUpdate();
-
+//
       stmt = conn.prepareStatement("create table nokeysecondaryindex (id BIGINT, id2 BIGINT)");
       stmt.executeUpdate();
 
@@ -228,9 +228,9 @@ public class TestDatabase {
 
       stmt = conn.prepareStatement("create index socialSecurityNumber on persons(socialSecurityNumber)");
       stmt.executeUpdate();
-
-      stmt = conn.prepareStatement("create index socialSecurityNumber on children(socialSecurityNumber)");
-      stmt.executeUpdate();
+//
+//      stmt = conn.prepareStatement("create index socialSecurityNumber on children(socialSecurityNumber)");
+//      stmt.executeUpdate();
 
       //create index ssn2 on persons(socialSecurityNumber)
       //    stmt = conn.prepareStatement("create index ssn on persons(socialSecurityNumber)");
@@ -247,32 +247,14 @@ public class TestDatabase {
         Thread.sleep(1000);
       }
 
-      IndexSchema indexSchema = null;
-      for (Map.Entry<String, IndexSchema> entry : client.getCommon().getTables("test").get("persons").getIndices().entrySet()) {
-        if (entry.getValue().getFields()[0].equalsIgnoreCase("socialsecuritynumber")) {
-          indexSchema = entry.getValue();
-        }
-      }
-      List<ColumnImpl> columns = new ArrayList<>();
-      columns.add(new ColumnImpl(null, null, "persons", "socialsecuritynumber", null));
-  /*
-      AtomicReference<String> usedIndex = new AtomicReference<String>();
-      ExpressionImpl.RecordCache recordCache = new ExpressionImpl.RecordCache();
-      ParameterHandler parms = new ParameterHandler();
-      SelectContextImpl ret = ExpressionImpl.lookupIds(
-            "test", client.getCommon(), client, 0,
-            1000, client.getCommon().getTables("test").get("persons"), indexSchema, false, BinaryExpression.Operator.equal,
-            null,
-            null,
-            new Object[]{"933-28-0".getBytes()}, parms, null, null,
-        new Object[]{"933-28-0".getBytes()},
-            null,
-            columns, "socialsecuritynumber", 0, recordCache,
-            usedIndex, false, client.getCommon().getSchemaVersion(), null, null, false);
-
-      assertEquals(ret.getCurrKeys().length, 4);
-  */
-
+//      IndexSchema indexSchema = null;
+//      for (Map.Entry<String, IndexSchema> entry : client.getCommon().getTables("test").get("persons").getIndices().entrySet()) {
+//        if (entry.getValue().getFields()[0].equalsIgnoreCase("socialsecuritynumber")) {
+//          indexSchema = entry.getValue();
+//        }
+//      }
+//      List<ColumnImpl> columns = new ArrayList<>();
+//      columns.add(new ColumnImpl(null, null, "persons", "socialsecuritynumber", null));
 
   //rebalance
       for (DatabaseServer server : dbServers) {
@@ -3013,15 +2995,19 @@ public class TestDatabase {
     PreparedStatement stmt;
     ResultSet ret;
     for (int i = 0; i < recordCount; i++) {
+      try {
+        //test jdbc select
+        stmt = conn.prepareStatement("select * from nokeysecondaryindex where id=" + i);
+        ret = stmt.executeQuery();
 
-      //test jdbc select
-      stmt = conn.prepareStatement("select * from nokeysecondaryindex where id=" + i);
-      ret = stmt.executeQuery();
-
-      ret.next();
-      long retId = ret.getLong("id");
-      assertEquals(retId, i, "Returned id doesn't match: id=" + i + ", retId=" + retId);
-      assertEquals(ret.getLong("id2"), 2 * i);
+        ret.next();
+        long retId = ret.getLong("id");
+        assertEquals(retId, i, "Returned id doesn't match: id=" + i + ", retId=" + retId);
+        assertEquals(ret.getLong("id2"), 2 * i);
+      }
+      catch (Exception e) {
+        fail("i=" + i);
+      }
     }
   }
 

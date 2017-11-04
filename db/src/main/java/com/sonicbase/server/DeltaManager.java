@@ -498,7 +498,7 @@ public class DeltaManager {
         List<Future> futures = new ArrayList<>();
         for (int currDeltaDirNum = getHighestCommittedSnapshotVersion(dataRootDir, logger); currDeltaDirNum >= -1; currDeltaDirNum--) {
           final int currDelta = currDeltaDirNum;
-          futures.add(executor.submit(new Callable(){
+          futures.add(executor.submit(new Callable() {
             @Override
             public Object call() throws Exception {
               recoverDeltaPreprocess(dbName, dataRoot, currDelta);
@@ -509,7 +509,13 @@ public class DeltaManager {
         for (Future future : futures) {
           future.get();
         }
+      }
+      finally {
+        executor.shutdownNow();
+      }
 
+      executor = new ThreadPoolExecutor(cores * 32, cores * 32, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+      try {
         currStage.set("recoveringSnapshot");
         totalBytes.set(0);
         finishedBytes.set(0);
@@ -747,17 +753,20 @@ public class DeltaManager {
                                                     inStream.readFully(records[i]);
                                                   }
 
+                                                  Object address;
+                                                  if (isPrimaryKey) {
+                                                    address = server.toUnsafeFromRecords(updateTime, records);
+                                                  }
+                                                  else {
+                                                    address = server.toUnsafeFromKeys(updateTime, records);
+                                                  }
                                                   synchronized (index.getMutex(key)) {
-                                                    Object value = index.get(key);
-                                                    if (value == null) {
-                                                      Object address;
-                                                      if (isPrimaryKey) {
-                                                        address = server.toUnsafeFromRecords(updateTime, records);
-                                                      }
-                                                      else {
-                                                        address = server.toUnsafeFromKeys(updateTime, records);
-                                                      }
-                                                      index.put(key, address);
+                                                    Object prevValue = index.put(key, address);
+                                                    if (prevValue != null) {
+                                                      index.put(key, prevValue);
+                                                      server.freeUnsafeIds(address);
+                                                    }
+                                                    else {
                                                       index.addAndGetCount(1);
                                                     }
                                                   }

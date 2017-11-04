@@ -4674,11 +4674,6 @@ public class DatabaseServer {
     }
   }
 
-  public static String format8601(Date date) throws ParseException {
-    DateFormat df1 = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
-    return df1.format(date);
-  }
-
   public ComObject prepareToComeAlive(ComObject cobj) {
     String slicePoint = null;
     try {

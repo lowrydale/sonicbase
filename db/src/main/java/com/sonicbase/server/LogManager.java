@@ -547,8 +547,7 @@ public class LogManager {
         currQueueTime = System.currentTimeMillis();
         File dataRootDir = new File(directory);
         dataRootDir.mkdirs();
-        String dt = DatabaseServer.format8601(new Date(System.currentTimeMillis()));
-        dt = dt.replace(':', '_');
+        String dt = DateUtils.toString(new Date(System.currentTimeMillis()));
         File newFile = null;
         if (peerReplicaNum == -1) {
           newFile = new File(dataRootDir, "/self/" + offset + "-" + dt + ".bin");
@@ -1149,7 +1148,6 @@ public class LogManager {
 
               int pos2 = name.indexOf('.');
               String dateStr = name.substring(pos + 1, pos2);
-              dateStr = dateStr.replace('_', ':');
               Date fileDate = DateUtils.fromString(dateStr);
               long fileTime = fileDate.getTime();
               if (exactDate) {

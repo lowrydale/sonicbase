@@ -97,7 +97,7 @@ public class MethodInvoker {
     priorityCommands.add("isEntireRestoreComplete");
     priorityCommands.add("isEntireBackupComplete");
     priorityCommands.add("isServerReloadFinished");
-    priorityCommands.add("licenseCheckIn");
+    priorityCommands.add("licenseCheckin");
     //priorityCommands.add("doPopulateIndex");
   }
 

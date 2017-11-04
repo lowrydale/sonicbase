@@ -101,7 +101,7 @@ public class DeleteManager {
     private int currFileNum;
     private int currOffset;
     private File dir;
-    public List<MergeEntry> entries = new ArrayList<>();
+    public ArrayBlockingQueue<MergeEntry> entries = new ArrayBlockingQueue<MergeEntry>(200_000);
   }
 
 
@@ -295,8 +295,9 @@ public class DeleteManager {
 
 
   public void buildDeletionsFiles(String dbName, AtomicReference<String> currStage, AtomicLong totalBytes, AtomicLong finishedBytes) {
+    int cores = Runtime.getRuntime().availableProcessors();
+    ThreadPoolExecutor executor = new ThreadPoolExecutor(cores, cores, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
     try {
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
       File file = new File(getDeltaRoot(), "tmp");
       FileUtils.deleteDirectory(file);
       Map<Integer, Map<Integer, OutputState>> streams = new HashMap<>();
@@ -310,7 +311,7 @@ public class DeleteManager {
           File indexFile = new File(file, table.getKey() + "/" + index.getKey() + "/" + state.currFileNum + ".bin");
           state.dir = indexFile.getParentFile();
           indexFile.getParentFile().mkdirs();
-          state.out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(indexFile)));
+          state.out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(indexFile), 64_000));
           indexState.put(index.getValue().getIndexId(), state);
         }
       }
@@ -324,6 +325,9 @@ public class DeleteManager {
     }
     catch (Exception e) {
       throw new DatabaseException(e);
+    }
+    finally {
+      executor.shutdownNow();
     }
   }
 
@@ -536,11 +540,11 @@ public class DeleteManager {
                 if (!readDbName.equals(dbName)) {
                   return true;
                 }
-                synchronized (state) {
-                  state.entries.add(entry);
-                }
+
+                state.entries.add(entry);
+
                 if (state.currOffset++ >= 100_000) {
-                  cycleFile(dbName, tableId, indexId, state, true);
+                  cycleFile(dbName, tableId, indexId, state, true, false);
                 }
               }
               catch (Exception e) {
@@ -570,7 +574,7 @@ public class DeleteManager {
     try {
       for (Map.Entry<Integer, Map<Integer, OutputState>> table : streams.entrySet()) {
         for (Map.Entry<Integer, OutputState> index : table.getValue().entrySet()) {
-          cycleFile(dbName, table.getKey(), index.getKey(), index.getValue(), false);
+          cycleFile(dbName, table.getKey(), index.getKey(), index.getValue(), false, true);
           //index.getValue().out.close();
         }
       }
@@ -605,7 +609,7 @@ public class DeleteManager {
         futures.add(executor.submit(new Callable(){
           @Override
           public Object call() throws Exception {
-            try (DataInputStream in = new DataInputStream(new BufferedInputStream(new DeltaManager.ByteCounterStream(finishedBytes, new FileInputStream(file))))) {
+            try (DataInputStream in = new DataInputStream(new BufferedInputStream(new DeltaManager.ByteCounterStream(finishedBytes, new FileInputStream(file)), 64_000))) {
               short serializationVersion = (short) Varint.readSignedVarLong(in);
               String dbName = in.readUTF();
               String tableName = in.readUTF();
@@ -634,13 +638,13 @@ public class DeleteManager {
                     entry.primaryKey = new byte[len];
                     in.readFully(entry.primaryKey);
                   }
-                  synchronized (state) {
-                    state.entries.add(entry);
+
+                  state.entries.add(entry);
+
+                  if (state.entries.size() >= 100_000) {
+                    cycleFile(dbName, tableSchema.getTableId(), indexSchema.getIndexId(), state, true, false);
                   }
 
-                  if (state.currOffset++ >= 100_000) {
-                    cycleFile(dbName, tableSchema.getTableId(), indexSchema.getIndexId(), state, true);
-                  }
                   errorsInARow = 0;
                 }
                 catch (EOFException e) {
@@ -678,20 +682,25 @@ public class DeleteManager {
     }
   }
 
-  private void cycleFile(String dbName, int tableId, int indexId, OutputState state, boolean openNew) {
+  private void cycleFile(String dbName, int tableId, int indexId, OutputState state, boolean openNew, boolean force) {
     try {
       synchronized (state) {
+        if (!force && state.entries.size() < 100_000) {
+          return;
+        }
         TableSchema tableSchema = databaseServer.getCommon().getTablesById(dbName).get(tableId);
         IndexSchema indexSchema = tableSchema.getIndexesById().get(indexId);
         final Comparator[] comparators = indexSchema.getComparators();
-        Collections.sort(state.entries, new Comparator<MergeEntry>() {
+        List<MergeEntry> entries = new ArrayList<>();
+        state.entries.drainTo(entries);
+        Collections.sort(entries, new Comparator<MergeEntry>() {
           @Override
           public int compare(MergeEntry o1, MergeEntry o2) {
             return DatabaseCommon.compareKey(comparators, o1.key, o2.key);
           }
         });
 
-        for (MergeEntry entry : state.entries) {
+        for (MergeEntry entry : entries) {
           state.out.write(DatabaseCommon.serializeKey(tableSchema, tableSchema.getIndexesById().get(indexId).getName(), entry.key));
           Varint.writeSignedVarLong(entry.sequence0, state.out);
           Varint.writeSignedVarLong(entry.sequence1, state.out);

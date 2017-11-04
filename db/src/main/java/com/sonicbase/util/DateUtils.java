@@ -15,21 +15,21 @@ public final class DateUtils {
 
 
   public static String toString(final Date date) {
-    return DateFormatUtils.format(date, "yyyy-MM-dd'T'HH:mm:ss.SSSZ", TimeZone.getTimeZone("UTC"));
+    return DateFormatUtils.format(date, "yyyy-MM-dd'T'HH_mm_ss.SSSZ", TimeZone.getTimeZone("UTC"));
   }
 
   public static String fromDate(final Date date) {
-    return DateFormatUtils.format(date, "yyyy-MM-dd'T'HH:mm:ss.SSSZ", TimeZone.getTimeZone("UTC"));
+    return DateFormatUtils.format(date, "yyyy-MM-dd'T'HH_mm_ss.SSSZ", TimeZone.getTimeZone("UTC"));
   }
 
   public static Date fromString(final String iso8601string)
       throws ParseException {
-    String[] patterns = new String[]{"yyyy-MM-dd'T'HH:mm:ss.SSSZ"};
+    String[] patterns = new String[]{"yyyy-MM-dd'T'HH_mm_ss.SSSZ"};
     try {
       return org.apache.commons.lang.time.DateUtils.parseDate(iso8601string, patterns);
     }
     catch (Exception e) {
-      patterns = new String[]{"yyyy-MM-dd'T'HH:mm:ss"};
+      patterns = new String[]{"yyyy-MM-dd'T'HH_mm_ss"};
       return org.apache.commons.lang.time.DateUtils.parseDate(iso8601string, patterns);
     }
   }

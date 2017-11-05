@@ -2778,8 +2778,9 @@ public class DatabaseServer {
 
   private Double checkResidentMemory() {
     Double totalGig = null;
-    String max = config.get("maxProcessMemoryTrigger").asText();
-    max = null; //disable for now
+    JsonNode node = config.get("maxProcessMemoryTrigger");
+    String max = node == null ? null : node.asText();
+//    max = null; //disable for now
 //    if (max == null) {
 //      logger.info("Max process memory not set in config. Not enforcing max memory");
 //    }

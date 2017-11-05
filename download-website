@@ -1,0 +1,1 @@
+rsync -rvlLt -e "ssh -i ~/amazonkeys/db.pem" ec2-user@34.204.57.5:/website/* /Users/lowryda/Dropbox/git/sonicbase/db/src/web

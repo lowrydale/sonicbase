@@ -486,11 +486,16 @@ public class DeltaManager {
       currStage.set("recoveringSnapshot - buildingDeletesFile");
       totalBytes.set(0);
       finishedBytes.set(0);
+      long begin = System.currentTimeMillis();
+      logger.info("recoveringSnapshot - buildingDeletesFile - begin");
       server.getDeleteManager().buildDeletionsFiles(dbName, currStage, totalBytes, finishedBytes);
+      logger.info("recoveringSnapshot - buildingDeletesFile - end: duration=" + (System.currentTimeMillis() - begin));
 
       currStage.set("recoveringSnapshot - applying deletes");
       totalBytes.set(0);
       finishedBytes.set(0);
+      begin = System.currentTimeMillis();
+      logger.info("begin recoveringSnapshot - applying deletes - begin");
       int cores = Runtime.getRuntime().availableProcessors();
 
       ThreadPoolExecutor executor = new ThreadPoolExecutor(cores, cores, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
@@ -513,7 +518,10 @@ public class DeltaManager {
       finally {
         executor.shutdownNow();
       }
+      logger.info("begin recoveringSnapshot - applying deletes - end: duration=" + (System.currentTimeMillis() - begin));
 
+      begin = System.currentTimeMillis();
+      logger.info("begin recoveringSnapshot - begin");
       executor = new ThreadPoolExecutor(cores * 32, cores * 32, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
       try {
         currStage.set("recoveringSnapshot");
@@ -529,6 +537,7 @@ public class DeltaManager {
       finally {
         executor.shutdownNow();
       }
+      logger.info("begin recoveringSnapshot - end: duration=" + (System.currentTimeMillis() - begin));
     }
     finally {
       isRecovering = false;

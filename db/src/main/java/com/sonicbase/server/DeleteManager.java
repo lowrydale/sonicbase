@@ -104,13 +104,24 @@ public class DeleteManager {
     public ArrayBlockingQueue<MergeEntry> entries = new ArrayBlockingQueue<MergeEntry>(200_000);
   }
 
+  private class DeltaContext {
+    private DataInputStream in;
+    private ArrayBlockingQueue<DeltaManager.MergeEntry> entries = new ArrayBlockingQueue<>(200_000);;
+    public boolean finished;
+  }
 
-  public void applyDeletesToSnapshot(String dbName, int deltaNum, AtomicLong finishedBytes) {
+  private class DeleteContext {
+    private DataInputStream in;
+    private ArrayBlockingQueue<MergeEntry> entries = new ArrayBlockingQueue<>(200_000);;
+    public boolean finished;
+  }
+
+  public void applyDeletesToSnapshot(final String dbName, int deltaNum, AtomicLong finishedBytes) {
     try {
       File file = new File(getDeltaRoot(), "tmp");
       outer:
-      for (Map.Entry<String, TableSchema> table : databaseServer.getCommon().getTables(dbName).entrySet()) {
-        for (Map.Entry<String, IndexSchema> index : table.getValue().getIndices().entrySet()) {
+      for (final Map.Entry<String, TableSchema> table : databaseServer.getCommon().getTables(dbName).entrySet()) {
+        for (final Map.Entry<String, IndexSchema> index : table.getValue().getIndices().entrySet()) {
           Comparator[] comparator = index.getValue().getComparators();
           boolean isPrimaryKey = index.getValue().isPrimaryKey();
           File deleteFile = new File(file, table.getKey() + "/" + index.getKey() + "/merged");
@@ -130,7 +141,7 @@ public class DeleteManager {
           AtomicReference<DataOutputStream> deletedStream = new AtomicReference<>(
               new DataOutputStream(new BufferedOutputStream(new FileOutputStream(deletedFile.get()))));
           DataInputStream deltaIn = new DataInputStream(new BufferedInputStream(new DeltaManager.ByteCounterStream(finishedBytes, new FileInputStream(deltaFile))));
-          DeltaManager deltaManager = databaseServer.getDeltaManager();
+          final DeltaManager deltaManager = databaseServer.getDeltaManager();
           long deltaFileSize = deltaFile.length();
           long sizePerPartition = deltaFileSize / DeltaManager.SNAPSHOT_PARTITION_COUNT;
 
@@ -139,134 +150,185 @@ public class DeleteManager {
             deleteIn = new DataInputStream(new BufferedInputStream(new FileInputStream(deleteFile)));
           }
 
-          List<MergeEntry> deletedEntries = new ArrayList<>();
-          MergeEntry deleteEntry = null;
-          MergeEntry pushedDeleteEntry = null;
-          DeltaManager.MergeEntry deltaEntry = null;
-          while (true) {
-            while (true) {
-              if (deleteIn != null) {
-                if (pushedDeleteEntry != null) {
-                  deleteEntry = pushedDeleteEntry;
-                  pushedDeleteEntry = null;
-                }
-                else {
-                  deleteEntry = readRow(dbName, table.getValue(), index.getValue(), deleteIn);
-                }
-                deletedEntries.clear();
-                if (deleteEntry != null) {
-                  deletedEntries.add(deleteEntry);
-                  while (true) {
-                    MergeEntry currDeleteEntry = readRow(dbName, table.getValue(), index.getValue(), deleteIn);
-                    if (currDeleteEntry == null) {
-                      break;
-                    }
-                    int comparison = DatabaseCommon.compareKey(comparator, deleteEntry.key, currDeleteEntry.key);
-                    if (comparison == 0) {
-                      deletedEntries.add(currDeleteEntry);
-                    }
-                    else {
-                      pushedDeleteEntry = currDeleteEntry;
-                      break;
-                    }
-                  }
-                }
-              }
-              if (deleteEntry == null) {
-                break;
-              }
-              if (deltaEntry == null) {
-                deltaEntry = deltaManager.readEntry(deltaIn, table.getValue());
-              }
-              if (deltaEntry == null) {
-                break;
-              }
-              int comparison = DatabaseCommon.compareKey(comparator, deleteEntry.key, deltaEntry.getKey());
-              if (comparison >= 0) {
-                break;
-              }
-            }
+          final DeleteContext deleteContext = new DeleteContext();
+          deleteContext.in = deleteIn;
+          final DeltaContext deltaContext = new DeltaContext();
+          deltaContext.in = deltaIn;
 
-            if (deleteEntry == null) {
+//          Thread deleteThread = new Thread(new Runnable(){
+//            @Override
+//            public void run() {
+//              while (true) {
+//                MergeEntry entry = readRow(dbName, table.getValue(), index.getValue(), deleteContext.in);
+//                if (entry == null) {
+//                  deleteContext.finished = true;
+//                  break;
+//                }
+//                try {
+//                  deleteContext.entries.put(entry);
+//                }
+//                catch (InterruptedException e) {
+//                  logger.error("Error reading delete row", e);
+//                }
+//              }
+//            }
+//          });
+//          deleteThread.start();
+//
+//          Thread deltaThread = new Thread(new Runnable(){
+//            @Override
+//            public void run() {
+//              while (true) {
+//                DeltaManager.MergeEntry entry = deltaManager.readEntry(deltaContext.in, table.getValue());
+//                if (entry == null) {
+//                  deltaContext.finished = true;
+//                  break;
+//                }
+//                try {
+//                  deltaContext.entries.put(entry);
+//                }
+//                catch (InterruptedException e) {
+//                  logger.error("Error reading delta entry", e);
+//                }
+//              }
+//            }
+//          });
+//          deltaThread.start();
+
+          try {
+            List<MergeEntry> deletedEntries = new ArrayList<>();
+            MergeEntry deleteEntry = null;
+            MergeEntry pushedDeleteEntry = null;
+            DeltaManager.MergeEntry deltaEntry = null;
+            while (true) {
               while (true) {
-                if (deltaEntry == null) {
-                  deltaEntry = deltaManager.readEntry(deltaIn, table.getValue());
-                }
-                if (deltaEntry == null) {
-                  break;
-                }
-                deltaManager.writeEntry(deletedStream.get(), table.getValue(), index.getKey(), deltaEntry);
-                cycleDeletedFile(deletedStream, deletedFile, currPartition, sizePerPartition, table.getKey(), index.getKey());
-                deltaEntry = deltaManager.readEntry(deltaIn, table.getValue());
-                if (deltaEntry == null) {
-                  break;
-                }
-              }
-            }
-            if (deltaEntry == null) {
-              break;
-            }
-
-            while (true) {
-              int comparison = -1;
-              if (deleteEntry != null) {
-                comparison = DatabaseCommon.compareKey(comparator, deleteEntry.key, deltaEntry.getKey());
-                if (comparison < 0) {
-                  break;
-                }
-              }
-              if (comparison == 0) {
-                byte[][] records = deltaEntry.getRecords();
-                if (!isPrimaryKey) {
-                  List<byte[]> toKeep = new ArrayList<>();
-                  for (byte[] record : records) {
-                    boolean found = false;
-                    for (MergeEntry currDeleteEntry : deletedEntries) {
-                      if (Arrays.equals(KeyRecord.getPrimaryKey(record), currDeleteEntry.primaryKey)) {
-                        found = true;
-                        long deltaSequence0;
-                        long deltaSequence1;
-                        deltaSequence0 = KeyRecord.getSequence0(record);
-                        deltaSequence1 = KeyRecord.getSequence1(record);
-                        if (deltaSequence0 > currDeleteEntry.sequence0 ||
-                            (deltaSequence0 == currDeleteEntry.sequence0 && deltaSequence1 > currDeleteEntry.sequence1)) {
-                          toKeep.add(record);
-                        }
+                if (deleteIn != null) {
+                  if (pushedDeleteEntry != null) {
+                    deleteEntry = pushedDeleteEntry;
+                    pushedDeleteEntry = null;
+                  }
+                  else {
+                    deleteEntry = readRow(dbName, table.getValue(), index.getValue(), deleteContext.in);//readRow(deleteContext);
+                  }
+                  deletedEntries.clear();
+                  if (deleteEntry != null) {
+                    deletedEntries.add(deleteEntry);
+                    while (true) {
+                      MergeEntry currDeleteEntry = readRow(dbName, table.getValue(), index.getValue(), deleteContext.in);//readRow(deleteContext);
+                      if (currDeleteEntry == null) {
+                        break;
+                      }
+                      int comparison = DatabaseCommon.compareKey(comparator, deleteEntry.key, currDeleteEntry.key);
+                      if (comparison == 0) {
+                        deletedEntries.add(currDeleteEntry);
+                      }
+                      else {
+                        pushedDeleteEntry = currDeleteEntry;
+                        break;
                       }
                     }
-                    if (!found) {
-                      toKeep.add(record);
+                  }
+                }
+                if (deleteEntry == null) {
+                  break;
+                }
+                if (deltaEntry == null) {
+                  deltaEntry = deltaManager.readEntry(deltaContext.in, table.getValue());//readRow(deltaContext);
+                }
+                if (deltaEntry == null) {
+                  break;
+                }
+                int comparison = DatabaseCommon.compareKey(comparator, deleteEntry.key, deltaEntry.getKey());
+                if (comparison >= 0) {
+                  break;
+                }
+              }
+
+              if (deleteEntry == null) {
+                while (true) {
+                  if (deltaEntry == null) {
+                    deltaEntry = deltaManager.readEntry(deltaContext.in, table.getValue());//readRow(deltaContext);
+                  }
+                  if (deltaEntry == null) {
+                    break;
+                  }
+                  deltaManager.writeEntry(deletedStream.get(), table.getValue(), index.getKey(), deltaEntry);
+                  cycleDeletedFile(deletedStream, deletedFile, currPartition, sizePerPartition, table.getKey(), index.getKey());
+                  deltaEntry = deltaManager.readEntry(deltaContext.in, table.getValue());//readRow(deltaContext);
+                  if (deltaEntry == null) {
+                    break;
+                  }
+                }
+              }
+              if (deltaEntry == null) {
+                break;
+              }
+
+              while (true) {
+                int comparison = -1;
+                if (deleteEntry != null) {
+                  comparison = DatabaseCommon.compareKey(comparator, deleteEntry.key, deltaEntry.getKey());
+                  if (comparison < 0) {
+                    break;
+                  }
+                }
+                if (comparison == 0) {
+                  byte[][] records = deltaEntry.getRecords();
+                  if (!isPrimaryKey) {
+                    List<byte[]> toKeep = new ArrayList<>();
+                    for (byte[] record : records) {
+                      boolean found = false;
+                      for (MergeEntry currDeleteEntry : deletedEntries) {
+                        if (Arrays.equals(KeyRecord.getPrimaryKey(record), currDeleteEntry.primaryKey)) {
+                          found = true;
+                          long deltaSequence0;
+                          long deltaSequence1;
+                          deltaSequence0 = KeyRecord.getSequence0(record);
+                          deltaSequence1 = KeyRecord.getSequence1(record);
+                          if (deltaSequence0 > currDeleteEntry.sequence0 ||
+                              (deltaSequence0 == currDeleteEntry.sequence0 && deltaSequence1 > currDeleteEntry.sequence1)) {
+                            toKeep.add(record);
+                          }
+                        }
+                      }
+                      if (!found) {
+                        toKeep.add(record);
+                      }
+                    }
+                    if (toKeep.size() != 0) {
+                      deltaEntry.setRecords(toKeep.toArray(new byte[toKeep.size()][]));
+                      deltaManager.writeEntry(deletedStream.get(), table.getValue(), index.getKey(), deltaEntry);
                     }
                   }
-                  if (toKeep.size() != 0) {
-                    deltaEntry.setRecords(toKeep.toArray(new byte[toKeep.size()][]));
-                    deltaManager.writeEntry(deletedStream.get(), table.getValue(), index.getKey(), deltaEntry);
+                  else {
+                    long deltaSequence0;
+                    long deltaSequence1;
+                    deltaSequence0 = Record.getSequence0(records[0]);
+                    deltaSequence1 = Record.getSequence1(records[0]);
+                    if (deltaSequence0 > deleteEntry.sequence0 ||
+                        (deltaSequence0 == deleteEntry.sequence0 && deltaSequence1 > deleteEntry.sequence1)) {
+                      deltaManager.writeEntry(deletedStream.get(), table.getValue(), index.getKey(), deltaEntry);
+                    }
                   }
                 }
                 else {
-                  long deltaSequence0;
-                  long deltaSequence1;
-                  deltaSequence0 = Record.getSequence0(records[0]);
-                  deltaSequence1 = Record.getSequence1(records[0]);
-                  if (deltaSequence0 > deleteEntry.sequence0 ||
-                      (deltaSequence0 == deleteEntry.sequence0 && deltaSequence1 > deleteEntry.sequence1)) {
-                    deltaManager.writeEntry(deletedStream.get(), table.getValue(), index.getKey(), deltaEntry);
-                  }
+                  deltaManager.writeEntry(deletedStream.get(), table.getValue(), index.getKey(), deltaEntry);
+                  cycleDeletedFile(deletedStream, deletedFile, currPartition, sizePerPartition, table.getKey(), index.getKey());
+                }
+
+                deltaEntry = deltaManager.readEntry(deltaContext.in, table.getValue());//readRow(deltaContext);
+                if (deltaEntry == null) {
+                  break;
                 }
               }
-              else {
-                deltaManager.writeEntry(deletedStream.get(), table.getValue(), index.getKey(), deltaEntry);
-                cycleDeletedFile(deletedStream, deletedFile, currPartition, sizePerPartition, table.getKey(), index.getKey());
-              }
-
-              deltaEntry = deltaManager.readEntry(deltaIn, table.getValue());
               if (deltaEntry == null) {
                 break;
               }
             }
-            if (deltaEntry == null) {
-              break;
-            }
+          }
+          finally {
+//            deleteThread.interrupt();
+//            deltaThread.interrupt();
           }
           deletedStream.get().writeBoolean(false);
           deletedStream.get().close();
@@ -280,6 +342,40 @@ public class DeleteManager {
       throw new DatabaseException(e);
     }
 
+  }
+
+  private MergeEntry readRow(DeleteContext deleteContext) {
+    try {
+      while (true) {
+        MergeEntry ret = deleteContext.entries.poll(100, TimeUnit.MILLISECONDS);
+        if (ret != null) {
+          return ret;
+        }
+        if (deleteContext.finished) {
+          return null;
+        }
+      }
+    }
+    catch (InterruptedException e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  private DeltaManager.MergeEntry readRow(DeltaContext deltaContext) {
+    try {
+      while (true) {
+        DeltaManager.MergeEntry ret = deltaContext.entries.poll(100, TimeUnit.MILLISECONDS);
+        if (ret != null) {
+          return ret;
+        }
+        if (deltaContext.finished) {
+          return null;
+        }
+      }
+    }
+    catch (InterruptedException e) {
+      throw new DatabaseException(e);
+    }
   }
 
   private void cycleDeletedFile(AtomicReference<DataOutputStream> deletedStream, AtomicReference<File> deletedFile,
@@ -333,7 +429,8 @@ public class DeleteManager {
 
   private void  mergeSort(String dbName, Map<Integer, Map<Integer, OutputState>> streams,
                           AtomicReference<String> currStage, AtomicLong totalBytes, AtomicLong finishedBytes) {
-    currStage.set("recoveringSnapshot - mergeDeletes");
+    long begin = System.currentTimeMillis();
+    currStage.set("recoveringSnapshot - mergeDeletes - begin");
     totalBytes.set(0);
     finishedBytes.set(0);
 
@@ -354,6 +451,7 @@ public class DeleteManager {
         mergeSort(dbName, table.getKey(), index.getKey(), index.getValue().dir, finishedBytes);
       }
     }
+    currStage.set("recoveringSnapshot - mergeDeletes - end: duration=" + (System.currentTimeMillis() - begin));
   }
 
   static class MergeEntry {
@@ -499,6 +597,9 @@ public class DeleteManager {
   }
 
   private void writeLogDeletes(ThreadPoolExecutor executor, final String dbName, final Map<Integer, Map<Integer, OutputState>> streams, AtomicReference<String> currStage, AtomicLong totalBytes, final AtomicLong finishedBytes) {
+    long begin = System.currentTimeMillis();
+    logger.info("recoveringSnapshot - writeLogDeletes- begin");
+
     currStage.set("recoveringSnapshot - writeLogDeletes");
     totalBytes.set(0);
     finishedBytes.set(0);
@@ -568,6 +669,7 @@ public class DeleteManager {
         e.printStackTrace();
       }
     }
+    logger.info("recoveringSnapshot - writeBatchDeletes- end: duration=" + (System.currentTimeMillis() - begin));
   }
 
   private void closeFiles(String dbName, Map<Integer, Map<Integer, OutputState>> streams) {
@@ -586,6 +688,9 @@ public class DeleteManager {
 
   private void writeBatchDeletes(ThreadPoolExecutor executor, final Map<Integer, Map<Integer, OutputState>> streams,
                                  AtomicReference<String> currStage, AtomicLong totalBytes, final AtomicLong finishedBytes) {
+
+    long begin = System.currentTimeMillis();
+    logger.info("recoveringSnapshot - writeBatchDeletes- begin");
 
     currStage.set("recoveringSnapshot - writeBatchDeletes");
     totalBytes.set(0);
@@ -680,6 +785,7 @@ public class DeleteManager {
         }
       }
     }
+    logger.info("recoveringSnapshot - writeBatchDeletes- end: duration=" + (System.currentTimeMillis() - begin));
   }
 
   private void cycleFile(String dbName, int tableId, int indexId, OutputState state, boolean openNew, boolean force) {

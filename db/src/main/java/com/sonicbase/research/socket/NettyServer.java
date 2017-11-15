@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.common.Logger;
 import com.sonicbase.server.DatabaseServer;
+
+import com.sonicbase.query.DatabaseException;
 import com.sonicbase.socket.DatabaseSocketClient;
 import com.sonicbase.socket.Util;
 import io.netty.bootstrap.ServerBootstrap;
@@ -45,10 +47,11 @@ public class NettyServer {
   private static final String UTF8_STR = "utf-8";
   private static final String PORT_STR = "port";
   private static final String HOST_STR = "host";
+  private final int threadCount;
 
   private boolean isRunning;
   private int port;
-  private static String cluster;
+  private String cluster;
   private DatabaseServer databaseServer = null;
   private ChannelFuture f;
   private EventLoopGroup bossGroup;
@@ -90,7 +93,11 @@ public class NettyServer {
   }
 
   public NettyServer() {
+    this(Runtime.getRuntime().availableProcessors() * 128);
+  }
 
+  public NettyServer(int threadCount) {
+    this.threadCount = threadCount;
   }
 
   public boolean isRunning() {
@@ -166,7 +173,7 @@ public class NettyServer {
       int bodyLen = Util.readRawLittleEndian32(intBuff);
 
       if (bodyLen > 1024 * 1024 * 1024) {
-        throw new com.sonicbase.query.DatabaseException("Invalid inner body length: " + bodyLen);
+        throw new DatabaseException("Invalid inner body length: " + bodyLen);
       }
       byte[] body = new byte[bodyLen];
       if (bodyLen != 0) {
@@ -181,7 +188,7 @@ public class NettyServer {
       return request;
     }
     catch (IOException e) {
-      throw new com.sonicbase.query.DatabaseException(e);
+      throw new DatabaseException(e);
     }
   }
 
@@ -632,6 +639,9 @@ public class NettyServer {
 
     private List<DatabaseServer.Response> processRequests(List<Request> requests, AtomicLong timeLogging, AtomicLong handlerTime) throws IOException {
       List<DatabaseServer.Response> ret = new ArrayList<>();
+      if (requests.size() > 1) {
+        ;
+      }
       for (Request request : requests) {
         byte[] retBody = getDatabaseServer().invokeMethod(request.body, -1L, (short) -1L, false, true, timeLogging, handlerTime);
         DatabaseServer.Response response = new DatabaseServer.Response(retBody);
@@ -668,7 +678,7 @@ public class NettyServer {
         return bytesOut.toByteArray();
       }
       catch (IOException e) {
-        throw new com.sonicbase.query.DatabaseException(e);
+        throw new DatabaseException(e);
       }
     }
 
@@ -739,7 +749,7 @@ public class NettyServer {
 
   public void run() {
     EventLoopGroup bossGroup = new NioEventLoopGroup(); // (1)
-    EventLoopGroup workerGroup = new NioEventLoopGroup(Runtime.getRuntime().availableProcessors() * 128);
+    EventLoopGroup workerGroup = new NioEventLoopGroup(threadCount);
     try {
 
       ServerBootstrap b = new ServerBootstrap(); // (2)
@@ -764,7 +774,7 @@ public class NettyServer {
       logger.info("exiting netty server");
     }
     catch (InterruptedException e) {
-      throw new com.sonicbase.query.DatabaseException(e);
+      throw new DatabaseException(e);
     }
     finally {
       workerGroup.shutdownGracefully();
@@ -833,7 +843,7 @@ public class NettyServer {
         final DatabaseServer databaseServer = new DatabaseServer();
         final AtomicBoolean isRunning = new AtomicBoolean(false);
 
-        databaseServer.setConfig(config, cluster, host, port, isRunning, gclog, xmx, false);
+        databaseServer.setConfig(config, cluster, host, port, isRunning, gclog, xmx, skipLicense);
         databaseServer.setRole(role);
 
         setDatabaseServer(databaseServer);
@@ -867,7 +877,7 @@ public class NettyServer {
               databaseServer.recoverFromSnapshot();
 
               logger.info("applying queues");
-              databaseServer.getLogManager().applyQueues();
+              databaseServer.getLogManager().applyLogs();
 
               databaseServer.getDeleteManager().forceDeletes();
               databaseServer.getDeleteManager().start();
@@ -910,7 +920,13 @@ public class NettyServer {
         catch (IOException e1) {
           e1.printStackTrace();
         }
-        logger.error("Error recovering snapshot", e);
+        if (logger == null) {
+          System.out.println("Error starting server");
+          e.printStackTrace();
+        }
+        else {
+          logger.error("Error recovering snapshot", e);
+        }
         System.exit(1);
       }
 
@@ -930,8 +946,14 @@ public class NettyServer {
       catch (IOException e1) {
         e1.printStackTrace();
       }
-      logger.error("Error starting server", e);
-      throw new com.sonicbase.query.DatabaseException(e);
+      if (logger == null) {
+        System.out.println("Error starting server");
+        e.printStackTrace();
+      }
+      else {
+        logger.error("Error starting server", e);
+      }
+      throw new DatabaseException(e);
     }
     logger.info("exiting netty server");
   }

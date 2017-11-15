@@ -8,13 +8,17 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.index.Index;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
-import com.sonicbase.schema.*;
+
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.util.FileUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import com.sonicbase.schema.DataType;
+import com.sonicbase.schema.IndexSchema;
+import com.sonicbase.schema.Schema;
+import com.sonicbase.schema.TableSchema;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
@@ -51,7 +55,7 @@ public class TestIndex {
     array.add(DatabaseServer.FOUR_SERVER_LICENSE);
     config.put("licenseKeys", array);
 
-        DatabaseServer.getServers().clear();
+        DatabaseClient.getServers().clear();
 
         final DatabaseServer[] dbServers = new DatabaseServer[4];
         ThreadPoolExecutor executor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());

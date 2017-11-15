@@ -59,7 +59,7 @@ public class TestRepartitionerConsistencyIdentity {
       array.add(DatabaseServer.FOUR_SERVER_LICENSE);
       config.put("licenseKeys", array);
 
-      DatabaseServer.getServers().clear();
+      DatabaseClient.getServers().clear();
 
 
       String role = "primaryMaster";
@@ -238,11 +238,11 @@ public class TestRepartitionerConsistencyIdentity {
                   }
 
                   boolean currPartitions = false;
-                  List<Integer> selectedShards = Repartitioner.findOrderedPartitionForRecord(false, true, fieldOffsets, dbServers[0].getCommon(), tableSchema,
+                  List<Integer> selectedShards = DatabaseClient.findOrderedPartitionForRecord(false, true, fieldOffsets, dbServers[0].getCommon(), tableSchema,
                       "_1__primarykey", null, BinaryExpression.Operator.equal, null, new Object[]{i},
                       null);
                   if (selectedShards.size() == 0) {
-                    selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false, fieldOffsets, dbServers[0].getCommon(), tableSchema,
+                    selectedShards = DatabaseClient.findOrderedPartitionForRecord(true, false, fieldOffsets, dbServers[0].getCommon(), tableSchema,
                         indexSchema.getName(), null, BinaryExpression.Operator.equal, null, new Object[]{i}, null);
                     currPartitions = true;
                   }

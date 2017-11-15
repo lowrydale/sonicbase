@@ -5,7 +5,11 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
 import com.sonicbase.index.Indices;
-import com.sonicbase.index.Repartitioner;
+
+import com.sonicbase.common.ComObject;
+import com.sonicbase.common.DatabaseCommon;
+import com.sonicbase.common.Logger;
+import com.sonicbase.common.Record;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.IndexSchema;
@@ -325,7 +329,7 @@ public class SnapshotManager {
 
   public void deleteRecord(String dbName, String tableName, TableSchema tableSchema, IndexSchema indexSchema, Object[] key, byte[] record, int[] fieldOffsets) {
 
-    List<Integer> selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false,
+    List<Integer> selectedShards = DatabaseClient.findOrderedPartitionForRecord(true, false,
         fieldOffsets, server.getClient().getCommon(), tableSchema,
         indexSchema.getName(), null, BinaryExpression.Operator.equal, null, key, null);
     if (selectedShards.size() == 0) {
@@ -333,7 +337,7 @@ public class SnapshotManager {
     }
 
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.serializationVersion, DatabaseServer.SERIALIZATION_VERSION);
+    cobj.put(ComObject.Tag.serializationVersion, DatabaseClient.SERIALIZATION_VERSION);
     cobj.put(ComObject.Tag.keyBytes, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), key));
     cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
     cobj.put(ComObject.Tag.dbName, dbName);
@@ -372,7 +376,7 @@ public class SnapshotManager {
 
     File versionFile = new File(file, "version.txt");
     try (BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(versionFile))) {
-      out.write(String.valueOf(DatabaseServer.SERIALIZATION_VERSION).getBytes());
+      out.write(String.valueOf(DatabaseClient.SERIALIZATION_VERSION).getBytes());
     }
 
     ObjectNode config = server.getConfig();

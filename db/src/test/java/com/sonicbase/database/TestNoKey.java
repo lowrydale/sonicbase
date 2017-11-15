@@ -52,7 +52,7 @@ public class TestNoKey {
       array.add(DatabaseServer.FOUR_SERVER_LICENSE);
       config.put("licenseKeys", array);
 
-      DatabaseServer.getServers().clear();
+      DatabaseClient.getServers().clear();
 
       final DatabaseServer[] dbServers = new DatabaseServer[4];
       ThreadPoolExecutor executor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());

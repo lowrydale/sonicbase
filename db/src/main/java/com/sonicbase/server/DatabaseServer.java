@@ -9,6 +9,7 @@ import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
 import com.sonicbase.index.Indices;
 import com.sonicbase.index.Repartitioner;
+
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.ExpressionImpl;
@@ -43,9 +44,7 @@ import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.text.DateFormat;
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -67,13 +66,6 @@ import static org.quartz.TriggerBuilder.newTrigger;
  * Time: 4:39 PM
  */
 public class DatabaseServer {
-
-  public static final short SERIALIZATION_VERSION = 23;
-  public static final short SERIALIZATION_VERSION_23 = 23;
-  public static final short SERIALIZATION_VERSION_22 = 22;
-  public static final short SERIALIZATION_VERSION_21 = 21;
-  public static final short SERIALIZATION_VERSION_20 = 20;
-  public static final short SERIALIZATION_VERSION_19 = 19;
 
   public static Object deathOverrideMutex = new Object();
   public static boolean[][] deathOverride;
@@ -159,8 +151,6 @@ public class DatabaseServer {
   private Map<String, Indices> indexes = new ConcurrentHashMap<>();
   private LongRunningCalls longRunningCommands;
 
-  private static ConcurrentHashMap<Integer, Map<Integer, DatabaseServer>> servers = new ConcurrentHashMap<>();
-  private static ConcurrentHashMap<Integer, Map<Integer, DatabaseServer>> debugServers = new ConcurrentHashMap<>();
   private String dataDir;
   private int replica;
   private int replicationFactor;
@@ -457,7 +447,8 @@ public class DatabaseServer {
         final int[] monitorReplicas = {0, 1, 2};
 
         ArrayNode shards = config.withArray("shards");
-        ArrayNode replicas = (ArrayNode) shards.get(0);
+        ObjectNode replicasNode = (ObjectNode) shards.get(0);
+        ArrayNode replicas = replicasNode.withArray("replicas");
         if (replicas.size() < 3) {
           monitorShards[2] = 1;
           monitorReplicas[2] = 0;
@@ -766,7 +757,7 @@ public class DatabaseServer {
               for (int i = 0; i < shardCount; i++) {
                 for (int j = 0; j < replicationFactor; j++) {
                   builder.append("[").append(i).append(",").append(j).append("=");
-                  builder.append(common.getServersConfig().getShards()[i].getReplicas()[j].dead ? "dead" : "alive").append("]");
+                  builder.append(common.getServersConfig().getShards()[i].getReplicas()[j].isDead() ? "dead" : "alive").append("]");
                 }
               }
               logger.info("Death status=" + builder.toString());
@@ -799,7 +790,7 @@ public class DatabaseServer {
         for (int j = 0; j < replicationFactor; j++) {
           final int replica = j;
           if (shard == this.shard && replica == this.replica) {
-            boolean wasDead = common.getServersConfig().getShards()[shard].getReplicas()[replica].dead;
+            boolean wasDead = common.getServersConfig().getShards()[shard].getReplicas()[replica].isDead();
             if (wasDead) {
               AtomicBoolean isHealthy = new AtomicBoolean(true);
               handleHealthChange(isHealthy, wasDead, true, shard, replica);
@@ -819,7 +810,7 @@ public class DatabaseServer {
                       break;
                     }
                   }
-                  boolean wasDead = common.getServersConfig().getShards()[shard].getReplicas()[replica].dead;
+                  boolean wasDead = common.getServersConfig().getShards()[shard].getReplicas()[replica].isDead();
                   boolean changed = false;
                   if (wasDead && isHealthy.get()) {
                     changed = true;
@@ -857,11 +848,11 @@ public class DatabaseServer {
   private void handleHealthChange(AtomicBoolean isHealthy, boolean wasDead, boolean changed, int shard, int replica) {
     synchronized (common) {
       if (wasDead && isHealthy.get()) {
-        common.getServersConfig().getShards()[shard].getReplicas()[replica].dead = false;
+        common.getServersConfig().getShards()[shard].getReplicas()[replica].setDead(false);
         changed = true;
       }
       else if (!wasDead && !isHealthy.get()) {
-        common.getServersConfig().getShards()[shard].getReplicas()[replica].dead = true;
+        common.getServersConfig().getShards()[shard].getReplicas()[replica].setDead(true);
         changed = true;
       }
     }
@@ -898,8 +889,8 @@ public class DatabaseServer {
       public void run() {
         int backoff = 100;
         while (true) {
-          Host host = common.getServersConfig().getShards()[shard].getReplicas()[replica];
-          boolean wasDead = host.dead;
+          ServersConfig.Host host = common.getServersConfig().getShards()[shard].getReplicas()[replica];
+          boolean wasDead = host.isDead();
           try {
             ComObject cobj = new ComObject();
             cobj.put(ComObject.Tag.dbName, "__none__");
@@ -1112,11 +1103,9 @@ public class DatabaseServer {
 
   private static class NullX509TrustManager implements X509TrustManager {
     public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
-      System.out.println();
     }
 
     public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
-      System.out.println();
     }
 
     public X509Certificate[] getAcceptedIssuers() {
@@ -1483,17 +1472,22 @@ public class DatabaseServer {
 
           backupFileSystemSingleDir(directory, subDirectory, "logSequenceNum");
           backupFileSystemSingleDir(directory, subDirectory, "nextRecordId");
+          deleteManager.delteTempDirs();
           deleteManager.backupFileSystem(directory, subDirectory);
           longRunningCommands.backupFileSystem(directory, subDirectory);
 //          snapshotManager.deleteTempDirs();
 //          snapshotManager.backupFileSystem(directory, subDirectory);
+          deltaManager.enableSnapshot(false);
           deltaManager.deleteTempDirs();
+          deltaManager.deleteDeletedDirs();
           deltaManager.backupFileSystem(directory, subDirectory);
           synchronized (common) {
             //snapshotManager.backupFileSystemSchema(directory, subDirectory);
             deltaManager.backupFileSystemSchema(directory, subDirectory);
           }
           logManager.backupFileSystem(directory, subDirectory, logSlicePoint);
+
+          deltaManager.enableSnapshot(true);
 
           isBackupComplete = true;
         }
@@ -1531,9 +1525,12 @@ public class DatabaseServer {
 
           backupAWSSingleDir(bucket, prefix, subDirectory, "logSequenceNum");
           backupAWSSingleDir(bucket, prefix, subDirectory, "nextRecordId");
+          deleteManager.delteTempDirs();
           deleteManager.backupAWS(bucket, prefix, subDirectory);
           longRunningCommands.backupAWS(bucket, prefix, subDirectory);
           //snapshotManager.deleteTempDirs();
+          deltaManager.enableSnapshot(false);
+          deltaManager.deleteDeletedDirs();
           deltaManager.deleteTempDirs();
           //snapshotManager.backupAWS(bucket, prefix, subDirectory);
           deltaManager.backupAWS(bucket, prefix, subDirectory);
@@ -1542,6 +1539,8 @@ public class DatabaseServer {
             deltaManager.backupAWSSchema(bucket, prefix, subDirectory);
           }
           logManager.backupAWS(bucket, prefix, subDirectory, logSlicePoint);
+
+          deltaManager.enableSnapshot(true);
 
           isBackupComplete = true;
         }
@@ -1830,9 +1829,15 @@ public class DatabaseServer {
 
       logger.info("Backup Master - delete old backups - begin");
 
-      String directory = backupConfig.get("directory").asText();
       Integer maxBackupCount = backupConfig.get("maxBackupCount").asInt();
-      Boolean shared = backupConfig.get("sharedDirectory").asBoolean();
+      String directory = null;
+      if (backupConfig.has("directory")) {
+        directory = backupConfig.get("directory").asText();
+      }
+      Boolean shared = null;
+      if (backupConfig.has("sharedDirectory")) {
+        shared = backupConfig.get("sharedDirectory").asBoolean();
+      }
       if (shared == null) {
         shared = false;
       }
@@ -1942,7 +1947,6 @@ public class DatabaseServer {
       @Override
       public void run() {
         try {
-          System.out.println("doRestoreFileSystem: shard=" + shard + ", replica=" + replica);
           String directory = cobj.getString(ComObject.Tag.directory);
           String subDirectory = cobj.getString(ComObject.Tag.subDirectory);
 
@@ -2093,7 +2097,7 @@ public class DatabaseServer {
     for (String dbName : getDbNames(getDataDir())) {
       getDeltaManager().recoverFromSnapshot(dbName);
     }
-    getLogManager().applyQueues();
+    getLogManager().applyLogs();
   }
 
   public ComObject isEntireRestoreComplete(ComObject cobj) {
@@ -2248,7 +2252,7 @@ public class DatabaseServer {
       }
 
       synchronized (common) {
-        if (shard != 0 || common.getServersConfig().getShards()[0].masterReplica != replica) {
+        if (shard != 0 || common.getServersConfig().getShards()[0].getMasterReplica() != replica) {
           int schemaVersion = common.getSchemaVersion() + 100;
           common.setSchemaVersion(schemaVersion);
         }
@@ -2299,14 +2303,6 @@ public class DatabaseServer {
     return commandCount.get();
   }
 
-  public static Map<Integer, Map<Integer, DatabaseServer>> getServers() {
-    return servers;
-  }
-
-  public static Map<Integer, Map<Integer, DatabaseServer>> getDebugServers() {
-    return debugServers;
-  }
-
   public int getReplicationFactor() {
     return replicationFactor;
   }
@@ -2316,7 +2312,7 @@ public class DatabaseServer {
       if (this.client.get() != null) {
         return this.client.get();
       }
-      DatabaseClient client = new DatabaseClient(masterAddress, masterPort, common.getShard(), common.getReplica(), false, common);
+      DatabaseClient client = new DatabaseClient(masterAddress, masterPort, common.getShard(), common.getReplica(), false, common, this);
 //      if (client.getCommon().getSchema().getVersion() <= common.getSchema().getVersion()) {
 //        client.getCommon().getSchema().setTables(common.getSchema().getTables());
 //        client.getCommon().getSchema().setServersConfig(common.getSchema().getServersConfig());
@@ -2516,217 +2512,6 @@ public class DatabaseServer {
     this.overrideProLicense = true;
   }
 
-  public static class Host {
-    private String publicAddress;
-    private String privateAddress;
-    private int port;
-    private boolean dead;
-
-    public Host(String publicAddress, String privateAddress, int port) {
-      this.publicAddress = publicAddress;
-      this.privateAddress = privateAddress;
-      this.port = port;
-    }
-
-    public String getPublicAddress() {
-      return publicAddress;
-    }
-
-    public String getPrivateAddress() {
-      return privateAddress;
-    }
-
-    public int getPort() {
-      return port;
-    }
-
-    public Host(DataInputStream in, short serializationVersionNumber) throws IOException {
-      publicAddress = in.readUTF();
-      privateAddress = in.readUTF();
-      port = in.readInt();
-      if (serializationVersionNumber >= DatabaseServer.SERIALIZATION_VERSION_21) {
-        dead = in.readBoolean();
-      }
-    }
-
-    public void serialize(DataOutputStream out, short serializationVersionNumber) throws IOException {
-      out.writeUTF(publicAddress);
-      out.writeUTF(privateAddress);
-      out.writeInt(port);
-      if (serializationVersionNumber >= DatabaseServer.SERIALIZATION_VERSION_21) {
-        out.writeBoolean(dead);
-      }
-    }
-
-    public boolean isDead() {
-      return dead;
-    }
-
-    public void setDead(boolean dead) {
-      this.dead = dead;
-    }
-  }
-
-  public static class Shard {
-    private Host[] replicas;
-    private int masterReplica;
-
-    @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP2", justification = "copying the passed in data is too slow")
-    @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
-    public Shard(Host[] hosts) {
-      this.replicas = hosts;
-    }
-
-    public Shard(DataInputStream in, short serializationVersionNumber) throws IOException {
-      int count = in.readInt();
-      replicas = new Host[count];
-      for (int i = 0; i < replicas.length; i++) {
-        replicas[i] = new Host(in, serializationVersionNumber);
-      }
-      if (serializationVersionNumber >= DatabaseServer.SERIALIZATION_VERSION_21) {
-        masterReplica = (int) Varint.readSignedVarLong(in);
-      }
-    }
-
-    public void serialize(DataOutputStream out, short serializationVersionNumber) throws IOException {
-      out.writeInt(replicas.length);
-      for (Host host : replicas) {
-        host.serialize(out, serializationVersionNumber);
-      }
-      if (serializationVersionNumber >= DatabaseServer.SERIALIZATION_VERSION_21) {
-        Varint.writeSignedVarLong(masterReplica, out);
-      }
-    }
-
-    public void setMasterReplica(int masterReplica) {
-      this.masterReplica = masterReplica;
-    }
-
-    public int getMasterReplica() {
-      return this.masterReplica;
-    }
-
-    public boolean contains(String host, int port) {
-      for (int i = 0; i < replicas.length; i++) {
-        if (replicas[i].privateAddress.equals(host) && replicas[i].port == port) {
-          return true;
-        }
-      }
-      return false;
-    }
-
-    @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP", justification = "copying the returned data is too slow")
-    public Host[] getReplicas() {
-      return replicas;
-    }
-
-  }
-
-  public static class ServersConfig {
-    private String cluster;
-    private Shard[] shards;
-    private boolean clientIsInternal;
-
-    public ServersConfig(byte[] bytes, short serializationVersion) throws IOException {
-      this(new DataInputStream(new ByteArrayInputStream(bytes)), serializationVersion);
-    }
-
-    /**
-     * ###############################
-     * DON"T MODIFY THIS SERIALIZATION
-     * ###############################
-     */
-    public ServersConfig(DataInputStream in, short serializationVersion) throws IOException {
-      if (serializationVersion >= DatabaseServer.SERIALIZATION_VERSION_21) {
-        cluster = in.readUTF();
-      }
-      int count = in.readInt();
-      shards = new Shard[count];
-      for (int i = 0; i < count; i++) {
-        shards[i] = new Shard(in, serializationVersion);
-      }
-      clientIsInternal = in.readBoolean();
-    }
-
-    /**
-     * ###############################
-     * DON"T MODIFY THIS SERIALIZATION
-     * ###############################
-     */
-    public byte[] serialize(short serializationVersionNumber) throws IOException {
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      DataOutputStream out = new DataOutputStream(bytesOut);
-      serialize(out, serializationVersionNumber);
-      out.close();
-      return bytesOut.toByteArray();
-    }
-
-    public void serialize(DataOutputStream out, short serializationVersionNumber) throws IOException {
-      out.writeUTF(cluster);
-      out.writeInt(shards.length);
-      for (Shard shard : shards) {
-        shard.serialize(out, serializationVersionNumber);
-      }
-      out.writeBoolean(clientIsInternal);
-    }
-
-    @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP", justification = "copying the returned data is too slow")
-    public Shard[] getShards() {
-      return shards;
-    }
-
-    public int getShardCount() {
-      return shards.length;
-    }
-
-    public String getCluster() {
-      return cluster;
-    }
-
-    public ServersConfig(String cluster, ArrayNode inShards, int replicationFactor, boolean clientIsInternal) {
-      int currServerOffset = 0;
-      this.cluster = cluster;
-      int shardCount = inShards.size();
-      shards = new Shard[shardCount];
-      for (int i = 0; i < shardCount; i++) {
-        ArrayNode replicas = (ArrayNode) inShards.get(i).withArray("replicas");
-        Host[] hosts = new Host[replicas.size()];
-        for (int j = 0; j < hosts.length; j++) {
-          hosts[j] = new Host(replicas.get(j).get("publicAddress").asText(), replicas.get(j).get("privateAddress").asText(),
-              (int) (long) replicas.get(j).get("port").asLong());
-          currServerOffset++;
-        }
-        shards[i] = new Shard(hosts);
-
-      }
-      this.clientIsInternal = clientIsInternal;
-    }
-
-    public int getThisReplica(String host, int port) {
-      for (int i = 0; i < shards.length; i++) {
-        for (int j = 0; j < shards[i].replicas.length; j++) {
-          Host currHost = shards[i].replicas[j];
-          if (currHost.privateAddress.equals(host) && currHost.port == port) {
-            return j;
-          }
-        }
-      }
-      return -1;
-    }
-
-    public int getThisShard(String host, int port) {
-      for (int i = 0; i < shards.length; i++) {
-        if (shards[i].contains(host, port)) {
-          return i;
-        }
-      }
-      return -1;
-    }
-
-    public boolean clientIsInternal() {
-      return clientIsInternal;
-    }
-  }
 
 
   public AtomicBoolean getAboveMemoryThreshold() {
@@ -3387,7 +3172,10 @@ public class DatabaseServer {
   private void checkJavaHeap(Double totalGig) throws IOException {
     String line = null;
     try {
-      String max = config.get("maxJavaHeapTrigger").asText();
+      String max = null;
+      if (config.has("maxJavaHeapTrigger")) {
+        max = config.get("maxJavaHeapTrigger").asText();
+      }
       max = null;//disable for now
       if (max == null) {
         logger.info("Max java heap trigger not set in config. Not enforcing max");
@@ -3667,19 +3455,19 @@ public class DatabaseServer {
     if (unitTest) {
       int thisShard = serversConfig.getThisShard(host, port);
       int thisReplica = serversConfig.getThisReplica(host, port);
-      Map<Integer, DatabaseServer> currShard = DatabaseServer.servers.get(thisShard);
+      Map<Integer, Object> currShard = DatabaseClient.dbservers.get(thisShard);
       if (currShard == null) {
         currShard = new ConcurrentHashMap<>();
-        DatabaseServer.servers.put(thisShard, currShard);
+        DatabaseClient.dbservers.put(thisShard, currShard);
       }
       currShard.put(thisReplica, this);
     }
     int thisShard = serversConfig.getThisShard(host, port);
     int thisReplica = serversConfig.getThisReplica(host, port);
-    Map<Integer, DatabaseServer> currShard = DatabaseServer.debugServers.get(thisShard);
+    Map<Integer, Object> currShard = DatabaseClient.dbdebugServers.get(thisShard);
     if (currShard == null) {
       currShard = new ConcurrentHashMap<>();
-      DatabaseServer.debugServers.put(thisShard, currShard);
+      DatabaseClient.dbdebugServers.put(thisShard, currShard);
     }
     currShard.put(thisReplica, this);
   }
@@ -3746,7 +3534,7 @@ public class DatabaseServer {
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
       cobj.put(ComObject.Tag.method, "updateSchema");
-      cobj.put(ComObject.Tag.schemaBytes, common.serializeSchema(DatabaseServer.SERIALIZATION_VERSION));
+      cobj.put(ComObject.Tag.schemaBytes, common.serializeSchema(DatabaseClient.SERIALIZATION_VERSION));
 
       for (int i = 0; i < shardCount; i++) {
         for (int j = 0; j < replicationFactor; j++) {
@@ -3961,7 +3749,7 @@ public class DatabaseServer {
           cobj.put(ComObject.Tag.dbName, "__none__");
           cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
           cobj.put(ComObject.Tag.method, "updateServersConfig");
-          cobj.put(ComObject.Tag.serversConfig, common.getServersConfig().serialize(DatabaseServer.SERIALIZATION_VERSION));
+          cobj.put(ComObject.Tag.serversConfig, common.getServersConfig().serialize(DatabaseClient.SERIALIZATION_VERSION));
           getDatabaseClient().send(null, i, j, cobj, DatabaseClient.Replica.specified);
         }
         catch (Exception e) {
@@ -4735,7 +4523,7 @@ public class DatabaseServer {
       if (config.has("clientIsPrivate")) {
         isInternal = config.get("clientIsPrivate").asBoolean();
       }
-      DatabaseServer.ServersConfig newConfig = new DatabaseServer.ServersConfig(cluster, config.withArray("shards"),
+      ServersConfig newConfig = new ServersConfig(cluster, config.withArray("shards"),
           config.withArray("shards").get(0).withArray("replicas").size(), isInternal);
 
       common.setServersConfig(newConfig);
@@ -4744,8 +4532,8 @@ public class DatabaseServer {
 
       pushSchema();
 
-      Shard[] oldShards = oldConfig.getShards();
-      Shard[] newShards = newConfig.getShards();
+      ServersConfig.Shard[] oldShards = oldConfig.getShards();
+      ServersConfig.Shard[] newShards = newConfig.getShards();
 
       int count = newShards.length - oldShards.length;
       ComObject retObj = new ComObject();

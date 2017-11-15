@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.InsufficientLicense;
 import com.sonicbase.common.Logger;
+import com.sonicbase.common.ServersConfig;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.queue.MessageQueueConsumer;
 import com.sonicbase.schema.FieldSchema;
@@ -42,14 +43,14 @@ public class StreamManager {
       public void run() {
         while (true) {
           try {
-            DatabaseServer.ServersConfig servers = server.getCommon().getServersConfig();
-            DatabaseServer.Shard[] shards = servers.getShards();
+            ServersConfig servers = server.getCommon().getServersConfig();
+            ServersConfig.Shard[] shards = servers.getShards();
             boolean allShardsAlive = true;
             outer:
-            for (DatabaseServer.Shard shard : shards) {
-              DatabaseServer.Host[] hosts = shard.getReplicas();
+            for (ServersConfig.Shard shard : shards) {
+              ServersConfig.Host[] hosts = shard.getReplicas();
               boolean alive = false;
-              for (DatabaseServer.Host host : hosts) {
+              for (ServersConfig.Host host : hosts) {
                 if (!host.isDead()) {
                   alive = true;
                   break;

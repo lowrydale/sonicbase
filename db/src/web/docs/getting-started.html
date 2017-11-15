@@ -134,7 +134,7 @@ Create and run the following class:<br/>
     package foo;<br/>
     class Test {
         public static void main(String[] args) {
-            Class.forName("com.sonicbase.jdbcdriver.Driver");
+            Class.forName("Driver");
             Connection conn = DriverManager.getConnection("jdbc:sonicbase:localhost;:9010/db");
             PreparedStatement stmt = conn.prepareStatement("select * from persons");
             ResultSet rs = stmt.executeQuery();

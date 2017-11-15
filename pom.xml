@@ -86,6 +86,8 @@
 
   <modules>
     <module>db</module>
-      <module>sonicbase</module>
+    <module>sonicbase</module>
+    <module>obfuscated</module>
+    <module>jdbc</module>
   </modules>
 </project>

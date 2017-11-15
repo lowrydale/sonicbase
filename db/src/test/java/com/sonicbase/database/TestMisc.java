@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.IOUtils;
@@ -42,7 +43,7 @@ public class TestMisc {
     array.add(DatabaseServer.FOUR_SERVER_LICENSE);
     config.put("licenseKeys", array);
 
-    DatabaseServer.getServers().clear();
+    DatabaseClient.getServers().clear();
 
     final DatabaseServer[] dbServers = new DatabaseServer[4];
 

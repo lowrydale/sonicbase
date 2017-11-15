@@ -170,7 +170,7 @@ public class MethodInvoker {
         newMessage.put(ComObject.Tag.sequence1, sequence1);
       }
       if (!server.onlyQueueCommands() || !enableQueuing) {
-        DatabaseServer.Shard currShard = common.getServersConfig().getShards()[server.getShard()];
+        ServersConfig.Shard currShard = common.getServersConfig().getShards()[server.getShard()];
         try {
           long handleBegin = System.nanoTime();
           request.put(ComObject.Tag.sequence0, sequence0);

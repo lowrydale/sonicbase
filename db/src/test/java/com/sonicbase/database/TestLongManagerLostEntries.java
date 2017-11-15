@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.server.LogManager;
@@ -60,7 +61,7 @@ public class TestLongManagerLostEntries {
     array.add(DatabaseServer.FOUR_SERVER_LICENSE);
     config.put("licenseKeys", array);
 
-    DatabaseServer.getServers().clear();
+    DatabaseClient.getServers().clear();
 
     final DatabaseServer[] dbServers = new DatabaseServer[4];
     ThreadPoolExecutor executor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
@@ -110,7 +111,7 @@ public class TestLongManagerLostEntries {
     }
 
     countPlayed.set(0);
-    logManager.applyQueues();
+    logManager.applyLogs();
 
     boolean first = true;
     int countMissing = 0;

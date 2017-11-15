@@ -50,7 +50,7 @@ public class TestAWSBackup {
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
-      DatabaseServer.getServers().clear();
+      DatabaseClient.getServers().clear();
 
       final DatabaseServer[] dbServers = new DatabaseServer[4];
       ThreadPoolExecutor executor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());

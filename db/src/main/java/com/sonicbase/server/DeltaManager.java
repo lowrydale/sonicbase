@@ -5,12 +5,16 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
 import com.sonicbase.index.Indices;
-import com.sonicbase.index.Repartitioner;
+
+import com.sonicbase.common.ComObject;
+import com.sonicbase.common.DatabaseCommon;
+import com.sonicbase.common.Logger;
+import com.sonicbase.common.Record;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.util.DateUtils;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.giraph.utils.Varint;
@@ -23,6 +27,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+
 
 public class DeltaManager {
 
@@ -170,7 +175,7 @@ public class DeltaManager {
 
   public void deleteRecord(String dbName, String tableName, TableSchema tableSchema, IndexSchema indexSchema, Object[] key, byte[] record, int[] fieldOffsets) {
 
-    List<Integer> selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false,
+    List<Integer> selectedShards = DatabaseClient.findOrderedPartitionForRecord(true, false,
         fieldOffsets, server.getClient().getCommon(), tableSchema,
         indexSchema.getName(), null, BinaryExpression.Operator.equal, null, key, null);
     if (selectedShards.size() == 0) {
@@ -178,7 +183,7 @@ public class DeltaManager {
     }
 
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.serializationVersion, DatabaseServer.SERIALIZATION_VERSION);
+    cobj.put(ComObject.Tag.serializationVersion, DatabaseClient.SERIALIZATION_VERSION);
     cobj.put(ComObject.Tag.keyBytes, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), key));
     cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
     cobj.put(ComObject.Tag.dbName, dbName);
@@ -246,7 +251,7 @@ public class DeltaManager {
 
     File versionFile = new File(file, "version.txt");
     try (OutputStreamWriter out = new OutputStreamWriter(new BufferedOutputStream(new FileOutputStream(versionFile)))) {
-      out.write(String.valueOf(DatabaseServer.SERIALIZATION_VERSION));
+      out.write(String.valueOf(DatabaseClient.SERIALIZATION_VERSION));
     }
 
     File beginTimeFile = new File(file, "begin-time.txt");
@@ -307,7 +312,11 @@ public class DeltaManager {
 
               File currFile = new File(file, tableEntry.getKey() + "/" + indexEntry.getKey() + "/0.bin");
               currFile.getParentFile().mkdirs();
-              final DataOutputStream outStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(currFile), 65_000));
+              final OutContext context = new OutContext();
+              context.out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(currFile), 65_000));
+              context.currOffset = 0;
+              context.totalCount = index.rawSize();
+              context.fileOffset = 0;
               try {
                 final boolean isPrimaryKey = indexEntry.getValue().isPrimaryKey();
                 Map.Entry<Object[], Object> first = index.firstEntry();
@@ -318,9 +327,6 @@ public class DeltaManager {
                     public boolean visit(Object[] key, Object value) throws IOException {
                       int bucket = (int) (countSaved.incrementAndGet() % SNAPSHOT_PARTITION_COUNT);
                       long updateTime = server.getUpdateTime(value);
-                      if (countChecked.incrementAndGet() % 100000 == 0) {
-                        System.out.println(String.valueOf(updateTime) + "-" + beginTimeForLastSnapshot + "-" + (updateTime < beginTimeForLastSnapshot - 10));
-                      }
                       //todo: need to check if should delete
                       if (!isFull && updateTime < beginTimeForLastSnapshot - 10) {
                         return true;
@@ -351,13 +357,19 @@ public class DeltaManager {
                       if (records != null) {
                         countWritten.incrementAndGet();
 
-                        outStream.writeBoolean(true);
+                        if (context.totalCount > 100_000 && ++context.currOffset % (context.totalCount / 1024) == 0) {
+                          context.out.close();
+                          File currFile = new File(file, tableEntry.getKey() + "/" + indexEntry.getKey() + "/" + (++context.fileOffset) + ".bin");
+                          context.out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(currFile), 65_000));
+                        }
+
+                        context.out.writeBoolean(true);
                         byte[] keyBytes = DatabaseCommon.serializeKey(tableEntry.getValue(), indexEntry.getKey(), key);
-                        outStream.write(keyBytes);
+                        context.out.write(keyBytes);
 
-                        Varint.writeUnsignedVarLong(updateTime, outStream);
+                        Varint.writeUnsignedVarLong(updateTime, context.out);
 
-                        Varint.writeSignedVarLong(records.length, outStream);
+                        Varint.writeSignedVarLong(records.length, context.out);
                         for (byte[] record : records) {
 
                           if (deleteIfOlder != null) {
@@ -368,8 +380,8 @@ public class DeltaManager {
                             }
                           }
 
-                          Varint.writeSignedVarLong(record.length, outStream);
-                          outStream.write(record);
+                          Varint.writeSignedVarLong(record.length, context.out);
+                          context.out.write(record);
 
                           savedCount.incrementAndGet();
                           if (System.currentTimeMillis() - lastLogged.get() > 2000) {
@@ -396,9 +408,10 @@ public class DeltaManager {
                 logger.error("Error creating snapshot", e);
               }
               finally {
-                outStream.writeBoolean(false);
-                outStream.flush();
-                outStream.close();
+                context.out.writeBoolean(false);
+
+                context.out.flush();
+                context.out.close();
               }
               return null;
             }
@@ -454,6 +467,13 @@ public class DeltaManager {
 
     logger.info("Snapshot - end: snapshotId=" + (highestSnapshot + 1) + ", countChecked=" + countChecked.get() +
         ", countWritten=" + countWritten.get() + ", duration=" + (System.currentTimeMillis() - begin));
+  }
+
+  class OutContext {
+    private DataOutputStream out;
+    private int fileOffset;
+    private long totalCount;
+    private long currOffset;
   }
 
 
@@ -549,14 +569,41 @@ public class DeltaManager {
     return new File(snapshotRootDir, deltaName + "/deleted/" + tableName + "/" + indexName);
   }
 
+  public void deleteDeletedDirs() {
+    File snapshotRootDir = getSnapshotReplicaDir();
+    File[] dbs = snapshotRootDir.listFiles();
+    if (dbs != null) {
+      for (File dbDir : dbs) {
+        File[] deltas = dbDir.listFiles();
+        if (deltas != null) {
+          for (File file : deltas) {
+            File deletedFile = new File(file, "deleted");
+            if (deletedFile.exists()) {
+              try {
+                FileUtils.deleteDirectory(deletedFile);
+              }
+              catch (IOException e) {
+                throw new DatabaseException(e);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   public File getDeletedDeltaDir(String dbName, String deltaName) {
     File snapshotRootDir = new File(getSnapshotRootDir(dbName));
     return new File(snapshotRootDir, deltaName + "/deleted/");
   }
 
-  public File getSortedDeltaFile(String dbName, String deltaName, String tableName, String indexName) {
+  public File getSortedDeltaFile(String dbName, String deltaName, String tableName, String indexName, int fileOffset) {
     File snapshotRootDir = new File(getSnapshotRootDir(dbName));
-    return new File(snapshotRootDir, deltaName + "/sorted/" + tableName + "/" + indexName + "/0.bin");
+    File ret = new File(snapshotRootDir, deltaName + "/sorted/" + tableName + "/" + indexName + "/" + fileOffset + ".bin.lzo");
+    if (!ret.exists()) {
+      ret = new File(snapshotRootDir, deltaName + "/sorted/" + tableName + "/" + indexName + "/" + fileOffset + ".bin");
+    }
+    return ret;
   }
 
   public File getSortedDeltaDir(String dbName, String deltaName) {
@@ -581,24 +628,41 @@ public class DeltaManager {
     }
   }
 
-  public MergeEntry readEntry(DataInputStream inStream, TableSchema tableSchema) {
+  public MergeEntry readEntry(String dbName, int deltaNum, DeleteManager.DeltaContext deltaContext, TableSchema tableSchema,
+                              IndexSchema indexSchema, AtomicLong finishedBytes) {
     try {
-      MergeEntry entry = new MergeEntry();
-      boolean exists = inStream.readBoolean();
-      if (!exists) {
-        return null;
-      }
-      entry.key = DatabaseCommon.deserializeKey(tableSchema, inStream);
-      entry.updateTime = Varint.readUnsignedVarLong(inStream);
+      while (true) {
+        try {
+          MergeEntry entry = new MergeEntry();
+          boolean exists = deltaContext.getIn().readBoolean();
+          if (!exists) {
+            return null;
+          }
+          entry.key = DatabaseCommon.deserializeKey(tableSchema, deltaContext.getIn());
+          entry.updateTime = Varint.readUnsignedVarLong(deltaContext.getIn());
 
-      int count = (int) Varint.readSignedVarLong(inStream);
-      entry.records = new byte[count][];
-      for (int i = 0; i < entry.records.length; i++) {
-        int len = (int) Varint.readSignedVarLong(inStream);
-        entry.records[i] = new byte[len];
-        inStream.readFully(entry.records[i]);
+          int count = (int) Varint.readSignedVarLong(deltaContext.getIn());
+          entry.records = new byte[count][];
+          for (int i = 0; i < entry.records.length; i++) {
+            int len = (int) Varint.readSignedVarLong(deltaContext.getIn());
+            entry.records[i] = new byte[len];
+            deltaContext.getIn().readFully(entry.records[i]);
+          }
+          return entry;
+        }
+        catch (EOFException e) {
+          File deltaFile = server.getDeltaManager().getSortedDeltaFile(dbName,
+              deltaNum == -1 ? "full" : String.valueOf(deltaNum), tableSchema.getName(), indexSchema.getName(), ++deltaContext.fileOffset);
+          if (!deltaFile.exists()) {
+            return null;
+          }
+          if (deltaContext.in != null) {
+            deltaContext.in.close();
+          }
+          InputStream tmpIn = new DeltaManager.ByteCounterStream(finishedBytes, new FileInputStream(deltaFile));
+          deltaContext.in = new DataInputStream(new BufferedInputStream(tmpIn));
+        }
       }
-      return entry;
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -984,11 +1048,16 @@ public class DeltaManager {
     if (files != null) {
       for (File file : files) {
         if (file.isDirectory()) {
-          if (file.getName().contains("tmp")) {
-            FileUtils.deleteDirectory(file);
-          }
-          else {
-            doDeleteTempDirs(file);
+          File[] deltaFiles = file.listFiles();
+          if (deltaFiles != null) {
+            for (File deltaDir : deltaFiles) {
+              if (file.getName().contains("tmp")) {
+                FileUtils.deleteDirectory(file);
+              }
+              else {
+                doDeleteTempDirs(file);
+              }
+            }
           }
         }
       }

@@ -183,6 +183,8 @@ public class BulkImportManager {
 
   private AtomicInteger countBulkImportRunning = new AtomicInteger();
 
+  private static ConcurrentHashMap<Long, Long> returned = new ConcurrentHashMap<>();
+
   public ComObject startBulkImportOnServer(final ComObject cobj) {
     final String dbName = cobj.getString(ComObject.Tag.dbName);
     final String tableName = cobj.getString(ComObject.Tag.tableName);
@@ -301,10 +303,10 @@ public class BulkImportManager {
                         Object[] lowerKey = cobj.getByteArray(ComObject.Tag.lowerKey) == null ? null : DatabaseCommon.deserializeKey(tableSchema, cobj.getByteArray(ComObject.Tag.lowerKey));
                         if (lowerKey != null) {
                           statementStr = "select " + fieldsStr.toString() + " from " + tableName + " where (" + keyFields[0] +
-                              ">=" + lowerKey[0] + " and " + keyFields[0] + "<" + currKey[0] + ")";
+                              " >= " + lowerKey[0] + " and " + keyFields[0] + " < " + currKey[0] + ")";
                         }
                         else {
-                          statementStr = "select " + fieldsStr.toString() + " from " + tableName + " where (" + keyFields[0] + "<" + currKey[0] + ")";
+                          statementStr = "select " + fieldsStr.toString() + " from " + tableName + " where (" + keyFields[0] + " < " + currKey[0] + ")";
                         }
                         //todo: expand key
                       }
@@ -314,18 +316,18 @@ public class BulkImportManager {
                       Object[] upperKey = cobj.getByteArray(ComObject.Tag.nextKey) == null ? null : DatabaseCommon.deserializeKey(tableSchema, cobj.getByteArray(ComObject.Tag.nextKey));
                       if (upperKey != null) {
                         statementStr = "select " + fieldsStr.toString() + " from " + tableName + " where (" + keyFields[0] +
-                            ">=" + currKey[0] + " and " + keyFields[0] + "<" + upperKey[0] + ")";
+                            " >= " + currKey[0] + " and " + keyFields[0] + " < " + upperKey[0] + ")";
                       }
                       else {
                         statementStr = "select " + fieldsStr.toString() + " from " + tableName + " where (" +
-                            keyFields[0] + ">= " + currKey[0] + ")";
+                            keyFields[0] + " >= " + currKey[0] + ")";
                       }
                     }
                     else {
                       Object[] lowerKey = DatabaseCommon.deserializeKey(tableSchema, (byte[]) keys.getArray().get(currSlice));
                       Object[] upperKey = DatabaseCommon.deserializeKey(tableSchema, (byte[]) keys.getArray().get(currSlice + 1));
                       statementStr = "select " + fieldsStr.toString() + " from " + tableName + " where (" + keyFields[0] +
-                          ">=" + lowerKey[0] + " and " + keyFields[0] + "<" + upperKey[0] + ")";
+                          " >= " + lowerKey[0] + " and " + keyFields[0] + " < " + upperKey[0] + ")";
                     }
 
                     String whereClause = cobj.getString(ComObject.Tag.whereClause);
@@ -360,6 +362,9 @@ public class BulkImportManager {
 
                         final Object[] currRecord = getCurrRecordFromResultSet(rs, fields);
 
+                        if (returned.put((Long)currRecord[0], 0L) != null) {
+                          System.out.println("dup: " + currRecord[0]);
+                        }
                         currBatch.add(currRecord);
                         countRead.incrementAndGet();
 
@@ -727,10 +732,12 @@ public class BulkImportManager {
 
               if (indexSchema == null) {
                 preProcessFinished.put(dbName + ":" + tableName, true);
+                logger.info("doImportForNoPrimaryKey - begin");
                 doImportForNoPrimaryKey(conn, count, serverCount, totalThreadCount, tableSchema,
                     indexSchema, tableName, dbName, cobj);
               }
               else {
+                logger.info("doCoordinateBulkLoad - begin");
                 doCoordinateBulkLoad(conn, count, serverCount, totalThreadCount, countProcessed, tableSchema,
                     indexSchema, tableName, dbName, cobj);
                 preProcessFinished.put(dbName + ":" + tableName, true);
@@ -956,6 +963,7 @@ public class BulkImportManager {
           for (int i = 0; i < keyFields.length; i++) {
             keys[slice][i] = getValueOfField(rs, keyFields[i], dataTypes[i]);
           }
+          System.out.println("Key=" + DatabaseCommon.keyToString(keys[slice]));
           lastPartialKey[0] = keys[slice][0];
           slice++;
         }
@@ -986,9 +994,13 @@ public class BulkImportManager {
     int keyOffset = 0;
     outer:
     for (int i = 0; i < serverCount; i++) {
+      cobj.remove(ComObject.Tag.lowerKey);
+      cobj.remove(ComObject.Tag.nextKey);
+
       ComArray keyArray = cobj.putArray(ComObject.Tag.keys, ComObject.Type.byteArrayType);
       if (keyOffset != 0) {
-        cobj.put(ComObject.Tag.lowerKey, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys[keyOffset - 1]));
+        cobj.put(ComObject.Tag.lowerKey, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys[keyOffset]));
+        //keyOffset++;
       }
       for (int j = 0; j < BULK_IMPORT_THREAD_COUNT_PER_SERVER; j++) {
         if (keys[keyOffset] == null) {
@@ -1356,10 +1368,10 @@ public class BulkImportManager {
                              List<FieldSchema> fields, StringBuilder fieldsStr, StringBuilder parmsStr) {
     PreparedStatement insertStmt = null;
     try {
-      insertStmt = insertConn.prepareStatement("insert into " + tableName +
-          " (" + fieldsStr.toString() + ") VALUES (" + parmsStr.toString() + ")");
+      //for (int i = 0; i < 10; i++) {
+        insertStmt = insertConn.prepareStatement("insert into " + tableName +
+            " (" + fieldsStr.toString() + ") VALUES (" + parmsStr.toString() + ")");
 
-      for (int i = 0; i < 10; i++) {
         try {
           for (Object[] currRecord : currBatch) {
             setFieldsInInsertStatement(insertStmt, currRecord, fields);
@@ -1370,16 +1382,16 @@ public class BulkImportManager {
 
           countProcessed.addAndGet(currBatch.size());
 
-          break;
+          //break;
         }
         catch (Exception e) {
-          if (i >= 9) {
+       //   if (i >= 9) {
             logger.error("Error inserting records - aborting", e);
             throw e;
-          }
-          logger.error("Error inserting records - will retry", e);
+         // }
+          //logger.error("Error inserting records - will retry", e);
         }
-      }
+      //}
     }
     catch (Exception e) {
       logger.error("Error inserting records", e);

@@ -2,12 +2,17 @@ package com.sonicbase.server;
 
 import com.amazonaws.transform.MapEntry;
 import com.codahale.metrics.MetricRegistry;
-import com.sonicbase.common.*;
+import com.sonicbase.client.DatabaseClient;
+
 import com.sonicbase.index.Index;
+
+import com.sonicbase.common.*;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.Expression;
+import com.sonicbase.query.impl.*;
+
 import com.sonicbase.query.impl.*;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
@@ -78,8 +83,6 @@ public class ReadManager {
     diskReaper.start();
   }
 
-
-  public static final int SELECT_PAGE_SIZE = 1000;
 
   public ComObject countRecords(ComObject cobj) {
     if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
@@ -214,7 +217,7 @@ public class ReadManager {
       Boolean ascending = null;
 
       ComObject retObj = new ComObject();
-      retObj.put(ComObject.Tag.serializationVersion, DatabaseServer.SERIALIZATION_VERSION);
+      retObj.put(ComObject.Tag.serializationVersion, DatabaseClient.SERIALIZATION_VERSION);
 
       int leftOperatorId = cobj.getInt(ComObject.Tag.leftOperator);
       BinaryExpression.Operator leftOperator = BinaryExpression.Operator.getOperator(leftOperatorId);
@@ -2006,7 +2009,7 @@ public class ReadManager {
               }
             }
           }
-          Object[] keyToUse = key;
+          Object[] keyToUse = key;//currEntry.getKey();
           if (keyToUse == null) {
             keyToUse = originalKey;
           }
@@ -2231,6 +2234,9 @@ public class ReadManager {
                 retKeys.add(key);
               }
               retKeyRecords.add(currKeyRecord);
+            }
+            else {
+              currOffset.decrementAndGet();
             }
           }
           if (done.get()) {

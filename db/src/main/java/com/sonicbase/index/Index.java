@@ -18,7 +18,6 @@ import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 
 public class Index {
   private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
@@ -271,6 +270,34 @@ public class Index {
       objectSkipIndex.clear();
     }
     size.set(0);
+  }
+
+  public long rawSize() {
+    if (longIndex != null) {
+      synchronized (this) {
+        return longIndex.size();
+      }
+    }
+    else if (stringIndex != null) {
+      synchronized (this) {
+        return stringIndex.size();
+      }
+    }
+    else if (objectIndex != null) {
+      synchronized (this) {
+        return objectIndex.size();
+      }
+    }
+    if (longSkipIndex != null) {
+      return longSkipIndex.size();
+    }
+    if (stringSkipIndex != null) {
+      return stringSkipIndex.size();
+    }
+    if (objectSkipIndex != null) {
+      return objectSkipIndex.size();
+    }
+    return 0;
   }
 
   public boolean iterate(Index.Visitor visitor) throws IOException {

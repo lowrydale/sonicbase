@@ -1,5 +1,6 @@
 package com.sonicbase.server;
 
+import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
 import com.sonicbase.query.DatabaseException;
@@ -52,6 +53,8 @@ public class DeleteManager {
         try {
           int pos = file.getName().indexOf(".");
           String dateStr = file.getName().substring(0, pos);
+          int pos2 = file.getName().lastIndexOf('-'); //get rid of random int on end
+          dateStr = file.getName().substring(0, pos2);
           Date date = DateUtils.fromString(dateStr);
           if (date.getTime() < lastSnapshot) {
             file.delete();
@@ -104,10 +107,15 @@ public class DeleteManager {
     public ArrayBlockingQueue<MergeEntry> entries = new ArrayBlockingQueue<MergeEntry>(200_000);
   }
 
-  private class DeltaContext {
-    private DataInputStream in;
+  public class DeltaContext {
+    public DataInputStream in;
     private ArrayBlockingQueue<DeltaManager.MergeEntry> entries = new ArrayBlockingQueue<>(200_000);;
     public boolean finished;
+    public int fileOffset;
+
+    public DataInputStream getIn() {
+      return in;
+    }
   }
 
   private class DeleteContext {
@@ -127,7 +135,7 @@ public class DeleteManager {
           File deleteFile = new File(file, table.getKey() + "/" + index.getKey() + "/merged");
 
           File deltaFile = databaseServer.getDeltaManager().getSortedDeltaFile(dbName,
-              deltaNum == -1 ? "full" : String.valueOf(deltaNum), table.getKey(), index.getKey());
+              deltaNum == -1 ? "full" : String.valueOf(deltaNum), table.getKey(), index.getKey(), 0);
           if (!deltaFile.exists()) {
             break;
           }
@@ -140,7 +148,8 @@ public class DeleteManager {
 
           AtomicReference<DataOutputStream> deletedStream = new AtomicReference<>(
               new DataOutputStream(new BufferedOutputStream(new FileOutputStream(deletedFile.get()))));
-          DataInputStream deltaIn = new DataInputStream(new BufferedInputStream(new DeltaManager.ByteCounterStream(finishedBytes, new FileInputStream(deltaFile))));
+          InputStream tmpIn = new DeltaManager.ByteCounterStream(finishedBytes, new FileInputStream(deltaFile));
+          DataInputStream deltaIn = new DataInputStream(new BufferedInputStream(tmpIn));
           final DeltaManager deltaManager = databaseServer.getDeltaManager();
           long deltaFileSize = deltaFile.length();
           long sizePerPartition = deltaFileSize / DeltaManager.SNAPSHOT_PARTITION_COUNT;
@@ -154,6 +163,7 @@ public class DeleteManager {
           deleteContext.in = deleteIn;
           final DeltaContext deltaContext = new DeltaContext();
           deltaContext.in = deltaIn;
+          deltaContext.fileOffset = 0;
 
 //          Thread deleteThread = new Thread(new Runnable(){
 //            @Override
@@ -233,7 +243,7 @@ public class DeleteManager {
                   break;
                 }
                 if (deltaEntry == null) {
-                  deltaEntry = deltaManager.readEntry(deltaContext.in, table.getValue());//readRow(deltaContext);
+                  deltaEntry = deltaManager.readEntry(dbName, deltaNum, deltaContext, table.getValue(), index.getValue(), finishedBytes);//readRow(deltaContext);
                 }
                 if (deltaEntry == null) {
                   break;
@@ -247,14 +257,14 @@ public class DeleteManager {
               if (deleteEntry == null) {
                 while (true) {
                   if (deltaEntry == null) {
-                    deltaEntry = deltaManager.readEntry(deltaContext.in, table.getValue());//readRow(deltaContext);
+                    deltaEntry = deltaManager.readEntry(dbName, deltaNum, deltaContext, table.getValue(), index.getValue(), finishedBytes);//readRow(deltaContext);
                   }
                   if (deltaEntry == null) {
                     break;
                   }
                   deltaManager.writeEntry(deletedStream.get(), table.getValue(), index.getKey(), deltaEntry);
                   cycleDeletedFile(deletedStream, deletedFile, currPartition, sizePerPartition, table.getKey(), index.getKey());
-                  deltaEntry = deltaManager.readEntry(deltaContext.in, table.getValue());//readRow(deltaContext);
+                  deltaEntry = deltaManager.readEntry(dbName, deltaNum, deltaContext, table.getValue(), index.getValue(), finishedBytes);//readRow(deltaContext);
                   if (deltaEntry == null) {
                     break;
                   }
@@ -316,7 +326,7 @@ public class DeleteManager {
                   cycleDeletedFile(deletedStream, deletedFile, currPartition, sizePerPartition, table.getKey(), index.getKey());
                 }
 
-                deltaEntry = deltaManager.readEntry(deltaContext.in, table.getValue());//readRow(deltaContext);
+                deltaEntry = deltaManager.readEntry(dbName, deltaNum, deltaContext, table.getValue(), index.getValue(), finishedBytes);//readRow(deltaContext);
                 if (deltaEntry == null) {
                   break;
                 }
@@ -389,6 +399,15 @@ public class DeleteManager {
     }
   }
 
+  public void delteTempDirs() {
+    File file = new File(getDeltaRoot(), "tmp");
+    try {
+      FileUtils.deleteDirectory(file);
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+  }
 
   public void buildDeletionsFiles(String dbName, AtomicReference<String> currStage, AtomicLong totalBytes, AtomicLong finishedBytes) {
     int cores = Runtime.getRuntime().availableProcessors();
@@ -898,7 +917,7 @@ public class DeleteManager {
       file.getParentFile().mkdirs();
       TableSchema tableSchema = databaseServer.getCommon().getTables(dbName).get(tableName);
       try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file)))) {
-        Varint.writeSignedVarLong(DatabaseServer.SERIALIZATION_VERSION, out);
+        Varint.writeSignedVarLong(DatabaseClient.SERIALIZATION_VERSION, out);
         out.writeUTF(dbName);
         out.writeUTF(tableName);
         out.writeUTF(indexName);
@@ -928,7 +947,7 @@ public class DeleteManager {
       file.getParentFile().mkdirs();
       TableSchema tableSchema = databaseServer.getCommon().getTables(dbName).get(tableName);
       try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file)))) {
-        Varint.writeSignedVarLong(DatabaseServer.SERIALIZATION_VERSION, out);
+        Varint.writeSignedVarLong(DatabaseClient.SERIALIZATION_VERSION, out);
         out.writeUTF(dbName);
         out.writeUTF(tableName);
         out.writeUTF(indexName);

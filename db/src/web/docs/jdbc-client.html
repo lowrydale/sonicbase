@@ -87,7 +87,7 @@ The jvm running the jdbc driver needs to be at least version 7.
 
 <h1>Connecting</h1>
 Include the following line before creating a connection:<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;Class.forName("com.sonicbase.jdbcdriver.Driver");
+&nbsp;&nbsp;&nbsp;&nbsp;Class.forName("Driver");
 <br/>
 <br/>
 Connect to the database with the following code:<br/>
@@ -103,7 +103,7 @@ Connect to the database with the following code:<br/>
         <br/>
         <pre class="java"><code>
     ComboPooledDataSource cpds = new ComboPooledDataSource();
-    cpds.setDriverClass("com.sonicbase.jdbcdriver.Driver");
+    cpds.setDriverClass("Driver");
     cpds.setJdbcUrl("jdbc:sonicbase:localhost:9010/db");
 <br/>
     cpds.setMinPoolSize(5);

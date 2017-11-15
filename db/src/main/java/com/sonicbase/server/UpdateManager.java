@@ -3,9 +3,11 @@ package com.sonicbase.server;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
-import com.sonicbase.common.*;
+
 import com.sonicbase.index.Index;
 import com.sonicbase.index.Repartitioner;
+
+import com.sonicbase.common.*;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.queue.MessageQueueProducer;
 import com.sonicbase.schema.FieldSchema;
@@ -440,6 +442,12 @@ public class UpdateManager {
   }
 
   public ComObject insertIndexEntryByKey(ComObject cobj, boolean replayedCommand) {
+
+    int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
+    if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
+      throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
+    }
+
     AtomicBoolean isExplicitTrans = new AtomicBoolean();
     AtomicLong transactionId = new AtomicLong();
     try {
@@ -766,11 +774,17 @@ private static class InsertRequest {
 
   public ComObject insertIndexEntryByKeyWithRecord(ComObject cobj, boolean replayedCommand) {
     try {
+      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
+      if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
+        throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
+      }
+
       long sequence0 = cobj.getLong(ComObject.Tag.sequence0);
       long sequence1 = cobj.getLong(ComObject.Tag.sequence1);
       short sequence2 = 0;
       final boolean isExplicitTrans = cobj.getBoolean(ComObject.Tag.isExcpliciteTrans);
       final long transactionId = cobj.getLong(ComObject.Tag.transactionId);
+
       ComObject ret = doInsertIndexEntryByKeyWithRecord(cobj, cobj, sequence0, sequence1, sequence2, replayedCommand,
           transactionId, isExplicitTrans, false);
       if (isExplicitTrans) {
@@ -880,26 +894,26 @@ private static class InsertRequest {
         server.getTransactionManager().deleteLock(dbName, tableName, indexName, transactionId, tableSchema, primaryKey);
       }
 
-      if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
-
-        if (selectedShards != null) {
-//          if (!alreadyExisted) {
-//            synchronized (index) {
-//              Long existingValue = index.remove(primaryKey);
-//              if (existingValue != null) {
-//                server.freeUnsafeIds(existingValue);
-//              }
+//      if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
+//
+//        if (selectedShards != null) {
+////          if (!alreadyExisted) {
+////            synchronized (index) {
+////              Long existingValue = index.remove(primaryKey);
+////              if (existingValue != null) {
+////                server.freeUnsafeIds(existingValue);
+////              }
+////            }
+////          }
+//
+//          if (indexSchema.getCurrPartitions()[selectedShards.get(0)].getShardOwning() != server.getShard()) {
+//            if (server.getRepartitioner().undeleteIndexEntry(dbName, tableName, indexName, primaryKey, recordBytes)) {
+//              doInsertKey(dbName, recordBytes, primaryKey, index, tableSchema.getName(), indexName, replayedCommand);
 //            }
 //          }
-
-          if (indexSchema.getCurrPartitions()[selectedShards.get(0)].getShardOwning() != server.getShard()) {
-            if (server.getRepartitioner().undeleteIndexEntry(dbName, tableName, indexName, primaryKey, recordBytes)) {
-              doInsertKey(dbName, recordBytes, primaryKey, index, tableSchema.getName(), indexName, replayedCommand);
-            }
-          }
-        }
-        throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
-      }
+//        }
+//        throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
+//      }
 
       ComObject retObj = new ComObject();
       retObj.put(ComObject.Tag.count, 1);
@@ -1072,7 +1086,7 @@ private static class InsertRequest {
       record.setSequence1(sequence1);
       record.setSequence2((short) 0);
 
-      bytes = record.serialize(server.getCommon(), DatabaseServer.SERIALIZATION_VERSION);
+      bytes = record.serialize(server.getCommon(), DatabaseClient.SERIALIZATION_VERSION);
 
       if (shouldExecute.get()) {
         //because this is the primary key index we won't have more than one index entry for the key
@@ -1274,6 +1288,8 @@ private static class InsertRequest {
    * Caller must synchronized index
    */
 
+  private ConcurrentHashMap<String, String> inserted = new ConcurrentHashMap<>();
+
   private void doActualInsertKeyWithRecord(
       String dbName,
       byte[] recordBytes, Object[] key, Index index, String tableName, String indexName, boolean ignoreDuplicates) {
@@ -1398,7 +1414,7 @@ class MessageRequest {
             toProcess.add(initialRequest);
             publishQueue.drainTo(toProcess);
 
-            DatabaseServer.Shard[] shards = server.getCommon().getServersConfig().getShards();
+            ServersConfig.Shard[] shards = server.getCommon().getServersConfig().getShards();
             if (server.getReplica() != shards[server.getShard()].getMasterReplica()) {
               toProcess.clear();
               continue;
@@ -1467,7 +1483,7 @@ class MessageRequest {
   private void publishBatch() {
     if (!producers.isEmpty() && threadLocalMessageRequests.get() != null && threadLocalMessageRequests.get().size() != 0) {
       try {
-        DatabaseServer.Shard[] shards = server.getCommon().getServersConfig().getShards();
+        ServersConfig.Shard[] shards = server.getCommon().getServersConfig().getShards();
         if (server.getReplica() != shards[server.getShard()].getMasterReplica()) {
           return;
         }
@@ -1494,7 +1510,10 @@ class MessageRequest {
   }
 
   private void doPublishBatch(List<MessageRequest> toPublish) {
-    MessageRequest request = threadLocalMessageRequests.get().get(0);
+    if (toPublish.size() == 0) {
+      return;
+    }
+    MessageRequest request = toPublish.get(0);
     StringBuilder builder = new StringBuilder();
     builder.append("{");
     builder.append("\"database\": \"" + request.dbName + "\",");
@@ -1524,7 +1543,7 @@ class MessageRequest {
   private void publishInsertOrUpdate(String dbName, String tableName, byte[] recordBytes, UpdateType updateType) {
     if (!producers.isEmpty()) {
       try {
-        DatabaseServer.Shard[] shards = server.getCommon().getServersConfig().getShards();
+        ServersConfig.Shard[] shards = server.getCommon().getServersConfig().getShards();
         if (server.getReplica() != shards[server.getShard()].getMasterReplica()) {
           return;
         }

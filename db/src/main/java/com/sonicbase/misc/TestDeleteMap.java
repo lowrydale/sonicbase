@@ -1,18 +1,9 @@
 package com.sonicbase.misc;
 
-import com.sonicbase.common.DatabaseCommon;
-import com.sonicbase.index.Index;
-import com.sonicbase.query.DatabaseException;
-import com.sonicbase.schema.IndexSchema;
-import com.sonicbase.schema.TableSchema;
-import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import org.apache.giraph.utils.Varint;
 
 import java.io.*;
-import java.util.Comparator;
 import java.util.HashMap;
-import java.util.concurrent.ConcurrentSkipListMap;
 
 public class TestDeleteMap {
 

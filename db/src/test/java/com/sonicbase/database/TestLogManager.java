@@ -43,7 +43,7 @@ public class TestLogManager {
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
-    DatabaseServer.getServers().clear();
+    DatabaseClient.getServers().clear();
 
      final DatabaseServer[] dbServers = new DatabaseServer[4];
      ThreadPoolExecutor executor = new ThreadPoolExecutor(128, 128, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());

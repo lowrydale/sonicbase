@@ -1,5 +1,6 @@
 package com.sonicbase.server;
 
+import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.AWSClient;
 import com.sonicbase.common.Logger;
 import com.sonicbase.query.DatabaseException;
@@ -227,7 +228,7 @@ public class LongRunningCalls {
     }
 
     public void serialize(DataOutputStream out) throws IOException {
-      Varint.writeSignedVarLong(DatabaseServer.SERIALIZATION_VERSION, out);
+      Varint.writeSignedVarLong(DatabaseClient.SERIALIZATION_VERSION, out);
       Varint.writeSignedVarLong(body.length, out);
       out.write(body);
     }
@@ -275,7 +276,7 @@ public class LongRunningCalls {
 
   public void serialize(DataOutputStream out) throws IOException {
     synchronized (commands) {
-      Varint.writeSignedVarLong(DatabaseServer.SERIALIZATION_VERSION, out);
+      Varint.writeSignedVarLong(DatabaseClient.SERIALIZATION_VERSION, out);
       Varint.writeSignedVarLong(commands.size(), out);
       for (SingleCommand command : commands) {
         command.serialize(out);

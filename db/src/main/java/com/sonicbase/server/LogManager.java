@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 /**
  * Responsible for
@@ -160,7 +161,7 @@ public class LogManager {
   }
 
   public void replayLogs() {
-    applyQueues();
+    applyLogs();
   }
 
   public long getCountLogged() {
@@ -401,7 +402,7 @@ public class LogManager {
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
 
-      Varint.writeSignedVarLong(DatabaseServer.SERIALIZATION_VERSION, out);
+      Varint.writeSignedVarLong(DatabaseClient.SERIALIZATION_VERSION, out);
       Varint.writeSignedVarLong(sequence0, out);
       Varint.writeSignedVarLong(sequence1, out);
       out.writeInt(request.length);
@@ -509,7 +510,7 @@ public class LogManager {
 
     public void logRequests(List<DatabaseServer.LogRequest> requests) throws IOException, ParseException {
       synchronized (this) {
-        if (shouldSlice || writer == null || System.currentTimeMillis() - 2 * 60 * 100 > currQueueTime) {
+        if (shouldSlice || writer == null || System.currentTimeMillis() - 12 * 100 > currQueueTime) {
           closeAndCreateLog();
         }
 
@@ -576,7 +577,7 @@ public class LogManager {
     unbindQueues.set(true);
   }
 
-  public void applyQueues() {
+  public void applyLogs() {
 
     unbindQueues();
     try {
@@ -895,7 +896,7 @@ public class LogManager {
       }
       else {
         final AtomicInteger countProcessed = new AtomicInteger();
-        logger.info("applyQueues - begin: fileCount=" + files.length);
+        logger.info("applyLogs - begin: fileCount=" + files.length);
         List<LogSource> sources = new ArrayList<>();
         Set<String> sliceFiles = new HashSet<>();
         if (slicePoint != null) {
@@ -994,7 +995,7 @@ public class LogManager {
                       countProcessed.incrementAndGet();
                       if (System.currentTimeMillis() - lastLogged.get() > 2000) {
                         lastLogged.set(System.currentTimeMillis());
-                        logger.info("applyQueues - progress: count=" + countProcessed.get() +
+                        logger.info("applyLogs - progress: count=" + countProcessed.get() +
                             ", countBatched=" + countBatched.get() +
                             ", avgBatchSize=" + (countProcessed.get() / batchCount.get()) +
                             ", rate=" + (double) countProcessed.get() / (double) (System.currentTimeMillis() - begin) * 1000d);
@@ -1026,7 +1027,7 @@ public class LogManager {
                   countProcessed.incrementAndGet();
                   if (System.currentTimeMillis() - lastLogged.get() > 2000) {
                     lastLogged.set(System.currentTimeMillis());
-                    logger.info("applyQueues - progress: count=" + countProcessed.get() +
+                    logger.info("applyLogs - progress: count=" + countProcessed.get() +
                         ", countBatched=" + countBatched.get() +
                         ", avgBatchSize=" + (countProcessed.get() / batchCount.get()) +
                         ", rate=" + (double) countProcessed.get() / (double) (System.currentTimeMillis() - begin) * 1000d);
@@ -1062,7 +1063,7 @@ public class LogManager {
           }
         }
         finally {
-          logger.info("applyQueues - finished: count=" + countProcessed.get() +
+          logger.info("applyLogs - finished: count=" + countProcessed.get() +
               ", rate=" + (double) countProcessed.get() / (double) (System.currentTimeMillis() - begin) * 1000d);
 
           allCurrentSources.clear();
@@ -1099,7 +1100,7 @@ public class LogManager {
           sequence1 = getNextSequencenNum();
         }
 
-        Varint.writeSignedVarLong(DatabaseServer.SERIALIZATION_VERSION, out);
+        Varint.writeSignedVarLong(DatabaseClient.SERIALIZATION_VERSION, out);
         Varint.writeSignedVarLong(sequence0, out);
         Varint.writeSignedVarLong(sequence1, out);
         out.writeInt(body.length);

@@ -1,8 +1,10 @@
 package com.sonicbase.server;
 
 import com.sonicbase.client.DatabaseClient;
-import com.sonicbase.common.*;
+
 import com.sonicbase.index.Indices;
+
+import com.sonicbase.common.*;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.CreateTableStatementImpl;
 import com.sonicbase.schema.DataType;
@@ -334,7 +336,7 @@ public class SchemaManager {
 
           ComObject slaveObj = new ComObject();
 
-          slaveObj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(DatabaseServer.SERIALIZATION_VERSION));
+          slaveObj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(DatabaseClient.SERIALIZATION_VERSION));
           slaveObj.put(ComObject.Tag.tableName, tableName);
           slaveObj.put(ComObject.Tag.dbName, dbName);
           slaveObj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
@@ -499,7 +501,7 @@ public class SchemaManager {
         cobj.put(ComObject.Tag.dbName, dbName);
         cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
         cobj.put(ComObject.Tag.method, "createIndexSlave");
-        cobj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(DatabaseServer.SERIALIZATION_VERSION));
+        cobj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(DatabaseClient.SERIALIZATION_VERSION));
         cobj.put(ComObject.Tag.tableName, table.get());
         ComArray array = cobj.putArray(ComObject.Tag.indices, ComObject.Type.stringType);
         for (String currIndexName : createdIndices) {
@@ -643,7 +645,7 @@ public class SchemaManager {
         cobj.put(ComObject.Tag.dbName, dbName);
         cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
         cobj.put(ComObject.Tag.method, "dropIndexSlave");
-        cobj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(DatabaseServer.SERIALIZATION_VERSION));
+        cobj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(DatabaseClient.SERIALIZATION_VERSION));
         cobj.put(ComObject.Tag.tableName, table);
         cobj.put(ComObject.Tag.masterSlave, "slave");
         ComArray array = cobj.putArray(ComObject.Tag.indices, ComObject.Type.stringType);

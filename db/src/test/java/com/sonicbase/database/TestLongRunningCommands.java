@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.server.MethodInvoker;
 import com.sonicbase.server.DatabaseServer;
@@ -36,7 +37,7 @@ public class TestLongRunningCommands {
     array.add(DatabaseServer.FOUR_SERVER_LICENSE);
     config.put("licenseKeys", array);
 
-    DatabaseServer.getServers().clear();
+    DatabaseClient.getServers().clear();
 
     DatabaseServer server = new DatabaseServer();
     server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true), null, true);

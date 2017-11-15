@@ -17,7 +17,7 @@
                   </class>
               </keep>
           </shrink>
-          <rename mainclass="com.sonicbase.research.socket.NettyServer" logfile="obfuscate.log" annotationClass="com.sonicbase.common.ExcludeRename">
+          <rename mainclass="com.sonicbase.research.socket.NettyServer" logfile="obfuscate.log" annotationClass="ExcludeRename">
           <keep>
               <linenumbertable>
                   <patternset id="CompanyPatternSet">
@@ -33,27 +33,27 @@
               <class classes="public"
                      methods="public" fields="public">
                   <patternset>
-                      <include name="com.sonicbase.jdbcdriver.Driver"/>
-                      <include name="com.sonicbase.client.ReconfigureResults"/>
-                      <include name="com.sonicbase.jdbcdriver.ConnectionProxy"/>
-                      <include name="com.sonicbase.jdbcdriver.ConnectionProxy$Replica"/>
-                      <include name="com.sonicbase.jdbcdriver.ResultSetProxy"/>
-                      <include name="com.sonicbase.common.MemUtil"/>
-                      <include name="com.sonicbase.common.ComObject"/>
-                      <include name="com.sonicbase.common.ComObject$$Tag"/>
-                      <include name="com.sonicbase.common.ComArray"/>
-                      <include name="com.sonicbase.schema.DataType"/>
-                      <include name="com.sonicbase.schema.FieldSchema"/>
-                      <include name="com.sonicbase.schema.TableSchema"/>
-                      <include name="com.sonicbase.schema.DataType$$Type"/>
-                      <include name="com.sonicbase.query.DatabaseException"/>
-                      <include name="com.sonicbase.common.LicenseOutOfComplianceException"/>
+                      <include name="Driver"/>
+                      <include name="ReconfigureResults"/>
+                      <include name="ConnectionProxy"/>
+                      <include name="ConnectionProxy$Replica"/>
+                      <include name="ResultSetProxy"/>
+                      <include name="MemUtil"/>
+                      <include name="ComObject"/>
+                      <include name="ComObject$$Tag"/>
+                      <include name="ComArray"/>
+                      <include name="DataType"/>
+                      <include name="FieldSchema"/>
+                      <include name="TableSchema"/>
+                      <include name="DataType$$Type"/>
+                      <include name="DatabaseException"/>
+                      <include name="LicenseOutOfComplianceException"/>
                       <include name="com.sonicbase.server.MethodInvoker"/>
                       <include name="com.sonicbase.common.WindowsTerminal"/>
-                      <include name="com.sonicbase.query.impl.ResultSetImpl"/>
-                      <include name="com.sonicbase.util.DateUtils"/>
+                      <include name="ResultSetImpl"/>
+                      <include name="DateUtils"/>
                       <include name="com.sonicbase.util.StreamUtils"/>
-                      <include name="com.sonicbase.common.SchemaOutOfSyncException"/>
+                      <include name="SchemaOutOfSyncException"/>
                   </patternset>
               </class>
 

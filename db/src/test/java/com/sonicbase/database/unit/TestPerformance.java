@@ -21,6 +21,7 @@ import java.sql.*;
 import java.util.concurrent.CountDownLatch;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 public class TestPerformance {
@@ -150,25 +151,110 @@ public class TestPerformance {
       stmt = conn.prepareStatement("create index id2 on persons(id2)");
       stmt.executeUpdate();
 
+      stmt = conn.prepareStatement("create table Employee (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20))");
+      stmt.executeUpdate();
+
+      stmt = conn.prepareStatement("create index socialsecuritynumber on employee(socialsecurityNumber)");
+      stmt.executeUpdate();
+
+      stmt = conn.prepareStatement("create table Residence (id BIGINT, id2 BIGINT, id3 BIGINT, address VARCHAR(20), PRIMARY KEY (id, id2, id3))");
+      stmt.executeUpdate();
+
+
       //rebalance
       for (DatabaseServer server : dbServers) {
         server.shutdownRepartitioner();
       }
 
-      for (int i = 0; i < 10_000; i++) {
+      int offset = 0;
+      for (int i = 0; i < 1_000; i++) {
         stmt = conn.prepareStatement("insert into persons (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
-        stmt.setLong(1, i);
-        stmt.setLong(2, i + 1000);
-        stmt.setString(3, "933-28-" + i);
-        stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
-        stmt.setBoolean(5, false);
-        stmt.setString(6, "m");
-        assertEquals(stmt.executeUpdate(), 1);
-        if (i % 1000 == 0) {
-          System.out.println("progress: count=" + i);
+        for (int j = 0; j < 100; j++) {
+          stmt.setLong(1, offset);
+          stmt.setLong(2, offset + 1000);
+          String leading = "";
+          if (offset < 10) {
+            leading = "00000";
+          }
+          else if (offset < 100) {
+            leading = "0000";
+          }
+          else if (offset < 1000) {
+            leading = "000";
+          }
+          else if (offset < 10000) {
+            leading = "00";
+          }
+          else if (offset < 100_000) {
+            leading = "0";
+          }
+          else if (offset < 1_000_000) {
+            leading = "";
+          }
+          if (offset == 99_999) {
+            System.out.println("here");
+          }
+          stmt.setString(3, leading + offset);
+          stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+          stmt.setBoolean(5, false);
+          stmt.setString(6, "m");
+          stmt.addBatch();
+          if (offset++ % 1000 == 0) {
+            System.out.println("progress: count=" + offset);
+          }
         }
+        stmt.executeBatch();
       }
 
+      offset = 0;
+      for (int i = 0; i < 1_000; i++) {
+        stmt = conn.prepareStatement("insert into residence (id, id2, id3, address) VALUES (?, ?, ?, ?)");
+        for (int j = 0; j < 100; j++) {
+          stmt.setLong(1, offset);
+          stmt.setLong(2, offset + 1000);
+          stmt.setLong(3, offset + 2000);
+          stmt.setString(4, "5078 West Black");
+          if (offset++ % 1000 == 0) {
+            System.out.println("progress: count=" + offset);
+          }
+          stmt.addBatch();
+        }
+        stmt.executeBatch();
+      }
+
+      offset = 0;
+      for (int i = 0; i < 1_000; i++) {
+        stmt = conn.prepareStatement("insert into employee (id, id2, socialSecurityNumber) VALUES (?, ?, ?)");
+        for (int j = 0; j < 100; j++) {
+          stmt.setLong(1, offset);
+          String leading = "";
+          if (offset < 10) {
+            leading = "00000";
+          }
+          else if (offset < 100) {
+            leading = "0000";
+          }
+          else if (offset < 1000) {
+            leading = "000";
+          }
+          else if (offset < 10000) {
+            leading = "00";
+          }
+          else if (offset < 100_000) {
+            leading = "0";
+          }
+          else if (offset < 1_000_000) {
+            leading = "";
+          }
+          stmt.setLong(2, offset + 1000);
+          stmt.setString(3, leading + offset);
+          if (offset++ % 1000 == 0) {
+            System.out.println("progress: count=" + offset);
+          }
+          stmt.addBatch();
+        }
+        stmt.executeBatch();
+      }
 
 //      long size = client.getPartitionSize("test", 0, "children", "_1_socialsecuritynumber");
 //      assertEquals(size, 10);
@@ -197,28 +283,595 @@ public class TestPerformance {
   public void test() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id=1000");
     long begin = System.nanoTime();
+    int count = 0;
     for (int i = 0; i < 10_000; i++) {
       ResultSet rs = stmt.executeQuery();
       assertTrue(rs.next());
       assertEquals(rs.getLong("id"), 1_000);
+      count++;
     }
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / 10_000D / 1_000_000);
-    assertTrue((end - begin) < (3000 * 1_000_000L), String.valueOf(end-begin));
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (3300 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void testIdNoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from employee where socialsecurityNumber='000009'");
+    long begin = System.nanoTime();
+    int count = 0;
+    for (int i = 0; i < 10_000; i++) {
+      ResultSet rs = stmt.executeQuery();
+      assertTrue(rs.next());
+      assertEquals(rs.getString("socialsecuritynumber"), "000009");
+      count++;
+    }
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (8000 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void testRangeNoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from employee where socialsecurityNumber>='001000'");
+    long begin = System.nanoTime();
+    ResultSet rs = stmt.executeQuery();
+    int count = 0;
+    for (int i = 1_000; i < 100_000; i++) {
+      assertTrue(rs.next());
+      String lead = "0";
+      if (i < 10_000) {
+        lead = "00";
+      }
+      assertEquals(rs.getString("socialsecuritynumber"), lead + i);
+      count++;
+    }
+    assertFalse(rs.next());
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (2000 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void testRangeThreeKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from residence where id>1000 and id2>2000 and id3>3000");
+    long begin = System.nanoTime();
+    ResultSet rs = stmt.executeQuery();
+    int count = 0;
+    for (int i = 1_001; i < 100_000; i++) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id"), i);
+      assertEquals(rs.getLong("id2"), i + 1000);
+      assertEquals(rs.getLong("id3"), i + 2000);
+      count++;
+    }
+    assertFalse(rs.next());
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (1000 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void testRangeThreeKeyBackwards() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from residence where id3>3000 and id2>2000 and id>1000");
+    long begin = System.nanoTime();
+    ResultSet rs = stmt.executeQuery();
+    int count = 0;
+    for (int i = 1_001; i < 100_000; i++) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id"), i);
+      assertEquals(rs.getLong("id2"), i + 1000);
+      assertEquals(rs.getLong("id3"), i + 2000);
+      count++;
+    }
+    assertFalse(rs.next());
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (1000 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void testRangeThreeKeyMixed() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from residence where id3<102000 and id2>4000 and id>1000");
+    long begin = System.nanoTime();
+    ResultSet rs = stmt.executeQuery();
+    int count = 0;
+    for (int i = 3_001; i < 100_000; i++) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id"), i);
+      assertEquals(rs.getLong("id2"), i + 1000);
+      assertEquals(rs.getLong("id3"), i + 2000);
+      count++;
+    }
+    assertFalse(rs.next());
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (1400 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void testRangeThreeKeySingle() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from residence where id>1000");
+    long begin = System.nanoTime();
+    ResultSet rs = stmt.executeQuery();
+    int count = 0;
+    for (int i = 1_001; i < 100_000; i++) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id"), i);
+      assertEquals(rs.getLong("id2"), i + 1000);
+      assertEquals(rs.getLong("id3"), i + 2000);
+      count++;
+    }
+    assertFalse(rs.next());
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (900 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void testNoKeyTwoKeyGreaterEqual() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from employee where socialsecurityNumber>='001000' and socialsecurityNumber<'095000' order by socialsecuritynumber desc");
+    long begin = System.nanoTime();
+    ResultSet rs = stmt.executeQuery();
+    int count = 0;
+    for (int i = 94_999; i >= 1_000; i--) {
+      assertTrue(rs.next(), String.valueOf(i));
+      String leading = "";
+      if (i < 10_000) {
+        leading = "00";
+      }
+      else if (i < 100_000) {
+        leading = "0";
+      }
+      assertEquals(rs.getString("socialsecuritynumber"), leading + i);
+      count++;
+    }
+    assertFalse(rs.next());
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (2000 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void testNoKeyTwoKeyGreater() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from employee where socialsecurityNumber>'001000' and socialsecurityNumber<'095000' order by socialsecuritynumber desc");
+    long begin = System.nanoTime();
+    ResultSet rs = stmt.executeQuery();
+    int count = 0;
+    for (int i = 94_999; i > 1_000; i--) {
+      assertTrue(rs.next(), String.valueOf(i));
+      String leading = "";
+      if (i < 10_000) {
+        leading = "00";
+      }
+      else if (i < 100_000) {
+        leading = "0";
+      }
+      assertEquals(rs.getString("socialsecuritynumber"), leading + i);
+      count++;
+    }
+    assertFalse(rs.next());
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (1900 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void testNoKeyTwoKeyGreaterLeftSided() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from employee where socialsecurityNumber>'001000' and (socialsecurityNumber>'003000' and socialsecurityNumber<'095000') order by socialsecuritynumber desc");
+    long begin = System.nanoTime();
+    ResultSet rs = stmt.executeQuery();
+    int count = 0;
+    for (int i = 94_999; i > 3_000; i--) {
+      assertTrue(rs.next(), String.valueOf(i));
+      String leading = "";
+      if (i < 10_000) {
+        leading = "00";
+      }
+      else if (i < 100_000) {
+        leading = "0";
+      }
+      assertEquals(rs.getString("socialsecuritynumber"), leading + i);
+      count++;
+    }
+    assertFalse(rs.next());
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / (double)count / 1_000_000);
+    assertTrue((end - begin) < (2650 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void notIn() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where id < 100000 and id > 10 and id not in (5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19) order by id desc");
+    long begin = System.nanoTime();
+    ResultSet rs = stmt.executeQuery();
+    int count = 0;
+    for (int i = 99_999; i > 19; i--) {
+      assertTrue(rs.next(), String.valueOf(i));
+      assertEquals(rs.getLong("id"), i);
+      count++;
+    }
+    assertFalse(rs.next());
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (1500 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void notInSecondary() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where id2 < 101000 and id2 > 1010 and id2 not in (1005, 1006, 1007, 1008, 1009, 1010, 1011, 1012, 1013, 1014, 1015, 1016, 1017, 1018, 1019) order by id2 desc");
+    long begin = System.nanoTime();
+    ResultSet rs = stmt.executeQuery();
+    int count = 0;
+    for (int i = 100999; i > 1019; i--) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id2"), i);
+      count++;
+    }
+    assertFalse(rs.next());
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (2200 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void notInTableScan() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where socialsecuritynumber not in ('000000') order by id2 asc");
+    long begin = System.nanoTime();
+    ResultSet rs = stmt.executeQuery();
+    int count = 0;
+    for (int i = 1001; i < 101_000; i++) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id2"), i);
+      count++;
+    }
+    assertFalse(rs.next());
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (2600 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void test2keyRange() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where (id < 92251) and (id > 1000)");
+    long begin = System.nanoTime();
+    ResultSet rs = stmt.executeQuery();
+    int count = 0;
+    for (int i = 1001; i < 92251; i++) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id"), i);
+      count++;
+    }
+    assertFalse(rs.next());
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (1200 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void testSecondaryKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where id2>1000");
+    long begin = System.nanoTime();
+    ResultSet rs = stmt.executeQuery();
+    int count = 0;
+    for (int i = 1001; i < 101_000; i++) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id2"), i);
+      count++;
+    }
+    assertFalse(rs.next());
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (2200 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void testTableScan() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where socialsecuritynumber>'000000'");
+    long begin = System.nanoTime();
+    ResultSet rs = stmt.executeQuery();
+    int count = 0;
+    for (int i = 1; i < 100_000; i++) {
+      assertTrue(rs.next());
+      String leading = "";
+      if (i < 10) {
+        leading = "00000";
+      }
+      else if (i < 100) {
+        leading = "0000";
+      }
+      else if (i < 1000) {
+        leading = "000";
+      }
+      else if (i < 10000) {
+        leading = "00";
+      }
+      else if (i < 100_000) {
+        leading = "0";
+      }
+      else if (i < 1_000_000) {
+        leading = "";
+      }
+      assertEquals(rs.getString("socialsecuritynumber"), leading + i);
+      count++;
+    }
+    assertFalse(rs.next());
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (1300 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void testTwoKey() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where id>=1000 and id<=95000");
+    long begin = System.nanoTime();
+    ResultSet rs = stmt.executeQuery();
+    int count = 0;
+    for (int i = 1000; i <= 95_000; i++) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id"), i);
+      count++;
+    }
+    assertFalse(rs.next());
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (1200 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void testTwoKeyRightSided() throws SQLException {
+
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where (id >= 3501 and id < 94751) and (id > 1000)");
+    long begin = System.nanoTime();
+    ResultSet rs = stmt.executeQuery();
+    int count = 0;
+    for (int i = 3501; i < 94_751; i++) {
+      assertTrue(rs.next(), String.valueOf(i));
+      assertEquals(rs.getLong("id"), i);
+      count++;
+    }
+    assertFalse(rs.next());
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (1200 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void testTwoKeyLeftSidedGreater() throws SQLException {
+
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where (id > 1000) and (id >= 3501 and id < 94751)");
+    long begin = System.nanoTime();
+    ResultSet rs = stmt.executeQuery();
+    int count = 0;
+    for (int i = 3501; i < 94_751; i++) {
+      assertTrue(rs.next(), String.valueOf(i));
+      assertEquals(rs.getLong("id"), i);
+      count++;
+    }
+    assertFalse(rs.next());
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (1300 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void testTwoKeyGreater() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where id>1000 and id<95000");
+    long begin = System.nanoTime();
+    ResultSet rs = stmt.executeQuery();
+    int count = 0;
+    for (int i = 1001; i < 95_000; i++) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id"), i);
+      count++;
+    }
+    assertFalse(rs.next());
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (1600 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void testTwoKeyGreaterBackwards() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where id<95000 and id>1000");
+    long begin = System.nanoTime();
+    ResultSet rs = stmt.executeQuery();
+    int count = 0;
+    for (int i = 1001; i < 95_000; i++) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id"), i);
+      count++;
+    }
+    assertFalse(rs.next());
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (1600 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+
+  @Test
+  public void testTwoKeyLeftSidedGreaterEqual() throws SQLException {
+
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where (id >= 1000) and (id >= 3501 and id < 94751)");
+    long begin = System.nanoTime();
+    ResultSet rs = stmt.executeQuery();
+    int count = 0;
+    for (int i = 3501; i < 94_751; i++) {
+      assertTrue(rs.next(), String.valueOf(i));
+      assertEquals(rs.getLong("id"), i);
+      count++;
+    }
+    assertFalse(rs.next());
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (800 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void testCountTwoKeyGreaterEqual() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select count(*) from persons where id>=1000 and id<=5000");
+    long begin = System.nanoTime();
+    int count = 0;
+    for (int i = 1000; i < 1020; i++) {
+      ResultSet rs = stmt.executeQuery();
+      assertTrue(rs.next());
+      assertEquals(rs.getLong(1), 4001);
+      count++;
+    }
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (4000 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void testMaxWhere() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from persons where id<=25000");
+    long begin = System.nanoTime();
+    int count = 0;
+    for (int i = 1000; i < 1020; i++) {
+      ResultSet rs = stmt.executeQuery();
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("maxValue"), 25_000);
+      count++;
+    }
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (2000 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void testMax() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from persons");
+    long begin = System.nanoTime();
+    int count = 0;
+    for (int i = 1000; i < 1020; i++) {
+      ResultSet rs = stmt.executeQuery();
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("maxValue"), 99_999);
+      count++;
+    }
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (6000 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void testSort() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where id>=1000 order by id desc");
+    long begin = System.nanoTime();
+    ResultSet rs = stmt.executeQuery();
+    int count = 0;
+    for (int i = 99_999; i >= 1000; i--) {
+      assertTrue(rs.next());
+      String leading = "";
+      if (i < 10) {
+        leading = "00000";
+      }
+      else if (i < 100) {
+        leading = "0000";
+      }
+      else if (i < 1000) {
+        leading = "000";
+      }
+      else if (i < 10000) {
+        leading = "00";
+      }
+      else if (i < 100_000) {
+        leading = "0";
+      }
+       else if (i < 1_000_000) {
+        leading = "";
+      }
+      assertEquals(rs.getString("socialsecuritynumber"), leading + i);
+      count++;
+    }
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (900 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void testSortDisk() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where id>=1000 order by socialsecuritynumber desc");
+    long begin = System.nanoTime();
+    ResultSet rs = stmt.executeQuery();
+    int count = 0;
+    for (int i = 99_999; i >= 1000; i--) {
+      assertTrue(rs.next());
+      String leading = "";
+      if (i < 10) {
+        leading = "00000";
+      }
+      else if (i < 100) {
+        leading = "0000";
+      }
+      else if (i < 1000) {
+        leading = "000";
+      }
+      else if (i < 10000) {
+        leading = "00";
+      }
+      else if (i < 100_000) {
+        leading = "0";
+      }
+      else if (i < 1_000_000) {
+        leading = "";
+      }
+      assertEquals(rs.getString("socialsecuritynumber"), leading + i);
+      count++;
+    }
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (3300 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void testId2() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where id2=2000");
+    long begin = System.nanoTime();
+    int count = 0;
+    for (int i = 0; i < 10_000; i++) {
+      ResultSet rs = stmt.executeQuery();
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id2"), 2_000);
+      count++;
+    }
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (9000 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void testId2Range() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where id2>2000");
+    long begin = System.nanoTime();
+    ResultSet rs = stmt.executeQuery();
+    int count = 0;
+    for (int i = 2001; i < 101_000; i++) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id2"), i);
+      count++;
+    }
+    assertFalse(rs.next());
+    long end = System.nanoTime();
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (2200 * 1_000_000L), String.valueOf(end-begin));
   }
 
   @Test
   public void testOtherExpression() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id=1000 and id2 < 10000 and id2 > 1000");
     long begin = System.nanoTime();
+    int count = 0;
     for (int i = 0; i < 10_000; i++) {
       ResultSet rs = stmt.executeQuery();
       assertTrue(rs.next());
       assertEquals(rs.getLong("id"), 1_000);
+      count++;
     }
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / 10_000D / 1_000_000);
-    assertTrue((end - begin) < (3000 * 1_000_000L), String.valueOf(end-begin));
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (3300 * 1_000_000L), String.valueOf(end-begin));
   }
 
   @Test
@@ -226,41 +879,49 @@ public class TestPerformance {
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id>1000");
     long begin = System.nanoTime();
     ResultSet rs = stmt.executeQuery();
-    for (int i = 1001; i < 10_000; i++) {
+    int count = 0;
+    for (int i = 1001; i < 100_000; i++) {
       assertTrue(rs.next());
       assertEquals(rs.getLong("id"), i);
       assertEquals(rs.getLong("id2"), i + 1000);
+      count++;
     }
+    assertFalse(rs.next());
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / 10_000D / 1_000_000);
-    assertTrue((end - begin) < (300 * 1_000_000L), String.valueOf(end-begin));
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (800 * 1_000_000L), String.valueOf(end-begin));
   }
 
   @Test
   public void testRangeOtherExpression() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("select * from persons where id>1000 and id2 < 10000 and id2 > 1000");
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where id>1000 and id2 < 100000 and id2 > 1000");
     long begin = System.nanoTime();
     ResultSet rs = stmt.executeQuery();
-    for (int i = 1001; i < 9_000; i++) {
+    int count = 0;
+    for (int i = 1001; i < 99_000; i++) {
       assertTrue(rs.next());
       assertEquals(rs.getLong("id"), i);
+      count++;
     }
+    assertFalse(rs.next());
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / 10_000D / 1_000_000);
-    assertTrue((end - begin) < (300 * 1_000_000L), String.valueOf(end-begin));
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (1100 * 1_000_000L), String.valueOf(end-begin));
   }
 
   @Test
   public void testSecondary() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id2=2000");
     long begin = System.nanoTime();
+    int count = 0;
     for (int i = 0; i < 10_000; i++) {
       ResultSet rs = stmt.executeQuery();
       assertTrue(rs.next());
       assertEquals(rs.getLong("id2"), 2_000);
+      count++;
     }
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / 10_000D / 1_000_000);
-    assertTrue((end - begin) < (6500 * 1_000_000L), String.valueOf(end-begin));
+    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    assertTrue((end - begin) < (8000 * 1_000_000L), String.valueOf(end-begin));
   }
 }

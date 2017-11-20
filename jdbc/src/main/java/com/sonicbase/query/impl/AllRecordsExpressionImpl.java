@@ -89,7 +89,7 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
   }
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset) {
+  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset, boolean b) {
     TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(getFromTable());
     IndexSchema indexSchema = null;
     for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndexes().entrySet()) {
@@ -122,7 +122,7 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
 
   @Override
   public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset) {
-    return next(DatabaseClient.SELECT_PAGE_SIZE, explain, currOffset, limit, offset);
+    return next(DatabaseClient.SELECT_PAGE_SIZE, explain, currOffset, limit, offset, false);
   }
 
   @Override

@@ -338,6 +338,10 @@ public class ResultSetImpl implements ResultSet {
   public boolean next() throws DatabaseException {
     currPos++;
 
+//    if (selectStatement.getFunctionAliases().size() != 0) {
+//      return currPos == 0;
+//    }
+
     if (describeStrs != null) {
       if (currPos > describeStrs.length - 1) {
         return false;
@@ -365,24 +369,25 @@ public class ResultSetImpl implements ResultSet {
     }
 
     if (counters != null) {
-      while (true) {
-        try {
-          getMoreResults();
-          if (selectContext.getCurrKeys() == null) {
-            break;
+      boolean first = false;
+      if (currPos == 0) {
+        first = true;
+        while (true) {
+          try {
+            getMoreResults();
+            if (selectContext.getCurrKeys() == null) {
+              break;
+            }
+          }
+          catch (SchemaOutOfSyncException e) {
+            continue;
+          }
+          catch (Exception e) {
+            throw new DatabaseException(e);
           }
         }
-        catch (SchemaOutOfSyncException e) {
-          continue;
-        }
-        catch (Exception e) {
-          throw new DatabaseException(e);
-        }
       }
-      if (currPos == 1) {
-        return true;
-      }
-      return false;
+      return first;
     }
 
     if (selectContext.getCurrKeys() == null && (readRecords == null || readRecords.length == 0)) {

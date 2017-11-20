@@ -272,6 +272,7 @@ public class ParameterHandler {
     try {
       ByteArrayOutputStream out = new ByteArrayOutputStream();
       IOUtils.copy(x, out);
+      out.close();
       bytes = out.toByteArray();
       x.read(bytes);
     }
@@ -303,6 +304,7 @@ public class ParameterHandler {
     try {
       ByteArrayOutputStream out = new ByteArrayOutputStream();
       IOUtils.copy(inputStream, out);
+      out.close();
       byte[] bytes = out.toByteArray();
 
       getCurrParmsByIndex().put(parameterIndex, new Parameter.Blob(bytes));

@@ -91,7 +91,7 @@ public class ParenthesisImpl extends ExpressionImpl {
   }
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain eplain, AtomicLong currOffset, Limit limit, Offset offset) {
+  public NextReturn next(int count, SelectStatementImpl.Explain eplain, AtomicLong currOffset, Limit limit, Offset offset, boolean b) {
     return null;
   }
 

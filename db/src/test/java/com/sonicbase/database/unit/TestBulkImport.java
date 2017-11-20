@@ -208,10 +208,22 @@ public class TestBulkImport {
   @Test
   public void test() throws Exception {
 
-    PreparedStatement stmt = connA.prepareStatement("select count(*) from persons");
+    PreparedStatement stmt = connB.prepareStatement("truncate table persons");
+    stmt.executeUpdate();
+
+    stmt = connA.prepareStatement("select count(*) from persons");
     ResultSet rs = stmt.executeQuery();
     rs.next();
     assertEquals(rs.getLong(1), 10_000);
+
+    stmt = connA.prepareStatement("select * from persons where (id < 2251) and (id > 1000)");
+    rs = stmt.executeQuery();
+    for (int i = 1001; i < 2251; i++) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id"), i);
+    }
+    assertFalse(rs.next());
+
 
     stmt = connA.prepareStatement("select * from persons where id>=0");
     rs = stmt.executeQuery();
@@ -228,6 +240,24 @@ public class TestBulkImport {
       assertEquals(rs.getLong("id"), i);
     }
     assertFalse(rs.next());
+
+    stmt = connA.prepareStatement("select * from persons where (id >= 2500 and id < 3750) and id > 3000");
+    rs = stmt.executeQuery();
+    for (int i = 3001; i < 3750; i++) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id"), i);
+    }
+    assertFalse(rs.next());
+
+    stmt = connA.prepareStatement("select * from persons where (id >= 2500 and id < 3750) and id > 1000");
+    rs = stmt.executeQuery();
+    for (int i = 2500; i < 3750; i++) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id"), i);
+    }
+    assertFalse(rs.next());
+
+
 
     startBulkImport((ConnectionProxy) connB, "start bulk import from persons(com.sonicbase.jdbcdriver.Driver, jdbc:sonicbase:127.0.0.1:9010/test)");
 
@@ -251,6 +281,49 @@ public class TestBulkImport {
     assertFalse(rs.next());
 
   }
+
+  @Test
+  public void testWithWhere() throws Exception {
+
+    PreparedStatement stmt = connB.prepareStatement("truncate table persons");
+    stmt.executeUpdate();
+
+    stmt = connA.prepareStatement("select count(*) from persons");
+    ResultSet rs = stmt.executeQuery();
+    rs.next();
+    assertEquals(rs.getLong(1), 10_000);
+
+    stmt = connA.prepareStatement("select * from persons where (id >= 3501 and id < 4751) and (id > 1000)");
+    rs = stmt.executeQuery();
+    for (int i = 3501; i < 4_751; i++) {
+      assertTrue(rs.next(), String.valueOf(i));
+      assertEquals(rs.getLong("id"), i);
+    }
+    assertFalse(rs.next());
+
+    startBulkImport((ConnectionProxy) connB, "start bulk import from persons(com.sonicbase.jdbcdriver.Driver, jdbc:sonicbase:127.0.0.1:9010/test) where id > 1000");
+
+    while (true) {
+      String ret = bulkImportStatus((ConnectionProxy) connB);
+      System.out.println("status=" + ret);
+      if (ret.contains("finished=true") && ret.startsWith("processing")) {
+        break;
+      }
+      Thread.sleep(500);
+    }
+    System.out.println("Finished load");
+
+    //validate data is in cluster B
+    stmt = connB.prepareStatement("select * from persons where id>=0");
+    rs = stmt.executeQuery();
+    for (int i = 1001; i < 10_000; i++) {
+      assertTrue(rs.next(), String.valueOf(i));
+      assertEquals(rs.getLong("id"), i);
+    }
+    assertFalse(rs.next());
+
+  }
+
 
   public String bulkImportStatus(ConnectionProxy conn) throws Exception {
     ComObject cobj = new ComObject();

@@ -124,7 +124,7 @@ public class TestDatabase {
 
       client.setPageSize(3);
 
-      PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
+      PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, id3 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
       stmt.executeUpdate();
 
       stmt = conn.prepareStatement("create table Children (parent BIGINT, socialSecurityNumber VARCHAR(20), bio VARCHAR(256))");
@@ -168,12 +168,13 @@ public class TestDatabase {
       }
 
       for (int i = 0; i < recordCount; i++) {
-        stmt = conn.prepareStatement("insert into persons (id, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?)");
+        stmt = conn.prepareStatement("insert into persons (id, socialSecurityNumber, relatives, restricted, gender, id3) VALUES (?, ?, ?, ?, ?, ?)");
         stmt.setLong(1, i);
         stmt.setString(2, "933-28-" + i);
         stmt.setString(3, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
         stmt.setBoolean(4, false);
         stmt.setString(5, "m");
+        stmt.setLong(6, i + 1000);
         assertEquals(stmt.executeUpdate(), 1);
         ids.add((long) i);
       }
@@ -705,6 +706,15 @@ public class TestDatabase {
 //    common.loadSchema(DatabaseClient.getServers().get(0).get(0).getDataDir());
 //
 //    assertEquals(common.getTables("test").size(), 1);
+  }
+
+  public void testMath() throws Exception {
+
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where id3 = id + 1000");
+    ResultSet ret = stmt.executeQuery();
+    assertTrue(ret.next());
+    assertEquals(ret.getInt("id3"), 1000);
+    assertEquals(ret.getInt("id"), 0);
   }
 
   @Test
@@ -1272,9 +1282,9 @@ public class TestDatabase {
     stmt.setLong(2, 2);
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 3);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 4);
     assertFalse(ret.next());
   }
@@ -1287,7 +1297,7 @@ public class TestDatabase {
     stmt.setString(2, "membership-0");
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("personId"), 0);
     assertEquals(ret.getString("membershipName"), "membership-0");
     assertFalse(ret.next());
@@ -1298,7 +1308,7 @@ public class TestDatabase {
     PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from nokeysecondaryindex");
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("maxValue"), 9);
     assertFalse(ret.next());
   }
@@ -1308,7 +1318,7 @@ public class TestDatabase {
     PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from nokey");
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("maxValue"), 9);
     assertFalse(ret.next());
   }
@@ -1318,7 +1328,7 @@ public class TestDatabase {
     PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from persons");
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("maxValue"), 109);
     assertFalse(ret.next());
   }
@@ -1328,7 +1338,7 @@ public class TestDatabase {
     PreparedStatement stmt = conn.prepareStatement("select min(id) as minValue from nokeysecondaryindex");
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("minValue"), 0);
     assertFalse(ret.next());
   }
@@ -1338,7 +1348,7 @@ public class TestDatabase {
     PreparedStatement stmt = conn.prepareStatement("select min(id) as minValue from nokey");
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("minValue"), 0);
     assertFalse(ret.next());
   }
@@ -1348,7 +1358,7 @@ public class TestDatabase {
     PreparedStatement stmt = conn.prepareStatement("select min(id) as minValue from persons");
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("minValue"), 0);
     assertFalse(ret.next());
   }
@@ -1358,7 +1368,7 @@ public class TestDatabase {
     PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from nokeysecondaryindex where id2 < 1");
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("maxValue"), 0);
     assertFalse(ret.next());
   }
@@ -1368,7 +1378,7 @@ public class TestDatabase {
     PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from persons where id2 < 1");
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("maxValue"), 108);
     assertFalse(ret.next());
   }
@@ -1378,7 +1388,7 @@ public class TestDatabase {
     PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from nokeysecondaryindex where id < 4");
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("maxValue"), 3);
     assertFalse(ret.next());
   }
@@ -1388,7 +1398,7 @@ public class TestDatabase {
     PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from nokey where id < 4");
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("maxValue"), 3);
     assertFalse(ret.next());
   }
@@ -1398,7 +1408,7 @@ public class TestDatabase {
     PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from persons where id < 100");
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("maxValue"), 9);
     assertFalse(ret.next());
   }
@@ -1408,7 +1418,7 @@ public class TestDatabase {
     PreparedStatement stmt = conn.prepareStatement("select sum(id) as sumValue from nokeysecondaryindex");
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("sumValue"), 45);
     assertFalse(ret.next());
   }
@@ -1418,7 +1428,7 @@ public class TestDatabase {
     PreparedStatement stmt = conn.prepareStatement("select sum(id) as sumValue from nokey");
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("sumValue"), 90);
     assertFalse(ret.next());
   }
@@ -1428,7 +1438,7 @@ public class TestDatabase {
     PreparedStatement stmt = conn.prepareStatement("select sum(id) as sumValue from persons");
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("sumValue"), 1090);
     assertFalse(ret.next());
   }
@@ -1440,13 +1450,13 @@ public class TestDatabase {
     stmt.setLong(2, 2);
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 3);
     assertEquals(ret.getLong("id2"), 6);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 4);
     assertEquals(ret.getLong("id2"), 8);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 5);
     assertEquals(ret.getLong("id2"), 10);
     assertFalse(ret.next());
@@ -1459,13 +1469,13 @@ public class TestDatabase {
     stmt.setLong(2, 2);
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 3);
     assertEquals(ret.getLong("id2"), 6);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 3);
     assertEquals(ret.getLong("id2"), 6);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 4);
     assertEquals(ret.getLong("id2"), 8);
     assertFalse(ret.next());
@@ -1478,11 +1488,11 @@ public class TestDatabase {
     stmt.setLong(2, 2);
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 3);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 4);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 5);
     assertFalse(ret.next());
   }
@@ -1495,13 +1505,13 @@ public class TestDatabase {
     stmt.setLong(2, 2);
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 4);
     assertEquals(ret.getLong("id2"), 8);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 5);
     assertEquals(ret.getLong("id2"), 10);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 6);
     assertEquals(ret.getLong("id2"), 12);
     assertFalse(ret.next());
@@ -1514,13 +1524,13 @@ public class TestDatabase {
     stmt.setLong(2, 2);
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 3);
     assertEquals(ret.getLong("id2"), 6);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 4);
     assertEquals(ret.getLong("id2"), 8);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 4);
     assertEquals(ret.getLong("id2"), 8);
     assertFalse(ret.next());
@@ -1533,11 +1543,11 @@ public class TestDatabase {
     stmt.setLong(2, 2);
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 4);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 5);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 6);
     assertFalse(ret.next());
   }
@@ -1548,11 +1558,11 @@ public class TestDatabase {
     stmt.setLong(1, 2);
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 4);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 5);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 6);
     assertFalse(ret.next());
   }
@@ -1564,7 +1574,7 @@ public class TestDatabase {
     ResultSet ret = stmt.executeQuery();
 
     for (int i = 0; i < recordCount; i++) {
-      ret.next();
+      assertTrue(ret.next());
       assertEquals(ret.getLong("id2"), i * 2);
       assertEquals(ret.getLong("id"), i);
     }
@@ -1576,10 +1586,10 @@ public class TestDatabase {
     ResultSet ret = stmt.executeQuery();
 
     for (int i = 0; i < recordCount; i++) {
-      ret.next();
+      assertTrue(ret.next());
       assertEquals(ret.getLong("id2"), i * 2);
       assertEquals(ret.getLong("id"), i);
-      ret.next();
+      assertTrue(ret.next());
       assertEquals(ret.getLong("id2"), i * 2);
       assertEquals(ret.getLong("id"), i);
     }
@@ -1591,73 +1601,73 @@ public class TestDatabase {
     PreparedStatement stmt = conn.prepareStatement("select id, id2 from persons order by id2 asc, id asc");
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 0);
     assertEquals(ret.getLong("id"), 100);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 0);
     assertEquals(ret.getLong("id"), 102);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 0);
     assertEquals(ret.getLong("id"), 104);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 0);
     assertEquals(ret.getLong("id"), 106);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 0);
     assertEquals(ret.getLong("id"), 108);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 1);
     assertEquals(ret.getLong("id"), 101);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 1);
     assertEquals(ret.getLong("id"), 103);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 1);
     assertEquals(ret.getLong("id"), 105);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 1);
     assertEquals(ret.getLong("id"), 107);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 1);
     assertEquals(ret.getLong("id"), 109);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 0);
     assertTrue(ret.wasNull());
     assertEquals(ret.getLong("id"), 0);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 0);
     assertTrue(ret.wasNull());
     assertEquals(ret.getLong("id"), 1);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 0);
     assertTrue(ret.wasNull());
     assertEquals(ret.getLong("id"), 2);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 0);
     assertTrue(ret.wasNull());
     assertEquals(ret.getLong("id"), 3);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 0);
     assertTrue(ret.wasNull());
     assertEquals(ret.getLong("id"), 4);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 0);
     assertTrue(ret.wasNull());
     assertEquals(ret.getLong("id"), 5);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 0);
     assertTrue(ret.wasNull());
     assertEquals(ret.getLong("id"), 6);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 0);
     assertTrue(ret.wasNull());
     assertEquals(ret.getLong("id"), 7);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 0);
     assertTrue(ret.wasNull());
     assertEquals(ret.getLong("id"), 8);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 0);
     assertTrue(ret.wasNull());
     assertEquals(ret.getLong("id"), 9);
@@ -1670,7 +1680,7 @@ public class TestDatabase {
     PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id < 2 and id2 = 0 order by id2 asc, id desc");
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 0);
     assertEquals(ret.getLong("id"), 0);
     assertFalse(ret.next());
@@ -1681,10 +1691,10 @@ public class TestDatabase {
     PreparedStatement stmt = conn.prepareStatement("select * from nokey where id < 2 and id2 = 0 order by id2 asc, id desc");
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 0);
     assertEquals(ret.getLong("id"), 0);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 0);
     assertEquals(ret.getLong("id"), 0);
     assertFalse(ret.next());
@@ -1695,16 +1705,16 @@ public class TestDatabase {
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id > 100 and id2 = 0 order by id2 asc, id desc");
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 0);
     assertEquals(ret.getLong("id"), 108);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 0);
     assertEquals(ret.getLong("id"), 106);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 0);
     assertEquals(ret.getLong("id"), 104);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id2"), 0);
     assertEquals(ret.getLong("id"), 102);
     assertFalse(ret.next());
@@ -1721,9 +1731,9 @@ public class TestDatabase {
     ResultSet ret = stmt.executeQuery();
 
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 1);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 3);
 
     assertFalse(ret.next());
@@ -1739,13 +1749,13 @@ public class TestDatabase {
     ResultSet ret = stmt.executeQuery();
 
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 1);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 1);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 3);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 3);
 
     assertFalse(ret.next());
@@ -1761,17 +1771,17 @@ public class TestDatabase {
     ResultSet ret = stmt.executeQuery();
 
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 100);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 102);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 104);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 7);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 8);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 9);
 
     assertFalse(ret.next());
@@ -1786,11 +1796,11 @@ public class TestDatabase {
         "from nokeysecondaryindex where nokeysecondaryindex.id<=5 AND (id < 2 OR id> 4)");                                              //
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 0);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 1);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 5);
 
     assertFalse(ret.next());
@@ -1805,17 +1815,17 @@ public class TestDatabase {
         "from nokey where nokey.id<=5 AND (id < 2 OR id> 4)");                                              //
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 0);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 0);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 1);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 1);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 5);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 5);
 
     assertFalse(ret.next());
@@ -1830,21 +1840,21 @@ public class TestDatabase {
         "from persons where persons.id<=100 AND (id < 6 OR id> 8)");                                              //
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 0);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 1);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 2);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 3);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 4);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 5);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 9);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 100);
 
     assertFalse(ret.next());
@@ -1859,13 +1869,13 @@ public class TestDatabase {
         "from nokeysecondaryindex where nokeysecondaryindex.id<=7 AND id > 4 OR id> 8");                                              //
     ResultSet ret = stmt.executeQuery();
 
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 5);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 6);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 7);
-    ret.next();
+    assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 9);
 
     assertFalse(ret.next());

@@ -4,7 +4,6 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
-import com.sonicbase.common.*;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
@@ -19,7 +18,6 @@ import net.sf.jsqlparser.statement.select.Offset;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.giraph.utils.Varint;
 
-import com.sonicbase.common.*;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -399,7 +397,7 @@ public abstract class ExpressionImpl implements Expression {
 
   abstract public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset);
 
-  public abstract NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset);
+  public abstract NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset, boolean evaluateExpression);
 
   abstract public boolean canUseIndex();
 
@@ -1471,16 +1469,18 @@ public abstract class ExpressionImpl implements Expression {
           //          }
           //        }
 
-          if (originalRightValue != null && leftValue != null) {
-            if (0 != DatabaseCommon.compareKey(comparators, originalRightValue, leftValue)) {
-              if (rightOperator == BinaryExpression.Operator.less) {
-                rightOperator = BinaryExpression.Operator.lessEqual;
-              }
-              else if (rightOperator == BinaryExpression.Operator.greater) {
-                rightOperator = BinaryExpression.Operator.greaterEqual;
-              }
-            }
-          }
+          //todo: do we want this?
+//          if (originalRightValue != null && leftValue != null) {
+//            if (0 != DatabaseCommon.compareKey(comparators, originalRightValue, leftValue)) {
+//              if (rightOperator == BinaryExpression.Operator.less) {
+//                rightOperator = BinaryExpression.Operator.lessEqual;
+//              }
+//              else if (rightOperator == BinaryExpression.Operator.greater) {
+//                rightOperator = BinaryExpression.Operator.greaterEqual;
+//              }
+//            }
+//          }
+
           //
           //        if (originalRightValue != null && leftValue != null) {
           //          if (0 != DatabaseCommon.compareKey(comparators, originalRightValue, leftValue)) {
@@ -1808,9 +1808,9 @@ public abstract class ExpressionImpl implements Expression {
                   System.out.println("hit key: shard=" + calledShard + ", replica=" + replica);
                 }
               }
-            }
-            if (nextKey == null && keys.getArray().size() != 0) {
-              nextKey = currRetKeys[keys.getArray().size() - 1][0];
+              if (/*nextKey == null && */currRetKeys.length != 0) {
+                nextKey = currRetKeys[currRetKeys.length - 1][0];
+              }
             }
 
             KeyRecord[][] currRetKeyRecords = null;
@@ -1858,7 +1858,7 @@ public abstract class ExpressionImpl implements Expression {
                   throw e;
                 }
               }
-              if (nextKey == null && currRetRecords.length != 0) {
+              if (/*nextKey == null &&*/ currRetRecords.length != 0) {
                 Object[] key = new Object[primaryKeyFields.length];
                 for (int j = 0; j < primaryKeyFields.length; j++) {
                   key[j] = currRetRecords[currRetRecords.length - 1].getFields()[primaryKeyOffsets[j]];

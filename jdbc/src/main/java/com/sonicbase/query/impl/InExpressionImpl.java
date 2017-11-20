@@ -196,7 +196,7 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
   }
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset) {
+  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset, boolean b) {
     if (getNextShard() == -2) {
       return new NextReturn(new String[]{getTableName()}, null);
     }
@@ -259,7 +259,7 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
 
 
   public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset) {
-    return next(DatabaseClient.SELECT_PAGE_SIZE, explain, currOffset, limit, offset);
+    return next(DatabaseClient.SELECT_PAGE_SIZE, explain, currOffset, limit, offset, false);
   }
 
   @Override

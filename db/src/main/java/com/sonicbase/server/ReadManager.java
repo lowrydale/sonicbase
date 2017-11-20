@@ -1157,7 +1157,7 @@ public class ReadManager {
     if (ascending == null || ascending) {
       useGreater = true;
       if (greaterKey != null) {
-        entry = index.floorEntry(greaterKey);
+        entry = index.ceilingEntry(greaterKey);
         lessKey = originalLeftKey;
       }
       else {
@@ -1165,7 +1165,7 @@ public class ReadManager {
           entry = index.firstEntry();
         }
         else {
-          entry = index.floorEntry(greaterOriginalKey);
+          entry = index.ceilingEntry(greaterOriginalKey);
         }
       }
       if (entry == null) {
@@ -1175,7 +1175,7 @@ public class ReadManager {
     else {
       if (ascending != null && !ascending) {
         if (lessKey != null) {
-          entry = index.ceilingEntry(lessKey);
+          entry = index.floorEntry(lessKey);
           greaterKey = originalRightKey;
         }
         else {
@@ -1183,7 +1183,7 @@ public class ReadManager {
             entry = index.lastEntry();
           }
           else {
-            entry = index.ceilingEntry(lessOriginalKey);
+            entry = index.floorEntry(lessOriginalKey);
           }
         }
         if (entry == null) {
@@ -1201,7 +1201,10 @@ public class ReadManager {
 
       if ((ascending != null && !ascending)) {
         if (lessKey != null && lessOriginalKey != lessKey) {
-          if (lessOp.equals(BinaryExpression.Operator.less) /*|| lessOp.equals(BinaryExpression.Operator.lessEqual)*/) {
+          if (lessOp.equals(BinaryExpression.Operator.less) ||
+              lessOp.equals(BinaryExpression.Operator.lessEqual) ||
+              lessOp.equals(BinaryExpression.Operator.greater) ||
+              lessOp.equals(BinaryExpression.Operator.greaterEqual)) {
             boolean foundMatch = 0 == server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), lessKey);
             if (foundMatch) {
               entry = index.lowerEntry((entry.getKey()));
@@ -1219,7 +1222,10 @@ public class ReadManager {
       }
       else {
         if (greaterKey != null) {
-          if (greaterOp.equals(BinaryExpression.Operator.greater) /*|| greaterOp.equals(BinaryExpression.Operator.greaterEqual)*/) {
+          if (greaterOp.equals(BinaryExpression.Operator.less) ||
+              greaterOp.equals(BinaryExpression.Operator.lessEqual) ||
+              greaterOp.equals(BinaryExpression.Operator.greater) ||
+              greaterOp.equals(BinaryExpression.Operator.greaterEqual)) {
             boolean foundMatch = key != null && 0 == server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), greaterKey);
             if (foundMatch) {
               entry = index.higherEntry((entry.getKey()));
@@ -1779,7 +1785,7 @@ public class ReadManager {
         //entry = index.floorEntry(key);
         //        if (operator.equals(BinaryExpression.Operator.greater) ||
         //             operator.equals(BinaryExpression.Operator.greaterEqual)) {
-        entry = index.floorEntry(key);
+        entry = index.ceilingEntry(key);
         if (entry == null) {
           entry = index.firstEntry();
         }
@@ -1818,7 +1824,7 @@ public class ReadManager {
         else {
           if (ascending != null && !ascending && originalKey != null &&
               (operator.equals(BinaryExpression.Operator.less) || operator.equals(BinaryExpression.Operator.lessEqual))) {
-            entry = index.ceilingEntry(originalKey);
+            entry = index.floorEntry(originalKey);
             if (entry == null) {
               entry = index.lastEntry();
             }
@@ -1843,10 +1849,32 @@ public class ReadManager {
         //     entry = index.firstEntry();
         //   }
         //   else {
-        entry = index.ceilingEntry(key);
+        entry = index.floorEntry(key);
         if (entry == null) {
           entry = index.lastEntry();
         }
+
+
+
+        if (operator.equals(BinaryExpression.Operator.less) ||
+            operator.equals(BinaryExpression.Operator.lessEqual) ||
+            operator.equals(BinaryExpression.Operator.greater) ||
+            operator.equals(BinaryExpression.Operator.greaterEqual)) {
+          boolean foundMatch = key != null && 0 == server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), key);
+          if (foundMatch) {
+            //todo: match below
+            entry = index.lowerEntry((entry.getKey()));
+          }
+          else if (operator.equals(BinaryExpression.Operator.less) ||
+              operator.equals(BinaryExpression.Operator.greater)) {
+            foundMatch = originalKey != null && 0 == server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), originalKey);
+            if (foundMatch) {
+              //todo: match below
+              entry = index.lowerEntry((entry.getKey()));
+            }
+          }
+        }
+
         //   }
 
         //}
@@ -2009,7 +2037,7 @@ public class ReadManager {
               }
             }
           }
-          Object[] keyToUse = key;//currEntry.getKey();
+          Object[] keyToUse = currEntry.getKey(); //key
           if (keyToUse == null) {
             keyToUse = originalKey;
           }

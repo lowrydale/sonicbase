@@ -712,6 +712,7 @@ public class NettyServer {
     GZIPInputStream in = new GZIPInputStream(new ByteArrayInputStream(b));
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     IOUtils.copy(in, out);
+    out.close();
     return out.toByteArray();
   }
 

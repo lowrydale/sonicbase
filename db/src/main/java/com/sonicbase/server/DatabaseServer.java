@@ -1964,6 +1964,7 @@ public class DatabaseServer {
 //          BufferedInputStream in = new BufferedInputStream(new FileInputStream(file));
 //          ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
 //          IOUtils.copy(in, bytesOut);
+          // bytesOut.close();
 //
 //          synchronized (common) {
 //            common.deserializeSchema(bytesOut.toByteArray());
@@ -2172,6 +2173,7 @@ public class DatabaseServer {
         BufferedInputStream in = new BufferedInputStream(new FileInputStream(file));
         ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
         IOUtils.copy(in, bytesOut);
+        bytesOut.close();
 
         synchronized (common) {
           common.deserializeSchema(bytesOut.toByteArray());
@@ -3667,6 +3669,7 @@ public class DatabaseServer {
       BufferedInputStream in = new BufferedInputStream(new FileInputStream(file));
       ByteArrayOutputStream out = new ByteArrayOutputStream();
       IOUtils.copy(in, out);
+      out.close();
       byte[] bytes = out.toByteArray();
       ComObject retObj = new ComObject();
       retObj.put(ComObject.Tag.binaryFileContent, bytes);

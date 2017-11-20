@@ -348,6 +348,7 @@ public class LogManager {
       InputStream in = new BufferedInputStream(new FileInputStream(file));
       ByteArrayOutputStream out = new ByteArrayOutputStream();
       IOUtils.copy(in, out);
+      out.close();
 
       ComObject retObj = new ComObject();
       retObj.put(ComObject.Tag.binaryFileContent, out.toByteArray());

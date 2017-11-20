@@ -8,9 +8,6 @@ import com.sonicbase.common.Record;
 import com.sonicbase.common.SchemaOutOfSyncException;
 import com.sonicbase.query.*;
 
-import com.sonicbase.query.*;
-
-import com.sonicbase.query.*;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
@@ -1028,7 +1025,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
         else {
           expression.forceSelectOnServer(forceSelectOnServer);
           expression.setDbName(dbName);
-          ret = expression.next(count, explain, currOffset, limit, offset);
+          ret = expression.next(count, explain, currOffset, limit, offset, false);
         }
         if (ret == null) {
           return null;
@@ -1263,7 +1260,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                       explain.getBuilder().append("inner join based on expression: table=" + fromTable + ", expression=" + expression.toString() + "\n");
                     }
                     long begin = System.nanoTime();
-                    ids = expression.next(pageSize / threadCount, explain, currOffset, limit, offset);
+                    ids = expression.next(pageSize / threadCount, explain, currOffset, limit, offset, false);
                     if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
                       hadSelectRet = true;
                     }
@@ -1293,7 +1290,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                     allExpression.setDbName(dbName);
                     allExpression.setColumns(getSelectColumns());
                     allExpression.setOrderByExpressions(expression.getOrderByExpressions());
-                    ids = allExpression.next(pageSize / threadCount, explain, currOffset, limit, offset);
+                    ids = allExpression.next(pageSize / threadCount, explain, currOffset, limit, offset, false);
                     if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
                       hadSelectRet = true;
                     }
@@ -1318,7 +1315,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                     allExpression.setDbName(dbName);
                     allExpression.setColumns(getSelectColumns());
                     allExpression.setOrderByExpressions(expression.getOrderByExpressions());
-                    ids = allExpression.next(pageSize / threadCount, explain, currOffset, limit, offset);
+                    ids = allExpression.next(pageSize / threadCount, explain, currOffset, limit, offset, false);
                     if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
                       hadSelectRet = true;
                     }

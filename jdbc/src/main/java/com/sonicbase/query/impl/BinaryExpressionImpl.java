@@ -19,7 +19,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.*;
-import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -132,7 +131,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
 
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset) {
+  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset, boolean evaluateExpression) {
 
     if (exhausted) {
       return null;
@@ -196,7 +195,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
 //         return tableScan(count, getClient(), (ExpressionImpl) getTopLevelExpression(), getParms(), getTableName());
       }
 
-      return evaluateRelationalOp(count, usedIndex, explain, currOffset, limit, offset);
+      return evaluateRelationalOp(count, usedIndex, explain, currOffset, limit, offset, evaluateExpression);
     }
     return null;
   }
@@ -208,11 +207,11 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
   }
 
   public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset) {
-    return next(DatabaseClient.SELECT_PAGE_SIZE, explain, currOffset, limit, offset);
+    return next(DatabaseClient.SELECT_PAGE_SIZE, explain, currOffset, limit, offset, false);
   }
 
   private NextReturn evaluateRelationalOp(int count, AtomicReference<String> usedIndex, SelectStatementImpl.Explain explain,
-                                          AtomicLong currOffset, Limit limit, Offset offset) {
+                                          AtomicLong currOffset, Limit limit, Offset offset, boolean evaluateExpression) {
     try {
       ExpressionImpl rightExpression = getRightExpression();
       ExpressionImpl leftExpression = getLeftExpression();
@@ -277,7 +276,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
               indexName, isForceSelectOnServer(),
               operator, null, getOrderByExpressions(), leftKey, getParms(), getTopLevelExpression(), null,
               new Object[]{originalLeftValue}, null, getColumns(), columnName,
-              getNextShard(), getRecordCache(), usedIndex, false, getViewVersion(), getCounters(), getGroupByContext(), debug, currOffset, limit, offset);
+              getNextShard(), getRecordCache(), usedIndex, evaluateExpression, getViewVersion(), getCounters(), getGroupByContext(), debug, currOffset, limit, offset);
           setNextShard(context.getNextShard());
           setNextKey(context.getNextKey());
           if (getNextShard() == -1 || getNextShard() == -2) {
@@ -838,15 +837,19 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
       leftExpression = rightExpression;
       rightExpression = leftExpression;
     }
-    leftIds = leftExpression.next(count, explain, currOffset, limit, offset);
+    leftIds = leftExpression.next(count, explain, currOffset, limit, offset, true);
     if (explain != null) {
       explain.appendSpaces();
       explain.getBuilder().append(" AND \n");
     }
+
+
 //    }
 //    if (leftIds == null || leftIds.getIds() == null) {
 //      return null;
 //    }
+
+
     //todo: loop while less than 200
     final TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(tableNames[0]);
     if (true || !rightExpression.canUseIndex()) {

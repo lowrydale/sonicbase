@@ -295,6 +295,7 @@ public class AWSClient {
       try (InputStream objectData = object.getObjectContent();
            ByteArrayOutputStream out = new ByteArrayOutputStream()) {
         IOUtils.copy(objectData, out);
+        out.close();
         return out.toByteArray();
       }
     }

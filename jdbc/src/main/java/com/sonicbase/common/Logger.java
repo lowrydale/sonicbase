@@ -23,7 +23,7 @@ public class Logger {
 
   static {
     try {
-      hostName = InetAddress.getLocalHost().getHostName();
+      hostName = "host";//InetAddress.getLocalHost().getHostName();
       sendThread = new Thread(new Runnable() {
         @Override
         public void run() {

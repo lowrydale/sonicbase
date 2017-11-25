@@ -3124,9 +3124,6 @@ public class DatabaseClient {
           }
 
           for (int i = 0; i < insertsWithKey.size(); i++) {
-            if (i == 1) {
-              System.out.println("multiplw client");
-            }
             PreparedInsert insert = insertsWithKey.get(i);
             insertKey(dbName, insertStatement.getTableName(), insert.keyInfo, insert.primaryKeyIndexName,
                 insert.primaryKey, insert.keyRecord, -1, -1);

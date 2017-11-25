@@ -15,7 +15,9 @@ then
   export _GC_="$SEARCH_HOME/logs/gc.log"
 fi
 
-java_opts="-server  -XX:NewRatio=2 -XX:SurvivorRatio=10 -XX:+UseG1GC -XX:MaxGCPauseMillis=150 -XX:-ResizePLAB -XX:ParallelGCThreads=4 -XX:ConcGCThreads=2 -XX:-OmitStackTraceInFastThrow"
+#-XX:NewRatio=2 -XX:SurvivorRatio=10 -XX:ParallelGCThreads=4 -XX:ConcGCThreads=2
+
+java_opts="-server  -XX:+UseG1GC -XX:MaxGCPauseMillis=150 -XX:-ResizePLAB"
 java_opts="$java_opts -verbose:gc -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=3 -XX:GCLogFileSize=2m -Xloggc:$_GC_"
 
 if [ "$_LOG4J_FILENAME_" = "" ]

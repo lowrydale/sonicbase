@@ -935,7 +935,7 @@ public class Repartitioner extends Thread {
     }
     maxKey = partitions[databaseServer.getShard()].getUpperKey();
 
-    long size = index.getSize(minKey, maxKey);
+    long size = index.getSize(minKey, maxKey);//index.getCount();//index.getSize(minKey, maxKey);
     long rawSize = index.size();
 
     logger.info("getPartitionSize: dbName=" + dbName + ", table=" + tableName + ", index=" + indexName +
@@ -2088,7 +2088,7 @@ public class Repartitioner extends Thread {
           String indexName = indexEntry.getKey();
           indexObject.put(ComObject.Tag.indexName, indexName);
           Index index = indexEntry.getValue();
-          long size = index.size();
+          long size = index.size();// index.getCount();//index.size();
           indexObject.put(ComObject.Tag.size, size);
           logger.info("getIndexCounts: dbName=" + dbName + ", table=" + tableName + ", index=" + indexName + ", count=" + size);
         }

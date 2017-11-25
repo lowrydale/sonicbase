@@ -11,6 +11,7 @@
 -keepattributes Exceptions,InnerClasses,Signature,Deprecated,SourceFile,LineNumberTable,*Annotation*,EnclosingMethod
 
 
+-keep public class com.sonicbase.server.DatabaseServer
 -keep public class com.sonicbase.jdbcdriver.Driver
 -keep public class com.sonicbase.client.ReconfigureResults
 -keep public class com.sonicbase.jdbcdriver.ConnectionProxy
@@ -33,6 +34,14 @@
 -keep public class com.sonicbase.util.DateUtils
 -keep public class com.sonicbase.common.SchemaOutOfSyncException
 -keep public class com.sonicbase.server.LogManager$ByteCounterStream
+
+-keepclassmembers class com.sonicbase.server.DatabaseServer {
+    !private <methods>;
+    !private <fields>;
+    !public <methods>;
+    !public <fields>;
+    public byte[] invokeMethod(byte[], boolean, boolean);
+}
 
 -keepclassmembers  class com.sonicbase.jdbcdriver.Driver {
     !private <methods>;

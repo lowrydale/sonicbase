@@ -6,11 +6,13 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.research.socket.NettyServer;
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.util.FileUtils;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -18,6 +20,8 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
 import static org.testng.Assert.assertEquals;
@@ -28,10 +32,24 @@ public class TestPerformance {
 
   private Connection conn;
   private DatabaseClient client;
+  private List<Thread> serverThreads = new ArrayList<>();
+  DatabaseServer[] dbServers;
+
+  @AfterClass
+  public void afterClass() {
+    for (DatabaseServer server : dbServers) {
+      server.shutdown();
+    }
+    for (Thread thread : serverThreads) {
+      thread.interrupt();
+    }
+    Logger.queue.clear();
+  }
 
   @BeforeClass
   public void beforeClass() throws IOException, InterruptedException, SQLException, ClassNotFoundException {
     try {
+      Logger.disable();
       String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
       ObjectMapper mapper = new ObjectMapper();
       final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
@@ -44,10 +62,11 @@ public class TestPerformance {
 
       DatabaseClient.getServers().clear();
 
-      final DatabaseServer[] dbServers = new DatabaseServer[4];
+      dbServers = new DatabaseServer[4];
 
       String role = "primaryMaster";
 
+      Logger.setReady(false);
 
       final CountDownLatch latch = new CountDownLatch(4);
       final NettyServer server0_0 = new NettyServer(128);
@@ -59,8 +78,10 @@ public class TestPerformance {
           latch.countDown();
         }
       });
+      serverThreads.add(thread);
       thread.start();
       while (true) {
+        Logger.setReady(false);
         if (server0_0.isRunning()) {
           break;
         }
@@ -76,9 +97,11 @@ public class TestPerformance {
           latch.countDown();
         }
       });
+      serverThreads.add(thread);
       thread.start();
 
       while (true) {
+        Logger.setReady(false);
         if (server0_1.isRunning()) {
           break;
         }
@@ -94,8 +117,10 @@ public class TestPerformance {
           latch.countDown();
         }
       });
+      serverThreads.add(thread);
       thread.start();
       while (true) {
+        Logger.setReady(false);
         if (server1_0.isRunning()) {
           break;
         }
@@ -111,9 +136,11 @@ public class TestPerformance {
           latch.countDown();
         }
       });
+      serverThreads.add(thread);
       thread.start();
 
       while (true) {
+        Logger.setReady(false);
         if (server0_0.isRunning() && server0_1.isRunning() && server1_0.isRunning() && server1_1.isRunning()) {
           break;
         }
@@ -143,6 +170,8 @@ public class TestPerformance {
       conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9010/test", "user", "password");
       client = ((ConnectionProxy) conn).getDatabaseClient();
       client.syncSchema();
+
+      Logger.setReady(false);
 
       //
       PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");

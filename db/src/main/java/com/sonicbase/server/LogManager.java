@@ -34,6 +34,7 @@ public class LogManager {
   private final DatabaseServer databaseServer;
   private final ThreadPoolExecutor executor;
   private final File rootDir;
+  private final List<Thread> logwWriterThreads = new ArrayList<>();
 
   private AtomicLong countLogged = new AtomicLong();
   private final DatabaseServer server;
@@ -72,8 +73,20 @@ public class LogManager {
       logWriters.add(logWriter);
       Thread thread = new Thread(logWriter);
       thread.start();
+      logwWriterThreads.add(thread);
     }
   }
+
+  public void shutdown() {
+    executor.shutdownNow();
+    for (Thread thread : logwWriterThreads) {
+      thread.interrupt();
+    }
+    for (LogWriter writer : logWriters) {
+      writer.shutdown();
+    }
+  }
+
 
   public void startLoggingForPeer(int replicaNum) {
     synchronized (peerLogRequests) {
@@ -564,6 +577,17 @@ public class LogManager {
       }
     }
 
+    public void shutdown() {
+      if (writer != null) {
+        try {
+          writer.close();
+        }
+        catch (IOException e) {
+          throw new DatabaseException(e);
+        }
+      }
+
+    }
   }
 
   private String getLogRoot() {

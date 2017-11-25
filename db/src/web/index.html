@@ -193,9 +193,14 @@
         </table>
       </div>
     </h1>
-    <br/><br/>
-    A highly functional subset of features is provided in the free version of SonicBase. Additional features are
-    available for a modest fee.
+    <br/>
+    <h1>What is SonicBase?</h1>
+    SonicBase allows you to store and retrieve records in a database with fast insert and retrieval speeds. You can use it for
+    long-term storage and more short-term storage if you just want to do some temporary analysis of data. You may store
+    anything from financial data to human resources data.
+    <h2>Free Database</h2>
+    A highly functional subset of <a href="docs/features.html">features</a> is provided in the free version of SonicBase. Additional features are
+    available for a modest fee ($250 for 8 cores per year).
     <h2>In-Memory Database</h2>
     SonicBase stores all data in memory. It uses a mix of on-heap and off-heap memory. Additionally, disk-based snapshots and
     logs are used to achieve durability.
@@ -204,19 +209,18 @@
     and it is dynamically distributed as you add or delete records. You can scale SonicBase to billions
     of records on commodity servers. See the documented benchmarks for more details. SonicBase Pro supports cross-shard transactions and cross-shard joins.
     <h2>Relational Database</h2>
-    SonicBase supports the SQL syntax. SQL support is accessed via the JDBC driver.
+    SonicBase supports the SQL syntax. SQL support is accessed via the JDBC driver. See Wikipedia for a description of
+    <a href="https://en.wikipedia.org/wiki/Relational_database">relational datbases</a>
     <h2>Cross-platform Database</h2>
     SonicBase is cross-platform, supporting Linux, Mac, Cygwin and Windows.
     <h2>Performance</h2>
     With a 32 server, 4 billion record cluster with replication factor equals 1 we achieved 4.4 million batch record inserts per second and
     49 million range-based record reads per second. With SonicBase you can achieve linear scalability.
-    <!--
     <h2>Automatic Bulk Import (new)</h2>
     <div class="mylink">
       We have added the ability to automatically load your SonicBase database from another JDBC compliant database. This will allow
     you to quickly load SonicBase and do analytics on your data. See <a href="docs/automated-bulk-import.html">Automated Bulk Import Documentation</a>.
     </div>
-    -->
     <h2>Message Queue Integration (new)</h2>
     <h3>Consumers</h3>
     <div class="mylink">
@@ -248,5 +252,6 @@
 
 </div>
 <!-- Main Container Ends -->
+<!-- Review widget start --> <script type='text/javascript'> var ucode='aHR0cHM6Ly9yZXZpZXd3aWRnZXQua3BpYW5hbHlzZXIuY29tLw=='; var code='524b6437c7b9e3482ea248a97362bf6d'; var _rewF = document.createElement('script'); _rewF.type = 'text/javascript'; _rewF.async = true; _rewF.src = "https://reviewwidget.kpianalyser.com/js/reviews.js"; (document.getElementsByTagName("head")[0] || document.documentElement).appendChild(_rewF); </script> <!-- Review widget end -->
 </body>
 </html>

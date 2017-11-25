@@ -8,12 +8,14 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComArray;
 import com.sonicbase.common.ComObject;
+import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.research.socket.NettyServer;
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.util.FileUtils;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -33,10 +35,21 @@ public class TestBulkImport {
   private Connection connB;
   private DatabaseClient clientA;
   private DatabaseClient clientB;
+  private DatabaseServer[] dbServers;
+
+  @AfterClass
+  public void afterClass() {
+    for (DatabaseServer server : dbServers) {
+      server.shutdown();
+    }
+    Logger.queue.clear();
+  }
 
   @BeforeClass
   public void beforeClass() throws IOException, InterruptedException, SQLException, ClassNotFoundException {
     try {
+      Logger.disable();
+
       String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-2-servers-a.json")), "utf-8");
       ObjectMapper mapper = new ObjectMapper();
       final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
@@ -49,7 +62,7 @@ public class TestBulkImport {
 
       DatabaseClient.getServers().clear();
 
-      final DatabaseServer[] dbServers = new DatabaseServer[4];
+      dbServers = new DatabaseServer[4];
 
       String role = "primaryMaster";
 
@@ -156,6 +169,7 @@ public class TestBulkImport {
       clientB = ((ConnectionProxy)connB).getDatabaseClient();
       clientB.syncSchema();
 
+      Logger.setReady(false);
       //
       PreparedStatement stmt = connA.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
       stmt.executeUpdate();

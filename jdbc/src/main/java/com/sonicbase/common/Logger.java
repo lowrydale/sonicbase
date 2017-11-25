@@ -14,10 +14,11 @@ import java.util.concurrent.TimeUnit;
  */
 public class Logger {
   private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
+  private static boolean disable;
   private final DatabaseClient databaseClient;
   private static Thread sendThread;
   private static String hostName;
-  private static ArrayBlockingQueue<Error> queue = new ArrayBlockingQueue<Error>(1000);
+  public static ArrayBlockingQueue<Error> queue = new ArrayBlockingQueue<Error>(10000);
   private static boolean ready = false;
   private static boolean isClient;
 
@@ -97,6 +98,17 @@ public class Logger {
     logger.error(msg, throwable);
   }
 
+  public static void setReady(boolean ready) {
+    Logger.ready = ready;
+    if (!ready) {
+      queue.clear();
+    }
+  }
+
+  public static void disable() {
+    Logger.disable = true;
+  }
+
   class Error {
     DatabaseClient client;
     String msg;
@@ -165,6 +177,9 @@ public class Logger {
 
   public void sendErrorToServer(String msg, Throwable e) {
     try {
+      if (disable) {
+        return;
+      }
       if (ready) {
         if (shard != -1) {
           queue.put(new Error(databaseClient, "shard=" + shard + ", replica=" + replica + " " + msg, e));

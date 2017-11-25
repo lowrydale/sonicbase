@@ -30,6 +30,7 @@ public class DeleteManager {
   private Thread mainThread;
   private ThreadPoolExecutor freeExecutor;
   private LogManager deltaLogManager;
+  private boolean shutdown;
 
   public DeleteManager(DatabaseServer databaseServer) {
     this.databaseServer = databaseServer;
@@ -65,6 +66,17 @@ public class DeleteManager {
         }
       }
     }
+
+  }
+
+  public void shutdown() {
+    shutdown = true;
+    if (mainThread != null) {
+      mainThread.interrupt();
+    }
+    executor.shutdownNow();
+    freeExecutor.shutdownNow();
+    deltaLogManager.shutdown();
 
   }
 
@@ -1190,7 +1202,7 @@ public class DeleteManager {
     mainThread = new Thread(new Runnable() {
       @Override
       public void run() {
-        while (true) {
+        while (!shutdown) {
           try {
             Thread.sleep(2_000);
             doDeletes(false);

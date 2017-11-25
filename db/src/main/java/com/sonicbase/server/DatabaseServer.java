@@ -3788,6 +3788,13 @@ public class DatabaseServer {
 
   public void shutdown() {
     shutdown = true;
+
+    shutdownDeathMonitor();
+    shutdownRepartitioner();
+    shutdownMasterLicenseValidator();
+    deleteManager.shutdown();
+    deltaManager.shutdown();
+    logManager.shutdown();
     executor.shutdownNow();
     methodInvoker.shutdown();
   }

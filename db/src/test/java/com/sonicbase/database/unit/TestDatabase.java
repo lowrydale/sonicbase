@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.DatabaseCommon;
+import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.BinaryExpression;
@@ -23,6 +24,7 @@ import com.sun.jersey.core.util.Base64;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.util.FileUtils;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -52,10 +54,13 @@ public class TestDatabase {
   List<Long> ids = new ArrayList<>();
 
   DatabaseClient client = null;
+  DatabaseServer[] dbServers;
 
   @BeforeClass
   public void beforeClass() throws Exception {
     try {
+      Logger.disable();
+
       String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
       ObjectMapper mapper = new ObjectMapper();
       final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
@@ -68,7 +73,7 @@ public class TestDatabase {
 
       DatabaseClient.getServers().clear();
 
-      final DatabaseServer[] dbServers = new DatabaseServer[4];
+      dbServers = new DatabaseServer[4];
       ThreadPoolExecutor executor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
       String role = "primaryMaster";
@@ -121,6 +126,8 @@ public class TestDatabase {
       conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/test", "user", "password");
 
       client = ((ConnectionProxy) conn).getDatabaseClient();
+
+      Logger.setReady(false);
 
       client.setPageSize(3);
 
@@ -422,6 +429,14 @@ public class TestDatabase {
       e.printStackTrace();
       throw e;
     }
+  }
+
+  @AfterClass
+  public void afterClass() {
+    for (DatabaseServer server : dbServers) {
+      server.shutdown();
+    }
+    Logger.queue.clear();
   }
 
   @Test

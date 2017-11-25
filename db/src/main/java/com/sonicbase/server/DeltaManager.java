@@ -49,6 +49,10 @@ public class DeltaManager {
     this.logger = new Logger(databaseServer.getDatabaseClient());
   }
 
+  public void shutdown() {
+    enableSnapshot(false);
+  }
+
   public static int getHighestCommittedSnapshotVersion(File snapshotRootDir, Logger logger) {
     int highestSnapshot = -1;
     try {

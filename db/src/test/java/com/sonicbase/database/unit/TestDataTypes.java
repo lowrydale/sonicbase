@@ -7,12 +7,14 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.queue.LocalMessageQueueConsumer;
 import com.sonicbase.queue.Message;
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.util.FileUtils;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -35,9 +37,20 @@ public class TestDataTypes {
   private int recordCount = 10;
   List<Long> ids = new ArrayList<>();
 
+  DatabaseServer[] dbServers;
+
+  @AfterClass
+  public void afterClass() {
+    for (DatabaseServer server : dbServers) {
+      server.shutdown();
+    }
+    Logger.queue.clear();
+  }
 
   @BeforeClass
   public void beforeClass() throws Exception {
+    Logger.disable();
+
     String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
     ObjectMapper mapper = new ObjectMapper();
     final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
@@ -50,7 +63,7 @@ public class TestDataTypes {
 
     DatabaseClient.getServers().clear();
 
-    final DatabaseServer[] dbServers = new DatabaseServer[4];
+    dbServers = new DatabaseServer[4];
     ThreadPoolExecutor executor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
     String role = "primaryMaster";
@@ -81,6 +94,8 @@ public class TestDataTypes {
     conn.close();
 
     conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/test", "user", "password");
+
+    Logger.setReady(false);
 
     DatabaseClient client = ((ConnectionProxy)conn).getDatabaseClient();
 

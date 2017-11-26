@@ -3,6 +3,7 @@ package com.sonicbase.query.impl;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.Record;
 import com.sonicbase.common.SchemaOutOfSyncException;
+import com.sonicbase.jdbcdriver.Parameter;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
@@ -18,6 +19,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -174,7 +176,11 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
         }
       }
 
-      if (!canUseIndex || operator == Operator.like || (leftExpression instanceof ColumnImpl && rightExpression instanceof ColumnImpl)) {
+      if (!canUseIndex || operator == Operator.like ||
+          (leftExpression instanceof ColumnImpl && rightExpression instanceof ColumnImpl)
+//          ||
+//          expressionContainsMath(leftExpression) || expressionContainsMath(rightExpression)
+          ) {
         if (explain != null) {
           explain.appendSpaces();
           explain.getBuilder().append("Table scan: " + getTopLevelExpression().toString() + "\n");
@@ -200,6 +206,27 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     return null;
   }
 
+  private boolean expressionContainsMath(ExpressionImpl expression) {
+    if (expression instanceof BinaryExpression) {
+      BinaryExpressionImpl binaryExpression = (BinaryExpressionImpl) expression;
+      if (binaryExpression.operator == Operator.and || binaryExpression.operator == Operator.or) {
+        return expressionContainsMath(leftExpression) || expressionContainsMath(rightExpression);
+      }
+      else if (binaryExpression.operator == Operator.plus ||
+            binaryExpression.operator == Operator.minus ||
+            binaryExpression.operator == Operator.times ||
+            binaryExpression.operator == Operator.divide ||
+            binaryExpression.operator == Operator.bitwiseAnd ||
+            binaryExpression.operator == Operator.bitwiseOr ||
+            binaryExpression.operator == Operator.bitwiseXOr ||
+            binaryExpression.operator == Operator.modulo) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   public void getColumnsInExpression(List<ColumnImpl> columns) {
     super.getColumnsInExpression(columns);
     leftExpression.getColumnsInExpression(columns);
@@ -223,10 +250,16 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
         }
         else {
           Object currLeftValue = ExpressionImpl.getValueFromExpression(getParms(), rightExpression);
+          if (currLeftValue == null) {
+            currLeftValue = ExpressionImpl.getValueFromExpression(getParms(), leftExpression);
+            columnName = ((ColumnImpl) leftExpression).getColumnName();
+          }
           TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(getTableName());
           int o = tableSchema.getFieldOffset(columnName);
-          currLeftValue = tableSchema.getFields().get(o).getType().getConverter().convert(currLeftValue);
-          originalLeftValue = currLeftValue;
+          if (currLeftValue != null) {
+            currLeftValue = tableSchema.getFields().get(o).getType().getConverter().convert(currLeftValue);
+            originalLeftValue = currLeftValue;
+          }
         }
         IndexSchema indexSchema = null;
         String[] preferredIndexColumns = null;
@@ -256,7 +289,8 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
 
         GroupByContext groupByContext = getGroupByContext();
 
-        if (groupByContext != null && !indexSchema.isPrimaryKey()) {
+        if (groupByContext != null && !indexSchema.isPrimaryKey() ||
+            expressionContainsMath(leftExpression) || expressionContainsMath(rightExpression)) {
           SelectContextImpl context = ExpressionImpl.tableScan(dbName, getViewVersion(), getClient(), count,
               getClient().getCommon().getTables(dbName).get(getTableName()),
               getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(),
@@ -1194,6 +1228,13 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
       Object lhsValue = leftExpression.evaluateSingleRecord(tableSchemas, records, parms);
       Object rhsValue = rightExpression.evaluateSingleRecord(tableSchemas, records, parms);
       Comparator comparator = DataType.Type.getComparatorForValue(lhsValue);
+      if (lhsValue instanceof BigDecimal || rhsValue instanceof BigDecimal) {
+        comparator = DataType.getBigDecimalComparator();
+      }
+      else if (lhsValue instanceof Double || rhsValue instanceof Double ||
+          lhsValue instanceof Float || rhsValue instanceof Float) {
+        comparator = DataType.getDoubleComparator();
+      }
       if (operator == BinaryExpression.Operator.equal) {
         if (lhsValue == null && rhsValue == null) {
           return true;
@@ -1212,7 +1253,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
         }
         return false;
       }
-      if (operator == BinaryExpression.Operator.like) {
+      else if (operator == BinaryExpression.Operator.like) {
         if (lhsValue == null && rhsValue == null) {
           return true;
         }
@@ -1327,6 +1368,106 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
           return !((Boolean) lhsValue || (Boolean) rhsValue);
         }
         return (Boolean) lhsValue || (Boolean) rhsValue;
+      }
+      else if (operator == BinaryExpression.Operator.plus ||
+          operator == BinaryExpression.Operator.minus ||
+          operator == BinaryExpression.Operator.times ||
+          operator == Operator.divide ||
+          operator == Operator.bitwiseAnd ||
+          operator == Operator.bitwiseOr ||
+          operator == Operator.bitwiseXOr ||
+          operator == Operator.modulo) {
+        if (lhsValue == null || rhsValue == null) {
+          return null;
+        }
+        if (lhsValue instanceof BigDecimal || rhsValue instanceof BigDecimal) {
+          BigDecimal lhs = (BigDecimal) DataType.getBigDecimalConverter().convert(lhsValue);
+          BigDecimal rhs = (BigDecimal) DataType.getBigDecimalConverter().convert(lhsValue);
+          if (operator == Operator.plus) {
+            return lhs.add(rhs);
+          }
+          else if (operator == Operator.minus) {
+            return lhs.subtract(rhs);
+          }
+          else if (operator == Operator.times) {
+            return lhs.multiply(rhs);
+          }
+          else if (operator == Operator.divide) {
+            return lhs.divide(rhs);
+          }
+          else if (operator == Operator.bitwiseAnd ||
+              operator == Operator.bitwiseOr ||
+              operator == Operator.bitwiseXOr ||
+              operator == Operator.modulo) {
+            throw new DatabaseException("Invalid operator");
+          }
+          else {
+            throw new DatabaseException("Invalid operator");
+          }
+        }
+        else if (lhsValue instanceof Double || rhsValue instanceof Double ||
+            lhsValue instanceof Float || rhsValue instanceof Float) {
+          Double lhs = (Double) DataType.getDoubleConverter().convert(lhsValue);
+          Double rhs = (Double) DataType.getDoubleConverter().convert(rhsValue);
+          if (operator == Operator.plus) {
+            return lhs + rhs;
+          }
+          else if (operator == Operator.minus) {
+            return lhs - rhs;
+          }
+          else if (operator == Operator.times) {
+            return lhs * rhs;
+          }
+          else if (operator == Operator.divide) {
+            return lhs / rhs;
+          }
+          else if (operator == Operator.bitwiseAnd ||
+              operator == Operator.bitwiseOr ||
+              operator == Operator.bitwiseXOr ||
+              operator == Operator.modulo) {
+            throw new DatabaseException("Invalid operator");
+          }
+          else {
+            throw new DatabaseException("Invalid operator");
+          }
+        }
+        else if (lhsValue instanceof Long || rhsValue instanceof Long ||
+            lhsValue instanceof Integer || rhsValue instanceof Integer ||
+            lhsValue instanceof Short || rhsValue instanceof Short ||
+            lhsValue instanceof Byte || rhsValue instanceof Byte) {
+          Long lhs = (Long) DataType.getLongConverter().convert(lhsValue);
+          Long rhs = (Long) DataType.getLongConverter().convert(rhsValue);
+          if (operator == Operator.plus) {
+            return lhs + rhs;
+          }
+          else if (operator == Operator.minus) {
+            return lhs - rhs;
+          }
+          else if (operator == Operator.times) {
+            return lhs * rhs;
+          }
+          else if (operator == Operator.divide) {
+            return lhs / rhs;
+          }
+          else if (operator == Operator.bitwiseAnd) {
+            return lhs & rhs;
+          }
+          else if (operator == Operator.bitwiseOr) {
+            return lhs | rhs;
+          }
+          else if (operator == Operator.bitwiseXOr) {
+            return lhs ^ rhs;
+          }
+          else if (operator == Operator.modulo) {
+            return lhs % rhs;
+          }
+          else {
+            throw new DatabaseException("Invalid operator");
+          }
+        }
+        else {
+          throw new DatabaseException("Operator not supported for this datatype");
+        }
       }
       if (isNot) {
         return true;

@@ -9,7 +9,6 @@ import java.util.Map;
 public interface BinaryExpression extends Expression {
   Map<Integer, Operator> idToOperator = new HashMap<Integer, Operator>();
 
-
   enum Operator {
     equal(0, "="),
     less(1, "<"),
@@ -19,7 +18,15 @@ public interface BinaryExpression extends Expression {
     and(5, "and"),
     or(6, "or"),
     notEqual(7, "!="),
-    like(8, "like");
+    like(8, "like"),
+    plus(9, "+"),
+    minus(10, "-"),
+    times(11, "*"),
+    divide(12, "/"),
+    bitwiseAnd(13, "&"),
+    bitwiseOr(14, "|"),
+    bitwiseXOr(15, "^"),
+    modulo(16, "%");
 
     private final int id;
     private final String symbol;

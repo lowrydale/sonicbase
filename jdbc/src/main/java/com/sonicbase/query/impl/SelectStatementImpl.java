@@ -20,6 +20,7 @@ import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.giraph.utils.Varint;
 
 import java.io.*;
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
@@ -1416,6 +1417,14 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                                 Object lhsValue = key[i][j];
                                 Object rhsValue = previousKey[i][j];
                                 Comparator comparator = DataType.Type.getComparatorForValue(lhsValue);
+                                if (lhsValue instanceof BigDecimal || rhsValue instanceof BigDecimal) {
+                                  comparator = DataType.getBigDecimalComparator();
+                                }
+                                else if (lhsValue instanceof Double || rhsValue instanceof Double ||
+                                    lhsValue instanceof Float || rhsValue instanceof Float) {
+                                  comparator = DataType.getDoubleComparator();
+                                }
+
                                 if (lhsValue == null || rhsValue == null) {
                                   equals = false;
                                 }

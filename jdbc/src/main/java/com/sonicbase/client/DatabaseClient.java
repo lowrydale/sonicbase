@@ -9,6 +9,7 @@ import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.jdbcdriver.QueryType;
 
 import com.sonicbase.query.*;
+import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.impl.*;
 
 import com.sonicbase.schema.FieldSchema;
@@ -19,6 +20,7 @@ import com.sonicbase.schema.Schema;
 import com.sonicbase.schema.TableSchema;
 import net.sf.jsqlparser.expression.*;
 import net.sf.jsqlparser.expression.Expression;
+import net.sf.jsqlparser.expression.operators.arithmetic.*;
 import net.sf.jsqlparser.expression.operators.conditional.AndExpression;
 import net.sf.jsqlparser.expression.operators.conditional.OrExpression;
 import net.sf.jsqlparser.expression.operators.relational.*;
@@ -3983,6 +3985,33 @@ public class DatabaseClient {
       }
       else if (whereExpression instanceof GreaterThanEquals) {
         binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.greaterEqual);
+      }
+      else if (whereExpression instanceof Addition) {
+        binaryOp.setOperator(BinaryExpression.Operator.plus);
+      }
+      else if (whereExpression instanceof Subtraction) {
+        binaryOp.setOperator(BinaryExpression.Operator.minus);
+      }
+      else if (whereExpression instanceof Multiplication) {
+        binaryOp.setOperator(BinaryExpression.Operator.times);
+      }
+      else if (whereExpression instanceof Division) {
+        binaryOp.setOperator(BinaryExpression.Operator.divide);
+      }
+      else if (whereExpression instanceof Division) {
+        binaryOp.setOperator(BinaryExpression.Operator.divide);
+      }
+      else if (whereExpression instanceof BitwiseAnd) {
+        binaryOp.setOperator(BinaryExpression.Operator.bitwiseAnd);
+      }
+      else if (whereExpression instanceof BitwiseOr) {
+        binaryOp.setOperator(BinaryExpression.Operator.bitwiseOr);
+      }
+      else if (whereExpression instanceof BitwiseXor) {
+        binaryOp.setOperator(BinaryExpression.Operator.bitwiseXOr);
+      }
+      else if (whereExpression instanceof Modulo) {
+        binaryOp.setOperator(BinaryExpression.Operator.modulo);
       }
       net.sf.jsqlparser.expression.BinaryExpression bexp = (net.sf.jsqlparser.expression.BinaryExpression) whereExpression;
       binaryOp.setNot(bexp.isNot());

@@ -1,5 +1,5 @@
 /* © 2017 by Intellectual Reserve, Inc. All rights reserved. */
-package com.sonicbase.database.unit;
+package com.sonicbase.database.performance;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
+import com.sonicbase.query.DatabaseException;
 import com.sonicbase.research.socket.NettyServer;
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.IOUtils;
@@ -22,7 +23,8 @@ import java.io.IOException;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
+import java.util.Map;
+import java.util.concurrent.*;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -44,10 +46,26 @@ public class TestPerformance {
       thread.interrupt();
     }
     Logger.queue.clear();
+
+    int maxLen = 0;
+    for (String name : results.keySet()) {
+      maxLen = Math.max(name.length(), maxLen);
+    }
+    for (Map.Entry<String, Result> entry : results.entrySet()) {
+      String name = entry.getKey();
+      String prefix = "";
+      for (int i = 0; i < maxLen - name.length(); i++) {
+        prefix += " ";
+      }
+      System.out.println(prefix + name + ": " + entry.getValue().duration / 1_000_000 + " " +
+          entry.getValue().duration / entry.getValue().count / 1_000_000D + " " +
+          (double)entry.getValue().count / (double)entry.getValue().duration * 1_000_000D * 1000D);
+    }
+
   }
 
   @BeforeClass
-  public void beforeClass() throws IOException, InterruptedException, SQLException, ClassNotFoundException {
+  public void beforeClass() throws IOException, InterruptedException, SQLException, ClassNotFoundException, ExecutionException {
     try {
       Logger.disable();
       String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
@@ -195,95 +213,134 @@ public class TestPerformance {
         server.shutdownRepartitioner();
       }
 
+      List<Future> futures = new ArrayList<>();
+      ThreadPoolExecutor executor = new ThreadPoolExecutor(8, 8, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
       int offset = 0;
-      for (int i = 0; i < 1_000; i++) {
-        stmt = conn.prepareStatement("insert into persons (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
-        for (int j = 0; j < 100; j++) {
-          stmt.setLong(1, offset);
-          stmt.setLong(2, offset + 1000);
-          String leading = "";
-          if (offset < 10) {
-            leading = "00000";
+      for (int i = 0; i < 5_000; i++) {
+        final int currOffset = offset;
+        offset += 100;
+        futures.add(executor.submit(new Callable(){
+          @Override
+          public Object call() throws Exception {
+            PreparedStatement stmt = conn.prepareStatement("insert into persons (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
+            int offset = currOffset;
+            for (int j = 0; j < 100; j++) {
+              stmt.setLong(1, offset);
+              stmt.setLong(2, offset + 1000);
+              String leading = "";
+              if (offset < 10) {
+                leading = "00000";
+              }
+              else if (offset < 100) {
+                leading = "0000";
+              }
+              else if (offset < 1000) {
+                leading = "000";
+              }
+              else if (offset < 10000) {
+                leading = "00";
+              }
+              else if (offset < 100_000) {
+                leading = "0";
+              }
+              else if (offset < 1_000_000) {
+                leading = "";
+              }
+              if (offset == 99_999) {
+                System.out.println("here");
+              }
+              stmt.setString(3, leading + offset);
+              stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+              stmt.setBoolean(5, false);
+              stmt.setString(6, "m");
+              stmt.addBatch();
+              if (offset++ % 1000 == 0) {
+                System.out.println("progress: count=" + offset);
+              }
+            }
+            stmt.executeBatch();    return null;
           }
-          else if (offset < 100) {
-            leading = "0000";
-          }
-          else if (offset < 1000) {
-            leading = "000";
-          }
-          else if (offset < 10000) {
-            leading = "00";
-          }
-          else if (offset < 100_000) {
-            leading = "0";
-          }
-          else if (offset < 1_000_000) {
-            leading = "";
-          }
-          if (offset == 99_999) {
-            System.out.println("here");
-          }
-          stmt.setString(3, leading + offset);
-          stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
-          stmt.setBoolean(5, false);
-          stmt.setString(6, "m");
-          stmt.addBatch();
-          if (offset++ % 1000 == 0) {
-            System.out.println("progress: count=" + offset);
-          }
-        }
-        stmt.executeBatch();
+        }));
+
+      }
+
+      for (Future future : futures) {
+        future.get();
       }
 
       offset = 0;
-      for (int i = 0; i < 1_000; i++) {
-        stmt = conn.prepareStatement("insert into residence (id, id2, id3, address) VALUES (?, ?, ?, ?)");
-        for (int j = 0; j < 100; j++) {
-          stmt.setLong(1, offset);
-          stmt.setLong(2, offset + 1000);
-          stmt.setLong(3, offset + 2000);
-          stmt.setString(4, "5078 West Black");
-          if (offset++ % 1000 == 0) {
-            System.out.println("progress: count=" + offset);
-          }
-          stmt.addBatch();
-        }
-        stmt.executeBatch();
+      for (int i = 0; i < 5_000; i++) {
+        final int currOffset = offset;
+        offset += 100;
+        futures.add(executor.submit(new Callable(){
+          @Override
+          public Object call() throws Exception {
+            int offset = currOffset;
+            PreparedStatement stmt = conn.prepareStatement("insert into residence (id, id2, id3, address) VALUES (?, ?, ?, ?)");
+            for (int j = 0; j < 100; j++) {
+              stmt.setLong(1, offset);
+              stmt.setLong(2, offset + 1000);
+              stmt.setLong(3, offset + 2000);
+              stmt.setString(4, "5078 West Black");
+              if (offset++ % 1000 == 0) {
+                System.out.println("progress: count=" + offset);
+              }
+              stmt.addBatch();
+            }
+            stmt.executeBatch();
+            return null;
+          }}));
+      }
+
+      for (Future future : futures) {
+        future.get();
       }
 
       offset = 0;
-      for (int i = 0; i < 1_000; i++) {
-        stmt = conn.prepareStatement("insert into employee (id, id2, socialSecurityNumber) VALUES (?, ?, ?)");
-        for (int j = 0; j < 100; j++) {
-          stmt.setLong(1, offset);
-          String leading = "";
-          if (offset < 10) {
-            leading = "00000";
-          }
-          else if (offset < 100) {
-            leading = "0000";
-          }
-          else if (offset < 1000) {
-            leading = "000";
-          }
-          else if (offset < 10000) {
-            leading = "00";
-          }
-          else if (offset < 100_000) {
-            leading = "0";
-          }
-          else if (offset < 1_000_000) {
-            leading = "";
-          }
-          stmt.setLong(2, offset + 1000);
-          stmt.setString(3, leading + offset);
-          if (offset++ % 1000 == 0) {
-            System.out.println("progress: count=" + offset);
-          }
-          stmt.addBatch();
-        }
-        stmt.executeBatch();
+      for (int i = 0; i < 5_000; i++) {
+        final int currOffset = offset;
+        offset += 100;
+        futures.add(executor.submit(new Callable(){
+          @Override
+          public Object call() throws Exception {
+            int offset = currOffset;
+            PreparedStatement stmt = conn.prepareStatement("insert into employee (id, id2, socialSecurityNumber) VALUES (?, ?, ?)");
+            for (int j = 0; j < 100; j++) {
+              stmt.setLong(1, offset);
+              String leading = "";
+              if (offset < 10) {
+                leading = "00000";
+              }
+              else if (offset < 100) {
+                leading = "0000";
+              }
+              else if (offset < 1000) {
+                leading = "000";
+              }
+              else if (offset < 10000) {
+                leading = "00";
+              }
+              else if (offset < 100_000) {
+                leading = "0";
+              }
+              else if (offset < 1_000_000) {
+                leading = "";
+              }
+              stmt.setLong(2, offset + 1000);
+              stmt.setString(3, leading + offset);
+              if (offset++ % 1000 == 0) {
+                System.out.println("progress: count=" + offset);
+              }
+              stmt.addBatch();
+            }
+            stmt.executeBatch();
+            return null;
+          }}));
       }
+      for (Future future : futures) {
+        future.get();
+      }
+
 
 //      long size = client.getPartitionSize("test", 0, "children", "_1_socialsecuritynumber");
 //      assertEquals(size, 10);
@@ -308,6 +365,28 @@ public class TestPerformance {
     }
   }
 
+  class Result {
+    private long duration;
+    private int count;
+
+    public Result(long duration, int count) {
+      this.duration = duration;
+      this.count = count;
+    }
+  }
+
+  private Map<String, Result> results = new ConcurrentHashMap<>();
+
+  private void registerResults(String testName, long duration, int count) {
+    System.out.println(testName + ": " + duration / 1_000_000 + " " +
+        duration / count / 1_000_000D + " " +
+        count / duration / 1_000_000D * 1000);
+
+    if (results.put(testName, new Result(duration, count)) != null) {
+      throw new DatabaseException("non-unique test: name=" + testName);
+    }
+  }
+
   @Test
   public void test() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id=1000");
@@ -320,8 +399,26 @@ public class TestPerformance {
       count++;
     }
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    registerResults("identity id=", end-begin, count);
     assertTrue((end - begin) < (3300 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void testMath() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id, id5 from persons where id >= 0 and id = id2 - 1000 order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    long begin = System.nanoTime();
+    int count = 0;
+    ResultSet rs = stmt.executeQuery();
+    for (int i = 0; i < 500_000; i++) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id"), i);
+      count++;
+    }
+    long end = System.nanoTime();
+    registerResults("math", end-begin, count);
+    assertTrue((end - begin) < (5000 * 1_000_000L), String.valueOf(end-begin));
   }
 
   @Test
@@ -336,7 +433,7 @@ public class TestPerformance {
       count++;
     }
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    registerResults("identity secondary key id=", end-begin, count);
     assertTrue((end - begin) < (8000 * 1_000_000L), String.valueOf(end-begin));
   }
 
@@ -346,19 +443,25 @@ public class TestPerformance {
     long begin = System.nanoTime();
     ResultSet rs = stmt.executeQuery();
     int count = 0;
-    for (int i = 1_000; i < 100_000; i++) {
+    for (int i = 1_000; i < 500_000; i++) {
       assertTrue(rs.next());
       String lead = "0";
       if (i < 10_000) {
         lead = "00";
+      }
+      else if (i < 100_000) {
+        lead = "0";
+      }
+      else if (i < 1_000_000) {
+        lead = "";
       }
       assertEquals(rs.getString("socialsecuritynumber"), lead + i);
       count++;
     }
     assertFalse(rs.next());
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
-    assertTrue((end - begin) < (2000 * 1_000_000L), String.valueOf(end-begin));
+    registerResults("range secondary key", end-begin, count);
+    assertTrue((end - begin) < (5500 * 1_000_000L), String.valueOf(end-begin));
   }
 
   @Test
@@ -367,7 +470,7 @@ public class TestPerformance {
     long begin = System.nanoTime();
     ResultSet rs = stmt.executeQuery();
     int count = 0;
-    for (int i = 1_001; i < 100_000; i++) {
+    for (int i = 1_001; i < 500_000; i++) {
       assertTrue(rs.next());
       assertEquals(rs.getLong("id"), i);
       assertEquals(rs.getLong("id2"), i + 1000);
@@ -376,8 +479,8 @@ public class TestPerformance {
     }
     assertFalse(rs.next());
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
-    assertTrue((end - begin) < (1000 * 1_000_000L), String.valueOf(end-begin));
+    registerResults("range three key", end-begin, count);
+    assertTrue((end - begin) < (3200 * 1_000_000L), String.valueOf(end-begin));
   }
 
   @Test
@@ -386,7 +489,7 @@ public class TestPerformance {
     long begin = System.nanoTime();
     ResultSet rs = stmt.executeQuery();
     int count = 0;
-    for (int i = 1_001; i < 100_000; i++) {
+    for (int i = 1_001; i < 500_000; i++) {
       assertTrue(rs.next());
       assertEquals(rs.getLong("id"), i);
       assertEquals(rs.getLong("id2"), i + 1000);
@@ -395,8 +498,8 @@ public class TestPerformance {
     }
     assertFalse(rs.next());
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
-    assertTrue((end - begin) < (1000 * 1_000_000L), String.valueOf(end-begin));
+    registerResults("range secondary key backwards", end-begin, count);
+    assertTrue((end - begin) < (3200 * 1_000_000L), String.valueOf(end-begin));
   }
 
   @Test
@@ -414,8 +517,8 @@ public class TestPerformance {
     }
     assertFalse(rs.next());
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
-    assertTrue((end - begin) < (1400 * 1_000_000L), String.valueOf(end-begin));
+    registerResults("range secondary key mixed", end-begin, count);
+    assertTrue((end - begin) < (2500 * 1_000_000L), String.valueOf(end-begin));
   }
 
   @Test
@@ -424,7 +527,7 @@ public class TestPerformance {
     long begin = System.nanoTime();
     ResultSet rs = stmt.executeQuery();
     int count = 0;
-    for (int i = 1_001; i < 100_000; i++) {
+    for (int i = 1_001; i < 500_000; i++) {
       assertTrue(rs.next());
       assertEquals(rs.getLong("id"), i);
       assertEquals(rs.getLong("id2"), i + 1000);
@@ -433,8 +536,8 @@ public class TestPerformance {
     }
     assertFalse(rs.next());
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
-    assertTrue((end - begin) < (900 * 1_000_000L), String.valueOf(end-begin));
+    registerResults("range secondary key single", end-begin, count);
+    assertTrue((end - begin) < (3200 * 1_000_000L), String.valueOf(end-begin));
   }
 
   @Test
@@ -457,7 +560,7 @@ public class TestPerformance {
     }
     assertFalse(rs.next());
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    registerResults("range two key greater equal2", end-begin, count);
     assertTrue((end - begin) < (2000 * 1_000_000L), String.valueOf(end-begin));
   }
 
@@ -481,7 +584,7 @@ public class TestPerformance {
     }
     assertFalse(rs.next());
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    registerResults("range two key greater", end-begin, count);
     assertTrue((end - begin) < (1900 * 1_000_000L), String.valueOf(end-begin));
   }
 
@@ -505,7 +608,7 @@ public class TestPerformance {
     }
     assertFalse(rs.next());
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / (double)count / 1_000_000);
+    registerResults("range two key greater left sided", end-begin, count);
     assertTrue((end - begin) < (2650 * 1_000_000L), String.valueOf(end-begin));
   }
 
@@ -522,7 +625,7 @@ public class TestPerformance {
     }
     assertFalse(rs.next());
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    registerResults("not in", end-begin, count);
     assertTrue((end - begin) < (1500 * 1_000_000L), String.valueOf(end-begin));
   }
 
@@ -539,7 +642,7 @@ public class TestPerformance {
     }
     assertFalse(rs.next());
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    registerResults("range not in secondary", end-begin, count);
     assertTrue((end - begin) < (2200 * 1_000_000L), String.valueOf(end-begin));
   }
 
@@ -549,15 +652,15 @@ public class TestPerformance {
     long begin = System.nanoTime();
     ResultSet rs = stmt.executeQuery();
     int count = 0;
-    for (int i = 1001; i < 101_000; i++) {
+    for (int i = 1001; i < 501_000; i++) {
       assertTrue(rs.next());
       assertEquals(rs.getLong("id2"), i);
       count++;
     }
     assertFalse(rs.next());
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
-    assertTrue((end - begin) < (2600 * 1_000_000L), String.valueOf(end-begin));
+    registerResults("range not in table scan", end-begin, count);
+    assertTrue((end - begin) < (8500 * 1_000_000L), String.valueOf(end-begin));
   }
 
   @Test
@@ -573,7 +676,7 @@ public class TestPerformance {
     }
     assertFalse(rs.next());
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    registerResults("range two key", end-begin, count);
     assertTrue((end - begin) < (1200 * 1_000_000L), String.valueOf(end-begin));
   }
 
@@ -583,15 +686,15 @@ public class TestPerformance {
     long begin = System.nanoTime();
     ResultSet rs = stmt.executeQuery();
     int count = 0;
-    for (int i = 1001; i < 101_000; i++) {
+    for (int i = 1001; i < 501_000; i++) {
       assertTrue(rs.next());
       assertEquals(rs.getLong("id2"), i);
       count++;
     }
     assertFalse(rs.next());
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
-    assertTrue((end - begin) < (2200 * 1_000_000L), String.valueOf(end-begin));
+    registerResults("range two key seocndyary key", end-begin, count);
+    assertTrue((end - begin) < (4500 * 1_000_000L), String.valueOf(end-begin));
   }
 
   @Test
@@ -600,7 +703,7 @@ public class TestPerformance {
     long begin = System.nanoTime();
     ResultSet rs = stmt.executeQuery();
     int count = 0;
-    for (int i = 1; i < 100_000; i++) {
+    for (int i = 1; i < 500_000; i++) {
       assertTrue(rs.next());
       String leading = "";
       if (i < 10) {
@@ -626,8 +729,8 @@ public class TestPerformance {
     }
     assertFalse(rs.next());
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
-    assertTrue((end - begin) < (1300 * 1_000_000L), String.valueOf(end-begin));
+    registerResults("table scan", end-begin, count);
+    assertTrue((end - begin) < (2500 * 1_000_000L), String.valueOf(end-begin));
   }
 
   @Test
@@ -643,7 +746,7 @@ public class TestPerformance {
     }
     assertFalse(rs.next());
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    registerResults("range two key2", end-begin, count);
     assertTrue((end - begin) < (1200 * 1_000_000L), String.valueOf(end-begin));
   }
 
@@ -661,7 +764,7 @@ public class TestPerformance {
     }
     assertFalse(rs.next());
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    registerResults("range two key right sided", end-begin, count);
     assertTrue((end - begin) < (1200 * 1_000_000L), String.valueOf(end-begin));
   }
 
@@ -679,7 +782,7 @@ public class TestPerformance {
     }
     assertFalse(rs.next());
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    registerResults("range two key left sided greater", end-begin, count);
     assertTrue((end - begin) < (1300 * 1_000_000L), String.valueOf(end-begin));
   }
 
@@ -696,7 +799,7 @@ public class TestPerformance {
     }
     assertFalse(rs.next());
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    registerResults("range two key greater2", end-begin, count);
     assertTrue((end - begin) < (1600 * 1_000_000L), String.valueOf(end-begin));
   }
 
@@ -713,7 +816,7 @@ public class TestPerformance {
     }
     assertFalse(rs.next());
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    registerResults("range two key greater backwards", end-begin, count);
     assertTrue((end - begin) < (1600 * 1_000_000L), String.valueOf(end-begin));
   }
 
@@ -732,7 +835,7 @@ public class TestPerformance {
     }
     assertFalse(rs.next());
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    registerResults("range two key left sided greater equal", end-begin, count);
     assertTrue((end - begin) < (800 * 1_000_000L), String.valueOf(end-begin));
   }
 
@@ -748,8 +851,8 @@ public class TestPerformance {
       count++;
     }
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
-    assertTrue((end - begin) < (4000 * 1_000_000L), String.valueOf(end-begin));
+    registerResults("range two key greater equal", end-begin, count);
+    assertTrue((end - begin) < (12000 * 1_000_000L), String.valueOf(end-begin));
   }
 
   @Test
@@ -764,7 +867,7 @@ public class TestPerformance {
       count++;
     }
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    registerResults("max where", end-begin, count);
     assertTrue((end - begin) < (2000 * 1_000_000L), String.valueOf(end-begin));
   }
 
@@ -776,12 +879,12 @@ public class TestPerformance {
     for (int i = 1000; i < 1020; i++) {
       ResultSet rs = stmt.executeQuery();
       assertTrue(rs.next());
-      assertEquals(rs.getLong("maxValue"), 99_999);
+      assertEquals(rs.getLong("maxValue"), 499_999);
       count++;
     }
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
-    assertTrue((end - begin) < (6000 * 1_000_000L), String.valueOf(end-begin));
+    registerResults("max", end-begin, count);
+    assertTrue((end - begin) < (18000 * 1_000_000L), String.valueOf(end-begin));
   }
 
   @Test
@@ -790,7 +893,7 @@ public class TestPerformance {
     long begin = System.nanoTime();
     ResultSet rs = stmt.executeQuery();
     int count = 0;
-    for (int i = 99_999; i >= 1000; i--) {
+    for (int i = 499_999; i >= 1000; i--) {
       assertTrue(rs.next());
       String leading = "";
       if (i < 10) {
@@ -815,8 +918,8 @@ public class TestPerformance {
       count++;
     }
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
-    assertTrue((end - begin) < (900 * 1_000_000L), String.valueOf(end-begin));
+    registerResults("range sort", end-begin, count);
+    assertTrue((end - begin) < (2300 * 1_000_000L), String.valueOf(end-begin));
   }
 
   @Test
@@ -825,7 +928,7 @@ public class TestPerformance {
     long begin = System.nanoTime();
     ResultSet rs = stmt.executeQuery();
     int count = 0;
-    for (int i = 99_999; i >= 1000; i--) {
+    for (int i = 499_999; i >= 1000; i--) {
       assertTrue(rs.next());
       String leading = "";
       if (i < 10) {
@@ -850,8 +953,8 @@ public class TestPerformance {
       count++;
     }
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
-    assertTrue((end - begin) < (3300 * 1_000_000L), String.valueOf(end-begin));
+    registerResults("range sort disk", end-begin, count);
+    assertTrue((end - begin) < (12000 * 1_000_000L), String.valueOf(end-begin));
   }
 
   @Test
@@ -866,7 +969,7 @@ public class TestPerformance {
       count++;
     }
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    registerResults("id2", end-begin, count);
     assertTrue((end - begin) < (9000 * 1_000_000L), String.valueOf(end-begin));
   }
 
@@ -876,15 +979,15 @@ public class TestPerformance {
     long begin = System.nanoTime();
     ResultSet rs = stmt.executeQuery();
     int count = 0;
-    for (int i = 2001; i < 101_000; i++) {
+    for (int i = 2001; i < 501_000; i++) {
       assertTrue(rs.next());
       assertEquals(rs.getLong("id2"), i);
       count++;
     }
     assertFalse(rs.next());
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
-    assertTrue((end - begin) < (2200 * 1_000_000L), String.valueOf(end-begin));
+    registerResults("range id2", end-begin, count);
+    assertTrue((end - begin) < (6200 * 1_000_000L), String.valueOf(end-begin));
   }
 
   @Test
@@ -899,7 +1002,7 @@ public class TestPerformance {
       count++;
     }
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    registerResults("range other expression", end-begin, count);
     assertTrue((end - begin) < (3300 * 1_000_000L), String.valueOf(end-begin));
   }
 
@@ -909,7 +1012,7 @@ public class TestPerformance {
     long begin = System.nanoTime();
     ResultSet rs = stmt.executeQuery();
     int count = 0;
-    for (int i = 1001; i < 100_000; i++) {
+    for (int i = 1001; i < 500_000; i++) {
       assertTrue(rs.next());
       assertEquals(rs.getLong("id"), i);
       assertEquals(rs.getLong("id2"), i + 1000);
@@ -917,25 +1020,25 @@ public class TestPerformance {
     }
     assertFalse(rs.next());
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
-    assertTrue((end - begin) < (800 * 1_000_000L), String.valueOf(end-begin));
+    registerResults("range", end-begin, count);
+    assertTrue((end - begin) < (1800 * 1_000_000L), String.valueOf(end-begin));
   }
 
   @Test
   public void testRangeOtherExpression() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("select * from persons where id>1000 and id2 < 100000 and id2 > 1000");
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where id>1000 and id2 < 500000 and id2 > 1000");
     long begin = System.nanoTime();
     ResultSet rs = stmt.executeQuery();
     int count = 0;
-    for (int i = 1001; i < 99_000; i++) {
+    for (int i = 1001; i < 499_000; i++) {
       assertTrue(rs.next());
       assertEquals(rs.getLong("id"), i);
       count++;
     }
     assertFalse(rs.next());
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
-    assertTrue((end - begin) < (1100 * 1_000_000L), String.valueOf(end-begin));
+    registerResults("range other expression2", end-begin, count);
+    assertTrue((end - begin) < (2500 * 1_000_000L), String.valueOf(end-begin));
   }
 
   @Test
@@ -950,7 +1053,7 @@ public class TestPerformance {
       count++;
     }
     long end = System.nanoTime();
-    System.out.println("duration=" + (end - begin) / 1_000_000 + ", latency=" + (end - begin) / count / 1_000_000D);
+    registerResults("id secdonary", end-begin, count);
     assertTrue((end - begin) < (8000 * 1_000_000L), String.valueOf(end-begin));
   }
 }

@@ -108,7 +108,7 @@ public class TestDatabaseAdvanced {
     DatabaseClient client = ((ConnectionProxy)conn).getDatabaseClient();
 
 
-    PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, id3 BIGINT, id4 BIGINT, num DOUBLE, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
+    PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, id3 BIGINT, id4 BIGINT, id5 BIGINT, num DOUBLE, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
     stmt.executeUpdate();
 
     stmt = conn.prepareStatement("create table Memberships (personId BIGINT, membershipName VARCHAR(20), resortId BIGINT, PRIMARY KEY (personId, membershipName))");
@@ -152,16 +152,17 @@ public class TestDatabaseAdvanced {
     }
 
     for (int i = 0; i < 4; i++) {
-      stmt = conn.prepareStatement("insert into persons (id, id2, id3, id4, num, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      stmt = conn.prepareStatement("insert into persons (id, id2, id3, id4, id5, num, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
       stmt.setLong(1, i);
       stmt.setLong(2, (i + 100) % 2);
       stmt.setLong(3, i + 100);
       stmt.setLong(4, (i + 100) % 3);
-      stmt.setDouble(5, i / 100d);
-      stmt.setString(6, "ssN-933-28-" + i);
-      stmt.setString(7, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
-      stmt.setBoolean(8, false);
-      stmt.setString(9, "m");
+      stmt.setDouble(5, 1);
+      stmt.setDouble(6, i / 100d);
+      stmt.setString(7, "ssN-933-28-" + i);
+      stmt.setString(8, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+      stmt.setBoolean(9, false);
+      stmt.setString(10, "m");
       assertEquals(stmt.executeUpdate(), 1);
       ids.add((long) i);
     }
@@ -237,6 +238,214 @@ public class TestDatabaseAdvanced {
     executor.shutdownNow();
   }
 
+  @Test
+  public void testMathLeftExpressionJustMath() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id, id5 from persons where id < 2 + 1 order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 0);
+    assertEquals(ret.getLong("id5"), 1);
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 1);
+    assertEquals(ret.getLong("id5"), 1);
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 2);
+    assertEquals(ret.getLong("id5"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test (enabled=false)
+  public void testMathLeftExpressionTwoColumns() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id, id5 from persons where 5 < id + id5 order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 0);
+    assertEquals(ret.getLong("id5"), 1);
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 1);
+    assertEquals(ret.getLong("id5"), 1);
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 2);
+    assertEquals(ret.getLong("id5"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testMathLeftExpressionTwoColumns2() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id, id5 from persons where id < id5 + id5 order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 0);
+    assertEquals(ret.getLong("id5"), 1);
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 1);
+    assertEquals(ret.getLong("id5"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testMathLeftExpressionGreaterEqual() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id, id5 from persons where id >= id5 + 1 and id > 1 order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 2);
+    assertEquals(ret.getLong("id5"), 1);
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 3);
+    assertEquals(ret.getLong("id5"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testMathLeftExpression() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id, id5 from persons where id = id5 + 1 and id > 1 order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 2);
+    assertEquals(ret.getLong("id5"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testMathRightExpression() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id, id5 from persons where id > 1 and id = id5 + 1 order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 2);
+    assertEquals(ret.getLong("id5"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testMath() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id, id5 from persons where id = id5 + 1 order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 2);
+    assertEquals(ret.getLong("id5"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testMathMultiply() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id, id5 from persons where id = id5 * 2 order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 2);
+    assertEquals(ret.getLong("id5"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testMathDivide() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id, id5 from persons where id = id5 / 2 order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 0);
+    assertEquals(ret.getLong("id5"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testMathMinus() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id, id5 from persons where id = id5 - 1 order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 0);
+    assertEquals(ret.getLong("id5"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testMathBitwiseAnd() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id, id5 from persons where id = id5 & 1 order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 1);
+    assertEquals(ret.getLong("id5"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testMathBitwiseOr() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id, id5 from persons where id = id5 | 2 order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 3);
+    assertEquals(ret.getLong("id5"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testMathBitwiseXOr() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id, id5 from persons where id = id5 ^ 1 order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 0);
+    assertEquals(ret.getLong("id5"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testMathDouble() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id, id5 from persons where id < id5 * 1.5 order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 0);
+    assertEquals(ret.getLong("id5"), 1);
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 1);
+    assertEquals(ret.getLong("id5"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testMathModulo() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id, id5 from persons where id = id5 % 1 order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 0);
+    assertEquals(ret.getLong("id5"), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testIncompatibleTypes() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id, id5 from persons where id < 5.5 order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 0);
+    assertEquals(ret.getLong("id5"), 1);
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 1);
+    assertEquals(ret.getLong("id5"), 1);
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 2);
+    assertEquals(ret.getLong("id5"), 1);
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 3);
+    assertEquals(ret.getLong("id5"), 1);
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 4);
+    assertEquals(ret.getLong("id5"), 0);
+    assertFalse(ret.next());
+  }
 
   @Test
   public void testJson() throws SQLException {

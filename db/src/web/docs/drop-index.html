@@ -1,0 +1,86 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>SonicBase - Drop Index SQL Syntax</title>
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="Shown is the SQL syntax for creating indices in SonicBase.">
+	<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+	<script type="text/javascript" src="../javascript/main.js"></script>
+
+	<link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+	<script src="../javascript/highlight.min.js"></script>
+	<script>hljs.initHighlightingOnLoad();</script>
+	<!-- Global site tag (gtag.js) - Google Analytics -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+	<script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-109032274-1');
+        ga('require', 'displayfeatures');
+	</script>
+</head>
+
+<body>
+<div class="container">
+	<header id="myHeader">
+		<div class="mobile">
+			<a href="../index.html">
+				<h4 class="logo">SonicBase™</h4>
+			</a>
+		</div>
+		<div class="desktop">
+			<a href="../index.html">
+				<img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+			</a>
+		<nav>
+			<ul>
+				<li><a href="../index.html">HOME</a></li>
+				<li> <a href="../documentation.html">DOCUMENTATION</a></li>
+				<li><a href="../contact.html">CONTACT</a></li>
+			</ul>
+		</nav>
+		</div>
+	</header>
+
+	<script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+	</script>
+
+
+	<div style="margin-left: 4em;margin-right: 4em;">
+<h1>SQL Drop Index Statement</h1>
+Removes an index and all its contents.<br/>
+<h3>Syntax</h3><table class="border-table" border="1"><tr><td> <table class="syntax-table" cellpadding="4">
+	<tbody>
+
+	<tr class="syntax-main">
+           <td width="512" colspan=2 >
+			   DROP INDEX table_name.index_name
+		</td>
+	  </tr>
+	  <tr><td><table border=0 cellpadding=4 cellspacing="0">
+		  <tr><td align="right">table_name:&nbsp;&nbsp;</td><td width="430">table to which the index belongs</td></tr>
+		  <tr><td align="right">index_name:&nbsp;&nbsp;</td><td width="430">name of the index to drop</td></tr>
+	  </table></td></tr>
+  </tbody>
+</table>
+</td>
+</tr>
+</table>
+<br/>
+<h3>Example</h3>
+
+		<pre class="SQL"><code>
+	drop index persons.age<br/>
+</code></pre>
+<br/>
+</div>
+</div>
+</body>
+</html>

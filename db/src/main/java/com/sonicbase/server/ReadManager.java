@@ -1616,8 +1616,22 @@ public class ReadManager {
       GroupByContext groupContext, AtomicLong currOffset, Long limit, Long offset, int[] keyOffsets, boolean keyContainsColumns) {
     Map.Entry<Object[], Object> entry = null;
 
+    if (originalKey == null || originalKey.length == 0) {
+      originalKey = null;
+    }
+    if (originalKey != null) {
+      boolean found = false;
+      for (int i = 0; i < originalKey.length; i++) {
+        if (originalKey[i] != null) {
+          found = true;
+        }
+      }
+      if (!found) {
+        originalKey = null;
+      }
+    }
     //count = 3;
-    if (operator.equals(BinaryExpression.Operator.equal)) {
+    if (originalKey != null && operator.equals(BinaryExpression.Operator.equal)) {
       if (originalKey == null) {
         return null;
       }

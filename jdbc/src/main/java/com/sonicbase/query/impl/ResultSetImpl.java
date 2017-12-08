@@ -368,7 +368,7 @@ public class ResultSetImpl implements ResultSet {
       return false;
     }
 
-    if (counters != null) {
+    if (counters != null || selectStatement.isDistinct()) {
       boolean first = false;
       if (currPos == 0) {
         first = true;
@@ -971,7 +971,14 @@ public class ResultSetImpl implements ResultSet {
 
   public Long getLong(String columnLabel) {
     if (isMatchingAlias(columnLabel) && isCount) {
-      return count;
+      SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
+      if (function == null) {
+        return count;
+      }
+
+      String[] actualColumn = getActualColumn("__all__");
+      Object ret = getField(actualColumn);
+      return getLong(ret, function);
     }
     Long ret = (Long) getGroupByFunctionResults(columnLabel, DataType.Type.BIGINT);
     if (ret != null) {
@@ -999,7 +1006,8 @@ public class ResultSetImpl implements ResultSet {
       if (function.getName().equalsIgnoreCase(LENGTH_STR)) {
         return (long) retString.length();
       }
-      else if (function.getName().equalsIgnoreCase("min") ||
+      else if (function.getName().equalsIgnoreCase("count") ||
+          function.getName().equalsIgnoreCase("min") ||
           function.getName().equalsIgnoreCase("max") ||
           function.getName().equalsIgnoreCase("sum") ||
           function.getName().equalsIgnoreCase("avg")) {
@@ -1026,7 +1034,16 @@ public class ResultSetImpl implements ResultSet {
   }
 
   private Object getCounterValue(SelectStatementImpl.Function function) {
-    if (function.getName().equalsIgnoreCase("min")) {
+    if (function.getName().equalsIgnoreCase("count")) {
+      if (counters != null) {
+        for (Counter counter : counters) {
+          if (counter.getLongCount() != null) {
+            return counter.getCount();
+          }
+        }
+      }
+    }
+    else if (function.getName().equalsIgnoreCase("min")) {
       String columnName = ((Column)function.getParms().getExpressions().get(0)).getColumnName();
       if (counters != null) {
         for (Counter counter : counters) {
@@ -1086,7 +1103,7 @@ public class ResultSetImpl implements ResultSet {
         }
       }
     }
-    return 0;
+    return 0L;
   }
 
   public Float getFloat(String columnLabel) {
@@ -1344,7 +1361,14 @@ public class ResultSetImpl implements ResultSet {
   @Override
   public Long getLong(int columnIndex) {
     if (columnIndex == 1 && isCount) {
-      return count;
+      SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower("__alias__"));
+      if (function == null) {
+        return count;
+      }
+
+      String[] actualColumn = getActualColumn("__all__");
+      Object ret = getField(actualColumn);
+      return getLong(ret, function);
     }
     List<ColumnImpl> columns = selectStatement.getSelectColumns();
     ColumnImpl column = columns.get(columnIndex - 1);
@@ -1539,6 +1563,14 @@ public class ResultSetImpl implements ResultSet {
     }
 
     return getString(ret);
+  }
+
+  public long getUniqueRecordCount() {
+    return uniqueRecords.size();
+  }
+
+  public void setIsCount() {
+    this.isCount = true;
   }
 
   public void getMoreResults() {

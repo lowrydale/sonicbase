@@ -3816,17 +3816,25 @@ public class DatabaseClient {
                 }
                 if (function.isDistinct()) {
                   selectStatement.setIsDistinct();
+                }
 
-                  String currAlias = null;
-                  for (SelectItem currItem : selectItems) {
-                    if (((SelectExpressionItem) currItem).getExpression() == function) {
-                      if (((SelectExpressionItem) currItem).getAlias() != null) {
-                        currAlias = ((SelectExpressionItem) currItem).getAlias().getName();
-                      }
+                String currAlias = null;
+                for (SelectItem currItem : selectItems) {
+                  if (((SelectExpressionItem) currItem).getExpression() == function) {
+                    if (((SelectExpressionItem) currItem).getAlias() != null) {
+                      currAlias = ((SelectExpressionItem) currItem).getAlias().getName();
                     }
                   }
-                  selectStatement.addSelectColumn(null, null, ((Column) function.getParameters().getExpressions().get(0)).getTable().getName(),
-                      ((Column) function.getParameters().getExpressions().get(0)).getColumnName(), currAlias);
+                }
+                if (!(expression instanceof AllRecordsExpressionImpl)) {
+                  String columnName = "__all__";
+                  if (!function.isAllColumns()) {
+                    ExpressionList list = function.getParameters();
+                    Column column = (Column) list.getExpressions().get(0);
+                    columnName = column.getColumnName();
+                  }
+                  selectStatement.addSelectColumn(function.getName(), null, ((Table) pselect.getFromItem()).getName(),
+                      columnName, currAlias);
                 }
               }
             }

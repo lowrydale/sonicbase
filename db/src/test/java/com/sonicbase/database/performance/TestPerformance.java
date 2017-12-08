@@ -851,7 +851,7 @@ public class TestPerformance {
       count++;
     }
     long end = System.nanoTime();
-    registerResults("range two key greater equal", end-begin, count);
+    registerResults("count range two key greater equal", end-begin, count);
     assertTrue((end - begin) < (12000 * 1_000_000L), String.valueOf(end-begin));
   }
 
@@ -885,6 +885,22 @@ public class TestPerformance {
     long end = System.nanoTime();
     registerResults("max", end-begin, count);
     assertTrue((end - begin) < (18000 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  @Test
+  public void testCount() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select count(*)  from persons");
+    long begin = System.nanoTime();
+    int count = 0;
+    for (int i = 1000; i < 1020; i++) {
+      ResultSet rs = stmt.executeQuery();
+      assertTrue(rs.next());
+      assertEquals(rs.getLong(1), 500_000);
+      count++;
+    }
+    long end = System.nanoTime();
+    registerResults("count", end-begin, count);
+    assertTrue((end - begin) < (50 * 1_000_000L), String.valueOf(end-begin));
   }
 
   @Test

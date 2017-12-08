@@ -49,7 +49,7 @@ public class TestDataTypes {
 
   @BeforeClass
   public void beforeClass() throws Exception {
-    Logger.disable();
+   // Logger.disable();
 
     String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
     ObjectMapper mapper = new ObjectMapper();
@@ -115,6 +115,13 @@ public class TestDataTypes {
 
     stmt = conn.prepareStatement("create index socialSecurityNumber on persons(socialSecurityNumber)");
     stmt.executeUpdate();
+
+    stmt = conn.prepareStatement("create table date (id DATE, id2 INTEGER, name VARCHAR(20), PRIMARY KEY (id))");
+    stmt.executeUpdate();
+
+    stmt = conn.prepareStatement("create table time (id TIME, id2 INTEGER, name VARCHAR(20), PRIMARY KEY (id))");
+    stmt.executeUpdate();
+
 
     //test insert
 
@@ -586,18 +593,15 @@ public class TestDataTypes {
 
   @Test
   public void testDate() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("create table date (id DATE, id2 INTEGER, name VARCHAR(20), PRIMARY KEY (id))");
-    stmt.executeUpdate();
-
     for (int i = 0; i < recordCount; i++) {
-      stmt = conn.prepareStatement("insert into date (id, id2, name) VALUES (?, ?, ?)");
+      PreparedStatement stmt = conn.prepareStatement("insert into date (id, id2, name) VALUES (?, ?, ?)");
       stmt.setDate(1, new Date(i + 1, i + 1, i + 1));
       stmt.setInt(2, i);
       stmt.setString(3, "name-" + i);
       assertEquals(stmt.executeUpdate(), 1);
     }
 
-    stmt = conn.prepareStatement("select id, id2, name from date where id<? order by id desc");
+    PreparedStatement stmt = conn.prepareStatement("select id, id2, name from date where id<? order by id desc");
     stmt.setDate(1, new Date(6, 6, 6));
     ResultSet ret = stmt.executeQuery();
 
@@ -613,22 +617,51 @@ public class TestDataTypes {
     assertEquals(ret.getDate("id").getYear(), 2);
     ret.next();
     assertEquals(ret.getDate("id").getYear(), 1);
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testDateString() throws Exception {
+    //beforeClass();
+    for (int i = 0; i < recordCount; i++) {
+      PreparedStatement stmt = conn.prepareStatement("insert into date (id, id2, name) VALUES (" +
+          "'200" + i + "-" + "0" + i + "-" + "0" + i + "', ?, ?)");
+      stmt.setInt(1, i);
+      stmt.setString(2, "name-" + i);
+      assertEquals(stmt.executeUpdate(), 1);
+    }
+
+    PreparedStatement stmt = conn.prepareStatement("select id, id2, name from date where id<? and id >? order by id desc");
+    stmt.setDate(1, new java.sql.Date(106, 1, 1));
+    stmt.setDate(2, new java.sql.Date(100, 1, 1));
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getDate("id").getYear(), 105);
+    assertEquals(ret.getInt("id2"), 5);
+    assertEquals(ret.getString("name"), "name-5");
+    ret.next();
+    assertEquals(ret.getDate("id").getYear(), 104);
+    ret.next();
+    assertEquals(ret.getDate("id").getYear(), 103);
+    ret.next();
+    assertEquals(ret.getDate("id").getYear(), 102);
+    ret.next();
+    assertEquals(ret.getDate("id").getYear(), 101);
+    assertFalse(ret.next());
   }
 
   @Test
   public void testTime() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("create table time (id TIME, id2 INTEGER, name VARCHAR(20), PRIMARY KEY (id))");
-    stmt.executeUpdate();
-
     for (int i = 0; i < recordCount; i++) {
-      stmt = conn.prepareStatement("insert into time (id, id2, name) VALUES (?, ?, ?)");
+      PreparedStatement stmt = conn.prepareStatement("insert into time (id, id2, name) VALUES (?, ?, ?)");
       stmt.setTime(1, new Time(i + 1, i + 1, i + 1));
       stmt.setInt(2, i);
       stmt.setString(3, "name-" + i);
       assertEquals(stmt.executeUpdate(), 1);
     }
 
-    stmt = conn.prepareStatement("select id, id2, name from time where id<? order by id desc");
+    PreparedStatement stmt = conn.prepareStatement("select id, id2, name from time where id<? order by id desc");
     stmt.setTime(1, new Time(6, 6, 6));
     ResultSet ret = stmt.executeQuery();
 
@@ -646,6 +679,36 @@ public class TestDataTypes {
     assertEquals(ret.getTime("id").getHours(), 1);
   }
 
+  @Test
+  public void testTimeString() throws SQLException {
+    for (int i = 0; i < recordCount; i++) {
+      PreparedStatement stmt = conn.prepareStatement("insert into time (id, id2, name) VALUES (" +
+          "'" + (i + 11) + ":"  + (i + 11) + ":" + (i + 11) + "', ?, ?)");
+      stmt.setInt(1, i);
+      stmt.setString(2, "name-" + i);
+      assertEquals(stmt.executeUpdate(), 1);
+    }
+
+    PreparedStatement stmt = conn.prepareStatement("select id, id2, name from time where id<? and id>? order by id desc");
+    stmt.setTime(1, new Time(16, 16, 16));
+    stmt.setTime(2, new Time(10, 10, 10));
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getTime("id").getHours(), 15);
+    assertEquals(ret.getInt("id2"), 4);
+    assertEquals(ret.getString("name"), "name-4");
+    ret.next();
+    assertEquals(ret.getTime("id").getHours(), 14);
+    ret.next();
+    assertEquals(ret.getTime("id").getHours(), 13);
+    ret.next();
+    assertEquals(ret.getTime("id").getHours(), 12);
+    ret.next();
+    assertEquals(ret.getTime("id").getHours(), 11);
+    assertFalse(ret.next());
+  }
+
 
   @Test
   public void testTimestamp() throws SQLException {
@@ -653,16 +716,17 @@ public class TestDataTypes {
     stmt.executeUpdate();
 
     for (int i = 0; i < recordCount; i++) {
-      stmt = conn.prepareStatement("insert into timestamp (id, idb, id2, name) VALUES (?, ?, ?, ?)");
-      stmt.setTimestamp(1, new Timestamp(1990 - 1900, 11, 13, 1, 2, i, 0));
+      stmt = conn.prepareStatement("insert into timestamp (id, idb, id2, name) VALUES ('"  +
+          "1990-12-13 01:02:0" + i + "', ?, ?, ?)");
+      //stmt.setTimestamp(1, new Timestamp(1990 - 1900, 11, 13, 1, 2, i, 0));
       if (i != 4) {
-        stmt.setTimestamp(2, new Timestamp(1990 - 1900, 11, 13, 1, 2, i + 100, 0));
+        stmt.setTimestamp(1, new Timestamp(1990 - 1900, 11, 13, 1, 2, i + 100, 0));
       }
       else {
-        stmt.setTimestamp(2, new Timestamp(1990 - 1900, 11, 13, 1, 2, i, 0));
+        stmt.setTimestamp(1, new Timestamp(1990 - 1900, 11, 13, 1, 2, i, 0));
       }
-      stmt.setInt(3, i);
-      stmt.setString(4, "name-" + i);
+      stmt.setInt(2, i);
+      stmt.setString(3, "name-" + i);
       assertEquals(stmt.executeUpdate(), 1);
     }
 

@@ -7,6 +7,7 @@ import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -109,7 +110,7 @@ public class ComArray {
           Varint.writeSignedVarLong(((java.sql.Time)obj).getTime(), out);
         }
         else if (nestedType.tag == ComObject.Type.timeStampType.tag) {
-          Varint.writeSignedVarLong(((java.sql.Timestamp)obj).getTime(), out);
+          out.writeUTF(((java.sql.Timestamp)obj).toString());
         }
       }
     }
@@ -186,7 +187,7 @@ public class ComArray {
           array.add(time);
         }
         else if (nestedType.tag == ComObject.Type.timeStampType.tag) {
-          java.sql.Timestamp timestamp = new java.sql.Timestamp(Varint.readSignedVarLong(in));
+          java.sql.Timestamp timestamp = Timestamp.valueOf(in.readUTF());
           array.add(timestamp);
         }
       }

@@ -72,4 +72,8 @@ public interface ResultSet {
   Boolean getBoolean(int columnIndex);
 
   InputStream getBinaryStream(int columnIndex);
+
+  void setIsCount();
+
+  long getUniqueRecordCount();
 }

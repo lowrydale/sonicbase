@@ -11,6 +11,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.util.Iterator;
 
 import static com.sonicbase.common.ComObject.Type.*;
@@ -428,7 +429,7 @@ public class ComObject {
           value = time;
         }
         else if (type.tag == timeStampType.tag) {
-          java.sql.Timestamp timestamp = new java.sql.Timestamp(Varint.readSignedVarLong(in));
+          java.sql.Timestamp timestamp = Timestamp.valueOf(in.readUTF());
           value = timestamp;
         }
 
@@ -516,7 +517,7 @@ public class ComObject {
           Varint.writeSignedVarLong(((java.sql.Time)value).getTime(), out);
         }
         else if (tagObj.type.tag == timeStampType.tag) {
-          Varint.writeSignedVarLong(((java.sql.Timestamp)value).getTime(), out);
+          out.writeUTF(((java.sql.Timestamp)value).toString());
         }
       }
 

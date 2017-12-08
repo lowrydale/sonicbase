@@ -334,6 +334,10 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     return expression.isCurrPartitions();
   }
 
+  public boolean isDistinct() {
+    return isDistinct;
+  }
+
   public static class Function {
     private String name;
     private ExpressionList parms;
@@ -368,6 +372,9 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     }
     if (localAlias != null) {
       localAlias = localAlias.toLowerCase();
+    }
+    else {
+      localAlias = "__alias__";
     }
     ColumnImpl columnImpl = new ColumnImpl(localFunction, parameters, localTable, localColumn, localAlias);
     if (localAlias != null) {
@@ -557,51 +564,65 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
         }
         else {
           Map<String, Function> aliases = getFunctionAliases();
-          for (Function function : aliases.values()) {
-            if (function.getName().equalsIgnoreCase("min") || function.getName().equalsIgnoreCase("max") ||
-                function.getName().equalsIgnoreCase("avg") || function.getName().equalsIgnoreCase("sum")) {
-              String columnName = ((Column) function.getParms().getExpressions().get(0)).getColumnName();
-              Counter counter = new Counter();
-              countersList.add(counter);
-              String table = ((Column) function.getParms().getExpressions().get(0)).getTable().getName();
-              if (table == null) {
-                table = getFromTable();
-              }
-              counter.setTableName(table);
-              counter.setColumnName(columnName);
-              int columnOffset = client.getCommon().getTables(dbName).get(table).getFieldOffset(columnName);
-              counter.setColumn(columnOffset);
-              FieldSchema fieldSchema = client.getCommon().getTables(dbName).get(table).getFields().get(columnOffset);
-              counter.setDataType(fieldSchema.getType());
-              switch (fieldSchema.getType()) {
-                case INTEGER:
-                case BIGINT:
-                case SMALLINT:
-                case TINYINT:
-                  counter.setDestTypeToLong();
-                  break;
-                case FLOAT:
-                case DOUBLE:
-                case NUMERIC:
-                case DECIMAL:
-                case REAL:
-                  counter.setDestTypeToDouble();
-                  break;
-              }
-              boolean indexed = false;
-              for (IndexSchema indexSchema : client.getCommon().getTables(dbName).get(table).getIndices().values()) {
-                if (indexSchema.getFields()[0].equals(columnName)) {
-                  indexed = true;
-                  break;
-                }
-              }
+          if (!isDistinct && isCountFunction && !(expression instanceof AllRecordsExpressionImpl)) {
+            Counter counter = new Counter();
+            countersList.add(counter);
+            String table = getFromTable();
 
-              haveCounters = true;
-              if (indexed && expression instanceof AllRecordsExpressionImpl) {
-                ExpressionImpl.evaluateCounter(client.getCommon(), client, dbName, counter);
-              }
-              else {
-                needToEvaluate = true;
+            counter.setTableName(table);
+            counter.setColumnName("__all__");
+            counter.setColumn(0);
+            counter.setDataType(DataType.Type.BIGINT);
+            counter.setDestTypeToLong();
+            needToEvaluate = true;
+          }
+          else {
+            for (Function function : aliases.values()) {
+              if (function.getName().equalsIgnoreCase("min") || function.getName().equalsIgnoreCase("max") ||
+                  function.getName().equalsIgnoreCase("avg") || function.getName().equalsIgnoreCase("sum")) {
+                String columnName = ((Column) function.getParms().getExpressions().get(0)).getColumnName();
+                Counter counter = new Counter();
+                countersList.add(counter);
+                String table = ((Column) function.getParms().getExpressions().get(0)).getTable().getName();
+                if (table == null) {
+                  table = getFromTable();
+                }
+                counter.setTableName(table);
+                counter.setColumnName(columnName);
+                int columnOffset = client.getCommon().getTables(dbName).get(table).getFieldOffset(columnName);
+                counter.setColumn(columnOffset);
+                FieldSchema fieldSchema = client.getCommon().getTables(dbName).get(table).getFields().get(columnOffset);
+                counter.setDataType(fieldSchema.getType());
+                switch (fieldSchema.getType()) {
+                  case INTEGER:
+                  case BIGINT:
+                  case SMALLINT:
+                  case TINYINT:
+                    counter.setDestTypeToLong();
+                    break;
+                  case FLOAT:
+                  case DOUBLE:
+                  case NUMERIC:
+                  case DECIMAL:
+                  case REAL:
+                    counter.setDestTypeToDouble();
+                    break;
+                }
+                boolean indexed = false;
+                for (IndexSchema indexSchema : client.getCommon().getTables(dbName).get(table).getIndices().values()) {
+                  if (indexSchema.getFields()[0].equals(columnName)) {
+                    indexed = true;
+                    break;
+                  }
+                }
+
+                haveCounters = true;
+                if (indexed && expression instanceof AllRecordsExpressionImpl) {
+                  ExpressionImpl.evaluateCounter(client.getCommon(), client, dbName, counter);
+                }
+                else {
+                  needToEvaluate = true;
+                }
               }
             }
           }
@@ -639,7 +660,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
           countDistinct = true;
         }
 
-        if (!countDistinct && this.isCountFunction) {
+        if (!countDistinct && this.isCountFunction && expression instanceof AllRecordsExpressionImpl) {
           return countRecords(dbName, tableNames);
         }
         else {
@@ -750,11 +771,11 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
           ResultSet ret = new ResultSetImpl(dbName, client, this, getParms(), uniqueRecords,
               new SelectContextImpl(ids, sortWithIndex, tableNames, expression.getNextShard(), expression.getNextKey(),
                   this, recordCache), null, list, null, counters, limit, offset, groupByColumns, this.groupByContext);
+          if (isCountFunction) {
+            ret.setIsCount();
+          }
           if (countDistinct) {
-            long count = 0;
-            while (ret.next()) {
-              count++;
-            }
+            long count = ret.getUniqueRecordCount();
             return new ResultSetImpl(dbName, client, this, count);
           }
           else {

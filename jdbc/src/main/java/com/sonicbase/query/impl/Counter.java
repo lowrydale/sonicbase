@@ -42,9 +42,15 @@ public class Counter {
   }
 
   public void add(Object[] fields) {
+    if (column == 0) {
+      count++;
+      return;
+    }
+
     if (fields[column] == null) {
       return;
     }
+
     switch (dataType) {
       case INTEGER:
         addLong((long)(int)((Integer)fields[column]));

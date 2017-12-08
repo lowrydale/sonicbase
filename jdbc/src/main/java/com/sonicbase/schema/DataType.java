@@ -2,6 +2,7 @@ package com.sonicbase.schema;
 
 import com.sonicbase.common.ExcludeRename;
 import com.sonicbase.query.DatabaseException;
+import com.sonicbase.util.DateUtils;
 import org.apache.commons.io.IOUtils;
 
 import java.io.ByteArrayOutputStream;
@@ -13,6 +14,7 @@ import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.sql.Types;
+import java.util.Calendar;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
@@ -82,8 +84,29 @@ public class DataType {
   private static Converter stringConverter = new Converter() {
     @Override
     public Object convert(Object value) {
-      String ret = String.valueOf(value);
-      return ret;
+      if (value instanceof String) {
+        return value;
+      }
+      if (value instanceof byte[]) {
+        try {
+          return new String((byte[])value, "utf-8");
+        }
+        catch (UnsupportedEncodingException e) {
+          throw new DatabaseException(e);
+        }
+      }
+      if (value instanceof Date) {
+        Calendar cal = Calendar.getInstance();
+        cal.setTime((Date)value);
+        return DateUtils.toDbString(cal);
+      }
+      if (value instanceof Time) {
+        return DateUtils.toDbTimeString((Time)value);
+      }
+      if (value instanceof Timestamp) {
+        return DateUtils.toDbTimestampString((Timestamp)value);
+      }
+      return String.valueOf(value);
     }
   };
 
@@ -338,11 +361,14 @@ public class DataType {
       }
       Date ret = null;
       if (value instanceof String) {
-        ret = Date.valueOf((String) value);
+        Calendar cal = DateUtils.fromDbCalString((String)value);
+        ret = new Date(cal.getTimeInMillis());
       }
       else if (value instanceof byte[]) {
         try {
-          ret = Date.valueOf(new String((byte[]) value, "utf-8"));
+          String str = new String((byte[]) value, "utf-8");
+          Calendar cal = DateUtils.fromDbCalString(str);
+          ret = new Date(cal.getTimeInMillis());
         }
         catch (UnsupportedEncodingException e) {
           throw new DatabaseException(e);
@@ -376,13 +402,21 @@ public class DataType {
       }
       Time ret = null;
       if (value instanceof String) {
-        ret = Time.valueOf((String) value);
+        try {
+          Calendar cal = DateUtils.fromDbTimeString((String)value);
+          ret = new Time(cal.getTimeInMillis());
+        }
+        catch (Exception e) {
+          throw new DatabaseException(e);
+        }
       }
       else if (value instanceof byte[]) {
         try {
-          ret = Time.valueOf(new String((byte[]) value, "utf-8"));
+          String str = new String((byte[]) value, "utf-8");
+          Calendar cal = DateUtils.fromDbTimeString(str);
+          ret = new Time(cal.getTimeInMillis());
         }
-        catch (UnsupportedEncodingException e) {
+        catch (Exception e) {
           throw new DatabaseException(e);
         }
       }
@@ -415,13 +449,21 @@ public class DataType {
       }
       Timestamp ret = null;
       if (value instanceof String) {
-        ret = Timestamp.valueOf((String) value);
+        try {
+          Calendar cal = DateUtils.fromDbCalString((String)value);
+          ret = new Timestamp(cal.getTimeInMillis());
+        }
+        catch (Exception e) {
+          throw new DatabaseException(e);
+        }
       }
       else if (value instanceof byte[]) {
         try {
-          ret = Timestamp.valueOf(new String((byte[]) value, "utf-8"));
+          String str = new String((byte[]) value, "utf-8");
+          Calendar cal = DateUtils.fromDbCalString(str);
+          ret = new Timestamp(cal.getTimeInMillis());
         }
-        catch (UnsupportedEncodingException e) {
+        catch (Exception e) {
           throw new DatabaseException(e);
         }
       }

@@ -1047,6 +1047,12 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
   public boolean canUseIndex() {
     boolean leftCanUse = false;
     boolean rightCanUse = false;
+    if (leftExpression instanceof FunctionImpl) {
+      return false;
+    }
+    if (rightExpression instanceof FunctionImpl) {
+      return false;
+    }
     if (leftExpression instanceof BinaryExpressionImpl) {
       leftCanUse = leftExpression.canUseIndex();
     }

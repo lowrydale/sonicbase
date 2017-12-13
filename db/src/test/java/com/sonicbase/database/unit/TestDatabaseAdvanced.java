@@ -158,7 +158,7 @@ public class TestDatabaseAdvanced {
       stmt.setLong(3, i + 100);
       stmt.setLong(4, (i + 100) % 3);
       stmt.setDouble(5, 1);
-      stmt.setDouble(6, i / 100d);
+      stmt.setDouble(6, i * 0.5);
       stmt.setString(7, "ssN-933-28-" + i);
       stmt.setString(8, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
       stmt.setBoolean(9, false);
@@ -172,7 +172,7 @@ public class TestDatabaseAdvanced {
       stmt.setLong(1, i);
       stmt.setLong(2, i + 100);
       stmt.setLong(3, (i + 100) % 3);
-      stmt.setDouble(4, i / 100d);
+      stmt.setDouble(4, i * 0.5);
       stmt.setString(5, "ssN-933-28-" + i);
       stmt.setString(6, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
       stmt.setBoolean(7, false);
@@ -187,7 +187,7 @@ public class TestDatabaseAdvanced {
       stmt.setLong(2, (i + 100) % 2);
       stmt.setLong(3, i + 100);
       stmt.setLong(4, (i + 100) % 3);
-      stmt.setDouble(5, i / 100d);
+      stmt.setDouble(5, (i + 100) * 0.5);
       stmt.setString(6, "ssN-933-28-" + (i % 4));
       stmt.setString(7, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
       stmt.setBoolean(8, false);
@@ -865,11 +865,11 @@ public class TestDatabaseAdvanced {
 
     ret.next();
     assertEquals(ret.getLong("id2"), 0);
-    assertEquals(ret.getDouble("sumValue"), 0.22000000000000003d);
+    assertEquals(ret.getDouble("sumValue"), 261.0D);
 
     ret.next();
     assertEquals(ret.getLong("id2"), 1);
-    assertEquals(ret.getDouble("sumValue"), 0.29000000000000004d);
+    assertEquals(ret.getDouble("sumValue"), 264.5D);
     assertFalse(ret.next());
   }
 
@@ -1335,6 +1335,32 @@ public class TestDatabaseAdvanced {
     ret.next();
     assertEquals(ret.getLong("id"), 5);
     assertFalse(ret.next());
+  }
+
+  @Test(enabled=false)
+  public void testUpsert() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("upsert into persons (id) values (?)");
+    stmt.setLong(1, 1000000L);
+    stmt.executeQuery();
+  }
+
+  @Test(enabled=false)
+  public void testUnion() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id from persons union select id from memberships");
+    stmt.executeUpdate();
+  }
+
+  @Test
+  public void testCeiling() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id, num from persons where ceiling(num) < 2.0");
+    ResultSet rs = stmt.executeQuery();
+    rs.next();
+    assertEquals(rs.getLong("id"), 0);
+    rs.next();
+    assertEquals(rs.getLong("id"), 1);
+    rs.next();
+    assertEquals(rs.getLong("id"), 2);
+    assertFalse(rs.next());
   }
 
   @Test

@@ -120,7 +120,7 @@ public class DataType {
       if (value instanceof byte[]) {
         return value;
       }
-      String ret = String.valueOf(value);
+      String ret = (String)stringConverter.convert(value);
       try {
         return ret.getBytes("utf-8");
       }
@@ -593,7 +593,17 @@ public class DataType {
   private static Comparator stringComparator = new Comparator() {
     @Override
     public int compare(Object o1, Object o2) {
-      return ((String) o1).compareTo((String) o2);
+      try {
+        if (o1 == null || o2 == null) {
+          return 0;
+        }
+        o1 = stringConverter.convert(o1);
+        o2 = stringConverter.convert(o2);
+        return ((String) o1).compareTo((String) o2);
+      }
+      catch (Exception e) {
+        throw new DatabaseException(e);
+      }
     }
   };
 
@@ -606,45 +616,16 @@ public class DataType {
     @Override
     public int compare(Object o1, Object o2) {
       try {
+        if (o1 == null || o2 == null) {
+          return 0;
+        }
+        o1 = utf8Converter.convert(o1);
+        o2 = utf8Converter.convert(o2);
         return (new String((byte[])o1, "utf-8")).compareTo(new String((byte[])o2, "utf-8"));
       }
       catch (Exception e) {
         throw new DatabaseException(e);
       }
-      /*
-      if (o1 == null || o2 == null) {
-        return 0;
-      }
-      if (o1 instanceof byte[] && o2 instanceof byte[]) {
-        byte[] b1 = (byte[]) o1;
-        byte[] b2 = (byte[]) o2;
-        if (b1 == null && b2 == null) {
-          return 0;
-        }
-        if (b1 == null) {
-          return -1;
-        }
-        if (b2 == null) {
-          return 1;
-        }
-        for (int i = 0; i < Math.min(b1.length, b2.length); i++) {
-          if (b1[i] < b2[i]) {
-            return -1;
-          }
-          if (b1[i] > b2[i]) {
-            return 1;
-          }
-        }
-        if (b1.length < b2.length) {
-          return -1;
-        }
-        if (b1.length > b2.length) {
-          return 1;
-        }
-        return 0;
-      }
-      throw new DatabaseException("Unsupported datatype");
-      */
     }
   }
 

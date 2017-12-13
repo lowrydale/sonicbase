@@ -13,6 +13,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.math.BigDecimal;
 import java.sql.Types;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
@@ -119,6 +120,32 @@ public class ConstantImpl extends ExpressionImpl {
 
   }
 
+  public void negate() {
+    if (value instanceof Long) {
+      value = -1 * (Long)value;
+    }
+    else if (value instanceof Integer) {
+      value = -1 * (Integer)value;
+    }
+    else if (value instanceof Short) {
+      value = -1 * (Short)value;
+    }
+    else if (value instanceof Byte) {
+      value = -1 * (Byte)value;
+    }
+    else if (value instanceof Double) {
+      value = -1 * (Double)value;
+    }
+    else if (value instanceof Float) {
+      value = -1 * (Float)value;
+    }
+    else if (value instanceof BigDecimal) {
+      BigDecimal bd = (BigDecimal)value;
+      bd.negate();
+      value = bd;
+    }
+  }
+
   /**
    * ###############################
    * DON"T MODIFY THIS SERIALIZATION
@@ -197,4 +224,5 @@ public class ConstantImpl extends ExpressionImpl {
   public ColumnImpl getPrimaryColumn() {
     return null;
   }
+
 }

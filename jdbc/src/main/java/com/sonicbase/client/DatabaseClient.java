@@ -4065,6 +4065,9 @@ public class DatabaseClient {
       if (colTableName != null) {
         columnNode.setTableName(toLower(colTableName));
       }
+      else {
+        columnNode.setTableName(tableName);
+      }
       columnNode.setColumnName(toLower(column.getColumnName()));
       return columnNode;
     }
@@ -4103,6 +4106,37 @@ public class DatabaseClient {
       ParameterImpl parameter = new ParameterImpl();
       parameter.setParmOffset(currParmNum.getAndIncrement());
       return parameter;
+    }
+    else if (whereExpression instanceof Function) {
+      Function sourceFunc = (Function)whereExpression;
+      ExpressionList sourceParms = sourceFunc.getParameters();
+      List<ExpressionImpl> expressions = new ArrayList<>();
+      if (sourceParms != null) {
+        for (Expression expression : sourceParms.getExpressions()) {
+          ExpressionImpl expressionImpl = getExpression(currParmNum, expression, tableName, parms);
+          expressions.add(expressionImpl);
+        }
+      }
+      FunctionImpl func = new FunctionImpl(sourceFunc.getName(), expressions);
+      return func;
+    }
+    else if (whereExpression instanceof SignedExpression) {
+      SignedExpression expression = (SignedExpression)whereExpression;
+      Expression innerExpression = expression.getExpression();
+      ExpressionImpl inner = getExpression(currParmNum, innerExpression, tableName, parms);
+      if (inner instanceof ConstantImpl) {
+        ConstantImpl constant = (ConstantImpl) inner;
+        if ('-' == expression.getSign()) {
+          constant.negate();
+        }
+        return constant;
+      }
+      SignedExpressionImpl ret = new SignedExpressionImpl();
+      ret.setExpression(inner);
+      if ('-' == expression.getSign()) {
+        ret.setNegative(true);
+      }
+      return ret;
     }
 
     return null;

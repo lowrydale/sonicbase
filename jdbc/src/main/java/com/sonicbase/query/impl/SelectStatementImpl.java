@@ -6,6 +6,7 @@ import com.sonicbase.common.ComArray;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Record;
 import com.sonicbase.common.SchemaOutOfSyncException;
+import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.*;
 
 import com.sonicbase.schema.FieldSchema;
@@ -49,7 +50,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
   final static AtomicLong expressionCount = new AtomicLong();
   final static AtomicLong expressionDuration = new AtomicLong();
 
-  private Map<String, Function> functionAliases = new HashMap<>();
+  private Map<String, SelectFunctionImpl> functionAliases = new HashMap<>();
   private List<ColumnImpl> columns;
   private boolean isOnServer;
   private boolean serverSelect;
@@ -338,23 +339,6 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     return isDistinct;
   }
 
-  public static class Function {
-    private String name;
-    private ExpressionList parms;
-
-    public Function(String function, ExpressionList parameters) {
-      this.name = function;
-      this.parms = parameters;
-    }
-
-    public String getName() {
-      return name;
-    }
-
-    public ExpressionList getParms() {
-      return parms;
-    }
-  }
 
   public void addSelectColumn(String function, ExpressionList parameters, String table, String column, String alias) {
     String localFunction = function;
@@ -381,12 +365,12 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       aliases.put(localAlias, columnImpl);
     }
     if (localFunction != null) {
-      functionAliases.put(localAlias, new Function(localFunction, parameters));
+      functionAliases.put(localAlias, new SelectFunctionImpl(localFunction, parameters));
     }
     this.selectColumns.add(columnImpl);
   }
 
-  public Map<String, Function> getFunctionAliases() {
+  public Map<String, SelectFunctionImpl> getFunctionAliases() {
     return functionAliases;
   }
 
@@ -510,8 +494,8 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
 
 
           Set<String> columnsHandled = new HashSet<>();
-          Map<String, Function> aliases = getFunctionAliases();
-          for (Function function : aliases.values()) {
+          Map<String, SelectFunctionImpl> aliases = getFunctionAliases();
+          for (SelectFunctionImpl function : aliases.values()) {
             if (function.getName().equalsIgnoreCase("count") || function.getName().equalsIgnoreCase("min") || function.getName().equalsIgnoreCase("max") ||
                 function.getName().equalsIgnoreCase("avg") || function.getName().equalsIgnoreCase("sum")) {
 
@@ -563,7 +547,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
           }
         }
         else {
-          Map<String, Function> aliases = getFunctionAliases();
+          Map<String, SelectFunctionImpl> aliases = getFunctionAliases();
           if (!isDistinct && isCountFunction && !(expression instanceof AllRecordsExpressionImpl)) {
             Counter counter = new Counter();
             countersList.add(counter);
@@ -577,7 +561,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
             needToEvaluate = true;
           }
           else {
-            for (Function function : aliases.values()) {
+            for (SelectFunctionImpl function : aliases.values()) {
               if (function.getName().equalsIgnoreCase("min") || function.getName().equalsIgnoreCase("max") ||
                   function.getName().equalsIgnoreCase("avg") || function.getName().equalsIgnoreCase("sum")) {
                 String columnName = ((Column) function.getParms().getExpressions().get(0)).getColumnName();

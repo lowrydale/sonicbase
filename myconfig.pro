@@ -1,5 +1,5 @@
--injars       db/target/sonicbase-core-unobfuscated-1.2.7.jar
--outjars      db/target/sonicbase-core-1.2.7.jar
+-injars       db/target/sonicbase-core-unobfuscated-1.2.8.jar
+-outjars      db/target/sonicbase-core-1.2.8.jar
 -libraryjars  <java.home>/lib/rt.jar
 -printmapping sonicbase-obfuscate.map
 

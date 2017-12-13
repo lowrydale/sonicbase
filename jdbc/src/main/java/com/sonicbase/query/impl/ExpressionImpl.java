@@ -310,7 +310,9 @@ public abstract class ExpressionImpl implements Expression {
     binaryOp(3),
     parenthesis(4),
     inExpression(5),
-    allExpression(6);
+    allExpression(6),
+    function(7),
+    signedExpression(8);
 
     private final int id;
 
@@ -473,6 +475,10 @@ public abstract class ExpressionImpl implements Expression {
           AllRecordsExpressionImpl allExpression = new AllRecordsExpressionImpl();
           allExpression.deserialize(in);
           return allExpression;
+        case function:
+          FunctionImpl function = new FunctionImpl();
+          function.deserialize(in);
+          return function;
       }
       return null;
     }

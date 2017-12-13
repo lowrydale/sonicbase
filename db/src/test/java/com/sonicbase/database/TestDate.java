@@ -10,7 +10,7 @@ import java.util.Date;
 public class TestDate {
 
   @Test
-  public void tes  t() throws ParseException {
+  public void test() throws ParseException {
     Date date = DateUtils.fromString("2018-12-08T03:57:46.915");
     System.out.println(date.toString());
     date = DateUtils.fromString("2018-12-08T03:57:46");

@@ -3,7 +3,6 @@ package com.sonicbase.query.impl;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 
-import com.sonicbase.common.*;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.ResultSet;
@@ -11,7 +10,6 @@ import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.common.*;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.LongValue;
 import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
@@ -368,7 +366,7 @@ public class ResultSetImpl implements ResultSet {
       return false;
     }
 
-    if (counters != null || selectStatement.isDistinct()) {
+    if (counters != null || (isCount && selectStatement.isDistinct())) {
       boolean first = false;
       if (currPos == 0) {
         first = true;
@@ -695,7 +693,7 @@ public class ResultSetImpl implements ResultSet {
     }
     String[] actualColumn = getActualColumn(columnLabel);
     Object ret = getField(actualColumn);
-    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
+    SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
 
     String retString = getString(ret);
 
@@ -818,7 +816,7 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnLabel);
     Object ret = getField(actualColumn);
 
-    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
+    SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
 
     return getByte(ret, function == null ? null : function.getName());
   }
@@ -860,7 +858,7 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnLabel);
     Object ret = getField(actualColumn);
 
-    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
+    SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
 
     Short retString1 = getShort(ret, function == null ? null : function.getName());
     if (retString1 != null) {
@@ -914,7 +912,7 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnLabel);
     Object retObj = getField(actualColumn);
 
-    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
+    SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
 
     return getInt(retObj, function);
   }
@@ -930,7 +928,7 @@ public class ResultSetImpl implements ResultSet {
     return matchingAlias;
   }
 
-  private Integer getInt(Object ret, SelectStatementImpl.Function function) {
+  private Integer getInt(Object ret, SelectFunctionImpl function) {
     String retString = null;
     if (ret instanceof byte[]) {
       try {
@@ -971,7 +969,7 @@ public class ResultSetImpl implements ResultSet {
 
   public Long getLong(String columnLabel) {
     if (isMatchingAlias(columnLabel) && isCount) {
-      SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
+      SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
       if (function == null) {
         return count;
       }
@@ -988,11 +986,11 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnLabel);
     Object retObj = getField(actualColumn);
 
-    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
+    SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
     return getLong(retObj, function);
   }
 
-  private Long getLong(Object ret, SelectStatementImpl.Function function) {
+  private Long getLong(Object ret, SelectFunctionImpl function) {
     String retString = null;
     if (ret instanceof byte[]) {
       try {
@@ -1033,7 +1031,7 @@ public class ResultSetImpl implements ResultSet {
     return null;
   }
 
-  private Object getCounterValue(SelectStatementImpl.Function function) {
+  private Object getCounterValue(SelectFunctionImpl function) {
     if (function.getName().equalsIgnoreCase("count")) {
       if (counters != null) {
         for (Counter counter : counters) {
@@ -1119,11 +1117,11 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnLabel);
     Object retObj = getField(actualColumn);
 
-    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
+    SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
     return getFloat(retObj, function);
   }
 
-  private Float getFloat(Object ret, SelectStatementImpl.Function function) {
+  private Float getFloat(Object ret, SelectFunctionImpl function) {
     String retString = null;
     if (ret instanceof byte[]) {
       try {
@@ -1183,11 +1181,11 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnLabel);
     Object retObj = getField(actualColumn);
 
-    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
+    SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
     return getDouble(retObj, function);
   }
 
-  private Double getDouble(Object ret, SelectStatementImpl.Function function) {
+  private Double getDouble(Object ret, SelectFunctionImpl function) {
     String retString = null;
     if (ret instanceof byte[]) {
       try {
@@ -1339,7 +1337,7 @@ public class ResultSetImpl implements ResultSet {
     List<ColumnImpl> columns = selectStatement.getSelectColumns();
 
     ColumnImpl column = columns.get(columnIndex - 1);
-    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(column.getColumnName()));
+    SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(column.getColumnName()));
 
     Object ret = getField(columnIndex);
 
@@ -1361,7 +1359,7 @@ public class ResultSetImpl implements ResultSet {
   @Override
   public Long getLong(int columnIndex) {
     if (columnIndex == 1 && isCount) {
-      SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower("__alias__"));
+      SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower("__alias__"));
       if (function == null) {
         return count;
       }
@@ -1373,7 +1371,7 @@ public class ResultSetImpl implements ResultSet {
     List<ColumnImpl> columns = selectStatement.getSelectColumns();
     ColumnImpl column = columns.get(columnIndex - 1);
     String columnName = column.getColumnName();
-    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(column.getColumnName()));
+    SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(column.getColumnName()));
 
     String[] actualColumn = getActualColumn(columnName);
     Object ret = getField(actualColumn);
@@ -1451,7 +1449,7 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnLabel);
     Object ret = getField(actualColumn);
 
-    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
+    SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
     return getDouble(ret, function);
   }
 
@@ -1467,7 +1465,7 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnLabel);
     Object ret = getField(actualColumn);
 
-    SelectStatementImpl.Function function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
+    SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
     return getFloat(ret, function);
   }
 

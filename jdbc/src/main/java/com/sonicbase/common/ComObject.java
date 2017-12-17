@@ -220,7 +220,10 @@ public class ComObject {
     keyRecordBytes(152, byteArrayType),
     keyRecords(153, arrayType),
     header(154, objectType),
-    replicationMaster(155, intType);
+    replicationMaster(155, intType),
+    selectStatements(156, arrayType),
+    operations(157, arrayType),
+    serverSelectPageNumber(158, longType);
 
     public final int tag;
 

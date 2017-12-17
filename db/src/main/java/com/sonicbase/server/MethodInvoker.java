@@ -976,6 +976,17 @@ public class MethodInvoker {
     }
   }
 
+  public ComObject serverSetSelect(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
+    common.getSchemaReadLock(dbName).lock();
+    try {
+      return readManager.serverSetSelect(cobj);
+    }
+    finally {
+      common.getSchemaReadLock(dbName).unlock();
+    }
+  }
+
   public ComObject serverSelect(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();

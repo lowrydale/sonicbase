@@ -1047,7 +1047,7 @@ public abstract class ExpressionImpl implements Expression {
 //    return null;
   }
 
-  static class NextReturn {
+  public static class NextReturn {
     private Object[][][] ids;
     private String[] tableNames;
     private ConcurrentHashMap<String, String[]> fields = new ConcurrentHashMap<>();

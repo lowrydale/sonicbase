@@ -31,6 +31,11 @@ import java.util.*;
 public class ResultSetImpl implements ResultSet {
   private static final String UTF8_STR = "utf-8";
   private static final String LENGTH_STR = "length";
+  private Map<String, SelectFunctionImpl> functionAliases;
+  private Map<String, ColumnImpl> aliases;
+  private String[] tableNames;
+  private Object[][][] retKeys;
+  private DatabaseClient.SetOperation setOperation;
   private List<Map<String, String>> mapResults;
   private String[] describeStrs;
   private String dbName;
@@ -55,6 +60,7 @@ public class ResultSetImpl implements ResultSet {
   private Counter[] counters;
   private Limit limit;
   private long pageSize = DatabaseClient.SELECT_PAGE_SIZE;
+  private Object moreServerSetResults;
 
   public ResultSetImpl(String[] describeStrs) {
     this.describeStrs = describeStrs;
@@ -62,6 +68,18 @@ public class ResultSetImpl implements ResultSet {
 
   public ResultSetImpl(List<Map<String, String>> mapResults) {
     this.mapResults = mapResults;
+  }
+
+  public ResultSetImpl(String dbName, DatabaseClient client, String[] tableNames, DatabaseClient.SetOperation setOperation, Map<String, ColumnImpl> aliases, Map<String, SelectFunctionImpl> functionAliases) {
+//    this.readRecords = readRecords(new ExpressionImpl.NextReturn(selectContext.getTableNames(), selectContext.getCurrKeys()));
+    this.dbName = dbName;
+    this.databaseClient = client;
+    //this.retKeys = retKeys;
+    this.setOperation = setOperation;
+    this.tableNames = tableNames;
+    this.recordCache = new ExpressionImpl.RecordCache();
+    this.aliases = aliases;
+    this.functionAliases = functionAliases;
   }
 
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP", justification="copying the returned data is too slow")
@@ -81,7 +99,7 @@ public class ResultSetImpl implements ResultSet {
     if (groupByContext == null) {
       return null;
     }
-    Map < String,ColumnImpl > aliases = selectStatement.getAliases();
+
     for (Map.Entry<String, ColumnImpl> alias : aliases.entrySet()) {
       if (columnLabel.equalsIgnoreCase(alias.getValue().getAlias())) {
         String function = alias.getValue().getFunction();
@@ -171,6 +189,14 @@ public class ResultSetImpl implements ResultSet {
     return selectStatement.isCurrPartitions();
   }
 
+  public void setRetKeys(Object[][][] retKeys) {
+    this.retKeys = retKeys;
+  }
+
+  public void setRecords(ExpressionImpl.CachedRecord[][] records) {
+    this.readRecords = records;
+  }
+
   public static class MultiTableRecordList {
     private String[] tableNames;
     private long[][] ids;
@@ -206,6 +232,9 @@ public class ResultSetImpl implements ResultSet {
     this.selectStatement = selectStatement;
     this.count = count;
     this.isCount = true;
+    this.aliases = selectStatement.getAliases();
+    this.functionAliases = selectStatement.getFunctionAliases();
+    this.tableNames = selectStatement.getTableNames();
   }
 
   public ResultSetImpl(
@@ -219,6 +248,9 @@ public class ResultSetImpl implements ResultSet {
     this.dbName = dbName;
     this.databaseClient = databaseClient;
     this.selectStatement = selectStatement;
+    this.aliases = selectStatement.getAliases();
+    this.functionAliases = selectStatement.getFunctionAliases();
+    this.tableNames = selectStatement.getTableNames();
     this.parms = parms;
     this.uniqueRecords = uniqueRecords;
     this.selectContext = selectContext;
@@ -248,7 +280,8 @@ public class ResultSetImpl implements ResultSet {
 //              }
 //            }
 //          }
-          sortResults(dbName, databaseClient.getCommon(), selectStatement, readRecords, selectContext.getTableNames());
+          sortResults(dbName, databaseClient.getCommon(), readRecords, selectContext.getTableNames(),
+              selectStatement.getOrderByExpressions());
         }
       }
     }
@@ -257,9 +290,8 @@ public class ResultSetImpl implements ResultSet {
   public static void sortResults(
       String dbName,
       DatabaseCommon common,
-      SelectStatementImpl selectStatement, ExpressionImpl.CachedRecord[][] records,
-      final String[] tableNames) {
-    List<OrderByExpressionImpl> orderByExpressions = selectStatement.getOrderByExpressions();
+      ExpressionImpl.CachedRecord[][] records,
+      final String[] tableNames, List<OrderByExpressionImpl> orderByExpressions) {
     if (orderByExpressions.size() != 0) {
       final int[] fieldOffsets = new int[orderByExpressions.size()];
       final boolean[] ascendingFlags = new boolean[orderByExpressions.size()];
@@ -362,11 +394,11 @@ public class ResultSetImpl implements ResultSet {
     }
 
     currTotalPos++;
-    if (selectContext == null) {
+    if (setOperation == null && selectContext == null) {
       return false;
     }
 
-    if (counters != null || (isCount && selectStatement.isDistinct())) {
+    if (counters != null || (selectStatement != null && (isCount && selectStatement.isDistinct()))) {
       boolean first = false;
       if (currPos == 0) {
         first = true;
@@ -388,7 +420,8 @@ public class ResultSetImpl implements ResultSet {
       return first;
     }
 
-    if (selectContext.getCurrKeys() == null && (readRecords == null || readRecords.length == 0)) {
+    if (((setOperation != null && retKeys == null) || (setOperation == null && selectContext.getCurrKeys() == null))
+        && (readRecords == null || readRecords.length == 0)) {
       return false;
     }
 //    if (readRecords != null) {
@@ -419,7 +452,7 @@ public class ResultSetImpl implements ResultSet {
 //      }
 //    }
 
-    if (groupByColumns != null) {
+    if (selectStatement != null && groupByColumns != null) {
       Object[] lastFields = new Object[groupByColumns.size()];
       Comparator[] comparators = new Comparator[groupByColumns.size()];
       String[][] actualColumns = new String[groupByColumns.size()][];
@@ -522,7 +555,8 @@ public class ResultSetImpl implements ResultSet {
       }
     }
 
-    if ((selectContext.getCurrKeys().length == 0 || currPos >= selectContext.getCurrKeys().length)) {
+    if ((setOperation != null && (retKeys.length == 0 || currPos >= retKeys.length)) ||
+        (setOperation == null && (selectContext.getCurrKeys().length == 0 || currPos >= selectContext.getCurrKeys().length))) {
       while (true) {
         try {
           getMoreResults();
@@ -552,7 +586,9 @@ public class ResultSetImpl implements ResultSet {
 //    }
     //   readCurrentRecord();
 
-    if (selectContext.getCurrKeys() == null) {
+
+    if ((setOperation != null && (retKeys == null || retKeys.length == 0)) ||
+        (setOperation == null && selectContext.getCurrKeys() == null)) {
       return false;
     }
 //    }
@@ -665,8 +701,8 @@ public class ResultSetImpl implements ResultSet {
         }
       }
     }
-    for (int i = 0; i < selectContext.getTableNames().length; i++) {
-      TableSchema tableSchema = databaseClient.getCommon().getTables(dbName).get(selectContext.getTableNames()[i]);
+    for (int i = 0; i < tableNames.length; i++) {
+      TableSchema tableSchema = databaseClient.getCommon().getTables(dbName).get(tableNames[i]);
       Integer offset = tableSchema.getFieldOffset(label[1]);
       if (offset != null) {
         if (currPos < 0) {
@@ -674,12 +710,12 @@ public class ResultSetImpl implements ResultSet {
             return null;
           }
           if (lastReadRecords[lastReadRecords.length + currPos][i] == null) {
-            return null;
+            continue;
           }
           return lastReadRecords[lastReadRecords.length + currPos][i].getRecord().getFields()[offset];
         }
         if (readRecords[currPos][i] == null) {
-          return null;
+          continue;
         }
         return readRecords[currPos][i].getRecord().getFields()[offset];
       }
@@ -693,7 +729,7 @@ public class ResultSetImpl implements ResultSet {
     }
     String[] actualColumn = getActualColumn(columnLabel);
     Object ret = getField(actualColumn);
-    SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
+    SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
 
     String retString = getString(ret);
 
@@ -767,7 +803,7 @@ public class ResultSetImpl implements ResultSet {
   }
 
   private String[] getActualColumn(String columnLabel) {
-    ColumnImpl column = selectStatement.getAliases().get(columnLabel);
+    ColumnImpl column = aliases.get(columnLabel);
     if (column != null) {
       return new String[]{column.getTableName(), column.getColumnName()};
     }
@@ -816,7 +852,7 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnLabel);
     Object ret = getField(actualColumn);
 
-    SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
+    SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
 
     return getByte(ret, function == null ? null : function.getName());
   }
@@ -858,7 +894,7 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnLabel);
     Object ret = getField(actualColumn);
 
-    SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
+    SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
 
     Short retString1 = getShort(ret, function == null ? null : function.getName());
     if (retString1 != null) {
@@ -912,14 +948,13 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnLabel);
     Object retObj = getField(actualColumn);
 
-    SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
+    SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
 
     return getInt(retObj, function);
   }
 
   private boolean isMatchingAlias(String columnLabel) {
     boolean matchingAlias = false;
-    Map<String, ColumnImpl> aliases = selectStatement.getAliases();
     for (String alias : aliases.keySet()) {
       if (alias.equals(columnLabel)) {
         matchingAlias = true;
@@ -969,7 +1004,7 @@ public class ResultSetImpl implements ResultSet {
 
   public Long getLong(String columnLabel) {
     if (isMatchingAlias(columnLabel) && isCount) {
-      SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
+      SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
       if (function == null) {
         return count;
       }
@@ -986,7 +1021,7 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnLabel);
     Object retObj = getField(actualColumn);
 
-    SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
+    SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
     return getLong(retObj, function);
   }
 
@@ -1117,7 +1152,7 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnLabel);
     Object retObj = getField(actualColumn);
 
-    SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
+    SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
     return getFloat(retObj, function);
   }
 
@@ -1181,7 +1216,7 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnLabel);
     Object retObj = getField(actualColumn);
 
-    SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
+    SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
     return getDouble(retObj, function);
   }
 
@@ -1337,7 +1372,7 @@ public class ResultSetImpl implements ResultSet {
     List<ColumnImpl> columns = selectStatement.getSelectColumns();
 
     ColumnImpl column = columns.get(columnIndex - 1);
-    SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(column.getColumnName()));
+    SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(column.getColumnName()));
 
     Object ret = getField(columnIndex);
 
@@ -1359,7 +1394,7 @@ public class ResultSetImpl implements ResultSet {
   @Override
   public Long getLong(int columnIndex) {
     if (columnIndex == 1 && isCount) {
-      SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower("__alias__"));
+      SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower("__alias__"));
       if (function == null) {
         return count;
       }
@@ -1371,7 +1406,7 @@ public class ResultSetImpl implements ResultSet {
     List<ColumnImpl> columns = selectStatement.getSelectColumns();
     ColumnImpl column = columns.get(columnIndex - 1);
     String columnName = column.getColumnName();
-    SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(column.getColumnName()));
+    SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(column.getColumnName()));
 
     String[] actualColumn = getActualColumn(columnName);
     Object ret = getField(actualColumn);
@@ -1449,7 +1484,7 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnLabel);
     Object ret = getField(actualColumn);
 
-    SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
+    SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
     return getDouble(ret, function);
   }
 
@@ -1465,7 +1500,7 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnLabel);
     Object ret = getField(actualColumn);
 
-    SelectFunctionImpl function = selectStatement.getFunctionAliases().get(DatabaseClient.toLower(columnLabel));
+    SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
     return getFloat(ret, function);
   }
 
@@ -1573,6 +1608,11 @@ public class ResultSetImpl implements ResultSet {
 
   public void getMoreResults() {
 
+    if (setOperation != null) {
+      getMoreServerSetResults();
+      return;
+    }
+
     if (selectContext.getSelectStatement() != null) {
       if (!selectStatement.isOnServer() && selectStatement.isServerSelect()) {
         getMoreServerResults(selectStatement);
@@ -1676,6 +1716,31 @@ public class ResultSetImpl implements ResultSet {
 //    }
   }
 
+  private void getMoreServerSetResults() {
+    while (true) {
+      try {
+        databaseClient.doServerSetSelect(dbName, tableNames, setOperation, this);
+
+        lastReadRecords = readRecords;
+        readRecords = null;
+        synchronized (recordCache.getRecordsForTable()) {
+          recordCache.getRecordsForTable().clear();
+        }
+
+        ExpressionImpl.NextReturn ret = new ExpressionImpl.NextReturn(tableNames, retKeys);
+        readRecords = readRecords(ret);
+        currPos = 0;
+        break;
+      }
+      catch (SchemaOutOfSyncException e) {
+        continue;
+      }
+      catch (Exception e) {
+        throw new DatabaseException(e);
+      }
+    }
+  }
+
   private void getMoreServerResults(SelectStatementImpl selectStatement) {
     while (true) {
       try {
@@ -1729,8 +1794,8 @@ public class ResultSetImpl implements ResultSet {
               record.deserialize(dbName, databaseClient.getCommon(), bytes, null, true);
               currRetRecords[k][j] = record;
 
-              Object[] key = new Object[primaryKeyFields.length];
-              for (int i = 0; i < primaryKeyFields.length; i++) {
+              Object[] key = new Object[primaryKeyFields[j].length];
+              for (int i = 0; i < primaryKeyFields[j].length; i++) {
                 key[i] = record.getFields()[tableSchemas[j].getFieldOffset(primaryKeyFields[j][i])];
               }
 
@@ -1763,7 +1828,7 @@ public class ResultSetImpl implements ResultSet {
 
   }
 
-  private ExpressionImpl.CachedRecord[][] readRecords(ExpressionImpl.NextReturn nextReturn) {
+  public ExpressionImpl.CachedRecord[][] readRecords(ExpressionImpl.NextReturn nextReturn) {
     if (nextReturn == null || nextReturn.getKeys() == null) {
       return null;
     }

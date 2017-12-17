@@ -3730,142 +3730,302 @@ public class DatabaseClient {
 //    List<Object> values = new ArrayList<>();
     SelectBody selectBody = selectNode.getSelectBody();
     AtomicInteger currParmNum = new AtomicInteger();
-    SelectStatementImpl selectStatement = new SelectStatementImpl(this);
     if (selectBody instanceof PlainSelect) {
-      PlainSelect pselect = (PlainSelect) selectBody;
-      selectStatement.setFromTable(((Table) pselect.getFromItem()).getName());
-      Expression whereExpression = pselect.getWhere();
-      ExpressionImpl expression = getExpression(currParmNum, whereExpression, selectStatement.getFromTable(), parms);
-      if (expression == null) {
-        expression = new AllRecordsExpressionImpl();
-        ((AllRecordsExpressionImpl) expression).setFromTable(selectStatement.getFromTable());
+      SelectStatementImpl selectStatement = parseSelectStatement(parms, debug, (PlainSelect) selectBody, currParmNum);
+      return selectStatement.execute(dbName, explain);
+    }
+    else if (selectBody instanceof SetOperationList){
+      SetOperationList opList = (SetOperationList) selectBody;
+      String[] tableNames = new String[opList.getSelects().size()];
+      SelectStatementImpl[] statements = new SelectStatementImpl[opList.getSelects().size()];
+      for (int i = 0; i < opList.getSelects().size(); i++) {
+        SelectBody innerBody = opList.getSelects().get(i);
+        SelectStatementImpl selectStatement = parseSelectStatement(parms, debug, (PlainSelect) innerBody, currParmNum);
+        tableNames[i] = selectStatement.getFromTable();
+        statements[i] = selectStatement;
       }
-      expression.setDebug(debug);
-      selectStatement.setWhereClause(expression);
-
-      Limit limit = pselect.getLimit();
-      selectStatement.setLimit(limit);
-      Offset offset = pselect.getOffset();
-      selectStatement.setOffset(offset);
-
-      List<Join> joins = pselect.getJoins();
-      if (joins != null) {
-        if (!common.haveProLicense()) {
-          throw new InsufficientLicense("You must have a pro license to execute joins");
-        }
-        for (Join join : joins) {
-          FromItem rightFromItem = join.getRightItem();
-          Expression onExpressionSrc = join.getOnExpression();
-          ExpressionImpl onExpression = getExpression(currParmNum, onExpressionSrc, selectStatement.getFromTable(), parms);
-
-          String rightFrom = rightFromItem.toString();
-          SelectStatement.JoinType type = null;
-          if (join.isInner()) {
-            type = SelectStatement.JoinType.inner;
-          }
-          else if (join.isFull()) {
-            type = SelectStatement.JoinType.full;
-          }
-          else if (join.isOuter() && join.isLeft()) {
-            type = SelectStatement.JoinType.leftOuter;
-          }
-          else if (join.isOuter() && join.isRight()) {
-            type = SelectStatement.JoinType.rightOuter;
-          }
-          selectStatement.addJoinExpression(type, rightFrom, onExpression);
+      String[] operations = new String[opList.getOperations().size()];
+      for (int i = 0; i < operations.length; i++) {
+        operations[i] = opList.getOperations().get(i).toString();
+      }
+      List<OrderByElement> orderByElements = opList.getOrderByElements();
+      OrderByExpressionImpl[] orderBy = null;
+      if (orderByElements != null) {
+        orderBy = new OrderByExpressionImpl[orderByElements.size()];
+        for (int i = 0; i < orderBy.length; i++) {
+          OrderByElement element = orderByElements.get(i);
+          String tableName = ((Column) element.getExpression()).getTable().getName();
+          String columnName = ((Column) element.getExpression()).getColumnName();
+          orderBy[i] = new OrderByExpressionImpl(tableName == null ? null : tableName.toLowerCase(),
+              columnName.toLowerCase(), element.isAsc());
         }
       }
-
-      Distinct distinct = ((PlainSelect) selectBody).getDistinct();
-      if (distinct != null) {
-        //distinct.getOnSelectItems();
-        selectStatement.setIsDistinct();
+      SetOperation setOperation = new SetOperation();
+      setOperation.selectStatements = statements;
+      setOperation.operations = operations;
+      setOperation.orderBy = orderBy;
+      try {
+        return serverSetSelect(dbName, tableNames, setOperation);
       }
+      catch (Exception e) {
+        throw new DatabaseException(e);
+      }
+    }
+    return null;
+  }
 
-      List<SelectItem> selectItems = ((PlainSelect) selectBody).getSelectItems();
-      for (SelectItem selectItem : selectItems) {
-        if (selectItem instanceof SelectExpressionItem) {
-          SelectExpressionItem item = (SelectExpressionItem) selectItem;
-          Alias alias = item.getAlias();
-          String aliasName = null;
-          if (alias != null) {
-            aliasName = alias.getName();
+  public static class SetOperation {
+    private SelectStatementImpl[] selectStatements;
+    public String[] operations;
+    public OrderByExpressionImpl[] orderBy;
+    public long serverSelectPageNumber;
+    public long resultSetId;
+  }
+
+  public ResultSet serverSetSelect(String dbName, String[] tableNames, SetOperation setOperation) throws Exception {
+    while (true) {
+      try {
+        Map<String, SelectFunctionImpl> functionAliases = new HashMap<>();
+        Map<String, ColumnImpl> aliases = new HashMap<>();
+        for (SelectStatementImpl select : setOperation.selectStatements) {
+          aliases.putAll(select.getAliases());
+          functionAliases.putAll(select.getFunctionAliases());
+        }
+
+        ResultSetImpl ret = new ResultSetImpl(dbName, this, tableNames, setOperation, aliases, functionAliases);
+        doServerSetSelect(dbName, tableNames, setOperation, ret);
+        return ret;
+      }
+      catch (SchemaOutOfSyncException e) {
+        continue;
+      }
+    }
+
+  }
+
+  public void doServerSetSelect(String dbName, String[] tableNames, SetOperation setOperation, ResultSetImpl ret) throws IOException {
+    ComObject cobj = new ComObject();
+    ComArray array = cobj.putArray(ComObject.Tag.selectStatements, ComObject.Type.byteArrayType);
+    for (int i = 0; i < setOperation.selectStatements.length; i++) {
+      setOperation.selectStatements[i].setTableNames(new String[]{setOperation.selectStatements[i].getFromTable()});
+      array.add(setOperation.selectStatements[i].serialize());
+    }
+    if (setOperation.orderBy != null) {
+      ComArray orderByArray = cobj.putArray(ComObject.Tag.orderByExpressions, ComObject.Type.byteArrayType);
+      for (int i = 0; i < setOperation.orderBy.length; i++) {
+        orderByArray.add(setOperation.orderBy[i].serialize());
+      }
+    }
+    ComArray tablesArray = cobj.putArray(ComObject.Tag.tables, ComObject.Type.stringType);
+    for (int i = 0; i < tableNames.length; i++) {
+      tablesArray.add(tableNames[i]);
+    }
+    ComArray strArray = cobj.putArray(ComObject.Tag.operations, ComObject.Type.stringType);
+    for (int i = 0; i < setOperation.operations.length; i++) {
+      strArray.add(setOperation.operations[i]);
+    }
+    cobj.put(ComObject.Tag.schemaVersion, getCommon().getSchemaVersion());
+    cobj.put(ComObject.Tag.count, DatabaseClient.SELECT_PAGE_SIZE);
+    cobj.put(ComObject.Tag.method, "serverSetSelect");
+    cobj.put(ComObject.Tag.dbName, dbName);
+    cobj.put(ComObject.Tag.serverSelectPageNumber, setOperation.serverSelectPageNumber);
+    cobj.put(ComObject.Tag.resultSetId, setOperation.resultSetId);
+
+    int previousSchemaVersion = getCommon().getSchemaVersion();
+
+    byte[] recordRet = send(null, Math.abs(ThreadLocalRandom.current().nextInt() % getShardCount()),
+        Math.abs(ThreadLocalRandom.current().nextLong()), cobj, Replica.def);
+    if (previousSchemaVersion < getCommon().getSchemaVersion()) {
+      throw new SchemaOutOfSyncException();
+    }
+
+    ComObject retObj = new ComObject(recordRet);
+
+    TableSchema[] tableSchemas = new TableSchema[tableNames.length];
+    for (int i = 0; i < tableNames.length; i++) {
+      tableSchemas[i] = getCommon().getTables(dbName).get(tableNames[i]);
+    }
+
+    String[][] primaryKeyFields = new String[tableNames.length][];
+    for (int i = 0; i < tableNames.length; i++) {
+      for (Map.Entry<String, IndexSchema> entry : tableSchemas[i].getIndices().entrySet()) {
+        if (entry.getValue().isPrimaryKey()) {
+          primaryKeyFields[i] = entry.getValue().getFields();
+          break;
+        }
+      }
+    }
+    setOperation.serverSelectPageNumber = retObj.getLong(ComObject.Tag.serverSelectPageNumber);
+    setOperation.resultSetId = retObj.getLong(ComObject.Tag.resultSetId);
+
+    ComArray tableRecords = retObj.getArray(ComObject.Tag.tableRecords);
+    Object[][][] retKeys = new Object[tableRecords == null ? 0 : tableRecords.getArray().size()][][];
+    Record[][] currRetRecords = new Record[tableRecords == null ? 0 : tableRecords.getArray().size()][];
+    for (int k = 0; k < currRetRecords.length; k++) {
+      currRetRecords[k] = new Record[tableNames.length];
+      retKeys[k] = new Object[tableNames.length][];
+      ComArray records = (ComArray)tableRecords.getArray().get(k);
+      for (int j = 0; j < tableNames.length; j++) {
+        byte [] recordBytes = (byte[])records.getArray().get(j);
+        if (recordBytes != null && recordBytes.length > 0) {
+          Record record = new Record(tableSchemas[j]);
+          record.deserialize(dbName, getCommon(), recordBytes, null, true);
+          currRetRecords[k][j] = record;
+
+          Object[] key = new Object[primaryKeyFields[j].length];
+          for (int i = 0; i < primaryKeyFields[j].length; i++) {
+            key[i] = record.getFields()[tableSchemas[j].getFieldOffset(primaryKeyFields[j][i])];
           }
 
-          if (item.getExpression() instanceof Column) {
-            selectStatement.addSelectColumn(null, null, ((Column) item.getExpression()).getTable().getName(),
-                ((Column) item.getExpression()).getColumnName(), aliasName);
+          if (retKeys[k][j] == null) {
+            retKeys[k][j] = key;
           }
-          else if (item.getExpression() instanceof Function) {
-            Function function = (Function) item.getExpression();
-            String name = function.getName();
-            boolean groupCount = null != pselect.getGroupByColumnReferences() && pselect.getGroupByColumnReferences().size() != 0 && name.equalsIgnoreCase("count");
-            if (groupCount || name.equalsIgnoreCase("min") || name.equalsIgnoreCase("max") || name.equalsIgnoreCase("sum") || name.equalsIgnoreCase("avg")) {
-              Column parm = (Column) function.getParameters().getExpressions().get(0);
-              selectStatement.addSelectColumn(name, function.getParameters(), parm.getTable().getName(), parm.getColumnName(), aliasName);
-            }
-            else if (name.equalsIgnoreCase("count")) {
-              if (null == pselect.getGroupByColumnReferences() || pselect.getGroupByColumnReferences().size() == 0) {
-                if (function.isAllColumns()) {
-                  selectStatement.setCountFunction();
-                }
-                else {
-                  ExpressionList list = function.getParameters();
-                  Column column = (Column) list.getExpressions().get(0);
-                  selectStatement.setCountFunction(column.getTable().getName(), column.getColumnName());
-                }
-                if (function.isDistinct()) {
-                  selectStatement.setIsDistinct();
-                }
 
-                String currAlias = null;
-                for (SelectItem currItem : selectItems) {
-                  if (((SelectExpressionItem) currItem).getExpression() == function) {
-                    if (((SelectExpressionItem) currItem).getAlias() != null) {
-                      currAlias = ((SelectExpressionItem) currItem).getAlias().getName();
-                    }
+          ret.getRecordCache().put(tableNames[j], key, new ExpressionImpl.CachedRecord(record, recordBytes));
+        }
+      }
+    }
+    ret.setRetKeys(retKeys);
+    ret.setRecords(ret.readRecords(new ExpressionImpl.NextReturn(tableNames, retKeys)));
+  }
+
+
+  private SelectStatementImpl parseSelectStatement(ParameterHandler parms, boolean debug, PlainSelect selectBody, AtomicInteger currParmNum) {
+    SelectStatementImpl selectStatement = new SelectStatementImpl(this);
+
+    PlainSelect pselect = selectBody;
+    selectStatement.setFromTable(((Table) pselect.getFromItem()).getName());
+    Expression whereExpression = pselect.getWhere();
+    ExpressionImpl expression = getExpression(currParmNum, whereExpression, selectStatement.getFromTable(), parms);
+    if (expression == null) {
+      expression = new AllRecordsExpressionImpl();
+      ((AllRecordsExpressionImpl) expression).setFromTable(selectStatement.getFromTable());
+    }
+    expression.setDebug(debug);
+    selectStatement.setWhereClause(expression);
+
+    Limit limit = pselect.getLimit();
+    selectStatement.setLimit(limit);
+    Offset offset = pselect.getOffset();
+    selectStatement.setOffset(offset);
+
+    List<Join> joins = pselect.getJoins();
+    if (joins != null) {
+      if (!common.haveProLicense()) {
+        throw new InsufficientLicense("You must have a pro license to execute joins");
+      }
+      for (Join join : joins) {
+        FromItem rightFromItem = join.getRightItem();
+        Expression onExpressionSrc = join.getOnExpression();
+        ExpressionImpl onExpression = getExpression(currParmNum, onExpressionSrc, selectStatement.getFromTable(), parms);
+
+        String rightFrom = rightFromItem.toString();
+        SelectStatement.JoinType type = null;
+        if (join.isInner()) {
+          type = SelectStatement.JoinType.inner;
+        }
+        else if (join.isFull()) {
+          type = SelectStatement.JoinType.full;
+        }
+        else if (join.isOuter() && join.isLeft()) {
+          type = SelectStatement.JoinType.leftOuter;
+        }
+        else if (join.isOuter() && join.isRight()) {
+          type = SelectStatement.JoinType.rightOuter;
+        }
+        selectStatement.addJoinExpression(type, rightFrom, onExpression);
+      }
+    }
+
+    Distinct distinct = selectBody.getDistinct();
+    if (distinct != null) {
+      //distinct.getOnSelectItems();
+      selectStatement.setIsDistinct();
+    }
+
+    List<SelectItem> selectItems = selectBody.getSelectItems();
+    for (SelectItem selectItem : selectItems) {
+      if (selectItem instanceof SelectExpressionItem) {
+        SelectExpressionItem item = (SelectExpressionItem) selectItem;
+        Alias alias = item.getAlias();
+        String aliasName = null;
+        if (alias != null) {
+          aliasName = alias.getName();
+        }
+
+        if (item.getExpression() instanceof Column) {
+          selectStatement.addSelectColumn(null, null, ((Column) item.getExpression()).getTable().getName(),
+              ((Column) item.getExpression()).getColumnName(), aliasName);
+        }
+        else if (item.getExpression() instanceof Function) {
+          Function function = (Function) item.getExpression();
+          String name = function.getName();
+          boolean groupCount = null != pselect.getGroupByColumnReferences() && pselect.getGroupByColumnReferences().size() != 0 && name.equalsIgnoreCase("count");
+          if (groupCount || name.equalsIgnoreCase("min") || name.equalsIgnoreCase("max") || name.equalsIgnoreCase("sum") || name.equalsIgnoreCase("avg")) {
+            Column parm = (Column) function.getParameters().getExpressions().get(0);
+            selectStatement.addSelectColumn(name, function.getParameters(), parm.getTable().getName(), parm.getColumnName(), aliasName);
+          }
+          else if (name.equalsIgnoreCase("count")) {
+            if (null == pselect.getGroupByColumnReferences() || pselect.getGroupByColumnReferences().size() == 0) {
+              if (function.isAllColumns()) {
+                selectStatement.setCountFunction();
+              }
+              else {
+                ExpressionList list = function.getParameters();
+                Column column = (Column) list.getExpressions().get(0);
+                selectStatement.setCountFunction(column.getTable().getName(), column.getColumnName());
+              }
+              if (function.isDistinct()) {
+                selectStatement.setIsDistinct();
+              }
+
+              String currAlias = null;
+              for (SelectItem currItem : selectItems) {
+                if (((SelectExpressionItem) currItem).getExpression() == function) {
+                  if (((SelectExpressionItem) currItem).getAlias() != null) {
+                    currAlias = ((SelectExpressionItem) currItem).getAlias().getName();
                   }
-                }
-                if (!(expression instanceof AllRecordsExpressionImpl)) {
-                  String columnName = "__all__";
-                  if (!function.isAllColumns()) {
-                    ExpressionList list = function.getParameters();
-                    Column column = (Column) list.getExpressions().get(0);
-                    columnName = column.getColumnName();
-                  }
-                  selectStatement.addSelectColumn(function.getName(), null, ((Table) pselect.getFromItem()).getName(),
-                      columnName, currAlias);
                 }
               }
+              if (!(expression instanceof AllRecordsExpressionImpl)) {
+                String columnName = "__all__";
+                if (!function.isAllColumns()) {
+                  ExpressionList list = function.getParameters();
+                  Column column = (Column) list.getExpressions().get(0);
+                  columnName = column.getColumnName();
+                }
+                selectStatement.addSelectColumn(function.getName(), null, ((Table) pselect.getFromItem()).getName(),
+                    columnName, currAlias);
+              }
             }
-            else if (name.equalsIgnoreCase("upper") || name.equalsIgnoreCase("lower") ||
-                name.equalsIgnoreCase("substring") || name.equalsIgnoreCase("length")) {
-              Column parm = (Column) function.getParameters().getExpressions().get(0);
-              selectStatement.addSelectColumn(name, function.getParameters(), parm.getTable().getName(), parm.getColumnName(), aliasName);
-            }
+          }
+          else if (name.equalsIgnoreCase("upper") || name.equalsIgnoreCase("lower") ||
+              name.equalsIgnoreCase("substring") || name.equalsIgnoreCase("length")) {
+            Column parm = (Column) function.getParameters().getExpressions().get(0);
+            selectStatement.addSelectColumn(name, function.getParameters(), parm.getTable().getName(), parm.getColumnName(), aliasName);
           }
         }
       }
+    }
 
-      List<Expression> groupColumns = pselect.getGroupByColumnReferences();
-      if (groupColumns != null && groupColumns.size() != 0) {
-        for (int i = 0; i < groupColumns.size(); i++) {
-          Column column = (Column) groupColumns.get(i);
-          selectStatement.addOrderBy(column.getTable().getName(), column.getColumnName(), true);
-        }
-        selectStatement.setGroupByColumns(groupColumns);
+    List<Expression> groupColumns = pselect.getGroupByColumnReferences();
+    if (groupColumns != null && groupColumns.size() != 0) {
+      for (int i = 0; i < groupColumns.size(); i++) {
+        Column column = (Column) groupColumns.get(i);
+        selectStatement.addOrderBy(column.getTable().getName(), column.getColumnName(), true);
       }
+      selectStatement.setGroupByColumns(groupColumns);
+    }
 
-      List<OrderByElement> orderByElements = pselect.getOrderByElements();
-      if (orderByElements != null) {
-        for (OrderByElement element : orderByElements) {
-          selectStatement.addOrderBy(((Column) element.getExpression()).getTable().getName(), ((Column) element.getExpression()).getColumnName(), element.isAsc());
-        }
+    List<OrderByElement> orderByElements = pselect.getOrderByElements();
+    if (orderByElements != null) {
+      for (OrderByElement element : orderByElements) {
+        selectStatement.addOrderBy(((Column) element.getExpression()).getTable().getName(), ((Column) element.getExpression()).getColumnName(), element.isAsc());
       }
     }
     selectStatement.setPageSize(pageSize);
     selectStatement.setParms(parms);
-    return selectStatement.execute(dbName, explain);
+    return selectStatement;
   }
 
 

@@ -1743,10 +1743,28 @@ class MessageRequest {
     String table = cobj.getString(ComObject.Tag.tableName);
     String phase = cobj.getString(ComObject.Tag.phase);
     TableSchema tableSchema = server.getCommon().getTables(dbName).get(table);
-    for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
-      Index index = server.getIndices(dbName).getIndices().get(table).get(entry.getKey());
-      if (entry.getValue().isPrimaryKey()) {
-        if (phase.equals("primary")) {
+    if (tableSchema != null) {
+      for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
+        Index index = server.getIndices(dbName).getIndices().get(table).get(entry.getKey());
+        if (entry.getValue().isPrimaryKey()) {
+          if (phase.equals("primary")) {
+            Map.Entry<Object[], Object> indexEntry = index.firstEntry();
+            do {
+              if (indexEntry == null) {
+                break;
+              }
+              synchronized (indexEntry.getKey()) {
+                Object value = index.remove(indexEntry.getKey());
+                if (value != null) {
+                  server.freeUnsafeIds(value);
+                }
+              }
+              indexEntry = index.higherEntry(indexEntry.getKey());
+            }
+            while (true);
+          }
+        }
+        else if (phase.equals("secondary")) {
           Map.Entry<Object[], Object> indexEntry = index.firstEntry();
           do {
             if (indexEntry == null) {
@@ -1762,24 +1780,8 @@ class MessageRequest {
           }
           while (true);
         }
+        index.setCount(0);
       }
-      else if (phase.equals("secondary")) {
-        Map.Entry<Object[], Object> indexEntry = index.firstEntry();
-        do {
-          if (indexEntry == null) {
-            break;
-          }
-          synchronized (indexEntry.getKey()) {
-            Object value = index.remove(indexEntry.getKey());
-            if (value != null) {
-              server.freeUnsafeIds(value);
-            }
-          }
-          indexEntry = index.higherEntry(indexEntry.getKey());
-        }
-        while (true);
-      }
-      index.setCount(0);
     }
 
     return null;

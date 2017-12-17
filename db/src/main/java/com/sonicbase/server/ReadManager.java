@@ -786,13 +786,14 @@ public class ReadManager {
       if (select.getServerSelectPageNumber() == 0) {
         select.setPageSize(500000);
         ResultSetImpl resultSet = (ResultSetImpl) select.execute(dbName, null);
-        diskResults = new DiskBasedResultSet(cobj.getShort(ComObject.Tag.serializationVersion), dbName, server, select.getTableNames(), resultSet, count, select);
+        diskResults = new DiskBasedResultSet(cobj.getShort(ComObject.Tag.serializationVersion), dbName, server,
+            select.getTableNames(), new int[]{0}, new ResultSetImpl[]{resultSet}, select.getOrderByExpressions(), count, select, false);
       }
       else {
         diskResults = new DiskBasedResultSet(server, select, select.getTableNames(), select.getServerSelectResultSetId());
       }
       select.setServerSelectResultSetId(diskResults.getResultSetId());
-      byte[][][] records = diskResults.nextPage(select.getServerSelectPageNumber(), count);
+      byte[][][] records = diskResults.nextPage(select.getServerSelectPageNumber());
 
       ComObject retObj = new ComObject();
       select.setIsOnServer(false);
@@ -811,9 +812,161 @@ public class ReadManager {
 
       return retObj;
     }
-    catch (IOException e) {
+    catch (Exception e) {
       throw new DatabaseException(e);
     }
+  }
+
+  public ComObject serverSetSelect(ComObject cobj) {
+    try {
+      if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
+        try {
+          Thread.sleep(10);
+        }
+        catch (InterruptedException e) {
+          throw new DatabaseException(e);
+        }
+      }
+
+      String dbName = cobj.getString(ComObject.Tag.dbName);
+      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
+      if (schemaVersion < server.getSchemaVersion()) {
+        throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
+      }
+
+      ComArray array = cobj.getArray(ComObject.Tag.selectStatements);
+      SelectStatementImpl[] selectStatements = new SelectStatementImpl[array.getArray().size()];
+      for (int i = 0; i < array.getArray().size(); i++) {
+        SelectStatementImpl stmt = new SelectStatementImpl(server.getClient());
+        stmt.deserialize((byte[])array.getArray().get(i), dbName);
+        selectStatements[i] = stmt;
+      }
+      ComArray tablesArray = cobj.getArray(ComObject.Tag.tables);
+      String[] tableNames = new String[tablesArray.getArray().size()];
+      TableSchema[] tableSchemas = new TableSchema[tableNames.length];
+      for (int i = 0; i < array.getArray().size(); i++) {
+        tableNames[i] = (String)tablesArray.getArray().get(i);
+        tableSchemas[i] = server.getCommon().getTables(dbName).get(tableNames[i]);
+      }
+
+      List<OrderByExpressionImpl> orderByExpressions = new ArrayList<>();
+      ComArray orderByArray = cobj.getArray(ComObject.Tag.orderByExpressions);
+      if (orderByArray != null) {
+        for (int i = 0; i < orderByArray.getArray().size(); i++) {
+          OrderByExpressionImpl orderBy = new OrderByExpressionImpl();
+          orderBy.deserialize((byte[]) orderByArray.getArray().get(i));
+          orderByExpressions.add(orderBy);
+        }
+      }
+
+      boolean haveUnique = false;
+      ComArray operationsArray = cobj.getArray(ComObject.Tag.operations);
+      String[] operations = new String[operationsArray.getArray().size()];
+      for (int i = 0; i < operations.length; i++) {
+        operations[i] = (String) operationsArray.getArray().get(i);
+        if (!operations[i].toUpperCase().endsWith("ALL")) {
+          haveUnique = true;
+        }
+      }
+
+      long serverSelectPageNumber = cobj.getLong(ComObject.Tag.serverSelectPageNumber);
+      long resultSetId = cobj.getLong(ComObject.Tag.resultSetId);
+
+      int count = cobj.getInt(ComObject.Tag.count);
+
+
+      DiskBasedResultSet diskResults = null;
+      if (serverSelectPageNumber == 0) {
+        ResultSetImpl[] resultSets = new ResultSetImpl[selectStatements.length];
+        for (int i = 0; i < selectStatements.length; i++) {
+          SelectStatementImpl stmt = selectStatements[i];
+          stmt.setPageSize(500000);
+          resultSets[i] = (ResultSetImpl) stmt.execute(dbName, null);
+        }
+
+        if (haveUnique) {
+          diskResults = buildUniqueResultSet(cobj.getShort(ComObject.Tag.serializationVersion),
+              dbName, selectStatements, tableNames, resultSets, orderByExpressions, count, operations);
+        }
+        else {
+          int[] offsets = new int[tableNames.length];
+          for (int i = 0; i < offsets.length; i++) {
+            offsets[i] = i;
+          }
+          diskResults = new DiskBasedResultSet(cobj.getShort(ComObject.Tag.serializationVersion), dbName, server,
+              tableNames, offsets, resultSets, orderByExpressions, count, null, true);
+        }
+      }
+      else {
+        diskResults = new DiskBasedResultSet(server, null, tableNames, resultSetId);
+      }
+      byte[][][] records = diskResults.nextPage((int)serverSelectPageNumber);
+
+      ComObject retObj = new ComObject();
+
+      retObj.put(ComObject.Tag.resultSetId, diskResults.getResultSetId());
+      retObj.put(ComObject.Tag.serverSelectPageNumber, serverSelectPageNumber + 1);
+
+      if (records != null) {
+        ComArray tableArray = retObj.putArray(ComObject.Tag.tableRecords, ComObject.Type.arrayType);
+        for (byte[][] tableRecords : records) {
+          ComArray recordArray = tableArray.addArray(ComObject.Tag.records, ComObject.Type.byteArrayType);
+
+          for (int i = 0; i < tableRecords.length; i++) {
+            byte[] record = tableRecords[i];
+            if (record == null) {
+              recordArray.add(new byte[]{});
+            }
+            else {
+              recordArray.add(record);
+            }
+          }
+        }
+      }
+
+      return retObj;
+    }
+    catch (Exception e) {
+      e.printStackTrace();
+      throw new DatabaseException(e);
+    }
+  }
+
+  private DiskBasedResultSet buildUniqueResultSet(Short serializationVersion, String dbName, SelectStatementImpl[] selectStatements, String[] tableNames,
+                                                  ResultSetImpl[] resultSets,
+                                                  List<OrderByExpressionImpl> orderByExpressions, int count, String[] operations) {
+    List<OrderByExpressionImpl> orderByUnique = new ArrayList<>();
+    for (ColumnImpl column : selectStatements[0].getSelectColumns()) {
+      String columnName = column.getColumnName();
+      OrderByExpressionImpl orderBy = new OrderByExpressionImpl();
+      orderBy.setAscending(true);
+      orderBy.setColumnName(columnName);
+      orderByUnique.add(orderBy);
+    }
+    DiskBasedResultSet[] diskResultSets = new DiskBasedResultSet[resultSets.length];
+    for (int i = 0; i < diskResultSets.length; i++) {
+      diskResultSets[i] = new DiskBasedResultSet(serializationVersion, dbName, server,
+          new String[]{selectStatements[i].getFromTable()}, new int[]{i}, new ResultSetImpl[]{resultSets[i]}, orderByUnique, count, null, true);
+    }
+
+    DiskBasedResultSet ret = diskResultSets[0];
+    for (int i = 1; i < resultSets.length; i++) {
+      boolean unique = !operations[i-1].toUpperCase().endsWith("ALL");
+      boolean intersect = operations[i-1].toUpperCase().startsWith("INTERSECT");
+      boolean except = operations[i-1].toUpperCase().startsWith("EXCEPT");
+      List<String> tables = new ArrayList<>();
+      for (String tableName : ret.getTableNames()) {
+        tables.add(tableName);
+      }
+      for (String tableName : diskResultSets[i].getTableNames()) {
+        tables.add(tableName);
+      }
+      ret = new DiskBasedResultSet(serializationVersion, dbName, server,
+          tables.toArray(new String[tables.size()]), new DiskBasedResultSet[]{ret, diskResultSets[i]},
+          orderByExpressions, count, unique, intersect, except, selectStatements[0].getSelectColumns());
+    }
+
+    return ret;
   }
 
   public ComObject indexLookupExpression(ComObject cobj) {

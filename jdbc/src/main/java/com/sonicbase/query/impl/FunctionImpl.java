@@ -16,13 +16,12 @@ import org.apache.commons.codec.binary.Hex;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.sql.Types;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class FunctionImpl extends ExpressionImpl {
@@ -38,6 +37,68 @@ public class FunctionImpl extends ExpressionImpl {
 
   }
 
+  public enum Function {
+    ceiling(new CeilingFunction()),
+    floor(new FloorFunction()),
+    abs(new AbsFunction()),
+    str(new StrFunction()),
+    avg(new AvgFunction()),
+    max(new MaxFunction()),
+    max_timestamp(new MaxTimestampFunction()),
+    sum(new SumFunction()),
+    min(new MinFunction()),
+    min_timestamp(new MinTImestampFunction()),
+    bit_shift_left(new BitShiftLeftFunction()),
+    bit_shift_right(new BitShiftRightFunction()),
+    bit_and(new BitAndFunction()),
+    bit_not(new BitNotFunction()),
+    bit_or(new BitOrFunction()),
+    bit_xor(new BitXOrFunction()),
+    coalesce(new CoalesceFunction()),
+    char_length(new CharLengthFunction()),
+    concat(new ConcatFunction()),
+    now(new NowFunction()),
+    date_add(new DateAddFunction()),
+    day(new DayFunction()),
+    day_of_week(new DayOfWeekFunction()),
+    day_of_year(new DayOfYearFunction()),
+    minute(new MinuteFunction()),
+    month(new MonthFunction()),
+    second(new SecondFunction()),
+    hour(new HourFunction()),
+    week_of_month(new WeekOfMonthFunction()),
+    week_of_year(new WeekOfYearFunction()),
+    year(new YearFunction()),
+    power(new PowerFunction()),
+    hex(new HexFunction()),
+    log(new LogFunction()),
+    log10(new Log10Function()),
+    mod(new ModFunction()),
+    lower(new LowerFunction()),
+    upper(new UpperFunction()),
+    index_of(new IndexOfFunction()),
+    replace(new ReplaceFunction()),
+    round(new RoundFunction()),
+    pi(new PiFunction()),
+    sqrt(new SqrtFunction()),
+    tan(new TanFunction()),
+    cos(new CosFunction()),
+    sin(new SinFunction()),
+    cot(new CotFunction()),
+    trim(new TrimFunction()),
+    radians(new RadiansFunction()),
+    custom(new CustomFunction());
+
+    private final FunctionBase func;
+
+    Function(FunctionBase func) {
+      this.func = func;
+    }
+  }
+
+  interface FunctionBase {
+    Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms);
+  }
   public String getName() {
     return name;
   }
@@ -52,24 +113,78 @@ public class FunctionImpl extends ExpressionImpl {
     return Type.function;
   }
 
-  @Override
-  public Object evaluateSingleRecord(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms) {
-    if (name.equalsIgnoreCase("ceiling")) {
-      Object parm = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  static class MethodObject {
+    Method method;
+    Object obj;
+
+    public MethodObject(Method method, Object obj) {
+      this.method = method;
+      this.obj = obj;
+    }
+  }
+  static class CustomFunction implements FunctionBase {
+
+    private Map<String, MethodObject> methods = new ConcurrentHashMap<>();
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      try {
+        String className = (String) funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+
+        String methodName = (String) funcParms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
+
+        Object[] evaluatedParms = new Object[funcParms.size() - 2];
+        for (int i = 2; i < funcParms.size(); i++) {
+          evaluatedParms[i] = funcParms.get(i).evaluateSingleRecord(tableSchemas, records, parms);
+        }
+
+        String key = className + "." + methodName;
+        MethodObject methodObj = methods.get(key);
+        Object obj = null;
+        Method method = null;
+        if (methodObj == null) {
+          obj = Class.forName(className).newInstance();
+          method = Class.forName(className).getMethod(methodName, Object[].class);
+          methods.put(key, new MethodObject(method, obj));
+        }
+        else {
+          obj = methodObj.obj;
+          method = methodObj.method;
+        }
+
+        return method.invoke(obj, evaluatedParms);
+      }
+      catch (Exception e) {
+        throw new DatabaseException(e);
+      }
+    }
+  }
+
+  static class CeilingFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object parm = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (parm == null) {
         return null;
       }
       return Math.ceil((Double) DataType.getDoubleConverter().convert(parm));
     }
-    if (name.equalsIgnoreCase("floor")) {
-      Object parm = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class FloorFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object parm = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (parm == null) {
         return null;
       }
       return Math.floor((Double) DataType.getDoubleConverter().convert(parm));
     }
-    if (name.equalsIgnoreCase("abs")) {
-      Object parm = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class AbsFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object parm = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (parm == null) {
         return null;
       }
@@ -85,17 +200,25 @@ public class FunctionImpl extends ExpressionImpl {
       }
       return null;
     }
-    if (name.equalsIgnoreCase("str")) {
-      Object parm = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class StrFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object parm = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (parm == null) {
         return null;
       }
       return String.valueOf(parm);
     }
-    if (name.equalsIgnoreCase("avg")) {
+  }
+
+  static class AvgFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
       Double sum = 0d;
       int count = 0;
-      for (ExpressionImpl expression : this.parms) {
+      for (ExpressionImpl expression : funcParms) {
         Object value = expression.evaluateSingleRecord(tableSchemas, records, parms);
         if (value == null) {
           continue;
@@ -105,9 +228,13 @@ public class FunctionImpl extends ExpressionImpl {
       }
       return sum / count;
     }
-    if (name.equalsIgnoreCase("max")) {
+  }
+
+  static class MaxFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
       Double max = null;
-      for (ExpressionImpl expression : this.parms) {
+      for (ExpressionImpl expression : funcParms) {
         Object value = expression.evaluateSingleRecord(tableSchemas, records, parms);
         if (value == null) {
           continue;
@@ -122,9 +249,13 @@ public class FunctionImpl extends ExpressionImpl {
       }
       return max;
     }
-    if (name.equalsIgnoreCase("max_timestamp")) {
+  }
+
+  static class MaxTimestampFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
       Timestamp max = null;
-      for (ExpressionImpl expression : this.parms) {
+      for (ExpressionImpl expression : funcParms) {
         Object value = expression.evaluateSingleRecord(tableSchemas, records, parms);
         if (value == null) {
           continue;
@@ -141,9 +272,13 @@ public class FunctionImpl extends ExpressionImpl {
       }
       return max;
     }
-    if (name.equalsIgnoreCase("sum")) {
+  }
+
+  static class SumFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
       Double sum = null;
-      for (ExpressionImpl expression : this.parms) {
+      for (ExpressionImpl expression : funcParms) {
         Object value = expression.evaluateSingleRecord(tableSchemas, records, parms);
         if (value == null) {
           continue;
@@ -158,9 +293,13 @@ public class FunctionImpl extends ExpressionImpl {
       }
       return sum;
     }
-    if (name.equalsIgnoreCase("min")) {
+  }
+
+  static class MinFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
       Double min = null;
-      for (ExpressionImpl expression : this.parms) {
+      for (ExpressionImpl expression : funcParms) {
         Object value = expression.evaluateSingleRecord(tableSchemas, records, parms);
         if (value == null) {
           continue;
@@ -175,9 +314,13 @@ public class FunctionImpl extends ExpressionImpl {
       }
       return min;
     }
-    if (name.equalsIgnoreCase("min_timestamp")) {
+  }
+
+  static class MinTImestampFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
       Timestamp min = null;
-      for (ExpressionImpl expression : this.parms) {
+      for (ExpressionImpl expression : funcParms) {
         Object value = expression.evaluateSingleRecord(tableSchemas, records, parms);
         if (value == null) {
           continue;
@@ -194,12 +337,16 @@ public class FunctionImpl extends ExpressionImpl {
       }
       return min;
     }
-    if (name.equalsIgnoreCase("bit_shift_left")) {
-      Object parm = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class BitShiftLeftFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object parm = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (parm == null) {
         return null;
       }
-      Object numBits = this.parms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
+      Object numBits = funcParms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
       if (numBits == null) {
         return null;
       }
@@ -207,12 +354,16 @@ public class FunctionImpl extends ExpressionImpl {
       Integer bits = (int) (long)(Long)DataType.getLongConverter().convert(numBits);
       return value << bits;
     }
-    if (name.equalsIgnoreCase("bit_shift_right")) {
-      Object parm = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class BitShiftRightFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object parm = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (parm == null) {
         return null;
       }
-      Object numBits = this.parms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
+      Object numBits = funcParms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
       if (numBits == null) {
         return null;
       }
@@ -220,12 +371,16 @@ public class FunctionImpl extends ExpressionImpl {
       Integer bits = (int) (long)(Long)DataType.getLongConverter().convert(numBits);
       return value >>> bits;
     }
-    if (name.equalsIgnoreCase("bit_and")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class BitAndFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
-      Object rhs = this.parms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
+      Object rhs = funcParms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
       if (rhs == null) {
         return null;
       }
@@ -233,20 +388,28 @@ public class FunctionImpl extends ExpressionImpl {
       Long rhsBits = (Long)DataType.getLongConverter().convert(rhs);
       return lhsBits & rhsBits;
     }
-    if (name.equalsIgnoreCase("bit_not")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class BitNotFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
       Long lhsBits = (Long) DataType.getLongConverter().convert(lhs);
       return ~lhsBits;
     }
-    if (name.equalsIgnoreCase("bit_or")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class BitOrFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
-      Object rhs = this.parms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
+      Object rhs = funcParms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
       if (rhs == null) {
         return null;
       }
@@ -254,12 +417,16 @@ public class FunctionImpl extends ExpressionImpl {
       Long rhsBits = (Long)DataType.getLongConverter().convert(rhs);
       return lhsBits | rhsBits;
     }
-    if (name.equalsIgnoreCase("bit_xor")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class BitXOrFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
-      Object rhs = this.parms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
+      Object rhs = funcParms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
       if (rhs == null) {
         return null;
       }
@@ -267,8 +434,12 @@ public class FunctionImpl extends ExpressionImpl {
       Long rhsBits = (Long)DataType.getLongConverter().convert(rhs);
       return lhsBits ^ rhsBits;
     }
-    if (name.equalsIgnoreCase("coalesce")) {
-      for (ExpressionImpl expression : this.parms) {
+  }
+
+  static class CoalesceFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      for (ExpressionImpl expression : funcParms) {
         Object value = expression.evaluateSingleRecord(tableSchemas, records, parms);
         if (value != null) {
           return value;
@@ -276,20 +447,28 @@ public class FunctionImpl extends ExpressionImpl {
       }
       return null;
     }
-    if (name.equalsIgnoreCase("char_length")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class CharLengthFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
       String lhsValue = (String) DataType.getStringConverter().convert(lhs);
       return lhsValue.length();
     }
-    if (name.equalsIgnoreCase("concat")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class ConcatFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
-      Object rhs = this.parms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
+      Object rhs = funcParms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
       if (rhs == null) {
         return null;
       }
@@ -297,16 +476,24 @@ public class FunctionImpl extends ExpressionImpl {
       String rhsStr = (String) DataType.getStringConverter().convert(rhs);
       return lhsStr + rhsStr;
     }
-    if (name.equalsIgnoreCase("now")) {
+  }
+
+  static class NowFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
       Timestamp time = new Timestamp(System.currentTimeMillis());
       return time;
     }
-    if (name.equalsIgnoreCase("date_add")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class DateAddFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
-      Object rhs = this.parms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
+      Object rhs = funcParms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
       if (rhs == null) {
         return null;
       }
@@ -317,8 +504,12 @@ public class FunctionImpl extends ExpressionImpl {
       Timestamp ret = new Timestamp(timeMillis);
       return ret;
     }
-    if (name.equalsIgnoreCase("day")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class DayFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
@@ -327,8 +518,12 @@ public class FunctionImpl extends ExpressionImpl {
       cal.setTimeInMillis(time.getTime());
       return cal.get(Calendar.DAY_OF_MONTH);
     }
-    if (name.equalsIgnoreCase("day_of_week")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class DayOfWeekFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
@@ -337,8 +532,12 @@ public class FunctionImpl extends ExpressionImpl {
       cal.setTimeInMillis(time.getTime());
       return cal.get(Calendar.DAY_OF_WEEK);
     }
-    if (name.equalsIgnoreCase("day_of_year")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class DayOfYearFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
@@ -347,8 +546,12 @@ public class FunctionImpl extends ExpressionImpl {
       cal.setTimeInMillis(time.getTime());
       return cal.get(Calendar.DAY_OF_YEAR);
     }
-    if (name.equalsIgnoreCase("minute")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class MinuteFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
@@ -357,8 +560,12 @@ public class FunctionImpl extends ExpressionImpl {
       cal.setTimeInMillis(time.getTime());
       return cal.get(Calendar.MINUTE);
     }
-    if (name.equalsIgnoreCase("month")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class MonthFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
@@ -367,8 +574,12 @@ public class FunctionImpl extends ExpressionImpl {
       cal.setTimeInMillis(time.getTime());
       return cal.get(Calendar.MONTH);
     }
-    if (name.equalsIgnoreCase("second")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class SecondFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
@@ -377,8 +588,12 @@ public class FunctionImpl extends ExpressionImpl {
       cal.setTimeInMillis(time.getTime());
       return cal.get(Calendar.SECOND);
     }
-    if (name.equalsIgnoreCase("hour")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class HourFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
@@ -387,8 +602,12 @@ public class FunctionImpl extends ExpressionImpl {
       cal.setTimeInMillis(time.getTime());
       return cal.get(Calendar.HOUR_OF_DAY);
     }
-    if (name.equalsIgnoreCase("week_of_month")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class WeekOfMonthFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
@@ -397,8 +616,12 @@ public class FunctionImpl extends ExpressionImpl {
       cal.setTimeInMillis(time.getTime());
       return cal.get(Calendar.WEEK_OF_MONTH);
     }
-    if (name.equalsIgnoreCase("week_of_year")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class WeekOfYearFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
@@ -407,8 +630,12 @@ public class FunctionImpl extends ExpressionImpl {
       cal.setTimeInMillis(time.getTime());
       return cal.get(Calendar.WEEK_OF_YEAR);
     }
-    if (name.equalsIgnoreCase("year")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class YearFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
@@ -417,12 +644,16 @@ public class FunctionImpl extends ExpressionImpl {
       cal.setTimeInMillis(time.getTime());
       return cal.get(Calendar.YEAR);
     }
-    if (name.equalsIgnoreCase("power")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class PowerFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
-      Object rhs = this.parms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
+      Object rhs = funcParms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
       if (rhs == null) {
         return null;
       }
@@ -430,8 +661,12 @@ public class FunctionImpl extends ExpressionImpl {
       Double rhsValue = (Double) DataType.getDoubleConverter().convert(rhs);
       return Math.pow(lhsValue, rhsValue);
     }
-    if (name.equalsIgnoreCase("hex")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class HexFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
@@ -443,29 +678,42 @@ public class FunctionImpl extends ExpressionImpl {
       catch (Exception e) {
         throw new DatabaseException(e);
       }
+
     }
-    if (name.equalsIgnoreCase("log")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class LogFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
       Double value = (Double) DataType.getDoubleConverter().convert(lhs);
       return Math.log(value);
     }
-    if (name.equalsIgnoreCase("log10")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class Log10Function implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
       Double value = (Double) DataType.getDoubleConverter().convert(lhs);
       return Math.log10(value);
     }
-    if (name.equalsIgnoreCase("mod")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class ModFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
-      Object rhs = this.parms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
+      Object rhs = funcParms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
       if (rhs == null) {
         return null;
       }
@@ -473,31 +721,40 @@ public class FunctionImpl extends ExpressionImpl {
       Double rhsValue = (Double) DataType.getDoubleConverter().convert(rhs);
       return lhsValue % rhsValue;
     }
-    if (name.equalsIgnoreCase("lower")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class LowerFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
       String str = (String) DataType.getStringConverter().convert(lhs);
       return str.toLowerCase();
     }
-    if (name.equalsIgnoreCase("upper")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class UpperFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
       String str = (String) DataType.getStringConverter().convert(lhs);
       return str.toUpperCase();
     }
-    if (name.equalsIgnoreCase("pi")) {
-      return Math.PI;
-    }
-    if (name.equalsIgnoreCase("index_of")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class IndexOfFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
-      Object rhs = this.parms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
+      Object rhs = funcParms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
       if (rhs == null) {
         return null;
       }
@@ -505,16 +762,20 @@ public class FunctionImpl extends ExpressionImpl {
       String rhsStr = (String) DataType.getStringConverter().convert(rhs);
       return lhsStr.indexOf(rhsStr);
     }
-    if (name.equalsIgnoreCase("replace")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class ReplaceFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
-      Object rhs = this.parms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
+      Object rhs = funcParms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
       if (rhs == null) {
         return null;
       }
-      Object replace = this.parms.get(2).evaluateSingleRecord(tableSchemas, records, parms);
+      Object replace = funcParms.get(2).evaluateSingleRecord(tableSchemas, records, parms);
       if (replace == null) {
         return null;
       }
@@ -523,72 +784,121 @@ public class FunctionImpl extends ExpressionImpl {
       String replaceStr = (String) DataType.getStringConverter().convert(replace);
       return lhsStr.replace(rhsStr, replaceStr);
     }
-    if (name.equalsIgnoreCase("round")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class RoundFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
       Double value = (Double) DataType.getDoubleConverter().convert(lhs);
       return Math.round(value);
     }
-    if (name.equalsIgnoreCase("sqrt")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class PiFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      return Math.PI;
+    }
+  }
+
+  static class SqrtFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
       Double value = (Double) DataType.getDoubleConverter().convert(lhs);
       return Math.sqrt(value);
     }
-    if (name.equalsIgnoreCase("tan")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class TanFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
       Double value = (Double) DataType.getDoubleConverter().convert(lhs);
       return Math.tan(value);
     }
-    if (name.equalsIgnoreCase("cos")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class CosFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
       Double value = (Double) DataType.getDoubleConverter().convert(lhs);
       return Math.cos(value);
     }
-    if (name.equalsIgnoreCase("sin")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class SinFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
       Double value = (Double) DataType.getDoubleConverter().convert(lhs);
       return Math.sin(value);
     }
-    if (name.equalsIgnoreCase("cot")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class CotFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
       Double value = (Double) DataType.getDoubleConverter().convert(lhs);
       return 1 / Math.tan(value);
     }
-    if (name.equalsIgnoreCase("trim")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class TrimFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
       String str = (String) DataType.getStringConverter().convert(lhs);
       return str.trim();
     }
-    if (name.equalsIgnoreCase("radians")) {
-      Object lhs = this.parms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+  }
+
+  static class RadiansFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
       if (lhs == null) {
         return null;
       }
       Double value = (Double) DataType.getDoubleConverter().convert(lhs);
       return Math.toRadians(value);
     }
+  }
 
-    throw new DatabaseException("Invalid function");
+  @Override
+  public Object evaluateSingleRecord(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms) {
+    Function funcValue = null;
+    try {
+      funcValue = Function.valueOf(name.toLowerCase());
+    }
+    catch (Exception e) {
+      throw new DatabaseException("Invalid function: name=" + name, e);
+    }
+    return funcValue.func.evaluate(tableSchemas, records, parms, this.parms);
   }
 
   @Override

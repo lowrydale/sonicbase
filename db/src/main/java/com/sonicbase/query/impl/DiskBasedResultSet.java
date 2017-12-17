@@ -2,7 +2,6 @@ package com.sonicbase.query.impl;
 
 import com.sonicbase.common.Record;
 import com.sonicbase.query.DatabaseException;
-import com.sonicbase.query.impl.*;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
@@ -13,6 +12,7 @@ import org.anarres.lzo.LzoInputStream;
 import org.anarres.lzo.LzoOutputStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.giraph.utils.Varint;
+import sun.misc.Cache;
 
 import java.io.*;
 import java.util.*;
@@ -28,6 +28,8 @@ public class DiskBasedResultSet {
   private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
 
   private static AtomicLong nextResultSetId = new AtomicLong();
+  private boolean setOperator;
+  private List<OrderByExpressionImpl> orderByExpressions;
   private int count;
   private SelectStatementImpl select;
   private DatabaseServer server;
@@ -41,12 +43,15 @@ public class DiskBasedResultSet {
       short serializationVersion,
       String dbName,
       DatabaseServer databaseServer,
-      String[] tableNames, ResultSetImpl resultSet, int count, SelectStatementImpl select) {
+      String[] tableNames, int[] tableOffsets, ResultSetImpl[] resultSets, List<OrderByExpressionImpl> orderByExpressions,
+      int count, SelectStatementImpl select, boolean setOperator) {
     this.server = databaseServer;
     this.tableNames = tableNames;
     this.select = select;
     this.count = count;
+    this.setOperator = setOperator;
     File file = null;
+    this.orderByExpressions = orderByExpressions;
     synchronized (this) {
       while (true) {
         resultSetId = nextResultSetId.getAndIncrement();
@@ -58,9 +63,240 @@ public class DiskBasedResultSet {
       file.mkdirs();
     }
 
-    ExpressionImpl.CachedRecord[][] records = resultSet.getReadRecordsAndSerializedRecords();
-    if (records == null) {
-      return;
+//    if (records != null && records.length < count) {
+//      ResultSetImpl.sortResults(server.getClient().getCommon(), select, records, tableNames);
+//      sorted = true;
+//    }
+//    writeRecordsToFile(out, records);
+    int fileOffset = 0;
+
+    Map<String, Integer> tableOffsets2 = new HashMap<>();
+    boolean[][] keepers = new boolean[tableNames.length][];
+    for (int i = 0; i < tableNames.length; i++) {
+      TableSchema tableSchema = databaseServer.getClient().getCommon().getTables(dbName).get(tableNames[i]);
+      tableOffsets2.put(tableNames[i], i);
+      keepers[i] = new boolean[tableSchema.getFields().size()];
+      for (int j = 0; j < keepers[i].length; j++) {
+        keepers[i][j] = false;
+      }
+    }
+
+    boolean selectAll = false;
+    if (select == null) {
+      selectAll = true;
+    }
+    else {
+      List<ColumnImpl> selectColumns = select.getSelectColumns();
+      if (selectColumns == null || selectColumns.size() == 0) {
+        selectAll = true;
+      }
+
+      for (ColumnImpl column : selectColumns) {
+        String tableName = column.getTableName();
+        String columnName = column.getColumnName();
+        getKeepers(dbName, databaseServer, tableNames, tableOffsets2, keepers, columnName, tableName);
+      }
+    }
+
+    for (int i = 0; i < tableNames.length; i++) {
+      for (Map.Entry<String, IndexSchema> indexSchema : server.getCommon().getTables(dbName).get(tableNames[i]).getIndexes().entrySet()) {
+        if (indexSchema.getValue().isPrimaryKey()) {
+          for (String column : indexSchema.getValue().getFields()) {
+            getKeepers(dbName, databaseServer, tableNames, tableOffsets2, keepers, column, tableNames[i]);
+          }
+        }
+      }
+    }
+
+    for (OrderByExpressionImpl expression : orderByExpressions) {
+      String tableName = expression.getTableName();
+      String columnName = expression.getColumnName();
+      getKeepers(dbName, databaseServer, tableNames, tableOffsets2, keepers, columnName, tableName);
+    }
+
+    for (int k = 0; k < resultSets.length; k++) {
+      ResultSetImpl rs = resultSets[k];
+      ExpressionImpl.CachedRecord[][] records = rs.getReadRecordsAndSerializedRecords();
+      if (records == null) {
+        continue;
+      }
+
+      List<ExpressionImpl.CachedRecord[]> batch = new ArrayList<>();
+      for (ExpressionImpl.CachedRecord[] row : records) {
+        if (!selectAll) {
+          for (int i = 0; i < row.length; i++) {
+            if (row[i] == null) {
+              continue;
+            }
+            for (int j = 0; j < row[i].getRecord().getFields().length; j++)
+              if (!keepers[i][j]) {
+                row[i].getRecord().getFields()[j] = null;
+              }
+          }
+        }
+//        ExpressionImpl.CachedRecord[] newRow = new ExpressionImpl.CachedRecord[tableNames.length];
+//        newRow[k] = row[0];
+//        batch.add(newRow);
+        batch.add(row);
+      }
+      //    if (!sorted) {
+      while (true) {
+        rs.setPageSize(500000);
+        rs.forceSelectOnServer();
+        long begin = System.currentTimeMillis();
+        rs.getMoreResults();
+        records = rs.getReadRecordsAndSerializedRecords();
+        if (records == null) {
+          break;
+        }
+        logger.info("got more results: duration=" + (System.currentTimeMillis() - begin) + ", recordCount=" + records.length);
+        for (ExpressionImpl.CachedRecord[] row : records) {
+          //        if (!selectAll) {
+          //          for (int i = 0; i < row.length; i++) {
+          //            if (row[i] == null) {
+          //              continue;
+          //            }
+          //            for (int j = 0; j < row[i].getFields().length; j++)
+          //            if (!keepers[i][j]) {
+          //              row[i].getFields()[j] = null;
+          //            }
+          //          }
+          //        }
+//          ExpressionImpl.CachedRecord[] newRow = new ExpressionImpl.CachedRecord[tableNames.length];
+//          newRow[k] = row[0];
+//          batch.add(newRow);
+          batch.add(row);
+        }
+        synchronized (rs.getRecordCache().getRecordsForTable()) {
+          rs.getRecordCache().getRecordsForTable().clear();
+        }
+        if (batch.size() >= 500000) {
+          ExpressionImpl.CachedRecord[][] batchRecords = new ExpressionImpl.CachedRecord[batch.size()][];
+          for (int i = 0; i < batchRecords.length; i++) {
+            batchRecords[i] = batch.get(i);
+          }
+          begin = System.currentTimeMillis();
+          ResultSetImpl.sortResults(dbName, server.getClient().getCommon(), batchRecords, tableNames, orderByExpressions);
+          logger.info("sorted in-memory results: duration=" + (System.currentTimeMillis() - begin));
+
+          for (int i = 0; i < batchRecords.length; i++) {
+            ExpressionImpl.CachedRecord[] newRow = new ExpressionImpl.CachedRecord[tableNames.length];
+            newRow[k] = batchRecords[i][0];
+            batchRecords[i] = newRow;
+          }
+          writeRecordsToFile(serializationVersion, file, batchRecords, fileOffset++);
+          batch.clear();
+        }
+      }
+      ExpressionImpl.CachedRecord[][] batchRecords = new ExpressionImpl.CachedRecord[batch.size()][];
+      for (int i = 0; i < batchRecords.length; i++) {
+        batchRecords[i] = batch.get(i);
+      }
+      ResultSetImpl.sortResults(dbName, server.getClient().getCommon(), batchRecords, tableNames, orderByExpressions);
+      for (int i = 0; i < batchRecords.length; i++) {
+        ExpressionImpl.CachedRecord[] newRow = new ExpressionImpl.CachedRecord[tableNames.length];
+        newRow[k] = batchRecords[i][0];
+        batchRecords[i] = newRow;
+      }
+      writeRecordsToFile(serializationVersion, file, batchRecords, fileOffset++);
+      batch.clear();
+    }
+    mergeSort(serializationVersion, dbName, file);
+
+    updateAccessTime(file);
+  }
+
+  public String[] getTableNames() {
+    return tableNames;
+  }
+
+  class ResultSetContext {
+    DatabaseServer databaseServer;
+    String dbName;
+    DiskBasedResultSet rs;
+    int pageNum = 0;
+    int pos = 0;
+    ExpressionImpl.CachedRecord[][] records;
+
+    public ResultSetContext(DatabaseServer databaseServer, String dbName, DiskBasedResultSet rs) {
+      this.databaseServer = databaseServer;
+      this.dbName = dbName;
+      this.rs = rs;
+    }
+
+    ExpressionImpl.CachedRecord[] nextRecord() {
+      if (records == null) {
+        if (!nextPage()) {
+          return null;
+        }
+      }
+      if (pos >= records.length) {
+        if (!nextPage()) {
+          return null;
+        }
+      }
+      return records[pos++];
+    }
+
+    public boolean nextPage() {
+      byte[][][] bytes = rs.nextPage(pageNum++);
+      if (bytes == null) {
+        return false;
+      }
+      records = new ExpressionImpl.CachedRecord[bytes.length][];
+      for (int i = 0; i < records.length; i++) {
+        records[i] = new ExpressionImpl.CachedRecord[bytes[i].length];
+        for (int j = 0; j < records[i].length; j++) {
+          if (bytes[i][j] != null) {
+            Record record = new Record(dbName, databaseServer.getCommon(), bytes[i][j]);
+            records[i][j] = new ExpressionImpl.CachedRecord(record, bytes[i][j]);
+          }
+        }
+      }
+      pos = 0;
+      return true;
+    }
+  }
+
+  public void addRecord(String dbName, short serializationVersion, ExpressionImpl.CachedRecord[] record,
+                        int tableOffset, int tableCount, List<ExpressionImpl.CachedRecord[]> batch, File file, AtomicInteger fileOffset) {
+    ExpressionImpl.CachedRecord[] newRecord = new ExpressionImpl.CachedRecord[tableCount];
+    System.arraycopy(record, 0, newRecord, tableOffset, record.length);
+    batch.add(newRecord);
+    if (batch.size() >= 500000) {
+      flushBatch(dbName, serializationVersion, batch, file, fileOffset);
+    }
+  }
+
+  private void flushBatch(String dbName, short serializationVersion, List<ExpressionImpl.CachedRecord[]> batch, File file, AtomicInteger fileOffset) {
+    ExpressionImpl.CachedRecord[][] batchRecords = new ExpressionImpl.CachedRecord[batch.size()][];
+    for (int i = 0; i < batchRecords.length; i++) {
+      batchRecords[i] = batch.get(i);
+    }
+    ResultSetImpl.sortResults(dbName, server.getClient().getCommon(), batchRecords, tableNames, orderByExpressions);
+    writeRecordsToFile(serializationVersion, file, batchRecords, fileOffset.getAndIncrement());
+    batch.clear();
+  }
+
+  public DiskBasedResultSet(Short serializationVersion, String dbName, DatabaseServer databaseServer, String[] tableNames,
+                            DiskBasedResultSet[] diskBasedResultSets, List<OrderByExpressionImpl> orderByExpressions,
+                            int count, boolean unique, boolean intersect, boolean except, final List<ColumnImpl> selectColumns) {
+    this.server = databaseServer;
+    this.tableNames = tableNames;
+    this.select = select;
+    this.count = count;
+    this.setOperator = setOperator;
+    File file = null;
+    this.orderByExpressions = orderByExpressions;
+    synchronized (this) {
+      while (true) {
+        resultSetId = nextResultSetId.getAndIncrement();
+        file = new File(server.getDataDir(), "result-sets/" + databaseServer.getShard() + "/" + server.getReplica() + "/" + resultSetId);
+        if (!file.exists()) {
+          break;
+        }
+      }
+      file.mkdirs();
     }
 
 //    if (records != null && records.length < count) {
@@ -68,7 +304,7 @@ public class DiskBasedResultSet {
 //      sorted = true;
 //    }
 //    writeRecordsToFile(out, records);
-    int fileOffset = 0;
+    AtomicInteger fileOffset = new AtomicInteger();
 
     Map<String, Integer> tableOffsets = new HashMap<>();
     boolean[][] keepers = new boolean[tableNames.length][];
@@ -82,9 +318,14 @@ public class DiskBasedResultSet {
     }
 
     boolean selectAll = false;
-    List<ColumnImpl> selectColumns = select.getSelectColumns();
     if (selectColumns == null || selectColumns.size() == 0) {
       selectAll = true;
+    }
+
+    for (ColumnImpl column : selectColumns) {
+      String tableName = column.getTableName();
+      String columnName = column.getColumnName();
+      getKeepers(dbName, databaseServer, tableNames, tableOffsets, keepers, columnName, tableName);
     }
 
     for (int i = 0; i < tableNames.length; i++) {
@@ -97,80 +338,148 @@ public class DiskBasedResultSet {
       }
     }
 
-    for (ColumnImpl column : selectColumns) {
-      String tableName = column.getTableName();
-      String columnName = column.getColumnName();
-      getKeepers(dbName, databaseServer, tableNames, tableOffsets, keepers, columnName, tableName);
-    }
-
-    for (OrderByExpressionImpl expression : select.getOrderByExpressions()) {
+    for (OrderByExpressionImpl expression : orderByExpressions) {
       String tableName = expression.getTableName();
       String columnName = expression.getColumnName();
       getKeepers(dbName, databaseServer, tableNames, tableOffsets, keepers, columnName, tableName);
     }
 
+
+    final int[][] fieldOffsets = new int[tableNames.length][];
+    for (int i = 0; i < tableNames.length; i++) {
+      fieldOffsets[i] = new int[selectColumns.size()];
+      TableSchema tableSchema = databaseServer.getCommon().getTables(dbName).get(tableNames[i]);
+      for (int j = 0; j < fieldOffsets[i].length; j++) {
+        fieldOffsets[i][j] = tableSchema.getFieldOffset(selectColumns.get(j).getColumnName());
+      }
+    }
+
+    final Comparator[] comparators = new Comparator[selectColumns.size()];
+    TableSchema tableSchema = databaseServer.getCommon().getTables(dbName).get(tableNames[0]);
+
+    for (int i = 0; i < selectColumns.size(); i++) {
+      comparators[i] = tableSchema.getFields().get(fieldOffsets[0][i]).getType().getComparator();
+    }
+
+    Comparator<ExpressionImpl.CachedRecord[]> comparator = new Comparator<ExpressionImpl.CachedRecord[]>() {
+      @Override
+      public int compare(ExpressionImpl.CachedRecord[] o1, ExpressionImpl.CachedRecord[] o2) {
+        int lhsOffset = -1;
+        for (int i = 0; i < o1.length; i++) {
+          if (o1[i] != null) {
+            lhsOffset = i;
+            break;
+          }
+        }
+        int rhsOffset = -1;
+        for (int i = 0; i < o2.length; i++) {
+          if (o2[i] != null) {
+            rhsOffset = i;
+            break;
+          }
+        }
+        for (int i = 0; i < selectColumns.size(); i++) {
+          Object lhsObj = o1[lhsOffset].getRecord().getFields()[fieldOffsets[0][i]];
+          Object rhsObj = o2[rhsOffset].getRecord().getFields()[fieldOffsets[1][i]];
+          int compareValue = comparators[i].compare(lhsObj, rhsObj);
+          if (compareValue < 0 || compareValue > 0) {
+            return compareValue;
+          }
+        }
+        return 0;
+      }
+    };
+
+    ResultSetContext lhsRs = new ResultSetContext(databaseServer, dbName, diskBasedResultSets[0]);
+    ResultSetContext rhsRs = new ResultSetContext(databaseServer, dbName, diskBasedResultSets[1]);
     List<ExpressionImpl.CachedRecord[]> batch = new ArrayList<>();
-    for (ExpressionImpl.CachedRecord[] row : records) {
-      if (!selectAll) {
-        for (int i = 0; i < row.length; i++) {
-          if (row[i] == null) {
+
+    ExpressionImpl.CachedRecord[] lhsRecord = lhsRs.nextRecord();
+    ExpressionImpl.CachedRecord[] rhsRecord = rhsRs.nextRecord();
+    ExpressionImpl.CachedRecord[] lastLhsRecord = null;
+    int lhsCount = 0;
+    int rhsCount = 0;
+    if (lhsRecord != null) {
+      lhsCount = lhsRecord.length;
+    }
+    if (rhsRecord != null) {
+      rhsCount = rhsRecord.length;
+    }
+    while (true) {
+
+      if (lhsRecord == null) {
+        while (rhsRecord != null) {
+          if (lastLhsRecord != null) {
+            if (0 == comparator.compare(lastLhsRecord, rhsRecord)) {
+              rhsRecord = rhsRs.nextRecord();
+              continue;
+            }
+          }
+          if (!intersect && !except) {
+            addRecord(dbName, serializationVersion, rhsRecord, lhsCount, lhsCount + rhsCount, batch, file, fileOffset);
+          }
+          rhsRecord = rhsRs.nextRecord();
+        }
+      }
+      if (rhsRecord == null) {
+        while (lhsRecord != null) {
+          if (lastLhsRecord != null) {
+            if (0 == comparator.compare(lastLhsRecord, lhsRecord)) {
+              lastLhsRecord = lhsRecord;
+              lhsRecord = lhsRs.nextRecord();
+              continue;
+            }
+          }
+          if (!intersect) {
+            addRecord(dbName, serializationVersion, lhsRecord, 0, lhsCount + rhsCount, batch, file, fileOffset);
+          }
+          lhsRecord = lhsRs.nextRecord();
+        }
+      }
+      if (lhsRecord != null && rhsRecord != null) {
+        if (lastLhsRecord != null) {
+          if (0 == comparator.compare(lastLhsRecord, lhsRecord)) {
+            lastLhsRecord = lhsRecord;
+            lhsRecord = lhsRs.nextRecord();
             continue;
           }
-          for (int j = 0; j < row[i].getRecord().getFields().length; j++)
-          if (!keepers[i][j]) {
-            row[i].getRecord().getFields()[j] = null;
+          if (0 == comparator.compare(lastLhsRecord, rhsRecord)) {
+            rhsRecord = rhsRs.nextRecord();
+            continue;
           }
         }
+        int compareValue = comparator.compare(lhsRecord, rhsRecord);
+        if (compareValue == 0) {
+          if (!except) {
+            addRecord(dbName, serializationVersion, lhsRecord, 0, lhsCount + rhsCount, batch, file, fileOffset);
+          }
+          lastLhsRecord = lhsRecord;
+          lhsRecord = lhsRs.nextRecord();
+          if (!unique && !except) {
+            addRecord(dbName, serializationVersion, rhsRecord, lhsCount, lhsCount + rhsCount, batch, file, fileOffset);
+          }
+          rhsRecord = rhsRs.nextRecord();
+        }
+        else if (compareValue < 0) {
+          if (!intersect) {
+            addRecord(dbName, serializationVersion, lhsRecord, 0, lhsCount + rhsCount, batch, file, fileOffset);
+          }
+          lastLhsRecord = lhsRecord;
+          lhsRecord = lhsRs.nextRecord();
+        }
+        else if (compareValue > 0) {
+          if (!intersect && !except) {
+            addRecord(dbName, serializationVersion, rhsRecord, lhsCount, lhsCount + rhsCount, batch, file, fileOffset);
+          }
+          rhsRecord = rhsRs.nextRecord();
+        }
       }
-      batch.add(row);
-    }
-//    if (!sorted) {
-    while (true) {
-      resultSet.setPageSize(500000);
-      resultSet.forceSelectOnServer();
-      long begin = System.currentTimeMillis();
-      resultSet.getMoreResults();
-      records = resultSet.getReadRecordsAndSerializedRecords();
-      if (records == null) {
+      if (lhsRecord == null && rhsRecord == null) {
         break;
       }
-      logger.info("got more results: duration=" + (System.currentTimeMillis() - begin) + ", recordCount=" + records.length);
-      for (ExpressionImpl.CachedRecord[] row : records) {
-//        if (!selectAll) {
-//          for (int i = 0; i < row.length; i++) {
-//            if (row[i] == null) {
-//              continue;
-//            }
-//            for (int j = 0; j < row[i].getFields().length; j++)
-//            if (!keepers[i][j]) {
-//              row[i].getFields()[j] = null;
-//            }
-//          }
-//        }
-        batch.add(row);
-      }
-      synchronized (resultSet.getRecordCache().getRecordsForTable()) {
-        resultSet.getRecordCache().getRecordsForTable().clear();
-      }
-      if (batch.size() >= 500000) {
-        ExpressionImpl.CachedRecord[][] batchRecords = new ExpressionImpl.CachedRecord[batch.size()][];
-        for (int i = 0; i < batchRecords.length; i++) {
-          batchRecords[i] = batch.get(i);
-        }
-        begin = System.currentTimeMillis();
-        ResultSetImpl.sortResults(dbName, server.getClient().getCommon(), select, batchRecords, tableNames);
-        logger.info("sorted in-memory results: duration=" + (System.currentTimeMillis() - begin));
-        writeRecordsToFile(serializationVersion, file, batchRecords, fileOffset++);
-        batch.clear();
-      }
     }
-    ExpressionImpl.CachedRecord[][] batchRecords = new ExpressionImpl.CachedRecord[batch.size()][];
-    for (int i = 0; i < batchRecords.length; i++) {
-      batchRecords[i] = batch.get(i);
-    }
-    ResultSetImpl.sortResults(dbName, server.getClient().getCommon(), select, batchRecords, tableNames);
-    writeRecordsToFile(serializationVersion, file, batchRecords, fileOffset++);
-    batch.clear();
+
+    flushBatch(dbName, serializationVersion, batch, file, fileOffset);
 
     mergeSort(serializationVersion, dbName, file);
 
@@ -216,14 +525,15 @@ public class DiskBasedResultSet {
     }
   }
 
-  private void getKeepers(String dbName, DatabaseServer databaseServer, String[] tableNames, Map<String, Integer> tableOffsets, boolean[][] keepers, String column,
+  private void getKeepers(String dbName, DatabaseServer databaseServer, String[] tableNames,
+                          Map<String, Integer> tableOffsets, boolean[][] keepers, String column,
                           String table) {
     if (table == null) {
       for (int i = 0; i < tableNames.length; i++) {
         TableSchema tableSchema = databaseServer.getClient().getCommon().getTables(dbName).get(tableNames[i]);
         Integer offset = tableSchema.getFieldOffset(column);
         if (offset != null) {
-          keepers[tableOffsets.get(tableNames[i])][tableSchema.getFieldOffset(column)] = true;
+          keepers[tableOffsets.get(tableNames[i])][offset] = true;
         }
       }
     }
@@ -231,7 +541,7 @@ public class DiskBasedResultSet {
       TableSchema tableSchema = databaseServer.getClient().getCommon().getTables(dbName).get(table);
       Integer offset = tableSchema.getFieldOffset(column);
       if (offset != null) {
-        keepers[tableOffsets.get(table)][tableSchema.getFieldOffset(column)] = true;
+        keepers[tableOffsets.get(table)][offset] = true;
       }
     }
   }
@@ -271,59 +581,61 @@ public class DiskBasedResultSet {
         DataInputStream in2 = new DataInputStream(new BufferedInputStream(new LzoInputStream(new FileInputStream(file2), new LzoDecompressor1x()))))
     {
 
-      List<OrderByExpressionImpl> orderByExpressions = select.getOrderByExpressions();
-      final int[] fieldOffsets = new int[orderByExpressions.size()];
-      final boolean[] ascendingFlags = new boolean[orderByExpressions.size()];
-      final Comparator[] comparators = new Comparator[orderByExpressions.size()];
-      final int[] tableOffsets = new int[orderByExpressions.size()];
-      for (int i = 0; i < orderByExpressions.size(); i++) {
-        String tableName = orderByExpressions.get(i).getTableName();
-        for (int j = 0; j < tableNames.length; j++) {
+      Comparator<Record[]> comparator = null;
+      if (orderByExpressions.size() > 0) {
+        final int[] fieldOffsets = new int[orderByExpressions.size()];
+        final boolean[] ascendingFlags = new boolean[orderByExpressions.size()];
+        final Comparator[] comparators = new Comparator[orderByExpressions.size()];
+        final int[] tableOffsets = new int[orderByExpressions.size()];
+        for (int i = 0; i < orderByExpressions.size(); i++) {
+          String tableName = orderByExpressions.get(i).getTableName();
+          for (int j = 0; j < tableNames.length; j++) {
+            if (tableName == null) {
+              tableOffsets[i] = 0;
+            }
+            else {
+              if (tableName.equals(tableNames[j])) {
+                tableOffsets[i] = j;
+                break;
+              }
+            }
+          }
           if (tableName == null) {
-            tableOffsets[i] = 0;
+            tableName = tableNames[0];
           }
-          else {
-            if (tableName.equals(tableNames[j])) {
-              tableOffsets[i] = j;
-              break;
+          TableSchema tableSchema = server.getClient().getCommon().getTables(dbName).get(tableName);
+          fieldOffsets[i] = tableSchema.getFieldOffset(orderByExpressions.get(i).getColumnName());
+          ascendingFlags[i] = orderByExpressions.get(i).isAscending();
+          FieldSchema fieldSchema = tableSchema.getFields().get(fieldOffsets[i]);
+          comparators[i] = fieldSchema.getType().getComparator();
+        }
+
+        comparator = new Comparator<Record[]>() {
+          @Override
+          public int compare(Record[] o1, Record[] o2) {
+            for (int i = 0; i < fieldOffsets.length; i++) {
+              if (o1[tableOffsets[i]] == null && o2[tableOffsets[i]] == null) {
+                continue;
+              }
+              if (o1[tableOffsets[i]] == null) {
+                return -1 * (ascendingFlags[i] ? 1 : -1);
+              }
+              if (o2[tableOffsets[i]] == null) {
+                return 1 * (ascendingFlags[i] ? 1 : -1);
+              }
+
+              int value = comparators[i].compare(o1[tableOffsets[i]].getFields()[fieldOffsets[i]], o2[tableOffsets[i]].getFields()[fieldOffsets[i]]);
+              if (value < 0) {
+                return -1 * (ascendingFlags[i] ? 1 : -1);
+              }
+              if (value > 0) {
+                return 1 * (ascendingFlags[i] ? 1 : -1);
+              }
             }
+            return 0;
           }
-        }
-        if (tableName == null) {
-          tableName = tableNames[0];
-        }
-        TableSchema tableSchema = server.getClient().getCommon().getTables(dbName).get(tableName);
-        fieldOffsets[i] = tableSchema.getFieldOffset(orderByExpressions.get(i).getColumnName());
-        ascendingFlags[i] = orderByExpressions.get(i).isAscending();
-        FieldSchema fieldSchema = tableSchema.getFields().get(fieldOffsets[i]);
-        comparators[i] = fieldSchema.getType().getComparator();
+        };
       }
-
-      Comparator<Record[]> comparator = new Comparator<Record[]>() {
-        @Override
-        public int compare(Record[] o1, Record[] o2) {
-          for (int i = 0; i < fieldOffsets.length; i++) {
-            if (o1[tableOffsets[i]] == null && o2[tableOffsets[i]] == null) {
-              continue;
-            }
-            if (o1[tableOffsets[i]] == null) {
-              return -1 * (ascendingFlags[i] ? 1 : -1);
-            }
-            if (o2[tableOffsets[i]] == null) {
-              return 1 * (ascendingFlags[i] ? 1 : -1);
-            }
-
-            int value = comparators[i].compare(o1[tableOffsets[i]].getFields()[fieldOffsets[i]], o2[tableOffsets[i]].getFields()[fieldOffsets[i]]);
-            if (value < 0) {
-              return -1 * (ascendingFlags[i] ? 1 : -1);
-            }
-            if (value > 0) {
-              return 1 * (ascendingFlags[i] ? 1 : -1);
-            }
-          }
-          return 0;
-        }
-      };
 
       AtomicInteger page = new AtomicInteger();
       AtomicInteger rowNumber = new AtomicInteger();
@@ -353,7 +665,7 @@ public class DiskBasedResultSet {
           continue;
         }
 
-        int compareValue = comparator.compare(row1, row2);
+        int compareValue = comparator == null ? 0 : comparator.compare(row1, row2);
         if (compareValue == 0) {
           out = writeRow(serializationVersion, row1, out, rowNumber, page, file);
           out = writeRow(serializationVersion, row2, out, rowNumber, page, file);
@@ -399,61 +711,147 @@ public class DiskBasedResultSet {
           inStreams.add(in);
         }
 
-        List<OrderByExpressionImpl> orderByExpressions = select.getOrderByExpressions();
-        final int[] fieldOffsets = new int[orderByExpressions.size()];
-        final boolean[] ascendingFlags = new boolean[orderByExpressions.size()];
-        final Comparator[] comparators = new Comparator[orderByExpressions.size()];
-        final int[] tableOffsets = new int[orderByExpressions.size()];
-        for (int i = 0; i < orderByExpressions.size(); i++) {
-          String tableName = orderByExpressions.get(i).getTableName();
-          for (int j = 0; j < tableNames.length; j++) {
-            if (tableName == null) {
-              tableOffsets[i] = 0;
-            }
-            else {
-              if (tableName.equals(tableNames[j])) {
-                tableOffsets[i] = j;
-                break;
+        Comparator<MergeRow> comparator = null;
+        if (setOperator) {
+          if (orderByExpressions.size() == 0) {
+            comparator = new Comparator<MergeRow>() {
+              @Override
+              public int compare(MergeRow o1, MergeRow o2) {
+                int pos1 = 0;
+                int pos2 = 0;
+                for (int i = 0; i < o1.row.length; i++) {
+                  if (o1.row[i] != null) {
+                    pos1 = i;
+                    break;
+                  }
+                }
+                for (int i = 0; i < o2.row.length; i++) {
+                  if (o2.row[i] != null) {
+                    pos2 = i;
+                    break;
+                  }
+                }
+                return Integer.compare(pos1, pos2);
+              }
+            };
+          }
+          else {
+            final int[][] fieldOffsets = new int[orderByExpressions.size()][];
+            final Comparator[] comparators = new Comparator[orderByExpressions.size()];
+            final boolean[] ascendingFlags = new boolean[orderByExpressions.size()];
+
+            for (int i = 0; i < comparators.length; i++) {
+              fieldOffsets[i] = new int[tableNames.length];
+              for (int j = 0; j < tableNames.length; j++) {
+                TableSchema tableSchema = server.getClient().getCommon().getTables(dbName).get(tableNames[j]);
+                int fieldOffset = tableSchema.getFieldOffset(orderByExpressions.get(i).getColumnName());
+                fieldOffsets[i][j] = tableSchema.getFieldOffset(orderByExpressions.get(i).getColumnName());
+                ascendingFlags[i] = orderByExpressions.get(i).isAscending();
+                FieldSchema fieldSchema = tableSchema.getFields().get(fieldOffset);
+                comparators[i] = fieldSchema.getType().getComparator();
               }
             }
+
+            comparator = new Comparator<MergeRow>() {
+              @Override
+              public int compare(MergeRow o1, MergeRow o2) {
+                for (int i = 0; i < fieldOffsets.length; i++) {
+                  for (int j = 0; j < o1.row.length; j++) {
+                    if (o1.row[j] == null && o2.row[j] == null) {
+                      continue;
+                    }
+
+                    if (o1.row[j] == null) {
+                      return -1 * (ascendingFlags[i] ? 1 : -1);
+                    }
+                    if (o2.row[j] == null) {
+                      return 1 * (ascendingFlags[i] ? 1 : -1);
+                    }
+                    int value = comparators[i].compare(o1.row[j].getFields()[fieldOffsets[i][j]], o2.row[j].getFields()[fieldOffsets[i][j]]);
+                    if (value < 0) {
+                      return -1 * (ascendingFlags[i] ? 1 : -1);
+                    }
+                    if (value > 0) {
+                      return 1 * (ascendingFlags[i] ? 1 : -1);
+                    }
+                    break;
+                  }
+                }
+                return 0;
+              }
+            };
           }
-          if (tableName == null) {
-            tableName = tableNames[0];
+        }
+        else {
+
+          if (orderByExpressions.size() > 0) {
+            final int[] fieldOffsets = new int[orderByExpressions.size()];
+            final boolean[] ascendingFlags = new boolean[orderByExpressions.size()];
+            final Comparator[] comparators = new Comparator[orderByExpressions.size()];
+            final int[] tableOffsets = new int[orderByExpressions.size()];
+            for (int i = 0; i < orderByExpressions.size(); i++) {
+              String tableName = orderByExpressions.get(i).getTableName();
+              for (int j = 0; j < tableNames.length; j++) {
+                if (tableName == null) {
+                  tableOffsets[i] = 0;
+                }
+                else {
+                  if (tableName.equals(tableNames[j])) {
+                    tableOffsets[i] = j;
+                    break;
+                  }
+                }
+              }
+              if (tableName == null) {
+                tableName = tableNames[0];
+              }
+              TableSchema tableSchema = server.getClient().getCommon().getTables(dbName).get(tableName);
+              fieldOffsets[i] = tableSchema.getFieldOffset(orderByExpressions.get(i).getColumnName());
+              ascendingFlags[i] = orderByExpressions.get(i).isAscending();
+              FieldSchema fieldSchema = tableSchema.getFields().get(fieldOffsets[i]);
+              comparators[i] = fieldSchema.getType().getComparator();
+            }
+
+            comparator = new Comparator<MergeRow>() {
+              @Override
+              public int compare(MergeRow o1, MergeRow o2) {
+                for (int i = 0; i < fieldOffsets.length; i++) {
+                  if (o1.row[tableOffsets[i]] == null && o2.row[tableOffsets[i]] == null) {
+                    continue;
+                  }
+                  if (o1.row[tableOffsets[i]] == null) {
+                    return -1 * (ascendingFlags[i] ? 1 : -1);
+                  }
+                  if (o2.row[tableOffsets[i]] == null) {
+                    return 1 * (ascendingFlags[i] ? 1 : -1);
+                  }
+
+                  int value = comparators[i].compare(o1.row[tableOffsets[i]].getFields()[fieldOffsets[i]], o2.row[tableOffsets[i]].getFields()[fieldOffsets[i]]);
+                  if (value < 0) {
+                    return -1 * (ascendingFlags[i] ? 1 : -1);
+                  }
+                  if (value > 0) {
+                    return 1 * (ascendingFlags[i] ? 1 : -1);
+                  }
+                }
+                return 0;
+              }
+            };
           }
-          TableSchema tableSchema = server.getClient().getCommon().getTables(dbName).get(tableName);
-          fieldOffsets[i] = tableSchema.getFieldOffset(orderByExpressions.get(i).getColumnName());
-          ascendingFlags[i] = orderByExpressions.get(i).isAscending();
-          FieldSchema fieldSchema = tableSchema.getFields().get(fieldOffsets[i]);
-          comparators[i] = fieldSchema.getType().getComparator();
         }
 
-        Comparator<MergeRow> comparator = new Comparator<MergeRow>() {
-          @Override
-          public int compare(MergeRow o1, MergeRow o2) {
-            for (int i = 0; i < fieldOffsets.length; i++) {
-              if (o1.row[tableOffsets[i]] == null && o2.row[tableOffsets[i]] == null) {
-                continue;
-              }
-              if (o1.row[tableOffsets[i]] == null) {
-                return -1 * (ascendingFlags[i] ? 1 : -1);
-              }
-              if (o2.row[tableOffsets[i]] == null) {
-                return 1 * (ascendingFlags[i] ? 1 : -1);
-              }
-
-              int value = comparators[i].compare(o1.row[tableOffsets[i]].getFields()[fieldOffsets[i]], o2.row[tableOffsets[i]].getFields()[fieldOffsets[i]]);
-              if (value < 0) {
-                return -1 * (ascendingFlags[i] ? 1 : -1);
-              }
-              if (value > 0) {
-                return 1 * (ascendingFlags[i] ? 1 : -1);
-              }
+        ConcurrentSkipListMap<MergeRow, List<MergeRow>> currRows = null;
+        if (comparator != null) {
+          currRows = new ConcurrentSkipListMap<MergeRow, List<MergeRow>>(comparator);
+        }
+        else {
+          currRows = new ConcurrentSkipListMap<>(new Comparator<MergeRow>() {
+            @Override
+            public int compare(MergeRow o1, MergeRow o2) {
+              return 0;
             }
-            return 0;
-          }
-        };
-
-        ConcurrentSkipListMap<MergeRow, List<MergeRow>> currRows = new ConcurrentSkipListMap<MergeRow, List<MergeRow>>(comparator);
+          });
+        }
 
         for (int i = 0; i < inStreams.size(); i++) {
           DataInputStream in = inStreams.get(i);
@@ -608,8 +1006,7 @@ public class DiskBasedResultSet {
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
   @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public DiskBasedResultSet(
-      DatabaseServer databaseServer, SelectStatementImpl select,
-      String[] tableNames, long resultSetId) {
+      DatabaseServer databaseServer, SelectStatementImpl select, String[] tableNames, long resultSetId) {
     this.server = databaseServer;
     this.resultSetId = resultSetId;
     this.tableNames = tableNames;
@@ -626,65 +1023,70 @@ public class DiskBasedResultSet {
     }
   }
 
-  public byte[][][] nextPage(int pageNumber, int count) throws IOException {
-    File file = new File(server.getDataDir(), "result-sets/" + server.getShard() + "/" + server.getReplica() + "/" + resultSetId);
-    if (!file.exists()) {
-      return null;
-    }
-    updateAccessTime(file);
-    File subFile = new File(file, "page-" + pageNumber);
-    if (!subFile.exists()) {
-      return null;
-    }
-    try (BufferedInputStream bufferedIn = new BufferedInputStream(new LzoInputStream(new FileInputStream(subFile), new LzoDecompressor1x()));
-         DataInputStream in = new DataInputStream(bufferedIn)) {
-
-      AtomicInteger AtomicInteger = new AtomicInteger();
-
-      //    //skip to the right page
-      //    try {
-      //      for (int i = 0; i < pageNumber * count; i++) {
-      //        for (int j = 0; j < tableNames.length; j++) {
-      //          if (in.readBoolean()) {
-      //            int len = (int) Varint.readSignedVarLong(in, AtomicInteger);
-      //            byte[] bytes = new byte[len];
-      //            in.readFully(bytes);
-      //          }
-      //        }
-      //      }
-      //    }
-      //    catch (EOFException e) {
-      //      //expected
-      //    }
-
-      List<byte[][]> records = new ArrayList<>();
-      try {
-        while (true) {
-          byte[][] row = new byte[tableNames.length][];
-          for (int j = 0; j < tableNames.length; j++) {
-            if (in.readBoolean()) {
-              int len = (int) Varint.readSignedVarLong(in);
-              byte[] bytes = new byte[len];
-              in.readFully(bytes);
-              row[j] = bytes;
-            }
-          }
-          records.add(row);
-        }
-      }
-      catch (EOFException e) {
-        //expected
-      }
-
-      if (records.size() == 0) {
+  public byte[][][] nextPage(int pageNumber) {
+    try {
+      File file = new File(server.getDataDir(), "result-sets/" + server.getShard() + "/" + server.getReplica() + "/" + resultSetId);
+      if (!file.exists()) {
         return null;
       }
-
-      byte[][][] ret = new byte[records.size()][][];
-      for (int i = 0; i < ret.length; i++) {
-        ret[i] = records.get(i);
+      updateAccessTime(file);
+      File subFile = new File(file, "page-" + pageNumber);
+      if (!subFile.exists()) {
+        return null;
       }
-      return ret;
+      try (BufferedInputStream bufferedIn = new BufferedInputStream(new LzoInputStream(new FileInputStream(subFile), new LzoDecompressor1x()));
+           DataInputStream in = new DataInputStream(bufferedIn)) {
+
+        AtomicInteger AtomicInteger = new AtomicInteger();
+
+        //    //skip to the right page
+        //    try {
+        //      for (int i = 0; i < pageNumber * count; i++) {
+        //        for (int j = 0; j < tableNames.length; j++) {
+        //          if (in.readBoolean()) {
+        //            int len = (int) Varint.readSignedVarLong(in, AtomicInteger);
+        //            byte[] bytes = new byte[len];
+        //            in.readFully(bytes);
+        //          }
+        //        }
+        //      }
+        //    }
+        //    catch (EOFException e) {
+        //      //expected
+        //    }
+
+        List<byte[][]> records = new ArrayList<>();
+        try {
+          while (true) {
+            byte[][] row = new byte[tableNames.length][];
+            for (int j = 0; j < tableNames.length; j++) {
+              if (in.readBoolean()) {
+                int len = (int) Varint.readSignedVarLong(in);
+                byte[] bytes = new byte[len];
+                in.readFully(bytes);
+                row[j] = bytes;
+              }
+            }
+            records.add(row);
+          }
+        }
+        catch (EOFException e) {
+          //expected
+        }
+
+        if (records.size() == 0) {
+          return null;
+        }
+
+        byte[][][] ret = new byte[records.size()][][];
+        for (int i = 0; i < ret.length; i++) {
+          ret[i] = records.get(i);
+        }
+        return ret;
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
     }
   }
 }

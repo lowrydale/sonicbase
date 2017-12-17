@@ -374,6 +374,10 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     return functionAliases;
   }
 
+  public void setTableNames(String[] tableNames) {
+    this.tableNames = tableNames;
+  }
+
   class DistinctRecord {
     private final Record record;
     private final List<ColumnImpl> selectColumns;
@@ -734,6 +738,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
 //            serverSelect = true;
 //            serverSelectResultSetId = -1;
           }
+
           if (serverSort) {
             serverSelect = true;
             serverSelectResultSetId = -1;
@@ -824,7 +829,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
               record.deserialize(dbName, client.getCommon(), recordBytes, null, true);
               currRetRecords[k][j] = record;
 
-              Object[] key = new Object[primaryKeyFields.length];
+              Object[] key = new Object[primaryKeyFields[j].length];
               for (int i = 0; i < primaryKeyFields[j].length; i++) {
                 key[i] = record.getFields()[tableSchemas[j].getFieldOffset(primaryKeyFields[j][i])];
               }

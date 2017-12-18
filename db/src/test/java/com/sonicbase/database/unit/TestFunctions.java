@@ -737,6 +737,20 @@ public class TestFunctions {
     assertEquals(rs.getLong("id"), 5);
     assertFalse(rs.next());
   }
+
+
+  @Test
+  public void testCustom() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where custom('com.sonicbase.database.unit.CustomFunctions', 'plus', id, id2) < 3");
+    ResultSet rs = stmt.executeQuery();
+    rs.next();
+    assertEquals(rs.getLong("id"), 0);
+    rs.next();
+    assertEquals(rs.getLong("id"), 1);
+    rs.next();
+    assertEquals(rs.getLong("id"), 2);
+    assertFalse(rs.next());
+  }
   /*
     md5
     to_base64

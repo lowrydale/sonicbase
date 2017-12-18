@@ -8,6 +8,10 @@
     <meta name="description" content="A list of all the SQL datatypes and an indication of which ones are supported by SonicBase.">
     <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
     <script type="text/javascript" src="../javascript/main.js"></script>
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+
     <!-- Global site tag (gtag.js) - Google Analytics -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
     <script>
@@ -97,6 +101,7 @@
     <tr><td>concat</td><td>Returns the string created by appending the second paramter to the first paramter</td></tr>
     <tr><td>cos</td><td>Returns the cosine of the first paramter</td></tr>
     <tr><td>cot</td><td>Returns the cotangent of the first paramter</td></tr>
+    <tr><td>custom</td><td>Allows you to plug in a custom function into the where clause</td></tr>
     <tr><td>date_add</td><td>Returns the date created by adding the milliseconds in the second parameter to the timestamp first parameter</td></tr>
     <tr><td>day</td><td>Returns the day of the month of the timestamp first paramter</td></tr>
     <tr><td>day_of_week</td><td>Returns the day of the week of the timestamp first parameter</td></tr>
@@ -131,8 +136,46 @@
     <tr><td>week_of_month</td><td>Returns the week of the month of the timestamp first parameter</td></tr>
     <tr><td>week_of_year</td><td>Returns the week of the year of the timestamp first parameter</td></tr>
     <tr><td>year</td><td>Returns the year of the timestamp first parameter</td></tr>
-
 </table>
+
+    <h2>Custom Functions</h2>
+    You may add the function named "custom" to insert a custom function into the where clause. Your function muat
+    reside in a class with a default constructor and it must have a signature like the following:<br/>
+    <br/>
+    public Object &lt;method_name&gt;(Object[] parms);<br/>
+    <br/>
+    A call to the function looks like the following:<br/>
+    <br/>
+    custom(&lt;class_name&gt;, &lt;method_name&gt;, parm[, parm...])
+
+    <h3>Example Call to Custom Function</h3>
+    <pre class="SQL"><code>
+select * from persons where custom('com.sonicbase.database.CustomFunctions', 'plus', id, id2) < 3
+        <br/><br/>
+            </code></pre>
+<h3>Example Implementation of Custom Function</h3>
+
+        <pre class="Java"><code>
+
+public class CustomFunctions {
+<br/>
+  public Object plus(Object[] o) {
+    if (o[0] == null) {
+      if (o[1] != null) {
+        return o[1];
+      }
+      return null;
+    }
+    long lhs = Long.valueOf(o[0]);
+    if (o[1] == null) {
+      return lhs;
+    }
+    long rhs = Long.valueOf(o[1]);
+    return lhs + rhs;
+  }
+}
+    </code></pre>
+
 </div>
 </div>
 </body>

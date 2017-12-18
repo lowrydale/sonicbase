@@ -128,13 +128,27 @@ public class FunctionImpl extends ExpressionImpl {
     @Override
     public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
       try {
-        String className = (String) funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+        Object classNameObj = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+        String className = null;
+        if (classNameObj instanceof byte[]) {
+          className = new String((byte[])classNameObj, "utf-8");
+        }
+        else {
+          className = (String) classNameObj;
+        }
 
-        String methodName = (String) funcParms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
+        Object methodNameObj = funcParms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
+        String methodName = null;
+        if (methodNameObj instanceof byte[]) {
+          methodName = new String((byte[])methodNameObj, "utf-8");
+        }
+        else {
+          methodName = (String) methodNameObj;
+        }
 
         Object[] evaluatedParms = new Object[funcParms.size() - 2];
         for (int i = 2; i < funcParms.size(); i++) {
-          evaluatedParms[i] = funcParms.get(i).evaluateSingleRecord(tableSchemas, records, parms);
+          evaluatedParms[i - 2] = funcParms.get(i).evaluateSingleRecord(tableSchemas, records, parms);
         }
 
         String key = className + "." + methodName;
@@ -143,7 +157,7 @@ public class FunctionImpl extends ExpressionImpl {
         Method method = null;
         if (methodObj == null) {
           obj = Class.forName(className).newInstance();
-          method = Class.forName(className).getMethod(methodName, Object[].class);
+          method = obj.getClass().getMethod(methodName, Object[].class);
           methods.put(key, new MethodObject(method, obj));
         }
         else {
@@ -151,7 +165,7 @@ public class FunctionImpl extends ExpressionImpl {
           method = methodObj.method;
         }
 
-        return method.invoke(obj, evaluatedParms);
+        return method.invoke(obj, new Object[]{evaluatedParms});
       }
       catch (Exception e) {
         throw new DatabaseException(e);

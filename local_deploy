@@ -7,6 +7,8 @@ mkdir -p $HOME/sonicbase/logs
 
 ./build-jar
 mkdir -p $HOME/sonicbase/lib
+
+rsync -rvlLt /Users/lowryda/.m2/repository/com/sun/jersey/jersey-json/1.19.4/jersey-json-1.19.4.jar $HOME/sonicbase/lib
 rsync -rvlLt /Users/lowryda/.m2/repository/org/apache/kafka/kafka-clients/0.11.0.1/kafka-clients-0.11.0.1.jar $HOME/sonicbase/lib
 rsync -rvlLt /Users/lowryda/.m2/repository/com/mashape/unirest/unirest-java/1.4.9/unirest-java-1.4.9.jar $HOME/sonicbase/lib
 rsync -rvlLt /Users/lowryda/.m2/repository/com/google/code/gson/gson/2.2.3/gson-2.2.3.jar $HOME/sonicbase/lib

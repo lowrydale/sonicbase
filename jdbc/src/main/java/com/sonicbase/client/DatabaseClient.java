@@ -3780,6 +3780,8 @@ public class DatabaseClient {
     public OrderByExpressionImpl[] orderBy;
     public long serverSelectPageNumber;
     public long resultSetId;
+    public Integer shard;
+    public Integer replica;
   }
 
   public ResultSet serverSetSelect(String dbName, String[] tableNames, SetOperation setOperation) throws Exception {
@@ -3796,8 +3798,14 @@ public class DatabaseClient {
         doServerSetSelect(dbName, tableNames, setOperation, ret);
         return ret;
       }
-      catch (SchemaOutOfSyncException e) {
-        continue;
+      catch (Exception e) {
+        if (e.getMessage() != null && e.getMessage().contains("SchemaOutOfSyncException")) {
+          continue;
+        }
+        if (-1 != ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class)) {
+          continue;
+        }
+        throw new DatabaseException(e);
       }
     }
 
@@ -3831,12 +3839,13 @@ public class DatabaseClient {
     cobj.put(ComObject.Tag.serverSelectPageNumber, setOperation.serverSelectPageNumber);
     cobj.put(ComObject.Tag.resultSetId, setOperation.resultSetId);
 
-    int previousSchemaVersion = getCommon().getSchemaVersion();
-
-    byte[] recordRet = send(null, Math.abs(ThreadLocalRandom.current().nextInt() % getShardCount()),
-        Math.abs(ThreadLocalRandom.current().nextLong()), cobj, Replica.def);
-    if (previousSchemaVersion < getCommon().getSchemaVersion()) {
-      throw new SchemaOutOfSyncException();
+    byte[] recordRet = null;
+    if (setOperation.shard == null) {
+      recordRet = send(null, Math.abs(ThreadLocalRandom.current().nextInt() % getShardCount()),
+          Math.abs(ThreadLocalRandom.current().nextLong()), cobj, Replica.def);
+    }
+    else {
+      recordRet = send(null, setOperation.shard, setOperation.replica, cobj, Replica.specified);
     }
 
     ComObject retObj = new ComObject(recordRet);
@@ -3857,12 +3866,18 @@ public class DatabaseClient {
     }
     setOperation.serverSelectPageNumber = retObj.getLong(ComObject.Tag.serverSelectPageNumber);
     setOperation.resultSetId = retObj.getLong(ComObject.Tag.resultSetId);
+    setOperation.shard = retObj.getInt(ComObject.Tag.shard);
+    setOperation.replica = retObj.getInt(ComObject.Tag.replica);
+
+    ret.getRecordCache().getRecordsForTable().clear();
 
     ComArray tableRecords = retObj.getArray(ComObject.Tag.tableRecords);
     Object[][][] retKeys = new Object[tableRecords == null ? 0 : tableRecords.getArray().size()][][];
     Record[][] currRetRecords = new Record[tableRecords == null ? 0 : tableRecords.getArray().size()][];
+    ExpressionImpl.CachedRecord[][] retRecords = new ExpressionImpl.CachedRecord[tableRecords == null ? 0 : tableRecords.getArray().size()][];
     for (int k = 0; k < currRetRecords.length; k++) {
       currRetRecords[k] = new Record[tableNames.length];
+      retRecords[k] = new ExpressionImpl.CachedRecord[tableNames.length];
       retKeys[k] = new Object[tableNames.length][];
       ComArray records = (ComArray)tableRecords.getArray().get(k);
       for (int j = 0; j < tableNames.length; j++) {
@@ -3881,12 +3896,13 @@ public class DatabaseClient {
             retKeys[k][j] = key;
           }
 
-          ret.getRecordCache().put(tableNames[j], key, new ExpressionImpl.CachedRecord(record, recordBytes));
+          retRecords[k][j] = new ExpressionImpl.CachedRecord(record, recordBytes);
+          ret.getRecordCache().put(tableNames[j], key, retRecords[k][j]);
         }
       }
     }
     ret.setRetKeys(retKeys);
-    ret.setRecords(ret.readRecords(new ExpressionImpl.NextReturn(tableNames, retKeys)));
+    ret.setRecords(retRecords);
   }
 
 

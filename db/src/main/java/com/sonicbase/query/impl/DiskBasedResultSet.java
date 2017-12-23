@@ -16,7 +16,7 @@ import sun.misc.Cache;
 
 import java.io.*;
 import java.util.*;
-import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -40,10 +40,10 @@ public class DiskBasedResultSet {
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
   @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public DiskBasedResultSet(
-      short serializationVersion,
-      String dbName,
+      final short serializationVersion,
+      final String dbName,
       DatabaseServer databaseServer,
-      String[] tableNames, int[] tableOffsets, ResultSetImpl[] resultSets, List<OrderByExpressionImpl> orderByExpressions,
+      final String[] tableNames, int[] tableOffsets, final ResultSetImpl[] resultSets, final List<OrderByExpressionImpl> orderByExpressions,
       int count, SelectStatementImpl select, boolean setOperator) {
     this.server = databaseServer;
     this.tableNames = tableNames;
@@ -62,16 +62,17 @@ public class DiskBasedResultSet {
       }
       file.mkdirs();
     }
+    final File finalFile = file;
 
 //    if (records != null && records.length < count) {
 //      ResultSetImpl.sortResults(server.getClient().getCommon(), select, records, tableNames);
 //      sorted = true;
 //    }
 //    writeRecordsToFile(out, records);
-    int fileOffset = 0;
+    final AtomicInteger fileOffset = new AtomicInteger();
 
     Map<String, Integer> tableOffsets2 = new HashMap<>();
-    boolean[][] keepers = new boolean[tableNames.length][];
+    final boolean[][] keepers = new boolean[tableNames.length][];
     for (int i = 0; i < tableNames.length; i++) {
       TableSchema tableSchema = databaseServer.getClient().getCommon().getTables(dbName).get(tableNames[i]);
       tableOffsets2.put(tableNames[i], i);
@@ -81,11 +82,12 @@ public class DiskBasedResultSet {
       }
     }
 
-    boolean selectAll = false;
+    boolean selectAll;
     if (select == null) {
       selectAll = true;
     }
     else {
+      selectAll = false;
       List<ColumnImpl> selectColumns = select.getSelectColumns();
       if (selectColumns == null || selectColumns.size() == 0) {
         selectAll = true;
@@ -114,92 +116,114 @@ public class DiskBasedResultSet {
       getKeepers(dbName, databaseServer, tableNames, tableOffsets2, keepers, columnName, tableName);
     }
 
-    for (int k = 0; k < resultSets.length; k++) {
-      ResultSetImpl rs = resultSets[k];
-      ExpressionImpl.CachedRecord[][] records = rs.getReadRecordsAndSerializedRecords();
-      if (records == null) {
-        continue;
-      }
+    ThreadPoolExecutor executor = new ThreadPoolExecutor(resultSets.length, resultSets.length, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+    List<Future> futures = new ArrayList<>();
 
-      List<ExpressionImpl.CachedRecord[]> batch = new ArrayList<>();
-      for (ExpressionImpl.CachedRecord[] row : records) {
-        if (!selectAll) {
-          for (int i = 0; i < row.length; i++) {
-            if (row[i] == null) {
-              continue;
+    try {
+      for (int k = 0; k < resultSets.length; k++) {
+        final int localK = k;
+        final boolean finalSelectAll = selectAll;
+        futures.add(executor.submit(new Callable(){
+          @Override
+          public Object call() throws Exception {
+            ResultSetImpl rs = resultSets[localK];
+            ExpressionImpl.CachedRecord[][] records = rs.getReadRecordsAndSerializedRecords();
+            if (records == null) {
+              return null;
             }
-            for (int j = 0; j < row[i].getRecord().getFields().length; j++)
-              if (!keepers[i][j]) {
-                row[i].getRecord().getFields()[j] = null;
-              }
-          }
-        }
-//        ExpressionImpl.CachedRecord[] newRow = new ExpressionImpl.CachedRecord[tableNames.length];
-//        newRow[k] = row[0];
-//        batch.add(newRow);
-        batch.add(row);
-      }
-      //    if (!sorted) {
-      while (true) {
-        rs.setPageSize(500000);
-        rs.forceSelectOnServer();
-        long begin = System.currentTimeMillis();
-        rs.getMoreResults();
-        records = rs.getReadRecordsAndSerializedRecords();
-        if (records == null) {
-          break;
-        }
-        logger.info("got more results: duration=" + (System.currentTimeMillis() - begin) + ", recordCount=" + records.length);
-        for (ExpressionImpl.CachedRecord[] row : records) {
-          //        if (!selectAll) {
-          //          for (int i = 0; i < row.length; i++) {
-          //            if (row[i] == null) {
-          //              continue;
-          //            }
-          //            for (int j = 0; j < row[i].getFields().length; j++)
-          //            if (!keepers[i][j]) {
-          //              row[i].getFields()[j] = null;
-          //            }
-          //          }
-          //        }
-//          ExpressionImpl.CachedRecord[] newRow = new ExpressionImpl.CachedRecord[tableNames.length];
-//          newRow[k] = row[0];
-//          batch.add(newRow);
-          batch.add(row);
-        }
-        synchronized (rs.getRecordCache().getRecordsForTable()) {
-          rs.getRecordCache().getRecordsForTable().clear();
-        }
-        if (batch.size() >= 500000) {
-          ExpressionImpl.CachedRecord[][] batchRecords = new ExpressionImpl.CachedRecord[batch.size()][];
-          for (int i = 0; i < batchRecords.length; i++) {
-            batchRecords[i] = batch.get(i);
-          }
-          begin = System.currentTimeMillis();
-          ResultSetImpl.sortResults(dbName, server.getClient().getCommon(), batchRecords, tableNames, orderByExpressions);
-          logger.info("sorted in-memory results: duration=" + (System.currentTimeMillis() - begin));
 
-          for (int i = 0; i < batchRecords.length; i++) {
-            ExpressionImpl.CachedRecord[] newRow = new ExpressionImpl.CachedRecord[tableNames.length];
-            newRow[k] = batchRecords[i][0];
-            batchRecords[i] = newRow;
+            List<ExpressionImpl.CachedRecord[]> batch = new ArrayList<>();
+            for (ExpressionImpl.CachedRecord[] row : records) {
+              if (!finalSelectAll) {
+                for (int i = 0; i < row.length; i++) {
+                  if (row[i] == null) {
+                    continue;
+                  }
+                  for (int j = 0; j < row[i].getRecord().getFields().length; j++)
+                    if (!keepers[i][j]) {
+                      row[i].getRecord().getFields()[j] = null;
+                    }
+                }
+              }
+              //        ExpressionImpl.CachedRecord[] newRow = new ExpressionImpl.CachedRecord[tableNames.length];
+              //        newRow[k] = row[0];
+              //        batch.add(newRow);
+              batch.add(row);
+            }
+            //    if (!sorted) {
+            while (true) {
+              rs.setPageSize(30000);
+              rs.forceSelectOnServer();
+              long begin = System.currentTimeMillis();
+              rs.getMoreResults();
+              records = rs.getReadRecordsAndSerializedRecords();
+              if (records == null) {
+                break;
+              }
+              logger.info("got more results: duration=" + (System.currentTimeMillis() - begin) + ", recordCount=" + records.length);
+              for (ExpressionImpl.CachedRecord[] row : records) {
+                //        if (!selectAll) {
+                //          for (int i = 0; i < row.length; i++) {
+                //            if (row[i] == null) {
+                //              continue;
+                //            }
+                //            for (int j = 0; j < row[i].getFields().length; j++)
+                //            if (!keepers[i][j]) {
+                //              row[i].getFields()[j] = null;
+                //            }
+                //          }
+                //        }
+                //          ExpressionImpl.CachedRecord[] newRow = new ExpressionImpl.CachedRecord[tableNames.length];
+                //          newRow[k] = row[0];
+                //          batch.add(newRow);
+                batch.add(row);
+              }
+              synchronized (rs.getRecordCache().getRecordsForTable()) {
+                rs.getRecordCache().getRecordsForTable().clear();
+              }
+              if (batch.size() >= 500000) {
+                ExpressionImpl.CachedRecord[][] batchRecords = new ExpressionImpl.CachedRecord[batch.size()][];
+                for (int i = 0; i < batchRecords.length; i++) {
+                  batchRecords[i] = batch.get(i);
+                }
+                begin = System.currentTimeMillis();
+                ResultSetImpl.sortResults(dbName, server.getClient().getCommon(), batchRecords, tableNames, orderByExpressions);
+                logger.info("sorted in-memory results: duration=" + (System.currentTimeMillis() - begin));
+
+                for (int i = 0; i < batchRecords.length; i++) {
+                  ExpressionImpl.CachedRecord[] newRow = new ExpressionImpl.CachedRecord[tableNames.length];
+                  newRow[localK] = batchRecords[i][0];
+                  batchRecords[i] = newRow;
+                }
+                writeRecordsToFile(serializationVersion, finalFile, batchRecords, fileOffset.getAndIncrement());
+                batch.clear();
+              }
+            }
+            ExpressionImpl.CachedRecord[][] batchRecords = new ExpressionImpl.CachedRecord[batch.size()][];
+            for (int i = 0; i < batchRecords.length; i++) {
+              batchRecords[i] = batch.get(i);
+            }
+            ResultSetImpl.sortResults(dbName, server.getClient().getCommon(), batchRecords, tableNames, orderByExpressions);
+            for (int i = 0; i < batchRecords.length; i++) {
+              ExpressionImpl.CachedRecord[] newRow = new ExpressionImpl.CachedRecord[tableNames.length];
+              newRow[localK] = batchRecords[i][0];
+              batchRecords[i] = newRow;
+            }
+            writeRecordsToFile(serializationVersion, finalFile, batchRecords, fileOffset.getAndIncrement());
+            batch.clear();
+            return null;
           }
-          writeRecordsToFile(serializationVersion, file, batchRecords, fileOffset++);
-          batch.clear();
-        }
+        }));
       }
-      ExpressionImpl.CachedRecord[][] batchRecords = new ExpressionImpl.CachedRecord[batch.size()][];
-      for (int i = 0; i < batchRecords.length; i++) {
-        batchRecords[i] = batch.get(i);
+      for (Future future : futures) {
+        future.get();
       }
-      ResultSetImpl.sortResults(dbName, server.getClient().getCommon(), batchRecords, tableNames, orderByExpressions);
-      for (int i = 0; i < batchRecords.length; i++) {
-        ExpressionImpl.CachedRecord[] newRow = new ExpressionImpl.CachedRecord[tableNames.length];
-        newRow[k] = batchRecords[i][0];
-        batchRecords[i] = newRow;
-      }
-      writeRecordsToFile(serializationVersion, file, batchRecords, fileOffset++);
-      batch.clear();
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+    finally {
+      executor.shutdownNow();
     }
     mergeSort(serializationVersion, dbName, file);
 
@@ -213,12 +237,12 @@ public class DiskBasedResultSet {
   class ResultSetContext {
     DatabaseServer databaseServer;
     String dbName;
-    DiskBasedResultSet rs;
+    Object rs;
     int pageNum = 0;
     int pos = 0;
     ExpressionImpl.CachedRecord[][] records;
 
-    public ResultSetContext(DatabaseServer databaseServer, String dbName, DiskBasedResultSet rs) {
+    public ResultSetContext(DatabaseServer databaseServer, String dbName, Object rs) {
       this.databaseServer = databaseServer;
       this.dbName = dbName;
       this.rs = rs;
@@ -239,7 +263,15 @@ public class DiskBasedResultSet {
     }
 
     public boolean nextPage() {
-      byte[][][] bytes = rs.nextPage(pageNum++);
+      if (rs instanceof ResultSetImpl) {
+        if (records != null) {
+          return false;
+        }
+        records = ((ResultSetImpl)rs).getReadRecordsAndSerializedRecords();
+        pos = 0;
+        return true;
+      }
+      byte[][][] bytes = ((DiskBasedResultSet)rs).nextPage(pageNum++);
       if (bytes == null) {
         return false;
       }
@@ -279,7 +311,7 @@ public class DiskBasedResultSet {
   }
 
   public DiskBasedResultSet(Short serializationVersion, String dbName, DatabaseServer databaseServer, String[] tableNames,
-                            DiskBasedResultSet[] diskBasedResultSets, List<OrderByExpressionImpl> orderByExpressions,
+                            Object[] resultSets, List<OrderByExpressionImpl> orderByExpressions,
                             int count, boolean unique, boolean intersect, boolean except, final List<ColumnImpl> selectColumns) {
     this.server = databaseServer;
     this.tableNames = tableNames;
@@ -390,8 +422,8 @@ public class DiskBasedResultSet {
       }
     };
 
-    ResultSetContext lhsRs = new ResultSetContext(databaseServer, dbName, diskBasedResultSets[0]);
-    ResultSetContext rhsRs = new ResultSetContext(databaseServer, dbName, diskBasedResultSets[1]);
+    ResultSetContext lhsRs = new ResultSetContext(databaseServer, dbName, resultSets[0]);
+    ResultSetContext rhsRs = new ResultSetContext(databaseServer, dbName, resultSets[1]);
     List<ExpressionImpl.CachedRecord[]> batch = new ArrayList<>();
 
     ExpressionImpl.CachedRecord[] lhsRecord = lhsRs.nextRecord();
@@ -513,13 +545,24 @@ public class DiskBasedResultSet {
 
   private void updateAccessTime(File file) {
     synchronized (this) {
-      String str = DateUtils.fromDate(new Date(System.currentTimeMillis()));
-      File timeFile = new File(file, "time-accessed.txt");
-      file.mkdirs();
-      try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(timeFile)))) {
-        writer.write(str);
+      try {
+        String str = DateUtils.fromDate(new Date(System.currentTimeMillis()));
+        File timeFile = new File(file, "time-accessed.txt");
+        file.mkdirs();
+        if (!timeFile.exists()) {
+          timeFile.createNewFile();
+        }
+        else {
+          file.setLastModified(System.currentTimeMillis());
+        }
+        //      try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(timeFile)))) {
+        //        writer.write(str);
+        //      }
+        //      catch (IOException e) {
+        //        throw new DatabaseException(e);
+        //      }
       }
-      catch (IOException e) {
+      catch (Exception e) {
         throw new DatabaseException(e);
       }
     }
@@ -704,10 +747,10 @@ public class DiskBasedResultSet {
       String name = "page-0";
       File outFile = new File(dir, name);
       List<DataInputStream> inStreams = new ArrayList<>();
-      DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new LzoOutputStream(new FileOutputStream(outFile))));
+      DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(outFile), 65_000));//new LzoOutputStream()));
       try {
         for (File file : files) {
-          DataInputStream in = new DataInputStream(new BufferedInputStream(new LzoInputStream(new FileInputStream(file), new LzoDecompressor1x())));
+          DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(file), 65_000)); //new LzoInputStream(, new LzoDecompressor1x())));
           inStreams.add(in);
         }
 
@@ -934,7 +977,7 @@ public class DiskBasedResultSet {
         out.close();
 
         File outFile = new File(file, "page-" + page.incrementAndGet());
-        out = new DataOutputStream(new BufferedOutputStream(new LzoOutputStream(new FileOutputStream(outFile))));
+        out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(outFile), 65_000));//new LzoOutputStream()));
         rowNumber.set(0);
       }
       return out;
@@ -978,8 +1021,11 @@ public class DiskBasedResultSet {
     try {
 
       File subFile = new File(file, String.valueOf(fileOffset));
-      try (BufferedOutputStream bufferedOut = new BufferedOutputStream(new LzoOutputStream(new FileOutputStream(subFile)));
-        DataOutputStream out = new DataOutputStream(bufferedOut)) {
+
+      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+      DataOutputStream out = new DataOutputStream(bytesOut);
+//      try (BufferedOutputStream bufferedOut = new BufferedOutputStream(new FileOutputStream(subFile), 65_000);//new LzoOutputStream());
+//        DataOutputStream out = new DataOutputStream(bufferedOut)) {
 
         for (int i = 0; i < records.length; i++) {
           for (int j = 0; j < records[0].length; j++) {
@@ -996,7 +1042,10 @@ public class DiskBasedResultSet {
             }
           }
         }
-      }
+        RandomAccessFile randomAccessFile = new RandomAccessFile(subFile, "rwd");
+        randomAccessFile.write(bytesOut.toByteArray());
+        randomAccessFile.close();
+//      }
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -1034,8 +1083,14 @@ public class DiskBasedResultSet {
       if (!subFile.exists()) {
         return null;
       }
-      try (BufferedInputStream bufferedIn = new BufferedInputStream(new LzoInputStream(new FileInputStream(subFile), new LzoDecompressor1x()));
-           DataInputStream in = new DataInputStream(bufferedIn)) {
+      RandomAccessFile randomAccessFile = new RandomAccessFile(subFile, "r");
+      byte[] buffer = new byte[(int) randomAccessFile.length()];
+      randomAccessFile.readFully(buffer);
+      randomAccessFile.close();
+
+      DataInputStream in = new DataInputStream(new ByteArrayInputStream(buffer));
+//      try (BufferedInputStream bufferedIn = new BufferedInputStream(new FileInputStream(subFile), 65_000);//new LzoInputStream(, new LzoDecompressor1x()));
+//           DataInputStream in = new DataInputStream(bufferedIn)) {
 
         AtomicInteger AtomicInteger = new AtomicInteger();
 
@@ -1083,7 +1138,7 @@ public class DiskBasedResultSet {
           ret[i] = records.get(i);
         }
         return ret;
-      }
+//      }
     }
     catch (Exception e) {
       throw new DatabaseException(e);

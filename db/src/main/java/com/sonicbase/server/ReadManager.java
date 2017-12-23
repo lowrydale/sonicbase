@@ -22,7 +22,7 @@ import org.apache.giraph.utils.Varint;
 
 import java.io.*;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -828,14 +828,14 @@ public class ReadManager {
         }
       }
 
-      String dbName = cobj.getString(ComObject.Tag.dbName);
-      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
-      if (schemaVersion < server.getSchemaVersion()) {
-        throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
-      }
+      final String dbName = cobj.getString(ComObject.Tag.dbName);
+//      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
+//      if (schemaVersion < server.getSchemaVersion()) {
+//        throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
+//      }
 
       ComArray array = cobj.getArray(ComObject.Tag.selectStatements);
-      SelectStatementImpl[] selectStatements = new SelectStatementImpl[array.getArray().size()];
+      final SelectStatementImpl[] selectStatements = new SelectStatementImpl[array.getArray().size()];
       for (int i = 0; i < array.getArray().size(); i++) {
         SelectStatementImpl stmt = new SelectStatementImpl(server.getClient());
         stmt.deserialize((byte[])array.getArray().get(i), dbName);
@@ -859,13 +859,13 @@ public class ReadManager {
         }
       }
 
-      boolean haveUnique = false;
+      boolean notAll = false;
       ComArray operationsArray = cobj.getArray(ComObject.Tag.operations);
       String[] operations = new String[operationsArray.getArray().size()];
       for (int i = 0; i < operations.length; i++) {
         operations[i] = (String) operationsArray.getArray().get(i);
         if (!operations[i].toUpperCase().endsWith("ALL")) {
-          haveUnique = true;
+          notAll = true;
         }
       }
 
@@ -877,14 +877,32 @@ public class ReadManager {
 
       DiskBasedResultSet diskResults = null;
       if (serverSelectPageNumber == 0) {
-        ResultSetImpl[] resultSets = new ResultSetImpl[selectStatements.length];
-        for (int i = 0; i < selectStatements.length; i++) {
-          SelectStatementImpl stmt = selectStatements[i];
-          stmt.setPageSize(500000);
-          resultSets[i] = (ResultSetImpl) stmt.execute(dbName, null);
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(selectStatements.length, selectStatements.length, 10_000,
+            TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+        final ResultSetImpl[] resultSets = new ResultSetImpl[selectStatements.length];
+        try {
+          List<Future> futures = new ArrayList<>();
+          for (int i = 0; i < selectStatements.length; i++) {
+            final int offset = i;
+            futures.add(executor.submit(new Callable() {
+              @Override
+              public Object call() throws Exception {
+                SelectStatementImpl stmt = selectStatements[offset];
+                stmt.setPageSize(30000);
+                resultSets[offset] = (ResultSetImpl) stmt.execute(dbName, null);
+                return null;
+              }
+            }));
+          }
+          for (Future future : futures) {
+            future.get();
+          }
+        }
+        finally {
+          executor.shutdownNow();
         }
 
-        if (haveUnique) {
+        if (notAll) {
           diskResults = buildUniqueResultSet(cobj.getShort(ComObject.Tag.serializationVersion),
               dbName, selectStatements, tableNames, resultSets, orderByExpressions, count, operations);
         }
@@ -906,6 +924,8 @@ public class ReadManager {
 
       retObj.put(ComObject.Tag.resultSetId, diskResults.getResultSetId());
       retObj.put(ComObject.Tag.serverSelectPageNumber, serverSelectPageNumber + 1);
+      retObj.put(ComObject.Tag.shard, server.getShard());
+      retObj.put(ComObject.Tag.replica, server.getReplica());
 
       if (records != null) {
         ComArray tableArray = retObj.putArray(ComObject.Tag.tableRecords, ComObject.Type.arrayType);
@@ -927,15 +947,15 @@ public class ReadManager {
       return retObj;
     }
     catch (Exception e) {
-      e.printStackTrace();
       throw new DatabaseException(e);
     }
   }
 
-  private DiskBasedResultSet buildUniqueResultSet(Short serializationVersion, String dbName, SelectStatementImpl[] selectStatements, String[] tableNames,
-                                                  ResultSetImpl[] resultSets,
-                                                  List<OrderByExpressionImpl> orderByExpressions, int count, String[] operations) {
-    List<OrderByExpressionImpl> orderByUnique = new ArrayList<>();
+  private DiskBasedResultSet buildUniqueResultSet(final Short serializationVersion, final String dbName,
+                                                  final SelectStatementImpl[] selectStatements, String[] tableNames,
+                                                  final ResultSetImpl[] resultSets,
+                                                  List<OrderByExpressionImpl> orderByExpressions, final int count, String[] operations) {
+    final List<OrderByExpressionImpl> orderByUnique = new ArrayList<>();
     for (ColumnImpl column : selectStatements[0].getSelectColumns()) {
       String columnName = column.getColumnName();
       OrderByExpressionImpl orderBy = new OrderByExpressionImpl();
@@ -943,30 +963,72 @@ public class ReadManager {
       orderBy.setColumnName(columnName);
       orderByUnique.add(orderBy);
     }
-    DiskBasedResultSet[] diskResultSets = new DiskBasedResultSet[resultSets.length];
-    for (int i = 0; i < diskResultSets.length; i++) {
-      diskResultSets[i] = new DiskBasedResultSet(serializationVersion, dbName, server,
-          new String[]{selectStatements[i].getFromTable()}, new int[]{i}, new ResultSetImpl[]{resultSets[i]}, orderByUnique, count, null, true);
+    boolean inMemory = true;
+    for (int i = 0; i < resultSets.length; i++) {
+      ExpressionImpl.CachedRecord[][] records = resultSets[0].getReadRecordsAndSerializedRecords();
+      if (records != null && records.length >= 30000) {
+        inMemory = false;
+        break;
+      }
+    }
+    Object[] diskResultSets = new Object[resultSets.length];
+    if (inMemory) {
+      for (int i = 0; i < resultSets.length; i++) {
+        diskResultSets[i] = resultSets[i];
+
+        ResultSetImpl.sortResults(dbName, server.getCommon(), resultSets[i].getReadRecordsAndSerializedRecords(),
+            resultSets[i].getTableNames(), orderByUnique);
+      }
+    }
+    else {
+      ThreadPoolExecutor executor = new ThreadPoolExecutor(resultSets.length, resultSets.length, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+      List<Future> futures = new ArrayList<>();
+      try {
+        for (int i = 0; i < resultSets.length; i++) {
+          final int offset = i;
+          futures.add(executor.submit(new Callable() {
+            @Override
+            public Object call() throws Exception {
+              return new DiskBasedResultSet(serializationVersion, dbName, server,
+                  new String[]{selectStatements[offset].getFromTable()},
+                  new int[]{offset}, new ResultSetImpl[]{resultSets[offset]}, orderByUnique, 30_000, null, true);
+            }
+          }));
+        }
+        for (int i = 0; i < futures.size(); i++) {
+          diskResultSets[i] = (DiskBasedResultSet) futures.get(i).get();
+        }
+      }
+      catch (Exception e) {
+        throw new DatabaseException(e);
+      }
+      finally {
+        executor.shutdownNow();
+      }
     }
 
-    DiskBasedResultSet ret = diskResultSets[0];
+    Object ret = diskResultSets[0];
     for (int i = 1; i < resultSets.length; i++) {
       boolean unique = !operations[i-1].toUpperCase().endsWith("ALL");
       boolean intersect = operations[i-1].toUpperCase().startsWith("INTERSECT");
       boolean except = operations[i-1].toUpperCase().startsWith("EXCEPT");
       List<String> tables = new ArrayList<>();
-      for (String tableName : ret.getTableNames()) {
+      String[] localTableNames = ret instanceof ResultSetImpl ?
+          ((ResultSetImpl)ret).getTableNames() : ((DiskBasedResultSet)ret).getTableNames();
+      for (String tableName : localTableNames) {
         tables.add(tableName);
       }
-      for (String tableName : diskResultSets[i].getTableNames()) {
+      localTableNames = diskResultSets[i] instanceof ResultSetImpl ?
+          ((ResultSetImpl)diskResultSets[i]).getTableNames() : ((DiskBasedResultSet)diskResultSets[i]).getTableNames();
+      for (String tableName : localTableNames) {
         tables.add(tableName);
       }
       ret = new DiskBasedResultSet(serializationVersion, dbName, server,
-          tables.toArray(new String[tables.size()]), new DiskBasedResultSet[]{ret, diskResultSets[i]},
+          tables.toArray(new String[tables.size()]), new Object[]{ret, diskResultSets[i]},
           orderByExpressions, count, unique, intersect, except, selectStatements[0].getSelectColumns());
     }
 
-    return ret;
+    return (DiskBasedResultSet) ret;
   }
 
   public ComObject indexLookupExpression(ComObject cobj) {

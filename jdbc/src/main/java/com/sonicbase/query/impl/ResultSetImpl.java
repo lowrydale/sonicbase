@@ -197,6 +197,10 @@ public class ResultSetImpl implements ResultSet {
     this.readRecords = records;
   }
 
+  public String[] getTableNames() {
+    return tableNames;
+  }
+
   public static class MultiTableRecordList {
     private String[] tableNames;
     private long[][] ids;
@@ -1719,16 +1723,17 @@ public class ResultSetImpl implements ResultSet {
   private void getMoreServerSetResults() {
     while (true) {
       try {
+        lastReadRecords = readRecords;
+
         databaseClient.doServerSetSelect(dbName, tableNames, setOperation, this);
 
-        lastReadRecords = readRecords;
-        readRecords = null;
-        synchronized (recordCache.getRecordsForTable()) {
-          recordCache.getRecordsForTable().clear();
-        }
-
-        ExpressionImpl.NextReturn ret = new ExpressionImpl.NextReturn(tableNames, retKeys);
-        readRecords = readRecords(ret);
+//        readRecords = null;
+//        synchronized (recordCache.getRecordsForTable()) {
+//          recordCache .getRecordsForTable().clear();
+//        }
+//
+//        ExpressionImpl.NextReturn ret = new ExpressionImpl.NextReturn(tableNames, retKeys);
+//        readRecords = readRecords(ret);
         currPos = 0;
         break;
       }

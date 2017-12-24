@@ -65,7 +65,7 @@ Inserts a record into a table<br/>
   
     <tr class="syntax-main">
            <td width="512" colspan=2 >
-            INSERT INTO table_name (column [,column...]) VALUES (expression [,expression...])
+            INSERT [IGNORE] INTO table_name (column [,column...]) VALUES (expression [,expression...])
 		</td>
 	  </tr>
 	  <tr><td><table border=0 cellpadding=4 cellspacing="0">
@@ -74,7 +74,7 @@ Inserts a record into a table<br/>
 	  <tr><td align="right">expression:&nbsp;&nbsp;</td><td>value to insert. May be parameter or constant</td></tr>
 		  <tr><td align="right">parameter:&nbsp;&nbsp;</td><td>the literal "?"</td></tr>
 		  <tr><td align="right">constant:&nbsp;&nbsp;</td><td>String, double, long, etc..</td></tr>
-
+		  <tr><td align="right">IGNORE:&nbsp;&nbsp;</td><td>Ignore unique constrain violations. This behaves like an upsert.</td></tr>
 	  </table></td></tr>
   </tbody>
 </table>
@@ -83,10 +83,10 @@ Inserts a record into a table<br/>
 <h3>Example</h3>
 
 		<pre class="java"><code>
-	PreparedStatement stmt = conn.prepareStatement("insert into persons (name, age, occupation) values ('bob', ?, ?)")
-	stmt.setInt(1, 30);
-	stmt.setString(2, "artist");
-	stmt.executeUpdate();<br/>
+PreparedStatement stmt = conn.prepareStatement("insert ignore into persons (name, age, occupation) values ('bob', ?, ?)")
+stmt.setInt(1, 30);
+stmt.setString(2, "artist");
+stmt.executeUpdate();<br/>
 </code></pre>
 <br/>
 </div>

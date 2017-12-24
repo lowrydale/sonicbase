@@ -576,13 +576,13 @@ public class DatabaseClient {
           }
           synchronized (mutex) {
             for (PreparedInsert insert : withRecordPrepared) {
-              ComObject obj = serializeInsertKeyWithRecord(insert.dbName, insert.tableId, insert.indexId, insert.tableName, insert.keyInfo, insert.record);
+              ComObject obj = serializeInsertKeyWithRecord(insert.dbName, insert.tableId, insert.indexId, insert.tableName, insert.keyInfo, insert.record, insert.ignore);
               cobjs1.get(insert.keyInfo.shard).getArray(ComObject.Tag.insertObjects).getArray().add(obj);
               withRecordProcessed.get(insert.keyInfo.shard).add(insert);
             }
             for (PreparedInsert insert : preparedKeys) {
               ComObject obj = serializeInsertKey(getCommon(), insert.dbName, insert.tableId, insert.indexId, insert.tableName, insert.keyInfo,
-                  insert.primaryKeyIndexName, insert.primaryKey, insert.keyRecord);
+                  insert.primaryKeyIndexName, insert.primaryKey, insert.keyRecord, insert.ignore);
               cobjs2.get(insert.keyInfo.shard).getArray(ComObject.Tag.insertObjects).getArray().add(obj);
               processed.get(insert.keyInfo.shard).add(insert);
             }
@@ -2693,12 +2693,12 @@ public class DatabaseClient {
     return updateStatement.execute(dbName, null);
   }
 
-  public void insertKey(String dbName, String tableName, KeyInfo keyInfo, String primaryKeyIndexName, Object[] primaryKey, KeyRecord keyRecord, int shard, int replica) {
+  public void insertKey(String dbName, String tableName, KeyInfo keyInfo, String primaryKeyIndexName, Object[] primaryKey, KeyRecord keyRecord, int shard, int replica, boolean ignore) {
     try {
       int tableId = common.getTables(dbName).get(tableName).getTableId();
       int indexId = common.getTables(dbName).get(tableName).getIndexes().get(keyInfo.indexSchema.getKey()).getIndexId();
       ComObject cobj = serializeInsertKey(getCommon(), dbName, tableId, indexId, tableName, keyInfo, primaryKeyIndexName,
-          primaryKey, keyRecord);
+          primaryKey, keyRecord, ignore);
 
       byte[] keyRecordBytes = keyRecord.serialize(SERIALIZATION_VERSION);
       cobj.put(ComObject.Tag.keyRecordBytes, keyRecordBytes);
@@ -2727,13 +2727,14 @@ public class DatabaseClient {
 
   public static ComObject serializeInsertKey(DatabaseCommon common, String dbName, int tableId, int indexId,
                                              String tableName, KeyInfo keyInfo,
-                                             String primaryKeyIndexName, Object[] primaryKey, KeyRecord keyRecord) throws IOException {
+                                             String primaryKeyIndexName, Object[] primaryKey, KeyRecord keyRecord, boolean ignore) throws IOException {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.serializationVersion, SERIALIZATION_VERSION);
 //    cobj.put(ComObject.Tag.dbName, dbName);
 //    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
     cobj.put(ComObject.Tag.tableId, tableId);
     cobj.put(ComObject.Tag.indexId, indexId);
+    cobj.put(ComObject.Tag.ignore, ignore);
 //    cobj.put(ComObject.Tag.tableName, tableName);
 //    cobj.put(ComObject.Tag.indexName, keyInfo.indexSchema.getKey());
 //    cobj.put(ComObject.Tag.isExcpliciteTrans, isExplicitTrans());
@@ -2755,11 +2756,11 @@ public class DatabaseClient {
     }
   }
 
-  public void insertKeyWithRecord(String dbName, String tableName, KeyInfo keyInfo, Record record) {
+  public void insertKeyWithRecord(String dbName, String tableName, KeyInfo keyInfo, Record record, boolean ignore) {
     try {
       int tableId = common.getTables(dbName).get(tableName).getTableId();
       int indexId = common.getTables(dbName).get(tableName).getIndexes().get(keyInfo.indexSchema.getKey()).getIndexId();
-      ComObject cobj = serializeInsertKeyWithRecord(dbName, tableId, indexId, tableName, keyInfo, record);
+      ComObject cobj = serializeInsertKeyWithRecord(dbName, tableId, indexId, tableName, keyInfo, record, ignore);
       cobj.put(ComObject.Tag.dbName, dbName);
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
       cobj.put(ComObject.Tag.method, "insertIndexEntryByKeyWithRecord");
@@ -2767,6 +2768,7 @@ public class DatabaseClient {
       cobj.put(ComObject.Tag.isExcpliciteTrans, isExplicitTrans());
       cobj.put(ComObject.Tag.isCommitting, isCommitting());
       cobj.put(ComObject.Tag.transactionId, getTransactionId());
+      cobj.put(ComObject.Tag.ignore, ignore);
 
       int replicaCount = getReplicaCount();
       Exception lastException = null;
@@ -2799,13 +2801,14 @@ public class DatabaseClient {
   }
 
   private ComObject serializeInsertKeyWithRecord(String dbName, int tableId, int indexId, String tableName,
-                                                 KeyInfo keyInfo, Record record) throws IOException {
+                                                 KeyInfo keyInfo, Record record, boolean ignore) throws IOException {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.serializationVersion, SERIALIZATION_VERSION);
 //    cobj.put(ComObject.Tag.dbName, dbName);
 //    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
     cobj.put(ComObject.Tag.indexId, indexId);
     cobj.put(ComObject.Tag.tableId, tableId);
+    cobj.put(ComObject.Tag.ignore, ignore);
 //    cobj.put(ComObject.Tag.tableName, tableName);
 //    cobj.put(ComObject.Tag.indexName, keyInfo.indexSchema.getKey());
 //    cobj.put(ComObject.Tag.isExcpliciteTrans, isExplicitTrans());
@@ -2877,6 +2880,7 @@ public class DatabaseClient {
   public int doInsert(String dbName, ParameterHandler parms, Insert stmt) throws IOException, SQLException {
     final InsertStatementImpl insertStatement = new InsertStatementImpl(this);
     insertStatement.setTableName(stmt.getTable().getName());
+    insertStatement.setIgnore(stmt.isModifierIgnore());
 
     List<Object> values = new ArrayList<>();
     List<String> columnNames = new ArrayList<>();
@@ -2940,6 +2944,7 @@ public class DatabaseClient {
     private String dbName;
     private InsertStatementImpl insertStatement;
     private ParameterHandler parms;
+    public boolean ignore;
   }
 
   class PreparedInsert {
@@ -2957,6 +2962,7 @@ public class DatabaseClient {
     public long id;
     public String indexName;
     public KeyRecord keyRecord;
+    public boolean ignore;
   }
 
   public List<PreparedInsert> prepareInsert(InsertRequest request,
@@ -3078,6 +3084,7 @@ public class DatabaseClient {
         insert.values = values;
         insert.id = id;
         insert.indexName = keyInfo.indexSchema.getKey();
+        insert.ignore = request.ignore;
         ret.add(insert);
       }
     }
@@ -3093,6 +3100,7 @@ public class DatabaseClient {
     request.dbName = dbName;
     request.insertStatement = insertStatement;
     request.parms = parms;
+    request.ignore = insertStatement.isIgnore();
     int insertCountCompleted = 0;
     List<KeyInfo> completed = new ArrayList<>();
     AtomicLong recordId = new AtomicLong(-1L);
@@ -3121,14 +3129,14 @@ public class DatabaseClient {
 
           for (int i = 0; i < insertsWithRecords.size(); i++) {
             PreparedInsert insert = insertsWithRecords.get(i);
-            insertKeyWithRecord(dbName, insertStatement.getTableName(), insert.keyInfo, insert.record);
+            insertKeyWithRecord(dbName, insertStatement.getTableName(), insert.keyInfo, insert.record, insertStatement.isIgnore());
             completed.add(insert.keyInfo);
           }
 
           for (int i = 0; i < insertsWithKey.size(); i++) {
             PreparedInsert insert = insertsWithKey.get(i);
             insertKey(dbName, insertStatement.getTableName(), insert.keyInfo, insert.primaryKeyIndexName,
-                insert.primaryKey, insert.keyRecord, -1, -1);
+                insert.primaryKey, insert.keyRecord, -1, -1, insertStatement.isIgnore());
             completed.add(insert.keyInfo);
           }
         }

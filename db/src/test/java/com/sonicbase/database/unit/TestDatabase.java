@@ -23,6 +23,7 @@ import com.sonicbase.server.DatabaseServer;
 import com.sun.jersey.core.util.Base64;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.codehaus.plexus.util.FileUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -184,6 +185,70 @@ public class TestDatabase {
         stmt.setLong(6, i + 1000);
         assertEquals(stmt.executeUpdate(), 1);
         ids.add((long) i);
+      }
+
+      for (int i = 0; i < recordCount; i++) {
+        stmt = conn.prepareStatement("insert ignore into persons (id, socialSecurityNumber, relatives, restricted, gender, id3) VALUES (?, ?, ?, ?, ?, ?)");
+        stmt.setLong(1, i);
+        stmt.setString(2, "933-28-" + i);
+        stmt.setString(3, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+        stmt.setBoolean(4, false);
+        stmt.setString(5, "m");
+        stmt.setLong(6, i + 1000);
+        assertEquals(stmt.executeUpdate(), 1);
+        ids.add((long) i);
+      }
+
+      try {
+        for (int i = 0; i < recordCount; i++) {
+          stmt = conn.prepareStatement("insert into persons (id, socialSecurityNumber, relatives, restricted, gender, id3) VALUES (?, ?, ?, ?, ?, ?)");
+          stmt.setLong(1, i);
+          stmt.setString(2, "933-28-" + i);
+          stmt.setString(3, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+          stmt.setBoolean(4, false);
+          stmt.setString(5, "m");
+          stmt.setLong(6, i + 1000);
+          assertEquals(stmt.executeUpdate(), 1);
+          ids.add((long) i);
+        }
+      }
+      catch (Exception e) {
+        //e.printStackTrace();
+        assertTrue(ExceptionUtils.getStackTrace(e).contains("Unique constraint violated"));
+      }
+
+      for (int i = 0; i < recordCount; i++) {
+        stmt = conn.prepareStatement("insert ignore into persons (id, socialSecurityNumber, relatives, restricted, gender, id3) VALUES (?, ?, ?, ?, ?, ?)");
+        stmt.setLong(1, i);
+        stmt.setString(2, "933-28-" + i);
+        stmt.setString(3, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+        stmt.setBoolean(4, false);
+        stmt.setString(5, "m");
+        stmt.setLong(6, i + 1000);
+        assertEquals(stmt.executeUpdate(), 1);
+        ids.add((long) i);
+        stmt.addBatch();
+      }
+      stmt.executeBatch();
+
+      try {
+        for (int i = 0; i < recordCount; i++) {
+          stmt = conn.prepareStatement("insert into persons (id, socialSecurityNumber, relatives, restricted, gender, id3) VALUES (?, ?, ?, ?, ?, ?)");
+          stmt.setLong(1, i);
+          stmt.setString(2, "933-28-" + i);
+          stmt.setString(3, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+          stmt.setBoolean(4, false);
+          stmt.setString(5, "m");
+          stmt.setLong(6, i + 1000);
+          assertEquals(stmt.executeUpdate(), 1);
+          ids.add((long) i);
+          stmt.addBatch();
+        }
+        stmt.executeBatch();
+      }
+      catch (Exception e) {
+        //e.printStackTrace();
+        assertTrue(ExceptionUtils.getStackTrace(e).contains("Unique constraint violated"));
       }
 
       for (int i = 0; i < recordCount; i++) {

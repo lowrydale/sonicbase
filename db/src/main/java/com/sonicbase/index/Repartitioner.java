@@ -2134,7 +2134,7 @@ public class Repartitioner extends Thread {
               }
             }
             catch (Exception e) {
-              e.printStackTrace();
+              logger.error("Error", e);
             }
           }
           if (!ok) {
@@ -2221,13 +2221,7 @@ public class Repartitioner extends Thread {
       }
       isRebalancing.set(true);
 
-      File file = new File(System.getProperty("user.dir"), "config/config-" + databaseServer.getCluster() + ".json");
-      if (!file.exists()) {
-        file = new File(System.getProperty("user.dir"), "src/main/resources/config/config-" + databaseServer.getCluster() + ".json");
-      }
-      String configStr = IOUtils.toString(new BufferedInputStream(new FileInputStream(file)), "utf-8");
-      ObjectMapper mapper = new ObjectMapper();
-      ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+      ObjectNode config = databaseServer.getConfig();
 
       boolean isInternal = false;
       if (config.has("clientIsPrivate")) {

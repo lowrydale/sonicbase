@@ -693,11 +693,8 @@ public class DeleteManager {
       try {
         future.get();
       }
-      catch (InterruptedException e) {
+      catch (Exception e) {
         throw new DatabaseException(e);
-      }
-      catch (ExecutionException e) {
-        e.printStackTrace();
       }
     }
     logger.info("recoveringSnapshot - writeBatchDeletes- end: duration=" + (System.currentTimeMillis() - begin));
@@ -807,11 +804,8 @@ public class DeleteManager {
           try {
             future.get();
           }
-          catch (InterruptedException e) {
+          catch (Exception e) {
             throw new DatabaseException(e);
-          }
-          catch (ExecutionException e) {
-            e.printStackTrace();
           }
         }
       }

@@ -49,7 +49,7 @@ public class NettyServer {
   private static final String HOST_STR = "host";
   private final int threadCount;
 
-  private boolean isRunning;
+  final AtomicBoolean isRunning = new AtomicBoolean(false);
   private int port;
   private String cluster;
   private DatabaseServer databaseServer = null;
@@ -101,7 +101,7 @@ public class NettyServer {
   }
 
   public boolean isRunning() {
-    return isRunning;
+    return isRunning.get();
   }
 
   public enum ReadState {
@@ -402,9 +402,9 @@ public class NettyServer {
       ByteBuf m = null;
       String respStr = "";
       try {
-        if (!NettyServer.this.isRunning) {
-          return;
-        }
+//        if (!NettyServer.this.isRunning.get()) {
+//          return;
+//        }
         m = (ByteBuf) msg;
 
         long requestBegin = System.nanoTime();
@@ -842,7 +842,6 @@ public class NettyServer {
       try {
 
         final DatabaseServer databaseServer = new DatabaseServer();
-        final AtomicBoolean isRunning = new AtomicBoolean(false);
 
         databaseServer.setConfig(config, cluster, host, port, isRunning, gclog, xmx, skipLicense);
         databaseServer.setRole(role);
@@ -934,7 +933,6 @@ public class NettyServer {
 
       Logger.setReady();
 
-      this.isRunning = true;
       nettyThread.join();
       logger.info("joined netty thread");
     }

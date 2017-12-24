@@ -2,9 +2,7 @@ package com.sonicbase.query.impl;
 
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
-import com.sonicbase.common.*;
 
-import com.sonicbase.common.*;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.Expression;
@@ -241,7 +239,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
                     keyRecord.setPrimaryKey(primaryKeyBytes);
                     keyRecord.setDbViewNumber(client.getCommon().getSchemaVersion());
                     client.insertKey(dbName, tableSchema.getName(), innerNewEntry.getValue(), indexSchema.getName(),
-                        newPrimaryKey, keyRecord, -1, -1);
+                        newPrimaryKey, keyRecord, -1, -1, false);
                   }
                 }
                 else {
@@ -256,7 +254,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
                       keyRecord.setPrimaryKey(primaryKeyBytes);
                       keyRecord.setDbViewNumber(client.getCommon().getSchemaVersion());
                       client.insertKey(dbName, tableSchema.getName(), innerNewEntry.getValue(), indexSchema.getName(),
-                          newPrimaryKey, keyRecord, -1, -1);
+                          newPrimaryKey, keyRecord, -1, -1, false);
                     }
                   }
                 }

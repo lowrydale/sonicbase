@@ -731,11 +731,43 @@ public class ResultSetImpl implements ResultSet {
     if (mapResults != null) {
       return mapResults.get(currPos).get(columnLabel);
     }
-    String[] actualColumn = getActualColumn(columnLabel);
-    Object ret = getField(actualColumn);
+    String[] actualColumn = null;
     SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
+    if (function != null) {
+      if (function.getName().equalsIgnoreCase(LENGTH_STR) ||
+          function.getName().equalsIgnoreCase("upper") ||
+          function.getName().equalsIgnoreCase("lower") ||
+          function.getName().equalsIgnoreCase("substring")) {
+        actualColumn = getActualColumn(columnLabel);
+      }
+      else {
+        actualColumn = new String[]{null, DatabaseClient.toLower(columnLabel)};
+      }
+    }
+    else {
+      actualColumn = getActualColumn(columnLabel);
+    }
+    Object ret = getField(actualColumn);
 
     String retString = getString(ret);
+
+    if (function != null) {
+      if (retString != null && function.getName().equalsIgnoreCase(LENGTH_STR)) {
+        return String.valueOf(retString.length());
+      }
+      else if (function.getName().equalsIgnoreCase("min") ||
+          function.getName().equalsIgnoreCase("max") ||
+          function.getName().equalsIgnoreCase("sum") ||
+          function.getName().equalsIgnoreCase("avg")) {
+        Object obj = getCounterValue(function);
+        if (obj instanceof Double) {
+          return String.valueOf((double)obj);
+        }
+        if (obj instanceof Long) {
+          return String.valueOf((long)obj);
+        }
+      }
+    }
 
     if (function != null) {
       if (function.getName().equals("upper")) {
@@ -853,10 +885,20 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public Byte getByte(String columnLabel) {
-    String[] actualColumn = getActualColumn(columnLabel);
-    Object ret = getField(actualColumn);
-
+    String[] actualColumn = null;
     SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
+    if (function != null) {
+      if (function.getName().equalsIgnoreCase(LENGTH_STR)) {
+        actualColumn = getActualColumn(columnLabel);
+      }
+      else {
+        actualColumn = new String[]{null, DatabaseClient.toLower(columnLabel)};
+      }
+    }
+    else {
+      actualColumn = getActualColumn(columnLabel);
+    }
+    Object ret = getField(actualColumn);
 
     return getByte(ret, function == null ? null : function.getName());
   }
@@ -895,10 +937,21 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public Short getShort(String columnLabel) {
-    String[] actualColumn = getActualColumn(columnLabel);
-    Object ret = getField(actualColumn);
-
+    String[] actualColumn = null;
     SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
+    if (function != null) {
+      if (function.getName().equalsIgnoreCase(LENGTH_STR)) {
+        actualColumn = getActualColumn(columnLabel);
+      }
+      else {
+        actualColumn = new String[]{null, DatabaseClient.toLower(columnLabel)};
+      }
+    }
+    else {
+      actualColumn = getActualColumn(columnLabel);
+    }
+
+    Object ret = getField(actualColumn);
 
     Short retString1 = getShort(ret, function == null ? null : function.getName());
     if (retString1 != null) {
@@ -949,10 +1002,21 @@ public class ResultSetImpl implements ResultSet {
       return ret;
     }
 
-    String[] actualColumn = getActualColumn(columnLabel);
-    Object retObj = getField(actualColumn);
-
+    String[] actualColumn = null;
     SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
+    if (function != null) {
+      if (function.getName().equalsIgnoreCase(LENGTH_STR)) {
+        actualColumn = getActualColumn(columnLabel);
+      }
+      else {
+        actualColumn = new String[]{null, DatabaseClient.toLower(columnLabel)};
+      }
+    }
+    else {
+      actualColumn = getActualColumn(columnLabel);
+    }
+
+    Object retObj = getField(actualColumn);
 
     return getInt(retObj, function);
   }
@@ -985,7 +1049,13 @@ public class ResultSetImpl implements ResultSet {
           function.getName().equalsIgnoreCase("max") ||
           function.getName().equalsIgnoreCase("sum") ||
           function.getName().equalsIgnoreCase("avg")) {
-        return (int)getCounterValue(function);
+        Object obj = getCounterValue(function);
+        if (obj instanceof Long) {
+          return (int)(long)obj;
+        }
+        if (obj instanceof Double) {
+          return (int)(double)obj;
+        }
       }
     }
     if (retString != null) {
@@ -1022,10 +1092,21 @@ public class ResultSetImpl implements ResultSet {
       return ret;
     }
 
-    String[] actualColumn = getActualColumn(columnLabel);
+    String[] actualColumn = null;
+    SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
+    if (function != null) {
+      if (function.getName().equalsIgnoreCase(LENGTH_STR)) {
+        actualColumn = getActualColumn(columnLabel);
+      }
+      else {
+        actualColumn = new String[]{null, DatabaseClient.toLower(columnLabel)};
+      }
+    }
+    else {
+      actualColumn = getActualColumn(columnLabel);
+    }
     Object retObj = getField(actualColumn);
 
-    SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
     return getLong(retObj, function);
   }
 
@@ -1048,7 +1129,13 @@ public class ResultSetImpl implements ResultSet {
           function.getName().equalsIgnoreCase("max") ||
           function.getName().equalsIgnoreCase("sum") ||
           function.getName().equalsIgnoreCase("avg")) {
-        return (long)getCounterValue(function);
+        Object obj = getCounterValue(function);
+        if (obj instanceof Long) {
+          return (Long) obj;
+        }
+        if (obj instanceof Double) {
+          return (long)(double)obj;
+        }
       }
     }
     if (retString != null) {
@@ -1153,10 +1240,22 @@ public class ResultSetImpl implements ResultSet {
       return ret;
     }
 
-    String[] actualColumn = getActualColumn(columnLabel);
+    String[] actualColumn = null;
+    SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
+    if (function != null) {
+      if (function.getName().equalsIgnoreCase(LENGTH_STR)) {
+        actualColumn = getActualColumn(columnLabel);
+      }
+      else {
+        actualColumn = new String[]{null, DatabaseClient.toLower(columnLabel)};
+      }
+    }
+    else {
+      actualColumn = getActualColumn(columnLabel);
+    }
+
     Object retObj = getField(actualColumn);
 
-    SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
     return getFloat(retObj, function);
   }
 
@@ -1178,7 +1277,13 @@ public class ResultSetImpl implements ResultSet {
           function.getName().equalsIgnoreCase("max") ||
           function.getName().equalsIgnoreCase("sum") ||
           function.getName().equalsIgnoreCase("avg")) {
-        return (float)getCounterValue(function);
+        Object obj = getCounterValue(function);
+        if (obj instanceof Double) {
+          return (float)(double)obj;
+        }
+        if (obj instanceof Long) {
+          return (float)(long)obj;
+        }
       }
     }
 
@@ -1217,10 +1322,22 @@ public class ResultSetImpl implements ResultSet {
       return ret;
     }
 
-    String[] actualColumn = getActualColumn(columnLabel);
+    String[] actualColumn = null;
+    SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
+    if (function != null) {
+      if (function.getName().equalsIgnoreCase(LENGTH_STR)) {
+        actualColumn = getActualColumn(columnLabel);
+      }
+      else {
+        actualColumn = new String[]{null, DatabaseClient.toLower(columnLabel)};
+      }
+    }
+    else {
+      actualColumn = getActualColumn(columnLabel);
+    }
+
     Object retObj = getField(actualColumn);
 
-    SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
     return getDouble(retObj, function);
   }
 
@@ -1242,7 +1359,13 @@ public class ResultSetImpl implements ResultSet {
           function.getName().equalsIgnoreCase("max") ||
           function.getName().equalsIgnoreCase("sum") ||
           function.getName().equalsIgnoreCase("avg")) {
-        return (double)getCounterValue(function);
+        Object obj = getCounterValue(function);
+        if (obj instanceof Double) {
+          return (Double) obj;
+        }
+        if (obj instanceof Long) {
+          return (double)(long)obj;
+        }
       }
     }
 
@@ -1479,33 +1602,43 @@ public class ResultSetImpl implements ResultSet {
 
   @Override
   public Double getDouble(int columnIndex) {
-    List<ColumnImpl> columns = selectStatement.getSelectColumns();
-    ColumnImpl column = columns.get(columnIndex - 1);
-    String columnLabel = column.getColumnName();
-    if (isMatchingAlias(columnLabel) && isCount) {
-      return (double)count;
+    if (columnIndex == 1 && this.isCount) {
+      return (double)this.count;
     }
-    String[] actualColumn = getActualColumn(columnLabel);
-    Object ret = getField(actualColumn);
+    else {
+      List<ColumnImpl> columns = selectStatement.getSelectColumns();
+      ColumnImpl column = columns.get(columnIndex - 1);
+      String columnLabel = column.getColumnName();
+      if (isMatchingAlias(columnLabel) && isCount) {
+        return (double) count;
+      }
+      String[] actualColumn = getActualColumn(columnLabel);
+      Object ret = getField(actualColumn);
 
-    SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
-    return getDouble(ret, function);
+      SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
+      return getDouble(ret, function);
+    }
   }
 
   @Override
   public Float getFloat(int columnIndex) {
-    List<ColumnImpl> columns = selectStatement.getSelectColumns();
-    ColumnImpl column = columns.get(columnIndex - 1);
-    String columnLabel = column.getColumnName();
-
-    if (isMatchingAlias(columnLabel) && isCount) {
-      return (float)count;
+    if (columnIndex == 1 && this.isCount) {
+      return (float)this.count;
     }
-    String[] actualColumn = getActualColumn(columnLabel);
-    Object ret = getField(actualColumn);
+    else {
+      List<ColumnImpl> columns = selectStatement.getSelectColumns();
+      ColumnImpl column = columns.get(columnIndex - 1);
+      String columnLabel = column.getColumnName();
 
-    SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
-    return getFloat(ret, function);
+      if (isMatchingAlias(columnLabel) && isCount) {
+        return (float) count;
+      }
+      String[] actualColumn = getActualColumn(columnLabel);
+      Object ret = getField(actualColumn);
+
+      SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
+      return getFloat(ret, function);
+    }
   }
 
   @Override

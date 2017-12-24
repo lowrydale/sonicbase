@@ -11,6 +11,7 @@
 -keepattributes Exceptions,InnerClasses,Signature,Deprecated,SourceFile,LineNumberTable,*Annotation*,EnclosingMethod
 
 
+-keep public class com.sonicbase.bench.TestPerformance
 -keep public class com.sonicbase.server.DatabaseServer
 -keep public class com.sonicbase.jdbcdriver.Driver
 -keep public class com.sonicbase.client.ReconfigureResults
@@ -35,6 +36,9 @@
 -keep public class com.sonicbase.common.SchemaOutOfSyncException
 -keep public class com.sonicbase.server.LogManager$ByteCounterStream
 
+-keepclassmembers  class com.sonicbase.bench.TestPerformance {
+    !private <methods>;
+}
 -keepclassmembers class com.sonicbase.server.DatabaseServer {
     !private <methods>;
     !private <fields>;
@@ -114,6 +118,9 @@
     !private <methods>;
 }
 
+-keep public class com.sonicbase.bench.TestPerformance {
+      public static void main(java.lang.String[]);
+}
 -keep public class com.sonicbase.research.socket.NettyServer {
       public static void main(java.lang.String[]);
 }

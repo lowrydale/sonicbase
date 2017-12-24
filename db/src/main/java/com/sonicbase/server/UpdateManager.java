@@ -319,7 +319,7 @@ public class UpdateManager {
                       keyRecord.setPrimaryKey(primaryKeyBytes);
                       keyRecord.setDbViewNumber(server.getCommon().getSchemaVersion());
                       server.getDatabaseClient().insertKey(dbName, tableName, keyInfo, primaryKeyIndexName,
-                          primaryKey.getKey(), keyRecord, server.getShard(), server.getReplica());
+                          primaryKey.getKey(), keyRecord, server.getShard(), server.getReplica(), true);
                       break;
                     }
                     catch (SchemaOutOfSyncException e) {
@@ -836,6 +836,8 @@ private static class InsertRequest {
       byte[] keyBytes = cobj.getByteArray(ComObject.Tag.keyBytes);
       Object[] primaryKey = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
 
+      boolean ignore = cobj.getBoolean(ComObject.Tag.ignore);
+
       AtomicBoolean shouldExecute = new AtomicBoolean();
       AtomicBoolean shouldDeleteLock = new AtomicBoolean();
       server.getTransactionManager().preHandleTransaction(dbName, tableName, indexName, isExpliciteTrans, isCommitting, transactionId, primaryKey, shouldExecute, shouldDeleteLock);
@@ -856,7 +858,7 @@ private static class InsertRequest {
 //        if (null != index.get(primaryKey)) {
 //          alreadyExisted = true;
 //        }
-        doInsertKey(dbName, recordBytes, primaryKey, index, tableSchema.getName(), indexName, replayedCommand);
+        doInsertKey(dbName, recordBytes, primaryKey, index, tableSchema.getName(), indexName, ignore || replayedCommand);
 
 //        int selectedShard = selectedShards.get(0);
 //        if (indexSchema.getCurrPartitions()[selectedShard].getShardOwning() != server.getShard()) {

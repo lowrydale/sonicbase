@@ -13,6 +13,7 @@ public class InsertStatementImpl extends StatementImpl implements InsertStatemen
   private String tableName;
   private List<Object> values = new ArrayList<Object>();
   private List<String> columnNames = new ArrayList<String>();
+  private boolean ignore;
 
   public InsertStatementImpl(DatabaseClient client) {
     this.client = client;
@@ -80,4 +81,11 @@ public class InsertStatementImpl extends StatementImpl implements InsertStatemen
     values.add(value);
   }
 
+  public void setIgnore(boolean ignore) {
+    this.ignore = ignore;
+  }
+
+  public boolean isIgnore() {
+    return ignore;
+  }
 }

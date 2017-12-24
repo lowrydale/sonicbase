@@ -215,11 +215,8 @@ public class AWSClient {
             try {
               future.get();
             }
-            catch (InterruptedException e) {
+            catch (Exception e) {
               throw new DatabaseException(e);
-            }
-            catch (ExecutionException e) {
-              e.printStackTrace();
             }
           }
 //      finally {

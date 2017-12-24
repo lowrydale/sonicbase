@@ -457,4 +457,23 @@ public class TestSetOperations {
     assertEquals(rs.getString("membershipname"), "membership-2");
     assertFalse(rs.next());
   }
+
+  @Test
+  public void testUnionAll() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id from persons where id > 1 union all select id from memberships where id > 1");
+    ResultSet rs = stmt.executeQuery();
+    for (int i = 2; i < 10; i++) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id"), i);
+    }
+    for (int i = 100; i < 110; i++) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id"), i);
+    }
+    for (int i = 2; i < 10; i++) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id"), i);
+    }
+    assertFalse(rs.next());
+  }
 }

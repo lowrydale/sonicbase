@@ -6,13 +6,11 @@ import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
-import com.sonicbase.util.DateUtils;
 import org.anarres.lzo.LzoDecompressor1x;
 import org.anarres.lzo.LzoInputStream;
 import org.anarres.lzo.LzoOutputStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.giraph.utils.Varint;
-import sun.misc.Cache;
 
 import java.io.*;
 import java.util.*;
@@ -181,7 +179,7 @@ public class DiskBasedResultSet {
               synchronized (rs.getRecordCache().getRecordsForTable()) {
                 rs.getRecordCache().getRecordsForTable().clear();
               }
-              if (batch.size() >= 500000) {
+              if (batch.size() >= 500_000) {
                 ExpressionImpl.CachedRecord[][] batchRecords = new ExpressionImpl.CachedRecord[batch.size()][];
                 for (int i = 0; i < batchRecords.length; i++) {
                   batchRecords[i] = batch.get(i);
@@ -295,7 +293,7 @@ public class DiskBasedResultSet {
     ExpressionImpl.CachedRecord[] newRecord = new ExpressionImpl.CachedRecord[tableCount];
     System.arraycopy(record, 0, newRecord, tableOffset, record.length);
     batch.add(newRecord);
-    if (batch.size() >= 500000) {
+    if (batch.size() >= 500_000) {
       flushBatch(dbName, serializationVersion, batch, file, fileOffset);
     }
   }
@@ -525,10 +523,8 @@ public class DiskBasedResultSet {
       for (File resultSet : resultSets) {
         File timeFile = new File(resultSet, "time-accessed.txt");
         if (timeFile.exists()) {
-          try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(timeFile)))) {
-            String str = reader.readLine();
-            Date date = DateUtils.fromString(str);
-            long updateTime = date.getTime();
+          try {
+            long updateTime = file.lastModified();
             if (updateTime < System.currentTimeMillis() - 24 * 60 * 60 * 1000) {
               FileUtils.deleteDirectory(resultSet);
               logger.info("Deleted old disk-based result set: dir=" + resultSet.getAbsolutePath());
@@ -546,7 +542,6 @@ public class DiskBasedResultSet {
   private void updateAccessTime(File file) {
     synchronized (this) {
       try {
-        String str = DateUtils.fromDate(new Date(System.currentTimeMillis()));
         File timeFile = new File(file, "time-accessed.txt");
         file.mkdirs();
         if (!timeFile.exists()) {

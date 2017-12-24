@@ -103,6 +103,8 @@ public class TestPerformance {
     methods.add("testUnion");
     methods.add("testUnionInMemory");
     methods.add("testUnionAll");
+    methods.add("testIntersect");
+    methods.add("testExcept");
 
 
     for (String method : methods) {
@@ -274,6 +276,13 @@ public class TestPerformance {
         });
         serverThreads.add(thread);
         thread.start();
+        while (true) {
+          Logger.setReady(false);
+          if (server1_1.isRunning()) {
+            break;
+          }
+          Thread.sleep(100);
+        }
 
         while (true) {
           Logger.setReady(false);
@@ -1009,7 +1018,11 @@ public class TestPerformance {
     for (int i = 0; i < outerFactor * 10; i++) {
       ResultSet rs = stmt.executeQuery();
       assertTrue(rs.next());
-      assertEquals(rs.getLong("maxValue"), (long)outerFactor * 500_000 - 1L);
+      assertEquals(rs.getLong("maxValue"), (long)((outerFactor * 500_000) - 1L));
+      assertEquals(rs.getInt("maxValue"), (int)(long)((outerFactor * 500_000) - 1L));
+      assertEquals(rs.getString("maxValue"), String.valueOf((long)((outerFactor * 500_000) - 1L)));
+      assertEquals(rs.getDouble("maxValue"), (double)(long)((outerFactor * 500_000) - 1L));
+      assertEquals(rs.getFloat("maxValue"), (float)(long)((outerFactor * 500_000) - 1L));
       count++;
     }
     long end = System.nanoTime();
@@ -1026,6 +1039,10 @@ public class TestPerformance {
       ResultSet rs = stmt.executeQuery();
       assertTrue(rs.next());
       assertEquals(rs.getLong(1), (long)(outerFactor * 500_000L));
+      assertEquals(rs.getInt(1), (int)(long)(outerFactor * 500_000L));
+      assertEquals(rs.getString(1), String.valueOf((long)(outerFactor * 500_000L)));
+      assertEquals(rs.getDouble(1), (double)(long)(outerFactor * 500_000L));
+      assertEquals(rs.getFloat(1),(float)(long)(outerFactor * 500_000L));
       count++;
     }
     long end = System.nanoTime();
@@ -1252,23 +1269,49 @@ public class TestPerformance {
   }
 
   public void testUnionAll() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("select id from persons where id > 1000 union all select id from persons2 where id > 1000");
+    PreparedStatement stmt = conn.prepareStatement("(select id from persons where id > 1000) union all (select id from persons2 where id > 1000) order by id asc");
     long begin = System.nanoTime();
     int count = 0;
     ResultSet rs = stmt.executeQuery();
     for (int i = 1001; i < outerFactor * 500_000; i++) {
       assertTrue(rs.next());
-      try {
-        assertEquals(rs.getLong("id"), (long)i);
-      }
-      catch (Exception e) {
-        System.out.println("Error: count=" + count);
-        break;
-      }
+      assertEquals(rs.getLong("id"), (long)i);
       count++;
     }
     long end = System.nanoTime();
     registerResults("union all", end-begin, count);
+    //assertTrue((end - begin) < (8000 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  public void testIntersect() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("(select id from persons where id > 1000 and id < "+
+        (int)(outerFactor * 100_000) + ") intersect (select id from persons2 where id > 1000) order by id asc");
+    long begin = System.nanoTime();
+    int count = 0;
+    ResultSet rs = stmt.executeQuery();
+    for (int i = 1001; i < outerFactor * 100_000; i++) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id"), (long)i);
+      count++;
+    }
+    long end = System.nanoTime();
+    registerResults("intersect", end-begin, count);
+    //assertTrue((end - begin) < (8000 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  public void testExcept() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("(select id from persons where id > 1000 and id < "+
+        (int)(outerFactor * 500_000) + ") except (select id from persons2 where id > 1000 and id < " + (int)(outerFactor * 100_000) + ") order by id asc");
+    long begin = System.nanoTime();
+    int count = 0;
+    ResultSet rs = stmt.executeQuery();
+    for (int i = (int)(outerFactor * 100_000); i < (int)(outerFactor * 500_000); i++) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id"), (long)i);
+      count++;
+    }
+    long end = System.nanoTime();
+    registerResults("except", end-begin, count);
     //assertTrue((end - begin) < (8000 * 1_000_000L), String.valueOf(end-begin));
   }
 }

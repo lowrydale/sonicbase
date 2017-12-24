@@ -223,7 +223,8 @@ public class ComObject {
     replicationMaster(155, intType),
     selectStatements(156, arrayType),
     operations(157, arrayType),
-    serverSelectPageNumber(158, longType);
+    serverSelectPageNumber(158, longType),
+    ignore(159, booleanType);
 
     public final int tag;
 

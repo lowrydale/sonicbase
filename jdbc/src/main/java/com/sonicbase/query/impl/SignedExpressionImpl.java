@@ -48,9 +48,9 @@ public class SignedExpressionImpl extends ExpressionImpl {
    * ###############################
    */
   @Override
-  public void serialize(DataOutputStream out) {
+  public void serialize(short serializationVersion, DataOutputStream out) {
     try {
-      super.serialize(out);
+      super.serialize(serializationVersion, out);
       serializeExpression(expression, out);
       out.writeBoolean(isNegative);
     }
@@ -70,7 +70,7 @@ public class SignedExpressionImpl extends ExpressionImpl {
    * ###############################
    */
   @Override
-  public void deserialize(DataInputStream in) {
+  public void deserialize(short serializationVersion, DataInputStream in) {
     try {
       expression = deserializeExpression(in);
       isNegative = in.readBoolean();

@@ -116,9 +116,9 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
    * ###############################
    */
   @Override
-  public void serialize(DataOutputStream out) {
+  public void serialize(short serializationVersion, DataOutputStream out) {
     try {
-      super.serialize(out);
+      super.serialize(serializationVersion, out);
       out.writeInt(expressionList.size());
       for (ExpressionImpl expression : expressionList) {
         serializeExpression(expression, out);
@@ -152,9 +152,9 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
    * ###############################
    */
   @Override
-  public void deserialize(DataInputStream in) {
+  public void deserialize(short serializationVersion, DataInputStream in) {
     try {
-      super.deserialize(in);
+      super.deserialize(serializationVersion, in);
       int count = in.readInt();
       for (int i = 0; i < count; i++) {
         ExpressionImpl expression = deserializeExpression(in);

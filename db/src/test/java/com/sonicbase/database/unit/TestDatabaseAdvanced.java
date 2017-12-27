@@ -519,6 +519,34 @@ public class TestDatabaseAdvanced {
   }
 
   @Test
+  public void testNot() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id as i from persons where not (id > 2) order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("i"), 0);
+    ret.next();
+    assertEquals(ret.getLong("i"), 1);
+    ret.next();
+    assertEquals(ret.getLong("i"), 2);
+    assertFalse(ret.next());
+
+  }
+
+  @Test
+  public void testParens() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select id as i from persons where (id < 2) order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("i"), 0);
+    ret.next();
+    assertEquals(ret.getLong("i"), 1);
+    assertFalse(ret.next());
+
+  }
+
+  @Test
   public void testAlias2() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select persons.id as i from persons where id < 2 order by id asc");
     ResultSet ret = stmt.executeQuery();

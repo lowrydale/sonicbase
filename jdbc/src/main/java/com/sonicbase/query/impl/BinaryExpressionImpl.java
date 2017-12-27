@@ -1155,9 +1155,9 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
    * DON"T MODIFY THIS SERIALIZATION
    * ###############################
    */
-  public void deserialize(DataInputStream in) {
+  public void deserialize(short serializationVersion, DataInputStream in) {
     try {
-      super.deserialize(in);
+      super.deserialize(serializationVersion, in);
       int id = in.readInt();
       operator = BinaryExpression.Operator.getOperator(id);
       ExpressionImpl expression = ExpressionImpl.deserializeExpression(in);
@@ -1178,9 +1178,9 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
    * DON"T MODIFY THIS SERIALIZATION
    * ###############################
    */
-  public void serialize(DataOutputStream out) {
+  public void serialize(short serializationVersion, DataOutputStream out) {
     try {
-      super.serialize(out);
+      super.serialize(serializationVersion, out);
       out.writeInt(operator.getId());
       ExpressionImpl value = getLeftExpression();
       ExpressionImpl.serializeExpression(value, out);

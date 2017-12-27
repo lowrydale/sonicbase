@@ -9,7 +9,13 @@ import com.sonicbase.index.Repartitioner;
 
 import com.sonicbase.common.*;
 import com.sonicbase.query.DatabaseException;
+import com.sonicbase.query.Expression;
+import com.sonicbase.query.ResultSet;
+import com.sonicbase.query.impl.ColumnImpl;
+import com.sonicbase.query.impl.ExpressionImpl;
+import com.sonicbase.query.impl.SelectStatementImpl;
 import com.sonicbase.queue.MessageQueueProducer;
+import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
@@ -17,6 +23,9 @@ import com.sun.jersey.json.impl.writer.JsonEncoder;
 import sun.misc.BASE64Encoder;
 
 import java.io.*;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -1916,6 +1925,157 @@ class MessageRequest {
         DeleteManager.DeleteRequestForKeyRecord request = new DeleteManager.DeleteRequestForKeyRecord(key, KeyRecord.getPrimaryKey(deletedRecord));
         server.getDeleteManager().saveDeleteForKeyRecord(dbName, tableSchema.getName(), indexName, sequence0, sequence1, request);
       }
+    }
+  }
+
+
+  public ComObject insertWithSelect(ComObject cobj, boolean replayedCommand) {
+
+    try {
+      String dbName = cobj.getString(ComObject.Tag.dbName);
+      byte[] selectBytes = cobj.getByteArray(ComObject.Tag.select);
+      SelectStatementImpl selectStatement = new SelectStatementImpl(server.getClient());
+      selectStatement.deserialize(selectBytes, dbName);
+      selectStatement.setIsOnServer(true);
+      selectStatement.setPageSize(30_000);
+
+      String tableName = cobj.getString(ComObject.Tag.tableName);
+      boolean ignore = cobj.getBoolean(ComObject.Tag.ignore);
+      ComArray columnsArray = cobj.getArray(ComObject.Tag.columns);
+
+      String fromTable = selectStatement.getFromTable();
+      List<ColumnImpl> srcColumns = selectStatement.getSelectColumns();
+
+      TableSchema fromTableSchema = server.getCommon().getTables(dbName).get(fromTable);
+      DataType.Type[] columnTypes = new DataType.Type[srcColumns.size()];
+      for (int i = 0; i < columnTypes.length; i++) {
+        ColumnImpl srcColumn = srcColumns.get(i);
+        DataType.Type type = fromTableSchema.getFields().get(fromTableSchema.getFieldOffset(srcColumn.getColumnName())).getType();
+        columnTypes[i] = type;
+      }
+
+      ObjectNode dict = server.getConfig();
+      ObjectNode databaseDict = dict;
+      ArrayNode array = databaseDict.withArray("shards");
+      ObjectNode replicaDict = (ObjectNode) array.get(0);
+      ArrayNode replicasArray = replicaDict.withArray("replicas");
+      final String address = databaseDict.get("clientIsPrivate") != null && databaseDict.get("clientIsPrivate").asBoolean() ?
+          replicasArray.get(0).get("privateAddress").asText() :
+          replicasArray.get(0).get("publicAddress").asText();
+      final int port = replicasArray.get(0).get("port").asInt();
+
+      //todo: make failsafe
+      Class.forName("com.sonicbase.jdbcdriver.Driver");
+      final Connection conn = DriverManager.getConnection("jdbc:sonicbase:" + address + ":" + port + "/" + dbName);
+
+      String destColumnsStr = "";
+      String destParmsStr = "";
+      for (int i = 0; i < columnsArray.getArray().size(); i++) {
+        if (i != 0) {
+          destColumnsStr += ",";
+          destParmsStr += ",";
+        }
+        destColumnsStr += (String)columnsArray.getArray().get(i);
+        destParmsStr += "?";
+      }
+
+      ResultSet rs = (ResultSet) selectStatement.execute(dbName, null);
+      String sql = "insert " + (ignore ? "ignore" : "") + " into " + tableName + " (" + destColumnsStr + ") values (" + destParmsStr + ")";
+      System.out.println(sql);
+      PreparedStatement stmt = conn.prepareStatement(sql);
+
+      int totalCountInserted = 0;
+      while (true) {
+        int batchSize = 0;
+        for (int j = 0; j < 100 && rs.next(); j++) {
+          for (int i = 0; i < columnsArray.getArray().size(); i++) {
+            ColumnImpl srcColumn = srcColumns.get(i);
+            String alias = srcColumn.getAlias();
+            String columnName = srcColumn.getColumnName();
+            if (alias != null && !"__alias__".equals(alias)) {
+              columnName = alias;
+            }
+//            else if (srcColumn.getTableName() != null) {
+//              columnName = srcColumn.getTableName() + "." + columnName;
+//            }
+            switch (columnTypes[i]) {
+              case BIGINT:
+                stmt.setLong(i + 1, rs.getLong(columnName));
+                break;
+              case INTEGER:
+                stmt.setInt(i + 1, rs.getInt(columnName));
+                break;
+              case BIT:
+                stmt.setBoolean(i + 1, rs.getBoolean(columnName));
+                break;
+              case TINYINT:
+                stmt.setByte(i + 1, rs.getByte(columnName));
+                break;
+              case SMALLINT:
+                stmt.setShort(i + 1, rs.getShort(columnName));
+                break;
+              case FLOAT:
+                stmt.setDouble(i + 1, rs.getDouble(columnName));
+                break;
+              case REAL:
+                stmt.setFloat(i + 1, rs.getFloat(columnName));
+                break;
+              case DOUBLE:
+                stmt.setDouble(i + 1, rs.getDouble(columnName));
+                break;
+              case NUMERIC:
+              case DECIMAL:
+                stmt.setBigDecimal(i + 1, rs.getBigDecimal(columnName));
+                break;
+              case CHAR:
+              case VARCHAR:
+              case CLOB:
+              case NCHAR:
+              case NVARCHAR:
+              case LONGNVARCHAR:
+              case LONGVARCHAR:
+                stmt.setString(1 + 1, rs.getString(columnName));
+                break;
+              case DATE:
+                stmt.setDate(i + 1, rs.getDate(columnName));
+                break;
+              case TIME:
+                stmt.setTime(i + 1, rs.getTime(columnName));
+                break;
+              case TIMESTAMP:
+                stmt.setTimestamp(i + 1, rs.getTimestamp(columnName));
+                break;
+              case BINARY:
+              case VARBINARY:
+              case LONGVARBINARY:
+              case BLOB:
+                stmt.setBytes(i + 1, rs.getBytes(columnName));
+                break;
+              case BOOLEAN:
+                stmt.setBoolean(i + 1, rs.getBoolean(columnName));
+                break;
+              case ROWID:
+                stmt.setLong(i + 1, rs.getLong(columnName));
+                break;
+              default:
+                throw new DatabaseException("Data type not supported: " + columnTypes[i].name());
+            }
+          }
+          stmt.addBatch();
+          batchSize++;
+          totalCountInserted++;
+        }
+        if (batchSize == 0) {
+          break;
+        }
+        stmt.executeBatch();
+      }
+      ComObject retObj = new ComObject();
+      retObj.put(ComObject.Tag.count, totalCountInserted);
+      return retObj;
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
     }
   }
 }

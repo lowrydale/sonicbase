@@ -72,9 +72,9 @@ public class ConstantImpl extends ExpressionImpl {
    * DON"T MODIFY THIS SERIALIZATION
    * ###############################
    */
-  public void deserialize(DataInputStream in) {
+  public void deserialize(short serializationVersion, DataInputStream in) {
     try {
-      super.deserialize(in);
+      super.deserialize(serializationVersion, in);
       sqlType = in.readInt();
       switch (sqlType) {
         case Types.CLOB:
@@ -152,9 +152,9 @@ public class ConstantImpl extends ExpressionImpl {
    * ###############################
    */
   @Override
-  public void serialize(DataOutputStream out) {
+  public void serialize(short serializationVersion, DataOutputStream out) {
     try {
-      super.serialize(out);
+      super.serialize(serializationVersion, out);
       out.writeInt(sqlType);
       switch (sqlType) {
         case Types.CLOB:

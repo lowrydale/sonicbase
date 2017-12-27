@@ -78,7 +78,8 @@ public class DatabaseClient {
   private static Logger logger;
 
 
-  public static final short SERIALIZATION_VERSION = 23;
+  public static final short SERIALIZATION_VERSION = 24;
+  public static final short SERIALIZATION_VERSION_24 = 24;
   public static final short SERIALIZATION_VERSION_23 = 23;
   public static final short SERIALIZATION_VERSION_22 = 22;
   public static final short SERIALIZATION_VERSION_21 = 21;
@@ -165,7 +166,6 @@ public class DatabaseClient {
       "rollback",
       "testWrite",
       "saveSchema"
-
   };
 
   private static Set<String> writeVerbs = new HashSet<String>();
@@ -2881,39 +2881,56 @@ public class DatabaseClient {
     final InsertStatementImpl insertStatement = new InsertStatementImpl(this);
     insertStatement.setTableName(stmt.getTable().getName());
     insertStatement.setIgnore(stmt.isModifierIgnore());
+    Select select = stmt.getSelect();
+    if (select != null) {
+      SelectBody selectBody = select.getSelectBody();
+      AtomicInteger currParmNum = new AtomicInteger();
+      if (selectBody instanceof PlainSelect) {
+        SelectStatementImpl selectStatement = parseSelectStatement(parms, false, (PlainSelect) selectBody, currParmNum);
+        insertStatement.setSelect(selectStatement);
+      }
+      else {
+        throw new DatabaseException("Unsupported select type");
+      }
+    }
 
     List<Object> values = new ArrayList<>();
     List<String> columnNames = new ArrayList<>();
 
     List srcColumns = stmt.getColumns();
     ExpressionList items = (ExpressionList) stmt.getItemsList();
-    List srcExpressions = items.getExpressions();
+    List srcExpressions = items == null ? null : items.getExpressions();
     int parmOffset = 1;
     for (int i = 0; i < srcColumns.size(); i++) {
       Column column = (Column) srcColumns.get(i);
       columnNames.add(toLower(column.getColumnName()));
-      Expression expression = (Expression) srcExpressions.get(i);
-      //todo: this doesn't handle out of order fields
-      if (expression instanceof JdbcParameter) {
-        values.add(parms.getValue(parmOffset++));
+      if (srcExpressions != null) {
+        Expression expression = (Expression) srcExpressions.get(i);
+        //todo: this doesn't handle out of order fields
+        if (expression instanceof JdbcParameter) {
+          values.add(parms.getValue(parmOffset++));
+        }
+        else if (expression instanceof StringValue) {
+          values.add(((StringValue) expression).getValue());
+        }
+        else if (expression instanceof LongValue) {
+          values.add(((LongValue) expression).getValue());
+        }
+        else if (expression instanceof DoubleValue) {
+          values.add(((DoubleValue) expression).getValue());
+        }
+        else {
+          throw new DatabaseException("Unexpected column type: " + expression.getClass().getName());
+        }
       }
-      else if (expression instanceof StringValue) {
-        values.add(((StringValue) expression).getValue());
-      }
-      else if (expression instanceof LongValue) {
-        values.add(((LongValue) expression).getValue());
-      }
-      else if (expression instanceof DoubleValue) {
-        values.add(((DoubleValue) expression).getValue());
-      }
-      else {
-        throw new DatabaseException("Unexpected column type: " + expression.getClass().getName());
-      }
+    }
 
-    }
     for (int i = 0; i < columnNames.size(); i++) {
-      insertStatement.addValue(columnNames.get(i), values.get(i));
+      if (values != null && values.size() > i) {
+        insertStatement.addValue(columnNames.get(i), values.get(i));
+      }
     }
+    insertStatement.setColumns(columnNames);
 
     if (isExplicitTrans()) {
       List<TransactionOperation> ops = transactionOps.get();
@@ -2923,8 +2940,41 @@ public class DatabaseClient {
       }
       ops.add(new TransactionOperation(insertStatement, parms));
     }
+    if (insertStatement.getSelect() != null) {
+      return doInsertWithSelect(dbName, insertStatement, parms);
+    }
     return doInsert(dbName, insertStatement, parms);
 
+  }
+
+  private int doInsertWithSelect(String dbName, InsertStatementImpl insertStatement, ParameterHandler parms) {
+
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.dbName, dbName);
+    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+    cobj.put(ComObject.Tag.method, "insertWithSelect");
+
+
+    SelectStatementImpl select = insertStatement.getSelect();
+    if (select != null) {
+      String[] tableNames = new String[]{select.getFromTable()};
+      select.setTableNames(tableNames);
+//      if (joins.size() > 0) {
+//        tableNames = new String[joins.size() + 1];
+//        tableNames[0] = fromTable;
+//        for (int i = 0; i < tableNames.length - 1; i++) {
+//          tableNames[i + 1] = joins.get(i).rightFrom;
+//        }
+//        //sortWithIndex = true; //false;
+//      }
+    }
+
+    insertStatement.serialize(cobj);
+
+    byte[] bytes = send(null, Math.abs(ThreadLocalRandom.current().nextInt() % getShardCount()),
+        Math.abs(ThreadLocalRandom.current().nextLong()), cobj, Replica.def);
+    ComObject retObj = new ComObject(bytes);
+    return retObj.getInt(ComObject.Tag.count);
   }
 
   private static ConcurrentHashMap<Long, Integer> addedRecords = new ConcurrentHashMap<>();
@@ -4065,6 +4115,7 @@ public class DatabaseClient {
   private ExpressionImpl getExpression(
       AtomicInteger currParmNum, Expression whereExpression, String tableName, ParameterHandler parms) {
 
+    ExpressionImpl retExpression = null;
     //todo: add math operators
     if (whereExpression instanceof Between) {
       Between between = (Between) whereExpression;
@@ -4128,7 +4179,7 @@ public class DatabaseClient {
       leftExpression.setRightExpression(leftValue);
       rightExpression.setRightExpression(rightValue);
 
-      return ret;
+      retExpression = ret;
     }
     else if (whereExpression instanceof AndExpression) {
       BinaryExpressionImpl binaryOp = new BinaryExpressionImpl();
@@ -4138,7 +4189,7 @@ public class DatabaseClient {
       binaryOp.setLeftExpression(getExpression(currParmNum, leftExpression, tableName, parms));
       Expression rightExpression = andExpression.getRightExpression();
       binaryOp.setRightExpression(getExpression(currParmNum, rightExpression, tableName, parms));
-      return binaryOp;
+      retExpression = binaryOp;
     }
     else if (whereExpression instanceof OrExpression) {
       BinaryExpressionImpl binaryOp = new BinaryExpressionImpl();
@@ -4149,10 +4200,16 @@ public class DatabaseClient {
       binaryOp.setLeftExpression(getExpression(currParmNum, leftExpression, tableName, parms));
       Expression rightExpression = andExpression.getRightExpression();
       binaryOp.setRightExpression(getExpression(currParmNum, rightExpression, tableName, parms));
-      return binaryOp;
+      retExpression = binaryOp;
     }
     else if (whereExpression instanceof Parenthesis) {
-      return getExpression(currParmNum, ((Parenthesis) whereExpression).getExpression(), tableName, parms);
+      retExpression = getExpression(currParmNum, ((Parenthesis) whereExpression).getExpression(), tableName, parms);
+      if (((Parenthesis)whereExpression).isNot()) {
+        ParenthesisImpl parens = new ParenthesisImpl();
+        parens.setExpression(retExpression);
+        parens.setNot(true);
+        retExpression = parens;
+      }
     }
     else if (whereExpression instanceof net.sf.jsqlparser.expression.BinaryExpression) {
       BinaryExpressionImpl binaryOp = new BinaryExpressionImpl();
@@ -4214,7 +4271,7 @@ public class DatabaseClient {
       Expression right = bexp.getRightExpression();
       binaryOp.setRightExpression(getExpression(currParmNum, right, tableName, parms));
 
-      return binaryOp;
+      retExpression = binaryOp;
     }
 //    else if (whereExpression instanceof ParenthesisImpl) {
 //      Parenthesis retParenthesis = new Parenthesis();
@@ -4240,7 +4297,7 @@ public class DatabaseClient {
       else if (items instanceof SubSelect) {
         //todo: implement
       }
-      return retInExpression;
+      retExpression = retInExpression;
     }
     else if (whereExpression instanceof Column) {
       Column column = (Column) whereExpression;
@@ -4253,7 +4310,7 @@ public class DatabaseClient {
         columnNode.setTableName(tableName);
       }
       columnNode.setColumnName(toLower(column.getColumnName()));
-      return columnNode;
+      retExpression = columnNode;
     }
     else if (whereExpression instanceof StringValue) {
       StringValue string = (StringValue) whereExpression;
@@ -4265,31 +4322,31 @@ public class DatabaseClient {
       catch (UnsupportedEncodingException e) {
         throw new DatabaseException(e);
       }
-      return constant;
+      retExpression = constant;
     }
     else if (whereExpression instanceof DoubleValue) {
       DoubleValue doubleValue = (DoubleValue) whereExpression;
       ConstantImpl constant = new ConstantImpl();
       constant.setSqlType(Types.DOUBLE);
       constant.setValue(doubleValue.getValue());
-      return constant;
+      retExpression = constant;
     }
     else if (whereExpression instanceof LongValue) {
       LongValue longValue = (LongValue) whereExpression;
       ConstantImpl constant = new ConstantImpl();
       constant.setSqlType(Types.BIGINT);
       constant.setValue(longValue.getValue());
-      return constant;
+      retExpression = constant;
     }
     else if (whereExpression instanceof JdbcNamedParameter) {
       ParameterImpl parameter = new ParameterImpl();
       parameter.setParmName(((JdbcNamedParameter) whereExpression).getName());
-      return parameter;
+      retExpression = parameter;
     }
     else if (whereExpression instanceof JdbcParameter) {
       ParameterImpl parameter = new ParameterImpl();
       parameter.setParmOffset(currParmNum.getAndIncrement());
-      return parameter;
+      retExpression = parameter;
     }
     else if (whereExpression instanceof Function) {
       Function sourceFunc = (Function)whereExpression;
@@ -4302,7 +4359,8 @@ public class DatabaseClient {
         }
       }
       FunctionImpl func = new FunctionImpl(sourceFunc.getName(), expressions);
-      return func;
+      //func.setNot(sourceFunc.isNot());
+      retExpression = func;
     }
     else if (whereExpression instanceof SignedExpression) {
       SignedExpression expression = (SignedExpression)whereExpression;
@@ -4320,10 +4378,10 @@ public class DatabaseClient {
       if ('-' == expression.getSign()) {
         ret.setNegative(true);
       }
-      return ret;
+      retExpression = ret;
     }
 
-    return null;
+    return retExpression;
   }
 
   public boolean isRepartitioningComplete(String dbName) {

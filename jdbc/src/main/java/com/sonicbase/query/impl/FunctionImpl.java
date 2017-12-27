@@ -87,7 +87,8 @@ public class FunctionImpl extends ExpressionImpl {
     cot(new CotFunction()),
     trim(new TrimFunction()),
     radians(new RadiansFunction()),
-    custom(new CustomFunction());
+    custom(new CustomFunction()),
+    is_null(new IsNullFunction());
 
     private final FunctionBase func;
 
@@ -903,6 +904,17 @@ public class FunctionImpl extends ExpressionImpl {
     }
   }
 
+  static class IsNullFunction implements FunctionBase {
+    @Override
+    public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
+      Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
+      if (lhs == null) {
+        return true;
+      }
+      return false;
+    }
+  }
+
   @Override
   public Object evaluateSingleRecord(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms) {
     Function funcValue = null;
@@ -950,9 +962,9 @@ public class FunctionImpl extends ExpressionImpl {
    * DON"T MODIFY THIS SERIALIZATION
    * ###############################
    */
-  public void deserialize(DataInputStream in) {
+  public void deserialize(short serializationVersion, DataInputStream in) {
     try {
-      super.deserialize(in);
+      super.deserialize(serializationVersion, in);
       name = in.readUTF();
       int count = in.readInt();
       parms = new ArrayList<>();
@@ -973,9 +985,9 @@ public class FunctionImpl extends ExpressionImpl {
    * ###############################
    */
   @Override
-  public void serialize(DataOutputStream out) {
+  public void serialize(short serializationVersion, DataOutputStream out) {
     try {
-      super.serialize(out);
+      super.serialize(serializationVersion, out);
       out.writeUTF(name);
       out.writeInt(parms.size());
       for (ExpressionImpl expression : parms) {

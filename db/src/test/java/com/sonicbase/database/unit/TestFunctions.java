@@ -738,6 +738,27 @@ public class TestFunctions {
     assertFalse(rs.next());
   }
 
+  @Test
+  public void testIsNull() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where is_Null(id2) and id < 7");
+    ResultSet rs = stmt.executeQuery();
+    for (int i = 4; i < 7; i++) {
+      rs.next();
+      assertEquals(rs.getLong("id"), i);
+    }
+    assertFalse(rs.next());
+  }
+
+  @Test
+  public void testNotNull() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where not(is_Null(id2)) and id < 7");
+    ResultSet rs = stmt.executeQuery();
+    for (int i = 0; i < 4; i++) {
+      rs.next();
+      assertEquals(rs.getLong("id"), i);
+    }
+    assertFalse(rs.next());
+  }
 
   @Test
   public void testCustom() throws SQLException {

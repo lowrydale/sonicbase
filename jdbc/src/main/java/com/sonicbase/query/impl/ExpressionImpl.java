@@ -50,7 +50,7 @@ public abstract class ExpressionImpl implements Expression {
   private GroupByContext groupByContext;
   protected String dbName;
   private boolean forceSelectOnServer;
-  protected short serializationVersion;
+  protected short serializationVersion = DatabaseClient.SERIALIZATION_VERSION;
   private int lastShard;
   private boolean isCurrPartitions;
 
@@ -303,6 +303,10 @@ public abstract class ExpressionImpl implements Expression {
     return isCurrPartitions;
   }
 
+  public short getSerializationVersion() {
+    return serializationVersion;
+  }
+
   public static enum Type {
     column(0),
     constant(1),
@@ -369,9 +373,18 @@ public abstract class ExpressionImpl implements Expression {
     return parms;
   }
 
-  public void serialize(DataOutputStream out) {
+  public void serialize(short serializationVersion, DataOutputStream out) {
     try {
       out.writeInt(nextShard);
+//      if (serializationVersion >= DatabaseClient.SERIALIZATION_VERSION_24) {
+//        if (tableName == null) {
+//          out.writeByte(0);
+//        }
+//        else {
+//          out.writeByte(1);
+//          out.writeUTF(tableName);
+//        }
+//      }
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -385,9 +398,15 @@ public abstract class ExpressionImpl implements Expression {
    * DON"T MODIFY THIS SERIALIZATION
    * ###############################
    */
-  public void deserialize(DataInputStream in) {
+  public void deserialize(short serializationVersion, DataInputStream in) {
     try {
+      this.serializationVersion = serializationVersion;
       nextShard = in.readInt();
+//      if (serializationVersion >= DatabaseClient.SERIALIZATION_VERSION_24) {
+//        if (1 == in.readByte()) {
+//          tableName = in.readUTF();
+//        }
+//      }
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -421,6 +440,7 @@ public abstract class ExpressionImpl implements Expression {
       throw new DatabaseException(e);
     }
   }
+
   /**
    * ###############################
    * DON"T MODIFY THIS SERIALIZATION
@@ -428,9 +448,9 @@ public abstract class ExpressionImpl implements Expression {
    */
   public static void serializeExpression(ExpressionImpl expression, DataOutputStream out) {
     try {
-      out.writeShort(DatabaseClient.SERIALIZATION_VERSION);
+      out.writeShort(expression.getSerializationVersion());
       out.writeInt(expression.getType().getId());
-      expression.serialize(out);
+      expression.serialize(expression.getSerializationVersion(), out);
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -451,33 +471,37 @@ public abstract class ExpressionImpl implements Expression {
       short serializationVersion = in.readShort();
       int type = in.readInt();
       switch (ExpressionImpl.typesById.get(type)) {
+        case parenthesis:
+          ParenthesisImpl parens = new ParenthesisImpl();
+          parens.deserialize(serializationVersion, in);
+          return parens;
         case column:
           ColumnImpl column = new ColumnImpl();
-          column.deserialize(in);
+          column.deserialize(serializationVersion, in);
           return column;
         case constant:
           ConstantImpl constant = new ConstantImpl();
-          constant.deserialize(in);
+          constant.deserialize(serializationVersion, in);
           return constant;
         case parameter:
           ParameterImpl parameter = new ParameterImpl();
-          parameter.deserialize(in);
+          parameter.deserialize(serializationVersion, in);
           return parameter;
         case inExpression:
           InExpressionImpl expression = new InExpressionImpl();
-          expression.deserialize(in);
+          expression.deserialize(serializationVersion, in);
           return expression;
         case binaryOp:
           BinaryExpressionImpl binaryOp = new BinaryExpressionImpl();
-          binaryOp.deserialize(in);
+          binaryOp.deserialize(serializationVersion, in);
           return binaryOp;
         case allExpression:
           AllRecordsExpressionImpl allExpression = new AllRecordsExpressionImpl();
-          allExpression.deserialize(in);
+          allExpression.deserialize(serializationVersion, in);
           return allExpression;
         case function:
           FunctionImpl function = new FunctionImpl();
-          function.deserialize(in);
+          function.deserialize(serializationVersion, in);
           return function;
       }
       return null;

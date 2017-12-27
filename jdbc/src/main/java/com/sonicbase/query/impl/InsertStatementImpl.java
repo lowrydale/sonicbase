@@ -1,6 +1,8 @@
 package com.sonicbase.query.impl;
 
 
+import com.sonicbase.common.ComArray;
+import com.sonicbase.common.ComObject;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.InsertStatement;
 import com.sonicbase.client.DatabaseClient;
@@ -14,6 +16,7 @@ public class InsertStatementImpl extends StatementImpl implements InsertStatemen
   private List<Object> values = new ArrayList<Object>();
   private List<String> columnNames = new ArrayList<String>();
   private boolean ignore;
+  private SelectStatementImpl select;
 
   public InsertStatementImpl(DatabaseClient client) {
     this.client = client;
@@ -87,5 +90,36 @@ public class InsertStatementImpl extends StatementImpl implements InsertStatemen
 
   public boolean isIgnore() {
     return ignore;
+  }
+
+  public void setSelect(SelectStatementImpl select) {
+    this.select = select;
+  }
+
+  public SelectStatementImpl getSelect() {
+    return select;
+  }
+
+  public void serialize(ComObject cobj) {
+
+    cobj.put(ComObject.Tag.tableName, tableName);
+
+    //todo: add support for values when needed
+    //cobj.putArray(ComObject.Tag.insearverValues, ComObject.Type.objectType);
+
+    ComArray columnsArray = cobj.putArray(ComObject.Tag.columns, ComObject.Type.stringType);
+    for (String column : columnNames) {
+      columnsArray.add(column);
+    }
+
+    cobj.put(ComObject.Tag.ignore, ignore);
+    if (select != null) {
+      cobj.put(ComObject.Tag.select, select.serialize());
+    }
+
+  }
+
+  public void setColumns(List<String> columns) {
+    this.columnNames = columns;
   }
 }

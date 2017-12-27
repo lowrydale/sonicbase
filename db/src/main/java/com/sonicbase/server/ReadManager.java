@@ -784,7 +784,7 @@ public class ReadManager {
 
       DiskBasedResultSet diskResults = null;
       if (select.getServerSelectPageNumber() == 0) {
-        select.setPageSize(500000);
+        select.setPageSize(30000);
         ResultSetImpl resultSet = (ResultSetImpl) select.execute(dbName, null);
         diskResults = new DiskBasedResultSet(cobj.getShort(ComObject.Tag.serializationVersion), dbName, server,
             select.getTableNames(), new int[]{0}, new ResultSetImpl[]{resultSet}, select.getOrderByExpressions(), count, select, false);

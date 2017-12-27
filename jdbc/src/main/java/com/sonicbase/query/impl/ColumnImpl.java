@@ -1,5 +1,7 @@
 package com.sonicbase.query.impl;
 
+import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Record;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.DatabaseException;
@@ -83,16 +85,36 @@ public class ColumnImpl extends ExpressionImpl {
    * ###############################
    */
   @Override
-  public void serialize(DataOutputStream out) {
+  public void serialize(short serializationVersion, DataOutputStream out) {
     try {
-      super.serialize(out);
-      out.writeUTF(columnName);
-      if (tableName == null) {
-        out.writeByte(0);
+      super.serialize(serializationVersion, out);
+      if (serializationVersion <= DatabaseClient.SERIALIZATION_VERSION_23) {
+        out.writeUTF(columnName);
+        if (tableName == null) {
+          out.writeByte(0);
+        }
+        else {
+          out.writeByte(1);
+          out.writeUTF(tableName);
+        }
       }
       else {
-        out.writeByte(1);
-        out.writeUTF(tableName);
+        ComObject cobj = new ComObject();
+        if (columnName != null) {
+          cobj.put(ComObject.Tag.columnName, columnName);
+        }
+        if (tableName != null) {
+          cobj.put(ComObject.Tag.tableName, tableName);
+        }
+        if (alias != null) {
+          cobj.put(ComObject.Tag.alias, alias);
+        }
+        if (function != null) {
+          cobj.put(ComObject.Tag.function, function);
+        }
+        byte[] bytes = cobj.serialize();
+        out.writeInt(bytes.length);
+        out.write(bytes);
       }
     }
     catch (IOException e) {
@@ -111,12 +133,24 @@ public class ColumnImpl extends ExpressionImpl {
    * ###############################
    */
   @Override
-  public void deserialize(DataInputStream in) {
+  public void deserialize(short serializationVersion, DataInputStream in) {
     try {
-      super.deserialize(in);
-      columnName = in.readUTF();
-      if (1 == in.readByte()) {
-        tableName = in.readUTF();
+      super.deserialize(serializationVersion, in);
+      if (serializationVersion <= DatabaseClient.SERIALIZATION_VERSION_23) {
+        columnName = in.readUTF();
+        if (1 == in.readByte()) {
+          tableName = in.readUTF();
+        }
+      }
+      else {
+        int len = in.readInt();
+        byte[] buffer = new byte[len];
+        in.readFully(buffer);
+        ComObject cobj = new ComObject(buffer);
+        columnName = cobj.getString(ComObject.Tag.columnName);
+        tableName = cobj.getString(ComObject.Tag.tableName);
+        alias = cobj.getString(ComObject.Tag.alias);
+        function = cobj.getString(ComObject.Tag.function);
       }
     }
     catch (IOException e) {

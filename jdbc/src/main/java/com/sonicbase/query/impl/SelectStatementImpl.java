@@ -68,6 +68,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
   private Long pageSize;
   private boolean forceSelectOnServer;
   private AtomicLong currOffset = new AtomicLong();
+  private short serializationVersion = DatabaseClient.SERIALIZATION_VERSION;
 
   public SelectStatementImpl(DatabaseClient client) {
     this.client = client;
@@ -114,7 +115,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
    */
   public void serialize(DataOutputStream out) {
     try {
-      Varint.writeSignedVarLong(DatabaseClient.SERIALIZATION_VERSION, out);
+      Varint.writeSignedVarLong(serializationVersion, out);
       out.writeUTF(fromTable);
       ExpressionImpl.serializeExpression(expression, out);
       out.writeInt(orderByExpressions.size());
@@ -123,7 +124,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       }
       out.writeInt(selectColumns.size());
       for (ColumnImpl column : selectColumns) {
-        column.serialize(out);
+        column.serialize(serializationVersion, out);
       }
       out.writeBoolean(serverSelect);
       out.writeBoolean(serverSort);
@@ -169,7 +170,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
    */
   public void deserialize(DataInputStream in, String dbName) {
     try {
-      short serializationVersion = (short)Varint.readSignedVarLong(in);
+      serializationVersion = (short)Varint.readSignedVarLong(in);
       fromTable = in.readUTF();
       expression = ExpressionImpl.deserializeExpression(in);
       int count = in.readInt();
@@ -183,8 +184,13 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       count = in.readInt();
       for (int i = 0; i < count; i++) {
         ColumnImpl column = new ColumnImpl();
-        column.deserialize(in);
+        column.deserialize(serializationVersion, in);
         selectColumns.add(column);
+      }
+      for (ColumnImpl column : selectColumns) {
+        if (column.getAlias() != null) {
+          aliases.put(column.getAlias(), column);
+        }
       }
       serverSelect = in.readBoolean();
       serverSort = in.readBoolean();

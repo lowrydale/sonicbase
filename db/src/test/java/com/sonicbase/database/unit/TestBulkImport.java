@@ -307,7 +307,7 @@ public class TestBulkImport {
     rs.next();
     assertEquals(rs.getLong(1), 10_000);
 
-    stmt = connA.prepareStatement("select * from persons where (id >= 3501 and id < 4751) and (id > 1000)");
+    stmt = connA.prepareStatement("select * from persons where (id >= 3501 and id < 4751 and (id > 1000)) ");//
     rs = stmt.executeQuery();
     for (int i = 3501; i < 4_751; i++) {
       assertTrue(rs.next(), String.valueOf(i));

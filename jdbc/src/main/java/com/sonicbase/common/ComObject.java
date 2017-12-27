@@ -224,7 +224,11 @@ public class ComObject {
     selectStatements(156, arrayType),
     operations(157, arrayType),
     serverSelectPageNumber(158, longType),
-    ignore(159, booleanType);
+    ignore(159, booleanType),
+    columns(160, arrayType),
+    select(161, byteArrayType),
+    alias(162, stringType),
+    function(163, stringType);
 
     public final int tag;
 

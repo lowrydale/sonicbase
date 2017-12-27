@@ -808,6 +808,17 @@ public class MethodInvoker {
     }
   }
 
+  public ComObject insertWithSelect(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
+    common.getSchemaReadLock(dbName).lock();
+    try {
+      return updateManager.insertWithSelect(cobj, replayedCommand);
+    }
+    finally {
+      common.getSchemaReadLock(dbName).unlock();
+    }
+  }
+
   public ComObject insertIndexEntryByKey(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();

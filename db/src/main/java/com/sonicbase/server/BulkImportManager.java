@@ -841,6 +841,7 @@ public class BulkImportManager {
             replicasArray.get(0).get("publicAddress").asText();
         final int port = replicasArray.get(0).get("port").asInt();
 
+        //todo: make failsafe
         Class.forName("com.sonicbase.jdbcdriver.Driver");
         final Connection insertConn = DriverManager.getConnection("jdbc:sonicbase:" + address + ":" + port + "/" + dbName);
 

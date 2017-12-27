@@ -47,9 +47,9 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
    * ###############################
    */
   @Override
-  public void serialize(DataOutputStream out) {
+  public void serialize(short serializationVersion, DataOutputStream out) {
     try {
-      super.serialize(out);
+      super.serialize(serializationVersion, out);
       out.writeUTF(fromTable);
     }
     catch (IOException e) {
@@ -63,9 +63,9 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
    * ###############################
    */
   @Override
-  public void deserialize(DataInputStream in) {
+  public void deserialize(short serilizationVersion, DataInputStream in) {
     try {
-      super.deserialize(in);
+      super.deserialize(serializationVersion, in);
       fromTable = in.readUTF();
     }
     catch (IOException e) {

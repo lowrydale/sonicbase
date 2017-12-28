@@ -1,279 +1,36 @@
-
-
-2017-12-23 11:01:38
-Full thread dump Java HotSpot(TM) 64-Bit Server VM (25.144-b01 mixed mode):
-
-"Thread-0" #12 prio=5 os_prio=31 tid=0x00007ff77996b000 nid=0x7303 runnable [0x0000700009709000]
-   java.lang.Thread.State: RUNNABLE
-	at java.net.PlainSocketImpl.socketConnect(Native Method)
-	at java.net.AbstractPlainSocketImpl.doConnect(AbstractPlainSocketImpl.java:350)
-	- locked <0x000000078f102790> (a java.net.SocksSocketImpl)
-	at java.net.AbstractPlainSocketImpl.connectToAddress(AbstractPlainSocketImpl.java:206)
-	at java.net.AbstractPlainSocketImpl.connect(AbstractPlainSocketImpl.java:188)
-	at java.net.SocksSocketImpl.connect(SocksSocketImpl.java:392)
-	at java.net.Socket.connect(Socket.java:589)
-	at sun.security.ssl.SSLSocketImpl.connect(SSLSocketImpl.java:673)
-	at sun.security.ssl.BaseSSLSocketImpl.connect(BaseSSLSocketImpl.java:173)
-	at sun.net.NetworkClient.doConnect(NetworkClient.java:180)
-	at sun.net.www.http.HttpClient.openServer(HttpClient.java:463)
-	at sun.net.www.http.HttpClient.openServer(HttpClient.java:558)
-	- locked <0x000000078f1015d8> (a sun.net.www.protocol.https.HttpsClient)
-	at sun.net.www.protocol.https.HttpsClient.<init>(HttpsClient.java:264)
-	at sun.net.www.protocol.https.HttpsClient.New(HttpsClient.java:367)
-	at sun.net.www.protocol.https.AbstractDelegateHttpsURLConnection.getNewHttpClient(AbstractDelegateHttpsURLConnection.java:191)
-	at sun.net.www.protocol.http.HttpURLConnection.plainConnect0(HttpURLConnection.java:1138)
-	at sun.net.www.protocol.http.HttpURLConnection.plainConnect(HttpURLConnection.java:1032)
-	at sun.net.www.protocol.https.AbstractDelegateHttpsURLConnection.connect(AbstractDelegateHttpsURLConnection.java:177)
-	at sun.net.www.protocol.http.HttpURLConnection.getInputStream0(HttpURLConnection.java:1546)
-	- locked <0x000000078f2fece0> (a sun.net.www.protocol.https.DelegateHttpsURLConnection)
-	at sun.net.www.protocol.http.HttpURLConnection.getInputStream(HttpURLConnection.java:1474)
-	- locked <0x000000078f2fece0> (a sun.net.www.protocol.https.DelegateHttpsURLConnection)
-	at sun.net.www.protocol.https.HttpsURLConnectionImpl.getInputStream(HttpsURLConnectionImpl.java:254)
-	- locked <0x000000078f2efed0> (a sun.net.www.protocol.https.HttpsURLConnectionImpl)
-	at com.sonicbase.client.a.y(SourceFile:1939)
-	at com.sonicbase.jdbcdriver.ConnectionProxy.describeLicenses(SourceFile:136)
-	at com.sonicbase.cli.Cli$1.run(SourceFile:904)
-	at java.lang.Thread.run(Thread.java:748)
-
-"process reaper" #11 daemon prio=10 os_prio=31 tid=0x00007ff77712a000 nid=0x7103 waiting on condition [0x0000700009607000]
-   java.lang.Thread.State: TIMED_WAITING (parking)
-	at sun.misc.Unsafe.park(Native Method)
-	- parking to wait for  <0x000000078ed50198> (a java.util.concurrent.SynchronousQueue$TransferStack)
-	at java.util.concurrent.locks.LockSupport.parkNanos(LockSupport.java:215)
-	at java.util.concurrent.SynchronousQueue$TransferStack.awaitFulfill(SynchronousQueue.java:460)
-	at java.util.concurrent.SynchronousQueue$TransferStack.transfer(SynchronousQueue.java:362)
-	at java.util.concurrent.SynchronousQueue.poll(SynchronousQueue.java:941)
-	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1073)
-	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
-	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Service Thread" #10 daemon prio=9 os_prio=31 tid=0x00007ff77784d800 nid=0x6d03 runnable [0x0000000000000000]
-   java.lang.Thread.State: RUNNABLE
-
-"C1 CompilerThread3" #9 daemon prio=9 os_prio=31 tid=0x00007ff77909f800 nid=0x6b03 waiting on condition [0x0000000000000000]
-   java.lang.Thread.State: RUNNABLE
-
-"C2 CompilerThread2" #8 daemon prio=9 os_prio=31 tid=0x00007ff77785b800 nid=0x6903 waiting on condition [0x0000000000000000]
-   java.lang.Thread.State: RUNNABLE
-
-"C2 CompilerThread1" #7 daemon prio=9 os_prio=31 tid=0x00007ff77a80c800 nid=0x6703 waiting on condition [0x0000000000000000]
-   java.lang.Thread.State: RUNNABLE
-
-"C2 CompilerThread0" #6 daemon prio=9 os_prio=31 tid=0x00007ff77980f000 nid=0x6503 waiting on condition [0x0000000000000000]
-   java.lang.Thread.State: RUNNABLE
-
-"Signal Dispatcher" #5 daemon prio=9 os_prio=31 tid=0x00007ff77a80c000 nid=0x6303 waiting on condition [0x0000000000000000]
-   java.lang.Thread.State: RUNNABLE
-
-"Surrogate Locker Thread (Concurrent GC)" #4 daemon prio=9 os_prio=31 tid=0x00007ff77900a000 nid=0x6007 waiting on condition [0x0000000000000000]
-   java.lang.Thread.State: RUNNABLE
-
-"Finalizer" #3 daemon prio=8 os_prio=31 tid=0x00007ff779099800 nid=0x5003 in Object.wait() [0x0000700008d41000]
-   java.lang.Thread.State: WAITING (on object monitor)
-	at java.lang.Object.wait(Native Method)
-	- waiting on <0x000000078ed1f0b8> (a java.lang.ref.ReferenceQueue$Lock)
-	at java.lang.ref.ReferenceQueue.remove(ReferenceQueue.java:143)
-	- locked <0x000000078ed1f0b8> (a java.lang.ref.ReferenceQueue$Lock)
-	at java.lang.ref.ReferenceQueue.remove(ReferenceQueue.java:164)
-	at java.lang.ref.Finalizer$FinalizerThread.run(Finalizer.java:209)
-
-"Reference Handler" #2 daemon prio=10 os_prio=31 tid=0x00007ff77a000000 nid=0x4e03 in Object.wait() [0x0000700008c3e000]
-   java.lang.Thread.State: WAITING (on object monitor)
-	at java.lang.Object.wait(Native Method)
-	- waiting on <0x000000078ed2e178> (a java.lang.ref.Reference$Lock)
-	at java.lang.Object.wait(Object.java:502)
-	at java.lang.ref.Reference.tryHandlePending(Reference.java:191)
-	- locked <0x000000078ed2e178> (a java.lang.ref.Reference$Lock)
-	at java.lang.ref.Reference$ReferenceHandler.run(Reference.java:153)
-
-"main" #1 prio=5 os_prio=31 tid=0x00007ff779005000 nid=0x1b03 runnable [0x00007000075fc000]
-   java.lang.Thread.State: RUNNABLE
-	at java.io.FileInputStream.read0(Native Method)
-	at java.io.FileInputStream.read(FileInputStream.java:207)
-	at jline.Terminal.readCharacter(Terminal.java:99)
-	at jline.UnixTerminal.readVirtualKey(UnixTerminal.java:131)
-	at jline.ConsoleReader.readVirtualKey(ConsoleReader.java:1451)
-	at jline.ConsoleReader.readBinding(ConsoleReader.java:655)
-	at jline.ConsoleReader.readLine(ConsoleReader.java:495)
-	at jline.ConsoleReader.readLine(ConsoleReader.java:449)
-	at jline.ConsoleReader.readLine(ConsoleReader.java:301)
-	at com.sonicbase.cli.Cli.main(SourceFile:189)
-
-"VM Thread" os_prio=31 tid=0x00007ff77783a800 nid=0x4c03 runnable
-
-"Gang worker#0 (Parallel GC Threads)" os_prio=31 tid=0x00007ff777807800 nid=0x2403 runnable
-
-"Gang worker#1 (Parallel GC Threads)" os_prio=31 tid=0x00007ff777808000 nid=0x2603 runnable
-
-"Gang worker#2 (Parallel GC Threads)" os_prio=31 tid=0x00007ff779005800 nid=0x2803 runnable
-
-"Gang worker#3 (Parallel GC Threads)" os_prio=31 tid=0x00007ff779006800 nid=0x2a03 runnable
-
-"Gang worker#4 (Parallel GC Threads)" os_prio=31 tid=0x00007ff779800000 nid=0x2c03 runnable
-
-"Gang worker#5 (Parallel GC Threads)" os_prio=31 tid=0x00007ff779007000 nid=0x2e03 runnable
-
-"Gang worker#6 (Parallel GC Threads)" os_prio=31 tid=0x00007ff779014000 nid=0x3003 runnable
-
-"Gang worker#7 (Parallel GC Threads)" os_prio=31 tid=0x00007ff779014800 nid=0x3203 runnable
-
-"G1 Main Concurrent Mark GC Thread" os_prio=31 tid=0x00007ff777019800 nid=0x4603 runnable
-
-"Gang worker#0 (G1 Parallel Marking Threads)" os_prio=31 tid=0x00007ff77701a800 nid=0x4803 runnable
-
-"Gang worker#1 (G1 Parallel Marking Threads)" os_prio=31 tid=0x00007ff77701b000 nid=0x4a03 runnable
-
-"G1 Concurrent Refinement Thread#0" os_prio=31 tid=0x00007ff77700b000 nid=0x4403 runnable
-
-"G1 Concurrent Refinement Thread#1" os_prio=31 tid=0x00007ff779016000 nid=0x4203 runnable
-
-"G1 Concurrent Refinement Thread#2" os_prio=31 tid=0x00007ff779015000 nid=0x4003 runnable
-
-"G1 Concurrent Refinement Thread#3" os_prio=31 tid=0x00007ff77780a800 nid=0x3e03 runnable
-
-"G1 Concurrent Refinement Thread#4" os_prio=31 tid=0x00007ff77700a000 nid=0x3c03 runnable
-
-"G1 Concurrent Refinement Thread#5" os_prio=31 tid=0x00007ff777009800 nid=0x3a03 runnable
-
-SonicBase Client                                         Using: 4-dale.<db=none>SonicBase Client                                         Using: 4-dale.<db=none>
-
-"G1 Concurrent Refinement Thread#7" os_prio=31 tid=0x00007ff777809800 nid=0x3603 runnable
-
-"G1 Concurrent Refinement Thread#8" os_prio=31 tid=0x00007ff777809000 nid=0x3403 runnable
-
-"VM Periodic Task Thread" os_prio=31 tid=0x00007ff777072000 nid=0x6f03 waiting on condition
-
-JNI global references: 249
-
-Heap
- garbage-first heap   total 262144K, used 19450K [0x0000000780000000, 0x0000000780100800, 0x00000007c0000000)
-  region size 1024K, 19 young (19456K), 3 survivors (3072K)
- Metaspace       used 14360K, capacity 14632K, committed 14720K, reserved 1062912K
-  class space    used 1560K, capacity 1652K, committed 1664K, reserved 1048576K
-
-use cluster 4-dale
-deploy cluster
-deploying: cluster=4-dale
-id=1, address=34.237.41.114
-Deploying to a server: id=1, address=34.237.41.114, userDir=/Users/lowryda/sonicbase, command=bin/do-rsync ec2-user@34.237.41.114:sonicbase
-2017-12-23 11:03:42
-Full thread dump Java HotSpot(TM) 64-Bit Server VM (25.144-b01 mixed mode):
-
-"process reaper" #14 daemon prio=10 os_prio=31 tid=0x00007ff7799bc000 nid=0x7107 runnable [0x00007000074a1000]
-   java.lang.Thread.State: RUNNABLE
-	at java.lang.UNIXProcess.waitForProcessExit(Native Method)
-	at java.lang.UNIXProcess.lambda$initStreams$3(UNIXProcess.java:289)
-	at java.lang.UNIXProcess$$Lambda$7/1789447862.run(Unknown Source)
-	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149)
-	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-0" #12 prio=5 os_prio=31 tid=0x00007ff77996b000 nid=0x7303 waiting on condition [0x000070000970a000]
-   java.lang.Thread.State: TIMED_WAITING (sleeping)
-	at java.lang.Thread.sleep(Native Method)
-	at com.sonicbase.cli.Cli$1.run(SourceFile:927)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Service Thread" #10 daemon prio=9 os_prio=31 tid=0x00007ff77784d800 nid=0x6d03 runnable [0x0000000000000000]
-   java.lang.Thread.State: RUNNABLE
-
-"C1 CompilerThread3" #9 daemon prio=9 os_prio=31 tid=0x00007ff77909f800 nid=0x6b03 waiting on condition [0x0000000000000000]
-   java.lang.Thread.State: RUNNABLE
-
-"C2 CompilerThread2" #8 daemon prio=9 os_prio=31 tid=0x00007ff77785b800 nid=0x6903 waiting on condition [0x0000000000000000]
-   java.lang.Thread.State: RUNNABLE
-
-"C2 CompilerThread1" #7 daemon prio=9 os_prio=31 tid=0x00007ff77a80c800 nid=0x6703 waiting on condition [0x0000000000000000]
-   java.lang.Thread.State: RUNNABLE
-
-"C2 CompilerThread0" #6 daemon prio=9 os_prio=31 tid=0x00007ff77980f000 nid=0x6503 waiting on condition [0x0000000000000000]
-   java.lang.Thread.State: RUNNABLE
-
-"Signal Dispatcher" #5 daemon prio=9 os_prio=31 tid=0x00007ff77a80c000 nid=0x6303 waiting on condition [0x0000000000000000]
-   java.lang.Thread.State: RUNNABLE
-
-"Surrogate Locker Thread (Concurrent GC)" #4 daemon prio=9 os_prio=31 tid=0x00007ff77900a000 nid=0x6007 waiting on condition [0x0000000000000000]
-   java.lang.Thread.State: RUNNABLE
-
-"Finalizer" #3 daemon prio=8 os_prio=31 tid=0x00007ff779099800 nid=0x5003 in Object.wait() [0x0000700008d41000]
-   java.lang.Thread.State: WAITING (on object monitor)
-	at java.lang.Object.wait(Native Method)
-	- waiting on <0x000000078ed1f0b8> (a java.lang.ref.ReferenceQueue$Lock)
-	at java.lang.ref.ReferenceQueue.remove(ReferenceQueue.java:143)
-	- locked <0x000000078ed1f0b8> (a java.lang.ref.ReferenceQueue$Lock)
-	at java.lang.ref.ReferenceQueue.remove(ReferenceQueue.java:164)
-	at java.lang.ref.Finalizer$FinalizerThread.run(Finalizer.java:209)
-
-"Reference Handler" #2 daemon prio=10 os_prio=31 tid=0x00007ff77a000000 nid=0x4e03 in Object.wait() [0x0000700008c3e000]
-   java.lang.Thread.State: WAITING (on object monitor)
-	at java.lang.Object.wait(Native Method)
-	- waiting on <0x000000078ed2e178> (a java.lang.ref.Reference$Lock)
-	at java.lang.Object.wait(Object.java:502)
-	at java.lang.ref.Reference.tryHandlePending(Reference.java:191)
-	- locked <0x000000078ed2e178> (a java.lang.ref.Reference$Lock)
-	at java.lang.ref.Reference$ReferenceHandler.run(Reference.java:153)
-
-"main" #1 prio=5 os_prio=31 tid=0x00007ff779005000 nid=0x1b03 runnable [0x00007000075fc000]
-   java.lang.Thread.State: RUNNABLE
-	at java.io.FileInputStream.readBytes(Native Method)
-	at java.io.FileInputStream.read(FileInputStream.java:255)
-	at java.io.BufferedInputStream.fill(BufferedInputStream.java:246)
-	at java.io.BufferedInputStream.read(BufferedInputStream.java:265)
-	- locked <0x000000078f0d7cf0> (a java.lang.UNIXProcess$ProcessPipeInputStream)
-	at com.sonicbase.cli.Deploy.a(SourceFile:130)
-	at com.sonicbase.cli.Deploy.a(SourceFile:86)
-	at com.sonicbase.cli.Cli.V(SourceFile:4542)
-	at com.sonicbase.cli.Cli.h(SourceFile:431)
-	at com.sonicbase.cli.Cli.main(SourceFile:212)
-
-"VM Thread" os_prio=31 tid=0x00007ff77783a800 nid=0x4c03 runnable
-
-"Gang worker#0 (Parallel GC Threads)" os_prio=31 tid=0x00007ff777807800 nid=0x2403 runnable
-
-"Gang worker#1 (Parallel GC Threads)" os_prio=31 tid=0x00007ff777808000 nid=0x2603 runnable
-
-"Gang worker#2 (Parallel GC Threads)" os_prio=31 tid=0x00007ff779005800 nid=0x2803 runnable
-
-"Gang worker#3 (Parallel GC Threads)" os_prio=31 tid=0x00007ff779006800 nid=0x2a03 runnable
-
-"Gang worker#4 (Parallel GC Threads)" os_prio=31 tid=0x00007ff779800000 nid=0x2c03 runnable
-
-"Gang worker#5 (Parallel GC Threads)" os_prio=31 tid=0x00007ff779007000 nid=0x2e03 runnable
-
-"Gang worker#6 (Parallel GC Threads)" os_prio=31 tid=0x00007ff779014000 nid=0x3003 runnable
-
-"Gang worker#7 (Parallel GC Threads)" os_prio=31 tid=0x00007ff779014800 nid=0x3203 runnable
-
-"G1 Main Concurrent Mark GC Thread" os_prio=31 tid=0x00007ff777019800 nid=0x4603 runnable
-
-"Gang worker#0 (G1 Parallel Marking Threads)" os_prio=31 tid=0x00007ff77701a800 nid=0x4803 runnable
-
-"Gang worker#1 (G1 Parallel Marking Threads)" os_prio=31 tid=0x00007ff77701b000 nid=0x4a03 runnable
-
-"G1 Concurrent Refinement Thread#0" os_prio=31 tid=0x00007ff77700b000 nid=0x4403 runnable
-
-"G1 Concurrent Refinement Thread#1" os_prio=31 tid=0x00007ff779016000 nid=0x4203 runnable
-
-"G1 Concurrent Refinement Thread#2" os_prio=31 tid=0x00007ff779015000 nid=0x4003 runnable
-
-"G1 Concurrent Refinement Thread#3" os_prio=31 tid=0x00007ff77780a800 nid=0x3e03 runnable
-
-"G1 Concurrent Refinement Thread#4" os_prio=31 tid=0x00007ff77700a000 nid=0x3c03 runnable
-
-"G1 Concurrent Refinement Thread#5" os_prio=31 tid=0x00007ff777009800 nid=0x3a03 runnable
-
-"G1 Concurrent Refinement Thread#6" os_prio=31 tid=0x00007ff777008800 nid=0x3803 runnable
-
-"G1 Concurrent Refinement Thread#7" os_prio=31 tid=0x00007ff777809800 nid=0x3603 runnable
-
-"G1 Concurrent Refinement Thread#8" os_prio=31 tid=0x00007ff777809000 nid=0x3403 runnable
-
-"VM Periodic Task Thread" os_prio=31 tid=0x00007ff777072000 nid=0x6f03 waiting on condition
-
-JNI global references: 282
-
-Heap
- garbage-first heap   total 262144K, used 19450K [0x0000000780000000, 0x0000000780100800, 0x00000007c0000000)
-  region size 1024K, 19 young (19456K), 3 survivors (3072K)
- Metaspace       used 14434K, capacity 14696K, committed 14720K, reserved 1062912K
+               range not in secondary: 761 0.007613 131342.4454731897
+                       range sort disk: 3930 0.007877 126947.22571887415
+                         range two key: 108 0.001186 842950.9884092252
+             range two key right sided: 101 0.001107 902915.6943707655
+                                 range: 1216 0.002438 410099.10535657144
+                        union inMemory: 68 0.002281 438267.16476513736
+               range not in table scan: 4245 0.008491 117767.2942897092
+                             range id2: 4031 0.008078 123788.25318374643
+range two key left sided greater equal: 149 0.001643 608586.959920257
+               range other expression2: 584 0.001174 851492.8599427501
+                                   not: 578 0.00118 847216.8751022473
+                       range three key: 1690 0.003388 295126.7623853746
+                                not in: 283 0.002839 352138.75689947
+                            table scan: 1632 0.003264 306349.30697202566
+                 range two key greater: 847 0.009017 110892.67760793517
+          range two key seocndyary key: 515 0.001031 969823.9828019605
+                          identity id=: 1127 0.1127 8873.04943876192
+            range secondary key single: 710 0.001423 702601.534957078
+       range two key greater backwards: 90 9.62E-4 1038893.0551890839
+                          id secdonary: 1114 0.111474 8970.66487181604
+                   range secondary key: 948 0.001901 525953.4147271434
+     count range two key greater equal: 1105 1.083336 923.0745748754481
+            identity secondary key id=: 1191 0.119167 8391.556145662465
+                                 count: 65941 64.648278 15.468315895433996
+                                 union: 2788 0.006972 143424.80352846615
+                range other expression: 2244 0.224467 4454.980187469077
+                             union all: 4220 0.008458 118227.21454434317
+      range two key greater left sided: 2507 0.027255 36689.68504155252
+                            range sort: 4013 0.008042 124334.34648749474
+                                   id2: 1587 0.158794 6297.456819860997
+          range two key greater equal2: 1731 0.018422 54281.96338554527
+                range two key greater2: 110 0.001178 848682.4759595942
+         range secondary key backwards: 1599 0.003206 311892.2614363954
+                        range two key2: 71 7.65E-4 1306259.3489480896
+      range two key left sided greater: 105 0.001152 867982.8273140889
+             range secondary key mixed: 218 0.002084 479794.5399683853

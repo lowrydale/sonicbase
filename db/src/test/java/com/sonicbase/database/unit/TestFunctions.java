@@ -772,7 +772,8 @@ public class TestFunctions {
     assertEquals(rs.getLong("id"), 2);
     assertFalse(rs.next());
   }
-  /*
+
+   /*
     md5
     to_base64
     from_base64

@@ -105,6 +105,10 @@ public class TestPerformance {
     methods.add("testUnionAll");
     methods.add("testIntersect");
     methods.add("testExcept");
+    methods.add("testNot");
+    methods.add("testFunctionAvg");
+    methods.add("testFunctionMin");
+    methods.add("testFunctionCustom");
 
 
     for (String method : methods) {
@@ -187,7 +191,7 @@ public class TestPerformance {
     try {
       int outerCount = (int) (outerFactor * 5_000);
       Logger.disable();
-      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
+      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-2-servers-a.json")), "utf-8");
       ObjectMapper mapper = new ObjectMapper();
       final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
 
@@ -199,7 +203,7 @@ public class TestPerformance {
 
       DatabaseClient.getServers().clear();
 
-      dbServers = new DatabaseServer[4];
+      dbServers = new DatabaseServer[2];
 
       String role = "primaryMaster";
 
@@ -212,7 +216,7 @@ public class TestPerformance {
           @Override
           public void run() {
             server0_0.startServer(new String[]{"-port", String.valueOf(9010), "-host", "localhost",
-                "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "4-servers", "-shard", String.valueOf(0)}, "db/src/main/resources/config/config-4-servers.json", true);
+                "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(0)}, "db/src/main/resources/config/config-4-servers.json", true);
             latch.countDown();
           }
         });
@@ -231,7 +235,7 @@ public class TestPerformance {
           @Override
           public void run() {
             server0_1.startServer(new String[]{"-port", String.valueOf(9060), "-host", "localhost",
-                "-mport", String.valueOf(9060), "-mhost", "localhost", "-cluster", "4-servers", "-shard", String.valueOf(0)}, "db/src/main/resources/config/config-4-servers.json", true);
+                "-mport", String.valueOf(9060), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(0)}, "db/src/main/resources/config/config-4-servers.json", true);
             latch.countDown();
           }
         });
@@ -246,47 +250,47 @@ public class TestPerformance {
           Thread.sleep(100);
         }
 
-        final NettyServer server1_0 = new NettyServer(128);
-        thread = new Thread(new Runnable() {
-          @Override
-          public void run() {
-            server1_0.startServer(new String[]{"-port", String.valueOf(9110), "-host", "localhost",
-                "-mport", String.valueOf(9110), "-mhost", "localhost", "-cluster", "4-servers", "-shard", String.valueOf(1)}, "db/src/main/resources/config/config-4-servers.json", true);
-            latch.countDown();
-          }
-        });
-        serverThreads.add(thread);
-        thread.start();
-        while (true) {
-          Logger.setReady(false);
-          if (server1_0.isRunning()) {
-            break;
-          }
-          Thread.sleep(100);
-        }
+//        final NettyServer server1_0 = new NettyServer(128);
+//        thread = new Thread(new Runnable() {
+//          @Override
+//          public void run() {
+//            server1_0.startServer(new String[]{"-port", String.valueOf(9110), "-host", "localhost",
+//                "-mport", String.valueOf(9110), "-mhost", "localhost", "-cluster", "4-servers", "-shard", String.valueOf(1)}, "db/src/main/resources/config/config-4-servers.json", true);
+//            latch.countDown();
+//          }
+//        });
+//        serverThreads.add(thread);
+//        thread.start();
+//        while (true) {
+//          Logger.setReady(false);
+//          if (server1_0.isRunning()) {
+//            break;
+//          }
+//          Thread.sleep(100);
+//        }
+//
+//        final NettyServer server1_1 = new NettyServer(128);
+//        thread = new Thread(new Runnable() {
+//          @Override
+//          public void run() {
+//            server1_1.startServer(new String[]{"-port", String.valueOf(9160), "-host", "localhost",
+//                "-mport", String.valueOf(9160), "-mhost", "localhost", "-cluster", "4-servers", "-shard", String.valueOf(1)}, "db/src/main/resources/config/config-4-servers.json", true);
+//            latch.countDown();
+//          }
+//        });
+//        serverThreads.add(thread);
+//        thread.start();
+//        while (true) {
+//          Logger.setReady(false);
+//          if (server1_1.isRunning()) {
+//            break;
+//          }
+//          Thread.sleep(100);
+//        }
 
-        final NettyServer server1_1 = new NettyServer(128);
-        thread = new Thread(new Runnable() {
-          @Override
-          public void run() {
-            server1_1.startServer(new String[]{"-port", String.valueOf(9160), "-host", "localhost",
-                "-mport", String.valueOf(9160), "-mhost", "localhost", "-cluster", "4-servers", "-shard", String.valueOf(1)}, "db/src/main/resources/config/config-4-servers.json", true);
-            latch.countDown();
-          }
-        });
-        serverThreads.add(thread);
-        thread.start();
         while (true) {
           Logger.setReady(false);
-          if (server1_1.isRunning()) {
-            break;
-          }
-          Thread.sleep(100);
-        }
-
-        while (true) {
-          Logger.setReady(false);
-          if (server0_0.isRunning() && server0_1.isRunning() && server1_0.isRunning() && server1_1.isRunning()) {
+          if (server0_0.isRunning() && server0_1.isRunning() /*&& server1_0.isRunning() && server1_1.isRunning()*/) {
             break;
           }
           Thread.sleep(100);
@@ -296,8 +300,8 @@ public class TestPerformance {
 
         dbServers[0] = server0_0.getDatabaseServer();
         dbServers[1] = server0_1.getDatabaseServer();
-        dbServers[2] = server1_0.getDatabaseServer();
-        dbServers[3] = server1_1.getDatabaseServer();
+//        dbServers[2] = server1_0.getDatabaseServer();
+//        dbServers[3] = server1_1.getDatabaseServer();
 
         System.out.println("Started 4 servers");
 
@@ -308,33 +312,89 @@ public class TestPerformance {
 
       Class.forName("com.sonicbase.jdbcdriver.Driver");
 
-      conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9010", "user", "password");
+      boolean sonicbase = true;
+      if (!sonicbase) {
+        Class.forName("com.mysql.jdbc.Driver");
+        conn = DriverManager.getConnection("jdbc:mysql://127.0.0.1:3306/db", "root", "pass");
+      }
+      else {
+        conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9010", "user", "password");
+        ((ConnectionProxy) conn).getDatabaseClient().createDatabase("test");
+        conn.close();
 
-      ((ConnectionProxy) conn).getDatabaseClient().createDatabase("test");
+        conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9010/test", "user", "password");
+        client = ((ConnectionProxy) conn).getDatabaseClient();
+        client.syncSchema();
+      }
 
-      conn.close();
-      conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9010/test", "user", "password");
-      client = ((ConnectionProxy) conn).getDatabaseClient();
-      client.syncSchema();
 
       Logger.setReady(false);
 
       if (server) {
         //
-        PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
+        PreparedStatement stmt = null;
+        try {
+          stmt = conn.prepareStatement("drop table persons");
+          stmt.executeUpdate();
+        }
+        catch (Exception e) {
+
+        }
+
+        stmt = conn.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
         stmt.executeUpdate();
+
+        try {
+          stmt = conn.prepareStatement("drop table Persons2");
+          stmt.executeUpdate();
+        }
+        catch (Exception e) {
+
+        }
 
         stmt = conn.prepareStatement("create table Persons2 (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
         stmt.executeUpdate();
 
+        try {
+          stmt = conn.prepareStatement("drop index id2");
+          stmt.executeUpdate();
+        }
+        catch (Exception e) {
+
+        }
+
         stmt = conn.prepareStatement("create index id2 on persons(id2)");
         stmt.executeUpdate();
+
+        try {
+          stmt = conn.prepareStatement("drop table Employee");
+          stmt.executeUpdate();
+        }
+        catch (Exception e) {
+
+        }
 
         stmt = conn.prepareStatement("create table Employee (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20))");
         stmt.executeUpdate();
 
+        try {
+          stmt = conn.prepareStatement("drop index socialsecuritynumber");
+          stmt.executeUpdate();
+        }
+        catch (Exception e) {
+
+        }
+
         stmt = conn.prepareStatement("create index socialsecuritynumber on employee(socialsecurityNumber)");
         stmt.executeUpdate();
+
+        try {
+          stmt = conn.prepareStatement("drop table Residence");
+          stmt.executeUpdate();
+        }
+        catch (Exception e) {
+
+        }
 
         stmt = conn.prepareStatement("create table Residence (id BIGINT, id2 BIGINT, id3 BIGINT, address VARCHAR(20), PRIMARY KEY (id, id2, id3))");
         stmt.executeUpdate();
@@ -445,18 +505,19 @@ public class TestPerformance {
         //      long size = client.getPartitionSize("test", 0, "children", "_1_socialsecuritynumber");
         //      assertEquals(size, 10);
 
-        client.beginRebalance("test", "persons", "_1__primarykey");
+        if (client != null) {
+          client.beginRebalance("test", "persons", "_1__primarykey");
 
-
-        while (true) {
-          if (client.isRepartitioningComplete("test")) {
-            break;
+          while (true) {
+            if (client.isRepartitioningComplete("test")) {
+              break;
+            }
+            Thread.sleep(200);
           }
-          Thread.sleep(200);
-        }
 
-        for (DatabaseServer server : dbServers) {
-          server.shutdownRepartitioner();
+          for (DatabaseServer server : dbServers) {
+            server.shutdownRepartitioner();
+          }
         }
       }
     }
@@ -999,7 +1060,7 @@ public class TestPerformance {
     PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from persons where id<=25000");
     long begin = System.nanoTime();
     int count = 0;
-    for (int i = 0; i < outerFactor * 1020; i++) {
+    for (int i = 0; i < outerFactor * 10; i++) {
       ResultSet rs = stmt.executeQuery();
       assertTrue(rs.next());
       assertEquals(rs.getLong("maxValue"), 25_000L);
@@ -1222,6 +1283,84 @@ public class TestPerformance {
     }
     long end = System.nanoTime();
     registerResults("id secdonary", end-begin, count);
+    //assertTrue((end - begin) < (8000 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  public void testNot() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where not(id < 10000 and id > " + outerFactor * 500_000 + ")");
+    long begin = System.nanoTime();
+    int count = 0;
+    ResultSet rs = stmt.executeQuery();
+    for (int i = 10_000; i < outerFactor * 500_000; i++) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id"), i);
+      count++;
+    }
+    long end = System.nanoTime();
+    registerResults("not", end-begin, count);
+    //assertTrue((end - begin) < (8000 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  public void testFunctionAvg() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where avg(id, id2) > " + outerFactor * 500_000);
+    long begin = System.nanoTime();
+    int count = 0;
+    ResultSet rs = stmt.executeQuery();
+    for (int i = (int)outerFactor * 500_000 - 499; i < outerFactor * 500_000; i++) {
+      try {
+        assertTrue(rs.next(), String.valueOf(i));
+        assertEquals(rs.getLong("id"), i, String.valueOf(i));
+        count++;
+      }
+      catch (Exception e) {
+        e.printStackTrace();
+        throw e;
+      }
+    }
+    long end = System.nanoTime();
+    registerResults("function avg", end-begin, count);
+    //assertTrue((end - begin) < (8000 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  public void testFunctionCustom() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where custom('com.sonicbase.bench.CustomFunctions', 'min', id, id2) > " + 50_000);
+    long begin = System.nanoTime();
+    int count = 0;
+    ResultSet rs = stmt.executeQuery();
+    for (int i = 50_001; i < outerFactor * 500_000; i++) {
+      try {
+        assertTrue(rs.next(), String.valueOf(i));
+        assertEquals(rs.getLong("id"), (long)i, String.valueOf(i));
+        count++;
+      }
+      catch (Exception e) {
+        e.printStackTrace();
+        throw e;
+      }
+    }
+    long end = System.nanoTime();
+    registerResults("function custom min", end-begin, count);
+    //assertTrue((end - begin) < (8000 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  public void testFunctionMin() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where min(id, id2) > " + 50_000);
+    long begin = System.nanoTime();
+    int count = 0;
+    ResultSet rs = stmt.executeQuery();
+    for (int i = 50_001; i < outerFactor * 500_000; i++) {
+      try {
+        assertTrue(rs.next(), String.valueOf(i));
+        assertEquals(rs.getLong("id"), i, String.valueOf(i));
+        count++;
+      }
+      catch (Exception e) {
+        e.printStackTrace();
+        throw e;
+      }
+    }
+    long end = System.nanoTime();
+    registerResults("function min", end-begin, count);
     //assertTrue((end - begin) < (8000 * 1_000_000L), String.valueOf(end-begin));
   }
 

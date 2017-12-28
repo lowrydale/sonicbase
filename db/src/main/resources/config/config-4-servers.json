@@ -7,6 +7,7 @@
   "indexEntrySize" : 60,
   "maxJavaHeap": "50%",
   "maxProcessMemory": "90%",
+  "useUnsafe": true,
   "backup" : {
     "type" : "fileSystem",
     "directory": "$HOME/db/db-backup",

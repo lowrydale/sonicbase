@@ -228,7 +228,8 @@ public class ComObject {
     columns(160, arrayType),
     select(161, byteArrayType),
     alias(162, stringType),
-    function(163, stringType);
+    function(163, stringType),
+    isProbe(164, booleanType);
 
     public final int tag;
 

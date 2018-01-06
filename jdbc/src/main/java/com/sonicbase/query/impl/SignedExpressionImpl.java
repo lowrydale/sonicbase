@@ -110,7 +110,7 @@ public class SignedExpressionImpl extends ExpressionImpl {
   }
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain eplain, AtomicLong currOffset, Limit limit, Offset offset, boolean b) {
+  public NextReturn next(int count, SelectStatementImpl.Explain eplain, AtomicLong currOffset, Limit limit, Offset offset, boolean b, boolean analyze) {
     return null;
   }
 

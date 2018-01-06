@@ -2,13 +2,10 @@
 package com.sonicbase.query.impl;
 
 import com.sonicbase.common.Record;
-import com.sonicbase.jdbcdriver.Parameter;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.TableSchema;
-import net.sf.jsqlparser.expression.Expression;
-import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
 import net.sf.jsqlparser.statement.select.Limit;
 import net.sf.jsqlparser.statement.select.Offset;
 import org.apache.commons.codec.binary.Hex;
@@ -19,7 +16,6 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
-import java.sql.Types;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -933,7 +929,7 @@ public class FunctionImpl extends ExpressionImpl {
   }
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset, boolean evaluateExpression) {
+  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset, boolean evaluateExpression, boolean analyze) {
     return null;
   }
 

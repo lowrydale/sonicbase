@@ -81,20 +81,24 @@ public class ConstantImpl extends ExpressionImpl {
           value = Parameter.Clob.deserialize(in).getValue();
           break;
         case Types.VARCHAR:
+        case Types.CHAR:
           value = Parameter.String.deserialize(in).getValue();
           break;
         case Types.INTEGER:
+          value = Parameter.Int.deserialize(in).getValue();
+          break;
         case Types.NUMERIC:
         case Types.DECIMAL:
-          value = Parameter.Int.deserialize(in).getValue();
+          value = Parameter.BigDecimal.deserialize(in).getValue();
           break;
         case Types.BIGINT:
           value = Parameter.Long.deserialize(in).getValue();
           break;
         case Types.SMALLINT:
-        case Types.TINYINT:
-        case Types.CHAR:
           value = Parameter.Short.deserialize(in).getValue();
+          break;
+        case Types.TINYINT:
+          value = Parameter.Byte.deserialize(in).getValue();
           break;
         case Types.REAL:
         case Types.FLOAT:
@@ -161,20 +165,24 @@ public class ConstantImpl extends ExpressionImpl {
           new Parameter.Clob((byte[]) value).serialize(out, false);
           break;
         case Types.VARCHAR:
+        case Types.CHAR:
           new Parameter.String((byte[]) value).serialize(out, false);
           break;
         case Types.INTEGER:
+          new Parameter.Int((Integer) value).serialize(out, false);
+          break;
         case Types.NUMERIC:
         case Types.DECIMAL:
-          new Parameter.Int((Integer) value).serialize(out, false);
+          new Parameter.BigDecimal((BigDecimal)value).serialize(out, false);
           break;
         case Types.BIGINT:
           new Parameter.Long((Long) value).serialize(out, false);
           break;
         case Types.SMALLINT:
-        case Types.TINYINT:
-        case Types.CHAR:
           new Parameter.Short((Short) value).serialize(out, false);
+          break;
+        case Types.TINYINT:
+          new Parameter.Byte((Byte) value).serialize(out, false);
           break;
         case Types.REAL:
         case Types.FLOAT:
@@ -200,7 +208,7 @@ public class ConstantImpl extends ExpressionImpl {
   }
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset, boolean b) {
+  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset, boolean b, boolean analyze) {
     return null;
   }
 

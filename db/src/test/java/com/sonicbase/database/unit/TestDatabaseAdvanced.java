@@ -68,6 +68,7 @@ public class TestDatabaseAdvanced {
     array.add(DatabaseServer.FOUR_SERVER_LICENSE);
     config.put("licenseKeys", array);
 
+    //DatabaseServer.getAddressMap().clear();
     DatabaseClient.getServers().clear();
 
     dbServers = new DatabaseServer[4];
@@ -426,7 +427,7 @@ public class TestDatabaseAdvanced {
 
   @Test
   public void testIncompatibleTypes() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("select id, id5 from persons where id < 5.5 order by id asc");
+    PreparedStatement stmt = conn.prepareStatement("select id, id5 from persons where id < 5.4 order by id asc");
     ResultSet ret = stmt.executeQuery();
 
     assertTrue(ret.next());
@@ -443,6 +444,9 @@ public class TestDatabaseAdvanced {
     assertEquals(ret.getLong("id5"), 1);
     assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 4);
+    assertEquals(ret.getLong("id5"), 0);
+    assertTrue(ret.next());
+    assertEquals(ret.getLong("id"), 5);
     assertEquals(ret.getLong("id5"), 0);
     assertFalse(ret.next());
   }

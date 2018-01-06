@@ -41,16 +41,27 @@ public class Record {
 
   public void recoverFromSnapshot(String dbName, DatabaseCommon common, byte[] bytes, Set<Integer> columns, boolean readHeader) {
     try {
-      DataInputStream sin = new DataInputStream(new ByteArrayInputStream(bytes));
-      short serializationVersion = sin.readShort();
-      sequence0 = sin.readLong();
-      sequence1 = sin.readLong();
-      sequence2 = sin.readShort();
+      DataInputStream sin = new DataInputStream(new ByteArrayInputStream(bytes, !readHeader ? 26 : 0, !readHeader ? bytes.length - 26 : bytes.length));
+      if (!readHeader) {
+//        int toSkip = 8 + 8 + 2 * 4 + 2;
+//        while (true) {
+//          int skipped = sin.skipBytes(toSkip);
+//          toSkip -= skipped;
+//          if (toSkip == 0) {
+//            break;
+//          }
+//        }
+      }
+      else {
+        short serializationVersion = sin.readShort();
+        sequence0 = sin.readLong();
+        sequence1 = sin.readLong();
+        sequence2 = sin.readShort();
 
-      dbViewNumber = sin.readInt();
-      dbViewFlags = sin.readShort();
+        dbViewNumber = sin.readInt();
+        dbViewFlags = sin.readShort();
+      }
       transId = Varint.readSignedVarLong(sin);
-
       this.tableSchema = common.getTablesById(dbName).get((int) Varint.readSignedVarLong(sin));
 
       int len = (int)Varint.readSignedVarLong(sin);

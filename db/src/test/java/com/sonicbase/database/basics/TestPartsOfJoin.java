@@ -164,7 +164,7 @@ public class TestPartsOfJoin {
           client.getCommon(), client, 0, 1000, tableSchema.getName(), indexSchema.getName(), false, BinaryExpression.Operator.less,
           null, null, new Object[]{100L}, null, null, null, new Object[]{100L}, null, null, "id", 0, recordCache, usedIndex,
         false, client.getCommon().getSchemaVersion(), null, null, false,
-        new AtomicLong(), null, null);
+        new AtomicLong(), null, null, false);
 
     Object[][][] keys = ret.getCurrKeys();
     assertEquals(keys[0][0][0], 9L);

@@ -97,12 +97,16 @@ public class TestPerformance {
     methods.add("testId2");
     methods.add("testId2Range");
     methods.add("testOtherExpression");
+
+    methods.add("testRangeGreaterDescend");
     methods.add("testRange");
+    methods.add("testRangeLess");
+
     methods.add("testRangeOtherExpression");
     methods.add("testSecondary");
     methods.add("testUnion");
     methods.add("testUnionInMemory");
-    methods.add("testUnionAll");
+    methods.add("testUnionAll"); //
     methods.add("testIntersect");
     methods.add("testExcept");
     methods.add("testNot");
@@ -466,27 +470,9 @@ public class TestPerformance {
               PreparedStatement stmt = conn.prepareStatement("insert into employee (id, id2, socialSecurityNumber) VALUES (?, ?, ?)");
               for (int j = 0; j < 100; j++) {
                 stmt.setLong(1, offset);
-                String leading = "";
-                if (offset < 10) {
-                  leading = "00000";
-                }
-                else if (offset < 100) {
-                  leading = "0000";
-                }
-                else if (offset < 1000) {
-                  leading = "000";
-                }
-                else if (offset < 10000) {
-                  leading = "00";
-                }
-                else if (offset < 100_000) {
-                  leading = "0";
-                }
-                else if (offset < 1_000_000) {
-                  leading = "";
-                }
+                String leading = padNumericString(offset);
                 stmt.setLong(2, offset + 1000);
-                stmt.setString(3, leading + offset);
+                stmt.setString(3, leading);
                 if (offset++ % 1000 == 0) {
                   System.out.println("progress: count=" + offset);
                 }
@@ -527,35 +513,40 @@ public class TestPerformance {
     }
   }
 
+  private String padNumericString(int offset) {
+    String leading = "";
+    if (offset < 10) {
+      leading = "00000";
+    }
+    else if (offset < 100) {
+      leading = "0000";
+    }
+    else if (offset < 1000) {
+      leading = "000";
+    }
+    else if (offset < 10000) {
+      leading = "00";
+    }
+    else if (offset < 100_000) {
+      leading = "0";
+    }
+    else if (offset < 1_000_000) {
+      leading = "";
+    }
+    return leading + offset;
+  }
+
   private void insertPersons(String tableName, int currOffset) throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("insert into " + tableName  + " (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
     int offset = currOffset;
     for (int j = 0; j < 100; j++) {
       stmt.setLong(1, offset);
       stmt.setLong(2, offset + 1000);
-      String leading = "";
-      if (offset < 10) {
-        leading = "00000";
-      }
-      else if (offset < 100) {
-        leading = "0000";
-      }
-      else if (offset < 1000) {
-        leading = "000";
-      }
-      else if (offset < 10000) {
-        leading = "00";
-      }
-      else if (offset < 100_000) {
-        leading = "0";
-      }
-      else if (offset < 1_000_000) {
-        leading = "";
-      }
+      String leading = padNumericString(offset);
       if (offset == 99_999) {
         System.out.println("here");
       }
-      stmt.setString(3, leading + offset);
+      stmt.setString(3, leading);
       stmt.setString(4, "");//12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
       stmt.setBoolean(5, false);
       stmt.setString(6, "m");
@@ -616,13 +607,14 @@ public class TestPerformance {
       assertEquals(rs.getLong("id"), (long)i);
       count++;
     }
+    System.out.println("math - " + count);
     long end = System.nanoTime();
     registerResults("math", end-begin, count);
     //assertTrue((end - begin) < (5000 * 1_000_000L), String.valueOf(end-begin));
   }
 
   public void testIdNoKey() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("select * from employee where socialsecurityNumber='000009'");
+    PreparedStatement stmt = conn.prepareStatement("select * from employee where socialsecurityNumber='" + padNumericString(9 ) + "'");
     long begin = System.nanoTime();
     int count = 0;
     for (int i = 0; i < outerFactor * 10_000; i++) {
@@ -637,23 +629,13 @@ public class TestPerformance {
   }
 
   public void testRangeNoKey() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("select * from employee where socialsecurityNumber>='001000'");
+    PreparedStatement stmt = conn.prepareStatement("select * from employee where socialsecurityNumber>='" + padNumericString(1000) + "'");
     long begin = System.nanoTime();
     ResultSet rs = stmt.executeQuery();
     int count = 0;
     for (int i = 1_000; i < outerFactor * 500_000; i++) {
       assertTrue(rs.next());
-      String lead = "0";
-      if (i < 10_000) {
-        lead = "00";
-      }
-      else if (i < 100_000) {
-        lead = "0";
-      }
-      else if (i < 1_000_000) {
-        lead = "";
-      }
-      assertEquals(rs.getString("socialsecuritynumber"), lead + i);
+      assertEquals(rs.getString("socialsecuritynumber"), padNumericString(i));
       count++;
     }
     assertFalse(rs.next());
@@ -676,6 +658,7 @@ public class TestPerformance {
       count++;
     }
     assertFalse(rs.next());
+    System.out.println("range three key - " + count);
     long end = System.nanoTime();
     registerResults("range three key", end-begin, count);
     //assertTrue((end - begin) < (3200 * 1_000_000L), String.valueOf(end-begin));
@@ -695,6 +678,7 @@ public class TestPerformance {
       count++;
     }
     assertFalse(rs.next());
+    System.out.println("rnage secondary key backwards - " + count);
     long end = System.nanoTime();
     registerResults("range secondary key backwards", end-begin, count);
     //assertTrue((end - begin) < (3200 * 1_000_000L), String.valueOf(end-begin));
@@ -715,6 +699,7 @@ public class TestPerformance {
       count++;
     }
     assertFalse(rs.next());
+    System.out.println("range secondary key mixed - " + count);
     long end = System.nanoTime();
     registerResults("range secondary key mixed", end-begin, count);
     //assertTrue((end - begin) < (2500 * 1_000_000L), String.valueOf(end-begin));
@@ -741,20 +726,13 @@ public class TestPerformance {
 
 
   public void testNoKeyTwoKeyGreaterEqual() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("select * from employee where socialsecurityNumber>='001000' and socialsecurityNumber<'" + (int)(outerFactor * 95000) + "' order by socialsecuritynumber desc");
+    PreparedStatement stmt = conn.prepareStatement("select * from employee where socialsecurityNumber>='001000' and socialsecurityNumber<'" + padNumericString((int)(outerFactor * 95000)) + "' order by socialsecuritynumber desc");
     long begin = System.nanoTime();
     ResultSet rs = stmt.executeQuery();
     int count = 0;
     for (int i = (int) (outerFactor * 95_000) - 1; i >= 1_000; i--) {
       assertTrue(rs.next(), String.valueOf(i));
-      String leading = "";
-      if (i < 10_000) {
-        leading = "00";
-      }
-      else if (i < 100_000) {
-        leading = "0";
-      }
-      assertEquals(rs.getString("socialsecuritynumber"), leading + i);
+      assertEquals(rs.getString("socialsecuritynumber"), padNumericString(i));
       count++;
     }
     assertFalse(rs.next());
@@ -765,20 +743,13 @@ public class TestPerformance {
 
 
   public void testNoKeyTwoKeyGreater() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("select * from employee where socialsecurityNumber>'001000' and socialsecurityNumber<'" + (int)(outerFactor * 95000) + "' order by socialsecuritynumber desc");
+    PreparedStatement stmt = conn.prepareStatement("select * from employee where socialsecurityNumber>'001000' and socialsecurityNumber<'" + padNumericString((int)(outerFactor * 95000)) + "' order by socialsecuritynumber desc");
     long begin = System.nanoTime();
     ResultSet rs = stmt.executeQuery();
     int count = 0;
     for (int i = (int) (outerFactor * 95_000) - 1; i > 1_000; i--) {
       assertTrue(rs.next(), String.valueOf(i));
-      String leading = "";
-      if (i < 10_000) {
-        leading = "00";
-      }
-      else if (i < 100_000) {
-        leading = "0";
-      }
-      assertEquals(rs.getString("socialsecuritynumber"), leading + i);
+      assertEquals(rs.getString("socialsecuritynumber"), padNumericString(i));
       count++;
     }
     assertFalse(rs.next());
@@ -789,20 +760,15 @@ public class TestPerformance {
 
 
   public void testNoKeyTwoKeyGreaterLeftSided() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("select * from employee where socialsecurityNumber>'001000' and (socialsecurityNumber>'003000' and socialsecurityNumber<'" + (int)(outerFactor * 95000) + "') order by socialsecuritynumber desc");
+    PreparedStatement stmt = conn.prepareStatement("select * from employee where socialsecurityNumber>'" + padNumericString(1000) +
+        "' and (socialsecurityNumber>'" + padNumericString(3000) + "' and socialsecurityNumber<'" + padNumericString((int)(outerFactor * 95000)) +
+        "') order by socialsecuritynumber desc");
     long begin = System.nanoTime();
     ResultSet rs = stmt.executeQuery();
     int count = 0;
     for (int i = (int) (outerFactor * 95_000) - 1; i > 3_000; i--) {
       assertTrue(rs.next(), String.valueOf(i));
-      String leading = "";
-      if (i < 10_000) {
-        leading = "00";
-      }
-      else if (i < 100_000) {
-        leading = "0";
-      }
-      assertEquals(rs.getString("socialsecuritynumber"), leading + i);
+      assertEquals(rs.getString("socialsecuritynumber"), padNumericString(i));
       count++;
     }
     assertFalse(rs.next());
@@ -847,7 +813,8 @@ public class TestPerformance {
 
 
   public void notInTableScan() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("select * from persons where socialsecuritynumber not in ('000000') order by id2 asc");
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where socialsecuritynumber not in ('" +
+        padNumericString(0) + "') order by id2 asc");
     long begin = System.nanoTime();
     ResultSet rs = stmt.executeQuery();
     int count = 0;
@@ -898,35 +865,18 @@ public class TestPerformance {
 
 
   public void testTableScan() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("select * from persons where socialsecuritynumber>'000000'");
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where socialsecuritynumber>'" + padNumericString(0) + "'");
     long begin = System.nanoTime();
     ResultSet rs = stmt.executeQuery();
     int count = 0;
     for (int i = 1; i < outerFactor * 500_000; i++) {
       assertTrue(rs.next());
-      String leading = "";
-      if (i < 10) {
-        leading = "00000";
-      }
-      else if (i < 100) {
-        leading = "0000";
-      }
-      else if (i < 1000) {
-        leading = "000";
-      }
-      else if (i < 10000) {
-        leading = "00";
-      }
-      else if (i < 100_000) {
-        leading = "0";
-      }
-      else if (i < 1_000_000) {
-        leading = "";
-      }
-      assertEquals(rs.getString("socialsecuritynumber"), leading + i);
+      String leading = padNumericString(i);
+      assertEquals(rs.getString("socialsecuritynumber"), leading);
       count++;
     }
     assertFalse(rs.next());
+    System.out.println("table scan - " + count);
     long end = System.nanoTime();
     registerResults("table scan", end-begin, count);
     //assertTrue((end - begin) < (2500 * 1_000_000L), String.valueOf(end-begin));
@@ -940,7 +890,7 @@ public class TestPerformance {
     int count = 0;
     for (int i = 1000; i <= outerFactor * 95_000; i++) {
       assertTrue(rs.next());
-      assertEquals(rs.getLong("id"), (long)i);
+       assertEquals(rs.getLong("id"), (long)i);
       count++;
     }
     assertFalse(rs.next());
@@ -957,11 +907,12 @@ public class TestPerformance {
     ResultSet rs = stmt.executeQuery();
     int count = 0;
     for (int i = 3501; i < (int)(outerFactor * 94_751); i++) {
-      assertTrue(rs.next(), String.valueOf(i));
+      assertTrue(rs.next());
       assertEquals(rs.getLong("id"), (long)i);
       count++;
     }
     assertFalse(rs.next());
+    System.out.println("range two key right sided - " + count);
     long end = System.nanoTime();
     registerResults("range two key right sided", end-begin, count);
     //assertTrue((end - begin) < (1200 * 1_000_000L), String.valueOf(end-begin));
@@ -1119,26 +1070,8 @@ public class TestPerformance {
     int count = 0;
     for (int i = (int) (outerFactor * 500_000) - 1; i >=  1000; i--) {
       assertTrue(rs.next());
-      String leading = "";
-      if (i < 10) {
-        leading = "00000";
-      }
-      else if (i < 100) {
-        leading = "0000";
-      }
-      else if (i < 1000) {
-        leading = "000";
-      }
-      else if (i < 10000) {
-        leading = "00";
-      }
-      else if (i < 100_000) {
-        leading = "0";
-      }
-      else if (i < 1_000_000) {
-        leading = "";
-      }
-      assertEquals(rs.getString("socialsecuritynumber"), leading + i);
+      String leading = padNumericString(i);
+      assertEquals(rs.getString("socialsecuritynumber"), leading);
       count++;
     }
     long end = System.nanoTime();
@@ -1153,27 +1086,9 @@ public class TestPerformance {
     ResultSet rs = stmt.executeQuery();
     int count = 0;
     for (int i = (int) (outerFactor * 500_000) - 1; i >= 1000; i--) {
-      assertTrue(rs.next());
-      String leading = "";
-      if (i < 10) {
-        leading = "00000";
-      }
-      else if (i < 100) {
-        leading = "0000";
-      }
-      else if (i < 1000) {
-        leading = "000";
-      }
-      else if (i < 10000) {
-        leading = "00";
-      }
-      else if (i < 100_000) {
-        leading = "0";
-      }
-      else if (i < 1_000_000) {
-        leading = "";
-      }
-      assertEquals(rs.getString("socialsecuritynumber"), leading + i);
+      assertTrue(rs.next(), String.valueOf(i));
+      String leading = padNumericString(i);
+      assertEquals(rs.getString("socialsecuritynumber"), leading);
       count++;
     }
     long end = System.nanoTime();
@@ -1232,22 +1147,118 @@ public class TestPerformance {
 
 
   public void testRange() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("select * from persons where id>1000");
-    long begin = System.nanoTime();
-    ResultSet rs = stmt.executeQuery();
-    int count = 0;
-    for (int i = 1001; i < outerFactor * 500_000; i++) {
-      assertTrue(rs.next());
-      assertEquals(rs.getLong("id"), (long)i);
-      assertEquals(rs.getLong("id2"), i + 1000L);
-      count++;
+    for (int j = 0; j < 10; j++) {
+      int max = 0;
+      PreparedStatement stmt = conn.prepareStatement("select * from persons where id>=100");
+      ResultSet rs = stmt.executeQuery();
+      for (int i = 100; i < outerFactor * 500_000; i++) {
+        assertTrue(rs.next());
+        assertEquals(rs.getLong("id"), (long) i);
+        //assertEquals(rs.getLong("id2"), i + 1000L);
+        max++;
+      }
+      System.out.println("max=" + max);
+      assertFalse(rs.next());
     }
-    assertFalse(rs.next());
+    int count = 0;
+    long begin = System.nanoTime();
+    for (int j = 0; j < 10; j++) {
+      int max = 0;
+      PreparedStatement stmt = conn.prepareStatement("select * from persons where id>=100");
+      ResultSet rs = stmt.executeQuery();
+      for (int i = 100; i < outerFactor * 500_000; i++) {
+        assertTrue(rs.next());
+        assertEquals(rs.getLong("id"), (long) i);
+        //assertEquals(rs.getLong("id2"), i + 1000L);
+        count++;
+        max++;
+      }
+      System.out.println("max=" + max);
+      assertFalse(rs.next());
+    }
     long end = System.nanoTime();
     registerResults("range", end-begin, count);
     //assertTrue((end - begin) < (1800 * 1_000_000L), String.valueOf(end-begin));
   }
 
+  public void testRangeGreaterDescend() throws SQLException {
+    for (int j = 0; j < 10; j++) {
+      int max = 0;
+      PreparedStatement stmt = conn.prepareStatement("select * from persons where id>=100 order by id desc");
+      ResultSet rs = stmt.executeQuery();
+      for (int i = (int)(outerFactor * 500_000) - 1; i >= 100; i--) {
+        try {
+          if (i == 100 || i == 101) {
+            System.out.println("i=100");
+          }
+          assertTrue(rs.next());
+          assertEquals(rs.getLong("id"), (long) i);
+          //assertEquals(rs.getLong("id2"), i + 1000L);
+          max++;
+        }
+        catch (Exception e) {
+          System.out.println("i=" + i);
+          throw new DatabaseException(e);
+        }
+      }
+      System.out.println("max=" + max);
+      assertFalse(rs.next());
+    }
+    int count = 0;
+    long begin = System.nanoTime();
+    for (int j = 0; j < 10; j++) {
+      int max = 0;
+      PreparedStatement stmt = conn.prepareStatement("select * from persons where id>=100 order by id desc");
+      ResultSet rs = stmt.executeQuery();
+      for (int i = (int)(outerFactor * 500_000) - 1; i >= 100; i--) {
+        assertTrue(rs.next());
+        assertEquals(rs.getLong("id"), (long) i);
+        //assertEquals(rs.getLong("id2"), i + 1000L);
+        count++;
+        max++;
+      }
+      System.out.println("max=" + max);
+      assertFalse(rs.next());
+    }
+    long end = System.nanoTime();
+    registerResults("range greater descend", end-begin, count);
+    //assertTrue((end - begin) < (1800 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  public void testRangeLess() throws SQLException {
+    for (int j = 0; j < 10; j++) {
+      int max = 0;
+      PreparedStatement stmt = conn.prepareStatement("select * from persons where id< " + (int)(outerFactor * 490_000));
+      ResultSet rs = stmt.executeQuery();
+      for (int i = 0; i < outerFactor * 490_000; i++) {
+        assertTrue(rs.next());
+        assertEquals(rs.getLong("id"), (long) i);
+        //assertEquals(rs.getLong("id2"), i + 1000L);
+        max++;
+      }
+      System.out.println("max=" + max);
+      assertFalse(rs.next());
+    }
+    int count = 0;
+    long begin = System.nanoTime();
+    for (int j = 0; j < 10; j++) {
+      int max = 0;
+      PreparedStatement stmt = conn.prepareStatement("select * from persons where id< " + (int)(outerFactor * 490_000));
+      ResultSet rs = stmt.executeQuery();
+      for (int i = 0; i < outerFactor * 490_000; i++) {
+        assertTrue(rs.next());
+        assertEquals(rs.getLong("id"), (long) i);
+        //assertEquals(rs.getLong("id2"), i + 1000L);
+        count++;
+        max++;
+      }
+      System.out.println("max=" + max);
+      assertFalse(rs.next());
+    }
+    long end = System.nanoTime();
+    registerResults("range less", end-begin, count);
+    //assertTrue((end - begin) < (1800 * 1_000_000L), String.valueOf(end-begin));
+  }
 
   public void testRangeOtherExpression() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id>1000 and id2 < " + (int)(outerFactor * 500000) + " and id2 > 1000");
@@ -1287,13 +1298,13 @@ public class TestPerformance {
   }
 
   public void testNot() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("select * from persons where not(id < 10000 and id > " + outerFactor * 500_000 + ")");
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where not(id > 100000 and id <= " + outerFactor * 500_000 + ")");
     long begin = System.nanoTime();
     int count = 0;
     ResultSet rs = stmt.executeQuery();
-    for (int i = 10_000; i < outerFactor * 500_000; i++) {
+    for (int i = 0; i <= outerFactor * 100_000; i++) {
       assertTrue(rs.next());
-      assertEquals(rs.getLong("id"), i);
+      assertEquals(rs.getLong("id"), (long)i);
       count++;
     }
     long end = System.nanoTime();
@@ -1302,14 +1313,14 @@ public class TestPerformance {
   }
 
   public void testFunctionAvg() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("select * from persons where avg(id, id2) > " + outerFactor * 500_000);
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where avg(id, id2) > " + outerFactor * 250_000);
     long begin = System.nanoTime();
     int count = 0;
     ResultSet rs = stmt.executeQuery();
-    for (int i = (int)outerFactor * 500_000 - 499; i < outerFactor * 500_000; i++) {
+    for (int i = (int)(outerFactor * 250_000) - 499; i < outerFactor * 500_000; i++) {
       try {
         assertTrue(rs.next(), String.valueOf(i));
-        assertEquals(rs.getLong("id"), i, String.valueOf(i));
+        assertEquals(rs.getLong("id"), (long)i, String.valueOf(i));
         count++;
       }
       catch (Exception e) {
@@ -1351,7 +1362,7 @@ public class TestPerformance {
     for (int i = 50_001; i < outerFactor * 500_000; i++) {
       try {
         assertTrue(rs.next(), String.valueOf(i));
-        assertEquals(rs.getLong("id"), i, String.valueOf(i));
+        assertEquals(rs.getLong("id"), (long)i, String.valueOf(i));
         count++;
       }
       catch (Exception e) {
@@ -1414,7 +1425,7 @@ public class TestPerformance {
     ResultSet rs = stmt.executeQuery();
     for (int i = 1001; i < outerFactor * 500_000; i++) {
       assertTrue(rs.next());
-      assertEquals(rs.getLong("id"), (long)i);
+       assertEquals(rs.getLong("id"), (long)i);
       count++;
     }
     long end = System.nanoTime();

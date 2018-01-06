@@ -527,13 +527,147 @@ public class DataType {
         long l2 = (Long) o2;
         return l1 < l2 ? -1 : l1 > l2 ? 1 : 0;
       }
-      if (o1 == null || o2 == null) {
-        return 0;
+      Integer ret = compareNumerics(o1, o2);
+      if (ret == null) {
+        long lhs = (long) longConverter.convert(o1);
+        long rhs = (long) longConverter.convert(o2);
+        return Long.compare(lhs, rhs);
       }
-      Long lhs = (Long) longConverter.convert(o1);
-      Long rhs = (Long) longConverter.convert(o2);
-      return lhs.compareTo(rhs);
+      return ret;
     }
+  }
+
+  private static Integer compareNumerics(Object o1, Object o2) {
+    if (o1 == null || o2 == null) {
+      return 0;
+    }
+    if (o1 instanceof Double) {
+      Double lhs = (Double) o1;
+      if (o2 instanceof Double) {
+        return lhs < (Double) o2 ? -1 : lhs > (Double) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Float) {
+        return lhs < (Float) o2 ? -1 : lhs > (Float) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Short) {
+        return lhs < (Short) o2 ? -1 : lhs > (Short) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Byte) {
+        return lhs < (Byte) o2 ? -1 : lhs > (Byte) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Integer) {
+        return lhs < (Integer) o2 ? -1 : lhs > (Integer) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Long) {
+        return lhs < (Long) o2 ? -1 : lhs > (Long) o2 ? 1 : 0;
+      }
+    }
+    if (o1 instanceof Float) {
+      Float lhs = (Float) o1;
+      if (o2 instanceof Double) {
+        return lhs < (Double) o2 ? -1 : lhs > (Double) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Float) {
+        return lhs < (Float) o2 ? -1 : lhs > (Float) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Short) {
+        return lhs < (Short) o2 ? -1 : lhs > (Short) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Byte) {
+        return lhs < (Byte) o2 ? -1 : lhs > (Byte) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Long) {
+        return lhs < (Long) o2 ? -1 : lhs > (Long) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Integer) {
+        return lhs < (Integer) o2 ? -1 : lhs > (Integer) o2 ? 1 : 0;
+      }
+    }
+    if (o1 instanceof Short) {
+      Short lhs = (Short) o1;
+      if (o2 instanceof Double) {
+        return lhs < (Double) o2 ? -1 : lhs > (Double) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Float) {
+        return lhs < (Float) o2 ? -1 : lhs > (Float) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Short) {
+        return lhs < (Short) o2 ? -1 : lhs > (Short) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Byte) {
+        return lhs < (Byte) o2 ? -1 : lhs > (Byte) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Long) {
+        return lhs < (Long) o2 ? -1 : lhs > (Long) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Integer) {
+        return lhs < (Integer) o2 ? -1 : lhs > (Integer) o2 ? 1 : 0;
+      }
+    }
+    if (o1 instanceof Byte) {
+      Byte lhs = (Byte) o1;
+      if (o2 instanceof Double) {
+        return lhs < (Double) o2 ? -1 : lhs > (Double) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Float) {
+        return lhs < (Float) o2 ? -1 : lhs > (Float) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Short) {
+        return lhs < (Short) o2 ? -1 : lhs > (Short) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Byte) {
+        return lhs < (Byte) o2 ? -1 : lhs > (Byte) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Long) {
+        return lhs < (Long) o2 ? -1 : lhs > (Long) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Integer) {
+        return lhs < (Integer) o2 ? -1 : lhs > (Integer) o2 ? 1 : 0;
+      }
+    }
+    if (o1 instanceof Integer) {
+      Integer lhs = (Integer) o1;
+      if (o2 instanceof Double) {
+        return lhs < (Double) o2 ? -1 : lhs > (Double) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Float) {
+        return lhs < (Float) o2 ? -1 : lhs > (Float) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Short) {
+        return lhs < (Short) o2 ? -1 : lhs > (Short) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Byte) {
+        return lhs < (Byte) o2 ? -1 : lhs > (Byte) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Long) {
+        return lhs < (Long) o2 ? -1 : lhs > (Long) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Integer) {
+        return lhs < (Integer) o2 ? -1 : lhs > (Integer) o2 ? 1 : 0;
+      }
+    }
+    if (o1 instanceof Long) {
+      Long lhs = (Long) o1;
+      if (o2 instanceof Double) {
+        return lhs < (Double) o2 ? -1 : lhs > (Double) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Float) {
+        return lhs < (Float) o2 ? -1 : lhs > (Float) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Short) {
+        return lhs < (Short) o2 ? -1 : lhs > (Short) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Byte) {
+        return lhs < (Byte) o2 ? -1 : lhs > (Byte) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Long) {
+        return lhs < (Long) o2 ? -1 : lhs > (Long) o2 ? 1 : 0;
+      }
+      if (o2 instanceof Integer) {
+        return lhs < (Integer) o2 ? -1 : lhs > (Integer) o2 ? 1 : 0;
+      }
+    }
+    return null;
   }
 
   private static Comparator longComparator = new LongComparator();
@@ -548,9 +682,13 @@ public class DataType {
       if (o1 == null || o2 == null) {
         return 0;
       }
-      Integer lhs = (Integer) intConverter.convert(o1);
-      Integer rhs = (Integer) intConverter.convert(o2);
-      return lhs.compareTo(rhs);
+      Integer ret = compareNumerics(o1, o2);
+      if (ret == null) {
+        Integer lhs = (Integer) intConverter.convert(o1);
+        Integer rhs = (Integer) intConverter.convert(o2);
+        return lhs.compareTo(rhs);
+      }
+      return ret;
     }
   };
 
@@ -564,9 +702,13 @@ public class DataType {
       if (o1 == null || o2 == null) {
         return 0;
       }
-      Double lhs = (Double) doubleConverter.convert(o1);
-      Double rhs = (Double) doubleConverter.convert(o2);
-      return lhs.compareTo(rhs);
+      Integer ret = compareNumerics(o1, o2);
+      if (ret == null) {
+        Double lhs = (Double) doubleConverter.convert(o1);
+        Double rhs = (Double) doubleConverter.convert(o2);
+        return lhs.compareTo(rhs);
+      }
+      return ret;
     }
   };
 
@@ -580,9 +722,13 @@ public class DataType {
       if (o1 == null || o2 == null) {
         return 0;
       }
-      Float lhs = (Float) floatConverter.convert(o1);
-      Float rhs = (Float) floatConverter.convert(o2);
-      return lhs.compareTo(rhs);
+      Integer ret = compareNumerics(o1, o2);
+      if (ret == null) {
+        Float lhs = (Float) floatConverter.convert(o1);
+        Float rhs = (Float) floatConverter.convert(o2);
+        return lhs.compareTo(rhs);
+      }
+      return ret;
     }
   };
 
@@ -641,9 +787,13 @@ public class DataType {
       if (o1 == null || o2 == null) {
         return 0;
       }
-      Byte lhs = (Byte) byteConverter.convert(o1);
-      Byte rhs = (Byte) byteConverter.convert(o2);
-      return lhs.compareTo(rhs);
+      Integer ret = compareNumerics(o1, o2);
+      if (ret == null) {
+        Byte lhs = (Byte) byteConverter.convert(o1);
+        Byte rhs = (Byte) byteConverter.convert(o2);
+        return lhs.compareTo(rhs);
+      }
+      return ret;
     }
   };
 
@@ -657,9 +807,13 @@ public class DataType {
       if (o1 == null || o2 == null) {
         return 0;
       }
-      Short lhs = (Short) shortConverter.convert(o1);
-      Short rhs = (Short) shortConverter.convert(o2);
-      return lhs.compareTo(rhs);
+      Integer ret = compareNumerics(o1, o2);
+      if (ret == null) {
+        Short lhs = (Short) shortConverter.convert(o1);
+        Short rhs = (Short) shortConverter.convert(o2);
+        return lhs.compareTo(rhs);
+      }
+      return ret;
     }
   };
 
@@ -946,6 +1100,49 @@ public class DataType {
         return byteArrayComparator;
       }
       return null;
+    }
+
+    public static int getTypeForValue(Object lhsValue) {
+      if (lhsValue instanceof String) {
+        return LONGVARCHAR.getValue();
+      }
+      else if (lhsValue instanceof byte[]) {
+        return LONGVARCHAR.getValue();
+      }
+      if (lhsValue instanceof Long) {
+        return BIGINT.getValue();
+      }
+      if (lhsValue instanceof Integer) {
+        return INTEGER.getValue();
+      }
+      if (lhsValue instanceof Short) {
+        return SMALLINT.getValue();
+      }
+      if (lhsValue instanceof Byte) {
+        return TINYINT.getValue();
+      }
+      if (lhsValue instanceof Double) {
+        return DOUBLE.getValue();
+      }
+      if (lhsValue instanceof Float) {
+        return FLOAT.getValue();
+      }
+      if (lhsValue instanceof Date) {
+        return DATE.getValue();
+      }
+      if (lhsValue instanceof Time) {
+        return TIME.getValue();
+      }
+      if (lhsValue instanceof Timestamp) {
+        return TIMESTAMP.getValue();
+      }
+      if (lhsValue instanceof Boolean) {
+        return BIT.getValue();
+      }
+      if (lhsValue instanceof BigDecimal) {
+        return DECIMAL.getValue();
+      }
+      return -1;
     }
 
     public Object getInitialValue() {

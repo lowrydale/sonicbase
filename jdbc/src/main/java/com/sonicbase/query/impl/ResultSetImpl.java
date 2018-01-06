@@ -4,12 +4,14 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 
 import com.sonicbase.jdbcdriver.ParameterHandler;
+import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.ResultSet;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.LongValue;
 import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
@@ -24,6 +26,10 @@ import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Responsible for
@@ -113,7 +119,7 @@ public class ResultSetImpl implements ResultSet {
           for (int i = 0; i < values.length; i++) {
             String groupColumnName = ((Column) groupByColumns.get(i)).getColumnName();
             String[] actualColumn = getActualColumn(groupColumnName);
-            values[i] = getField(actualColumn);
+            values[i] = getField(actualColumn, columnLabel);
             if (values[i] == null) {
               isNull = true;
             }
@@ -468,7 +474,7 @@ public class ResultSetImpl implements ResultSet {
         comparators[i] = type.getComparator();
 
         actualColumns[i] = getActualColumn(column);
-        lastFields[i] = getField(actualColumns[i]);
+        lastFields[i] = getField(actualColumns[i], column);
       }
       outer:
       while (true) {
@@ -507,7 +513,7 @@ public class ResultSetImpl implements ResultSet {
           if (lastFields[i] == null) {
             return false;
           }
-          Object field = getField(actualColumns[i]);
+          Object field = getField(actualColumns[i], actualColumns[i][1]);
           if (nonNull && 0 != comparators[i].compare(field, lastFields[i]) && field != null && lastFields[i] != null) {
             currPos--;
             break outer;
@@ -677,7 +683,7 @@ public class ResultSetImpl implements ResultSet {
 
   }
 
-  private Object getField(String[] label) {
+  private Object getField(String[] label, String columnLabel) {
     label[1] = DatabaseClient.toLower(label[1]);
     if (label[0] != null) {
       label[0] = DatabaseClient.toLower(label[0]);
@@ -700,6 +706,11 @@ public class ResultSetImpl implements ResultSet {
             if (readRecords[currPos][i] == null) {
               return null;
             }
+            FieldInfo fieldInfo = new FieldInfo();
+            fieldInfo.labelName = label[1];
+            fieldInfo.tableOffset = i;
+            fieldInfo.fieldOffset = offset;
+            fieldInfos.put(columnLabel, fieldInfo);
             return readRecords[currPos][i].getRecord().getFields()[offset];
           }
         }
@@ -721,6 +732,11 @@ public class ResultSetImpl implements ResultSet {
         if (readRecords[currPos][i] == null) {
           continue;
         }
+        FieldInfo fieldInfo = new FieldInfo();
+        fieldInfo.labelName = label[1];
+        fieldInfo.tableOffset = i;
+        fieldInfo.fieldOffset = offset;
+        fieldInfos.put(columnLabel, fieldInfo);
         return readRecords[currPos][i].getRecord().getFields()[offset];
       }
     }
@@ -747,7 +763,7 @@ public class ResultSetImpl implements ResultSet {
     else {
       actualColumn = getActualColumn(columnLabel);
     }
-    Object ret = getField(actualColumn);
+    Object ret = getField(actualColumn, columnLabel);
 
     String retString = getString(ret);
 
@@ -847,8 +863,17 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public Boolean getBoolean(String columnLabel) {
+    FieldInfo fieldInfo = fieldInfos.get(columnLabel);
+    if (canShortCircuitFieldLookup(fieldInfo)) {
+      ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
+      if (ret != null) {
+        Object obj = ret.getRecord().getFields()[fieldInfo.fieldOffset];
+        return getBoolean(obj);
+      }
+    }
+
     String[] actualColumn = getActualColumn(columnLabel);
-    Object ret = getField(actualColumn);
+    Object ret = getField(actualColumn, columnLabel);
 
     return getBoolean(ret);
   }
@@ -885,6 +910,15 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public Byte getByte(String columnLabel) {
+    FieldInfo fieldInfo = fieldInfos.get(columnLabel);
+    if (canShortCircuitFieldLookup(fieldInfo)) {
+      ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
+      if (ret != null) {
+        Object obj = ret.getRecord().getFields()[fieldInfo.fieldOffset];
+        return getByte(obj, fieldInfo.function == null ? null : fieldInfo.function.getName());
+      }
+    }
+
     String[] actualColumn = null;
     SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
     if (function != null) {
@@ -898,7 +932,12 @@ public class ResultSetImpl implements ResultSet {
     else {
       actualColumn = getActualColumn(columnLabel);
     }
-    Object ret = getField(actualColumn);
+    Object ret = getField(actualColumn, columnLabel);
+
+    fieldInfo = fieldInfos.get(columnLabel);
+    if (fieldInfo != null) {
+      fieldInfo.function = function;
+    }
 
     return getByte(ret, function == null ? null : function.getName());
   }
@@ -937,6 +976,19 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public Short getShort(String columnLabel) {
+    FieldInfo fieldInfo = fieldInfos.get(columnLabel);
+    if (canShortCircuitFieldLookup(fieldInfo)) {
+      ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
+      if (ret != null) {
+        Object obj = ret.getRecord().getFields()[fieldInfo.fieldOffset];
+        Short retString1 = getShort(obj, fieldInfo.function == null ? null : fieldInfo.function.getName());
+        if (retString1 != null) {
+          return retString1;
+        }
+        return (Short) obj;
+      }
+    }
+
     String[] actualColumn = null;
     SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
     if (function != null) {
@@ -951,7 +1003,12 @@ public class ResultSetImpl implements ResultSet {
       actualColumn = getActualColumn(columnLabel);
     }
 
-    Object ret = getField(actualColumn);
+    Object ret = getField(actualColumn, columnLabel);
+
+    fieldInfo = fieldInfos.get(columnLabel);
+    if (fieldInfo != null) {
+      fieldInfo.function = function;
+    }
 
     Short retString1 = getShort(ret, function == null ? null : function.getName());
     if (retString1 != null) {
@@ -994,6 +1051,15 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public Integer getInt(String columnLabel) {
+    FieldInfo fieldInfo = fieldInfos.get(columnLabel);
+    if (canShortCircuitFieldLookup(fieldInfo)) {
+      ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
+      if (ret != null) {
+        Object obj = ret.getRecord().getFields()[fieldInfo.fieldOffset];
+        return getInt(obj, fieldInfo.function);
+      }
+    }
+
     if (isMatchingAlias(columnLabel) && isCount) {
       return (int) count;
     }
@@ -1016,7 +1082,12 @@ public class ResultSetImpl implements ResultSet {
       actualColumn = getActualColumn(columnLabel);
     }
 
-    Object retObj = getField(actualColumn);
+    Object retObj = getField(actualColumn, columnLabel);
+
+    fieldInfo = fieldInfos.get(columnLabel);
+    if (fieldInfo != null) {
+      fieldInfo.function = function;
+    }
 
     return getInt(retObj, function);
   }
@@ -1076,7 +1147,31 @@ public class ResultSetImpl implements ResultSet {
     return null;
   }
 
+  private class FieldInfo {
+    private String labelName;
+    private int tableOffset;
+    private int fieldOffset;
+    private SelectFunctionImpl function;
+  }
+
+  private Object2ObjectOpenHashMap<String, FieldInfo> fieldInfos = new Object2ObjectOpenHashMap<>();
+
+  private boolean canShortCircuitFieldLookup(FieldInfo fieldInfo) {
+    if (fieldInfo != null && currPos >= 0 && !isCount && groupByContext == null && !functionAliases.containsKey(fieldInfo.labelName)) {
+      return true;
+    }
+    return false;
+  }
+
   public Long getLong(String columnLabel) {
+    FieldInfo fieldInfo = fieldInfos.get(columnLabel);
+    if (canShortCircuitFieldLookup(fieldInfo)) {
+      ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
+      if (ret != null) {
+        Object obj = ret.getRecord().getFields()[fieldInfo.fieldOffset];
+        return getLong(obj, fieldInfo.function);
+      }
+    }
     if (isMatchingAlias(columnLabel) && isCount) {
       SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
       if (function == null) {
@@ -1084,7 +1179,7 @@ public class ResultSetImpl implements ResultSet {
       }
 
       String[] actualColumn = getActualColumn("__all__");
-      Object ret = getField(actualColumn);
+      Object ret = getField(actualColumn, columnLabel);
       return getLong(ret, function);
     }
     Long ret = (Long) getGroupByFunctionResults(columnLabel, DataType.Type.BIGINT);
@@ -1105,7 +1200,12 @@ public class ResultSetImpl implements ResultSet {
     else {
       actualColumn = getActualColumn(columnLabel);
     }
-    Object retObj = getField(actualColumn);
+    Object retObj = getField(actualColumn, columnLabel);
+
+    fieldInfo = fieldInfos.get(columnLabel);
+    if (fieldInfo != null) {
+      fieldInfo.function = function;
+    }
 
     return getLong(retObj, function);
   }
@@ -1231,6 +1331,15 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public Float getFloat(String columnLabel) {
+    FieldInfo fieldInfo = fieldInfos.get(columnLabel);
+    if (canShortCircuitFieldLookup(fieldInfo)) {
+      ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
+      if (ret != null) {
+        Object obj = ret.getRecord().getFields()[fieldInfo.fieldOffset];
+        return getFloat(obj, fieldInfo.function);
+      }
+    }
+
     if (isMatchingAlias(columnLabel) && isCount) {
       return (float)count;
     }
@@ -1254,7 +1363,12 @@ public class ResultSetImpl implements ResultSet {
       actualColumn = getActualColumn(columnLabel);
     }
 
-    Object retObj = getField(actualColumn);
+    Object retObj = getField(actualColumn, columnLabel);
+
+    fieldInfo = fieldInfos.get(columnLabel);
+    if (fieldInfo != null) {
+      fieldInfo.function = function;
+    }
 
     return getFloat(retObj, function);
   }
@@ -1313,6 +1427,15 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public Double getDouble(String columnLabel) {
+    FieldInfo fieldInfo = fieldInfos.get(columnLabel);
+    if (canShortCircuitFieldLookup(fieldInfo)) {
+      ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
+      if (ret != null) {
+        Object obj = ret.getRecord().getFields()[fieldInfo.fieldOffset];
+        return getDouble(obj, fieldInfo.function);
+      }
+    }
+
     if (isMatchingAlias(columnLabel) && isCount) {
       return (double)count;
     }
@@ -1336,7 +1459,12 @@ public class ResultSetImpl implements ResultSet {
       actualColumn = getActualColumn(columnLabel);
     }
 
-    Object retObj = getField(actualColumn);
+    Object retObj = getField(actualColumn, columnLabel);
+
+    fieldInfo = fieldInfos.get(columnLabel);
+    if (fieldInfo != null) {
+      fieldInfo.function = function;
+    }
 
     return getDouble(retObj, function);
   }
@@ -1395,8 +1523,17 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public BigDecimal getBigDecimal(String columnLabel, int scale) {
+    FieldInfo fieldInfo = fieldInfos.get(columnLabel);
+    if (canShortCircuitFieldLookup(fieldInfo)) {
+      ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
+      if (ret != null) {
+        Object obj = ret.getRecord().getFields()[fieldInfo.fieldOffset];
+        return getBigDecimal(obj, scale);
+      }
+    }
+
     String[] actualColumn = getActualColumn(columnLabel);
-    Object ret = getField(actualColumn);
+    Object ret = getField(actualColumn, columnLabel);
 
     return getBigDecimal(ret, scale);
   }
@@ -1421,8 +1558,21 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public byte[] getBytes(String columnLabel) {
+    FieldInfo fieldInfo = fieldInfos.get(columnLabel);
+    if (canShortCircuitFieldLookup(fieldInfo)) {
+      ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
+      if (ret != null) {
+        Object obj = ret.getRecord().getFields()[fieldInfo.fieldOffset];
+        if (obj instanceof Blob) {
+          return ((Blob) obj).getData();
+        }
+        return (byte[]) obj;
+      }
+    }
+
+
     String[] actualColumn = getActualColumn(columnLabel);
-    Object ret = getField(actualColumn);
+    Object ret = getField(actualColumn, columnLabel);
     if (ret instanceof Blob) {
       return ((Blob) ret).getData();
     }
@@ -1430,33 +1580,94 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public Date getDate(String columnLabel) {
+    FieldInfo fieldInfo = fieldInfos.get(columnLabel);
+    if (canShortCircuitFieldLookup(fieldInfo)) {
+      ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
+      if (ret != null) {
+        Object obj = ret.getRecord().getFields()[fieldInfo.fieldOffset];
+        return (Date)obj;
+      }
+    }
+
     String[] actualColumn = getActualColumn(columnLabel);
-    return (Date) getField(actualColumn);
+    return (Date) getField(actualColumn, columnLabel);
   }
 
   public Time getTime(String columnLabel) {
+    FieldInfo fieldInfo = fieldInfos.get(columnLabel);
+    if (canShortCircuitFieldLookup(fieldInfo)) {
+      ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
+      if (ret != null) {
+        Object obj = ret.getRecord().getFields()[fieldInfo.fieldOffset];
+        return (Time)obj;
+      }
+    }
+
     String[] actualColumn = getActualColumn(columnLabel);
-    return (Time) getField(actualColumn);
+    return (Time) getField(actualColumn, columnLabel);
   }
 
   public Timestamp getTimestamp(String columnLabel) {
+    FieldInfo fieldInfo = fieldInfos.get(columnLabel);
+    if (canShortCircuitFieldLookup(fieldInfo)) {
+      ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
+      if (ret != null) {
+        Object obj = ret.getRecord().getFields()[fieldInfo.fieldOffset];
+        return (Timestamp)obj;
+      }
+    }
+
     String[] actualColumn = getActualColumn(columnLabel);
-    return (Timestamp) getField(actualColumn);
+    return (Timestamp) getField(actualColumn, columnLabel);
   }
 
   public InputStream getAsciiStream(String columnLabel) {
+    FieldInfo fieldInfo = fieldInfos.get(columnLabel);
+    if (canShortCircuitFieldLookup(fieldInfo)) {
+      ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
+      if (ret != null) {
+        Object obj = ret.getRecord().getFields()[fieldInfo.fieldOffset];
+        return (InputStream)obj;
+      }
+    }
+
     String[] actualColumn = getActualColumn(columnLabel);
-    return (InputStream) getField(actualColumn);
+    return (InputStream) getField(actualColumn, columnLabel);
   }
 
   public InputStream getUnicodeStream(String columnLabel) {
+    FieldInfo fieldInfo = fieldInfos.get(columnLabel);
+    if (canShortCircuitFieldLookup(fieldInfo)) {
+      ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
+      if (ret != null) {
+        Object obj = ret.getRecord().getFields()[fieldInfo.fieldOffset];
+        return (InputStream)obj;
+      }
+    }
+
     String[] actualColumn = getActualColumn(columnLabel);
-    return (InputStream) getField(actualColumn);
+    return (InputStream) getField(actualColumn, columnLabel);
   }
 
   public InputStream getBinaryStream(String columnLabel) {
+    FieldInfo fieldInfo = fieldInfos.get(columnLabel);
+    if (canShortCircuitFieldLookup(fieldInfo)) {
+      ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
+      if (ret != null) {
+        Object obj = ret.getRecord().getFields()[fieldInfo.fieldOffset];
+        if (obj == null) {
+          return null;
+        }
+        if (obj instanceof byte[]) {
+          return new ByteArrayInputStream((byte[]) obj);
+        }
+        Blob blob = (Blob) obj;
+        return new ByteArrayInputStream(blob.getData());
+      }
+    }
+
     String[] actualColumn = getActualColumn(columnLabel);
-    Object ret = getField(actualColumn);
+    Object ret = getField(actualColumn, columnLabel);
     if (ret == null) {
       return null;
     }
@@ -1469,8 +1680,20 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public Reader getCharacterStream(String columnLabel) {
+    FieldInfo fieldInfo = fieldInfos.get(columnLabel);
+    if (canShortCircuitFieldLookup(fieldInfo)) {
+      ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
+      if (ret != null) {
+        Object obj = ret.getRecord().getFields()[fieldInfo.fieldOffset];
+        if (obj == null) {
+          return null;
+        }
+        return new InputStreamReader(new ByteArrayInputStream((byte[]) obj));
+      }
+    }
+
     String[] actualColumn = getActualColumn(columnLabel);
-    byte[] bytes = (byte[]) getField(actualColumn);
+    byte[] bytes = (byte[]) getField(actualColumn, columnLabel);
     if (bytes == null) {
       return null;
     }
@@ -1486,8 +1709,17 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public BigDecimal getBigDecimal(String columnLabel) {
+    FieldInfo fieldInfo = fieldInfos.get(columnLabel);
+    if (canShortCircuitFieldLookup(fieldInfo)) {
+      ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
+      if (ret != null) {
+        Object obj = ret.getRecord().getFields()[fieldInfo.fieldOffset];
+        return (BigDecimal)obj;
+      }
+    }
+
     String[] actualColumn = getActualColumn(columnLabel);
-    return (BigDecimal) getField(actualColumn);
+    return (BigDecimal) getField(actualColumn, columnLabel);
   }
 
   @Override
@@ -1513,7 +1745,7 @@ public class ResultSetImpl implements ResultSet {
     if (function == null) {
       String columnName = column.getColumnName();
       String[] actualColumn = getActualColumn(columnName);
-      return getField(actualColumn);
+      return getField(actualColumn, actualColumn[1]);
     }
     return null;
   }
@@ -1527,7 +1759,7 @@ public class ResultSetImpl implements ResultSet {
       }
 
       String[] actualColumn = getActualColumn("__all__");
-      Object ret = getField(actualColumn);
+      Object ret = getField(actualColumn, actualColumn[1]);
       return getLong(ret, function);
     }
     List<ColumnImpl> columns = selectStatement.getSelectColumns();
@@ -1536,7 +1768,7 @@ public class ResultSetImpl implements ResultSet {
     SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(column.getColumnName()));
 
     String[] actualColumn = getActualColumn(columnName);
-    Object ret = getField(actualColumn);
+    Object ret = getField(actualColumn, actualColumn[1]);
     return getLong(ret, function);
   }
 
@@ -1546,7 +1778,7 @@ public class ResultSetImpl implements ResultSet {
     ColumnImpl column = columns.get(columnIndex - 1);
     String columnName = column.getColumnName();
     String[] actualColumn = getActualColumn(columnName);
-    Object ret = getField(actualColumn);
+    Object ret = getField(actualColumn, actualColumn[1]);
     return getBigDecimal(ret, -1);
   }
 
@@ -1556,7 +1788,7 @@ public class ResultSetImpl implements ResultSet {
     ColumnImpl column = columns.get(columnIndex - 1);
     String columnName = column.getColumnName();
     String[] actualColumn = getActualColumn(columnName);
-    return (Timestamp) getField(actualColumn);
+    return (Timestamp) getField(actualColumn, actualColumn[1]);
   }
 
   @Override
@@ -1565,7 +1797,7 @@ public class ResultSetImpl implements ResultSet {
     ColumnImpl column = columns.get(columnIndex - 1);
     String columnName = column.getColumnName();
     String[] actualColumn = getActualColumn(columnName);
-    return (Time) getField(actualColumn);
+    return (Time) getField(actualColumn, actualColumn[1]);
   }
 
   @Override
@@ -1574,7 +1806,7 @@ public class ResultSetImpl implements ResultSet {
     ColumnImpl column = columns.get(columnIndex - 1);
     String columnName = column.getColumnName();
     String[] actualColumn = getActualColumn(columnName);
-    return (Date) getField(actualColumn);
+    return (Date) getField(actualColumn, actualColumn[1]);
   }
 
   @Override
@@ -1583,7 +1815,7 @@ public class ResultSetImpl implements ResultSet {
     ColumnImpl column = columns.get(columnIndex - 1);
     String columnName = column.getColumnName();
     String[] actualColumn = getActualColumn(columnName);
-    Object ret = getField(actualColumn);
+    Object ret = getField(actualColumn, actualColumn[1]);
     if (ret instanceof Blob) {
       return ((Blob) ret).getData();
     }
@@ -1596,7 +1828,7 @@ public class ResultSetImpl implements ResultSet {
     ColumnImpl column = columns.get(columnIndex - 1);
     String columnName = column.getColumnName();
     String[] actualColumn = getActualColumn(columnName);
-    Object ret = getField(actualColumn);
+    Object ret = getField(actualColumn, actualColumn[1]);
     return getBigDecimal(ret, scale);
   }
 
@@ -1613,7 +1845,7 @@ public class ResultSetImpl implements ResultSet {
         return (double) count;
       }
       String[] actualColumn = getActualColumn(columnLabel);
-      Object ret = getField(actualColumn);
+      Object ret = getField(actualColumn, columnLabel);
 
       SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
       return getDouble(ret, function);
@@ -1634,7 +1866,7 @@ public class ResultSetImpl implements ResultSet {
         return (float) count;
       }
       String[] actualColumn = getActualColumn(columnLabel);
-      Object ret = getField(actualColumn);
+      Object ret = getField(actualColumn, columnLabel);
 
       SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
       return getFloat(ret, function);
@@ -1648,7 +1880,7 @@ public class ResultSetImpl implements ResultSet {
     String columnName = column.getColumnName();
     String function = column.getFunction();
     String[] actualColumn = getActualColumn(columnName);
-    Object ret = getField(actualColumn);
+    Object ret = getField(actualColumn, actualColumn[1]);
     return getShort(ret, function);
   }
 
@@ -1659,7 +1891,7 @@ public class ResultSetImpl implements ResultSet {
     String columnName = column.getColumnName();
     String function = column.getFunction();
     String[] actualColumn = getActualColumn(columnName);
-    Object ret = getField(actualColumn);
+    Object ret = getField(actualColumn, actualColumn[1]);
     return getByte(ret, function);
   }
 
@@ -1669,7 +1901,7 @@ public class ResultSetImpl implements ResultSet {
     ColumnImpl column = columns.get(columnIndex - 1);
     String columnName = column.getColumnName();
     String[] actualColumn = getActualColumn(columnName);
-    Object ret = getField(actualColumn);
+    Object ret = getField(actualColumn, actualColumn[1]);
     return getBoolean(ret);
   }
 
@@ -1679,7 +1911,7 @@ public class ResultSetImpl implements ResultSet {
     ColumnImpl column = columns.get(columnIndex - 1);
     String columnName = column.getColumnName();
     String[] actualColumn = getActualColumn(columnName);
-    Object ret = getField(actualColumn);
+    Object ret = getField(actualColumn, actualColumn[1]);
     if (ret == null) {
       return null;
     }
@@ -1707,7 +1939,7 @@ public class ResultSetImpl implements ResultSet {
     String function = column.getFunction();
 
     String[] actualColumn = getActualColumn(columnName);
-    Object ret = getField(actualColumn);
+    Object ret = getField(actualColumn, actualColumn[1]);
 
     if (function != null) {
       ExpressionList parms = column.getParameters();
@@ -1743,6 +1975,34 @@ public class ResultSetImpl implements ResultSet {
     this.isCount = true;
   }
 
+  private class OptimizationSettings {
+
+    public BinaryExpressionImpl parentExpression;
+    public BinaryExpressionImpl lookupExpression;
+    public OrderByExpressionImpl orderBy;
+    public boolean isTableScan;
+    public ColumnSettings leftColumn;
+    public ColumnSettings rightColumn;
+    public String fromTable;
+    public boolean isTwoKeyLookup;
+    public boolean ascend;
+  }
+
+  private class ColumnSettings {
+    public String columnTableName;
+    public String columnName;
+    public DataType.Type columnType;
+    public BinaryExpression.Operator operator;
+    public Integer fieldOffset;
+    public Object value;
+  }
+
+  private ArrayBlockingQueue<Object[]> blockKeys = new ArrayBlockingQueue<>(1000);
+  private Thread probeThread;
+  private AtomicBoolean doneProbing = new AtomicBoolean();
+  final AtomicReference<Object[]> lastKey = new AtomicReference<>();
+  private List<Object[]> probedKeys = new ArrayList<>();
+  private boolean first = true;
   public void getMoreResults() {
 
     if (setOperation != null) {
@@ -1758,18 +2018,543 @@ public class ResultSetImpl implements ResultSet {
         lastReadRecords = readRecords;
         readRecords = null;
 
-        selectStatement.setPageSize(pageSize);
-        ExpressionImpl.NextReturn ids = selectStatement.next(dbName, null);
-        if (ids != null && ids.getIds() != null) {
-          selectStatement.applyDistinct(dbName, selectContext.getTableNames(), ids, uniqueRecords);
+        final ExpressionImpl topMostExpression = selectStatement.getExpression();
+
+        OptimizationSettings optimizationSettings = null;
+        if ((selectStatement.getJoins() == null || selectStatement.getJoins().size() == 0) &&
+            !selectStatement.isServerSelect() &&
+            topMostExpression instanceof BinaryExpressionImpl) {
+          selectStatement.getExpression().next((int) count, null, new AtomicLong(), limit, offset, false, true);
+          BinaryExpressionImpl binaryTopMost = (BinaryExpressionImpl) topMostExpression;
+          BinaryExpressionImpl lookupExpression = findLookupExpression(binaryTopMost);
+          BinaryExpressionImpl parentExpression = null;
+          if (lookupExpression != null) {
+            parentExpression = findExpressionParent(lookupExpression, topMostExpression);
+            if (lookupExpression.isOneKeyLookup()) {
+              if (lookupExpression.getLeftExpression() instanceof ConstantImpl ||
+                  lookupExpression.getLeftExpression() instanceof ParameterImpl) {
+                Object value = ExpressionImpl.getValueFromExpression(selectStatement.getParms(), lookupExpression.getLeftExpression());
+                if (lookupExpression.getRightExpression() instanceof ColumnImpl) {
+                  optimizationSettings = getOptimizationSettings(lookupExpression, lookupExpression.getRightExpression(), value);
+                }
+              }
+              else if (lookupExpression.getRightExpression() instanceof ConstantImpl ||
+                  lookupExpression.getRightExpression() instanceof ParameterImpl) {
+                Object value = ExpressionImpl.getValueFromExpression(selectStatement.getParms(), lookupExpression.getRightExpression());
+                if (lookupExpression.getLeftExpression() instanceof ColumnImpl) {
+                  optimizationSettings = getOptimizationSettings(lookupExpression, lookupExpression.getLeftExpression(), value);
+                }
+              }
+            }
+            else if (lookupExpression.isTwoKeyLookup()) {
+              optimizationSettings = getOptimizationSettingsForTwoKeyLookup(lookupExpression);
+            }
+            else if (lookupExpression.isTableScan()) {
+              OptimizationSettings settings = optimizationSettings = new OptimizationSettings();
+              settings.isTableScan = true;
+              settings.fromTable = selectStatement.getFromTable();
+              TableSchema tableSchema = databaseClient.getCommon().getTables(dbName).get(settings.fromTable);
+              boolean found = false;
+              for (Map.Entry<String, IndexSchema> indexSchema : tableSchema.getIndices().entrySet()) {
+                if (indexSchema.getValue().isPrimaryKey()) {
+                  String[] fields = indexSchema.getValue().getFields();
+                  settings.leftColumn = new ColumnSettings();
+                  settings.leftColumn.columnName = fields[0];
+                  settings.leftColumn.columnTableName = settings.fromTable;
+                  int offset = tableSchema.getFieldOffset(fields[0]);
+                  FieldSchema fieldSchema = tableSchema.getFields().get(offset);
+                  settings.leftColumn.columnType = fieldSchema.getType();
+                  settings.leftColumn.fieldOffset = tableSchema.getFieldOffset(settings.leftColumn.columnName);
+                  found = true;
+                  break;
+                }
+              }
+              if (!found) {
+                settings = null;
+              }
+              else {
+                settings.leftColumn.operator = BinaryExpression.Operator.greaterEqual;
+              }
+            }
+          }
+          if (optimizationSettings != null) {
+            optimizationSettings.parentExpression = parentExpression;
+            optimizationSettings.lookupExpression = lookupExpression;
+
+            optimizationSettings.ascend = true;
+            List<OrderByExpressionImpl> orderBy = selectStatement.getOrderByExpressions();
+            if (orderBy != null && orderBy.size() != 0) {
+              OrderByExpressionImpl order = orderBy.get(0);
+              optimizationSettings.orderBy = order;
+            }
+            if (optimizationSettings.orderBy != null) {
+              if (optimizationSettings.orderBy.getColumnName().equals(optimizationSettings.leftColumn.columnName) &&
+                  (optimizationSettings.orderBy.getTableName() == null || optimizationSettings.orderBy.getTableName().equals(optimizationSettings.leftColumn.columnTableName))) {
+                if (!optimizationSettings.orderBy.isAscending()) {
+                  optimizationSettings.ascend = false;
+                }
+              }
+            }
+          }
         }
 
-        readRecords = readRecords(ids);
-        if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
-          selectContext.setCurrKeys(ids.getKeys());
+        if (optimizationSettings != null) {
+          final OptimizationSettings settings = optimizationSettings;
+          List<Future> futures = new ArrayList<>();
+          final byte[] selectBytes = selectStatement.serialize();
+          if (probeThread == null) {
+            probeThread = new Thread(new Runnable(){
+              @Override
+              public void run() {
+                SelectStatementImpl selectStatement = new SelectStatementImpl(databaseClient);
+                selectStatement.deserialize(selectBytes, dbName);
+                //outer.setRecordCache(recordCache);
+
+//                if (settings.isTableScan) {
+//                  AllRecordsExpressionImpl allExpression = new AllRecordsExpressionImpl();
+//                  allExpression.setTableName(selectStatement.getFromTable());
+//                  allExpression.setFromTable(selectStatement.getFromTable());
+//                  allExpression.setClient(databaseClient);
+//                  allExpression.setViewVersion(databaseClient.getCommon().getSchemaVersion());
+//                  allExpression.setRecordCache(recordCache);
+//                  allExpression.setOrderByExpressions(selectStatement.getOrderByExpressions());
+//                  allExpression.setDbName(dbName);
+//                  allExpression.setParms(selectStatement.getParms());
+//
+//                  selectStatement.setExpression(allExpression);
+//                }
+                selectStatement.setRecordCache(recordCache);
+                selectStatement.setPageSize(10);
+                selectStatement.setProbe(true);
+                selectStatement.setServerSelectPageNumber(-1);
+                selectStatement.setServerSelectShardNumber(-1);
+                selectStatement.setServerSelectReplicaNumber(-1);
+                selectStatement.setServerSelectResultSetId(-1);
+//                if (selectStatement.isServerSelect()) {
+//                  //selectStatement.setIsOnServer(true);
+//                  selectStatement.forceSelectOnServer(false);
+//                }
+                ExpressionImpl outer = selectStatement.getExpression();
+                outer.setTableName(selectStatement.getFromTable());
+                outer.setClient(databaseClient);
+                outer.setViewVersion(databaseClient.getCommon().getSchemaVersion());
+
+                int iteration = 0;
+                while (true) {
+                  int pageSize = 10 + (iteration++ * 20);
+                  selectStatement.setPageSize(pageSize);
+                  selectStatement.setColumns(new ArrayList<ColumnImpl>());
+
+                  ExpressionImpl.NextReturn ids = selectStatement.next(dbName, null);
+                  if (ids == null || ids.getKeys() == null || ids.getKeys().length == 0) {
+                    break;
+                  }
+                  for (Object[][] key : ids.getKeys()) {
+                    ExpressionImpl.CachedRecord record = outer.getRecordCache().get(settings.leftColumn.columnTableName, key[0]);
+                    if (lastKey.get() != null) {
+                      synchronized (probedKeys) {
+                        probedKeys.add(lastKey.get());
+                      }
+                    }
+                    if (record != null && record.getRecord() != null) {
+                      Object value = record.getRecord().getFields()[settings.leftColumn.fieldOffset];
+                      lastKey.set(new Object[]{value});
+                    }
+                  }
+                }
+                doneProbing.set(true);
+
+              }});
+            probeThread.start();
+
+
+            Object[] key = null;
+            while (true) {
+              synchronized (probedKeys) {
+                if (probedKeys.size() != 0) {
+                  key = probedKeys.get(0);
+                }
+              }
+              if (key != null) {
+                break;
+              }
+              if (doneProbing.get()) {
+                synchronized (probedKeys) {
+                  if (probedKeys.size() != 0) {
+                    key = probedKeys.get(0);
+                  }
+                }
+                if (key == null) {
+                  break;
+                }
+              }
+              try {
+                Thread.sleep(5);
+              }
+              catch (InterruptedException e) {
+                throw new DatabaseException(e);
+              }
+            }
+              //final Object[] nextKey = probedKeys.get(0);
+
+            final Object[] finalKey = key;
+            futures.add(databaseClient.getExecutor().submit(new Callable() {
+              @Override
+              public Object call() throws Exception {
+                try {
+                  SelectStatementImpl selectStatement = new SelectStatementImpl(databaseClient);
+                  selectStatement.deserialize(selectBytes, dbName);
+                  selectStatement.setRecordCache(recordCache);
+                  selectStatement.setPageSize(100_000);
+
+                  BinaryExpressionImpl outer = null;
+
+                  Object[] value = getValueForExpression(settings);
+
+                  if (settings.isTwoKeyLookup) {
+                    if (finalKey == null) {
+                      if (!settings.ascend) {
+                        outer = createExpressionForKeys(value, new Object[]{settings.leftColumn.value},
+                            BinaryExpression.Operator.less, settings.leftColumn.operator, settings);
+                      }
+                      else {
+                        outer = createExpressionForKeys(value, new Object[]{settings.rightColumn.value},
+                            BinaryExpression.Operator.greater, settings.rightColumn.operator, settings);
+                      }
+                    }
+                    else {
+                      if (!settings.ascend) {
+                        outer = createExpressionForKeys(finalKey, value,
+                            BinaryExpression.Operator.greater/*settings.leftColumn.operator*/,  BinaryExpression.Operator.less, settings);
+                      }
+                      else {
+                        outer = createExpressionForKeys(value, finalKey, BinaryExpression.Operator.greater,
+                            BinaryExpression.Operator.less, settings);
+                      }
+                    }
+                  }
+                  else {
+                    if (finalKey == null) {
+                      if (settings.leftColumn.operator == BinaryExpression.Operator.less || settings.leftColumn.operator == BinaryExpression.Operator.lessEqual) {
+                        if (!settings.ascend) {
+                          outer = createExpressionForSingleKey(selectStatement, value, BinaryExpression.Operator.less, settings);
+                        }
+                        else {
+                          outer = createExpressionForKeys(value, new Object[]{settings.leftColumn.value},
+                              BinaryExpression.Operator.greater, settings.leftColumn.operator, settings);
+                        }
+                      }
+                      else {
+                        outer = createExpressionForSingleKey(selectStatement, value, BinaryExpression.Operator.greater, settings);
+                      }
+                    }
+                    else {
+                      if (!settings.ascend) {
+                        outer = createExpressionForKeys(finalKey, value, BinaryExpression.Operator.greater,
+                            BinaryExpression.Operator.less, settings);
+                      }
+                      else {
+                        outer = createExpressionForKeys(value, finalKey, BinaryExpression.Operator.greater,
+                            BinaryExpression.Operator.less, settings);
+                      }
+                    }
+                  }
+
+                  if (settings.isTableScan) {
+                    BinaryExpressionImpl parent = new BinaryExpressionImpl();
+                    parent.setLeftExpression(outer);
+                    parent.setRightExpression(selectStatement.getExpression());
+                    parent.setOperator(BinaryExpression.Operator.and);
+                    selectStatement.setExpression(parent);
+                  }
+                  else {
+                    if (settings.parentExpression == null) {
+                      selectStatement.setExpression(outer);
+                    }
+                    else {
+                      ExpressionImpl topMostExpression = (ExpressionImpl) selectStatement.getExpression().getTopLevelExpression();
+                      BinaryExpressionImpl lookupExpression = findLookupExpression(topMostExpression);
+                      BinaryExpressionImpl parentExpression = findExpressionParent(lookupExpression, topMostExpression);
+                      if (parentExpression.getLeftExpression() == lookupExpression) {
+                        parentExpression.setLeftExpression(outer);
+                      }
+                      else if (parentExpression.getRightExpression() == lookupExpression) {
+                        parentExpression.setRightExpression(outer);
+                      }
+                      else {
+                        throw new DatabaseException("Can't find expression for replacement");
+                      }
+                    }
+                  }
+
+                  ExpressionImpl expression = selectStatement.getExpression();
+                  expression.setTableName(selectStatement.getFromTable());
+                  expression.setClient(databaseClient);
+                  expression.setViewVersion(databaseClient.getCommon().getSchemaVersion());
+                  expression.setRecordCache(recordCache);
+                  expression.setOrderByExpressions(selectStatement.getOrderByExpressions());
+                  expression.setTopLevelExpression(expression);
+                  expression.setParms(selectStatement.getParms());
+
+                  selectStatement.setColumns(new ArrayList<ColumnImpl>());
+                  ExpressionImpl.NextReturn ids = selectStatement.next(dbName, null);
+                  if (ids == null || ids.getKeys() == null || ids.getKeys().length == 0) {
+                    return null;
+                  }
+                  return ids;
+                }
+                catch (Exception e) {
+                  throw new DatabaseException(e);
+                }
+              }
+            }));
+          }
+
+
+
+          outer:
+          for (int i = 0; i < 8; i++) {
+            boolean isLastKey = false;
+            Object[] key = null;
+            Object[] nextKey = null;
+            while (true) {
+              synchronized (probedKeys) {
+                if (probedKeys.size() != 0) {
+                  key = probedKeys.remove(0);
+                  if (probedKeys.size() != 0) {
+                    nextKey = probedKeys.get(0);
+                  }
+                }
+              }
+              if (key != null) {
+                if (nextKey == null) {
+                  if (doneProbing.get()) {
+                    nextKey = lastKey.get();
+                    lastKey.set(null);
+                    isLastKey = true;
+                  }
+                  else {
+                    while (true) {
+                      if (probedKeys.size() != 0) {
+                        nextKey = probedKeys.get(0);
+                        if (nextKey != null) {
+                          break;
+                        }
+                      }
+                      try {
+                        Thread.sleep(5);
+                      }
+                      catch (InterruptedException e) {
+                        throw new DatabaseException(e);
+                      }
+                    }
+                  }
+                }
+                break;
+              }
+              if (doneProbing.get()) {
+                synchronized (probedKeys) {
+                  if (probedKeys.size() != 0) {
+                    key = probedKeys.remove(0);
+                    if (probedKeys.size() != 0) {
+                      nextKey = probedKeys.get(0);
+                    }
+                    if (key != null) {
+                      if (nextKey == null) {
+                        nextKey = lastKey.get();
+                        lastKey.set(null);
+                        isLastKey = true;
+                      }
+                      break;
+                    }
+
+                  }
+                  if (key == null) {
+                    key = lastKey.get();
+                    lastKey.set(null);
+                    if (key == null) {
+                      break outer;
+                    }
+                    else {
+                      isLastKey = true;
+                      break;
+                    }
+                  }
+                }
+              }
+              try {
+                Thread.sleep(5);
+              }
+              catch (InterruptedException e) {
+                throw new DatabaseException(e);
+              }
+            }
+
+            final boolean finalIsLastKey = isLastKey;
+            final Object[] finalKey = key;
+            final Object[] finalNextKey = nextKey;
+            futures.add(databaseClient.getExecutor().submit(new Callable() {
+              @Override
+              public Object call() throws Exception {
+                SelectStatementImpl selectStatement = new SelectStatementImpl(databaseClient);
+                selectStatement.deserialize(selectBytes, dbName);
+                selectStatement.setRecordCache(recordCache);
+                selectStatement.setPageSize(100_000);
+
+                BinaryExpressionImpl outer = null;
+                if (settings.isTwoKeyLookup) {
+                  if (finalIsLastKey || finalNextKey == null) {
+                    if (settings.leftColumn.operator == BinaryExpression.Operator.less ||
+                        settings.leftColumn.operator == BinaryExpression.Operator.lessEqual) {
+                      outer = createExpressionForKeys(finalKey, new Object[]{settings.leftColumn.value},
+                          BinaryExpression.Operator.greaterEqual, settings.leftColumn.operator, settings);
+                    }
+                    else {
+                      boolean handled = false;
+                      if (!settings.ascend) {
+                        outer = createExpressionForKeys(finalKey, new Object[]{settings.leftColumn.value},
+                            BinaryExpression.Operator.lessEqual, settings.leftColumn.operator, settings);
+                        handled = true;
+                      }
+                      if (!handled) {
+                        outer = createExpressionForKeys(finalKey, new Object[]{settings.rightColumn.value}, BinaryExpression.Operator.greaterEqual,
+                            settings.rightColumn.operator, settings);
+                      }
+                    }
+                  }
+                  else {
+                    if (!settings.ascend) {
+                      outer = createExpressionForKeys(finalKey, finalNextKey,
+                          BinaryExpression.Operator.lessEqual, BinaryExpression.Operator.greater, settings);
+                    }
+                    else {
+                      outer = createExpressionForKeys(finalKey, finalNextKey, BinaryExpression.Operator.greaterEqual,
+                          BinaryExpression.Operator.less, settings);
+                    }
+                  }
+                }
+                else {
+                  if (finalIsLastKey || finalNextKey == null) {
+                    if (settings.leftColumn.operator == BinaryExpression.Operator.less ||
+                        settings.leftColumn.operator == BinaryExpression.Operator.lessEqual) {
+                      outer = createExpressionForKeys(finalKey, new Object[]{settings.leftColumn.value},
+                          BinaryExpression.Operator.greaterEqual, settings.leftColumn.operator, settings);
+                    }
+                    else {
+                      boolean handled = false;
+                      if (!settings.ascend) {
+                        outer = createExpressionForKeys(finalKey, new Object[]{settings.leftColumn.value},
+                            BinaryExpression.Operator.lessEqual, settings.leftColumn.operator, settings);
+                        handled = true;
+                      }
+                      if (!handled) {
+                        outer = createExpressionForSingleKey(selectStatement, finalKey, BinaryExpression.Operator.greaterEqual, settings);
+                      }
+                    }
+                  }
+                  else {
+                    if (!settings.ascend) {
+                      outer = createExpressionForKeys(finalKey, finalNextKey,
+                          BinaryExpression.Operator.lessEqual, BinaryExpression.Operator.greater, settings);
+                    }
+                    else {
+                      outer = createExpressionForKeys(finalKey, finalNextKey, BinaryExpression.Operator.greaterEqual,
+                          BinaryExpression.Operator.less, settings);
+                    }
+                  }
+                }
+                if (settings.isTableScan) {
+                  BinaryExpressionImpl parent = new BinaryExpressionImpl();
+                  parent.setLeftExpression(outer);
+                  parent.setRightExpression(selectStatement.getExpression());
+                  parent.setOperator(BinaryExpression.Operator.and);
+                  selectStatement.setExpression(parent);
+                }
+                else {
+                  if (settings.parentExpression == null) {
+                    selectStatement.setExpression(outer);
+                  }
+                  else {
+                    ExpressionImpl topMostExpression = (ExpressionImpl) selectStatement.getExpression().getTopLevelExpression();
+                    BinaryExpressionImpl lookupExpression = findLookupExpression(topMostExpression);
+                    BinaryExpressionImpl parentExpression = findExpressionParent(lookupExpression, topMostExpression);
+                    if (parentExpression.getLeftExpression() == lookupExpression) {
+                      parentExpression.setLeftExpression(outer);
+                    }
+                    else if (parentExpression.getRightExpression() == lookupExpression) {
+                      parentExpression.setRightExpression(outer);
+                    }
+                    else {
+                      throw new DatabaseException("Can't find expression for replacement");
+                    }
+                  }
+                }
+
+                ExpressionImpl expression = selectStatement.getExpression();
+                expression.setTableName(selectStatement.getFromTable());
+                expression.setClient(databaseClient);
+                expression.setViewVersion(databaseClient.getCommon().getSchemaVersion());
+                expression.setRecordCache(recordCache);
+                expression.setOrderByExpressions(selectStatement.getOrderByExpressions());
+                expression.setTopLevelExpression(expression);
+                expression.setParms(selectStatement.getParms());
+
+                selectStatement.setColumns(new ArrayList<ColumnImpl>());
+                ExpressionImpl.NextReturn ids = selectStatement.next(dbName, null);
+                if (ids == null || ids.getKeys() == null || ids.getKeys().length == 0) {
+                  return null;
+                }
+                return ids;
+              }
+            }));
+          }
+          ExpressionImpl.NextReturn allIds = null;
+          for (Future future : futures) {
+            try {
+              ExpressionImpl.NextReturn ids = (ExpressionImpl.NextReturn) future.get();
+              if (allIds == null || allIds.getKeys() == null || allIds.getKeys().length == 0) {
+                allIds = ids;
+              }
+              else if (ids != null && ids.getKeys() != null && ids.getKeys().length != 0){
+                Object[][][] keys = ids.getKeys();
+                if (keys != null) {
+                  Object[][][] newKeys = new Object[keys.length + allIds.getKeys().length][][];
+                  System.arraycopy(allIds.getKeys(), 0, newKeys, 0, allIds.getKeys().length);
+                  System.arraycopy(keys, 0, newKeys, allIds.getKeys().length, keys.length);
+                  keys = newKeys;
+                  allIds.setIds(keys);
+                }
+              }
+            }
+            catch (Exception e) {
+              throw new DatabaseException(e);
+            }
+          }
+          if (allIds != null && allIds.getIds() != null) {
+            selectStatement.applyDistinct(dbName, selectContext.getTableNames(), allIds, uniqueRecords);
+          }
+          readRecords = readRecords(allIds);
+          if (allIds != null && allIds.getIds() != null && allIds.getIds().length != 0) {
+            selectContext.setCurrKeys(allIds.getKeys());
+          }
+          else {
+            selectContext.setCurrKeys((Object[][][]) null);
+          }
         }
         else {
-          selectContext.setCurrKeys((Object[][][]) null);
+          selectStatement.setPageSize(pageSize);
+          ExpressionImpl.NextReturn ids = selectStatement.next(dbName, null);
+          if (ids != null && ids.getIds() != null) {
+            selectStatement.applyDistinct(dbName, selectContext.getTableNames(), ids, uniqueRecords);
+          }
+
+          readRecords = readRecords(ids);
+          if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
+            selectContext.setCurrKeys(ids.getKeys());
+          }
+          else {
+            selectContext.setCurrKeys((Object[][][]) null);
+          }
         }
         currPos = 0;
       }
@@ -1851,6 +2636,401 @@ public class ResultSetImpl implements ResultSet {
 //        break;
 //      }
 //    }
+  }
+
+  private Object[] getValueForExpression(ResultSetImpl.OptimizationSettings settings) {
+    String[] fields = getIndexFields(settings);
+    ExpressionImpl.CachedRecord[] record = ResultSetImpl.this.lastReadRecords[ResultSetImpl.this.lastReadRecords.length - 1];
+    Object[] ret = new Object[fields.length];
+    for (int i = 0; i < ret.length; i++) {
+      ret[i] = record[0].getRecord().getField(fields[i]);
+    }
+    return ret;
+  }
+
+  private String[] getIndexFields(ResultSetImpl.OptimizationSettings settings) {
+    TableSchema tableSchema = databaseClient.getCommon().getTables(dbName).get(settings.fromTable);
+    String[] fields = null;
+    for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
+      if (entry.getValue().getFields()[0].equals(settings.leftColumn.columnName)) {
+        fields = entry.getValue().getFields();
+        break;
+      }
+    }
+    return fields;
+  }
+
+  private OptimizationSettings getOptimizationSettingsForTwoKeyLookup(BinaryExpressionImpl lookupExpression) {
+    if (lookupExpression.getOperator() != BinaryExpression.Operator.and) {
+      return null;
+    }
+    OptimizationSettings settings = new OptimizationSettings();
+
+    settings.leftColumn = new ResultSetImpl.ColumnSettings();
+    settings.rightColumn = new ResultSetImpl.ColumnSettings();
+
+    BinaryExpressionImpl leftExpression = (BinaryExpressionImpl) lookupExpression.getLeftExpression();
+    if (leftExpression.getOperator() == BinaryExpression.Operator.greater || leftExpression.getOperator() == BinaryExpression.Operator.greaterEqual) {
+      getTwoKeySettingsForOneSideExpression(lookupExpression, settings, settings.leftColumn, settings.rightColumn);
+    }
+    else {
+      getTwoKeySettingsForOneSideExpression(lookupExpression, settings, settings.rightColumn, settings.leftColumn);
+    }
+
+    settings.isTwoKeyLookup = true;
+
+    return settings;
+  }
+
+  private void getTwoKeySettingsForOneSideExpression(BinaryExpressionImpl lookupExpression, OptimizationSettings settings,
+                                                     ColumnSettings greater, ColumnSettings less) {
+    BinaryExpressionImpl leftExpression = (BinaryExpressionImpl) lookupExpression.getLeftExpression();
+    BinaryExpressionImpl rightExpression = (BinaryExpressionImpl) lookupExpression.getRightExpression();
+
+    if (leftExpression.getLeftExpression() instanceof ConstantImpl ||
+        leftExpression.getLeftExpression() instanceof ParameterImpl) {
+      greater.value = ExpressionImpl.getValueFromExpression(selectStatement.getParms(), leftExpression.getLeftExpression());
+      getColumnSettings(settings, greater, leftExpression.getRightExpression(), leftExpression.getOperator());
+    }
+    else {
+      greater.value = ExpressionImpl.getValueFromExpression(selectStatement.getParms(), leftExpression.getRightExpression());
+      getColumnSettings(settings, greater, leftExpression.getLeftExpression(), leftExpression.getOperator());
+    }
+
+    if (rightExpression.getLeftExpression() instanceof ConstantImpl ||
+        rightExpression.getLeftExpression() instanceof ParameterImpl) {
+      less.value = ExpressionImpl.getValueFromExpression(selectStatement.getParms(), rightExpression.getLeftExpression());
+      getColumnSettings(settings, less, rightExpression.getRightExpression(), rightExpression.getOperator());
+    }
+    else {
+      less.value = ExpressionImpl.getValueFromExpression(selectStatement.getParms(), rightExpression.getRightExpression());
+      getColumnSettings(settings, less, rightExpression.getLeftExpression(), rightExpression.getOperator());
+    }
+  }
+
+  private void getColumnSettings(OptimizationSettings settings, ColumnSettings columnSettings,
+                                 ExpressionImpl columnExpression, BinaryExpression.Operator operator2) {
+    ColumnImpl column = (ColumnImpl) columnExpression;
+    String tableName = column.getTableName();
+    if (tableName == null) {
+      tableName = selectStatement.getFromTable();
+    }
+    String columnName = column.getColumnName();
+    TableSchema tableSchema = databaseClient.getCommon().getTables(dbName).get(tableName);
+    int fieldOffset = tableSchema.getFieldOffset(columnName);
+    FieldSchema fieldSchema = tableSchema.getFields().get(fieldOffset);
+    DataType.Type type = fieldSchema.getType();
+    BinaryExpression.Operator operator = operator2;
+    settings.fromTable = selectStatement.getFromTable();
+    columnSettings.columnTableName = tableName;
+    columnSettings.columnName = columnName;
+    columnSettings.columnType = type;
+    columnSettings.operator = operator;
+    columnSettings.fieldOffset = tableSchema.getFieldOffset(columnName);
+  }
+
+  private OptimizationSettings getOptimizationSettings(BinaryExpressionImpl lookupExpression, ExpressionImpl columnExpression, Object value) {
+    OptimizationSettings settings = new OptimizationSettings();
+    ColumnImpl column = (ColumnImpl) columnExpression;
+    String tableName = column.getTableName();
+    if (tableName == null) {
+      tableName = selectStatement.getFromTable();
+    }
+    String columnName = column.getColumnName();
+    TableSchema tableSchema = databaseClient.getCommon().getTables(dbName).get(tableName);
+    int fieldOffset = tableSchema.getFieldOffset(columnName);
+    FieldSchema fieldSchema = tableSchema.getFields().get(fieldOffset);
+    DataType.Type type = fieldSchema.getType();
+    BinaryExpression.Operator operator = lookupExpression.getOperator();
+    settings.leftColumn = new ColumnSettings();
+    settings.fromTable = selectStatement.getFromTable();
+    settings.leftColumn.columnTableName = tableName;
+    settings.leftColumn.columnName = columnName;
+    settings.leftColumn.columnType = type;
+    settings.leftColumn.operator = operator;
+    settings.leftColumn.value = value;
+    settings.leftColumn.fieldOffset = tableSchema.getFieldOffset(columnName);
+    return settings;
+  }
+
+  private BinaryExpressionImpl findExpressionParent(ExpressionImpl expression, ExpressionImpl currExpression) {
+    if (!(expression instanceof BinaryExpressionImpl) || !(currExpression instanceof BinaryExpressionImpl)) {
+      return null;
+    }
+    BinaryExpressionImpl binary = (BinaryExpressionImpl) currExpression;
+    if (expression == binary.getLeftExpression()) {
+      return binary;
+    }
+    if (expression == binary.getRightExpression()) {
+      return binary;
+    }
+    BinaryExpressionImpl ret = findExpressionParent(expression, binary.getLeftExpression());
+    if (ret != null) {
+      return ret;
+    }
+    ret = findExpressionParent(expression, binary.getRightExpression());
+    if (ret != null) {
+      return ret;
+    }
+    return null;
+  }
+
+  private BinaryExpressionImpl findLookupExpression(ExpressionImpl expression) {
+    if (!(expression instanceof BinaryExpressionImpl)) {
+      return null;
+    }
+    BinaryExpressionImpl binary = (BinaryExpressionImpl) expression;
+    if (binary.isOneKeyLookup() || binary.isTwoKeyLookup() || binary.isTableScan()) {
+      return binary;
+    }
+    BinaryExpressionImpl ret = findLookupExpression((ExpressionImpl) binary.getLeftExpression());
+    if (ret != null) {
+      return ret;
+    }
+    ret = findLookupExpression((ExpressionImpl) binary.getRightExpression());
+    if (ret != null) {
+      return ret;
+    }
+    return null;
+  }
+
+  private BinaryExpressionImpl createExpressionForSingleKey(SelectStatementImpl selectStatement, Object[] value,
+                                                            BinaryExpression.Operator greater, OptimizationSettings settings) {
+    BinaryExpression.Operator operator = greater;
+    if (!settings.ascend) {
+      operator = BinaryExpression.Operator.less;
+    }
+
+    String[] fields = getIndexFields(settings);
+    BinaryExpressionImpl left = null;
+    for (int i = 0; i < value.length; i += 2) {
+      if (i + 1 < value.length) {
+        BinaryExpressionImpl andExpression = new BinaryExpressionImpl();
+        left = andExpression;
+        andExpression.setOperator(BinaryExpression.Operator.and);
+        BinaryExpressionImpl lhs = new BinaryExpressionImpl();
+        lhs.setIsLeftKey(true);
+        andExpression.setLeftExpression(lhs);
+        ColumnImpl column = new ColumnImpl(null, null, settings.leftColumn.columnTableName, fields[i], null);
+        lhs.setLeftExpression(column);
+        if (operator == BinaryExpression.Operator.greater) {
+          lhs.setOperator(BinaryExpression.Operator.greaterEqual);
+        }
+        else {
+          lhs.setOperator(BinaryExpression.Operator.lessEqual);
+        }
+        ConstantImpl constant = new ConstantImpl();
+        constant.setSqlType(DataType.Type.getTypeForValue(value[i]));//settings.leftColumn.columnType.getValue());
+        constant.setValue(value[i]);
+        lhs.setRightExpression(constant);
+
+        BinaryExpressionImpl rhs = new BinaryExpressionImpl();
+        rhs.setIsRightKey(true);
+        andExpression.setRightExpression(rhs);
+        column = new ColumnImpl(null, null, settings.leftColumn.columnTableName, fields[i + 1], null);
+        rhs.setLeftExpression(column);
+        rhs.setOperator(operator);
+        constant = new ConstantImpl();
+        constant.setSqlType(DataType.Type.getTypeForValue(value[i + 1]));//settings.leftColumn.columnType.getValue());
+        constant.setValue(value[i + 1]);
+        rhs.setRightExpression(constant);
+      }
+      else {
+        BinaryExpressionImpl lhs = new BinaryExpressionImpl();
+        left = lhs;
+        lhs.setIsLeftKey(true);
+        ColumnImpl column = new ColumnImpl(null, null, settings.leftColumn.columnTableName, fields[i], null);
+        lhs.setLeftExpression(column);
+        lhs.setOperator(operator);
+        ConstantImpl constant = new ConstantImpl();
+        constant.setSqlType(DataType.Type.getTypeForValue(value[0]));//settings.leftColumn.columnType.getValue());
+        constant.setValue(value[0]);
+        lhs.setRightExpression(constant);
+
+      }
+    }
+
+    left.setTableName(selectStatement.getFromTable());
+    left.setClient(databaseClient);
+    left.setViewVersion(databaseClient.getCommon().getSchemaVersion());
+    left.setRecordCache(recordCache);
+    left.setOrderByExpressions(selectStatement.getOrderByExpressions());
+    return left;
+  }
+
+  private BinaryExpressionImpl createExpressionForKeys(Object[] lowerKey, Object[] higherKey, BinaryExpression.Operator greaterOp,
+                                                       BinaryExpression.Operator lessOp, OptimizationSettings settings) {
+    BinaryExpressionImpl outer = new BinaryExpressionImpl();
+
+//    if (!settings.ascend) {
+//      Object[] tmp = lowerKey;
+//      lowerKey = higherKey;
+//      higherKey = tmp;
+//      if (greaterOp == BinaryExpression.Operator.greater) {
+//        greaterOp = BinaryExpression.Operator.greaterEqual;
+//      }
+//    }
+
+    String[] fields = getIndexFields(settings);
+
+    List<BinaryExpressionImpl> stack = new ArrayList<>();
+    for (int i = 0; i < lowerKey.length; i += 2) {
+      if (i + 1 < lowerKey.length) {
+        BinaryExpressionImpl andExpression = new BinaryExpressionImpl();
+        stack.add(andExpression);
+        andExpression.setOperator(BinaryExpression.Operator.and);
+        BinaryExpressionImpl lhs = new BinaryExpressionImpl();
+        lhs.setIsLeftKey(true);
+        andExpression.setLeftExpression(lhs);
+        ColumnImpl column = new ColumnImpl(null, null, settings.leftColumn.columnTableName, fields[i], null);
+        lhs.setLeftExpression(column);
+        if (greaterOp == BinaryExpression.Operator.greater) {
+          lhs.setOperator(BinaryExpression.Operator.greaterEqual);
+        }
+        else {
+          lhs.setOperator(BinaryExpression.Operator.lessEqual);
+        }
+        ConstantImpl constant = new ConstantImpl();
+        constant.setSqlType(DataType.Type.getTypeForValue(lowerKey[i]));//settings.leftColumn.columnType.getValue());
+        constant.setValue(lowerKey[i]);
+        lhs.setRightExpression(constant);
+
+        BinaryExpressionImpl rhs = new BinaryExpressionImpl();
+        rhs.setIsRightKey(true);
+        andExpression.setRightExpression(rhs);
+        column = new ColumnImpl(null, null, settings.leftColumn.columnTableName, fields[i + 1], null);
+        rhs.setLeftExpression(column);
+        if (i == lowerKey.length - 1) {
+          rhs.setOperator(greaterOp);
+        }
+        else {
+          if (greaterOp == BinaryExpression.Operator.greater) {
+            lhs.setOperator(BinaryExpression.Operator.greaterEqual);
+          }
+          else {
+            lhs.setOperator(BinaryExpression.Operator.lessEqual);
+          }
+        }
+        constant = new ConstantImpl();
+        constant.setSqlType(DataType.Type.getTypeForValue(lowerKey[i + 1]));//settings.leftColumn.columnType.getValue());
+        constant.setValue(lowerKey[i + 1]);
+        rhs.setRightExpression(constant);
+      }
+      else {
+        BinaryExpressionImpl lhs = new BinaryExpressionImpl();
+        stack.add(lhs);
+        lhs.setIsLeftKey(true);
+        ColumnImpl column = new ColumnImpl(null, null, settings.leftColumn.columnTableName, fields[i], null);
+        lhs.setLeftExpression(column);
+        lhs.setOperator(greaterOp);
+        ConstantImpl constant = new ConstantImpl();
+        constant.setSqlType(DataType.Type.getTypeForValue(lowerKey[0]));//settings.leftColumn.columnType.getValue());
+        constant.setValue(lowerKey[0]);
+        lhs.setRightExpression(constant);
+      }
+    }
+
+    BinaryExpressionImpl left = convertStackToTree(stack);
+
+    stack.clear();
+    for (int i = 0; i < higherKey.length; i += 2) {
+      if (i + 1 < higherKey.length) {
+        BinaryExpressionImpl andExpression = new BinaryExpressionImpl();
+        stack.add(andExpression);
+        andExpression.setOperator(BinaryExpression.Operator.and);
+        BinaryExpressionImpl lhs = new BinaryExpressionImpl();
+        lhs.setIsLeftKey(true);
+        andExpression.setLeftExpression(lhs);
+        ColumnImpl column = new ColumnImpl(null, null, settings.leftColumn.columnTableName, fields[i], null);
+        lhs.setLeftExpression(column);
+        if (lessOp == BinaryExpression.Operator.greater) {
+          lhs.setOperator(BinaryExpression.Operator.greaterEqual);
+        }
+        else {
+          lhs.setOperator(BinaryExpression.Operator.lessEqual);
+        }
+        ConstantImpl constant = new ConstantImpl();
+        constant.setSqlType(DataType.Type.getTypeForValue(higherKey[i]));//settings.leftColumn.columnType.getValue());
+        constant.setValue(higherKey[i]);
+        lhs.setRightExpression(constant);
+
+        BinaryExpressionImpl rhs = new BinaryExpressionImpl();
+        rhs.setIsRightKey(true);
+        andExpression.setRightExpression(rhs);
+        column = new ColumnImpl(null, null, settings.leftColumn.columnTableName, fields[i + 1], null);
+        rhs.setLeftExpression(column);
+        if (i == higherKey.length - 1) {
+          rhs.setOperator(lessOp);
+        }
+        else {
+          if (lessOp == BinaryExpression.Operator.greater) {
+            lhs.setOperator(BinaryExpression.Operator.greaterEqual);
+          }
+          else {
+            lhs.setOperator(BinaryExpression.Operator.lessEqual);
+          }
+        }
+        constant = new ConstantImpl();
+        constant.setSqlType(DataType.Type.getTypeForValue(higherKey[i + 1]));//settings.leftColumn.columnType.getValue());
+        constant.setValue(higherKey[i + 1]);
+        rhs.setRightExpression(constant);
+      }
+      else {
+        BinaryExpressionImpl lhs = new BinaryExpressionImpl();
+        stack.add(lhs);
+        lhs.setIsLeftKey(true);
+        ColumnImpl column = new ColumnImpl(null, null, settings.leftColumn.columnTableName, fields[i], null);
+        lhs.setLeftExpression(column);
+        lhs.setOperator(lessOp);
+        ConstantImpl constant = new ConstantImpl();
+        constant.setSqlType(DataType.Type.getTypeForValue(higherKey[0]));//settings.leftColumn.columnType.getValue());
+        constant.setValue(higherKey[0]);
+        lhs.setRightExpression(constant);
+      }
+    }
+    BinaryExpressionImpl right = convertStackToTree(stack);
+
+    outer.setLeftExpression(left);
+    outer.setRightExpression(right);
+    outer.setOperator(BinaryExpression.Operator.and);
+
+    outer.setTableName(selectStatement.getFromTable());
+    outer.setClient(databaseClient);
+    outer.setViewVersion(databaseClient.getCommon().getSchemaVersion());
+    outer.setRecordCache(recordCache);
+    outer.setOrderByExpressions(selectStatement.getOrderByExpressions());
+    return outer;
+  }
+
+  private BinaryExpressionImpl convertStackToTree(List<BinaryExpressionImpl> stack) {
+    BinaryExpressionImpl left;
+    if (stack.size() == 1) {
+      left = stack.remove(0);
+    }
+    else {
+      left = new BinaryExpressionImpl();
+      left.setOperator(BinaryExpression.Operator.and);
+      left.setLeftExpression(stack.remove(0));
+      left.setRightExpression(stack.remove(0));
+    }
+    while (stack.size() > 0) {
+      BinaryExpressionImpl e = null;
+      if (stack.size() == 1) {
+        e = stack.remove(0);
+      }
+      else {
+        e = new BinaryExpressionImpl();
+        e.setOperator(BinaryExpression.Operator.and);
+        e.setLeftExpression(stack.remove(0));
+        e.setRightExpression(stack.remove(0));
+      }
+      BinaryExpressionImpl and = new BinaryExpressionImpl();
+      and.setOperator(BinaryExpression.Operator.and);
+      and.setLeftExpression(left);
+      and.setRightExpression(e);
+      left = and;
+    }
+    return left;
   }
 
   private void getMoreServerSetResults() {
@@ -2012,19 +3192,27 @@ public class ResultSetImpl implements ResultSet {
 //        }
         Object[][][] actualIds = nextReturn.getKeys();
         ExpressionImpl.CachedRecord[][] retRecords = new ExpressionImpl.CachedRecord[actualIds.length][];
-        for (int i = 0; i < retRecords.length; i++) {
-          retRecords[i] = new ExpressionImpl.CachedRecord[actualIds[i].length];
-          for (int j = 0; j < retRecords[i].length; j++) {
-            if (actualIds[i][j] == null) {
-              continue;
-            }
 
-            ExpressionImpl.CachedRecord cachedRecord = recordCache.get(nextReturn.getTableNames()[j], actualIds[i][j]);
-            retRecords[i][j] = cachedRecord;
-            if (retRecords[i][j] == null) {
-              //todo: batch these reads
-              Record record = doReadRecord(actualIds[i][j], nextReturn.getTableNames()[j]);
-              retRecords[i][j] = new ExpressionImpl.CachedRecord(record, record.serialize(databaseClient.getCommon(), DatabaseClient.SERIALIZATION_VERSION));
+        if (retRecords.length > 0) {
+          ConcurrentHashMap<ExpressionImpl.RecordCache.Key, ExpressionImpl.CachedRecord>[] tables = new ConcurrentHashMap[nextReturn.getTableNames().length];
+          for (int j = 0; j <  nextReturn.getTableNames().length; j++) {
+            tables[j] = recordCache.getRecordsForTable(nextReturn.getTableNames()[j]);
+          }
+
+          for (int i = 0; i < retRecords.length; i++) {
+            retRecords[i] = new ExpressionImpl.CachedRecord[actualIds[i].length];
+            for (int j = 0; j < retRecords[i].length; j++) {
+              if (actualIds[i][j] == null) {
+                continue;
+              }
+
+              ExpressionImpl.CachedRecord cachedRecord = tables[j].get(new ExpressionImpl.RecordCache.Key(actualIds[i][j]));
+              retRecords[i][j] = cachedRecord;
+              if (retRecords[i][j] == null) {
+                //todo: batch these reads
+                Record record = doReadRecord(actualIds[i][j], nextReturn.getTableNames()[j]);
+                retRecords[i][j] = new ExpressionImpl.CachedRecord(record, record.serialize(databaseClient.getCommon(), DatabaseClient.SERIALIZATION_VERSION));
+              }
             }
           }
         }

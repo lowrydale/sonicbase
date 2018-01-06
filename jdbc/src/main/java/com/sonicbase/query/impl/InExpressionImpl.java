@@ -110,6 +110,11 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
     leftExpression.setColumns(columns);
   }
 
+  public void setProbe(boolean probe) {
+    super.setProbe(probe);
+    leftExpression.setProbe(probe);
+  }
+
   /**
    * ###############################
    * DON"T MODIFY THIS SERIALIZATION
@@ -196,7 +201,7 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
   }
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset, boolean b) {
+  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset, boolean b, boolean analyze) {
     if (getNextShard() == -2) {
       return new NextReturn(new String[]{getTableName()}, null);
     }
@@ -204,7 +209,7 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
       SelectContextImpl context = tableScan(dbName, getViewVersion(), getClient(), count,
           getClient().getCommon().getTables(dbName).get(getTableName()),
            getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(),
-          getRecordCache(), getCounters(), getGroupByContext(), currOffset, limit, offset);
+          getRecordCache(), getCounters(), getGroupByContext(), currOffset, limit, offset, isProbe());
        if (context != null) {
          setNextShard(context.getNextShard());
          setNextKey(context.getNextKey());
@@ -232,7 +237,7 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
       SelectContextImpl context = tableScan(dbName, getViewVersion(), getClient(), count,
           getClient().getCommon().getTables(dbName).get(getTableName()),
           getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(),
-          getRecordCache(), getCounters(), getGroupByContext(), currOffset, limit, offset);
+          getRecordCache(), getCounters(), getGroupByContext(), currOffset, limit, offset, isProbe());
       if (context != null) {
         setNextShard(context.getNextShard());
         setNextKey(context.getNextKey());
@@ -250,7 +255,7 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
           tableName, indexSchema.getName(), isForceSelectOnServer(),
           BinaryExpression.Operator.equal, null,
           null, key, getParms(), this, null, key, null, getColumns(), cNode.getColumnName(), -1, getRecordCache(), usedIndex,
-          false, getViewVersion(), getCounters(), getGroupByContext(), debug, currOffset, limit, offset);
+          false, getViewVersion(), getCounters(), getGroupByContext(), debug, currOffset, limit, offset, isProbe());
       ret = aggregateResults(ret, currRet.getCurrKeys());
     }
     setNextShard(-2);
@@ -259,7 +264,7 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
 
 
   public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset) {
-    return next(DatabaseClient.SELECT_PAGE_SIZE, explain, currOffset, limit, offset, false);
+    return next(DatabaseClient.SELECT_PAGE_SIZE, explain, currOffset, limit, offset, false, false);
   }
 
   @Override

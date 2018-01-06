@@ -118,6 +118,8 @@ public class TestDeltaManager {
 
       insertRecord(conn, 0);
       insertRecord(conn, 1);
+      validateRecord(conn, 0);
+      validateRecord(conn, 1);
 
       runSnapshot(dbServers);
 

@@ -94,7 +94,7 @@ public class ParenthesisImpl extends ExpressionImpl {
   }
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset, boolean b) {
+  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset, boolean b, boolean analyze) {
     NextReturn ret = doNext(explain, count, currOffset, limit, offset);
     return ret;
 //    return expression.next(count, eplain, currOffset, limit, offset, b);
@@ -122,7 +122,8 @@ public class ParenthesisImpl extends ExpressionImpl {
       AtomicReference<String> usedIndex = new AtomicReference<>();
       SelectContextImpl context = lookupIds(dbName, getClient().getCommon(), getClient(), getReplica(), count, tableSchema.getName(), indexSchema.getName(), isForceSelectOnServer(),
           op, null, getOrderByExpressions(), getNextKey(), getParms(), this, null, getNextKey(), null,
-          getColumns(), indexSchema.getFields()[0], getNextShard(), getRecordCache(), usedIndex, isNot, getViewVersion(), getCounters(), getGroupByContext(), debug, currOffset, limit, offset);
+          getColumns(), indexSchema.getFields()[0], getNextShard(), getRecordCache(), usedIndex, isNot, getViewVersion(),
+          getCounters(), getGroupByContext(), debug, currOffset, limit, offset, isProbe());
       setNextShard(context.getNextShard());
       setNextKey(context.getNextKey());
       NextReturn ret = new NextReturn();
@@ -188,6 +189,11 @@ public class ParenthesisImpl extends ExpressionImpl {
   public void setCounters(Counter[] counters) {
     super.setCounters(counters);
     expression.setCounters(counters);
+  }
+
+  public void setProbe(boolean probe) {
+    super.setProbe(probe);
+    expression.setProbe(probe);
   }
 
   public void setLimit(Limit limit) {

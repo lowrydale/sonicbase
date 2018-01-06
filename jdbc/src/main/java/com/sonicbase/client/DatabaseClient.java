@@ -87,6 +87,7 @@ public class DatabaseClient {
   public static final short SERIALIZATION_VERSION_19 = 19;
 
   public static final int SELECT_PAGE_SIZE = 1000;
+  public static final int OPTIMIZED_RANGE_PAGE_SIZE = 4_000;
 
   private int pageSize = SELECT_PAGE_SIZE;
 
@@ -452,7 +453,7 @@ public class DatabaseClient {
                 null, null, keyObj, parms,
                 null, null, keyObj, null, columns, columnName, shard, recordCache,
                 usedIndex, false, common.getSchemaVersion(), null, null,
-                false, new AtomicLong(), null, null);
+                false, new AtomicLong(), null, null, false);
             Object[][][] keys = context.getCurrKeys();
             if (keys != null && keys.length > 0 && keys[0].length > 0 && keys[0][0].length > 0) {
               builder.append("[shard=" + shard + ", replica=" + replica + "]");
@@ -4473,10 +4474,15 @@ public class DatabaseClient {
 
   private Object syncSchemaMutex = new Object();
 
-  public void syncSchema(int serverVersion) {
+  public void syncSchema(Integer serverVersion) {
     synchronized (common) {
-      if (serverVersion > common.getSchemaVersion()) {
+      if (serverVersion == null) {
         syncSchema();
+      }
+      else {
+        if (serverVersion > common.getSchemaVersion()) {
+          syncSchema();
+        }
       }
     }
   }

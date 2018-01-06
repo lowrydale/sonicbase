@@ -24,6 +24,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION;
 import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION_21;
+import static java.sql.Types.*;
 
 /**
  * User: lowryda
@@ -732,6 +733,184 @@ public class DatabaseCommon {
                 Varint.writeSignedVarLong(bytes.length, out);
                 out.write(bytes);
               }
+            }
+          }
+        }
+      }
+      out.close();
+      return bytesOut.toByteArray();
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public static Object[] deserializeTypedKey(byte[] bytes) {
+    try {
+
+      DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
+
+      int serializationVersion = (int) Varint.readUnsignedVarLong(in);
+      int count = (int) Varint.readUnsignedVarLong(in);
+      if (count == 0) {
+        return null;
+      }
+      Object[] ret = new Object[count];
+      for (int i = 0; i < count; i++) {
+        if (in.readBoolean()) {
+          int type = (int) Varint.readSignedVarLong(in);
+          switch (type) {
+            case BIGINT:
+              ret[i] = (long)Varint.readSignedVarLong(in);
+              break;
+            case INTEGER:
+              ret[i] = (int)Varint.readSignedVarLong(in);
+              break;
+            case SMALLINT:
+              ret[i] = (short)Varint.readSignedVarLong(in);
+              break;
+            case TINYINT:
+              ret[i] = in.readByte();
+              break;
+            case LONGVARCHAR:
+            case VARCHAR:
+            case CHAR: {
+              int len = (int) Varint.readSignedVarLong(in);
+              byte[] buffer = new byte[len];
+              in.readFully(buffer);
+              ret[i] = buffer;
+            }
+              break;
+            case FLOAT:
+              ret[i] = in.readFloat();
+              break;
+            case DOUBLE:
+              ret[i] = in.readDouble();
+              break;
+            case BIT:
+              ret[i] = in.readBoolean();
+              break;
+            case DECIMAL: {
+              int len = (int) Varint.readSignedVarLong(in);
+              byte[] buffer = new byte[len];
+              in.readFully(buffer);
+              String value = new String(buffer, "utf-8");
+              ret[i] = new BigDecimal(value);
+              break;
+            }
+            case DATE: {
+              int len = (int) Varint.readSignedVarLong(in);
+              byte[] buffer = new byte[len];
+              in.readFully(buffer);
+              String value = new String(buffer, "utf-8");
+              ret[i] = Date.valueOf(value);
+            }
+              break;
+            case TIME: {
+              int len = (int) Varint.readSignedVarLong(in);
+              byte[] buffer = new byte[len];
+              in.readFully(buffer);
+              String value = new String(buffer, "utf-8");
+              ret[i] = Time.valueOf(value);
+            }
+              break;
+            case TIMESTAMP: {
+              int len = (int) Varint.readSignedVarLong(in);
+              byte[] buffer = new byte[len];
+              in.readFully(buffer);
+              String value = new String(buffer, "utf-8");
+              ret[i] = Timestamp.valueOf(value);
+            }
+            break;
+            default:
+              throw new DatabaseException("Unknown type: type=" + type);
+          }
+        }
+      }
+      return ret;
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public static byte[] serializeTypedKey(Object[] key) {
+    try {
+      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+      DataOutputStream out = new DataOutputStream(bytesOut);
+      Varint.writeUnsignedVarLong(SERIALIZATION_VERSION, out);
+      if (key == null) {
+        Varint.writeUnsignedVarLong(0, out);
+      }
+      else {
+        Varint.writeUnsignedVarLong(key.length, out);
+        for (int i = 0; i < key.length; i++) {
+          if (key[i] == null) {
+            out.writeBoolean(false);
+          }
+          else {
+            out.writeBoolean(true);
+            int type = DataType.Type.getTypeForValue(key[i]);
+            if (type == -1) {
+              System.out.println("bad type");
+            }
+            Varint.writeSignedVarLong(type, out);
+
+            if (key[i] instanceof Long) {
+              Varint.writeSignedVarLong((Long) key[i], out);
+            }
+            else if (key[i] instanceof Integer) {
+              Varint.writeSignedVarLong((Integer) key[i], out);
+            }
+            else if (key[i] instanceof Short) {
+              Varint.writeSignedVarLong((Short) key[i], out);
+            }
+            else if (key[i] instanceof Byte) {
+              out.write((byte) key[i]);
+            }
+            else if (key[i] instanceof byte[]) {
+              Varint.writeSignedVarLong(((byte[])key[i]).length, out);
+              out.write(((byte[])key[i]));
+            }
+            else if (key[i] instanceof Float) {
+              out.writeFloat((Float) key[i]);
+            }
+            else if (key[i] instanceof Double) {
+              out.writeDouble((Double) key[i]);
+            }
+            else if (key[i] instanceof Boolean) {
+              out.writeBoolean((Boolean) key[i]);
+            }
+            else if (key[i] instanceof BigDecimal) {
+              BigDecimal value = ((BigDecimal) key[i]);
+              String strValue = value.toPlainString();
+              byte[] bytes = strValue.getBytes("utf-8");
+              Varint.writeSignedVarLong(bytes.length, out);
+              out.write(bytes);
+            }
+            else if (key[i] instanceof Date) {
+              Date value = ((Date) key[i]);
+              String str = value.toString();
+              byte[] bytes = str.getBytes("utf-8");
+              Varint.writeSignedVarLong(bytes.length, out);
+              out.write(bytes);
+            }
+            else if (key[i] instanceof Time) {
+              Time value = ((Time) key[i]);
+              String str = value.toString();
+              byte[] bytes = str.getBytes("utf-8");
+              Varint.writeSignedVarLong(bytes.length, out);
+              out.write(bytes);
+            }
+            else if (key[i] instanceof Timestamp) {
+              Timestamp value = ((Timestamp) key[i]);
+              String str = value.toString();
+              byte[] bytes = str.getBytes("utf-8");
+              Varint.writeSignedVarLong(bytes.length, out);
+              out.write(bytes);
+            }
+            else {
+              throw new DatabaseException("Unknown type: type=" + key[i].getClass().getName());
             }
           }
         }

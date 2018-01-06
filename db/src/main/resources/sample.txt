@@ -1,36 +1,42 @@
-               range not in secondary: 761 0.007613 131342.4454731897
-                       range sort disk: 3930 0.007877 126947.22571887415
-                         range two key: 108 0.001186 842950.9884092252
-             range two key right sided: 101 0.001107 902915.6943707655
-                                 range: 1216 0.002438 410099.10535657144
-                        union inMemory: 68 0.002281 438267.16476513736
-               range not in table scan: 4245 0.008491 117767.2942897092
-                             range id2: 4031 0.008078 123788.25318374643
-range two key left sided greater equal: 149 0.001643 608586.959920257
-               range other expression2: 584 0.001174 851492.8599427501
-                                   not: 578 0.00118 847216.8751022473
-                       range three key: 1690 0.003388 295126.7623853746
-                                not in: 283 0.002839 352138.75689947
-                            table scan: 1632 0.003264 306349.30697202566
-                 range two key greater: 847 0.009017 110892.67760793517
-          range two key seocndyary key: 515 0.001031 969823.9828019605
-                          identity id=: 1127 0.1127 8873.04943876192
-            range secondary key single: 710 0.001423 702601.534957078
-       range two key greater backwards: 90 9.62E-4 1038893.0551890839
-                          id secdonary: 1114 0.111474 8970.66487181604
-                   range secondary key: 948 0.001901 525953.4147271434
-     count range two key greater equal: 1105 1.083336 923.0745748754481
-            identity secondary key id=: 1191 0.119167 8391.556145662465
-                                 count: 65941 64.648278 15.468315895433996
-                                 union: 2788 0.006972 143424.80352846615
-                range other expression: 2244 0.224467 4454.980187469077
-                             union all: 4220 0.008458 118227.21454434317
-      range two key greater left sided: 2507 0.027255 36689.68504155252
-                            range sort: 4013 0.008042 124334.34648749474
-                                   id2: 1587 0.158794 6297.456819860997
-          range two key greater equal2: 1731 0.018422 54281.96338554527
-                range two key greater2: 110 0.001178 848682.4759595942
-         range secondary key backwards: 1599 0.003206 311892.2614363954
-                        range two key2: 71 7.65E-4 1306259.3489480896
-      range two key left sided greater: 105 0.001152 867982.8273140889
-             range secondary key mixed: 218 0.002084 479794.5399683853
+1024 	at com.sonicbase.server.LogManager$LogWriter.run(LogManager.java:507)
+ 512 	at com.sonicbase.socket.DatabaseSocketClient$BatchSender.run(DatabaseSocketClient.java:379)
+ 157 	at com.sonicbase.socket.DatabaseSocketClient.readResponse(DatabaseSocketClient.java:655)
+ 128 	at com.sonicbase.server.UpdateManager$4.run(UpdateManager.java:1421)
+ 128 	at com.sonicbase.server.StreamManager$1.run(StreamManager.java:68)
+ 128 	at com.sonicbase.server.ReadManager$3.run(ReadManager.java:346)
+ 128 	at com.sonicbase.server.ReadManager$2.run(ReadManager.java:76)
+ 128 	at com.sonicbase.research.socket.NettyServer.startServer(NettyServer.java:936)
+ 128 	at com.sonicbase.research.socket.NettyServer.run(NettyServer.java:774)
+ 126 	at com.sonicbase.server.DeltaManager$1.run(DeltaManager.java:150)
+ 125 	at com.sonicbase.server.DatabaseServer$StatsMonitor.run(DatabaseServer.java:4753)
+ 125 	at com.sonicbase.server.DatabaseServer$19.run(DatabaseServer.java:2550)
+ 117 	at com.sonicbase.server.DeleteManager$8.run(DeleteManager.java:1201)
+  64 	at com.sonicbase.server.DatabaseServer$4.run(DatabaseServer.java:755)
+  64 	at com.sonicbase.query.impl.ExpressionImpl$3.run(ExpressionImpl.java:1421)
+  64 	at com.sonicbase.common.Logger$1.run(Logger.java:34)
+  60 	at com.sonicbase.server.DatabaseServer$5.run(DatabaseServer.java:805)
+  38 	at com.sonicbase.query.impl.ResultSetImpl.getMoreResults(ResultSetImpl.java:2215)
+  25 	at com.sonicbase.server.DatabaseServer$AddressMap.getAddress(DatabaseServer.java:3871)
+  20 	at com.sonicbase.index.Index.get(Index.java:361)
+  11 	at com.sonicbase.index.Index.higherEntry(Index.java:1312)
+   9 	at com.sonicbase.server.LogManager$ByteCounterStream.read(LogManager.java:700)
+   9 	at com.sonicbase.server.DatabaseServer.fromUnsafeToRecords(DatabaseServer.java:4200)
+   9 	at com.sonicbase.query.impl.ResultSetImpl.readRecords(ResultSetImpl.java:2510)
+   9 	at com.sonicbase.jdbcdriver.ResultSetProxy.getLong(ResultSetProxy.java:578)
+   7 	at com.sonicbase.server.DatabaseServer.fromUnsafeToRecords(DatabaseServer.java:4181)
+   6 	at com.sonicbase.server.ReadManager.indexLookup(ReadManager.java:682)
+   6 	at com.sonicbase.query.impl.SelectStatementImpl.dedupIds(SelectStatementImpl.java:1179)
+   6 	at com.sonicbase.common.Record.getDbViewNumber(Record.java:131)
+   6 	at com.sonicbase.common.DatabaseCommon.deserializeFields(DatabaseCommon.java:961)
+   6 	at com.sonicbase.common.DatabaseCommon.deserializeFields(DatabaseCommon.java:915)
+   5 	at com.sonicbase.research.socket.NettyServer.writeResponse(NettyServer.java:132)
+   5 	at com.sonicbase.common.DatabaseCommon.deserializeFields(DatabaseCommon.java:924)
+   5 	at com.sonicbase.common.ComArray.serialize(ComArray.java:83)
+   4 	at com.sonicbase.server.DatabaseServer.fromUnsafeToRecords(DatabaseServer.java:4204)
+   4 	at com.sonicbase.server.DatabaseServer.checkHealthOfServer(DatabaseServer.java:934)
+   4 	at com.sonicbase.query.impl.SelectStatementImpl.dedupIds(SelectStatementImpl.java:1187)
+   4 	at com.sonicbase.index.Index.visitTailMap(Index.java:1566)
+   4 	at com.sonicbase.common.Record.recoverFromSnapshot(Record.java:64)
+   3 	at com.sonicbase.server.ReadManager.doIndexLookupTwoKeys(ReadManager.java:1750)
+   3 	at com.sonicbase.server.DatabaseServer.fromUnsafeToRecords(DatabaseServer.java:4182)
+   3 	at com.sonicbase.server.DatabaseServer.fromUnsafeToRecords(DatabaseServer.java:4162)

@@ -6,7 +6,6 @@ import com.sonicbase.common.ComArray;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Record;
 import com.sonicbase.common.SchemaOutOfSyncException;
-import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.*;
 
 import com.sonicbase.schema.FieldSchema;
@@ -33,7 +32,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public class SelectStatementImpl extends StatementImpl implements SelectStatement {
 
   private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
-  private final ExpressionImpl.RecordCache recordCache;
+  private ExpressionImpl.RecordCache recordCache;
 
   private DatabaseClient client;
   private String fromTable;
@@ -69,6 +68,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
   private boolean forceSelectOnServer;
   private AtomicLong currOffset = new AtomicLong();
   private short serializationVersion = DatabaseClient.SERIALIZATION_VERSION;
+  private boolean probe;
 
   public SelectStatementImpl(DatabaseClient client) {
     this.client = client;
@@ -382,6 +382,31 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
 
   public void setTableNames(String[] tableNames) {
     this.tableNames = tableNames;
+  }
+
+  public void setExpression(ExpressionImpl expression) {
+    this.expression = expression;
+  }
+
+  public void setRecordCache(ExpressionImpl.RecordCache recordCache) {
+    this.recordCache = recordCache;
+  }
+
+  public void setProbe(boolean probe) {
+    this.probe = probe;
+    expression.setProbe(probe);
+  }
+
+  public void setColumns(ArrayList<ColumnImpl> columns) {
+    this.columns = columns;
+  }
+
+  public List<Join> getJoins() {
+    return joins;
+  }
+
+  public void forceSelectOnServer(boolean force) {
+    this.forceSelectOnServer = force;
   }
 
   class DistinctRecord {
@@ -1042,14 +1067,14 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
         else {
           expression.forceSelectOnServer(forceSelectOnServer);
           expression.setDbName(dbName);
-          ret = expression.next(count, explain, currOffset, limit, offset, false);
+          ret = expression.next(count, explain, currOffset, limit, offset, false, false);
         }
         if (ret == null) {
           return null;
         }
-        if (!serverSelect) {
+        //if (!serverSelect) {
           dedupIds(dbName, ret.getTableNames(), ret);
-        }
+        //}
         return ret;
       }
       catch (SchemaOutOfSyncException e) {
@@ -1277,7 +1302,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                       explain.getBuilder().append("inner join based on expression: table=" + fromTable + ", expression=" + expression.toString() + "\n");
                     }
                     long begin = System.nanoTime();
-                    ids = expression.next(pageSize / threadCount, explain, currOffset, limit, offset, false);
+                    ids = expression.next(pageSize / threadCount, explain, currOffset, limit, offset, false, false);
                     if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
                       hadSelectRet = true;
                     }
@@ -1307,7 +1332,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                     allExpression.setDbName(dbName);
                     allExpression.setColumns(getSelectColumns());
                     allExpression.setOrderByExpressions(expression.getOrderByExpressions());
-                    ids = allExpression.next(pageSize / threadCount, explain, currOffset, limit, offset, false);
+                    ids = allExpression.next(pageSize / threadCount, explain, currOffset, limit, offset, false, false);
                     if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
                       hadSelectRet = true;
                     }
@@ -1332,7 +1357,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                     allExpression.setDbName(dbName);
                     allExpression.setColumns(getSelectColumns());
                     allExpression.setOrderByExpressions(expression.getOrderByExpressions());
-                    ids = allExpression.next(pageSize / threadCount, explain, currOffset, limit, offset, false);
+                    ids = allExpression.next(pageSize / threadCount, explain, currOffset, limit, offset, false, false);
                     if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
                       hadSelectRet = true;
                     }

@@ -1370,7 +1370,7 @@ public class BulkImportManager {
     PreparedStatement insertStmt = null;
     try {
       //for (int i = 0; i < 10; i++) {
-        insertStmt = insertConn.prepareStatement("insert into " + tableName +
+        insertStmt = insertConn.prepareStatement("insert ignore into " + tableName +
             " (" + fieldsStr.toString() + ") VALUES (" + parmsStr.toString() + ")");
 
         try {

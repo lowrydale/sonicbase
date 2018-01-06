@@ -91,7 +91,7 @@ public class ParameterImpl extends ExpressionImpl {
   }
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset, boolean b) {
+  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset, boolean b, boolean analyze) {
     return null;
   }
 

@@ -471,8 +471,13 @@ public class TestSetOperations {
       assertEquals(rs.getLong("id"), i);
     }
     for (int i = 2; i < 10; i++) {
-      assertTrue(rs.next());
-      assertEquals(rs.getLong("id"), i);
+      try {
+        assertTrue(rs.next());
+        assertEquals(rs.getLong("id"), i, String.valueOf(i));
+      }
+      catch (Exception e) {
+        System.out.println("i=" + i);
+      }
     }
     assertFalse(rs.next());
   }

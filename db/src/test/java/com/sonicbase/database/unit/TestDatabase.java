@@ -646,7 +646,7 @@ public class TestDatabase {
            null,
            columns, "socialsecuritynumber", 0, recordCache,
            usedIndex, false, client.getCommon().getSchemaVersion(), null, null,
-         false, new AtomicLong(), null, null);
+         false, new AtomicLong(), null, null, false);
 
      assertEquals(ret.getCurrKeys().length, 4);
 
@@ -2860,7 +2860,7 @@ public class TestDatabase {
   }
 
   @Test
-  public void testLessEqualAndGreaterEqual() throws SQLException {
+  public void    testLessEqualAndGreaterEqual() throws SQLException {
 
     //test select returns multiple records with an index using operator '<='
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id<=5 and id>=1 order by id desc");

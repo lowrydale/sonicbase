@@ -89,7 +89,7 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
   }
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset, boolean b) {
+  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset, boolean b, boolean analyze) {
     TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(getFromTable());
     IndexSchema indexSchema = null;
     for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndexes().entrySet()) {
@@ -110,7 +110,8 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
     AtomicReference<String> usedIndex = new AtomicReference<>();
     SelectContextImpl context = lookupIds(dbName, getClient().getCommon(), getClient(), getReplica(), count, tableSchema.getName(), indexSchema.getName(), isForceSelectOnServer(),
         op, null, getOrderByExpressions(), getNextKey(), getParms(), this, null, getNextKey(), null,
-        getColumns(), indexSchema.getFields()[0], getNextShard(), getRecordCache(), usedIndex, false, getViewVersion(), getCounters(), getGroupByContext(), debug, currOffset, limit, offset);
+        getColumns(), indexSchema.getFields()[0], getNextShard(), getRecordCache(), usedIndex, false,
+        getViewVersion(), getCounters(), getGroupByContext(), debug, currOffset, limit, offset, isProbe());
     setNextShard(context.getNextShard());
     setNextKey(context.getNextKey());
     NextReturn ret = new NextReturn();
@@ -122,7 +123,7 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
 
   @Override
   public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset) {
-    return next(DatabaseClient.SELECT_PAGE_SIZE, explain, currOffset, limit, offset, false);
+    return next(DatabaseClient.SELECT_PAGE_SIZE, explain, currOffset, limit, offset, false, false);
   }
 
   @Override

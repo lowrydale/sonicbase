@@ -11,6 +11,7 @@ import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.query.DatabaseException;
+import com.sonicbase.queue.LocalMessageQueueProducer;
 import com.sonicbase.research.socket.NettyServer;
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.IOUtils;
@@ -181,6 +182,9 @@ public class TestBulkImport {
       for (DatabaseServer server : dbServers) {
         server.shutdownRepartitioner();
       }
+
+      LocalMessageQueueProducer.queue.clear();
+
 
       for (int i = 0; i < 10_000; i++) {
         stmt = connA.prepareStatement("insert into persons (id, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?)");

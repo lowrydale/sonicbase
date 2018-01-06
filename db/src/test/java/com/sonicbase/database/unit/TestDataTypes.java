@@ -10,6 +10,7 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.queue.LocalMessageQueueConsumer;
+import com.sonicbase.queue.LocalMessageQueueProducer;
 import com.sonicbase.queue.Message;
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.IOUtils;
@@ -99,7 +100,6 @@ public class TestDataTypes {
 
     DatabaseClient client = ((ConnectionProxy)conn).getDatabaseClient();
 
-
     executor.shutdownNow();
   }
 
@@ -170,9 +170,9 @@ public class TestDataTypes {
     System.out.println(body);
     ObjectMapper mapper = new ObjectMapper();
     ObjectNode dict = (ObjectNode) mapper.readTree(body);
-    assertEquals("test", dict.get("database").asText());
-    assertEquals("persons", dict.get("table").asText());
-    assertEquals("insert", dict.get("action").asText());
+    assertEquals(dict.get("database").asText(), "test");
+    assertEquals(dict.get("table").asText(), "persons");
+    assertEquals(dict.get("action").asText(), "insert");
     ObjectNode record = (ObjectNode) dict.withArray("records").get(0);
     assertNotNull(record.get("_sequence0").asLong());
     assertNotNull(record.get("_sequence1").asLong());
@@ -270,6 +270,9 @@ public class TestDataTypes {
 
   @Test
   public void testBasics() throws Exception {
+
+    LocalMessageQueueProducer.queue.clear();
+
     initTypes();
 
     //test select returns multiple records with an index using operator '<'

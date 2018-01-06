@@ -12,6 +12,7 @@ import com.sonicbase.index.Index;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.ExpressionImpl;
+import com.sonicbase.queue.LocalMessageQueueProducer;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.TableSchema;
@@ -136,6 +137,8 @@ public class TestFunctions {
     stmt.executeUpdate();
 
     //test insert
+
+    LocalMessageQueueProducer.queue.clear();
 
     stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");
     stmt.setLong(1, 1000);

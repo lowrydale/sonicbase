@@ -1522,13 +1522,13 @@ public class ReadManager {
         }
         if (entry != null && lessKey != null) {
           if (useGreater) {
-            int compareValue = server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), lessOriginalKey);
-            if ((0 == compareValue || 1 == compareValue) && greaterOp == BinaryExpression.Operator.greater) {
+            int compareValue = server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), greaterOriginalKey);
+            if ((0 == compareValue || -1 == compareValue) && greaterOp == BinaryExpression.Operator.greater) {
               entry = null;
             }
-            if (1 == compareValue) {
-              entry = null;
-            }
+//            if (1 == compareValue) {
+//              entry = null;
+//            }
           }
           else {
             int compareValue = server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), lessKey);
@@ -1783,10 +1783,10 @@ public class ReadManager {
           //          break;
           //        }
           if (ascending != null && !ascending) {
-            entry = index.lowerEntry((entry.getKey()));
+            entry = index.lowerEntry(entry.getKey());
           }
           else {
-            entry = index.higherEntry((entry.getKey()));
+            entry = index.higherEntry(entry.getKey());
           }
           if (entry != null) {
             if (entry.getKey() == null) {

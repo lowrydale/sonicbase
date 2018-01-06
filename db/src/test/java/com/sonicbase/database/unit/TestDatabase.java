@@ -16,6 +16,7 @@ import com.sonicbase.query.impl.ColumnImpl;
 import com.sonicbase.query.impl.ExpressionImpl;
 import com.sonicbase.query.impl.SelectContextImpl;
 import com.sonicbase.queue.LocalMessageQueueConsumer;
+import com.sonicbase.queue.LocalMessageQueueProducer;
 import com.sonicbase.queue.Message;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
@@ -154,6 +155,8 @@ public class TestDatabase {
       stmt.executeUpdate();
 
       //test insertWithRecord
+
+      LocalMessageQueueProducer.queue.clear();
 
       stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");
       stmt.setLong(1, 1000);
@@ -2024,6 +2027,30 @@ public class TestDatabase {
     ret.next();
     assertEquals(ret.getLong("id"), 109);
 
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testTwoKeyLessEqual() throws SQLException {
+    //fails
+
+    //test select returns multiple records with a table scan
+    PreparedStatement stmt = conn.prepareStatement("select persons.id  " +
+        "from persons where persons.id<=100 AND id > 4");                                              //
+    ResultSet ret = stmt.executeQuery();
+
+    ret.next();
+    assertEquals(ret.getLong("id"), 5);
+    ret.next();
+    assertEquals(ret.getLong("id"), 6);
+    ret.next();
+    assertEquals(ret.getLong("id"), 7);
+    ret.next();
+    assertEquals(ret.getLong("id"), 8);
+    ret.next();
+    assertEquals(ret.getLong("id"), 9);
+    ret.next();
+    assertEquals(ret.getLong("id"), 100);
     assertFalse(ret.next());
   }
 

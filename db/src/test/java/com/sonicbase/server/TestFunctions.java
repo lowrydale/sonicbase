@@ -1,25 +1,13 @@
-package com.sonicbase.database.unit;
+package com.sonicbase.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
-import com.sonicbase.common.DatabaseCommon;
-import com.sonicbase.common.KeyRecord;
 import com.sonicbase.common.Logger;
-import com.sonicbase.index.Index;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
-import com.sonicbase.query.DatabaseException;
-import com.sonicbase.query.impl.ExpressionImpl;
 import com.sonicbase.queue.LocalMessageQueueProducer;
-import com.sonicbase.schema.DataType;
-import com.sonicbase.schema.FieldSchema;
-import com.sonicbase.schema.TableSchema;
-import com.sonicbase.server.BulkImportManager;
-import com.sonicbase.server.DatabaseServer;
-import com.sonicbase.server.StreamManager;
-import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.util.FileUtils;
 import org.testng.annotations.AfterClass;
@@ -27,13 +15,9 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.io.BufferedInputStream;
-import java.io.EOFException;
 import java.io.File;
-import java.io.UnsupportedEncodingException;
-import java.math.BigDecimal;
 import java.sql.*;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Future;
@@ -765,7 +749,7 @@ public class TestFunctions {
 
   @Test
   public void testCustom() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("select * from persons where custom('com.sonicbase.database.unit.CustomFunctions', 'plus', id, id2) < 3");
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where custom('com.sonicbase.server.CustomFunctions', 'plus', id, id2) < 3");
     ResultSet rs = stmt.executeQuery();
     rs.next();
     assertEquals(rs.getLong("id"), 0);

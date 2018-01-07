@@ -124,12 +124,6 @@ public class DiskBasedResultSet {
         futures.add(executor.submit(new Callable(){
           @Override
           public Object call() throws Exception {
-            if (localK == 0) {
-              System.out.println("rs=0");
-            }
-            if (localK == 1) {
-              System.out.println("rs=1");
-            }
             ResultSetImpl rs = resultSets[localK];
             ExpressionImpl.CachedRecord[][] records = rs.getReadRecordsAndSerializedRecords();
             if (records == null) {

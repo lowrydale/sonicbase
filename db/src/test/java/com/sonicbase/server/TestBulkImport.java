@@ -1,5 +1,5 @@
 /* © 2017 by Intellectual Reserve, Inc. All rights reserved. */
-package com.sonicbase.database.unit;
+package com.sonicbase.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -13,7 +13,6 @@ import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.queue.LocalMessageQueueProducer;
 import com.sonicbase.research.socket.NettyServer;
-import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.util.FileUtils;
 import org.testng.annotations.AfterClass;

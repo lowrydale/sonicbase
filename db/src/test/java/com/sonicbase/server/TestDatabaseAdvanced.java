@@ -1,4 +1,4 @@
-package com.sonicbase.database.unit;
+package com.sonicbase.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -13,9 +13,6 @@ import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.queue.LocalMessageQueueProducer;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.server.BulkImportManager;
-import com.sonicbase.server.DatabaseServer;
-import com.sonicbase.server.StreamManager;
 import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.util.FileUtils;
 import org.testng.annotations.AfterClass;

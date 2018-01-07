@@ -1,4 +1,4 @@
-package com.sonicbase.database.unit;
+package com.sonicbase.server;
 
 import com.sonicbase.common.ComObject;
 import org.testng.annotations.Test;

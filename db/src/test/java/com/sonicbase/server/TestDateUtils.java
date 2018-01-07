@@ -1,5 +1,5 @@
 /* © 2017 by Intellectual Reserve, Inc. All rights reserved. */
-package com.sonicbase.database.unit;
+package com.sonicbase.server;
 
 import com.sonicbase.util.DateUtils;
 import org.testng.annotations.Test;

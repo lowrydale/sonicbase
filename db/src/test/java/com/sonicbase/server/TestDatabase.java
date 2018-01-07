@@ -1,4 +1,4 @@
-package com.sonicbase.database.unit;
+package com.sonicbase.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -20,7 +20,6 @@ import com.sonicbase.queue.LocalMessageQueueProducer;
 import com.sonicbase.queue.Message;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.server.DatabaseServer;
 import com.sun.jersey.core.util.Base64;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.IOUtils;
@@ -46,7 +45,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static com.sonicbase.database.unit.TestDataTypes.assertJsonEquals;
 import static org.testng.Assert.*;
 
 public class TestDatabase {
@@ -3894,7 +3892,7 @@ public class TestDatabase {
       record.remove("_sequence0");
       record.remove("_sequence1");
       record.remove("_sequence2");
-      assertJsonEquals(record.toString(), "{\"id2\":0,\"id\":0}");
+      TestDataTypes.assertJsonEquals(record.toString(), "{\"id2\":0,\"id\":0}");
 
       stmt = conn.prepareStatement("select * from ToDeleteNoPrimaryKey where id = 0");
       rs = stmt.executeQuery();

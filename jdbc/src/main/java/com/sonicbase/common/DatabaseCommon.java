@@ -851,9 +851,6 @@ public class DatabaseCommon {
           else {
             out.writeBoolean(true);
             int type = DataType.Type.getTypeForValue(key[i]);
-            if (type == -1) {
-              System.out.println("bad type");
-            }
             Varint.writeSignedVarLong(type, out);
 
             if (key[i] instanceof Long) {

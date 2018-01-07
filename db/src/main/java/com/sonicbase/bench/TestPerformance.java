@@ -65,6 +65,11 @@ public class TestPerformance {
     setup(outerFactor);
 
     List<String> methods = new ArrayList<>();
+
+
+    methods.add("testInnerJoin");
+    methods.add("testLeftOuterJoin");
+    methods.add("testRightOuterJoin");
     methods.add("testIdLookup");
     methods.add("testMath");
     methods.add("testIdNoKey");
@@ -90,13 +95,14 @@ public class TestPerformance {
     methods.add("testTwoKeyLeftSidedGreaterEqual");
     methods.add("testCountTwoKeyGreaterEqual");
     methods.add("testMaxWhere");
-    methods.add("testMax");
+    //methods.add("testMax");
     methods.add("testCount");
     methods.add("testSort");
     methods.add("testSortDisk");
     methods.add("testId2");
     methods.add("testId2Range");
     methods.add("testOtherExpression");
+    methods.add("testNoWhereClause");
 
     methods.add("testRangeGreaterDescend");
     methods.add("testRange");
@@ -504,6 +510,19 @@ public class TestPerformance {
           for (DatabaseServer server : dbServers) {
             server.shutdownRepartitioner();
           }
+
+          client.beginRebalance("test", "persons", "_1__primarykey");
+
+          while (true) {
+            if (client.isRepartitioningComplete("test")) {
+              break;
+            }
+            Thread.sleep(200);
+          }
+
+          for (DatabaseServer server : dbServers) {
+            server.shutdownRepartitioner();
+          }
         }
       }
     }
@@ -579,6 +598,76 @@ public class TestPerformance {
       throw new DatabaseException("non-unique test: name=" + testName);
     }
   }
+
+  public void testNoWhereClause() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from persons");
+    long begin = System.nanoTime();
+    int count = 0;
+    ResultSet rs = stmt.executeQuery();
+    for (int i = 0; i < outerFactor * 500_000; i++) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id"), (long)i);
+      count++;
+    }
+    long end = System.nanoTime();
+    registerResults("no where clause", end-begin, count);
+    //assertTrue((end - begin) < (8000 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+
+  public void testInnerJoin() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement(
+        "select persons.id, persons.socialsecuritynumber, persons2.socialsecuritynumber from persons " +
+            " inner join persons2 on persons.id = persons2.id where persons.id>1000  order by persons.id desc");
+    ResultSet rs = stmt.executeQuery();
+    long begin = System.nanoTime();
+    int count = 0;
+    for (int i = (int)(outerFactor * 500_000) - 1; i > 1000; i--) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id"), (long)i);
+      count++;
+    }
+    long end = System.nanoTime();
+    registerResults("inner join", end-begin, count);
+    //assertTrue((end - begin) < (3300 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  public void testLeftOuterJoin() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement(
+        "select persons.id, persons.socialsecuritynumber, persons2.id from persons " +
+            "left outer join persons2 on persons.id = persons2.id where persons2.id > 1000  order by persons2.id desc");
+    ResultSet rs = stmt.executeQuery();
+    long begin = System.nanoTime();
+    int count = 0;
+    for (int i = (int)(outerFactor * 500_000) - 1; i > 1000; i--) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id"), (long)i);
+      count++;
+    }
+    long end = System.nanoTime();
+    registerResults("left outer join", end-begin, count);
+    //assertTrue((end - begin) < (3300 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+  public void testRightOuterJoin() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement(
+        "select persons.id, persons.socialsecuritynumber, persons2.id from persons " +
+            "right outer join persons2 on persons.id = persons2.id where persons.id > 1000  order by persons.id desc");
+    ResultSet rs = stmt.executeQuery();
+
+    long begin = System.nanoTime();
+    int count = 0;
+    for (int i = (int)(outerFactor * 500_000) - 1; i > 1000; i--) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id"), (long)i);
+      count++;
+    }
+    long end = System.nanoTime();
+    registerResults("right outer join", end-begin, count);
+    //assertTrue((end - begin) < (3300 * 1_000_000L), String.valueOf(end-begin));
+  }
+
+
 
   public void testIdLookup() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id=1000");

@@ -1,8 +1,7 @@
 /* © 2017 by Intellectual Reserve, Inc. All rights reserved. */
-package com.sonicbase.database.unit;
+package com.sonicbase.server;
 
 import com.sonicbase.query.DatabaseException;
-import com.sonicbase.server.AddressMap;
 import org.testng.annotations.Test;
 import sun.misc.Unsafe;
 

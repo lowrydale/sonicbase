@@ -1441,6 +1441,15 @@ public class TestDatabase {
 
     assertTrue(ret.next());
     assertEquals(ret.getLong("minValue"), 0);
+    assertEquals(ret.getLong(1), 0);
+    assertEquals(ret.getString("minValue"), "0");
+    assertEquals(ret.getString(1), "0");
+    assertEquals(ret.getInt("minValue"), 0);
+    assertEquals(ret.getInt(1), 0);
+    assertEquals(ret.getFloat("minValue"), 0f);
+    assertEquals(ret.getFloat(1), 0f);
+    assertEquals(ret.getDouble("minValue"), 0d);
+    assertEquals(ret.getDouble(1), 0d);
     assertFalse(ret.next());
   }
 
@@ -3522,7 +3531,7 @@ public class TestDatabase {
 
     List<Long> ids = new ArrayList<>();
 
-    //test insert
+    //test upsert
     int recordCount = 2000;
 
     for (int i = 0; i < recordCount; i++) {
@@ -3622,7 +3631,7 @@ public class TestDatabase {
 
     List<Long> ids = new ArrayList<>();
 
-    //test insert
+    //test upsert
     int recordCount = 20000;
 
     for (int i = 0; i < recordCount; i++) {
@@ -3716,7 +3725,7 @@ public class TestDatabase {
 
     List<Long> ids = new ArrayList<>();
 
-    //test insert
+    //test upsert
     int recordCount = 20000;
 
     for (int i = 0; i < recordCount; i++) {

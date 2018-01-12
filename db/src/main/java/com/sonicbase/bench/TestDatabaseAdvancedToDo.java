@@ -89,7 +89,7 @@ public class TestDatabaseAdvancedToDo {
     stmt = conn.prepareStatement("create index socialSecurityNumber on persons(socialSecurityNumber)");
     stmt.executeUpdate();
 
-    //test insert
+    //test upsert
 
     stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");
     stmt.setLong(1, 1000);

@@ -5,7 +5,7 @@
       classname="com.yworks.yguard.YGuardTask"
       classpath="/Users/lowryda/tools/yguard-2.6/lib/yguard.jar"/>
       <yguard>
-          <inoutpair in="db/target/sonicbase-core-unobfuscated-1.2.8.jar" out="db/target/sonicbase-core-1.2.8.jar"/>
+          <inoutpair in="db/target/sonicbase-core-unobfuscated-1.2.9.jar" out="db/target/sonicbase-core-1.2.9.jar"/>
           <shrink logfile="shrink.log">
 
               <keep>

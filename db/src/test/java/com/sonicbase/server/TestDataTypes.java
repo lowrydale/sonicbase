@@ -122,7 +122,7 @@ public class TestDataTypes {
     stmt.executeUpdate();
 
 
-    //test insert
+    //test upsert
 
     for (int i = 0; i < recordCount; i++) {
       stmt = conn.prepareStatement("insert into persons (id, socialSecurityNumber, relatives, restricted, gender, int, bool, smallInt, char, float, double, blob, numeric, decimal, bin, date, time, timestamp, tinyint, bit, real, nchar, nvarchar, longnvarchar, longvarchar, longvarbinary) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -171,7 +171,7 @@ public class TestDataTypes {
     ObjectNode dict = (ObjectNode) mapper.readTree(body);
     assertEquals(dict.get("database").asText(), "test");
     assertEquals(dict.get("table").asText(), "persons");
-    assertEquals(dict.get("action").asText(), "insert");
+    assertEquals(dict.get("action").asText(), "upsert");
     ObjectNode record = (ObjectNode) dict.withArray("records").get(0);
     assertNotNull(record.get("_sequence0").asLong());
     assertNotNull(record.get("_sequence1").asLong());

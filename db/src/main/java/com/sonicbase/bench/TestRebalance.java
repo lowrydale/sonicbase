@@ -71,7 +71,7 @@ public class TestRebalance {
 
     Connection conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000", "user", "password");
 
-    //test insert
+    //test upsert
     int recordCount = dbServers.length * 50;
 
     for (int i = 0; i < recordCount; i++) {

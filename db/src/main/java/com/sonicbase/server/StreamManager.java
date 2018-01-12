@@ -178,7 +178,7 @@ public class StreamManager {
             parmsStr.append("?");
           }
 
-          PreparedStatement stmt = connections.get(dbName).prepareStatement("insert into " + tableName + " (" + fieldsStr.toString() +
+          PreparedStatement stmt = connections.get(dbName).prepareStatement("insert ignore into " + tableName + " (" + fieldsStr.toString() +
               ") VALUES (" + parmsStr.toString() + ")");
           try {
 
@@ -225,9 +225,13 @@ public class StreamManager {
             stmt.execute();
           }
         }
+        else {
+          throw new DatabaseException("Unkown publish action: action=" + action);
+        }
         consumer.acknowledgeMessage(messageObj);
       }
       catch (Exception e) {
+        throw new DatabaseException(e);
       }
     }
   }

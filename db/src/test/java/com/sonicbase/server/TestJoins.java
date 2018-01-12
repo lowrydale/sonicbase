@@ -125,7 +125,7 @@ public class TestJoins {
     stmt = conn.prepareStatement("create index socialSecurityNumber on persons(socialSecurityNumber)");
     stmt.executeUpdate();
 
-    //test insert
+    //test upsert
 
     LocalMessageQueueProducer.queue.clear();
 

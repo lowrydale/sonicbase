@@ -99,7 +99,7 @@ public class TestPartsOfJoin {
 
     List<Long> ids = new ArrayList<>();
 
-    //test insert
+    //test upsert
     int recordCount = 10;
 
     stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");

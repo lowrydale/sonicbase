@@ -750,6 +750,19 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = null;
     SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
     if (function != null) {
+      if (function != null && this.groupByContext == null) {
+        if (function.getName().equalsIgnoreCase("count") || function.getName().equalsIgnoreCase("min") || function.getName().equalsIgnoreCase("max") || function.getName().equalsIgnoreCase("sum") || function.getName().equalsIgnoreCase("avg")) {
+          Object obj = this.getCounterValue(function);
+          if (obj instanceof Long) {
+            return String.valueOf((Long)obj);
+          }
+
+          if (obj instanceof Double) {
+            return String.valueOf((Double)obj);
+          }
+        }
+      }
+
       if (function.getName().equalsIgnoreCase(LENGTH_STR) ||
           function.getName().equalsIgnoreCase("upper") ||
           function.getName().equalsIgnoreCase("lower") ||
@@ -1728,6 +1741,27 @@ public class ResultSetImpl implements ResultSet {
       return (int) count;
     }
 
+    if (columnIndex == 1) {
+      if (functionAliases != null && functionAliases.values() != null && functionAliases.values().size() != 0) {
+        SelectFunctionImpl functionObj = functionAliases.values().iterator().next();
+        if (functionObj != null) {
+          if (functionObj.getName().equalsIgnoreCase("count") ||
+              functionObj.getName().equalsIgnoreCase("min") ||
+              functionObj.getName().equalsIgnoreCase("max") ||
+              functionObj.getName().equalsIgnoreCase("sum") ||
+              functionObj.getName().equalsIgnoreCase("avg")) {
+            Object obj = getCounterValue(functionObj);
+            if (obj instanceof Long) {
+              return (int) (long) obj;
+            }
+            if (obj instanceof Double) {
+              return (int) (double) obj;
+            }
+          }
+        }
+      }
+    }
+
     List<ColumnImpl> columns = selectStatement.getSelectColumns();
 
     ColumnImpl column = columns.get(columnIndex - 1);
@@ -1762,6 +1796,28 @@ public class ResultSetImpl implements ResultSet {
       Object ret = getField(actualColumn, actualColumn[1]);
       return getLong(ret, function);
     }
+
+    if (columnIndex == 1) {
+      if (functionAliases != null && functionAliases.values() != null && functionAliases.values().size() != 0) {
+        SelectFunctionImpl functionObj = functionAliases.values().iterator().next();
+        if (functionObj != null) {
+          if (functionObj.getName().equalsIgnoreCase("count") ||
+              functionObj.getName().equalsIgnoreCase("min") ||
+              functionObj.getName().equalsIgnoreCase("max") ||
+              functionObj.getName().equalsIgnoreCase("sum") ||
+              functionObj.getName().equalsIgnoreCase("avg")) {
+            Object obj = getCounterValue(functionObj);
+            if (obj instanceof Long) {
+              return (Long) obj;
+            }
+            if (obj instanceof Double) {
+              return (long) (double) obj;
+            }
+          }
+        }
+      }
+    }
+
     List<ColumnImpl> columns = selectStatement.getSelectColumns();
     ColumnImpl column = columns.get(columnIndex - 1);
     String columnName = column.getColumnName();
@@ -1837,19 +1893,40 @@ public class ResultSetImpl implements ResultSet {
     if (columnIndex == 1 && this.isCount) {
       return (double) this.count;
     }
-    else {
-      List<ColumnImpl> columns = selectStatement.getSelectColumns();
-      ColumnImpl column = columns.get(columnIndex - 1);
-      String columnLabel = column.getColumnName();
-      if (isMatchingAlias(columnLabel) && isCount) {
-        return (double) count;
-      }
-      String[] actualColumn = getActualColumn(columnLabel);
-      Object ret = getField(actualColumn, columnLabel);
 
-      SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
-      return getDouble(ret, function);
+    if (columnIndex == 1) {
+      if (functionAliases != null && functionAliases.values() != null && functionAliases.values().size() != 0) {
+        SelectFunctionImpl functionObj = functionAliases.values().iterator().next();
+        if (functionObj != null) {
+          if (functionObj.getName().equalsIgnoreCase("count") ||
+              functionObj.getName().equalsIgnoreCase("min") ||
+              functionObj.getName().equalsIgnoreCase("max") ||
+              functionObj.getName().equalsIgnoreCase("sum") ||
+              functionObj.getName().equalsIgnoreCase("avg")) {
+            Object obj = getCounterValue(functionObj);
+            if (obj instanceof Long) {
+              return (double) (long) obj;
+            }
+            if (obj instanceof Double) {
+              return (double) (double) obj;
+            }
+          }
+        }
+      }
     }
+
+    List<ColumnImpl> columns = selectStatement.getSelectColumns();
+    ColumnImpl column = columns.get(columnIndex - 1);
+    String columnLabel = column.getColumnName();
+    if (isMatchingAlias(columnLabel) && isCount) {
+      return (double) count;
+    }
+    String[] actualColumn = getActualColumn(columnLabel);
+    Object ret = getField(actualColumn, columnLabel);
+
+    SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
+    return getDouble(ret, function);
+
   }
 
   @Override
@@ -1857,20 +1934,40 @@ public class ResultSetImpl implements ResultSet {
     if (columnIndex == 1 && this.isCount) {
       return (float) this.count;
     }
-    else {
-      List<ColumnImpl> columns = selectStatement.getSelectColumns();
-      ColumnImpl column = columns.get(columnIndex - 1);
-      String columnLabel = column.getColumnName();
 
-      if (isMatchingAlias(columnLabel) && isCount) {
-        return (float) count;
+    if (columnIndex == 1) {
+      if (functionAliases != null && functionAliases.values() != null && functionAliases.values().size() != 0) {
+        SelectFunctionImpl functionObj = functionAliases.values().iterator().next();
+        if (functionObj != null) {
+          if (functionObj.getName().equalsIgnoreCase("count") ||
+              functionObj.getName().equalsIgnoreCase("min") ||
+              functionObj.getName().equalsIgnoreCase("max") ||
+              functionObj.getName().equalsIgnoreCase("sum") ||
+              functionObj.getName().equalsIgnoreCase("avg")) {
+            Object obj = getCounterValue(functionObj);
+            if (obj instanceof Long) {
+              return (float) (long) obj;
+            }
+            if (obj instanceof Double) {
+              return (float) (double) obj;
+            }
+          }
+        }
       }
-      String[] actualColumn = getActualColumn(columnLabel);
-      Object ret = getField(actualColumn, columnLabel);
-
-      SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
-      return getFloat(ret, function);
     }
+
+    List<ColumnImpl> columns = selectStatement.getSelectColumns();
+    ColumnImpl column = columns.get(columnIndex - 1);
+    String columnLabel = column.getColumnName();
+
+    if (isMatchingAlias(columnLabel) && isCount) {
+      return (float) count;
+    }
+    String[] actualColumn = getActualColumn(columnLabel);
+    Object ret = getField(actualColumn, columnLabel);
+
+    SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(columnLabel));
+    return getFloat(ret, function);
   }
 
   @Override
@@ -1927,6 +2024,26 @@ public class ResultSetImpl implements ResultSet {
       return String.valueOf((int) count);
     }
 
+    if (columnIndex == 1) {
+      if (functionAliases != null && functionAliases.values() != null && functionAliases.values().size() != 0) {
+        SelectFunctionImpl functionObj = functionAliases.values().iterator().next();
+        if (functionObj != null) {
+          if (functionObj.getName().equalsIgnoreCase("count") ||
+              functionObj.getName().equalsIgnoreCase("min") ||
+              functionObj.getName().equalsIgnoreCase("max") ||
+              functionObj.getName().equalsIgnoreCase("sum") ||
+              functionObj.getName().equalsIgnoreCase("avg")) {
+            Object obj = getCounterValue(functionObj);
+            if (obj instanceof Long) {
+              return String.valueOf((Long) obj);
+            }
+            if (obj instanceof Double) {
+              return String.valueOf((long) (double) obj);
+            }
+          }
+        }
+      }
+    }
     if (describeStrs != null) {
       if (columnIndex == 1) {
         return describeStrs[(int) currPos];
@@ -2022,7 +2139,7 @@ public class ResultSetImpl implements ResultSet {
         final ExpressionImpl topMostExpression = selectStatement.getExpression();
 
         OptimizationSettings optimizationSettings = null;
-        if ((selectStatement.getJoins() == null || selectStatement.getJoins().size() == 0) &&
+        if (counters == null && (selectStatement.getJoins() == null || selectStatement.getJoins().size() == 0) &&
             !selectStatement.isServerSelect() &&
             (topMostExpression instanceof BinaryExpressionImpl || topMostExpression instanceof AllRecordsExpressionImpl)) {
           selectStatement.getExpression().next((int) count, null, new AtomicLong(), limit, offset, false, true);

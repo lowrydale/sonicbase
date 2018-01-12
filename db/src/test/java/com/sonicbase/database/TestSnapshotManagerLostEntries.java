@@ -110,7 +110,7 @@ public class TestSnapshotManagerLostEntries {
       stmt.setLong(1, i);
       assertEquals(stmt.executeUpdate(), 1);
       if (i % 10_000 == 0) {
-        System.out.println("insert progress: count=" + i);
+        System.out.println("upsert progress: count=" + i);
       }
     }
 

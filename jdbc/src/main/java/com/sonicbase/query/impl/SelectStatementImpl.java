@@ -80,7 +80,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
   }
 
   public void setFromTable(String fromTable) {
-    this.fromTable = fromTable.toLowerCase();
+    this.fromTable = DatabaseClient.toLower(fromTable);
   }
 
   public ExpressionImpl getExpression() {

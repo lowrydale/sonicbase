@@ -167,7 +167,7 @@ public class TestInsertSelect {
     stmt = conn.prepareStatement("create index id on nokeysecondaryindex(id)");
     stmt.executeUpdate();
 
-    //test insert
+    //test upsert
 
 
     for (int i = 0; i < recordCount; i++) {

@@ -140,7 +140,7 @@ public class TestRepartitionerConsistencyIdentity {
               Thread.sleep(1);
 
               if (highestId.get() % 10000 == 0) {
-                System.out.println("insert progress: count=" + highestId.get());
+                System.out.println("upsert progress: count=" + highestId.get());
               }
             }
           }

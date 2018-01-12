@@ -1,5 +1,5 @@
--injars       obfuscated/target/sonicbase-parent-unobfuscated-1.2.8.jar
--outjars      obfuscated/target/sonicbase-parent-1.2.8.jar
+-injars       obfuscated/target/sonicbase-parent-unobfuscated-1.2.9.jar
+-outjars      obfuscated/target/sonicbase-parent-1.2.9.jar
 -libraryjars  <java.home>/lib/rt.jar
 -printmapping sonicbase-parent.map
 
@@ -154,6 +154,12 @@
 -keep public class com.sonicbase.research.socket.NettyServer$ServerHandler
 -keep public class com.sonicbase.server.MethodInvoker
 
+-keepclassmembers  class com.sonicbase.queue.AWSSQSMessageQueueProducer {
+    !private <methods>;
+}
+-keepclassmembers  class com.sonicbase.queue.AWSSQSMessageQueueConsumer {
+    !private <methods>;
+}
 -keepclassmembers  class com.sonicbase.server.LogManager$ByteCounterStream {
     !private <methods>;
 }

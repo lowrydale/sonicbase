@@ -344,7 +344,7 @@ public class BulkImportManager {
 
                     stmt = localConn.prepareStatement(statementStr);
                     logger.info("bulkImport select statement: slice=" + currSlice + ", str=" + statementStr);
-                    logger.info("bulkImport insert statement: slice=" + currSlice + ", str=insert into " + tableName +
+                    logger.info("bulkImport upsert statement: slice=" + currSlice + ", str=upsert into " + tableName +
                         " (" + fieldsStr.toString() + ") VALUES (" + parmsStr.toString() + ")");
 
                     try {
@@ -362,9 +362,9 @@ public class BulkImportManager {
 
                         final Object[] currRecord = getCurrRecordFromResultSet(rs, fields);
 
-                        if (returned.put((Long)currRecord[0], 0L) != null) {
-                          System.out.println("dup: " + currRecord[0]);
-                        }
+//                        if (returned.put((Long)currRecord[0], 0L) != null) {
+//                          System.out.println("dup: " + currRecord[0]);
+//                        }
                         currBatch.add(currRecord);
                         countRead.incrementAndGet();
 
@@ -964,7 +964,7 @@ public class BulkImportManager {
           for (int i = 0; i < keyFields.length; i++) {
             keys[slice][i] = getValueOfField(rs, keyFields[i], dataTypes[i]);
           }
-          System.out.println("Key=" + DatabaseCommon.keyToString(keys[slice]));
+          //System.out.println("Key=" + DatabaseCommon.keyToString(keys[slice]));
           lastPartialKey[0] = keys[slice][0];
           slice++;
         }

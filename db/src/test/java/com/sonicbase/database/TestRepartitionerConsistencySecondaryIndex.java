@@ -150,7 +150,7 @@ public class TestRepartitionerConsistencySecondaryIndex {
     try {
       int offset = 0;
 //            while (true) {
-//              PreparedStatement stmt = conn.prepareStatement("insert into persons (id, id2) VALUES (?, ?)");
+//              PreparedStatement stmt = conn.prepareStatement("upsert into persons (id, id2) VALUES (?, ?)");
 //              for (int i = 0; i < 100; i++) {
 //                stmt.setLong(1, offset);
 //                stmt.setLong(2, (offset + 100) % 2);
@@ -160,7 +160,7 @@ public class TestRepartitionerConsistencySecondaryIndex {
 //                Thread.sleep(1);
 //
 //                if (highestId.get() % 10000 == 0) {
-//                  System.out.println("insert progress: count=" + highestId.get());
+//                  System.out.println("upsert progress: count=" + highestId.get());
 //                }
 //              }
 //              stmt.executeBatch();
@@ -176,7 +176,7 @@ public class TestRepartitionerConsistencySecondaryIndex {
         Thread.sleep(1);
 
         if (highestId.get() % 10000 == 0) {
-          System.out.println("insert progress: count=" + highestId.get());
+          System.out.println("upsert progress: count=" + highestId.get());
         }
       }
     }

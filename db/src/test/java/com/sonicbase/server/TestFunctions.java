@@ -120,7 +120,7 @@ public class TestFunctions {
     stmt = conn.prepareStatement("create index id on nokeysecondaryindex(id)");
     stmt.executeUpdate();
 
-    //test insert
+    //test upsert
 
     LocalMessageQueueProducer.queue.clear();
 

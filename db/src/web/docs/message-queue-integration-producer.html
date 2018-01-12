@@ -102,7 +102,7 @@
         <lu>
             <li>database - the name of the database for the affected records</li>
             <li>table - the name of the table to for the affected records</li>
-            <li>action - the action that triggered the publish of the message. The action may be "insert", "update" or "delete".</li>
+            <li>action - the action that triggered the publish of the message. The action may be "upsert" or "delete".</li>
         </lu>
         <br/>
         The "records" section contains an array of records that are being publishee. <br/>
@@ -114,7 +114,7 @@
     {
         "database": "test",
         "table": "persons",
-        "action": "insert",
+        "action": "upsert",
         "records": [
             {
                 "id": 123,

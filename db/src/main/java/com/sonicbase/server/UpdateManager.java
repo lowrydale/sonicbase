@@ -9,10 +9,8 @@ import com.sonicbase.index.Repartitioner;
 
 import com.sonicbase.common.*;
 import com.sonicbase.query.DatabaseException;
-import com.sonicbase.query.Expression;
 import com.sonicbase.query.ResultSet;
 import com.sonicbase.query.impl.ColumnImpl;
-import com.sonicbase.query.impl.ExpressionImpl;
 import com.sonicbase.query.impl.SelectStatementImpl;
 import com.sonicbase.queue.MessageQueueProducer;
 import com.sonicbase.schema.DataType;
@@ -93,7 +91,7 @@ public class UpdateManager {
           producers.add(producer);
         }
         catch (Exception e) {
-          logger.error("Error initializing queue producer: config=" + streams.toString());
+          logger.error("Error initializing queue producer: config=" + streams.toString(), e);
         }
       }
     }
@@ -1123,7 +1121,7 @@ private static class InsertRequest {
             server.freeUnsafeIds(value);
           }
         }
-        publishInsertOrUpdate(dbName, tableName, bytes, UpdateType.update);
+        publishInsertOrUpdate(dbName, tableName, bytes, UpdateType.upsert);
       }
       else {
         if (transactionId != 0) {
@@ -1371,13 +1369,13 @@ private static class InsertRequest {
           request.dbName = dbName;
           request.tableName = tableName;
           request.recordBytes = recordBytes;
-          request.updateType = UpdateType.insert;
+          request.updateType = UpdateType.upsert;
           threadLocalMessageRequests.get().add(request);
         }
       }
       else {
         if (Record.DB_VIEW_FLAG_DELETING != Record.getDbViewFlags(recordBytes)) {
-          publishInsertOrUpdate(dbName, tableName, recordBytes, UpdateType.insert);
+          publishInsertOrUpdate(dbName, tableName, recordBytes, UpdateType.upsert);
         }
       }
     }
@@ -1387,8 +1385,7 @@ private static class InsertRequest {
   }
 
 public enum UpdateType {
-  insert,
-  update,
+  upsert,
   delete
 }
 

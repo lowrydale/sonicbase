@@ -98,7 +98,7 @@ public class TestLongManagerLostEntries {
         Thread.sleep(100);
       }
       if (i % 10_000 == 0) {
-        System.out.println("insert progress: count=" + i);
+        System.out.println("upsert progress: count=" + i);
       }
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.countLong, (long)i);

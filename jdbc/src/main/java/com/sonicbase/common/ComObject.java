@@ -460,73 +460,79 @@ public class ComObject {
       Varint.writeSignedVarLong(map.size(), out);
       Iterator<Int2ObjectMap.Entry<Object>> iterator = map.int2ObjectEntrySet().fastIterator();
       while (iterator.hasNext()) {
-        Int2ObjectMap.Entry<Object> entry = iterator.next();
-        int tag = entry.getIntKey();
-        Object value = entry.getValue();
-        DynamicTag tagObj = tagsByTag.get(tag);
-        if (tagObj == null) {
-          throw new DatabaseException("Tag not defined: tag=" + tag);
-        }
-        Varint.writeSignedVarLong(tag, out);
-        Varint.writeSignedVarLong(tagObj.type.tag, out);
-        if (tagObj.type.tag == intType.tag) {
-          Varint.writeSignedVarLong((Integer) value, out);
-        }
-        else if (tagObj.type.tag == shortType.tag) {
-          Varint.writeSignedVarLong((Short) value, out);
-        }
-        else if (tagObj.type.tag == longType.tag) {
-          if (value instanceof Integer) {
-            Varint.writeSignedVarLong((Integer)value, out);
+        int tag = -1;
+        try {
+          Int2ObjectMap.Entry<Object> entry = iterator.next();
+          tag = entry.getIntKey();
+          Object value = entry.getValue();
+          DynamicTag tagObj = tagsByTag.get(tag);
+          if (tagObj == null) {
+            throw new DatabaseException("Tag not defined: tag=" + tag);
           }
-          else {
-            Varint.writeSignedVarLong((Long) value, out);
+          Varint.writeSignedVarLong(tag, out);
+          Varint.writeSignedVarLong(tagObj.type.tag, out);
+          if (tagObj.type.tag == intType.tag) {
+            Varint.writeSignedVarLong((Integer) value, out);
+          }
+          else if (tagObj.type.tag == shortType.tag) {
+            Varint.writeSignedVarLong((Short) value, out);
+          }
+          else if (tagObj.type.tag == longType.tag) {
+            if (value instanceof Integer) {
+              Varint.writeSignedVarLong((Integer) value, out);
+            }
+            else {
+              Varint.writeSignedVarLong((Long) value, out);
+            }
+          }
+          else if (tagObj.type.tag == stringType.tag) {
+            byte[] bytes = ((String) value).getBytes("utf-8");
+            Varint.writeSignedVarLong(bytes.length, out);
+            out.write(bytes);
+          }
+          else if (tagObj.type.tag == booleanType.tag) {
+            out.writeBoolean((Boolean) value);
+          }
+          else if (tagObj.type.tag == byteArrayType.tag) {
+            byte[] bytes = (byte[]) value;
+            Varint.writeSignedVarLong(bytes.length, out);
+            out.write(bytes);
+          }
+          else if (tagObj.type.tag == arrayType.tag) {
+            ((ComArray) value).serialize(out);
+          }
+          else if (tagObj.type.tag == objectType.tag) {
+            out.write(((ComObject) value).serialize());
+          }
+          else if (tagObj.type.tag == tinyIntType.tag) {
+            out.write((byte) value);
+          }
+          else if (tagObj.type.tag == smallIntType.tag) {
+            out.writeShort((short) value);
+          }
+          else if (tagObj.type.tag == floatType.tag) {
+            out.writeFloat((float) value);
+          }
+          else if (tagObj.type.tag == doubleType.tag) {
+            out.writeDouble((double) value);
+          }
+          else if (tagObj.type.tag == bigDecimalType.tag) {
+            byte[] bytes = ((BigDecimal) value).toPlainString().getBytes("utf-8");
+            Varint.writeSignedVarLong(bytes.length, out);
+            out.write(bytes);
+          }
+          else if (tagObj.type.tag == dateType.tag) {
+            Varint.writeSignedVarLong(((java.sql.Date) value).getTime(), out);
+          }
+          else if (tagObj.type.tag == timeType.tag) {
+            Varint.writeSignedVarLong(((java.sql.Time) value).getTime(), out);
+          }
+          else if (tagObj.type.tag == timeStampType.tag) {
+            out.writeUTF(((java.sql.Timestamp) value).toString());
           }
         }
-        else if (tagObj.type.tag == stringType.tag) {
-          byte[] bytes = ((String) value).getBytes("utf-8");
-          Varint.writeSignedVarLong(bytes.length, out);
-          out.write(bytes);
-        }
-        else if (tagObj.type.tag == booleanType.tag) {
-          out.writeBoolean((Boolean) value);
-        }
-        else if (tagObj.type.tag == byteArrayType.tag) {
-          byte[] bytes = (byte[])value;
-          Varint.writeSignedVarLong(bytes.length, out);
-          out.write(bytes);
-        }
-        else if (tagObj.type.tag == arrayType.tag) {
-          ((ComArray)value).serialize(out);
-        }
-        else if (tagObj.type.tag == objectType.tag) {
-          out.write(((ComObject)value).serialize());
-        }
-        else if (tagObj.type.tag == tinyIntType.tag) {
-          out.write((byte)value);
-        }
-        else if (tagObj.type.tag == smallIntType.tag) {
-          out.writeShort((short)value);
-        }
-        else if (tagObj.type.tag == floatType.tag) {
-          out.writeFloat((float)value);
-        }
-        else if (tagObj.type.tag == doubleType.tag) {
-          out.writeDouble((double)value);
-        }
-        else if (tagObj.type.tag == bigDecimalType.tag) {
-          byte[] bytes = ((BigDecimal) value).toPlainString().getBytes("utf-8");
-          Varint.writeSignedVarLong(bytes.length, out);
-          out.write(bytes);
-        }
-        else if (tagObj.type.tag == dateType.tag) {
-          Varint.writeSignedVarLong(((java.sql.Date)value).getTime(), out);
-        }
-        else if (tagObj.type.tag == timeType.tag) {
-          Varint.writeSignedVarLong(((java.sql.Time)value).getTime(), out);
-        }
-        else if (tagObj.type.tag == timeStampType.tag) {
-          out.writeUTF(((java.sql.Timestamp)value).toString());
+        catch (Exception e) {
+          throw new DatabaseException("Error serializing field: tag=" + tag, e);
         }
       }
 

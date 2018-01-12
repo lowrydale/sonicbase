@@ -15,6 +15,9 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class AddressMap {
+
+  private org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
+
   private List<long[]>[] map = new List[10_000];
   private AtomicLong currOuterAddress = new AtomicLong();
   final ConcurrentLinkedQueue<Long> freeList = new ConcurrentLinkedQueue<>();
@@ -44,10 +47,15 @@ public class AddressMap {
     if (outerAddress != null) {
       int offset = (int) Math.floor(outerAddress / (float) map.length);
 
+      long[] value = null;
       synchronized (getMutex(outerAddress)) {
-        long[] value = map[(int) (outerAddress % map.length)].get(offset);
-        return value[1];
+        value = map[(int) (outerAddress % map.length)].get(offset);
       }
+      if (value.length < 2) {
+        logger.error("Invalid address: address=" + outerAddress);
+        return 0;
+      }
+      return value[1];
     }
     return 0;
   }

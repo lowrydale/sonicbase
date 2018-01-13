@@ -55,11 +55,11 @@
 
 
     <div style="margin-left: 4em;">
-
+<h1>Transactions</h1>
 <br/>
 SonicBase supports the read committed transaction isolation level.<br/>
 
-<h1>Simple Example</h1>
+<h2>Simple Example</h2>
         <pre class="java"><code>
     conn.setAutoCommit(false);
     <br/>
@@ -72,7 +72,7 @@ SonicBase supports the read committed transaction isolation level.<br/>
     conn.commit();<br/>
             </code></pre>
 
-<h1>Concurrent Access Example</h1>
+<h2>Concurrent Access Example</h2>
         <pre class="java"><code>
     PreparedStatement stmt = conn.prepareStatement("truncate table persons");
     stmt.execute();

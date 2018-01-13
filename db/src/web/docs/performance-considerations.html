@@ -51,36 +51,36 @@
 
 
     <div style="margin-left: 4em;">
-
-<h1>Prepared Statements</h1>
+<h1>Performance Considerations</h1>
+<h2>Prepared Statements</h2>
 It is important that you use a parameterized prepared statement. You should not use constants for parameters
 that change frequently. Using parameters allows SonicBased to optimize and reuse the query.<br/>
 
-<h1>Bulk Loading</h1>
+<h2>Bulk Loading</h2>
 When bulk loading you should have many clients with up to sixteen threads per client all doing batch inserts.
 The source records should be divided evenly by primary key range across all the clients. In our testing
 we used twice as many clients as servers and the clients had half the cores. The worst thing you can do is load
         all the records from a single client.<br/>
 
-<h1>Machine Size</h1>
+<h2>Machine Size</h2>
 A pretty optimal size of machine is one that has 60gig of ram. Larger machines have a tendency to have
 larger garbage collection times. If you are still having gc problems with 60gig, try using more and smaller
 machines. If you can't go smaller, try running two servers on each machine with half the java heap. Make sure you
 give them different ports.
 
-<h1>Startup Performance</h1>
+<h2>Startup Performance</h2>
 Starting a cluster that is loaded with data can be slow. The server must read every record from disk
 and load it into memory. An optimized disk will speed up server start time. If you need fast startup, it is
 recommended that you have an SSD disk with 2000 iops.
 <br/>
-        <h1>Disk Performance</h1>
+        <h2>Disk Performance</h2>
         If you want to quickly load the database using batch inserts, you will need fast disk. The reason for this
         is that commands are logged to disk and a slow disk can't keep up with the inserts. We were able to achieve
         good performance with Amazon's SSDs with 2000 provisioned iops, however, using 1000 iops wasn't too bad.
         You may want to play with different iops to keep the costs down. Slower disks should be fine under a normal load.
         <br/>
 
-<h1>Networking</h1>
+<h2>Networking</h2>
 <div class="mylink">
     The network will likely be your bottlneck when using SonicBase. It is recommended that you configure
 the most performant network that you can. On AWS it is recommended that you use

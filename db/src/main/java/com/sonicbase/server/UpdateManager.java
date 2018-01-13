@@ -81,7 +81,7 @@ public class UpdateManager {
           if (maxBatchSize == null) {
             maxBatchSize = 10;
           }
-          this.maxPublishBatchSize = Math.min(this.maxPublishBatchSize, maxBatchSize);
+          this.maxPublishBatchSize = maxBatchSize;
 
           logger.info("starting queue producer: config=" + stream.toString());
           MessageQueueProducer producer = (MessageQueueProducer) Class.forName(className).newInstance();

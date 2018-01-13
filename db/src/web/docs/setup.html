@@ -52,30 +52,31 @@
 
     <div style="margin-left: 4em;">
 
-<h1>JDK Requirements</h1>
+        <h1>Common Setup</h1>
+<h2>JDK Requirements</h2>
 The jvm running the database server and the jdbc client needs to be at least version 7.
 <br/>
 
-<h1>Operating System Requirements</h1>
+<h2>Operating System Requirements</h2>
 SonicBase runs on Linux, Mac OS X, Windows and Cygwin.
 <br/>
 
-<h1>Server Memory Size</h1>
+<h2>Server Memory Size</h2>
         Set the "maxJavaHeap" setting to approximately "60%" for small records (150 bytes).
 Allocate a slightly less percentage for larger records.
 <br/>
 
-<h1>Disk Size</h1>
+<h2>Disk Size</h2>
 Size the disk at 3x the server memory size plus enough for disk-based result sets (perhaps another 3x).
 <br/>
 
-<h1>Config File</h1>
+<h2>Config File</h2>
 <div class="mylink">
 You must create a config file for your cluster. See <a href="config.html?framed=true">Configuration Files</a> for details.
 </div>
 <br/>
 
-<h1>Port Access</h1>
+<h2>Port Access</h2>
 The servers must be able to communicate with one another on the configured ports in the config file. Also,
 the client needs to communicate with each server on the configured ports. If you don't want access to these
 port outside a firewall, move the client inside the firewall and run it from there.

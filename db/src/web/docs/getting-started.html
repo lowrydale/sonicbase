@@ -58,15 +58,15 @@
 
 
     <div style="margin-left: 4em;margin-right: 4em;">
-
+<h1>Getting Started</h1>
 <br/>
 In this tutorial we will walk you through the process of starting a cluster and inserting into and reading from it.<br/>
 <br/>
-<h1>Download The Software</h1>
+<h2>Download The Software</h2>
         <div class="mylink">
 Go to the <a href="javascript:parent.window.location.href='../downloads.html'">downloads</a> section of the SonicBase website and download the latest version.
         </div>
-<h1>Unpack Package</h1>
+<h2>Unpack Package</h2>
         <div style="margin-left: 2em;">
 
             <lu>
@@ -80,7 +80,7 @@ Go to the <a href="javascript:parent.window.location.href='../downloads.html'">d
                 </li>
             </lu>
         </div>
-<h1>Set Paths In The Config</h1>
+<h2>Set Paths In The Config</h2>
         <div class="mylink">
 Edit the config-1-local.json file in the sonicbase/config directory. See <a href="config.html?framed=true">Configuration Files</a>. Set the dataDirectory and the installDirectory to
 the locations you desire. The installDirectory should point to the sonicbase directory in the unpacked distribution.<br/>
@@ -89,9 +89,9 @@ the locations you desire. The installDirectory should point to the sonicbase dir
         Note on Windows you will need to escape the backslashes so the value can be stored in the json file.<br/>
 On Windows the directory may look like "c:\\\\sonicbase". On linux it may look like "/mnt/sonicbase". On linux and mac
 you also have the option of prefixing your path with "$HOME" to specify the home directory. This option is not available on Windows.
-<h1>Start Client</h1>
+<h2>Start Client</h2>
 Change to the sonicbase/bin directory and type "./cli" for MacOS and Linux and "./cli.bat" for cygwin and "cli.bat" for Windows. This will start the SonicBase client.
-<h1>Use Cluster</h1>
+<h2>Use Cluster</h2>
 In the client, type:<br/>
 &nbsp;&nbsp;use cluster 1-local<br/><br/>
         <div class="mylink">
@@ -99,35 +99,35 @@ This will allow you to use the 1-local cluster. You can create other clusters by
 in the sonicbase/config directory. The name of the file must be "config-&lt;cluster name&gt;.json". See
         <a href="config.html?framed=true">Configuration Files</a> for more detail.
         </div>
-        <h1>Passwordless SSH</h1>
+        <h2>Passwordless SSH</h2>
         If your servers aren't local, for Linux and Mac you need to setup passwordless ssh between all your servers and the local machine before taking
         the next steps.
-        <h1>Deploy Cluster</h1>
+        <h2>Deploy Cluster</h2>
         In the client, type:<br/>
         &nbsp;&nbsp;deploy cluster<br/><br/>
         If all your servers are local, you do not need to deploy the cluster. Note that this command is not available
         in Windows. In Windows you need to manually copy the local install directory to each server in the location
         specified by "installDirectory" in the config file.
-<h1>Start Cluster</h1>
+<h2>Start Cluster</h2>
 In the client, type:<br/>
 &nbsp;&nbsp;start cluster<br/><br/>
 This will start the cluster on the servers specified in the config file.
-<h1>Create Database</h1>
+<h2>Create Database</h2>
 In the client, type:<br/>
 &nbsp;&nbsp;create database db<br/><br/>
 This will create the database named "db".
-<h1>Create Table</h1>
+<h2>Create Table</h2>
 In the client, type:<br/>
 &nbsp;&nbsp;create table persons (name VARCHAR, age INTEGER, ssn VARCHAR, PRIMARY KEY (ssn))<br/>
-<h1>Insert Record</h1>
+<h2>Insert Record</h2>
 In the client, type:<br/>
 &nbsp;&nbsp;insert into persons (name, age, ssn) VALUES ('bob', 22, '555-66-7777')<br/>
-<h1>Read Record</h1>
+<h2>Read Record</h2>
 In the client, type:<br/>
 &nbsp;&nbsp;select * from persons<br/>
 <br/>
 You should see the inserted record displayed in the client.
-<h1>Access From JDBC Client</h1>
+<h2>Access From JDBC Client</h2>
 Create and run the following class:<br/>
 <br/>
 <pre class="java"><code>
@@ -143,7 +143,7 @@ Create and run the following class:<br/>
         }
     }
     </code></pre>
-<h1>Stop Cluster</h1>
+<h2>Stop Cluster</h2>
 In the client, type:<br/>
 &nbsp;&nbsp;stop cluster
 </div>

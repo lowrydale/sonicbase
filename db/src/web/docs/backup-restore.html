@@ -57,8 +57,9 @@
 
     <div style="margin-left: 4em;">
 
-<h1>Configuration</h1>
-        <h2>FileSystem Backup</h2>
+        <h1>Backup and Restore</h1>
+<h2>Configuration</h2>
+        <h3>FileSystem Backup</h3>
         The following configuration is used for a filesystem backup. The backup directory can
         be located on a shared drive or be a local drive. If the directory is shared you must
         specify this with the "sharedDirectory" setting.<br/>
@@ -77,7 +78,7 @@
     }
 </code></pre>
 
-        <h2>AWS Backup</h2>
+        <h3>AWS Backup</h3>
         The following configuration is used for the AWS backup. Files will be backed up to S3 using
         the specified bucket and prefix.<br/>
         <pre class="JSON"><code>
@@ -100,10 +101,10 @@
         secret key on the second line.
 
         <br/>
-        <h2>maxBackupCount</h2>
+        <h3>maxBackupCount</h3>
         The maxBackupCount setting allows you to specify how many backups you want to keep. The most recent n backups
         are kept after doing a backup.
-        <h2>cronSchedule</h2>
+        <h3>cronSchedule</h3>
         <div class="mylink">
         The cronSchedule setting allows you to specify when the backup starts. Specify a valid cron expression. To learn
         more about cron visit <a target="_blank" href="https://en.wikipedia.org/wiki/Cron">Wikipedia</a> or
@@ -111,7 +112,7 @@
         start a backup in the administration client by typing "start backup".
         </div>
 
-        <h1>Restore</h1>
+        <h2>Restore</h2>
         To restore a backup, in the administration client type "start restore &lt;backupDir&gt;". Where "backupDir" is
         the name of the backup directory to restore. If the following is your actual direcotry:<br/>
         <br/>
@@ -119,15 +120,15 @@
         <br/>
         Then you would specify "2017-06-17T20:52:10.000Z" as the directory to restore.
 
-        <h1>Commands</h1>
-        <h2>Start Backup</h2>
+        <h2>Commands</h2>
+        <h3>Start Backup</h3>
         To manually start a backup, in the admin client type "start backup".
-        <h2>Backup Status</h2>
+        <h3>Backup Status</h3>
         To check if the backup is complete, in the admin client type "backup status".
-        <h2>Start Restore</h2>
+        <h3>Start Restore</h3>
         To restore a backup, in the admin client type "start restore &lt;directory&gt;". Directory is the subdirectory of the backup,
         which is a date.
-        <h2>Restore Status</h2>
+        <h3>Restore Status</h3>
         To check if the restore is complete, in the admin client type "restore status".
 </div>
 </div>

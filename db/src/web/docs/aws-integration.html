@@ -56,7 +56,8 @@
 
 
     <div style="margin-left: 4em;margin-right: 4em;">
-<h1>Config Builder</h1>
+        <h1>AWS Integration</h1>
+<h2>Config Builder</h2>
 SonicBase will automatically create a config file based on the servers tagged in AWS. Machines
 you desire to be servers need the tag "sonicbase-server" with a value of the name of the cluster.
 Machines you desire to be clients need the tag "sonicbase-client with a value of the name of the cluster.
@@ -64,7 +65,7 @@ A config file for the cluster must exist in the config directory, but doesn't ne
 clients previously configured. The existing config file will be updated with the tagged servers.<br/>
 <br/>
 To build your config file type "build config" in the client.<br/>
-        <h2>Recommendations</h2>
+        <h3>Recommendations</h3>
         It is recommended that you instantiate the servers using the AWS api. You can then easily tag all your
         servers and clients with code like the following:<br/><br/>
 
@@ -78,17 +79,26 @@ To build your config file type "build config" in the client.<br/>
 <br/>
         ec2.createTags(createTagsRequest_requests);<br/>
 </code></pre>
-        <h1>Prerequisites</h1>
+        <h2>Prerequisites</h2>
 In order for AWS integration to work you must have a file named "&lt;cluster&gt;-awskeys" located in the
         "keys" subdirectory of the install directory.
 The first line of the file is the aws access key. The second line of the file is the aws secret key.<br/>
 
 
-        <h1>Backup and Restore</h1>
+        <h2>Backup and Restore</h2>
 
         <div class="mylink">
         In the Pro version you may backup and restore to AWS. See <a href="backup-restore.html?framed=true">Backup and Restore</a>
         for details.
+        </div>
+
+        <h2>Message Queue Integration</h2>
+
+        <div class="mylink">
+            In the Pro version you may publish and receive upserts and deletes from the Simple Message Queue Service.
+            See <a href=message-queue-integration-producer.html?framed=true">Producers</a> and
+            <a href=message-queue-integration-consumer.html?framed=true">Consumers</a>
+            for details.
         </div>
     </div>
 </div>

@@ -127,6 +127,9 @@ public class DatabaseServer {
   static {
     addressMap = new AddressMap();
   }
+
+  private boolean finishedRestoreFileCopy;
+
   @SuppressWarnings("restriction")
   private static Unsafe getUnsafe() {
     try {
@@ -886,6 +889,8 @@ public class DatabaseServer {
     final AtomicBoolean finished = new AtomicBoolean();
     isHealthy.set(false);
     Thread checkThread = new Thread(new Runnable() {
+      private ComObject recoverStatus;
+
       @Override
       public void run() {
         int backoff = 100;
@@ -1100,6 +1105,27 @@ public class DatabaseServer {
 
   public DeltaManager getDeltaManager() {
     return deltaManager;
+  }
+
+  public ComObject getRecoverProgress() {
+    ComObject retObj = new ComObject();
+    if (deltaManager.isRecovering()) {
+      deltaManager.getPercentRecoverComplete(retObj);
+    }
+    else if (!getDeleteManager().isForcingDeletes()) {
+      retObj.put(ComObject.Tag.percentComplete, logManager.getPercentApplyQueuesComplete());
+      retObj.put(ComObject.Tag.stage, "applyingLogs");
+    }
+    else {
+      retObj.put(ComObject.Tag.percentComplete, getDeleteManager().getPercentDeleteComplete());
+      retObj.put(ComObject.Tag.stage, "forcingDeletes");
+    }
+    Exception error = deltaManager.getErrorRecovering();
+    if (error != null) {
+      retObj.put(ComObject.Tag.error, true);
+    }
+    return retObj;
+
   }
 
   private static class NullX509TrustManager implements X509TrustManager {
@@ -1461,8 +1487,182 @@ public class DatabaseServer {
     return ret;
   }
 
+  public long getBackupLocalFileSystemSize() {
+    long size = 0;
+    size += deleteManager.getBackupLocalFileSystemSize();
+    size += longRunningCommands.getBackupLocalFileSystemSize();
+    size += deltaManager.getBackupLocalFileSystemSize();
+    //size += logManager.getBackupLocalFileSystemSize();
+    return size;
+  }
+
+  public long getBackupS3Size(String bucket, String prefix, String subDirectory) {
+    AWSClient client = new AWSClient(getDatabaseClient());
+    return client.getDirectorySize(bucket, prefix, subDirectory);
+  }
+
+  public ComObject getBackupStatus(final ComObject obj) {
+
+    List<Future> futures = new ArrayList<>();
+    long srcSize = 0;
+    long destSize = 0;
+    for (int i = 0; i < shardCount; i++) {
+      for (int j = 0; j < replicationFactor; j++) {
+
+        final int finalI = i;
+        final int finalJ = j;
+        futures.add(executor.submit(new Callable(){
+          @Override
+          public Object call() throws Exception {
+            ComObject cobj = new ComObject();
+            cobj.put(ComObject.Tag.dbName, "__none__");
+            cobj.put(ComObject.Tag.schemaVersion, getCommon().getSchemaVersion());
+            cobj.put(ComObject.Tag.method, "doGetBackupSizes");
+
+            ComObject ret = new ComObject(getDatabaseClient().send(null, finalI, finalJ, cobj, DatabaseClient.Replica.specified));
+            return ret;
+          }
+        }));
+      }
+    }
+
+    for (Future future : futures) {
+      try {
+        ComObject ret = (ComObject) future.get();
+        srcSize += ret.getLong(ComObject.Tag.sourceSize);
+        String type = backupConfig.get("type").asText();
+        if (type.equals("AWS")) {
+          destSize = ret.getLong(ComObject.Tag.destSize);
+        }
+        else if (backupConfig.has("sharedDirectory")) {
+          destSize = ret.getLong(ComObject.Tag.destSize);
+        }
+        else {
+          destSize += ret.getLong(ComObject.Tag.destSize);
+        }
+      }
+      catch (InterruptedException e) {
+        throw new DatabaseException(e);
+      }
+      catch (ExecutionException e) {
+        e.printStackTrace();
+      }
+    }
+    ComObject retObj = new ComObject();
+    double percent = destSize == 0 || srcSize == 0 ? 0d : (double)destSize / (double)srcSize;
+    percent = Math.min(percent, 01.0d);
+    retObj.put(ComObject.Tag.percentComplete, percent     );
+    return retObj;
+  }
+
+  public ComObject doGetBackupSizes(final ComObject obj) {
+
+    long begin = System.currentTimeMillis();
+    long srcSize = getBackupLocalFileSystemSize();
+    long end = System.currentTimeMillis();
+    long destSize = 0;
+    String type = backupConfig.get("type").asText();
+    long beginDest = System.currentTimeMillis();
+    if (type.equals("AWS")) {
+      String bucket = backupConfig.get("bucket").asText();
+      String prefix = backupConfig.get("prefix").asText();
+      destSize = getBackupS3Size(bucket, prefix, lastBackupDir);
+    }
+    else {
+      destSize = FileUtils.sizeOfDirectory(new File(backupFileSystemDir, lastBackupDir));
+    }
+    long endDest = System.currentTimeMillis();
+    ComObject retObj = new ComObject();
+    retObj.put(ComObject.Tag.sourceSize, srcSize);
+    retObj.put(ComObject.Tag.destSize, destSize);
+    logger.info("backup sizes: shard=" + shard + ", replica=" + replica +
+        ", srcTime=" + (end - begin) + ", destTime=" + (endDest - beginDest) + ", srcSize=" + srcSize + ", destSize=" + destSize);
+    return retObj;
+  }
+
+  public ComObject getRestoreStatus(final ComObject obj) {
+
+    if (finishedRestoreFileCopy) {
+      return getRecoverProgress();
+    }
+    else {
+      List<Future> futures = new ArrayList<>();
+      long srcSize = 0;
+      long destSize = 0;
+      for (int i = 0; i < shardCount; i++) {
+        for (int j = 0; j < replicationFactor; j++) {
+
+          final int finalI = i;
+          final int finalJ = j;
+          futures.add(executor.submit(new Callable(){
+            @Override
+            public Object call() throws Exception {
+              ComObject cobj = new ComObject();
+              cobj.put(ComObject.Tag.dbName, "__none__");
+              cobj.put(ComObject.Tag.schemaVersion, getCommon().getSchemaVersion());
+              cobj.put(ComObject.Tag.method, "doGetRestoreSizes");
+
+              ComObject ret = new ComObject(getDatabaseClient().send(null, finalI, finalJ, cobj, DatabaseClient.Replica.specified));
+              return ret;
+            }
+          }));
+        }
+      }
+
+      for (Future future : futures) {
+        try {
+          ComObject ret = (ComObject) future.get();
+          String type = backupConfig.get("type").asText();
+          if (type.equals("AWS")) {
+            srcSize = ret.getLong(ComObject.Tag.sourceSize);
+          }
+          else if (backupConfig.has("sharedDirectory")) {
+            srcSize = ret.getLong(ComObject.Tag.sourceSize);
+          }
+          else {
+            srcSize += ret.getLong(ComObject.Tag.sourceSize);
+          }
+          srcSize *= (double)replicationFactor;
+          destSize += ret.getLong(ComObject.Tag.destSize);
+        }
+        catch (InterruptedException e) {
+          throw new DatabaseException(e);
+        }
+        catch (ExecutionException e) {
+          e.printStackTrace();
+        }
+      }
+      ComObject retObj = new ComObject();
+      double percent = destSize == 0 || srcSize == 0 ? 0d : (double)destSize / (double)srcSize;
+      percent = Math.min(percent, 01.0d);
+      retObj.put(ComObject.Tag.percentComplete, percent);
+      retObj.put(ComObject.Tag.stage, "copyingFiles");
+      return retObj;
+    }
+  }
+
+  public ComObject doGetRestoreSizes(final ComObject obj) {
+    long destSize = getBackupLocalFileSystemSize();
+    long srcSize = 0;
+    String type = backupConfig.get("type").asText();
+    if (type.equals("AWS")) {
+      String bucket = backupConfig.get("bucket").asText();
+      String prefix = backupConfig.get("prefix").asText();
+      srcSize = getBackupS3Size(bucket, prefix, lastBackupDir);
+    }
+    else {
+      srcSize = FileUtils.sizeOfDirectory(new File(backupFileSystemDir, lastBackupDir));
+    }
+    ComObject retObj = new ComObject();
+    retObj.put(ComObject.Tag.sourceSize, srcSize);
+    retObj.put(ComObject.Tag.destSize, destSize);
+    logger.info("restore sizes: shard=" + shard + ", replica=" + replica + ", srcSize=" + srcSize + ", destSize=" + destSize);
+    return retObj;
+  }
+
   public ComObject doBackupFileSystem(final ComObject cobj) {
     Thread thread = new Thread(new Runnable() {
+
       @Override
       public void run() {
         try {
@@ -1471,6 +1671,10 @@ public class DatabaseServer {
 
           directory = directory.replace("$HOME", System.getProperty("user.home"));
 
+          lastBackupDir = subDirectory;
+          backupFileSystemDir = directory;
+
+          backupFileSystemDir = directory;
           backupFileSystemSingleDir(directory, subDirectory, "logSequenceNum");
           backupFileSystemSingleDir(directory, subDirectory, "nextRecordId");
           deleteManager.delteTempDirs();
@@ -1491,6 +1695,7 @@ public class DatabaseServer {
           deltaManager.enableSnapshot(true);
 
           isBackupComplete = true;
+
         }
         catch (Exception e) {
           logger.error("Error backing up database", e);
@@ -1523,6 +1728,8 @@ public class DatabaseServer {
           String subDirectory = cobj.getString(ComObject.Tag.subDirectory);
           String bucket = cobj.getString(ComObject.Tag.bucket);
           String prefix = cobj.getString(ComObject.Tag.prefix);
+
+          lastBackupDir = subDirectory;
 
           backupAWSSingleDir(bucket, prefix, subDirectory, "logSequenceNum");
           backupAWSSingleDir(bucket, prefix, subDirectory, "nextRecordId");
@@ -1717,6 +1924,8 @@ public class DatabaseServer {
   }
 
   private String lastBackupDir;
+  private String backupFileSystemDir;
+
 
   public ComObject getLastBackupDir(ComObject cobj) {
     ComObject retObj = new ComObject();
@@ -1948,9 +2157,13 @@ public class DatabaseServer {
       @Override
       public void run() {
         try {
+          finishedRestoreFileCopy = false;
+
           String directory = cobj.getString(ComObject.Tag.directory);
           String subDirectory = cobj.getString(ComObject.Tag.subDirectory);
 
+          backupFileSystemDir = directory;
+          lastBackupDir = subDirectory;
           directory = directory.replace("$HOME", System.getProperty("user.home"));
 
           restoreFileSystemSingleDir(directory, subDirectory, "logSequenceNum");
@@ -1972,6 +2185,8 @@ public class DatabaseServer {
 //            common.saveSchema(getClient(), getDataDir());
 //          }
           logManager.restoreFileSystem(directory, subDirectory);
+
+          finishedRestoreFileCopy = true;
 
           prepareDataFromRestore();
 
@@ -2022,11 +2237,13 @@ public class DatabaseServer {
       @Override
       public void run() {
         try {
+          finishedRestoreFileCopy = false;
           //synchronized (restoreAwsMutex) {
           String subDirectory = cobj.getString(ComObject.Tag.subDirectory);
           String bucket = cobj.getString(ComObject.Tag.bucket);
           String prefix = cobj.getString(ComObject.Tag.prefix);
 
+          lastBackupDir = subDirectory;
           restoreAWSSingleDir(bucket, prefix, subDirectory, "logSequenceNum");
           restoreAWSSingleDir(bucket, prefix, subDirectory, "nextRecordId");
           deleteManager.restoreAWS(bucket, prefix, subDirectory);
@@ -2034,6 +2251,8 @@ public class DatabaseServer {
           //snapshotManager.restoreAWS(bucket, prefix, subDirectory);
           deltaManager.restoreAWS(bucket, prefix, subDirectory);
           logManager.restoreAWS(bucket, prefix, subDirectory);
+
+          finishedRestoreFileCopy = true;
 
           prepareDataFromRestore();
 
@@ -2145,6 +2364,8 @@ public class DatabaseServer {
   private void doRestore(String subDirectory) {
     try {
       shutdownRepartitioner();
+      deltaManager.shutdown();
+
       finalRestoreException = null;
       doingRestore = true;
 
@@ -2295,6 +2516,7 @@ public class DatabaseServer {
     finally {
       doingRestore = false;
       startRepartitioner();
+      deltaManager.runSnapshotLoop();
     }
   }
 

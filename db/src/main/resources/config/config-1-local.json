@@ -6,13 +6,21 @@
   "maxJavaHeap": "20%",
   "user": "ubuntu",
   "clientIsPrivate": false,
-  "backup" : {
+  "xbackup" : {
     "type" : "fileSystem",
     "directory": "$HOME/db-backup",
     "period": "daily",
     "time": "23:00",
     "maxBackupCount": 10,
     "sharedDirectory": false
+  },
+  "backup" : {
+    "bucket" : "sonicbase-test-backup",
+    "period" : "daily",
+    "prefix" : "backups",
+    "time" : "23:00",
+    "type" : "AWS",
+    "maxBackupCount" : 10
   },
   "shards" : [
     {

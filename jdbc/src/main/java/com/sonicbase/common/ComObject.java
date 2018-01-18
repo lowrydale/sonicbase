@@ -229,7 +229,9 @@ public class ComObject {
     select(161, byteArrayType),
     alias(162, stringType),
     function(163, stringType),
-    isProbe(164, booleanType);
+    isProbe(164, booleanType),
+    sourceSize(165, longType),
+    destSize(166, longType);
 
     public final int tag;
 

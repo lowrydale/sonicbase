@@ -148,101 +148,162 @@ public abstract class ExpressionImpl implements Expression {
     this.forceSelectOnServer = forceSelectOnServer;
   }
 
-  public static void evaluateCounter(DatabaseCommon common, DatabaseClient client, String dbName, Counter counter) throws IOException {
-    ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.legacyCounter, counter.serialize());
-    cobj.put(ComObject.Tag.dbName, dbName);
-    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-    cobj.put(ComObject.Tag.method, "evaluateCounterGetKeys");
+  public static void evaluateCounter(DatabaseCommon common, DatabaseClient client, String dbName,
+                                     ExpressionImpl expression, IndexSchema indexSchema, Counter counter,
+                                     SelectFunctionImpl function) throws IOException {
+    if (false && (function.getName().equalsIgnoreCase("min") || function.getName().equalsIgnoreCase("max"))) {
 
-    String batchKey = "DatabaseServer:evaluateCounterGetKeys";
+      BinaryExpression.Operator op = BinaryExpression.Operator.greater;
+      AtomicReference<String> usedIndex = new AtomicReference<>();
+      Random rand = new Random(System.currentTimeMillis());
+      int replica = rand.nextInt(client.getReplicaCount());
 
-    Counter lastCounter = null;
-    int shardCount = common.getServersConfig().getShardCount();
-
-    for (int i = 0; i < shardCount; i++) {
-      byte[] ret = client.send(batchKey, i, 0, cobj, DatabaseClient.Replica.def);
-      ComObject retObj = new ComObject(ret);
-
-      byte[] minKeyBytes = retObj.getByteArray(ComObject.Tag.minKey);
-      byte[] maxKeyBytes = retObj.getByteArray(ComObject.Tag.maxKey);
-
-      Counter minCounter = null;
-      if (minKeyBytes != null) {
-        minCounter = getCounterValue(common, client, dbName, counter, minKeyBytes, false);
-      }
-      else {
-        minCounter = new Counter();
-      }
-      Counter maxCounter = null;
-      if (maxKeyBytes != null) {
-        maxCounter = getCounterValue(common, client, dbName, counter, maxKeyBytes, false);
-      }
-      else {
-        maxCounter = new Counter();
+      List<OrderByExpressionImpl> orderBy = null;
+      if (function.getName().equalsIgnoreCase("max")) {
+        orderBy = new ArrayList<>();
+        OrderByExpressionImpl ret = new OrderByExpressionImpl();
+        ret.setTableName(counter.getTableName());
+        ret.setColumnName(counter.getColumnName());
+        ret.setAscending(false);
+        orderBy.add(ret);
       }
 
-      if (lastCounter != null) {
-        Long maxLong = maxCounter.getMaxLong();
-        Long lastMaxLong = lastCounter.getMaxLong();
-        if (maxLong != null) {
-          if (lastMaxLong != null) {
-            maxCounter.setMaxLong(Math.max(maxLong, lastMaxLong));
-          }
+      boolean found = false;
+      Set<ColumnImpl> columns = new HashSet<>();
+      expression.getColumns(columns);
+      for (ColumnImpl column : columns) {
+        if (column.getColumnName().equals(counter.getColumnName()) && column.getTableName().equals(counter.getTableName())) {
+          found = true;
+        }
+      }
+      if (!found) {
+        ColumnImpl column = new ColumnImpl();
+        column.setTableName(counter.getTableName());
+        column.setColumnName(counter.getColumnName());
+        columns.add(column);
+      }
+      List<ColumnImpl> columnList = new ArrayList<>();
+      columnList.addAll(columns);
+      SelectContextImpl context = lookupIds(dbName, client.getCommon(), client, replica, 1, counter.getTableName(),
+          indexSchema.getName(), false,
+          op, null, orderBy, null, null, expression, null, null, null,
+          columnList, indexSchema.getFields()[0], 0, expression.getRecordCache(), usedIndex, false,
+          client.getCommon().getSchemaVersion(), null, null, false, new AtomicLong(),null, null, false);
+      NextReturn ret = new NextReturn();
+      ret.setTableNames(context.getTableNames());
+      ret.setIds(context.getCurrKeys());
+
+      if (context.getCurrKeys() != null) {
+        CachedRecord record = expression.getRecordCache().get(counter.getTableName(), context.getCurrKeys()[0][0]);
+
+        TableSchema tableSchema = client.getCommon().getTables(dbName).get(counter.getTableName());
+        int offset = tableSchema.getFieldOffset(counter.getColumnName());
+        if (function.getName().equalsIgnoreCase("max")) {
+          counter.setMaxLong((Long) DataType.getLongConverter().convert(record.getRecord().getFields()[offset]));
+          counter.setMaxDouble((Double) DataType.getDoubleConverter().convert(record.getRecord().getFields()[offset]));
         }
         else {
-          maxCounter.setMaxLong(lastMaxLong);
+          counter.setMinLong((Long) DataType.getLongConverter().convert(record.getRecord().getFields()[offset]));
+          counter.setMinDouble((Double) DataType.getDoubleConverter().convert(record.getRecord().getFields()[offset]));
         }
-        Double maxDouble = maxCounter.getMaxDouble();
-        Double lastMaxDouble = lastCounter.getMaxDouble();
-        if (maxDouble != null) {
-          if (lastMaxDouble != null) {
-            maxCounter.setMaxDouble(Math.max(maxDouble, lastMaxDouble));
-          }
-        }
-        else {
-          maxCounter.setMaxDouble(lastMaxDouble);
-        }
-        Long minLong = minCounter.getMinLong();
-        Long lastMinLong = lastCounter.getMinLong();
-        if (minLong != null) {
-          if (lastMinLong != null) {
-            minCounter.setMinLong(Math.max(minLong, lastMinLong));
-          }
-        }
-        else {
-          minCounter.setMinLong(lastMinLong);
-        }
-        Double minDouble = minCounter.getMinDouble();
-        Double lastMinDouble = lastCounter.getMinDouble();
-        if (minDouble != null) {
-          if (lastMinDouble != null) {
-            minCounter.setMinDouble(Math.max(minDouble, lastMinDouble));
-          }
-        }
-        else {
-          minCounter.setMinDouble(lastMinDouble);
-        }
-//        Long count = retCounter.getCount();
-//        Long lastCount = lastCounter.getCount();
-//        if (count != null) {
-//          if (lastCount != null) {
-//            retCounter.setCount(count + lastCount);
-//          }
-//        }
-//        else {
-//          retCounter.setCount(lastCount);
-//        }
-        minCounter.setMaxLong(maxCounter.getMaxLong());
-        minCounter.setMaxDouble(maxCounter.getMaxDouble());
       }
-      lastCounter = minCounter;
     }
-    counter.setMaxLong(lastCounter.getMaxLong());
-    counter.setMinLong(lastCounter.getMinLong());
-    counter.setMaxDouble(lastCounter.getMaxDouble());
-    counter.setMinDouble(lastCounter.getMinDouble());
-    counter.setCount(lastCounter.getCount());
+    else {
+      ComObject cobj = new ComObject();
+      cobj.put(ComObject.Tag.legacyCounter, counter.serialize());
+      cobj.put(ComObject.Tag.dbName, dbName);
+      cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+      cobj.put(ComObject.Tag.method, "evaluateCounterGetKeys");
+
+      String batchKey = "DatabaseServer:evaluateCounterGetKeys";
+
+      Counter lastCounter = null;
+      int shardCount = common.getServersConfig().getShardCount();
+
+      for (int i = 0; i < shardCount; i++) {
+        byte[] ret = client.send(batchKey, i, 0, cobj, DatabaseClient.Replica.def);
+        ComObject retObj = new ComObject(ret);
+
+        byte[] minKeyBytes = retObj.getByteArray(ComObject.Tag.minKey);
+        byte[] maxKeyBytes = retObj.getByteArray(ComObject.Tag.maxKey);
+
+        Counter minCounter = null;
+        if (minKeyBytes != null) {
+          minCounter = getCounterValue(common, client, dbName, counter, minKeyBytes, false);
+        }
+        else {
+          minCounter = new Counter();
+        }
+        Counter maxCounter = null;
+        if (maxKeyBytes != null) {
+          maxCounter = getCounterValue(common, client, dbName, counter, maxKeyBytes, false);
+        }
+        else {
+          maxCounter = new Counter();
+        }
+
+        if (lastCounter != null) {
+          Long maxLong = maxCounter.getMaxLong();
+          Long lastMaxLong = lastCounter.getMaxLong();
+          if (maxLong != null) {
+            if (lastMaxLong != null) {
+              maxCounter.setMaxLong(Math.max(maxLong, lastMaxLong));
+            }
+          }
+          else {
+            maxCounter.setMaxLong(lastMaxLong);
+          }
+          Double maxDouble = maxCounter.getMaxDouble();
+          Double lastMaxDouble = lastCounter.getMaxDouble();
+          if (maxDouble != null) {
+            if (lastMaxDouble != null) {
+              maxCounter.setMaxDouble(Math.max(maxDouble, lastMaxDouble));
+            }
+          }
+          else {
+            maxCounter.setMaxDouble(lastMaxDouble);
+          }
+          Long minLong = minCounter.getMinLong();
+          Long lastMinLong = lastCounter.getMinLong();
+          if (minLong != null) {
+            if (lastMinLong != null) {
+              minCounter.setMinLong(Math.max(minLong, lastMinLong));
+            }
+          }
+          else {
+            minCounter.setMinLong(lastMinLong);
+          }
+          Double minDouble = minCounter.getMinDouble();
+          Double lastMinDouble = lastCounter.getMinDouble();
+          if (minDouble != null) {
+            if (lastMinDouble != null) {
+              minCounter.setMinDouble(Math.max(minDouble, lastMinDouble));
+            }
+          }
+          else {
+            minCounter.setMinDouble(lastMinDouble);
+          }
+          //        Long count = retCounter.getCount();
+          //        Long lastCount = lastCounter.getCount();
+          //        if (count != null) {
+          //          if (lastCount != null) {
+          //            retCounter.setCount(count + lastCount);
+          //          }
+          //        }
+          //        else {
+          //          retCounter.setCount(lastCount);
+          //        }
+          minCounter.setMaxLong(maxCounter.getMaxLong());
+          minCounter.setMaxDouble(maxCounter.getMaxDouble());
+        }
+        lastCounter = minCounter;
+      }
+      counter.setMaxLong(lastCounter.getMaxLong());
+      counter.setMinLong(lastCounter.getMinLong());
+      counter.setMaxDouble(lastCounter.getMaxDouble());
+      counter.setMinDouble(lastCounter.getMinDouble());
+      counter.setCount(lastCounter.getCount());
+    }
   }
 
   private static Counter getCounterValue(DatabaseCommon common, DatabaseClient client, String dbName, Counter counter, byte[] keyBytes,

@@ -1236,6 +1236,11 @@ public class DeleteManager {
     }
   }
 
+  public long getBackupLocalFileSystemSize() {
+    File dir = getReplicaRoot();
+    return com.sonicbase.common.FileUtils.sizeOfDirectory(dir);
+  }
+
   public void backupFileSystem(String directory, String subDirectory) {
     try {
       File dir = getReplicaRoot();

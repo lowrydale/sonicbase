@@ -502,6 +502,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
         expression.setTopLevelExpression(getWhereClause());
         expression.setOrderByExpressions(orderByExpressions);
         expression.setLimit(limit);
+        expression.setRecordCache(recordCache);
 
         boolean haveCounters = false;
         boolean needToEvaluate = false;
@@ -628,16 +629,18 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                     break;
                 }
                 boolean indexed = false;
+                IndexSchema selectedSchema = null;
                 for (IndexSchema indexSchema : client.getCommon().getTables(dbName).get(table).getIndices().values()) {
                   if (indexSchema.getFields()[0].equals(columnName)) {
                     indexed = true;
+                    selectedSchema = indexSchema;
                     break;
                   }
                 }
 
                 haveCounters = true;
                 if (indexed && expression instanceof AllRecordsExpressionImpl) {
-                  ExpressionImpl.evaluateCounter(client.getCommon(), client, dbName, counter);
+                  ExpressionImpl.evaluateCounter(client.getCommon(), client, dbName, expression, selectedSchema, counter, function);
                 }
                 else {
                   needToEvaluate = true;

@@ -945,6 +945,11 @@ public class DeltaManager {
     }
   }
 
+  public long getBackupLocalFileSystemSize() {
+    File dir = getSnapshotReplicaDir();
+    return com.sonicbase.common.FileUtils.sizeOfDirectory(dir);
+  }
+
   public void backupFileSystem(String directory, String subDirectory) {
     try {
       File file = new File(directory, subDirectory);
@@ -1055,11 +1060,11 @@ public class DeltaManager {
           File[] deltaFiles = file.listFiles();
           if (deltaFiles != null) {
             for (File deltaDir : deltaFiles) {
-              if (file.getName().contains("tmp")) {
-                FileUtils.deleteDirectory(file);
+              if (deltaDir.getName().contains("tmp")) {
+                FileUtils.deleteDirectory(deltaDir);
               }
               else {
-                doDeleteTempDirs(file);
+                doDeleteTempDirs(deltaDir);
               }
             }
           }

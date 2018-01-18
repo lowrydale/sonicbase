@@ -65,59 +65,60 @@ public class TestPerformance {
     setup(outerFactor);
 
     List<String> methods = new ArrayList<>();
-
-    methods.add("testInnerJoin");
-    methods.add("testLeftOuterJoin");
-    methods.add("testRightOuterJoin");
-    methods.add("testIdLookup");
-    methods.add("testMath");
-    methods.add("testIdNoKey");
-    methods.add("testRangeNoKey");
-    methods.add("testRangeThreeKey");
-    methods.add("testRangeThreeKeyBackwards");
-    methods.add("testRangeThreeKeyMixed");
-    methods.add("testRangeThreeKeySingle");
-    methods.add("testNoKeyTwoKeyGreaterEqual");
-    methods.add("testNoKeyTwoKeyGreater");
-    methods.add("testNoKeyTwoKeyGreaterLeftSided");
-    methods.add("notIn");
-    methods.add("notInSecondary");
-    methods.add("notInTableScan");
-    methods.add("test2keyRange");
-    methods.add("testSecondaryKey");
-    methods.add("testTableScan");
-    methods.add("testTwoKey");
-    methods.add("testTwoKeyRightSided");
-    methods.add("testTwoKeyLeftSidedGreater");
-    methods.add("testTwoKeyGreater");
-    methods.add("testTwoKeyGreaterBackwards");
-    methods.add("testTwoKeyLeftSidedGreaterEqual");
-    methods.add("testCountTwoKeyGreaterEqual");
-    methods.add("testMaxWhere");
-    //methods.add("testMax");
-    methods.add("testCount");
-    methods.add("testSort");
-    methods.add("testSortDisk");
-    methods.add("testId2");
-    methods.add("testId2Range");
-    methods.add("testOtherExpression");
-    methods.add("testNoWhereClause");
-
-    methods.add("testRangeGreaterDescend");
-    methods.add("testRange");
-    methods.add("testRangeLess");
-
-    methods.add("testRangeOtherExpression");
-    methods.add("testSecondary");
-    methods.add("testUnion");
-    methods.add("testUnionInMemory");
-    methods.add("testUnionAll"); //
-    methods.add("testIntersect");
-    methods.add("testExcept");
-    methods.add("testNot");
-    methods.add("testFunctionAvg");
-    methods.add("testFunctionMin");
-    methods.add("testFunctionCustom");
+//
+//    methods.add("testInnerJoin");
+//    methods.add("testLeftOuterJoin");
+//    methods.add("testRightOuterJoin");
+//    methods.add("testIdLookup");
+//    methods.add("testMath");
+//    methods.add("testIdNoKey");
+//    methods.add("testRangeNoKey");
+//    methods.add("testRangeThreeKey");
+//    methods.add("testRangeThreeKeyBackwards");
+//    methods.add("testRangeThreeKeyMixed");
+//    methods.add("testRangeThreeKeySingle");
+//    methods.add("testNoKeyTwoKeyGreaterEqual");
+//    methods.add("testNoKeyTwoKeyGreater");
+//    methods.add("testNoKeyTwoKeyGreaterLeftSided");
+//    methods.add("notIn");
+//    methods.add("notInSecondary");
+//    methods.add("notInTableScan");
+//    methods.add("test2keyRange");
+//    methods.add("testSecondaryKey");
+//    methods.add("testTableScan");
+//    methods.add("testTwoKey");
+//    methods.add("testTwoKeyRightSided");
+//    methods.add("testTwoKeyLeftSidedGreater");
+//    methods.add("testTwoKeyGreater");
+//    methods.add("testTwoKeyGreaterBackwards");
+//    methods.add("testTwoKeyLeftSidedGreaterEqual");
+//    methods.add("testCountTwoKeyGreaterEqual");
+//    methods.add("testMaxWhere");
+    methods.add("testMax");
+    methods.add("testMin");
+//    methods.add("testCount");
+//    methods.add("testSort");
+//    methods.add("testSortDisk");
+//    methods.add("testId2");
+//    methods.add("testId2Range");
+//    methods.add("testOtherExpression");
+//    methods.add("testNoWhereClause");
+//
+//    methods.add("testRangeGreaterDescend");
+//    methods.add("testRange");
+//    methods.add("testRangeLess");
+//
+//    methods.add("testRangeOtherExpression");
+//    methods.add("testSecondary");
+//    methods.add("testUnion");
+//    methods.add("testUnionInMemory");
+//    methods.add("testUnionAll"); //
+//    methods.add("testIntersect");
+//    methods.add("testExcept");
+//    methods.add("testNot");
+//    methods.add("testFunctionAvg");
+//    methods.add("testFunctionMin");
+//    methods.add("testFunctionCustom");
 
     for (String method : methods) {
       try {
@@ -1116,7 +1117,7 @@ public class TestPerformance {
     PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from persons");
     long begin = System.nanoTime();
     int count = 0;
-    for (int i = 0; i < outerFactor * 10; i++) {
+    for (int i = 0; i < outerFactor * 100; i++) {
       ResultSet rs = stmt.executeQuery();
       assertTrue(rs.next());
       assertEquals(rs.getLong("maxValue"), (long)((outerFactor * 500_000) - 1L));
@@ -1131,6 +1132,24 @@ public class TestPerformance {
     //assertTrue((end - begin) < (18000 * 1_000_000L), String.valueOf(end-begin));
   }
 
+  public void testMin() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select min(id) as minValue from persons");
+    long begin = System.nanoTime();
+    int count = 0;
+    for (int i = 0; i < outerFactor * 100; i++) {
+      ResultSet rs = stmt.executeQuery();
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("minValue"), (long)0);
+      assertEquals(rs.getInt("minValue"), (int)0);
+      assertEquals(rs.getString("minValue"), String.valueOf(0));
+      assertEquals(rs.getDouble("minValue"), (double)0);
+      assertEquals(rs.getFloat("minValue"), (float)0);
+      count++;
+    }
+    long end = System.nanoTime();
+    registerResults("min", end-begin, count);
+    //assertTrue((end - begin) < (18000 * 1_000_000L), String.valueOf(end-begin));
+  }
 
   public void testCount() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select count(*)  from persons");
@@ -1361,7 +1380,7 @@ public class TestPerformance {
         count++;
       }
       catch (Exception e) {
-        throw new DatabaseException(e);
+        throw new DatabaseException("i=" + i, e);
       }
     }
     assertFalse(rs.next());

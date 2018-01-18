@@ -463,4 +463,27 @@ public class AWSClient {
       throw new DatabaseException(e);
     }
   }
+
+  public long getDirectorySize(String bucket, String prefix, String subDirectory) {
+    long size = 0;
+    AmazonS3 s3client = getS3Client();
+    try {
+      final ListObjectsV2Request req = new ListObjectsV2Request().withBucketName(bucket).withPrefix(prefix + "/" + subDirectory);
+      ListObjectsV2Result result;
+      do {
+        result = s3client.listObjectsV2(req);
+
+        for (S3ObjectSummary objectSummary :
+            result.getObjectSummaries()) {
+          size += objectSummary.getSize();
+        }
+        req.setContinuationToken(result.getNextContinuationToken());
+      }
+      while (result.isTruncated() == true);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+    return size;
+  }
 }

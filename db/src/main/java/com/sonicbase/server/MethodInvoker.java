@@ -90,6 +90,9 @@ public class MethodInvoker {
     priorityCommands.add("finishRestore");
     priorityCommands.add("prepareForBackup");
     priorityCommands.add("doBackupAWS");
+    priorityCommands.add("doGetBackupSizes");
+    priorityCommands.add("doGetRestoreSizes");
+    priorityCommands.add("getBackupStatus");
     priorityCommands.add("doBackupFileSystem");
     priorityCommands.add("isBackupComplete");
     priorityCommands.add("finishBackup");
@@ -437,6 +440,23 @@ public class MethodInvoker {
     return server.doBackupFileSystem(cobj);
   }
 
+
+  public ComObject doGetBackupSizes(final ComObject obj, boolean replayedCommand) {
+    return server.doGetBackupSizes(obj);
+  }
+
+  public ComObject doGetRestoreSizes(final ComObject obj, boolean replayedCommand) {
+    return server.doGetRestoreSizes(obj);
+  }
+
+  public ComObject getBackupStatus(final ComObject obj, boolean replayedCommand) {
+    return server.getBackupStatus(obj);
+  }
+
+  public ComObject getRestoreStatus(final ComObject obj, boolean replayedCommand) {
+    return server.getRestoreStatus(obj);
+  }
+
   public ComObject doBackupAWS(final ComObject cobj, boolean replayedCommand) {
     return server.doBackupAWS(cobj);
   }
@@ -625,24 +645,7 @@ public class MethodInvoker {
 
   @ExcludeRename
   public ComObject getRecoverProgress(ComObject cobj, boolean replayedCommand) {
-
-    ComObject retObj = new ComObject();
-    if (deltaManager.isRecovering()) {
-      deltaManager.getPercentRecoverComplete(retObj);
-    }
-    else if (!server.getDeleteManager().isForcingDeletes()) {
-      retObj.put(ComObject.Tag.percentComplete, logManager.getPercentApplyQueuesComplete());
-      retObj.put(ComObject.Tag.stage, "applyingLogs");
-    }
-    else {
-      retObj.put(ComObject.Tag.percentComplete, server.getDeleteManager().getPercentDeleteComplete());
-      retObj.put(ComObject.Tag.stage, "forcingDeletes");
-    }
-    Exception error = deltaManager.getErrorRecovering();
-    if (error != null) {
-      retObj.put(ComObject.Tag.error, true);
-    }
-    return retObj;
+    return server.getRecoverProgress();
   }
 
   public ComObject pushMaxSequenceNum(ComObject cobj, boolean replayedCommand) {

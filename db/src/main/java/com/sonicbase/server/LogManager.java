@@ -231,6 +231,17 @@ public class LogManager {
 
   }
 
+  public long getBackupLocalFileSystemSize() {
+    File srcDir = new File(getLogReplicaDir(), "self");
+    long size = FileUtils.sizeOfDirectory(srcDir);
+
+    for (int replica = 0; replica < server.getReplicationFactor(); replica++) {
+      srcDir = new File(getLogReplicaDir(), "peer-" + replica);
+      size += FileUtils.sizeOfDirectory(srcDir);
+    }
+    return size;
+  }
+
   public void backupFileSystem(String directory, String subDirectory, String logSlicePoint) {
     try {
       File srcDir = new File(getLogReplicaDir(), "self");

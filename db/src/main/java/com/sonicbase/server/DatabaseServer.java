@@ -16,7 +16,6 @@ import com.sonicbase.query.impl.ExpressionImpl;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.socket.DeadServerException;
 import com.sonicbase.util.DateUtils;
-import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import net.jpountz.lz4.LZ4Compressor;
 import net.jpountz.lz4.LZ4Factory;
 import net.jpountz.lz4.LZ4FastDecompressor;
@@ -276,7 +275,14 @@ public class DatabaseServer {
     if (databaseDict.has("clientIsPrivate")) {
       isInternal = databaseDict.get("clientIsPrivate").asBoolean();
     }
-    serversConfig = new ServersConfig(cluster, shards, replicationFactor, isInternal);
+    boolean optimizedForThroughput = false;
+    if (databaseDict.has("optimizeReadsFor")) {
+      String text = databaseDict.get("optimizeReadsFor").asText();
+      if (text.equalsIgnoreCase("totalThroughput")) {
+        optimizedForThroughput = true;
+      }
+    }
+    serversConfig = new ServersConfig(cluster, shards, replicationFactor, isInternal, optimizedForThroughput);
 
     initServersForUnitTest(host, port, unitTest, serversConfig);
 
@@ -1526,6 +1532,7 @@ public class DatabaseServer {
       }
     }
 
+    boolean error = false;
     for (Future future : futures) {
       try {
         ComObject ret = (ComObject) future.get();
@@ -1540,6 +1547,10 @@ public class DatabaseServer {
         else {
           destSize += ret.getLong(ComObject.Tag.destSize);
         }
+        boolean localError = ret.getBoolean(ComObject.Tag.error);
+        if (localError) {
+          error = true;
+        }
       }
       catch (InterruptedException e) {
         throw new DatabaseException(e);
@@ -1552,29 +1563,43 @@ public class DatabaseServer {
     double percent = destSize == 0 || srcSize == 0 ? 0d : (double)destSize / (double)srcSize;
     percent = Math.min(percent, 01.0d);
     retObj.put(ComObject.Tag.percentComplete, percent     );
+    retObj.put(ComObject.Tag.error, error);
     return retObj;
   }
 
   public ComObject doGetBackupSizes(final ComObject obj) {
 
     long begin = System.currentTimeMillis();
-    long srcSize = getBackupLocalFileSystemSize();
-    long end = System.currentTimeMillis();
+    long srcSize = 0;
+    long end = 0;
     long destSize = 0;
-    String type = backupConfig.get("type").asText();
-    long beginDest = System.currentTimeMillis();
-    if (type.equals("AWS")) {
-      String bucket = backupConfig.get("bucket").asText();
-      String prefix = backupConfig.get("prefix").asText();
-      destSize = getBackupS3Size(bucket, prefix, lastBackupDir);
+    long beginDest = 0;
+    boolean error = false;
+    try {
+      srcSize = getBackupLocalFileSystemSize();
+      end = System.currentTimeMillis();
+      destSize = 0;
+      String type = backupConfig.get("type").asText();
+      beginDest = System.currentTimeMillis();
+      if (type.equals("AWS")) {
+        String bucket = backupConfig.get("bucket").asText();
+        String prefix = backupConfig.get("prefix").asText();
+        destSize = getBackupS3Size(bucket, prefix, lastBackupDir);
+      }
+      else {
+        destSize = FileUtils.sizeOfDirectory(new File(backupFileSystemDir, lastBackupDir));
+      }
     }
-    else {
-      destSize = FileUtils.sizeOfDirectory(new File(backupFileSystemDir, lastBackupDir));
+    catch (Exception e) {
+      logger.error("Error getting backup sizes", e);
+      error = true;
     }
     long endDest = System.currentTimeMillis();
     ComObject retObj = new ComObject();
     retObj.put(ComObject.Tag.sourceSize, srcSize);
     retObj.put(ComObject.Tag.destSize, destSize);
+    retObj.put(ComObject.Tag.error, error || backupException != null);
+
     logger.info("backup sizes: shard=" + shard + ", replica=" + replica +
         ", srcTime=" + (end - begin) + ", destTime=" + (endDest - beginDest) + ", srcSize=" + srcSize + ", destSize=" + destSize);
     return retObj;
@@ -1609,6 +1634,7 @@ public class DatabaseServer {
         }
       }
 
+      boolean error = false;
       for (Future future : futures) {
         try {
           ComObject ret = (ComObject) future.get();
@@ -1621,6 +1647,10 @@ public class DatabaseServer {
           }
           else {
             srcSize += ret.getLong(ComObject.Tag.sourceSize);
+          }
+          boolean localError = ret.getBoolean(ComObject.Tag.error);
+          if (localError) {
+            error = true;
           }
           srcSize *= (double)replicationFactor;
           destSize += ret.getLong(ComObject.Tag.destSize);
@@ -1637,25 +1667,36 @@ public class DatabaseServer {
       percent = Math.min(percent, 01.0d);
       retObj.put(ComObject.Tag.percentComplete, percent);
       retObj.put(ComObject.Tag.stage, "copyingFiles");
+      retObj.put(ComObject.Tag.error, error);
       return retObj;
     }
   }
 
   public ComObject doGetRestoreSizes(final ComObject obj) {
-    long destSize = getBackupLocalFileSystemSize();
+    boolean error = false;
+    long destSize = 0;
     long srcSize = 0;
-    String type = backupConfig.get("type").asText();
-    if (type.equals("AWS")) {
-      String bucket = backupConfig.get("bucket").asText();
-      String prefix = backupConfig.get("prefix").asText();
-      srcSize = getBackupS3Size(bucket, prefix, lastBackupDir);
+    try {
+      destSize = getBackupLocalFileSystemSize();
+      srcSize = 0;
+      String type = backupConfig.get("type").asText();
+      if (type.equals("AWS")) {
+        String bucket = backupConfig.get("bucket").asText();
+        String prefix = backupConfig.get("prefix").asText();
+        srcSize = getBackupS3Size(bucket, prefix, lastBackupDir);
+      }
+      else {
+        srcSize = FileUtils.sizeOfDirectory(new File(backupFileSystemDir, lastBackupDir));
+      }
     }
-    else {
-      srcSize = FileUtils.sizeOfDirectory(new File(backupFileSystemDir, lastBackupDir));
+    catch (Exception e) {
+      logger.error("Error getting restore sizes", e);
+      error = true;
     }
     ComObject retObj = new ComObject();
     retObj.put(ComObject.Tag.sourceSize, srcSize);
     retObj.put(ComObject.Tag.destSize, destSize);
+    retObj.put(ComObject.Tag.error, error || restoreException != null);
     logger.info("restore sizes: shard=" + shard + ", replica=" + replica + ", srcSize=" + srcSize + ", destSize=" + destSize);
     return retObj;
   }
@@ -1774,9 +1815,9 @@ public class DatabaseServer {
 
   public ComObject isBackupComplete(ComObject cobj) {
     try {
-      if (backupException != null) {
-        throw new DatabaseException(backupException);
-      }
+//      if (backupException != null) {
+//        throw new DatabaseException(backupException);
+//      }
       ComObject retObj = new ComObject();
       retObj.put(ComObject.Tag.isComplete, isBackupComplete);
       return retObj;
@@ -2158,6 +2199,7 @@ public class DatabaseServer {
       public void run() {
         try {
           finishedRestoreFileCopy = false;
+          restoreException = null;
 
           String directory = cobj.getString(ComObject.Tag.directory);
           String subDirectory = cobj.getString(ComObject.Tag.subDirectory);
@@ -2237,6 +2279,7 @@ public class DatabaseServer {
       @Override
       public void run() {
         try {
+          restoreException = null;
           finishedRestoreFileCopy = false;
           //synchronized (restoreAwsMutex) {
           String subDirectory = cobj.getString(ComObject.Tag.subDirectory);
@@ -2288,9 +2331,9 @@ public class DatabaseServer {
 
   public ComObject isRestoreComplete(ComObject cobj) {
     try {
-      if (restoreException != null) {
-        throw new DatabaseException(restoreException);
-      }
+//      if (restoreException != null) {
+//        throw new DatabaseException(restoreException);
+//      }
       ComObject retObj = new ComObject();
       retObj.put(ComObject.Tag.isComplete, isRestoreComplete);
       return retObj;
@@ -4588,8 +4631,17 @@ public class DatabaseServer {
       if (config.has("clientIsPrivate")) {
         isInternal = config.get("clientIsPrivate").asBoolean();
       }
+
+      boolean optimizedForThroughput = false;
+      if (config.has("optimizeReadsFor")) {
+        String text = config.get("optimizeReadsFor").asText();
+        if (text.equalsIgnoreCase("totalThroughput")) {
+          optimizedForThroughput = true;
+        }
+      }
+
       ServersConfig newConfig = new ServersConfig(cluster, config.withArray("shards"),
-          config.withArray("shards").get(0).withArray("replicas").size(), isInternal);
+          config.withArray("shards").get(0).withArray("replicas").size(), isInternal, optimizedForThroughput);
 
       common.setServersConfig(newConfig);
 

@@ -532,7 +532,8 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
           Set<String> columnsHandled = new HashSet<>();
           Map<String, SelectFunctionImpl> aliases = getFunctionAliases();
           for (SelectFunctionImpl function : aliases.values()) {
-            if (function.getName().equalsIgnoreCase("count") || function.getName().equalsIgnoreCase("min") || function.getName().equalsIgnoreCase("max") ||
+            if (function.getName().equalsIgnoreCase("count") || function.getName().equalsIgnoreCase("min") ||
+                function.getName().equalsIgnoreCase("max") ||
                 function.getName().equalsIgnoreCase("avg") || function.getName().equalsIgnoreCase("sum")) {
 
               if (groupContext == null) {

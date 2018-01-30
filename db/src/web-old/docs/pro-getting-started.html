@@ -1,0 +1,126 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+
+<title>SonicBase - Getting Started</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Tutorial on how to get started with SonicBase. The tutorial primarily shows you how to use SonicBase via the administration client.">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="../javascript/main.js"></script>
+
+
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-109032274-1');
+        ga('require', 'displayfeatures');
+    </script>
+
+</head>
+
+
+<body>
+<div class="container">
+    <header id="myHeader">
+        <div class="mobile">
+            <a href="../index.html">
+                <h4 class="logo">SonicBase™</h4>
+            </a>
+        </div>
+        <div class="desktop">
+            <a href="../index.html">
+                <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+            </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+        </div>
+    </header>
+
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+
+    <div style="margin-left: 4em;">
+
+        <h1>Pro Version Getting Started</h1>
+        <h2>License Server</h2>
+        <div class="mylink">
+            You will need to run a license server in order to use the Pro version. See <a href="license-server.html">License Server</a> for
+        details.
+        </div>
+        <h2>Minimum Server Count</h2>
+        If you have more than one replica, you must have at least three servers. This doesn't mean you have to have three
+        replicas. You must either have at least three replicas or have at least two shards with two replicas. If you truly
+        only want one shard with two replicas, you will need to run two servers on each box.
+
+        <h2>Configuration</h2>
+        With the Pro version, you may add replicas to your shards. The following example partial
+        configuration shows how to create a cluster with two shards, each having three replicas.<br/>
+        <pre class="JSON"><code>
+    {
+        "dataDirectory": "$HOME/db-data",
+        "installDirectory": "$HOME/sonicbase",
+        ...
+        "shards" : [
+            {
+                "replicas": [
+                    {
+                        "privateAddress": "localhost",
+                        "publicAddress": "localhost",
+                        "port": 9010
+                    },
+                    {
+                        "privateAddress": "localhost",
+                        "publicAddress": "localhost",
+                        "port": 9020
+                    },
+                    {
+                        "privateAddress": "localhost",
+                        "publicAddress": "localhost",
+                        "port": 9030
+                    }
+                ]
+            },
+            {
+                "replicas": [
+                    {
+                        "privateAddress": "localhost",
+                        "publicAddress": "localhost",
+                        "port": 9040
+                    },
+                    {
+                        "privateAddress": "localhost",
+                        "publicAddress": "localhost",
+                        "port": 9050
+                    },
+                    {
+                        "privateAddress": "localhost",
+                        "publicAddress": "localhost",
+                        "port": 9060
+                    }
+                ]
+            }
+        ]
+    }
+            </code></pre>
+</div>
+</div>
+</body>
+</html>

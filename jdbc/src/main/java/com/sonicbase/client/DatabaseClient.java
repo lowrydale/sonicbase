@@ -78,7 +78,8 @@ public class DatabaseClient {
   private static Logger logger;
 
 
-  public static final short SERIALIZATION_VERSION = 24;
+  public static final short SERIALIZATION_VERSION = 25;
+  public static final short SERIALIZATION_VERSION_25 = 25;
   public static final short SERIALIZATION_VERSION_24 = 24;
   public static final short SERIALIZATION_VERSION_23 = 23;
   public static final short SERIALIZATION_VERSION_22 = 22;

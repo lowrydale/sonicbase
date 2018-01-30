@@ -1,0 +1,104 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>SonicBase - Supported Data Types</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="A list of all the SQL datatypes and an indication of which ones are supported by SonicBase.">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="../javascript/main.js"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-109032274-1');
+        ga('require', 'displayfeatures');
+    </script>
+</head>
+
+<body>
+<div class="container">
+    <header id="myHeader">
+        <div class="mobile">
+            <a href="../index.html">
+                <h4 class="logo">SonicBase™</h4>
+            </a>
+        </div>
+
+        <div class="desktop">
+            <a href="../index.html">
+                <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+            </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+        </div>
+    </header>
+
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+
+    <div style="margin-left: 4em;">
+
+<h1>Data Types</h1>
+        The following table lists the data types that are supported and what java type they map to.<br/>
+        <br/>
+<table class="syntax-table" border="1" cellpadding=2 cellspacing="0">
+    <tr class="syntax-main"><td>SQL Type</td><td>Java Type</td></tr>
+    <tr><td>BIT</td><td>boolean</td></tr>
+    <tr><td>TINYINT</td><td>byte</td></tr>
+    <tr><td>SMALLINT</td><td>short</td></tr>
+    <tr><td>INTEGER</td><td>int</td></tr>
+    <tr><td>BIGINT</td><td>long</td></tr>
+    <tr><td>FLOAT</td><td>double</td></tr>
+    <tr><td>REAL</td><td>float</td></tr>
+    <tr><td>DOUBLE</td><td>double</td></tr>
+    <tr><td>NUMERIC</td><td>BigDecimal</td></tr>
+    <tr><td>DECIMAL</td><td>BigDecimal</td></tr>
+    <tr><td>CHAR</td><td>String</td></tr>
+    <tr><td>VARCHAR</td><td>String</td></tr>
+    <tr><td>LONGVARCHAR</td><td>String</td></tr>
+    <tr><td>DATE</td><td>Date</td></tr>
+    <tr><td>TIME</td><td>Time</td></tr>
+    <tr><td>TIMESTAMP</td><td>Timestamp</td></tr>
+    <tr><td>BINARY</td><td>Blob</td></tr>
+    <tr><td>VARBINARY</td><td>Blob</td></tr>
+    <tr><td>LONGVARBINARY</td><td>Blob</td></tr>
+    <tr><td>NULL</td><td>Not Supported</td></tr>
+    <tr><td>OTHER</td><td>Not Supported</td></tr>
+    <tr><td>JAVA_OBJECT</td><td>Not Supported</td></tr>
+    <tr><td>DISTINCT</td><td>Not Supported</td></tr>
+    <tr><td>STRUCT</td><td>Not Supported</td></tr>
+    <tr><td>ARRAY</td><td>Not Supported</td></tr>
+    <tr><td>BLOB</td><td>Blob</td></tr>
+    <tr><td>CLOB</td><td>String</td></tr>
+    <tr><td>REF</td><td>Not Supported</td></tr>
+    <tr><td>DATALINK</td><td>Not Supported</td></tr>
+    <tr><td>BOOLEAN</td><td>boolean</td></tr>
+    <tr><td>ROWID</td><td>No Supported</td></tr>
+    <tr><td>NCHAR</td><td>String</td></tr>
+    <tr><td>NVARCHAR</td><td>String</td></tr>
+    <tr><td>LONGNVARCHAR</td><td>String</td></tr>
+    <tr><td>NCLOB</td><td>String</td></tr>
+    <tr><td>SQLXML</td><td>Not Supported</td></tr>
+    <tr><td>REF_CURSOR</td><td>Not Supported</td></tr>
+    <tr><td>TIME_WITH_TIMEZONE</td><td>Not Supported</td></tr>
+    <tr><td>TIMESTAMP_WITH_TIMEZONE</td><td>Not Supported</td></tr>
+    <tr><td>PARAMETER</td><td>Not Supported</td></tr>
+</table>
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en-US">
+<head>
+
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+  <!-- Global site tag (gtag.js) - Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+  <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-109032274-1');
+      ga('require', 'displayfeatures');
+  </script>
+
+  <!-- Place this tag in the <head> of your document -->
+  <script type="text/javascript" src="https://apis.google.com/js/plusone.js"></script>
+
+
+<title>Press Release - AquaTech Software, Inc. Provides Sonicbase Database Product</title>
+<meta name="description" content="AquaTech Software, Inc. is a database software solutions company that offers an affordable option for companies that want to quickly & easily store & analyze data. It also offers a variety of features that make its performance optimal." />
+  <!--<link href="css/singlePageTemplateMobile.css" rel="stylesheet" type="text/css" media="only screen and (max-device-width: 480px)">-->
+  <link href="/css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+  <script type="text/javascript" src="/javascript/jquery-3.2.1.min.js"></script>
+  <script type="text/javascript" src="/javascript/main.js"></script>
+<!--The following script tag downloads a font from the Adobe Edge Web Fonts server for use within the web page. We recommend that you do not modify it.-->
+<!--<script>var __adobewebfontsappname__="dreamweaver"</script>-->
+<!--<script src="http://use.edgefonts.net/source-sans-pro:n2:default.js" type="text/javascript"></script>-->
+<!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+<!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+<!--[if lt IE 9]>
+      <!--<script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>-->
+      <!--<script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>-->
+    <!--<![endif]&ndash;&gt;-->
+
+  <script>
+      function login(){
+          window.location.href = "login.html";
+      }
+
+      function freeDownload(url) {
+
+          $.ajaxSetup({
+              error: function(xhr){
+                  alert('Request Status: ' + xhr.status + ' Status Text: ' + xhr.statusText + ' ' + xhr.responseText);
+              }
+          });
+
+          if (!confirm("Agree to license terms?")) {
+              return;
+          }
+
+          $.ajax({
+              headers:{
+                  "Accept":"application/text",
+                  "Content-type":"application/json"
+              },   url:"/app/notifyFreeDownload?" +
+              "referringSite=" + "other" +
+              "&downloadUrl=" + encodeURI(url),
+              success:function(response){
+                  window.location.href = url;
+              },
+              error: function(xhr) {
+
+                  if (xhr.status == 400) {
+                      alert("Error validating robot response");
+                  }
+                  else if (xhr.status == 409) {
+                      alert('Email already in use');
+                  }
+                  else if (xhr.status == 500) {
+                      alert("Server error");
+                  }
+                  else {
+                      // revert to default
+                      ajaxError.apply(this, arguments);
+                  }
+              }
+          });
+      }
+
+  </script>
+<script type="application/ld+json">
+{
+  "@context":"http://schema.org",
+  "@type":"LocalBusiness",
+  "name":"AquaTech Software, Inc.",
+  "address":{
+    "@type":"PostalAddress",
+    "streetAddress":"5078 W Black Granite Way",
+    "addressLocality":"West Valley City",
+    "addressRegion":"UT",
+    "postalCode":"84120",
+    "addressCountry":"US"
+  },
+ "image":"http://www.sonicbase.com/images/logo-white.gif",
+ "logo":"http://www.sonicbase.com/images/logo-white.gif",
+  "url":"http://www.sonicbase.com/images/",
+  "telephone":"",
+  "priceRange":"$"
+ }
+</script>
+</head>
+<body>
+<!-- Main Container -->
+<div class="container">
+  <!-- Navigation -->
+    <header>
+      <div class="mobile">
+        <a href="/index.html">
+        <h4 class="logo">SonicBase™</h4>
+        </a>
+      </div>
+
+      <div class="desktop">
+        <a href="/index.html">
+        <img style="margin-top:3px" src="/images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+        </a>
+      <nav>
+        <ul>
+          <li><a href="/documentation.html">DOCUMENTATION</a></li>
+          <li><a href="/downloads.html">DOWNLOADS</a></li>
+          <li> <a href="/app-static/login.html">LOGIN</a></li>
+          <li> <a href="/contact.html">CONTACT</a></li>
+        </ul>
+      </nav>
+      </div>
+    </header>
+  <!-- Hero Section -->
+
+  <div class="desktop">
+      <img src="/images/main-page-desktop.jpg" width=100% vspace=0 hspace=0 alt="" />
+
+  </div>
+
+  <div class="mobile">
+
+    <img src="/images/main-page-mobile.jpg" width=100% vspace=0 hspace=0 alt="" />
+
+  </div>
+
+  <div class="mobile">
+    <div style="margin-left: 1em;">
+
+    <div class="mylink" style="font-size: 24px;">
+    <a href="/documentation.html">DOCUMENTATION</a><br/>
+      <a href="/downloads.html">DOWNLOADS</a><br/>
+      <a href="/app-static/login.html">LOGIN/PURCHASE</a><br/>
+    <a href="/contact.html">CONTACT</a><br/>
+    </div>
+    </div>
+  </div>
+
+  <!-- Place this tag where you want the +1 button to render. -->
+  <div class="g-plusone" data-annotation="inline" data-width="300"></div>
+
+  <!-- Place this tag after the last +1 button tag. -->
+  <script type="text/javascript">
+      (function() {
+          var po = document.createElement('script'); po.type = 'text/javascript'; po.async = true;
+          po.src = 'https://apis.google.com/js/plusone.js';
+          var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+      })();
+  </script>
+
+  <div style="margin-left: 2em; margin-right: 2em; font-size: 16px;">
+<h1>AquaTech Software, Inc. Provides Sonicbase Database Product</h1>
+
+<p><strong>December 15, 2017</strong>: AquaTech Software, Inc is pleased to announce they have created the SonicBase Database product designed to provide users with an easy way to store data for long and short-term use. This software is the best value in its class, helping businesses save money, while properly storing their data.</p>
+
+<p>The SonicBase Database features high-performance with <a style="color: #26a5bf; text-decoration: underline;" href="http://sonicbase.com/docs/features.html?framed=true">in-memory</a> support using a combination of both on-heap and off-heap memory for increased capacity. Disk-based snapshots and logs are also used to provide durability for the database. Customers who choose this software solution can count on a distributed, relational database that spreads information across as many servers as you deem necessary. It can be separated into subsections and dynamically distributed during the insertion and deletion process. Data can be stored for both the short and long-term, providing a vast array of uses for customers.</p>
+
+<p>The new product is ideal for analytics and real-time processing to ensure businesses can quickly and easily analyze any data to improve their business. Their goal was to create a database software solution that was reliable and affordable so every business can take advantage of these services.</p>
+
+<p>Anyone interested in learning about this database software and what it can do can find out more by visiting the <a style="color: #26a5bf; text-decoration: underline;" href="http://sonicbase.com/">AquaTech Software, Inc.</a> Website.</p>
+
+<p>About AquaTech Software, Inc: AquaTech Software, Inc. is a database software solutions company that offers an affordable option for companies that want to quickly and easily store and analyze data. This software solution is ideal for both short and long-term storage and is reliable and durable. Their database solution offers a variety of features that make its performance optimal.</p>
+
+<p><strong>Company:</strong> AquaTech Software, Inc.
+<br />
+<strong>Email address:</strong> <a style="color: #26a5bf; text-decoration: underline;" href="mailto:mailto:support@sonicbase.com?subject=">support@sonicbase.com</a></p>
+
+<p>&nbsp;</p>
+<h3><span style="font-size: 18px;">Categories:</span> Database Management Systems | Database Software | Servers | Relational Database Management Systems | Relational Model</h3>
+
+<h3><span style="font-size: 18px;">Tags:</span> Software, Database Software Solutions Company, Store & Analyze Data</h3>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+  </div>
+  <!-- Copyrights Section -->
+  <div class="copyright">&copy;2017 - <strong>AquaTech Software™, Inc.</strong></div>
+</div>
+<!-- Main Container Ends -->
+<!-- Review widget start --> <script type='text/javascript'> var ucode='aHR0cHM6Ly9yZXZpZXd3aWRnZXQua3BpYW5hbHlzZXIuY29tLw=='; var code='524b6437c7b9e3482ea248a97362bf6d'; var _rewF = document.createElement('script'); _rewF.type = 'text/javascript'; _rewF.async = true; _rewF.src = "https://reviewwidget.kpianalyser.com/js/reviews.js"; (document.getElementsByTagName("head")[0] || document.documentElement).appendChild(_rewF); </script> <!-- Review widget end -->
+</body>
+</html>

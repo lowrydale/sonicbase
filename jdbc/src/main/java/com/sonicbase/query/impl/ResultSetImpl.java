@@ -1,5 +1,6 @@
 package com.sonicbase.query.impl;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 
@@ -409,25 +410,46 @@ public class ResultSetImpl implements ResultSet {
     }
 
     if (counters != null || (selectStatement != null && (isCount && selectStatement.isDistinct()))) {
-      boolean first = false;
-      if (currPos == 0) {
-        first = true;
-        while (true) {
-          try {
-            getMoreResults();
-            if (selectContext.getCurrKeys() == null) {
-              break;
-            }
+
+      boolean requireEvaluation = false;
+      if (selectStatement != null) {
+        for (SelectFunctionImpl function : selectStatement.getFunctionAliases().values()) {
+          if (function.getName().equalsIgnoreCase("min") || function.getName().equalsIgnoreCase("max")) {
           }
-          catch (SchemaOutOfSyncException e) {
-            continue;
-          }
-          catch (Exception e) {
-            throw new DatabaseException(e);
+          else {
+            requireEvaluation = true;
           }
         }
       }
-      return first;
+      if (requireEvaluation || (counters == null || !(selectStatement.getExpression() instanceof AllRecordsExpressionImpl))) {
+        boolean first = false;
+        if (currPos == 0) {
+          first = true;
+          while (true) {
+            try {
+              getMoreResults();
+              if (selectContext.getCurrKeys() == null) {
+                break;
+              }
+            }
+            catch (SchemaOutOfSyncException e) {
+              continue;
+            }
+            catch (Exception e) {
+              throw new DatabaseException(e);
+            }
+          }
+        }
+        return first;
+      }
+      else {
+        if (currPos == 0) {
+          return true;
+        }
+        else {
+          return false;
+        }
+      }
     }
 
     if (((setOperation != null && retKeys == null) || (setOperation == null && selectContext.getCurrKeys() == null))
@@ -2138,8 +2160,10 @@ public class ResultSetImpl implements ResultSet {
 
         final ExpressionImpl topMostExpression = selectStatement.getExpression();
 
+
+        boolean shouldOptimizeForThroughput = databaseClient.getCommon().getServersConfig().shouldOptimizeForThroughput();
         OptimizationSettings optimizationSettings = null;
-        if (counters == null && (selectStatement.getJoins() == null || selectStatement.getJoins().size() == 0) &&
+        if (!shouldOptimizeForThroughput && counters == null && (selectStatement.getJoins() == null || selectStatement.getJoins().size() == 0) &&
             !selectStatement.isServerSelect() &&
             (topMostExpression instanceof BinaryExpressionImpl || topMostExpression instanceof AllRecordsExpressionImpl)) {
           selectStatement.getExpression().next((int) count, null, new AtomicLong(), limit, offset, false, true);

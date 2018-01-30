@@ -1,6 +1,5 @@
 package com.sonicbase.index;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 
@@ -14,7 +13,6 @@ import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.server.DeleteManager;
 import com.sonicbase.socket.DeadServerException;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 
 import java.io.*;
@@ -2228,8 +2226,16 @@ public class Repartitioner extends Thread {
         isInternal = config.get("clientIsPrivate").asBoolean();
       }
 
+      boolean optimizedForThroughput = false;
+      if (config.has("optimizeReadsFor")) {
+        String text = config.get("optimizeReadsFor").asText();
+        if (text.equalsIgnoreCase("totalThroughput")) {
+          optimizedForThroughput = true;
+        }
+      }
+
       ServersConfig newConfig = new ServersConfig(databaseServer.getCluster(),
-          config.withArray("shards"), config.withArray("shards").get(0).withArray("replicas").size(), isInternal);
+          config.withArray("shards"), config.withArray("shards").get(0).withArray("replicas").size(), isInternal, optimizedForThroughput);
       ServersConfig.Shard[] newShards = newConfig.getShards();
 
       synchronized (common) {

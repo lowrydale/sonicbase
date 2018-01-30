@@ -6,6 +6,7 @@
   "maxJavaHeap": "20%",
   "user": "ubuntu",
   "clientIsPrivate": false,
+  "optimizeReadsFor": "singleClient",
   "xbackup" : {
     "type" : "fileSystem",
     "directory": "$HOME/db-backup",

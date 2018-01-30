@@ -1,0 +1,116 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>SonicBase - Select SQL Syntax Math</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Shown is the SQL syntax for a variety of functions that are available to use in the select clause.">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="../javascript/main.js"></script>
+
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-109032274-1');
+        ga('require', 'displayfeatures');
+    </script>
+</head>
+
+<body>
+<div class="container">
+    <header id="myHeader">
+        <div class="mobile">
+            <a href="../index.html">
+                <h4 class="logo">SonicBase™</h4>
+            </a>
+        </div>
+
+        <div class="desktop">
+            <a href="../index.html">
+                <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+            </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+        </div>
+    </header>
+
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+
+    <div style="margin-left: 4em;">
+<h1>SQL Select With Math Statement</h1>
+<br/>
+<h3>Syntax</h3><table class="border-table" border="1"><tr><td> <table class="syntax-table" cellpadding="4">
+    <tbody>
+
+    <tr class="syntax-main">
+        <td width="512" colspan=2 >
+            SELECT select_columns FROM table_name [WHERE expression]
+        </td>
+    </tr>
+    <tr><td><table cellpadding=4 cellspacing=0>
+        <tr><td align="right">select_columns:&nbsp;&nbsp;</td><td width="430"> * for all columns or comma separated list of column names</td></tr>
+        <tr ><td align="right">table_name:&nbsp;&nbsp;</td><td>name of table to select records from</td></tr>
+        <tr ><td align="right">expression:&nbsp;&nbsp;</td>
+            <td>column | constant | parameter | not expression | (expression) | <br>
+                expression operator expression | in (expression [, expression...])</td></tr>
+        <tr><td align="right">operator:&nbsp;&nbsp;</td>
+            <td> or | and  | = | != | &lt; | &gt; | &lt;= | &gt;= | + | - | * | / | &amp; | | | ^ | %</td></tr>
+        <tr><td align="right">+&nbsp;&nbsp;</td>
+            <td> plus</td></tr>
+        <tr><td align="right">-&nbsp;&nbsp;</td>
+            <td> minus</td></tr>
+        <tr><td align="right">*&nbsp;&nbsp;</td>
+            <td> multiply</td></tr>
+        <tr><td align="right">/&nbsp;&nbsp;</td>
+            <td> divide</td></tr>
+        <tr><td align="right">&amp;&nbsp;&nbsp;</td>
+            <td> bitwise and</td></tr>
+        <tr><td align="right">|&nbsp;&nbsp;</td>
+            <td> bitwise or</td></tr>
+        <tr><td align="right">^&nbsp;&nbsp;</td>
+            <td> bitwise xor</td></tr>
+        <tr><td align="right">%&nbsp;&nbsp;</td>
+            <td> modulo</td></tr>
+
+    </table></td></tr>
+	  
+  </tbody>
+</table>
+</td>
+</tr>
+</table>
+
+        <h3>Examples</h3>
+        <pre class="java"><code>
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where id > 1 and id = id2 + 100 limit 3");
+    ResultSet ret = stmt.executeQuery();
+            <br/>
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where id = id2 % 100");
+    ResultSet ret = stmt.executeQuery();
+            </code></pre>
+
+  </tbody>
+</table>
+</div>
+</div>
+</body>
+</html>

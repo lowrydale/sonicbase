@@ -138,6 +138,25 @@ public class TestMisc {
     return value;
   }
 
+  @Test
+  public void testStoredProcedure() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("CREATE PROCEDURE RAISE_PRICE(\n" +
+        "    IN coffeeName varchar(32),\n" +
+        "    IN maximumPercentage float,\n" +
+        "    INOUT newPrice float)\n" +
+        "    PARAMETER STYLE JAVA\n" +
+        "    LANGUAGE JAVA\n" +
+        "    DYNAMIC RESULT SETS 0\n" +
+        "    EXTERNAL NAME 'com.oracle.tutorial.jdbc.\n" +
+        "        StoredProcedureJavaDBSample.raisePrice'");
+    stmt.execute();
+  }
+
+  @Test
+  public void testCallStoredProcedure() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("CALL myProdcedure(1, 2, 3)");
+    stmt.execute();
+  }
 
   @Test
   public void testMem() {

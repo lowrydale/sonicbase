@@ -65,60 +65,60 @@ public class TestPerformance {
     setup(outerFactor);
 
     List<String> methods = new ArrayList<>();
-//
-//    methods.add("testInnerJoin");
-//    methods.add("testLeftOuterJoin");
-//    methods.add("testRightOuterJoin");
-//    methods.add("testIdLookup");
-//    methods.add("testMath");
-//    methods.add("testIdNoKey");
-//    methods.add("testRangeNoKey");
-//    methods.add("testRangeThreeKey");
-//    methods.add("testRangeThreeKeyBackwards");
-//    methods.add("testRangeThreeKeyMixed");
-//    methods.add("testRangeThreeKeySingle");
-//    methods.add("testNoKeyTwoKeyGreaterEqual");
-//    methods.add("testNoKeyTwoKeyGreater");
-//    methods.add("testNoKeyTwoKeyGreaterLeftSided");
-//    methods.add("notIn");
-//    methods.add("notInSecondary");
-//    methods.add("notInTableScan");
-//    methods.add("test2keyRange");
-//    methods.add("testSecondaryKey");
-//    methods.add("testTableScan");
-//    methods.add("testTwoKey");
-//    methods.add("testTwoKeyRightSided");
-//    methods.add("testTwoKeyLeftSidedGreater");
-//    methods.add("testTwoKeyGreater");
-//    methods.add("testTwoKeyGreaterBackwards");
-//    methods.add("testTwoKeyLeftSidedGreaterEqual");
-//    methods.add("testCountTwoKeyGreaterEqual");
-//    methods.add("testMaxWhere");
+
+    methods.add("testInnerJoin");
+    methods.add("testLeftOuterJoin");
+    methods.add("testRightOuterJoin");
+    methods.add("testIdLookup");
+    methods.add("testMath");
+    methods.add("testIdNoKey");
+    methods.add("testRangeNoKey");
+    methods.add("testRangeThreeKey");
+    methods.add("testRangeThreeKeyBackwards");
+    methods.add("testRangeThreeKeyMixed");
+    methods.add("testRangeThreeKeySingle");
+    methods.add("testNoKeyTwoKeyGreaterEqual");
+    methods.add("testNoKeyTwoKeyGreater");
+    methods.add("testNoKeyTwoKeyGreaterLeftSided");
+    methods.add("notIn");
+    methods.add("notInSecondary");
+    methods.add("notInTableScan");
+    methods.add("test2keyRange");
+    methods.add("testSecondaryKey");
+    methods.add("testTableScan");
+    methods.add("testTwoKey");
+    methods.add("testTwoKeyRightSided");
+    methods.add("testTwoKeyLeftSidedGreater");
+    methods.add("testTwoKeyGreater");
+    methods.add("testTwoKeyGreaterBackwards");
+    methods.add("testTwoKeyLeftSidedGreaterEqual");
+    methods.add("testCountTwoKeyGreaterEqual");
+    methods.add("testMaxWhere");
     methods.add("testMax");
     methods.add("testMin");
-//    methods.add("testCount");
-//    methods.add("testSort");
-//    methods.add("testSortDisk");
-//    methods.add("testId2");
-//    methods.add("testId2Range");
-//    methods.add("testOtherExpression");
-//    methods.add("testNoWhereClause");
-//
-//    methods.add("testRangeGreaterDescend");
-//    methods.add("testRange");
-//    methods.add("testRangeLess");
-//
-//    methods.add("testRangeOtherExpression");
-//    methods.add("testSecondary");
-//    methods.add("testUnion");
-//    methods.add("testUnionInMemory");
-//    methods.add("testUnionAll"); //
-//    methods.add("testIntersect");
-//    methods.add("testExcept");
-//    methods.add("testNot");
-//    methods.add("testFunctionAvg");
-//    methods.add("testFunctionMin");
-//    methods.add("testFunctionCustom");
+    methods.add("testCount");
+    methods.add("testSort");
+    methods.add("testSortDisk");
+    methods.add("testId2");
+    methods.add("testId2Range");
+    methods.add("testOtherExpression");
+    methods.add("testNoWhereClause");
+
+    methods.add("testRangeGreaterDescend");
+    methods.add("testRange");
+    methods.add("testRangeLess");
+
+    methods.add("testRangeOtherExpression");
+    methods.add("testSecondary");
+    methods.add("testUnion");
+    methods.add("testUnionInMemory");
+    methods.add("testUnionAll"); //
+    methods.add("testIntersect");
+    methods.add("testExcept");
+    methods.add("testNot");
+    methods.add("testFunctionAvg");
+    methods.add("testFunctionMin");
+    methods.add("testFunctionCustom");
 
     for (String method : methods) {
       try {
@@ -225,7 +225,7 @@ public class TestPerformance {
           @Override
           public void run() {
             server0_0.startServer(new String[]{"-port", String.valueOf(9010), "-host", "localhost",
-                "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(0)}, "db/src/main/resources/config/config-4-servers.json", true);
+                "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(0)}, "db/src/main/resources/config/config-2-servers-a.json", true);
             latch.countDown();
           }
         });
@@ -244,7 +244,7 @@ public class TestPerformance {
           @Override
           public void run() {
             server0_1.startServer(new String[]{"-port", String.valueOf(9060), "-host", "localhost",
-                "-mport", String.valueOf(9060), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(0)}, "db/src/main/resources/config/config-4-servers.json", true);
+                "-mport", String.valueOf(9060), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(0)}, "db/src/main/resources/config/config-2-servers-a.json", true);
             latch.countDown();
           }
         });
@@ -1114,17 +1114,17 @@ public class TestPerformance {
 
 
   public void testMax() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from persons");
     long begin = System.nanoTime();
     int count = 0;
-    for (int i = 0; i < outerFactor * 100; i++) {
+    PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from persons");
+    for (int i = 0; i < outerFactor * 10000; i++) {
       ResultSet rs = stmt.executeQuery();
       assertTrue(rs.next());
-      assertEquals(rs.getLong("maxValue"), (long)((outerFactor * 500_000) - 1L));
-      assertEquals(rs.getInt("maxValue"), (int)(long)((outerFactor * 500_000) - 1L));
-      assertEquals(rs.getString("maxValue"), String.valueOf((long)((outerFactor * 500_000) - 1L)));
-      assertEquals(rs.getDouble("maxValue"), (double)(long)((outerFactor * 500_000) - 1L));
-      assertEquals(rs.getFloat("maxValue"), (float)(long)((outerFactor * 500_000) - 1L));
+      assertEquals(rs.getLong("maxValue"), (long) ((outerFactor * 500_000) - 1L));
+      assertEquals(rs.getInt("maxValue"), (int) (long) ((outerFactor * 500_000) - 1L));
+      assertEquals(rs.getString("maxValue"), String.valueOf((long) ((outerFactor * 500_000) - 1L)));
+      assertEquals(rs.getDouble("maxValue"), (double) (long) ((outerFactor * 500_000) - 1L));
+      assertEquals(rs.getFloat("maxValue"), (float) (long) ((outerFactor * 500_000) - 1L));
       count++;
     }
     long end = System.nanoTime();
@@ -1136,7 +1136,7 @@ public class TestPerformance {
     PreparedStatement stmt = conn.prepareStatement("select min(id) as minValue from persons");
     long begin = System.nanoTime();
     int count = 0;
-    for (int i = 0; i < outerFactor * 100; i++) {
+    for (int i = 0; i < outerFactor * 10000; i++) {
       ResultSet rs = stmt.executeQuery();
       assertTrue(rs.next());
       assertEquals(rs.getLong("minValue"), (long)0);

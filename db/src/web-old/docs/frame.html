@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+
+	<title>SonicBase - Update SQL Syntax</title>
+	<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+
+	<!-- Global site tag (gtag.js) - Google Analytics -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+	<script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-109032274-1');
+        ga('require', 'displayfeatures');
+	</script>
+</head>
+
+<body>
+
+<div class="container">
+	<header>
+		<div class="mobile">
+			<a href="../index.html">
+				<h4 class="logo">SonicBase™</h4>
+			</a>
+		</div>
+		<div class="desktop">
+			<a href="../index.html">
+				<img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+			</a>
+		<nav>
+			<ul>
+				<li><a href="../index.html">HOME</a></li>
+				<li> <a href="../documentation.html">DOCUMENTATION</a></li>
+				<li><a href="../contact.html">CONTACT</a></li>
+			</ul>
+		</nav>
+		</div>
+	</header>
+
+	<!--<div style="margin-left: 4em;">-->
+
+
+		<iframe id="myIFrame" frameBorder="0" width=100% height=900px name="doc-frame"></iframe>
+
+	<script>
+        var sPageURL = window.location.search.substring(1);
+        var sURLVariables = sPageURL.split('&');
+        for (var i = 0; i < sURLVariables.length; i++)
+        {
+            var sParameterName = sURLVariables[i].split('=');
+            if (decodeURIComponent(sParameterName[0]) == "ref")
+            {
+                var iframe = document.getElementById('myIFrame');
+                iframe.src = decodeURIComponent(sParameterName[1]);
+            }
+        }
+	</script>
+</div>
+</body>
+</html>

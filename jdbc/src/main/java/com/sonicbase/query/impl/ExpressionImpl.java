@@ -151,7 +151,7 @@ public abstract class ExpressionImpl implements Expression {
   public static void evaluateCounter(DatabaseCommon common, DatabaseClient client, String dbName,
                                      ExpressionImpl expression, IndexSchema indexSchema, Counter counter,
                                      SelectFunctionImpl function) throws IOException {
-    if (false && (function.getName().equalsIgnoreCase("min") || function.getName().equalsIgnoreCase("max"))) {
+    if ((function.getName().equalsIgnoreCase("min") || function.getName().equalsIgnoreCase("max"))) {
 
       BinaryExpression.Operator op = BinaryExpression.Operator.greater;
       AtomicReference<String> usedIndex = new AtomicReference<>();
@@ -187,7 +187,7 @@ public abstract class ExpressionImpl implements Expression {
       SelectContextImpl context = lookupIds(dbName, client.getCommon(), client, replica, 1, counter.getTableName(),
           indexSchema.getName(), false,
           op, null, orderBy, null, null, expression, null, null, null,
-          columnList, indexSchema.getFields()[0], 0, expression.getRecordCache(), usedIndex, false,
+          columnList, indexSchema.getFields()[0], -1, expression.getRecordCache(), usedIndex, false,
           client.getCommon().getSchemaVersion(), null, null, false, new AtomicLong(),null, null, false);
       NextReturn ret = new NextReturn();
       ret.setTableNames(context.getTableNames());

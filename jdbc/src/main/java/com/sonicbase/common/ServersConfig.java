@@ -8,9 +8,14 @@ import org.apache.giraph.utils.Varint;
 import java.io.*;
 
 public class ServersConfig {
+  private boolean optimizeForThroughput;
   private String cluster;
   private Shard[] shards;
   private boolean clientIsInternal;
+
+  public boolean shouldOptimizeForThroughput() {
+    return optimizeForThroughput;
+  }
 
 
   public static class Host {
@@ -138,6 +143,9 @@ public class ServersConfig {
       shards[i] = new Shard(in, serializationVersion);
     }
     clientIsInternal = in.readBoolean();
+    if (serializationVersion >= DatabaseClient.SERIALIZATION_VERSION_25) {
+      optimizeForThroughput = in.readBoolean();
+    }
   }
 
   /**
@@ -160,6 +168,7 @@ public class ServersConfig {
       shard.serialize(out, serializationVersionNumber);
     }
     out.writeBoolean(clientIsInternal);
+    out.writeBoolean(optimizeForThroughput);
   }
 
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP", justification = "copying the returned data is too slow")
@@ -175,7 +184,7 @@ public class ServersConfig {
     return cluster;
   }
 
-  public ServersConfig(String cluster, ArrayNode inShards, int replicationFactor, boolean clientIsInternal) {
+  public ServersConfig(String cluster, ArrayNode inShards, int replicationFactor, boolean clientIsInternal, boolean optimizedForThroughput) {
     int currServerOffset = 0;
     this.cluster = cluster;
     int shardCount = inShards.size();
@@ -192,6 +201,7 @@ public class ServersConfig {
 
     }
     this.clientIsInternal = clientIsInternal;
+    this.optimizeForThroughput = optimizedForThroughput;
   }
 
   public int getThisReplica(String host, int port) {

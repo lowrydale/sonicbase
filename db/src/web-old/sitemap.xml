@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset
+      xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+            http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+<!-- created with Free Online Sitemap Generator www.xml-sitemaps.com -->
+
+<url>
+  <loc>http://sonicbase.com/</loc>
+  <lastmod>2017-06-09T00:01:40+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/index.html</loc>
+  <lastmod>2017-06-09T00:01:40+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/documentation.html</loc>
+  <lastmod>2017-06-08T23:06:42+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/downloads.html</loc>
+  <lastmod>2017-06-05T02:30:02+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/contact.html</loc>
+  <lastmod>2017-06-04T19:21:22+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/getting-started.html</loc>
+  <lastmod>2017-06-08T23:13:27+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/features.html</loc>
+  <lastmod>2017-06-08T22:29:29+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/select-basics.html</loc>
+  <lastmod>2017-06-08T23:39:45+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/select-order-by.html</loc>
+  <lastmod>2017-06-08T23:40:12+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/select-functions.html</loc>
+  <lastmod>2017-06-08T23:38:14+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/select-group-by.html</loc>
+  <lastmod>2017-06-08T23:38:14+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/select-limit.html</loc>
+  <lastmod>2017-06-08T23:38:14+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/joins-inner.html</loc>
+  <lastmod>2017-06-08T23:31:40+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/joins-left-outer.html</loc>
+  <lastmod>2017-06-08T23:32:23+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/joins-right-outer.html</loc>
+  <lastmod>2017-06-08T23:32:23+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/joins-full.html</loc>
+  <lastmod>2017-06-08T23:31:40+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/joins-three-way.html</loc>
+  <lastmod>2017-06-08T23:32:23+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/insert.html</loc>
+  <lastmod>2017-06-08T23:46:55+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/batch_insert.html</loc>
+  <lastmod>2017-06-08T23:48:23+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/delete.html</loc>
+  <lastmod>2017-06-08T23:48:50+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/update.html</loc>
+  <lastmod>2017-06-08T23:49:16+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/create-table.html</loc>
+  <lastmod>2017-06-08T23:52:05+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/create-index.html</loc>
+  <lastmod>2017-06-08T23:50:46+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/describe.html</loc>
+  <lastmod>2017-06-08T23:46:20+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/describe-tables.html</loc>
+  <lastmod>2017-06-08T23:53:52+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/describe-shards.html</loc>
+  <lastmod>2017-06-08T23:54:25+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/describe-server-stats.html</loc>
+  <lastmod>2017-06-08T23:54:49+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/setup.html</loc>
+  <lastmod>2017-06-08T23:06:10+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/setup-linux-mac.html</loc>
+  <lastmod>2017-06-08T23:06:10+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/setup-windows.html</loc>
+  <lastmod>2017-06-08T23:09:43+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/setup-cygwin.html</loc>
+  <lastmod>2017-06-08T22:43:02+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/diagnostics.html</loc>
+  <lastmod>2017-06-08T22:43:33+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/config.html</loc>
+  <lastmod>2017-06-08T22:57:08+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/client.html</loc>
+  <lastmod>2017-06-08T23:01:38+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/aws-integration.html</loc>
+  <lastmod>2017-06-08T23:02:12+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/jdbc-client.html</loc>
+  <lastmod>2017-06-08T23:11:51+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/datatypes.html</loc>
+  <lastmod>2017-06-08T23:14:42+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/transactions.html</loc>
+  <lastmod>2017-06-08T23:15:16+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/monitoring.html</loc>
+  <lastmod>2017-06-08T23:16:30+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/performance-considerations.html</loc>
+  <lastmod>2017-06-08T23:17:13+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/troubleshooting.html</loc>
+  <lastmod>2017-06-08T23:17:56+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/benchmarks-batch-insert.html</loc>
+  <lastmod>2017-06-08T23:18:55+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/benchmarks-identity-query.html</loc>
+  <lastmod>2017-06-08T23:19:21+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/benchmarks-range-query.html</loc>
+  <lastmod>2017-06-08T23:19:40+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/pro-features.html</loc>
+  <lastmod>2017-06-08T23:20:24+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/doc-detail.html</loc>
+  <lastmod>2017-06-08T22:19:00+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/license-agreement.html</loc>
+  <lastmod>2017-05-29T21:09:27+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/config.html?framed=true</loc>
+  <lastmod>2017-06-08T22:57:08+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/getting-started.html?framed=true</loc>
+  <lastmod>2017-06-08T23:13:27+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/benchmarks-schema.html?framed=true</loc>
+  <lastmod>2017-06-06T03:25:08+00:00</lastmod>
+  <changefreq>daily</changefreq>
+</url>
+</urlset>

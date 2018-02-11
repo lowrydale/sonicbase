@@ -56,34 +56,34 @@
         <div class="mylink">
 
             <h1>Administrative Client</h1>
-        <h2>Startup</h2>
+        <h3 style="font-size:18px;">Startup</h3>
 Start the client by typing, from the bin subdirectory of the install directory, "./cli" for mac or linux and "./cli.bat" for cygwin and "cli.bat" for Windows.<br/>
 <br/>
-<h2>Plain Client</h2>
+<h3 style="font-size:18px;">Plain Client</h3>
 If you are having problems with the colors, text positiong or windows resizing, you may wan to use the plain client.
 To run the plain client, add "--plain" to the cli command.
 <br/>
-<h2>Use a Cluster</h2>
+<h3 style="font-size:18px;">Use a Cluster</h3>
 You must use a cluster in order to operate on in. Type "use cluster &lt;cluster name&gt;". The cluster
         name must match a config file in the config directory.
 The name of the config file must follow "config-&lt;cluster name&gt;.json".
 <br/>
-<h2>Deploy Cluster</h2>
+<h3 style="font-size:18px;">Deploy Cluster</h3>
 To deploy the image to the servers in the cluster, type "deploy cluster". Note that you must setup passwordless
 ssh between all the servers and between all the servers and the client. Deploy cluster is not supported for Windows.
 <br/>
-<h2>Start Cluster</h2>
+<h3 style="font-size:18px;">Start Cluster</h3>
 To start a cluster type "start cluster".
 <br/>
-        <h2>Start Server</h2>
+        <h3 style="font-size:18px;">Start Server</h3>
         To start a single server type "start server &lt;shard&gt; &ltreplica&gt;". Where shard and replica indicate
         which server to start.
 <h2>Stop Cluster</h2>
         To stop the cluster type "stop cluster".
-        <h2>Stop Server</h2>
+        <h3 style="font-size:18px;">Stop Server</h3>
         To stop a single server type "stop server &lt;shard&gt; &ltreplica&gt;". Where shard and replica indicate
         which server to stop.
-<h2>Purge Cluster</h2>
+<h3 style="font-size:18px;">Purge Cluster</h3>
 To purge a cluster type "purge cluster". This will purge and stop the cluster.
 <br/>
 <h2>Create a Database</h2>
@@ -125,13 +125,13 @@ describe<br/>
         See <a href="backup-restore.html?framed=true">Backup and Restore</a>.
         <h2>Purge Install</h2>
         To purge the install directory across the cluster, type "purge install".
-        <h2>Quit or Exit</h2>
+        <h3 style="font-size:18px;">Quit or Exit</h3>
         To exit the client, type "quit" or type "exit".
-        <h2>Healthcheck</h2>
+        <h3 style="font-size:18px;">Healthcheck</h3>
         To run a healthcheck across the cluster, type "healthcheck".
-        <h2>Clear</h2>
+        <h3 style="font-size:18px;">Clear</h3>
         To clear the screen, type "clear".
-        <h2>Gather Diagnostics</h2>
+        <h3 style="font-size:18px;">Gather Diagnostics</h3>
         See <a href="diagnostics.html?framed=true">Diagnostics</a>.
         <h2>Build Config</h2>
         See <a href="aws-integration.html?framed=true">AWS Integration</a>.
@@ -145,11 +145,11 @@ describe<br/>
             <h2>Reload Server Status</h2>
             To get the status of a server reload, type "reload server status &lt;shard&gt; &lt;replica&gt;, where shard
             and replica specify the server you are reloading. Returns "complete" or "running" depending on the state of the reload.
-            <h2>Reload Replica</h2>
+            <h3 style="font-size:18px;">Reload Replica</h3>
             To reload a replica from its peers, type "reload replica &lt;replica&gt;, where
             replica specifies the replica you wish to reload. You would need to take this action in the
             case you are adding a new replica.
-            <h2>Reload Replica Status</h2>
+            <h3 style="font-size:18px;">Reload Replica Status</h3>
             To get the status of a replica reload, type "reload replica status &lt;replica&gt;, where
             replica specifies the replica you are reloading. Returns "complete" or "running" depending on the state of the reload.
 </div>

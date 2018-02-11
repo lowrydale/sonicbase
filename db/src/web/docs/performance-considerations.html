@@ -80,6 +80,12 @@ recommended that you have an SSD disk with 2000 iops.
         You may want to play with different iops to keep the costs down. Slower disks should be fine under a normal load.
         <br/>
 
+        <h2>Read Optimization Setting</h2>
+        By default, reads are optimized for single or few concurrent requests. You can change this setting to achieve maximum concurrent
+        throughput. In you config file, set "optimizeReadsFor" to "totalThroughput" for maximum total throughput. Set
+        "optimizeReadsFor" to "singleClient" for few concurrent reads. This setting only has effect on range-based queries,
+        not identity-based queries.
+
 <h2>Networking</h2>
 <div class="mylink">
     The network will likely be your bottlneck when using SonicBase. It is recommended that you configure

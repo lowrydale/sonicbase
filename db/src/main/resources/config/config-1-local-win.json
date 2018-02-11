@@ -6,6 +6,7 @@
   "maxJavaHeap": "20%",
   "user": "ubuntu",
   "clientIsPrivate": false,
+  "optimizeReadsFor": "singleClient",
   "backup" : {
     "type" : "fileSystem",
     "directory": "c:\\\\db-backup",

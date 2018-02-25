@@ -56,7 +56,7 @@
         }
     </script>
 
-    <div style="margin-left: 4em;margin-right: 4em;">
+    <div class="main-page-text">
 <h1>Streams Consumers</h1>
         <h2>Overview</h2>
         With SonicBase you can consume messages from an external data source. This is very useful where SonicBase
@@ -162,6 +162,11 @@
         <h3>Stop Consuming</h3>
         In the admin client type "stop streams consumers" to stop consuming across the cluster.
 
+        <h2>Error Handling</h2>
+        When an error occurs, the message is logged to disk for later processing. The log files are located at
+        &lt;dataDirectory&gt;/stream_errors/&lt;shard&gt;/&lt;replica&gt;/&lt;date&gt;.error.<br/>
+        <br/>
+        Additionally, the "handleError" method on your consumer will be called for the messages that got an error.
         <h2>Custom Streams Providers</h2>
         You can hook into any streams system by providing a custom provider. Your class must implement the following
         interface located in sonicbase-&lt;version&gt;.jar.<br/><br/>
@@ -177,7 +182,9 @@ public interface StreamsConsumer {<br/>
 
     List&lt;Message&gt; receive();<br/>
 
-    void acknowledgeMessage(Message message);<br/>
+    void acknowledgeMessages(List&lt;Message&gt; messages);<br/>
+
+    void handleError(List&lt;Message&gt; messages, Exception e);<br/>
 
     void shutdown();<br/>
 }<br/>
@@ -188,7 +195,9 @@ public interface StreamsConsumer {<br/>
         <br/>
         "receive" is called for you to return messages from your provider.<br/>
         <br/>
-        "acknowledgeMessage" is called for you to acknowledge the message with your provider if applicable.<br/>
+        "acknowledgeMessages" is called for you to acknowledge the messages with your provider if applicable.<br/>
+        <br/>
+        "handleError" is called when there is an exception processing your messages.
         <br/>
         "shutdown" is called for you to disconnect from your provider.<br/>
         <br/>
@@ -318,9 +327,16 @@ public class AWSSQSConsumer implements StreamsConsumer {
   }<br/>
 
   @Override
-  public void acknowledgeMessage(Message message) {
-    sqsClient.deleteMessage(url, ((AWSMessage)message).message.getReceiptHandle());
+  public void acknowledgeMessage(List&lt;Message&gt; messages) {
+    for (Message message : messages) {
+      sqsClient.deleteMessage(url, ((AWSMessage)message).message.getReceiptHandle());
+    }
+  }<br/>
+
+  @Override
+  public void handleError(List&lt;Message&gt; messages, Exception e) {
   }
+
 }
 
             </code></pre>

@@ -10,7 +10,9 @@ public interface StreamsConsumer {
 
   List<Message> receive();
 
-  void acknowledgeMessage(Message message);
+  void acknowledgeMessages(List<Message> messages);
+
+  void handleError(List<Message> messages, Exception e);
 
   void shutdown();
 

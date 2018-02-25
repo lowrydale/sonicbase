@@ -240,7 +240,7 @@ public class BulkImportManager {
             final StringBuilder parmsStr = new StringBuilder();
             boolean first = true;
             for (FieldSchema field : fields) {
-              if (field.getName().equals("_id")) {
+              if (field.getName().equals("_sonicbase_id")) {
                 continue;
               }
               if (first) {
@@ -445,7 +445,7 @@ public class BulkImportManager {
 
     int offset = 0;
     for (FieldSchema field : fields) {
-      if (field.getName().equals("_id")) {
+      if (field.getName().equals("_sonicbase_id")) {
         continue;
       }
       switch (field.getType()) {
@@ -805,7 +805,7 @@ public class BulkImportManager {
       final StringBuilder parmsStr = new StringBuilder();
       boolean first = true;
       for (FieldSchema field : fields) {
-        if (field.getName().equals("_id")) {
+        if (field.getName().equals("_sonicbase_id")) {
           continue;
         }
         if (first) {
@@ -1102,12 +1102,11 @@ public class BulkImportManager {
     }
   }
 
-  public static void setFieldsInInsertStatement(PreparedStatement insertStmt, Object[] currRecord, List<FieldSchema> fields) {
+  public static void setFieldsInInsertStatement(PreparedStatement insertStmt, int parmOffset, Object[] currRecord, List<FieldSchema> fields) {
     try {
-      int parmOffset = 1;
       int fieldOffset = 0;
       for (FieldSchema field : fields) {
-        if (field.getName().equals("_id")) {
+        if (field.getName().equals("_sonicbase_id")) {
           //fieldOffset++;
           continue;
         }
@@ -1375,7 +1374,7 @@ public class BulkImportManager {
 
         try {
           for (Object[] currRecord : currBatch) {
-            setFieldsInInsertStatement(insertStmt, currRecord, fields);
+            setFieldsInInsertStatement(insertStmt, 1, currRecord, fields);
 
             insertStmt.addBatch();
           }

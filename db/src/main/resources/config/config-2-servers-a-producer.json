@@ -1,5 +1,5 @@
 {
-  "dataDirectory": "$HOME/db/database",
+  "dataDirectory": "$HOME/db/database-a",
   "installDirectory": "$HOME/test-sonicbase",
   "partitionCountForRecordIndex" : 10000,
   "subPartitionsForIdIndex" : 10,
@@ -7,8 +7,8 @@
   "indexEntrySize" : 60,
   "maxJavaHeap": "50%",
   "maxProcessMemory": "90%",
+  "clientIsPrivate": false,
   "optimizeReadsFor": "totalThroughput",
-  "useUnsafe": true,
   "backup" : {
     "type" : "fileSystem",
     "directory": "$HOME/db/db-backup",
@@ -17,6 +17,14 @@
     "maxBackupCount": 10,
     "sharedDirectory": true
   },
+  "streams" : {
+    "processorThreadCount" : 8,
+    "publisherThreadCount" : 32,
+    "producers" : [ {
+      "className" : "com.sonicbase.streams.LocalProducer",
+      "maxBatchSize" : 200
+    } ]
+  },
   "shards" : [
     {
       "replicas": [
@@ -24,11 +32,6 @@
           "privateAddress": "localhost",
           "publicAddress": "localhost",
           "port": 9010
-        },
-        {
-          "publicAddress": "localhost",
-          "privateAddress": "localhost",
-          "port": 9060
         }
       ]
     },
@@ -37,12 +40,7 @@
         {
           "publicAddress": "localhost",
           "privateAddress": "localhost",
-          "port": 9110
-        },
-        {
-          "publicAddress": "localhost",
-          "privateAddress": "localhost",
-          "port": 9160
+          "port": 9060
         }
       ]
     }

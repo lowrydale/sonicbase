@@ -2,10 +2,7 @@ package com.sonicbase.query.impl;
 
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.*;
-import com.sonicbase.query.*;
 import com.sonicbase.schema.DataType;
-
-import com.sonicbase.query.*;
 
 /**
  * Responsible for
@@ -27,7 +24,7 @@ public abstract class StatementImpl implements Statement {
     return parms;
   }
 
-  public abstract Object execute(String dbName, SelectStatementImpl.Explain explain) throws DatabaseException;
+  public abstract Object execute(String dbName, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2) throws DatabaseException;
 
   @Override
   public BinaryExpression createBinaryExpression(String id, BinaryExpression.Operator op, long value) {

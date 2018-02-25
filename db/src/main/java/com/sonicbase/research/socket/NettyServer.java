@@ -888,12 +888,6 @@ public class NettyServer {
               databaseServer.getDeltaManager().runSnapshotLoop();
 //              databaseServer.getSnapshotManager().runSnapshotLoop();
 
-              try {
-                databaseServer.getStreamManager().startStreaming(null);
-              }
-              catch (Exception e) {
-                logger.error("Error starting streaming", e);
-              }
               isRunning.set(true);
             }
             catch (Exception e) {

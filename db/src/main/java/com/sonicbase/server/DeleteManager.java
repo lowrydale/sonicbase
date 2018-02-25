@@ -427,6 +427,7 @@ public class DeleteManager {
     try {
       File file = new File(getDeltaRoot(), "tmp");
       FileUtils.deleteDirectory(file);
+
       Map<Integer, Map<Integer, OutputState>> streams = new HashMap<>();
       for (Map.Entry<String, TableSchema> table : databaseServer.getCommon().getTables(dbName).entrySet()) {
         Map<Integer, OutputState> indexState = new HashMap<Integer, OutputState>();
@@ -443,7 +444,7 @@ public class DeleteManager {
         }
       }
 
-      writeBatchDeletes(executor, streams, currStage, totalBytes, finishedBytes);
+      writeBatchDeletes(executor, dbName, streams, currStage, totalBytes, finishedBytes);
       writeLogDeletes(executor, dbName, streams, currStage, totalBytes, finishedBytes);
 
       closeFiles(dbName, streams);
@@ -714,7 +715,7 @@ public class DeleteManager {
     }
   }
 
-  private void writeBatchDeletes(ThreadPoolExecutor executor, final Map<Integer, Map<Integer, OutputState>> streams,
+  private void writeBatchDeletes(ThreadPoolExecutor executor, final String dbName, final Map<Integer, Map<Integer, OutputState>> streams,
                                  AtomicReference<String> currStage, AtomicLong totalBytes, final AtomicLong finishedBytes) {
 
     long begin = System.currentTimeMillis();
@@ -744,9 +745,12 @@ public class DeleteManager {
           public Object call() throws Exception {
             try (DataInputStream in = new DataInputStream(new BufferedInputStream(new DeltaManager.ByteCounterStream(finishedBytes, new FileInputStream(file)), 64_000))) {
               short serializationVersion = (short) Varint.readSignedVarLong(in);
-              String dbName = in.readUTF();
+              String currDbName = in.readUTF();
+              if (!currDbName.equals(dbName)) {
+                return null;
+              }
               String tableName = in.readUTF();
-              TableSchema tableSchema = databaseServer.getCommon().getTables(dbName).get(tableName);
+              TableSchema tableSchema = databaseServer.getCommon().getTables(currDbName).get(tableName);
 
               String indexName = in.readUTF();
               final IndexSchema indexSchema = tableSchema.getIndices().get(indexName);

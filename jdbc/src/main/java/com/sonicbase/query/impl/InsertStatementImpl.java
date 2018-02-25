@@ -31,7 +31,7 @@ public class InsertStatementImpl extends StatementImpl implements InsertStatemen
   }
 
   @Override
-  public Object execute(String dbName, SelectStatementImpl.Explain explain) throws DatabaseException {
+  public Object execute(String dbName, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2) throws DatabaseException {
     try {
       return client.doInsert(dbName, this, getParms());
     }

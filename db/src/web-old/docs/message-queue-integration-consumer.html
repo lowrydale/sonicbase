@@ -77,15 +77,15 @@
         "maxJavaHeap": "60%",
         "user": "ubuntu",
         "clientIsPrivate": false,
-        "queue": {
+        "streams": {
             "consumers": [
                 {
-                    "className": "com.sonicbase.queue.AWSSQSMessageQueueConsumer",
+                    "className": "com.sonicbase.streams.AWSSQSConsumer",
                     "threadCount": 128,
                     "url": "https://sqs.us-east-1.amazonaws.com/892217715566/benchmark-queue2"
                 },
                 {
-                    "className": "com.sonicbase.queue.KafkaMessageQueueConsumer",
+                    "className": "com.sonicbase.streams.KafkaConsumer",
                     "threadCount": 16,
                     "servers: "localhost:9092"
                     "topic: "test"

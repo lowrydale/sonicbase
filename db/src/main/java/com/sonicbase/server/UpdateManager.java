@@ -12,7 +12,7 @@ import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.ResultSet;
 import com.sonicbase.query.impl.ColumnImpl;
 import com.sonicbase.query.impl.SelectStatementImpl;
-import com.sonicbase.queue.MessageQueueProducer;
+import com.sonicbase.streams.StreamsProducer;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
@@ -41,8 +41,9 @@ public class UpdateManager {
 
   private static final String CURR_VER_STR = "currVer:";
   private final DatabaseServer server;
-  private List<MessageQueueProducer> producers = new ArrayList<>();
+  private List<StreamsProducer> producers = new ArrayList<>();
   private int maxPublishBatchSize = 10;
+  private int publisherThreadCount;
 
   public UpdateManager(DatabaseServer databaseServer) {
     this.server = databaseServer;
@@ -53,10 +54,10 @@ public class UpdateManager {
   }
 
   private class Producer {
-    MessageQueueProducer producer;
+    StreamsProducer producer;
     int maxBatchSize;
 
-    public Producer(MessageQueueProducer producer, Integer maxBatchSize) {
+    public Producer(StreamsProducer producer, Integer maxBatchSize) {
       this.producer = producer;
       this.maxBatchSize = maxBatchSize;
     }
@@ -64,13 +65,19 @@ public class UpdateManager {
 
   private void initMessageQueueProducers() {
     final ObjectNode config = server.getConfig();
-    ObjectNode queueDict = (ObjectNode) config.get("queue");
+    ObjectNode queueDict = (ObjectNode) config.get("streams");
     logger.info("Starting queue consumers: queue notNull=" + (queueDict != null));
     if (queueDict != null) {
+      if (queueDict.has("publisherThreadCount")) {
+        publisherThreadCount = queueDict.get("publisherThreadCount").asInt();
+      }
+      else {
+        publisherThreadCount = 8;
+      }
       if (!server.haveProLicense()) {
         throw new InsufficientLicense("You must have a pro license to use message queue integration");
       }
-      logger.info("Starting queues. Have license");
+      logger.info("Starting queues. Have license: publisherThreadCount=" + publisherThreadCount);
 
       ArrayNode streams = queueDict.withArray("producers");
       for (int i = 0; i < streams.size(); i++) {
@@ -84,7 +91,7 @@ public class UpdateManager {
           this.maxPublishBatchSize = maxBatchSize;
 
           logger.info("starting queue producer: config=" + stream.toString());
-          MessageQueueProducer producer = (MessageQueueProducer) Class.forName(className).newInstance();
+          StreamsProducer producer = (StreamsProducer) Class.forName(className).newInstance();
 
           producer.init(server.getCluster(), config.toString(), stream.toString());
 
@@ -287,7 +294,7 @@ public class UpdateManager {
               tableSchema = server.getCommon().getTables(dbName).get(tableName);
 
               long id = 0;
-              if (tableSchema.getFields().get(0).getName().equals("_id")) {
+              if (tableSchema.getFields().get(0).getName().equals("_sonicbase_id")) {
                 id = (long) record.getFields()[0];
               }
               List<DatabaseClient.KeyInfo> keys = server.getDatabaseClient().getKeys(server.getCommon(), tableSchema, columnNames, values, id);
@@ -708,7 +715,7 @@ private static class InsertRequest {
         trans.addOperation(batchInsertWithRecord, command, cobj.serialize(), replayedCommand);
       }
 
-      publishBatch();
+      publishBatch(cobj);
 
       batchDuration.addAndGet(System.nanoTime() - begin);
     }
@@ -865,7 +872,7 @@ private static class InsertRequest {
 //        if (null != index.get(primaryKey)) {
 //          alreadyExisted = true;
 //        }
-        doInsertKey(dbName, recordBytes, primaryKey, index, tableSchema.getName(), indexName, ignore || replayedCommand);
+        doInsertKey(outerCobj, dbName, recordBytes, primaryKey, index, tableSchema.getName(), indexName, ignore || replayedCommand);
 
 //        int selectedShard = selectedShards.get(0);
 //        if (indexSchema.getCurrPartitions()[selectedShard].getShardOwning() != server.getShard()) {
@@ -1007,7 +1014,7 @@ private static class InsertRequest {
                   doInsertIndexEntryByKeyWithRecord(cobj, innerObj, sequence0, sequence1, (short) i, op.getReplayed(),
                       transactionId, isExplicitTrans, true);
                 }
-                publishBatch();
+                publishBatch(cobj);
               }
               finally {
                 threadLocalIsBatchRequest.set(false);
@@ -1085,15 +1092,29 @@ private static class InsertRequest {
       server.getTransactionManager().preHandleTransaction(dbName, tableName, indexName, isExplicitTrans, isCommitting, transactionId, primaryKey, shouldExecute, shouldDeleteLock);
 
       Record record = new Record(dbName, server.getCommon(), bytes);
-      long sequence0 = cobj.getLong(ComObject.Tag.sequence0);
-      long sequence1 = cobj.getLong(ComObject.Tag.sequence1);
+      if (cobj.getLong(ComObject.Tag.sequence0Override) != null) {
+        long sequence0 = cobj.getLong(ComObject.Tag.sequence0Override);
+        long sequence1 = cobj.getLong(ComObject.Tag.sequence1Override);
+        short sequence2 = cobj.getShort(ComObject.Tag.sequence2Override);
 
-      if (sequence0 < record.getSequence0() && sequence1 < record.getSequence1()) {
-        throw new DatabaseException("Out of order update detected: key=" + server.getCommon().keyToString(primaryKey));
+        if (sequence0 < record.getSequence0() && sequence1 < record.getSequence1() && sequence2 < record.getSequence2()) {
+          throw new DatabaseException("Out of order update detected: key=" + server.getCommon().keyToString(primaryKey));
+        }
+        record.setSequence0(sequence0);
+        record.setSequence1(sequence1);
+        record.setSequence2(sequence2);
       }
-      record.setSequence0(sequence0);
-      record.setSequence1(sequence1);
-      record.setSequence2((short) 0);
+      else {
+        long sequence0 = cobj.getLong(ComObject.Tag.sequence0);
+        long sequence1 = cobj.getLong(ComObject.Tag.sequence1);
+
+        if (sequence0 < record.getSequence0() && sequence1 < record.getSequence1()) {
+          throw new DatabaseException("Out of order update detected: key=" + server.getCommon().keyToString(primaryKey));
+        }
+        record.setSequence0(sequence0);
+        record.setSequence1(sequence1);
+        record.setSequence2((short) 0);
+      }
 
       bytes = record.serialize(server.getCommon(), DatabaseClient.SERIALIZATION_VERSION);
 
@@ -1101,10 +1122,12 @@ private static class InsertRequest {
         //because this is the primary key index we won't have more than one index entry for the key
         Index index = server.getIndices(dbName).getIndices().get(tableName).get(indexName);
         Object newValue = server.toUnsafeFromRecords(new byte[][]{bytes});
+        byte[] existingBytes = null;
         synchronized (index.getMutex(primaryKey)) {
           Object value = index.get(primaryKey);
           if (value != null) {
             byte[][] content = server.fromUnsafeToRecords(value);
+            existingBytes = content[0];
             if (Record.DB_VIEW_FLAG_DELETING == Record.getDbViewFlags(content[0])) {
               if (Record.DB_VIEW_FLAG_DELETING != Record.getDbViewFlags(bytes)) {
                 index.addAndGetCount(1);
@@ -1121,7 +1144,7 @@ private static class InsertRequest {
             server.freeUnsafeIds(value);
           }
         }
-        publishInsertOrUpdate(dbName, tableName, bytes, UpdateType.upsert);
+        publishInsertOrUpdate(cobj, dbName, tableName, bytes, existingBytes, UpdateType.update);
       }
       else {
         if (transactionId != 0) {
@@ -1148,8 +1171,8 @@ private static class InsertRequest {
   }
 
   private void doInsertKey(
-      String dbName, byte[] recordBytes, Object[] key, Index index, String tableName, String indexName, boolean ignoreDuplicates) throws IOException, DatabaseException {
-    doActualInsertKeyWithRecord(dbName, recordBytes, key, index, tableName, indexName, ignoreDuplicates);
+      ComObject cobj, String dbName, byte[] recordBytes, Object[] key, Index index, String tableName, String indexName, boolean ignoreDuplicates) throws IOException, DatabaseException {
+    doActualInsertKeyWithRecord(cobj, dbName, recordBytes, key, index, tableName, indexName, ignoreDuplicates, false);
   }
 
   private void doInsertKey(Object[] key, byte[] keyRecordBytes, String tableName, Index index, IndexSchema indexSchema) {
@@ -1163,9 +1186,9 @@ private static class InsertRequest {
     //    currEntry.latch.await();
   }
 
-  public void doInsertKeys(
-      final String dbName,
-      List<Repartitioner.MoveRequest> moveRequests, final Index index, final String tableName, final IndexSchema indexSchema, boolean replayedCommand) {
+  public void doInsertKeys(final ComObject cobj, final String dbName, List<Repartitioner.MoveRequest> moveRequests, final Index index,
+                           final String tableName, final IndexSchema indexSchema, boolean replayedCommand,
+                           final boolean movingRecord) {
     //    ArrayBlockingQueue<Entry> existing = insertQueue.computeIfAbsent(index, k -> new ArrayBlockingQueue<>(1000));
     //    insertThreads.computeIfAbsent(index, k -> createThread(index));
     try {
@@ -1178,7 +1201,8 @@ private static class InsertRequest {
               public Object call() throws Exception {
                 byte[][] content = moveRequest.getContent();
                 for (int i = 0; i < content.length; i++) {
-                  doActualInsertKeyWithRecord(dbName, content[i], moveRequest.getKey(), index, tableName, indexSchema.getName(), true);
+                  doActualInsertKeyWithRecord(cobj, dbName, content[i], moveRequest.getKey(), index, tableName,
+                      indexSchema.getName(), true, movingRecord);
                 }
                 return null;
               }
@@ -1192,7 +1216,8 @@ private static class InsertRequest {
           for (Repartitioner.MoveRequest moveRequest : moveRequests) {
             byte[][] content = moveRequest.getContent();
             for (int i = 0; i < content.length; i++) {
-              doActualInsertKeyWithRecord(dbName, content[i], moveRequest.getKey(), index, tableName, indexSchema.getName(), true);
+              doActualInsertKeyWithRecord(cobj, dbName, content[i], moveRequest.getKey(), index, tableName,
+                  indexSchema.getName(), true, movingRecord);
             }
           }
         }
@@ -1299,9 +1324,8 @@ private static class InsertRequest {
 
   private ConcurrentHashMap<String, String> inserted = new ConcurrentHashMap<>();
 
-  private void doActualInsertKeyWithRecord(
-      String dbName,
-      byte[] recordBytes, Object[] key, Index index, String tableName, String indexName, boolean ignoreDuplicates) {
+  private void doActualInsertKeyWithRecord(ComObject cobj, String dbName, byte[] recordBytes, Object[] key, Index index,
+                                           String tableName, String indexName, boolean ignoreDuplicates, boolean movingRecord) {
 //    int fieldCount = index.getComparators().length;
 //    if (fieldCount != key.length) {
 //      Object[] newKey = new Object[fieldCount];
@@ -1363,19 +1387,21 @@ private static class InsertRequest {
           server.freeUnsafeIds(existingValue);
         }
       }
-      if (threadLocalIsBatchRequest.get() != null && threadLocalIsBatchRequest.get()) {
-        if (!producers.isEmpty()) {
-          MessageRequest request = new MessageRequest();
-          request.dbName = dbName;
-          request.tableName = tableName;
-          request.recordBytes = recordBytes;
-          request.updateType = UpdateType.upsert;
-          threadLocalMessageRequests.get().add(request);
+      if (!movingRecord) {
+        if (threadLocalIsBatchRequest.get() != null && threadLocalIsBatchRequest.get()) {
+          if (!producers.isEmpty()) {
+            MessageRequest request = new MessageRequest();
+            request.dbName = dbName;
+            request.tableName = tableName;
+            request.recordBytes = recordBytes;
+            request.updateType = UpdateType.insert;
+            threadLocalMessageRequests.get().add(request);
+          }
         }
-      }
-      else {
-        if (Record.DB_VIEW_FLAG_DELETING != Record.getDbViewFlags(recordBytes)) {
-          publishInsertOrUpdate(dbName, tableName, recordBytes, UpdateType.upsert);
+        else {
+          if (Record.DB_VIEW_FLAG_DELETING != Record.getDbViewFlags(recordBytes)) {
+            publishInsertOrUpdate(cobj, dbName, tableName, recordBytes, null, UpdateType.insert);
+          }
         }
       }
     }
@@ -1385,7 +1411,8 @@ private static class InsertRequest {
   }
 
 public enum UpdateType {
-  upsert,
+  insert,
+  update,
   delete
 }
 
@@ -1394,117 +1421,144 @@ class MessageRequest {
   private String tableName;
   private byte[] recordBytes;
   private UpdateType updateType;
+  private byte[] existingBytes;
 }
 
   private ThreadLocal<Boolean> threadLocalIsBatchRequest = new ThreadLocal<>();
   private ThreadLocal<List<MessageRequest>> threadLocalMessageRequests = new ThreadLocal<>();
 
-  private ArrayBlockingQueue<MessageRequest> publishQueue = new ArrayBlockingQueue<MessageRequest>(10000);
+  private ArrayBlockingQueue<MessageRequest> publishQueue = new ArrayBlockingQueue<>(30_000);
 
   public void initPublisher() {
-    Thread thread = new Thread(new Runnable() {
-      @Override
-      public void run() {
-        String currDbName = null;
-        String currTable = null;
-        UpdateType currUpdateType = null;
+    if (!server.haveProLicense()) {
+      throw new InsufficientLicense("You must have a pro license to use message queue integration");
+    }
 
-        StringBuilder builder = null;
-        List<MessageRequest> toProcess = new ArrayList<>();
-        boolean newHeader = false;
-        int count = 0;
-        while (true) {
-          try {
-            MessageRequest initialRequest = publishQueue.poll(10000, TimeUnit.MILLISECONDS);
-            if (initialRequest == null) {
-              continue;
-            }
-            toProcess.add(initialRequest);
-            publishQueue.drainTo(toProcess);
-
-            ServersConfig.Shard[] shards = server.getCommon().getServersConfig().getShards();
-            if (server.getReplica() != shards[server.getShard()].getMasterReplica()) {
-              toProcess.clear();
-              continue;
-            }
-
-            for (MessageRequest request : toProcess) {
-              try {
-                if (currDbName == null /*|| !(currDbName.equals(request.dbName) && currTable.equals(request.tableName) &&
-                    currUpdateType == request.updateType)*/) {
-                  newHeader = true;
+    Thread[] threads = new Thread[publisherThreadCount];
+    for (int i = 0; i < threads.length; i++) {
+      threads[i] = new Thread(new Runnable() {
+        @Override
+        public void run() {
+          List<MessageRequest> toProcess = new ArrayList<>();
+          long lastTimePublished = System.currentTimeMillis();
+          while (true) {
+            try {
+              for (int i = 0; i < maxPublishBatchSize * 4; i++) {
+                MessageRequest initialRequest = publishQueue.poll(100, TimeUnit.MILLISECONDS);
+                if (initialRequest == null) {
                 }
-                currDbName = request.dbName;
-                currTable = request.tableName;
-                currUpdateType = request.updateType;
-                if (newHeader) {
-                  if (builder != null && currDbName != null) {
-                    for (MessageQueueProducer producer : producers) {
-                      producer.publish(builder.toString());
-                      count = 0;
-                    }
-                  }
-                  builder = new StringBuilder();
-                  builder.append("{");
-                  builder.append("\"database\": \"" + currDbName + "\",");
-                  builder.append("\"table\": \"" + currTable + "\",");
-                  builder.append("\"action\": \"" + currUpdateType.name() + "\",");
-                  builder.append("\"records\":[{");
-                  newHeader = false;
+                else {
+                  toProcess.add(initialRequest);
                 }
-
-                TableSchema tableSchema = server.getCommon().getTables(currDbName).get(currTable);
-                Record record = new Record(currDbName, server.getCommon(), request.recordBytes);
-
-                getJsonFromRecord(builder, tableSchema, record);
-                count++;
-
-                builder.append("}]}");
-
-                if (builder != null && count > UpdateManager.this.maxPublishBatchSize) {
-                  for (MessageQueueProducer producer : producers) {
-                    producer.publish(builder.toString());
-                  }
-                  count = 0;
-                  newHeader = true;
+                if (System.currentTimeMillis() - lastTimePublished > 2000) {
+                  break;
                 }
               }
-              catch (Exception e) {
-                logger.error("error publishing message", e);
+
+              if (toProcess.size() != 0) {
+                publishMessages(toProcess);
+                toProcess.clear();
               }
+              lastTimePublished = System.currentTimeMillis();
             }
-//            if (records != null && records.size() != 0) {
-//              for (MessageQueueProducer producer : producers) {
-//                producer.publish(message.toString());
-//              }
-//            }
-          }
-          catch (Exception e) {
-            logger.error("error in message publisher", e);
+            catch (Exception e) {
+              logger.error("error in message publisher", e);
+            }
           }
         }
-      }
-    });
-    thread.start();
+      });
+      threads[i].start();
+    }
   }
 
-  private void publishBatch() {
+  private void publishMessages(List<MessageRequest> toProcess) {
+    List<MessageRequest> batch = new ArrayList<>();
+    List<String> messages = new ArrayList<>();
+    try {
+      for (MessageRequest request : toProcess) {
+        batch.add(request);
+        if (batch.size() >= maxPublishBatchSize) {
+          buildBatchMessage(batch, messages);
+          batch = new ArrayList<>();
+        }
+      }
+      if (batch.size() != 0) {
+        buildBatchMessage(batch, messages);
+      }
+
+      for (StreamsProducer producer : producers) {
+        producer.publish(messages);
+      }
+    }
+    catch (Exception e) {
+      logger.error("error publishing message", e);
+    }
+  }
+
+  private void buildBatchMessage(List<MessageRequest> batch, List<String> messages) {
+    StringBuilder builder = new StringBuilder();
+    builder.append("{");
+    builder.append("\"actions\":[");
+
+    int offset = 0;
+    for (MessageRequest currRequest : batch) {
+      if (offset != 0) {
+        builder.append(",");
+      }
+      builder.append("{");
+
+      if (currRequest.updateType == UpdateType.update) {
+        builder.append("\"_sonicbase_dbname\": \"").append(currRequest.dbName).append("\",");
+        builder.append("\"_sonicbase_tablename\": \"").append(currRequest.tableName).append("\",");
+        builder.append("\"_sonicbase_action\": \"").append(currRequest.updateType).append("\",");
+        builder.append("\"before\" : {");
+
+        TableSchema tableSchema = server.getCommon().getTables(currRequest.dbName).get(currRequest.tableName);
+        Record record = new Record(currRequest.dbName, server.getCommon(), currRequest.existingBytes);
+        getJsonFromRecord(builder, tableSchema, record);
+        builder.append("},");
+        builder.append("\"after\": {");
+        record = new Record(currRequest.dbName, server.getCommon(), currRequest.recordBytes);
+        getJsonFromRecord(builder, tableSchema, record);
+        builder.append("}");
+
+      }
+      else {
+        TableSchema tableSchema = server.getCommon().getTables(currRequest.dbName).get(currRequest.tableName);
+        Record record = new Record(currRequest.dbName, server.getCommon(), currRequest.recordBytes);
+
+        builder.append("\"_sonicbase_dbname\": \"").append(currRequest.dbName).append("\",");
+        builder.append("\"_sonicbase_tablename\": \"").append(currRequest.tableName).append("\",");
+        builder.append("\"_sonicbase_action\": \"").append(currRequest.updateType).append("\",");
+
+        getJsonFromRecord(builder, tableSchema, record);
+      }
+      builder.append("}");
+      offset++;
+    }
+
+    builder.append("]}");
+    messages.add(builder.toString());
+  }
+
+  private void publishBatch(ComObject cobj) {
     if (!producers.isEmpty() && threadLocalMessageRequests.get() != null && threadLocalMessageRequests.get().size() != 0) {
       try {
-        ServersConfig.Shard[] shards = server.getCommon().getServersConfig().getShards();
-        if (server.getReplica() != shards[server.getShard()].getMasterReplica()) {
+        if (!cobj.getBoolean(ComObject.Tag.currRequestIsMaster)) {
           return;
         }
 
+        List<MessageRequest> toPublish = new ArrayList<>();
         while(true) {
-          List<MessageRequest> toPublish = new ArrayList<>();
-          for (int i = 0; i < maxPublishBatchSize && threadLocalMessageRequests.get().size() != 0; i++) {
+          for (int i = 0; /*i < maxPublishBatchSize && */threadLocalMessageRequests.get().size() != 0; i++) {
             toPublish.add(threadLocalMessageRequests.get().remove(0));
           }
-          doPublishBatch(toPublish);
           if (threadLocalMessageRequests.get().size() == 0) {
             break;
           }
+        }
+        for (MessageRequest msg : toPublish) {
+          publishQueue.put(msg);
         }
       }
       catch (Exception e) {
@@ -1521,38 +1575,79 @@ class MessageRequest {
     if (toPublish.size() == 0) {
       return;
     }
-    MessageRequest request = toPublish.get(0);
-    StringBuilder builder = new StringBuilder();
-    builder.append("{");
-    builder.append("\"database\": \"" + request.dbName + "\",");
-    builder.append("\"table\": \"" + request.tableName + "\",");
-    builder.append("\"action\": \"" + request.updateType.name() + "\",");
-    builder.append("\"records\":[");
-
-    for (int i = 0; i < toPublish.size(); i++) {
-      if (i > 0) {
-        builder.append(",");
-      }
-      request = toPublish.get(i);
-      builder.append("{");
-      TableSchema tableSchema = server.getCommon().getTables(request.dbName).get(request.tableName);
-      Record record = new Record(request.dbName, server.getCommon(), request.recordBytes);
-      getJsonFromRecord(builder, tableSchema, record);
-      builder.append("}");
+    if (!server.haveProLicense()) {
+      throw new InsufficientLicense("You must have a pro license to use message queue integration");
     }
 
-    builder.append("]}");
-    for (MessageQueueProducer producer : producers) {
-      producer.publish(builder.toString());
+    if (false) {
+      List<String> messages = new ArrayList<>();
+
+      for (int i = 0; i < toPublish.size(); i++) {
+        MessageRequest request = toPublish.get(i);
+        StringBuilder builder = new StringBuilder();
+        builder.append("{");
+        builder.append("\"database\": \"" + request.dbName + "\",");
+        builder.append("\"table\": \"" + request.tableName + "\",");
+        builder.append("\"action\": \"" + request.updateType.name() + "\",");
+        builder.append("\"records\":[");
+        builder.append("{");
+        TableSchema tableSchema = server.getCommon().getTables(request.dbName).get(request.tableName);
+        Record record = new Record(request.dbName, server.getCommon(), request.recordBytes);
+        getJsonFromRecord(builder, tableSchema, record);
+        builder.append("}");
+        builder.append("]}");
+        messages.add(builder.toString());
+      }
+      for (StreamsProducer producer : producers) {
+        producer.publish(messages);
+      }
+    }
+    else {
+      List<MessageRequest> messages = new ArrayList<>();
+      messages.addAll(toPublish);
+
+      List<String> messagesToPublish = new ArrayList<>();
+      while (messages.size() != 0) {
+        MessageRequest request = messages.get(0);
+        StringBuilder builder = new StringBuilder();
+        builder.append("{");
+        builder.append("\"database\": \"" + request.dbName + "\",");
+        builder.append("\"table\": \"" + request.tableName + "\",");
+        builder.append("\"action\": \"" + request.updateType.name() + "\",");
+        builder.append("\"records\":[");
+
+        for (int i = 0; i < maxPublishBatchSize && messages.size() != 0; i++) {
+          if (i > 0) {
+            builder.append(",");
+          }
+          request = messages.remove(0);
+          builder.append("{");
+          TableSchema tableSchema = server.getCommon().getTables(request.dbName).get(request.tableName);
+          Record record = new Record(request.dbName, server.getCommon(), request.recordBytes);
+          getJsonFromRecord(builder, tableSchema, record);
+          builder.append("}");
+        }
+
+        builder.append("]}");
+        messagesToPublish.add(builder.toString());
+      }
+      if (messagesToPublish.size() != 0) {
+        for (StreamsProducer producer : producers) {
+          producer.publish(messagesToPublish);
+        }
+      }
     }
   }
 
 
-  private void publishInsertOrUpdate(String dbName, String tableName, byte[] recordBytes, UpdateType updateType) {
+  private void publishInsertOrUpdate(ComObject cobj, String dbName, String tableName, byte[] recordBytes, byte[] existingBytes, UpdateType updateType) {
     if (!producers.isEmpty()) {
+      if (!server.haveProLicense()) {
+        throw new InsufficientLicense("You must have a pro license to use message queue integration");
+      }
+
       try {
-        ServersConfig.Shard[] shards = server.getCommon().getServersConfig().getShards();
-        if (server.getReplica() != shards[server.getShard()].getMasterReplica()) {
+        if (!cobj.getBoolean(ComObject.Tag.currRequestIsMaster)) {
           return;
         }
 
@@ -1560,24 +1655,9 @@ class MessageRequest {
         request.dbName = dbName;
         request.tableName = tableName;
         request.recordBytes = recordBytes;
+        request.existingBytes = existingBytes;
         request.updateType = updateType;
-        //publishQueue.put(request);
-
-        StringBuilder builder = new StringBuilder();
-        builder.append("{");
-        builder.append("\"database\": \"" + dbName + "\",");
-        builder.append("\"table\": \"" + tableName + "\",");
-        builder.append("\"action\": \"" + updateType.name() + "\",");
-        builder.append("\"records\":[{");
-
-        TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
-        Record record = new Record(dbName, server.getCommon(), request.recordBytes);
-        getJsonFromRecord(builder, tableSchema, record);
-
-        builder.append("}]}");
-        for (MessageQueueProducer producer : producers) {
-          producer.publish(builder.toString());
-        }
+        publishQueue.put(request);
       }
       catch (Exception e) {
         logger.error("Error publishing message", e);
@@ -1589,14 +1669,14 @@ class MessageRequest {
     String fieldName = null;
     try {
 
-      builder.append("\"_sequence0\": ").append(record.getSequence0()).append(",");
-      builder.append("\"_sequence1\": ").append(record.getSequence1()).append(",");
-      builder.append("\"_sequence2\": ").append(record.getSequence2());
+      builder.append("\"_sonicbase_sequence0\": ").append(record.getSequence0()).append(",");
+      builder.append("\"_sonicbase_sequence1\": ").append(record.getSequence1()).append(",");
+      builder.append("\"_sonicbase_sequence2\": ").append(record.getSequence2());
 
       List<FieldSchema> fields = tableSchema.getFields();
       for (FieldSchema fieldSchema : fields) {
         fieldName = fieldSchema.getName();
-        if (fieldName.equals("_id")) {
+        if (fieldName.equals("_sonicbase_id")) {
           continue;
         }
         int offset = tableSchema.getFieldOffset(fieldName);
@@ -1726,12 +1806,30 @@ class MessageRequest {
       }
 
       if (bytes != null) {
+        for (byte[] currBytes : bytes) {
+          Record record = new Record(dbName, server.getCommon(), currBytes);
+          if (cobj.getLong(ComObject.Tag.sequence0Override) != null) {
+            sequence0 = cobj.getLong(ComObject.Tag.sequence0Override);
+            sequence1 = cobj.getLong(ComObject.Tag.sequence1Override);
+            short sequence2 = cobj.getShort(ComObject.Tag.sequence2Override);
+
+            if (sequence0 < record.getSequence0() && sequence1 < record.getSequence1() && sequence2 < record.getSequence2()) {
+              throw new DatabaseException("Out of order update detected: key=" + server.getCommon().keyToString(key));
+            }
+          }
+          else {
+            if (sequence0 < record.getSequence0() && sequence1 < record.getSequence1()) {
+              throw new DatabaseException("Out of order update detected: key=" + server.getCommon().keyToString(key));
+            }
+          }
+        }
+
         DeleteManager.DeleteRequestForRecord request = new DeleteManager.DeleteRequestForRecord(key);
         server.getDeleteManager().saveDeleteForRecord(dbName, tableName, indexName, sequence0, sequence1, request);
 
         if (tableSchema.getIndices().get(indexName).isPrimaryKey()) {
           for (byte[] innerBytes : bytes) {
-            publishInsertOrUpdate(dbName, tableName, innerBytes, UpdateType.delete);
+            publishInsertOrUpdate(cobj, dbName, tableName, innerBytes, null, UpdateType.delete);
           }
         }
       }
@@ -1976,7 +2074,7 @@ class MessageRequest {
         destParmsStr += "?";
       }
 
-      ResultSet rs = (ResultSet) selectStatement.execute(dbName, null);
+      ResultSet rs = (ResultSet) selectStatement.execute(dbName, null, null, null, null);
       String sql = "insert " + (ignore ? "ignore" : "") + " into " + tableName + " (" + destColumnsStr + ") values (" + destParmsStr + ")";
       System.out.println(sql);
       PreparedStatement stmt = conn.prepareStatement(sql);

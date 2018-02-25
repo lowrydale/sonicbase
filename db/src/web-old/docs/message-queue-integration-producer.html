@@ -81,17 +81,17 @@
         "maxJavaHeap": "60%",
         "user": "ubuntu",
         "clientIsPrivate": false,
-        "queue": {
+        "streams": {
             "producers" : [ {
                 "maxBatchSize" : 100,
-                "className" : "com.sonicbase.queue.AWSSQSMessageQueueProducer",
+                "className" : "com.sonicbase.streams.AWSSQSProducer",
                 "url" : "https://sqs.us-east-1.amazonaws.com/892217754330/benchmark-queue"
             },
             {
                 "servers" : "10.0.0.231:9092",
                 "maxBatchSize" : 100,
                 "topic" : "test",
-                "className" : "com.sonicbase.queue.KafkaMessageQueueProducer"
+                "className" : "com.sonicbase.streams.KafkaProducer"
             } ]
         }
     }

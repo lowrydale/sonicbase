@@ -984,6 +984,9 @@ public class DatabaseClient {
         throw e;
       }
       catch (Exception e) {
+        if (getReplicaCount() == 1) {
+          throw e;
+        }
         for (int i = 0; i < getReplicaCount(); i++) {
           if (i == masterReplica) {
             continue;
@@ -1214,13 +1217,14 @@ public class DatabaseClient {
               if (writeVerbs.contains(method)) {
                 ComObject header = new ComObject();
                 header.put(ComObject.Tag.method, body.getString(ComObject.Tag.method));
-                if (body.containsTag(ComObject.Tag.replica)) {
-                  header.put(ComObject.Tag.replica, body.getString(ComObject.Tag.replica));
-                }
+//                if (body.containsTag(ComObject.Tag.replica)) {
+//                  header.put(ComObject.Tag.replica, body.getInt(ComObject.Tag.replica));
+//                }
+                header.put(ComObject.Tag.replica, (int)auth_user);
                 body.put(ComObject.Tag.header, header);
 
                 body.put(ComObject.Tag.method, "queueForOtherServer");
-                body.put(ComObject.Tag.replica, auth_user);
+                //body.put(ComObject.Tag.replica, (int)auth_user);
 
                 //String queueCommand = "DatabaseServer:queueForOtherServer:1:" + SnapshotManager.SERIALIZATION_VERSION + ":1:__none__:" + (int) auth_user;
 
@@ -1335,13 +1339,14 @@ public class DatabaseClient {
                           if (writeVerbs.contains(method)) {
                             ComObject header = new ComObject();
                             header.put(ComObject.Tag.method, body.getString(ComObject.Tag.method));
-                            if (body.containsTag(ComObject.Tag.replica)) {
-                              header.put(ComObject.Tag.replica, body.getString(ComObject.Tag.replica));
-                            }
+//                            if (body.containsTag(ComObject.Tag.replica)) {
+//                              header.put(ComObject.Tag.replica, body.getInt(ComObject.Tag.replica));
+//                            }
+                            header.put(ComObject.Tag.replica, (int)auth_user);
                             body.put(ComObject.Tag.header, header);
 
                             body.put(ComObject.Tag.method, "queueForOtherServer");
-                            body.put(ComObject.Tag.replica, auth_user);
+                            //body.put(ComObject.Tag.replica, (int)auth_user);
 
                             //String queueCommand = "DatabaseServer:queueForOtherServer:1:" + SnapshotManager.SERIALIZATION_VERSION + ":1:__none__:" + (int) auth_user;
 
@@ -1435,12 +1440,12 @@ public class DatabaseClient {
             else {
               Exception lastException = null;
               boolean success = false;
+              int offset = ThreadLocalRandom.current().nextInt(replicas.length);
               outer:
               for (int i = 0; i < 10; i++) {
-                int offset = ThreadLocalRandom.current().nextInt(replicas.length);
                 for (long rand = offset; rand < offset + replicas.length; rand++) {
                   int replicaOffset = Math.abs((int) (rand % replicas.length));
-                  if (i > 0 || !replicas[replicaOffset].dead) {
+                  if (!replicas[replicaOffset].dead) {
                     try {
                       if (shard == this.shard && replicaOffset == this.replica && databaseServer != null) {
                         return invokeOnServer(databaseServer, body.serialize(), false, true);
@@ -1674,10 +1679,11 @@ public class DatabaseClient {
   }
 
   public Object executeQuery(String dbName, QueryType queryType, String sql, ParameterHandler parms) throws SQLException {
-    return executeQuery(dbName, queryType, sql, parms, false);
+    return executeQuery(dbName, queryType, sql, parms, false, null, null, null);
   }
 
-  public Object executeQuery(String dbName, QueryType queryType, String sql, ParameterHandler parms, boolean debug) throws SQLException {
+  public Object executeQuery(String dbName, QueryType queryType, String sql, ParameterHandler parms, boolean debug,
+                             Long sequence0, Long sequence1, Short sequence2) throws SQLException {
     while (true) {
       try {
         if (common == null) {
@@ -1735,7 +1741,7 @@ public class DatabaseClient {
             return doInsert(dbName, parms, (Insert) statement);
           }
           else if (statement instanceof Update) {
-            return doUpdate(dbName, parms, (Update) statement);
+            return doUpdate(dbName, parms, (Update) statement, sequence0, sequence1, sequence2);
           }
           else if (statement instanceof CreateTable) {
             return doCreateTable(dbName, (CreateTable) statement);
@@ -1744,7 +1750,7 @@ public class DatabaseClient {
             return doCreateIndex(dbName, (CreateIndex) statement);
           }
           else if (statement instanceof Delete) {
-            return doDelete(dbName, parms, (Delete) statement);
+            return doDelete(dbName, parms, (Delete) statement, sequence0, sequence1, sequence2);
           }
           else if (statement instanceof Alter) {
             return doAlter(dbName, parms, (Alter) statement);
@@ -1822,7 +1828,7 @@ public class DatabaseClient {
       appendChars(builder, "-", totalWidth);
       builder.append("\n");
       for (FieldSchema field : fields) {
-        if (field.getName().equals("_id")) {
+        if (field.getName().equals("_sonicbase_id")) {
           continue;
         }
         builder.append("| ");
@@ -2058,9 +2064,26 @@ public class DatabaseClient {
           for (int j = 0; j < getReplicaCount(); j++) {
             final int shard = i;
             final int replica = j;
+            boolean dead = servers[i][j].dead;//common.getServersConfig().getShards()[shard].getReplicas()[replica].isDead();
+            if (dead) {
+              continue;
+            }
             futures.add(executor.submit(new Callable<Map<String, String>>(){
               @Override
               public Map<String, String> call() throws Exception {
+                boolean dead = common.getServersConfig().getShards()[shard].getReplicas()[replica].isDead();
+                if (dead) {
+                  Map<String, String> line = new HashMap<>();
+                  line.put("host", "shard=" + shard + ", replica=" + replica);
+                  line.put("cpu", "?");
+                  line.put("resGig", "?");
+                  line.put("javaMemMin", "?");
+                  line.put("javaMemMax", "?");
+                  line.put("receive", "?");
+                  line.put("transmit", "?");
+                  line.put("diskAvail", "?");
+                  return line;
+                }
                 ComObject cobj = new ComObject();
                 cobj.put(ComObject.Tag.dbName, "__none__");
                 cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
@@ -2568,7 +2591,7 @@ public class DatabaseClient {
     return 1;
   }
 
-  private Object doDelete(String dbName, ParameterHandler parms, Delete stmt) {
+  private Object doDelete(String dbName, ParameterHandler parms, Delete stmt, Long sequence0, Long sequence1, Short sequence2) {
     DeleteStatementImpl deleteStatement = new DeleteStatementImpl(this);
     deleteStatement.setTableName(stmt.getTable().getName());
 
@@ -2578,7 +2601,7 @@ public class DatabaseClient {
     deleteStatement.setWhereClause(innerExpression);
 
     deleteStatement.setParms(parms);
-    return deleteStatement.execute(dbName, null);
+    return deleteStatement.execute(dbName, null, sequence0, sequence1, sequence2);
   }
 
   private int doCreateTable(String dbName, CreateTable stmt) {
@@ -2623,7 +2646,7 @@ public class DatabaseClient {
     List<String> primaryKey = new ArrayList<String>();
     List indexes = stmt.getIndexes();
     if (indexes == null) {
-      primaryKey.add("_id");
+      primaryKey.add("_sonicbase_id");
     }
     else {
       for (int i = 0; i < indexes.size(); i++) {
@@ -2664,7 +2687,7 @@ public class DatabaseClient {
   }
 
 
-  public Object doUpdate(String dbName, ParameterHandler parms, Update stmt) {
+  public Object doUpdate(String dbName, ParameterHandler parms, Update stmt, Long sequence0, Long sequence1, Short sequence2) {
     UpdateStatementImpl updateStatement = new UpdateStatementImpl(this);
     AtomicInteger currParmNum = new AtomicInteger();
     //todo: support multiple tables?
@@ -2692,7 +2715,7 @@ public class DatabaseClient {
       ops.add(new TransactionOperation(updateStatement, parms));
     }
     updateStatement.setParms(parms);
-    return updateStatement.execute(dbName, null);
+    return updateStatement.execute(dbName, null, sequence0, sequence1, sequence2);
   }
 
   public void insertKey(String dbName, String tableName, KeyInfo keyInfo, String primaryKeyIndexName, Object[] primaryKey, KeyRecord keyRecord, int shard, int replica, boolean ignore) {
@@ -3036,7 +3059,7 @@ public class DatabaseClient {
 
     long id = -1;
     for (IndexSchema indexSchema : tableSchema.getIndexes().values()) {
-      if (indexSchema.isPrimaryKey() && indexSchema.getFields()[0].equals("_id")) {
+      if (indexSchema.isPrimaryKey() && indexSchema.getFields()[0].equals("_sonicbase_id")) {
         if (recordId.get() == -1L) {
           id = allocateId(dbName);
         }
@@ -3291,7 +3314,7 @@ public class DatabaseClient {
           break;
         }
         else {
-          if (fieldSchema.getName().equals("_id")) {
+          if (fieldSchema.getName().equals("_sonicbase_id")) {
             valuesToStore[i] = id;
           }
         }
@@ -3308,7 +3331,7 @@ public class DatabaseClient {
 //         }
 //         Object currValue = value.increment();
 //         valuesToStore[i] = currValue;
-//         if (fieldSchema.getName().equals("_id")) {
+//         if (fieldSchema.getName().equals("_sonicbase_id")) {
 //           id = (long) currValue;
 //         }
       }
@@ -3723,7 +3746,7 @@ public class DatabaseClient {
         TableSchema.Partition[] lastPartitions = indexSchema.getValue().getLastPartitions();
 
         Object[] key = new Object[indexFields.length];
-        if (indexFields.length == 1 && indexFields[0].equals("_id")) {
+        if (indexFields.length == 1 && indexFields[0].equals("_sonicbase_id")) {
           key[0] = id;
         }
         else {
@@ -3792,7 +3815,7 @@ public class DatabaseClient {
     AtomicInteger currParmNum = new AtomicInteger();
     if (selectBody instanceof PlainSelect) {
       SelectStatementImpl selectStatement = parseSelectStatement(parms, debug, (PlainSelect) selectBody, currParmNum);
-      return selectStatement.execute(dbName, explain);
+      return selectStatement.execute(dbName, explain, null, null, null);
     }
     else if (selectBody instanceof SetOperationList){
       SetOperationList opList = (SetOperationList) selectBody;

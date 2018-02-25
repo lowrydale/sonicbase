@@ -8,6 +8,7 @@
   "maxJavaHeap": "50%",
   "maxProcessMemory": "90%",
   "optimizeReadsFor": "totalThroughput",
+  "clientIsPrivate": false,
   "useUnsafe": true,
   "backup" : {
     "type" : "fileSystem",
@@ -16,6 +17,14 @@
     "time": "23:00",
     "maxBackupCount": 10,
     "sharedDirectory": true
+  },
+  "streams": {
+    "consumers": [
+      {
+        "className": "com.sonicbase.streams.LocalConsumer",
+        "maxBatchSize": 5
+      }
+    ]
   },
   "shards" : [
     {

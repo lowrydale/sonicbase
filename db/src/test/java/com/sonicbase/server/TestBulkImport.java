@@ -11,7 +11,7 @@ import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.query.DatabaseException;
-import com.sonicbase.queue.LocalMessageQueueProducer;
+import com.sonicbase.streams.LocalProducer;
 import com.sonicbase.research.socket.NettyServer;
 import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.util.FileUtils;
@@ -182,7 +182,7 @@ public class TestBulkImport {
         server.shutdownRepartitioner();
       }
 
-      LocalMessageQueueProducer.queue.clear();
+      LocalProducer.queue.clear();
 
 
       for (int i = 0; i < 10_000; i++) {

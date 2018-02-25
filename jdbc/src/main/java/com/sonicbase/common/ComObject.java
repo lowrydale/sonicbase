@@ -231,7 +231,13 @@ public class ComObject {
     function(163, stringType),
     isProbe(164, booleanType),
     sourceSize(165, longType),
-    destSize(166, longType);
+    destSize(166, longType),
+    currRequestIsMaster(167, booleanType),
+    sequence0Override(168, longType),
+    sequence1Override(169, longType),
+    sequence2Override(170, shortType),
+    messages(171, arrayType),
+    isStarted(172, booleanType);
 
     public final int tag;
 
@@ -320,6 +326,11 @@ public class ComObject {
   }
 
   public Integer getInt(Tag tag) {
+    Object obj = map.get(tag.tag);
+    if (obj instanceof Long) {
+      System.out.println("bogus");
+      return null;
+    }
     return (Integer)map.get(tag.tag);
   }
 
@@ -474,7 +485,15 @@ public class ComObject {
           Varint.writeSignedVarLong(tag, out);
           Varint.writeSignedVarLong(tagObj.type.tag, out);
           if (tagObj.type.tag == intType.tag) {
-            Varint.writeSignedVarLong((Integer) value, out);
+            if (value instanceof Integer) {
+              Varint.writeSignedVarLong((Integer) value, out);
+            }
+            else if (value instanceof Long) {
+              Varint.writeSignedVarLong((Long) value, out);
+            }
+            else {
+              throw new DatabaseException("Invalid type: class=" + value.getClass());
+            }
           }
           else if (tagObj.type.tag == shortType.tag) {
             Varint.writeSignedVarLong((Short) value, out);
@@ -483,8 +502,11 @@ public class ComObject {
             if (value instanceof Integer) {
               Varint.writeSignedVarLong((Integer) value, out);
             }
-            else {
+            else if (value instanceof Long){
               Varint.writeSignedVarLong((Long) value, out);
+            }
+            else {
+              throw new DatabaseException("Invalid type: class=" + value.getClass());
             }
           }
           else if (tagObj.type.tag == stringType.tag) {

@@ -792,7 +792,7 @@ public class ReadManager {
       DiskBasedResultSet diskResults = null;
       if (select.getServerSelectPageNumber() == 0) {
         select.setPageSize(1000);
-        ResultSetImpl resultSet = (ResultSetImpl) select.execute(dbName, null);
+        ResultSetImpl resultSet = (ResultSetImpl) select.execute(dbName, null, null, null, null);
         diskResults = new DiskBasedResultSet(cobj.getShort(ComObject.Tag.serializationVersion), dbName, server,
             select.getTableNames(), new int[]{0}, new ResultSetImpl[]{resultSet}, select.getOrderByExpressions(), count, select, false);
       }
@@ -896,7 +896,7 @@ public class ReadManager {
               public Object call() throws Exception {
                 SelectStatementImpl stmt = selectStatements[offset];
                 stmt.setPageSize(1000);
-                resultSets[offset] = (ResultSetImpl) stmt.execute(dbName, null);
+                resultSets[offset] = (ResultSetImpl) stmt.execute(dbName, null, null, null, null);
                 return null;
               }
             }));

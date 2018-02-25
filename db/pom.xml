@@ -206,7 +206,7 @@
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-bundle</artifactId>
-            <version>1.11.109</version>
+            <version>1.11.279</version>
             <scope>provided</scope>
         </dependency>
 
@@ -214,7 +214,7 @@
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk</artifactId>
-            <version>1.11.109</version>
+            <version>1.11.279</version>
             <scope>provided</scope>
         </dependency>
 

@@ -10,7 +10,7 @@ import com.sonicbase.common.KeyRecord;
 import com.sonicbase.common.Logger;
 import com.sonicbase.index.Index;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
-import com.sonicbase.queue.LocalMessageQueueProducer;
+import com.sonicbase.streams.LocalProducer;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.TableSchema;
 import org.apache.commons.io.IOUtils;
@@ -130,7 +130,7 @@ public class TestDatabaseAdvanced {
 
     //test upsert
 
-    LocalMessageQueueProducer.queue.clear();
+    LocalProducer.queue.clear();
 
     stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");
     stmt.setLong(1, 1000);
@@ -462,7 +462,7 @@ public class TestDatabaseAdvanced {
     final StringBuilder parmsStr = new StringBuilder();
     boolean first = true;
     for (FieldSchema field : fields) {
-      if (field.getName().equals("_id")) {
+      if (field.getName().equals("_sonicbase_id")) {
         continue;
       }
       if (first) {
@@ -488,7 +488,7 @@ public class TestDatabaseAdvanced {
     recordJson.put("gender", "m");
 
     Object[] record = StreamManager.getCurrRecordFromJson(recordJson, fields);
-    BulkImportManager.setFieldsInInsertStatement(stmt, record, fields);
+    BulkImportManager.setFieldsInInsertStatement(stmt, 1, record, fields);
 
     assertEquals(stmt.executeUpdate(), 1);
 

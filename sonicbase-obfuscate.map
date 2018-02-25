@@ -644,7 +644,7 @@ com.sonicbase.query.impl.DiskBasedResultSet$MergeRow -> com.sonicbase.d.a.a$a:
     384:384:Record[] access$002(com.sonicbase.query.impl.DiskBasedResultSet$MergeRow,Record[]) -> a
     384:384:int access$102(com.sonicbase.query.impl.DiskBasedResultSet$MergeRow,int) -> a
     384:384:int access$100(com.sonicbase.query.impl.DiskBasedResultSet$MergeRow) -> b
-com.sonicbase.queue.AWSSQSMessageQueueConsumer -> com.sonicbase.queue.AWSSQSMessageQueueConsumer:
+com.sonicbase.queue.AWSSQSConsumer -> com.sonicbase.queue.AWSSQSConsumer:
     java.lang.String url -> a
     com.amazonaws.services.sqs.AmazonSQSClient sqsClient -> b
     boolean shutdown -> c
@@ -654,13 +654,13 @@ com.sonicbase.queue.AWSSQSMessageQueueConsumer -> com.sonicbase.queue.AWSSQSMess
     44:72:void init(java.lang.String,java.lang.String,java.lang.String) -> a
     76:86:java.util.List receive() -> b
     91:92:void acknowledgeMessage(com.sonicbase.queue.Message) -> a
-com.sonicbase.queue.AWSSQSMessageQueueConsumer$AWSMessage -> com.sonicbase.queue.AWSSQSMessageQueueConsumer$a:
+com.sonicbase.queue.AWSSQSConsumer$AWSMessage -> com.sonicbase.queue.AWSSQSConsumer$a:
     com.amazonaws.services.sqs.model.Message message -> b
     com.amazonaws.services.sqs.model.Message awsMessage -> c
-    com.sonicbase.queue.AWSSQSMessageQueueConsumer this$0 -> a
-    26:29:void <init>(com.sonicbase.queue.AWSSQSMessageQueueConsumer,com.amazonaws.services.sqs.model.Message,java.lang.String) -> <init>
-    22:22:com.amazonaws.services.sqs.model.Message access$000(com.sonicbase.queue.AWSSQSMessageQueueConsumer$AWSMessage) -> a
-com.sonicbase.queue.AWSSQSMessageQueueProducer -> com.sonicbase.queue.AWSSQSMessageQueueProducer:
+    com.sonicbase.queue.AWSSQSConsumer this$0 -> a
+    26:29:void <init>(com.sonicbase.queue.AWSSQSConsumer,com.amazonaws.services.sqs.model.Message,java.lang.String) -> <init>
+    22:22:com.amazonaws.services.sqs.model.Message access$000(com.sonicbase.queue.AWSSQSConsumer$AWSMessage) -> a
+com.sonicbase.queue.AWSSQSProducer -> com.sonicbase.queue.AWSSQSProducer:
     java.lang.String url -> a
     com.amazonaws.services.sqs.AmazonSQSClient sqsClient -> b
     15:15:void <init>() -> <init>
@@ -668,7 +668,7 @@ com.sonicbase.queue.AWSSQSMessageQueueProducer -> com.sonicbase.queue.AWSSQSMess
     28:56:void init(java.lang.String,java.lang.String,java.lang.String) -> a
     60:69:void publish(java.lang.String) -> a
     74:74:void shutdown() -> a
-com.sonicbase.queue.KafkaMessageQueueConsumer -> com.sonicbase.queue.KafkaMessageQueueConsumer:
+com.sonicbase.queue.KafkaConsumer -> com.sonicbase.queue.KafkaConsumer:
     org.apache.log4j.Logger logger -> a
     org.apache.kafka.clients.consumer.KafkaConsumer consumer -> b
     boolean shutdown -> c
@@ -678,14 +678,14 @@ com.sonicbase.queue.KafkaMessageQueueConsumer -> com.sonicbase.queue.KafkaMessag
     52:58:java.util.List receive() -> b
     63:63:void acknowledgeMessage(com.sonicbase.queue.Message) -> a
     18:18:void <clinit>() -> <clinit>
-com.sonicbase.queue.KafkaMessageQueueProducer -> com.sonicbase.queue.KafkaMessageQueueProducer:
+com.sonicbase.queue.KafkaProducer -> com.sonicbase.queue.KafkaProducer:
     java.lang.String topic -> a
     org.apache.kafka.clients.producer.Producer producer -> b
     14:14:void <init>() -> <init>
     22:42:void init(java.lang.String,java.lang.String,java.lang.String) -> a
     47:53:void publish(java.lang.String) -> a
     58:58:void shutdown() -> a
-com.sonicbase.queue.LocalMessageQueueConsumer -> com.sonicbase.queue.LocalMessageQueueConsumer:
+com.sonicbase.queue.LocalConsumer -> com.sonicbase.queue.LocalConsumer:
     org.apache.log4j.Logger logger -> a
     org.apache.kafka.clients.consumer.KafkaConsumer consumer -> b
     boolean shutdown -> c
@@ -695,7 +695,7 @@ com.sonicbase.queue.LocalMessageQueueConsumer -> com.sonicbase.queue.LocalMessag
     25:37:java.util.List receive() -> b
     42:42:void acknowledgeMessage(com.sonicbase.queue.Message) -> a
     10:10:void <clinit>() -> <clinit>
-com.sonicbase.queue.LocalMessageQueueProducer -> com.sonicbase.queue.LocalMessageQueueProducer:
+com.sonicbase.queue.LocalProducer -> com.sonicbase.queue.LocalProducer:
     java.util.List queue -> a
     6:6:void <init>() -> <init>
     11:11:void init(java.lang.String,java.lang.String,java.lang.String) -> a
@@ -708,12 +708,12 @@ com.sonicbase.queue.Message -> com.sonicbase.queue.Message:
     9:11:void <init>(java.lang.String) -> <init>
     14:15:void setBody(java.lang.String) -> a
     18:18:java.lang.String getBody() -> a
-com.sonicbase.queue.MessageQueueConsumer -> com.sonicbase.queue.MessageQueueConsumer:
+com.sonicbase.queue.StreamConsumer -> com.sonicbase.queue.StreamConsumer:
     void init(java.lang.String,java.lang.String,java.lang.String) -> a
     java.util.List receive() -> b
     void acknowledgeMessage(com.sonicbase.queue.Message) -> a
     void shutdown() -> a
-com.sonicbase.queue.MessageQueueProducer -> com.sonicbase.queue.MessageQueueProducer:
+com.sonicbase.queue.StreamProducer -> com.sonicbase.queue.StreamProducer:
     void init(java.lang.String,java.lang.String,java.lang.String) -> a
     void publish(java.lang.String) -> a
     void shutdown() -> a
@@ -2361,7 +2361,7 @@ com.sonicbase.server.StreamManager -> com.sonicbase.server.k:
     boolean pauseStreaming -> f
     30:80:void <init>(com.sonicbase.server.DatabaseServer) -> <init>
     83:147:ComObject startStreaming(ComObject) -> a
-    151:233:void processMessages(com.sonicbase.queue.MessageQueueConsumer,java.util.List) -> a
+    151:233:void processMessages(com.sonicbase.queue.StreamConsumer,java.util.List) -> a
     236:246:ComObject stopStreaming(ComObject) -> b
     250:257:void initConnection(java.lang.String) -> a
     261:275:java.sql.Connection doInitConnection(java.lang.String) -> b
@@ -2370,7 +2370,7 @@ com.sonicbase.server.StreamManager -> com.sonicbase.server.k:
     26:26:Logger access$100(com.sonicbase.server.StreamManager) -> a
     26:26:com.sonicbase.server.DatabaseServer access$200(com.sonicbase.server.StreamManager) -> b
     26:26:boolean access$000(com.sonicbase.server.StreamManager) -> c
-    26:26:void access$300(com.sonicbase.server.StreamManager,com.sonicbase.queue.MessageQueueConsumer,java.util.List) -> a
+    26:26:void access$300(com.sonicbase.server.StreamManager,com.sonicbase.queue.StreamConsumer,java.util.List) -> a
 com.sonicbase.server.StreamManager$1 -> com.sonicbase.server.k$1:
     com.sonicbase.server.DatabaseServer val$server -> a
     com.sonicbase.server.StreamManager this$0 -> b
@@ -2579,10 +2579,10 @@ com.sonicbase.server.UpdateManager$MessageRequest -> com.sonicbase.server.m$b:
     1368:1368:com.sonicbase.server.UpdateManager$UpdateType access$1100(com.sonicbase.server.UpdateManager$MessageRequest) -> c
     1368:1368:byte[] access$1000(com.sonicbase.server.UpdateManager$MessageRequest) -> d
 com.sonicbase.server.UpdateManager$Producer -> com.sonicbase.server.m$c:
-    com.sonicbase.queue.MessageQueueProducer producer -> a
+    com.sonicbase.queue.StreamProducer producer -> a
     int maxBatchSize -> b
     com.sonicbase.server.UpdateManager this$0 -> c
-    50:53:void <init>(com.sonicbase.server.UpdateManager,com.sonicbase.queue.MessageQueueProducer,java.lang.Integer) -> <init>
+    50:53:void <init>(com.sonicbase.server.UpdateManager,com.sonicbase.queue.StreamProducer,java.lang.Integer) -> <init>
 com.sonicbase.server.UpdateManager$UpdateType -> com.sonicbase.server.m$d:
     com.sonicbase.server.UpdateManager$UpdateType insert -> a
     com.sonicbase.server.UpdateManager$UpdateType update -> b

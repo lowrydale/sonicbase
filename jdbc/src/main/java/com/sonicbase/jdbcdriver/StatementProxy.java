@@ -234,6 +234,14 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
     throw new NotImplementedException();
   }
 
+  public void doUpdate(Long sequence0, Long sequence1, Short sequence2) throws SQLException {
+    databaseClient.executeQuery(dbName, QueryType.update0, sql, parms, false, sequence0, sequence1, sequence2);
+  }
+
+  public void doDelete(Long sequence0, Long sequence1, Short sequence2) throws SQLException {
+    databaseClient.executeQuery(dbName, QueryType.update0, sql, parms, false, sequence0, sequence1, sequence2);
+  }
+
   public boolean execute() throws SQLException {
     try {
       return (Integer) databaseClient.executeQuery(dbName, QueryType.execute0, sql, parms) > 0;
@@ -762,6 +770,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
   public ParameterHandler getParms() {
     return parms;
   }
+
 }
 
 

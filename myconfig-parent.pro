@@ -141,23 +141,46 @@
       public static void main(java.lang.String[]);
 }
 
--keep public class com.sonicbase.queue.LocalMessageQueueProducer
--keep public class com.sonicbase.queue.AWSSQSMessageQueueProducer
--keep public class com.sonicbase.queue.KafkaMessageQueueProducer
--keep public class com.sonicbase.queue.MessageQueueProducer
--keep public class com.sonicbase.queue.LocalMessageQueueConsumer
--keep public class com.sonicbase.queue.AWSSQSMessageQueueConsumer
--keep public class com.sonicbase.queue.KafkaMessageQueueConsumer
--keep public class com.sonicbase.queue.MessageQueueConsumer
--keep public class com.sonicbase.queue.Message
+-keep public class com.sonicbase.streams.LocalProducer
+-keep public class com.sonicbase.streams.AWSSQSProducer
+-keep public class com.sonicbase.streams.AWSKinesisProducer
+-keep public class com.sonicbase.streams.KafkaProducer
+-keep public class com.sonicbase.streams.StreamsProducer
+-keep public class com.sonicbase.streams.LocalConsumer
+-keep public class com.sonicbase.streams.AWSSQSConsumer
+-keep public class com.sonicbase.streams.AWSKinesisConsumer
+-keep public class com.sonicbase.streams.KafkaConsumer
+-keep public class com.sonicbase.streams.StreamsConsumer
+-keep public class com.sonicbase.streams.Message
 -keep public class com.sonicbase.research.socket.NettyServer$MyChannelInitializer
 -keep public class com.sonicbase.research.socket.NettyServer$ServerHandler
 -keep public class com.sonicbase.server.MethodInvoker
 
--keepclassmembers  class com.sonicbase.queue.AWSSQSMessageQueueProducer {
+-keepclassmembers  class com.sonicbase.streams.AWSSQSProducer {
     !private <methods>;
 }
--keepclassmembers  class com.sonicbase.queue.AWSSQSMessageQueueConsumer {
+-keepclassmembers  class com.sonicbase.streams.AWSKinesisProducer {
+    !private <methods>;
+}
+-keepclassmembers  class com.sonicbase.streams.KafkaProducer {
+    !private <methods>;
+}
+-keepclassmembers  class com.sonicbase.streams.StreamsProducer {
+    !private <methods>;
+}
+-keepclassmembers  class com.sonicbase.streams.AWSSQSConsumer {
+    !private <methods>;
+}
+-keepclassmembers  class com.sonicbase.streams.AWSKinesisConsumer {
+    !private <methods>;
+}
+-keepclassmembers  class com.sonicbase.streams.KafkaConsumer {
+    !private <methods>;
+}
+-keepclassmembers  class com.sonicbase.streams.StreamsConsumer {
+    !private <methods>;
+}
+-keepclassmembers  class com.sonicbase.streams.Message {
     !private <methods>;
 }
 -keepclassmembers  class com.sonicbase.server.LogManager$ByteCounterStream {

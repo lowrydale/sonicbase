@@ -491,7 +491,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
   }
 
   @Override
-  public Object execute(String dbName, Explain explain) throws DatabaseException {
+  public Object execute(String dbName, Explain explain, Long sequence0, Long sequence1, Short sequence2) throws DatabaseException {
     while (true) {
       try {
         expression.setViewVersion(client.getCommon().getSchemaVersion());

@@ -141,7 +141,7 @@ public class MethodInvoker {
       if (methodStr.equals("queueForOtherServer")) {
         try {
           ComObject header = request.getObject(ComObject.Tag.header);
-          int replica = header.getInt(ComObject.Tag.replica);
+          Integer replica = header.getInt(ComObject.Tag.replica);
           String innerMethod = header.getString(ComObject.Tag.method);
           request.put(ComObject.Tag.method, innerMethod);
           logManager.logRequestForPeer(requestBytes, System.currentTimeMillis(), logManager.getNextSequencenNum(), replica);
@@ -178,6 +178,12 @@ public class MethodInvoker {
           long handleBegin = System.nanoTime();
           request.put(ComObject.Tag.sequence0, sequence0);
           request.put(ComObject.Tag.sequence1, sequence1);
+          if (existingSequence0 == null) {
+            request.put(ComObject.Tag.currRequestIsMaster, true);
+          }
+          else {
+            request.put(ComObject.Tag.currRequestIsMaster, false);
+          }
           Method method = getClass().getMethod(methodStr, ComObject.class, boolean.class);
           ret = (ComObject) method.invoke(this, request, replayedCommand);
           if (handlerTime != null) {
@@ -265,6 +271,17 @@ public class MethodInvoker {
 
   public ComObject stopStreaming(final ComObject cobj, boolean replayedCommand) {
     return server.getStreamManager().stopStreaming(cobj);
+  }
+
+  public ComObject isStreamingStarted(ComObject cobj, boolean replayedCommand) {
+    boolean started = server.getStreamManager().isStreamingStarted();
+    ComObject retObj = new ComObject();
+    retObj.put(ComObject.Tag.isStarted, started);
+    return retObj;
+  }
+
+  public ComObject processMessages(ComObject cobj, boolean replayedCommand) {
+    return server.getStreamManager().processMessages(cobj);
   }
 
   public ComObject cancelBulkImport(final ComObject cobj, boolean replayedCommand) {

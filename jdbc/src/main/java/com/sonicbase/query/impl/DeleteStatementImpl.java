@@ -49,7 +49,7 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
   }
 
   @Override
-  public Object execute(String dbName, SelectStatementImpl.Explain explain) throws DatabaseException {
+  public Object execute(String dbName, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2) throws DatabaseException {
     while (true) {
       try {
         expression.setViewVersion(client.getCommon().getSchemaVersion());
@@ -116,6 +116,11 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
               cobj.put(ComObject.Tag.isCommitting, client.isCommitting());
               cobj.put(ComObject.Tag.transactionId, client.getTransactionId());
               cobj.put(ComObject.Tag.method, "deleteRecord");
+              if (sequence0 != null && sequence1 != null && sequence2 != null) {
+                cobj.put(ComObject.Tag.sequence0Override, sequence0);
+                cobj.put(ComObject.Tag.sequence1Override, sequence1);
+                cobj.put(ComObject.Tag.sequence2Override, sequence2);
+              }
               client.send("DatabaseServer:deleteRecord", selectedShards.get(0), rand.nextLong(), cobj, DatabaseClient.Replica.def);
 
               cobj = new ComObject();
@@ -129,6 +134,11 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
               cobj.put(ComObject.Tag.method, "deleteIndexEntry");
               byte[] bytes = record.serialize(client.getCommon(), DatabaseClient.SERIALIZATION_VERSION);
               cobj.put(ComObject.Tag.recordBytes, bytes);
+              if (sequence0 != null && sequence1 != null && sequence2 != null) {
+                cobj.put(ComObject.Tag.sequence0Override, sequence0);
+                cobj.put(ComObject.Tag.sequence1Override, sequence1);
+                cobj.put(ComObject.Tag.sequence2Override, sequence2);
+              }
 
               client.sendToAllShards(null, rand.nextLong(), cobj, DatabaseClient.Replica.def);
               countDeleted++;

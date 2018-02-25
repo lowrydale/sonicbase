@@ -11,5 +11,5 @@ public interface DeleteStatement extends Statement {
 
   void setWhereClause(Expression expression);
 
-  Object execute(String dbName, SelectStatementImpl.Explain explain) throws DatabaseException;
+  Object execute(String dbName, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2) throws DatabaseException;
 }

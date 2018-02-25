@@ -44,7 +44,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
   }
 
   @Override
-  public Object execute(String dbName, SelectStatementImpl.Explain explain) throws DatabaseException {
+  public Object execute(String dbName, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2) throws DatabaseException {
 
     while (true) {
       try {
@@ -114,7 +114,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
               }
 
               long id = 0;
-              if (tableFields.get(0).getName().equals("_id")) {
+              if (tableFields.get(0).getName().equals("_sonicbase_id")) {
                 id = (long)record.getFields()[0];
               }
               List<DatabaseClient.KeyInfo> previousKeys = client.getKeys(client.getCommon(), tableSchema, columnNames, values, id);
@@ -201,6 +201,12 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
               cobj.put(ComObject.Tag.transactionId, client.getTransactionId());
               cobj.put(ComObject.Tag.primaryKeyBytes, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), newPrimaryKey));
               cobj.put(ComObject.Tag.bytes, record.serialize(client.getCommon(), DatabaseClient.SERIALIZATION_VERSION));
+              if (sequence0 != null && sequence1 != null && sequence2 != null) {
+                cobj.put(ComObject.Tag.sequence0Override, sequence0);
+                cobj.put(ComObject.Tag.sequence1Override, sequence1);
+                cobj.put(ComObject.Tag.sequence2Override, sequence2);
+              }
+
 
               client.send(null, selectedShards.get(0), rand.nextLong(), cobj, DatabaseClient.Replica.def);
 

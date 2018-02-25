@@ -18,7 +18,7 @@ public class Logger {
   private final DatabaseClient databaseClient;
   private static Thread sendThread;
   private static String hostName;
-  public static ArrayBlockingQueue<Error> queue = new ArrayBlockingQueue<Error>(10000);
+  public static ArrayBlockingQueue<Error> queue = new ArrayBlockingQueue<Error>(10_000);
   private static boolean ready = false;
   private static boolean isClient;
 
@@ -158,11 +158,16 @@ public class Logger {
         }
       }
       if (ready && databaseClient != null) {
-        if (shard != -1) {
-          queue.put(new Error(databaseClient, "shard=" + shard + ", replica=" + replica + " " + msg, e));
+        if (queue.size() < 9_000) {
+          if (shard != -1) {
+            queue.put(new Error(databaseClient, "shard=" + shard + ", replica=" + replica + " " + msg, e));
+          }
+          else {
+            queue.put(new Error(databaseClient, msg, e));
+          }
         }
         else {
-          queue.put(new Error(databaseClient, msg, e));
+          logger.error(msg, e);
         }
       }
     }
@@ -181,11 +186,16 @@ public class Logger {
         return;
       }
       if (ready) {
-        if (shard != -1) {
-          queue.put(new Error(databaseClient, "shard=" + shard + ", replica=" + replica + " " + msg, e));
+        if (queue.size() < 9_000) {
+          if (shard != -1) {
+            queue.put(new Error(databaseClient, "shard=" + shard + ", replica=" + replica + " " + msg, e));
+          }
+          else {
+            queue.put(new Error(databaseClient, msg, e));
+          }
         }
         else {
-          queue.put(new Error(databaseClient, msg, e));
+          logger.error(msg, e);
         }
       }
     }

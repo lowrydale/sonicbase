@@ -2050,7 +2050,7 @@ public class Repartitioner extends Thread {
         TableSchema tableSchema = common.getTables(dbName).get(tableName);
         Index index = databaseServer.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexName);
         IndexSchema indexSchema = common.getTables(dbName).get(tableName).getIndices().get(indexName);
-        databaseServer.getUpdateManager().doInsertKeys(dbName, moveRequests, index, tableName, indexSchema, replayedCommand);
+        databaseServer.getUpdateManager().doInsertKeys(cobj, dbName, moveRequests, index, tableName, indexSchema, replayedCommand, true);
 
       return null;
     }

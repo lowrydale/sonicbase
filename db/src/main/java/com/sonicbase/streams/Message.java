@@ -1,4 +1,4 @@
-package com.sonicbase.queue;
+package com.sonicbase.streams;
 
 
 public class Message {

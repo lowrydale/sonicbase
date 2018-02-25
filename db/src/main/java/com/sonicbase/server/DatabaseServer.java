@@ -43,6 +43,10 @@ import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.text.ParseException;
 import java.util.*;
 import java.util.concurrent.*;
@@ -128,6 +132,8 @@ public class DatabaseServer {
   }
 
   private boolean finishedRestoreFileCopy;
+  private Connection sysConnection;
+  private Thread streamsConsumerMonitorthread;
 
   @SuppressWarnings("restriction")
   private static Unsafe getUnsafe() {
@@ -392,6 +398,21 @@ public class DatabaseServer {
     //startMasterMonitor();
 
     logger.info("Started server");
+
+
+    Timer timer = new Timer();
+    timer.schedule(new TimerTask(){
+      @Override
+      public void run() {
+        ComObject cobj = new ComObject();
+        cobj.put(ComObject.Tag.method, "isStreamingStarted");
+
+        ComObject retObj = new ComObject(getDatabaseClient().sendToMaster(cobj));
+        if (retObj.getBoolean(ComObject.Tag.isStarted)) {
+          streamManager.startStreaming(null);
+        }
+      }
+    }, 20_000);
 
     //logger.error("Testing errors", new DatabaseException());
 
@@ -708,6 +729,8 @@ public class DatabaseServer {
         shutdownMasterLicenseValidator();
         startMasterLicenseValidator();
 
+        startStreamsConsumerMonitor();
+
         shutdownDeathMonitor();
 
         logger.info("starting death monitor");
@@ -720,6 +743,106 @@ public class DatabaseServer {
     }
     catch (Exception e) {
       throw new DatabaseException(e);
+    }
+  }
+
+  private void startStreamsConsumerMonitor() {
+    if (streamsConsumerMonitorthread == null) {
+      streamsConsumerMonitorthread = new Thread(new Runnable() {
+        @Override
+        public void run() {
+          try {
+            if (sysConnection == null) {
+              sysConnection = StreamManager.initSysConnection(config);
+              StreamManager.initStreamsConsumerTable(sysConnection);
+            }
+            while (!shutdown) {
+              try {
+                StringBuilder builder = new StringBuilder();
+                Map<String, Boolean> currState = readStreamConsumerState();
+                for (int shard = 0; shard < shardCount; shard++) {
+                  int aliveReplica = -1;
+                  for (int replica = 0; replica < replicationFactor; replica++) {
+                    boolean dead = common.getServersConfig().getShards()[shard].getReplicas()[replica].isDead();
+                    if (!dead) {
+                      aliveReplica = replica;
+                    }
+                  }
+                  builder.append(",").append(shard).append(":").append(aliveReplica);
+                  Boolean currActive = currState.get(shard + ":" + aliveReplica);
+                  if (currActive == null || !currActive) {
+                    setStreamConsumerState(shard, aliveReplica);
+                  }
+                }
+                logger.info("active streams consumers: " + builder.toString());
+                Thread.sleep(10_000);
+              }
+              catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+              }
+              catch (Exception e) {
+                logger.error("Error in stream consumer monitor", e);
+              }
+            }
+          }
+          finally {
+            streamsConsumerMonitorthread = null;
+          }
+        }
+      });
+      streamsConsumerMonitorthread.start();
+    }
+  }
+
+  private void setStreamConsumerState(int shard, int replica) {
+    try {
+      for (int i = 0; i < getReplicationFactor(); i++) {
+        PreparedStatement stmt = null;
+        try {
+          stmt = sysConnection.prepareStatement("insert ignore into streams_consumer_state (shard, replica, active) VALUES (?, ?, ?)");
+          stmt.setInt(1, shard);
+          stmt.setInt(2, i);
+          stmt.setBoolean(3, replica == i);
+          int count = stmt.executeUpdate();
+          stmt.close();
+        }
+        finally {
+          stmt.close();
+        }
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  private Map<String, Boolean> readStreamConsumerState() {
+    Map<String, Boolean> ret = new HashMap<>();
+    PreparedStatement stmt = null;
+    try {
+      stmt = sysConnection.prepareStatement("select * from streams_consumer_state");
+      ResultSet rs = stmt.executeQuery();
+      while (rs.next()) {
+        int shard = rs.getInt("shard");
+        int replica = rs.getInt("replica");
+        boolean isActive = rs.getBoolean("active");
+        ret.put(shard + ":" + replica, isActive);
+      }
+      return ret;
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+    finally {
+      if (stmt != null) {
+        try {
+          stmt.close();
+        }
+        catch (SQLException e) {
+          throw new DatabaseException(e);
+        }
+      }
     }
   }
 
@@ -819,6 +942,7 @@ public class DatabaseServer {
                     if (isHealthy.get()) {
                       break;
                     }
+                    Thread.sleep(1_000);
                   }
                   boolean wasDead = common.getServersConfig().getShards()[shard].getReplicas()[replica].isDead();
                   boolean changed = false;
@@ -900,7 +1024,7 @@ public class DatabaseServer {
       @Override
       public void run() {
         int backoff = 100;
-        while (true) {
+        //while (true) {
           ServersConfig.Host host = common.getServersConfig().getShards()[shard].getReplicas()[replica];
           boolean wasDead = host.isDead();
           try {
@@ -913,7 +1037,7 @@ public class DatabaseServer {
             if (retObj.getString(ComObject.Tag.status).equals("{\"status\" : \"ok\"}")) {
               isHealthy.set(true);
             }
-            break;
+            return;
           }
           catch (Exception e) {
             //int index = ExceptionUtils.indexOfThrowable(e, DeadServerException.class);
@@ -925,18 +1049,18 @@ public class DatabaseServer {
             else {
               logger.error("Error checking health of server: shard=" + shard + ", replica=" + replica, e);
             }
-            try {
-              Thread.sleep(backoff);
-              backoff *= 2;
-            }
-            catch (InterruptedException e1) {
-              break;
-            }
+//            try {
+//              Thread.sleep(backoff);
+//              backoff *= 2;
+//            }
+//            catch (InterruptedException e1) {
+//              return;
+//            }
           }
           finally {
             finished.set(true);
           }
-        }
+        //}
       }
     });
     checkThread.start();

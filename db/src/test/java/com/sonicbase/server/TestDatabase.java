@@ -1,5 +1,6 @@
 package com.sonicbase.server;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -15,9 +16,9 @@ import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.ColumnImpl;
 import com.sonicbase.query.impl.ExpressionImpl;
 import com.sonicbase.query.impl.SelectContextImpl;
-import com.sonicbase.queue.LocalMessageQueueConsumer;
-import com.sonicbase.queue.LocalMessageQueueProducer;
-import com.sonicbase.queue.Message;
+import com.sonicbase.streams.LocalConsumer;
+import com.sonicbase.streams.LocalProducer;
+import com.sonicbase.streams.Message;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sun.jersey.core.util.Base64;
@@ -34,6 +35,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.security.InvalidKeyException;
 import java.security.Key;
 import java.sql.*;
@@ -119,6 +121,29 @@ public class TestDatabase {
 
       conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000", "user", "password");
 
+      ((ConnectionProxy) conn).getDatabaseClient().createDatabase("_sonicbase_sys");
+
+      conn.close();
+
+      conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/_sonicbase_sys", "user", "password");
+
+      client = ((ConnectionProxy) conn).getDatabaseClient();
+
+
+
+      PreparedStatement stmt = conn.prepareStatement("create table kafka_stream_state (topic VARCHAR, _partition BIGINT, _offset BIGINT, PRIMARY KEY (topic, _partition))");
+      stmt.executeUpdate();
+
+
+      stmt = conn.prepareStatement("insert into kafka_stream_state (topic, _partition, _offset) VALUES (?, ?, ?)");
+      stmt.setString(1, "topic");
+      stmt.setLong(2, 1);
+      stmt.setLong(3, 1);
+      assertEquals(stmt.executeUpdate(), 1);
+
+
+      conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000", "user", "password");
+
       ((ConnectionProxy) conn).getDatabaseClient().createDatabase("test");
 
       conn.close();
@@ -131,7 +156,7 @@ public class TestDatabase {
 
       client.setPageSize(3);
 
-      PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, id3 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
+      stmt = conn.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, id3 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
       stmt.executeUpdate();
 
       stmt = conn.prepareStatement("create table Children (parent BIGINT, socialSecurityNumber VARCHAR(20), bio VARCHAR(256))");
@@ -154,7 +179,7 @@ public class TestDatabase {
 
       //test insertWithRecord
 
-      LocalMessageQueueProducer.queue.clear();
+      LocalProducer.queue.clear();
 
       stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");
       stmt.setLong(1, 1000);
@@ -300,6 +325,7 @@ public class TestDatabase {
         assertEquals(stmt.executeUpdate(), 1);
       }
 
+
       stmt = conn.prepareStatement("create index socialSecurityNumber on persons(socialSecurityNumber)");
       stmt.executeUpdate();
 //
@@ -353,6 +379,11 @@ public class TestDatabase {
       }
 
       //Thread.sleep(60000);
+
+      dbServers[0].runSnapshot();
+      dbServers[1].runSnapshot();
+      dbServers[2].runSnapshot();
+      dbServers[3].runSnapshot();
 
 //      assertTrue(client.getPartitionSize("test", 0, "persons", "_1__primarykey") >= 8);
 //      assertTrue(client.getPartitionSize("test", 1, "persons", "_1__primarykey") <= 12);
@@ -3357,7 +3388,7 @@ public class TestDatabase {
   @Test
   public void testBatchInsertNoKey() throws SQLException, InterruptedException {
 
-    LocalMessageQueueConsumer consumer = new LocalMessageQueueConsumer();
+    LocalConsumer consumer = new LocalConsumer();
     while (true) {
       List<Message> msgs = consumer.receive();
       if (msgs == null || msgs.size() == 0) {
@@ -3380,14 +3411,18 @@ public class TestDatabase {
     conn.commit();
 
     try {
-      List<Message> msgs = consumer.receive();
-      String actual = msgs.get(0).getBody();
-      ObjectMapper mapper = new ObjectMapper();
-      ObjectNode dict = (ObjectNode) mapper.readTree(actual);
-      assertEquals(dict.withArray("records").size(), 5);
-      actual = msgs.get(1).getBody();
-      dict = (ObjectNode) mapper.readTree(actual);
-      assertEquals(dict.withArray("records").size(), 5);
+//      List<Message> msgs = consumer.receive();
+//      assertEquals(msgs.size(), 10);
+//      int offset = 0;
+//      for (Message msg : msgs) {
+//        String actual = msg.getBody();
+//        ObjectMapper mapper = new ObjectMapper();
+//        ObjectNode dict = (ObjectNode) mapper.readTree(actual);
+//        assertEquals(dict.withArray("records").size(), 1);
+//        JsonNode node = dict.withArray("records").get(0);
+//        assertEquals(node.get("id").asLong(), 200000 + (offset / 2));
+//        offset += 1;
+//      }
 
 
       stmt = conn.prepareStatement("select * from nokey where id>=200000");
@@ -3410,9 +3445,18 @@ public class TestDatabase {
   }
 
   @Test
-  public void testBatchInsert() throws SQLException, InterruptedException {
+  public void testBatchInsert() throws SQLException, InterruptedException, IOException {
 
     try {
+
+      LocalConsumer consumer = new LocalConsumer();
+      while (true) {
+        List<Message> msgs = consumer.receive();
+        if (msgs == null || msgs.size() == 0) {
+          break;
+        }
+      }
+
       client.syncSchema();
       conn.setAutoCommit(false);
       PreparedStatement stmt = conn.prepareStatement("insert into persons (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
@@ -3427,6 +3471,8 @@ public class TestDatabase {
       }
       stmt.executeBatch();
       conn.commit();
+
+      Thread.sleep(5000);
 
       stmt = conn.prepareStatement("select * from persons where id>=200000");
       ResultSet resultSet = stmt.executeQuery();
@@ -3882,7 +3928,7 @@ public class TestDatabase {
     assertTrue(rs.next());
     assertFalse(rs.next());
 
-    LocalMessageQueueConsumer consumer = new LocalMessageQueueConsumer();
+    LocalConsumer consumer = new LocalConsumer();
     while (true) {
       List<Message> msgs = consumer.receive();
       if (msgs == null || msgs.size() == 0) {
@@ -3893,16 +3939,6 @@ public class TestDatabase {
     assertTrue(stmt2.execute());
 
     try {
-      List<Message> msgs = consumer.receive();
-      ObjectMapper mapper = new ObjectMapper();
-      ObjectNode dict = (ObjectNode) mapper.readTree(msgs.get(0).getBody());
-      ArrayNode array = dict.withArray("records");
-      ObjectNode record = (ObjectNode) array.get(0);
-      record.remove("_sequence0");
-      record.remove("_sequence1");
-      record.remove("_sequence2");
-      TestDataTypes.assertJsonEquals(record.toString(), "{\"id2\":0,\"id\":0}");
-
       stmt = conn.prepareStatement("select * from ToDeleteNoPrimaryKey where id = 0");
       rs = stmt.executeQuery();
       assertFalse(rs.next());

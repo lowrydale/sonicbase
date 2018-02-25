@@ -14,8 +14,8 @@ rsync -rvlLt /Users/lowryda/.m2/repository/com/mashape/unirest/unirest-java/1.4.
 rsync -rvlLt /Users/lowryda/.m2/repository/com/google/code/gson/gson/2.2.3/gson-2.2.3.jar $HOME/sonicbase/lib
 rsync -rvlLt /Users/lowryda/.m2/repository/org/quartz-scheduler/quartz/2.2.1/quartz-2.2.1.jar $HOME/sonicbase/lib
 rsync -rvlLt /Users/lowryda/.m2/repository/org/quartz-sheduler/quartz-jobs/2.2.1/quartz-jobs-2.2.1.jar $HOME/sonicbase/lib
-rsync -rvlLt /Users/lowryda/.m2/repository/com/amazonaws/aws-java-sdk-bundle/1.11.109/aws-java-sdk-bundle-1.11.109.jar $HOME/sonicbase/lib
-rsync -rvlLt /Users/lowryda/.m2/repository/com/amazonaws/aws-java-sdk/1.11.109/aws-java-sdk-1.11.109.jar $HOME/sonicbase/lib
+rsync -rvlLt /Users/lowryda/.m2/repository/com/amazonaws/aws-java-sdk-bundle/1.11.279/aws-java-sdk-bundle-1.11.279.jar $HOME/sonicbase/lib
+rsync -rvlLt /Users/lowryda/.m2/repository/com/amazonaws/aws-java-sdk/1.11.279/aws-java-sdk-1.11.279.jar $HOME/sonicbase/lib
 rsync -rvlLt /Users/lowryda/.m2/repository/it/unimi/dsi/fastutil/7.0.2/fastutil-7.0.2.jar $HOME/sonicbase/lib
 rsync -rvlLt /Users/lowryda/.m2/repository/com/google/http-client/google-http-client/1.17.0-rc/google-http-client-1.17.0-rc.jar $HOME/sonicbase/lib
 rsync -rvlLt /Users/lowryda/.m2/repository/commons-configuration/commons-configuration/1.6/commons-configuration-1.6.jar $HOME/sonicbase/lib

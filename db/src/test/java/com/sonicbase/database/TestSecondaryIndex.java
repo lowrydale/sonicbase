@@ -235,7 +235,7 @@ public class TestSecondaryIndex {
       System.out.println("Checking: " + i);
 
       assertEquals(rs.getLong("id"), i);
-      System.out.println("found: _id=" + rs.getLong("_id") + ", id=" + rs.getLong("id"));
+      System.out.println("found: _sonicbase_id=" + rs.getLong("_sonicbase_id") + ", id=" + rs.getLong("id"));
     }
     assertFalse(rs.next());
   }

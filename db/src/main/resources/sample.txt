@@ -1,42 +1,56 @@
-1024 	at com.sonicbase.server.LogManager$LogWriter.run(LogManager.java:507)
- 512 	at com.sonicbase.socket.DatabaseSocketClient$BatchSender.run(DatabaseSocketClient.java:379)
- 157 	at com.sonicbase.socket.DatabaseSocketClient.readResponse(DatabaseSocketClient.java:655)
- 128 	at com.sonicbase.server.UpdateManager$4.run(UpdateManager.java:1421)
- 128 	at com.sonicbase.server.StreamManager$1.run(StreamManager.java:68)
- 128 	at com.sonicbase.server.ReadManager$3.run(ReadManager.java:346)
- 128 	at com.sonicbase.server.ReadManager$2.run(ReadManager.java:76)
- 128 	at com.sonicbase.research.socket.NettyServer.startServer(NettyServer.java:936)
- 128 	at com.sonicbase.research.socket.NettyServer.run(NettyServer.java:774)
- 126 	at com.sonicbase.server.DeltaManager$1.run(DeltaManager.java:150)
- 125 	at com.sonicbase.server.DatabaseServer$StatsMonitor.run(DatabaseServer.java:4753)
- 125 	at com.sonicbase.server.DatabaseServer$19.run(DatabaseServer.java:2550)
- 117 	at com.sonicbase.server.DeleteManager$8.run(DeleteManager.java:1201)
-  64 	at com.sonicbase.server.DatabaseServer$4.run(DatabaseServer.java:755)
-  64 	at com.sonicbase.query.impl.ExpressionImpl$3.run(ExpressionImpl.java:1421)
-  64 	at com.sonicbase.common.Logger$1.run(Logger.java:34)
-  60 	at com.sonicbase.server.DatabaseServer$5.run(DatabaseServer.java:805)
-  38 	at com.sonicbase.query.impl.ResultSetImpl.getMoreResults(ResultSetImpl.java:2215)
-  25 	at com.sonicbase.server.DatabaseServer$AddressMap.getAddress(DatabaseServer.java:3871)
-  20 	at com.sonicbase.index.Index.get(Index.java:361)
-  11 	at com.sonicbase.index.Index.higherEntry(Index.java:1312)
-   9 	at com.sonicbase.server.LogManager$ByteCounterStream.read(LogManager.java:700)
-   9 	at com.sonicbase.server.DatabaseServer.fromUnsafeToRecords(DatabaseServer.java:4200)
-   9 	at com.sonicbase.query.impl.ResultSetImpl.readRecords(ResultSetImpl.java:2510)
-   9 	at com.sonicbase.jdbcdriver.ResultSetProxy.getLong(ResultSetProxy.java:578)
-   7 	at com.sonicbase.server.DatabaseServer.fromUnsafeToRecords(DatabaseServer.java:4181)
-   6 	at com.sonicbase.server.ReadManager.indexLookup(ReadManager.java:682)
-   6 	at com.sonicbase.query.impl.SelectStatementImpl.dedupIds(SelectStatementImpl.java:1179)
-   6 	at com.sonicbase.common.Record.getDbViewNumber(Record.java:131)
-   6 	at com.sonicbase.common.DatabaseCommon.deserializeFields(DatabaseCommon.java:961)
-   6 	at com.sonicbase.common.DatabaseCommon.deserializeFields(DatabaseCommon.java:915)
-   5 	at com.sonicbase.research.socket.NettyServer.writeResponse(NettyServer.java:132)
-   5 	at com.sonicbase.common.DatabaseCommon.deserializeFields(DatabaseCommon.java:924)
-   5 	at com.sonicbase.common.ComArray.serialize(ComArray.java:83)
-   4 	at com.sonicbase.server.DatabaseServer.fromUnsafeToRecords(DatabaseServer.java:4204)
-   4 	at com.sonicbase.server.DatabaseServer.checkHealthOfServer(DatabaseServer.java:934)
-   4 	at com.sonicbase.query.impl.SelectStatementImpl.dedupIds(SelectStatementImpl.java:1187)
-   4 	at com.sonicbase.index.Index.visitTailMap(Index.java:1566)
-   4 	at com.sonicbase.common.Record.recoverFromSnapshot(Record.java:64)
-   3 	at com.sonicbase.server.ReadManager.doIndexLookupTwoKeys(ReadManager.java:1750)
-   3 	at com.sonicbase.server.DatabaseServer.fromUnsafeToRecords(DatabaseServer.java:4182)
-   3 	at com.sonicbase.server.DatabaseServer.fromUnsafeToRecords(DatabaseServer.java:4162)
+9NDD-D1K,MNKR-N6J
+LKK3-YCD,LY1Y-P34
+LJGH-ZB2,LT62-LB1 attempted fix on 2/21/18
+KW6F-T9J,LN8Z-LVR
+LYQ7-WY8,LYQQ-D27
+9VDW-K4D,9VDW-K41
+KNR5-CXJ,KPWL-52R
+K8JV-R1N,KZ5P-2MG
+KF2S-VML,LLSW-VGP
+LTF3-HP7,9NLX-67D
+LTVH-J6R,LL7P-HXW
+MJQT-B97,9K8W-4CZ
+LRFL-S53,LRHT-4HP
+LBMK-G2R,9W4S-7MV
+L785-QM8,LQTH-6KG
+LZBP-X8V,LFP6-1GW
+LCJC-NTM,LJTJ-2KW
+LXCZ-38G,KLJP-VD3
+LZBP-X8V,K81C-NSS
+LDS3-FR4,LDS9-88C
+L5FG-VY7,KZSF-S8Y
+LYQ7-31X,M4D2-V2H
+LZBP-X8V,K242-1VG
+LRK6-XY3,LX7K-T4M
+9F71-BC2,9ZWL-ZJZ
+K8XR-JJ1,MVB2-473
+KGND-661,KGND-6X9 attempted fix on 2/21/18
+LFHZ-NRY,KWHJ-15C
+LTJW-Q24,L697-G1D
+KJGM-7Y2,KJGM-7YJ
+LZRS-5K8,L5LJ-V9Z
+KN13-QJC,KN13-QV8
+99B7-8D9,LRQZ-N5Y
+KN13-QJC,KN13-QV4
+LRNC-6Z7,LRNC-S7C
+LYQQ-BSZ,LYQQ-V2N
+LHFW-K1B,LX37-P9Q
+9ZW2-Y4D,9ZW2-Y46
+967X-VD3,K69D-MDL
+LY3G-D3T,LY3G-D2J
+LYQQ-RH5,KFRX-JPN
+LNKM-316,LNKM-312
+LWW8-WBL,LWW8-WBN
+KW6F-T9J,LF48-1QN
+27MQ-N79,27MQ-NQB
+LYQQ-2H6,KD77-KWP
+M3BK-Z4B,M3BK-Z4F
+KCB5-Z2R,KDB1-CKV
+LYYZ-W3S,LYYZ-DTJ
+LQR4-L9F,KLB9-Q5K
+LYQQ-RHC,LYQQ-RTN
+9VHD-W56,LYQ7-W5Y
+LDJ4-P82,L8SR-B54
+KZF1-ZQS,KHQQ-XSV
+K8Q8-Z2R,LYQQ-SG4
+LZBP-X8V,KLXB-FPM

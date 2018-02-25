@@ -575,4 +575,14 @@ public class ConnectionProxy implements Connection {
       throw new DatabaseException(e);
     }
   }
+
+  public boolean databaseExists(String dbName) {
+    try {
+      clients.get(url).client.syncSchema();
+      return clients.get(url).client.getCommon().getDatabases().containsKey(dbName);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
 }

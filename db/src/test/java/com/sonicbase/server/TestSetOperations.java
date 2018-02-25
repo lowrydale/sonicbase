@@ -7,7 +7,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
-import com.sonicbase.queue.LocalMessageQueueProducer;
+import com.sonicbase.streams.LocalProducer;
 import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.util.FileUtils;
 import org.testng.annotations.AfterClass;
@@ -170,7 +170,7 @@ public class TestSetOperations {
 
     //test upsert
 
-    LocalMessageQueueProducer.queue.clear();
+    LocalProducer.queue.clear();
 
 
     stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");

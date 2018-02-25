@@ -123,16 +123,21 @@ public class SchemaManager {
         return null;
       }
 
-      logger.info("Create database: shard=" + server.getShard() + ", replica=" + server.getReplica() + ", name=" + dbName);
-      File dir = new File(server.getDataDir(), "delta/" + server.getShard() + "/" + server.getReplica() + "/" + dbName);
-      if (!dir.exists() && !dir.mkdirs()) {
-        throw new DatabaseException("Error creating database directory: dir=" + dir.getAbsolutePath());
+      synchronized (this) {
+
+        if (server.getCommon().getDatabases().containsKey(dbName)) {
+          throw new DatabaseException("Database already exists: name=" + dbName);
+        }
+        logger.info("Create database: shard=" + server.getShard() + ", replica=" + server.getReplica() + ", name=" + dbName);
+        File dir = new File(server.getDataDir(), "delta/" + server.getShard() + "/" + server.getReplica() + "/" + dbName);
+        if (!dir.exists() && !dir.mkdirs()) {
+          throw new DatabaseException("Error creating database directory: dir=" + dir.getAbsolutePath());
+        }
+
+        server.getIndices().put(dbName, new Indices());
+        server.getCommon().addDatabase(dbName);
+        server.getCommon().saveSchema(server.getClient(), server.getDataDir());
       }
-
-      server.getIndices().put(dbName, new Indices());
-      server.getCommon().addDatabase(dbName);
-      server.getCommon().saveSchema(server.getClient(), server.getDataDir());
-
       if (masterSlave.equals("master")) {
         for (int i = 0; i < server.getShardCount(); i++) {
           cobj.put(ComObject.Tag.slave, true);
@@ -275,53 +280,57 @@ public class SchemaManager {
 
         logger.info("Create table: shard=" + server.getShard() + ", replica=" + server.getReplica() + ", name=" + createTableStatement.getTablename());
 
-        TableSchema schema = new TableSchema();
-        tableName = createTableStatement.getTablename();
-        if (replayedCommand) {
-          logger.info("replayedCommand: table=" + tableName + ", tableCount=" + server.getCommon().getTables(dbName).size());
-          if (server.getCommon().getTables(dbName).containsKey(tableName.toLowerCase())) {
-            ComObject retObj = new ComObject();
-            retObj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(serializationVersionNumber));
+        synchronized (this) {
+          TableSchema schema = new TableSchema();
+          tableName = createTableStatement.getTablename();
+          if (server.getCommon().getTables(dbName).containsKey(tableName) && server.getShard() == 0 &&
+                server.getCommon().getServersConfig().getShards()[0].getMasterReplica() == server.getReplica()) {
+            throw new DatabaseException("Table already exists: name=" + tableName);
+          }
+          else {
+            if (replayedCommand) {
+              logger.info("replayedCommand: table=" + tableName + ", tableCount=" + server.getCommon().getTables(dbName).size());
+              if (server.getCommon().getTables(dbName).containsKey(tableName.toLowerCase())) {
+                ComObject retObj = new ComObject();
+                retObj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(serializationVersionNumber));
 
-            return retObj;
+                return retObj;
+              }
+            }
+
+            List<String> primaryKey = createTableStatement.getPrimaryKey();
+            List<FieldSchema> fields = createTableStatement.getFields();
+            List<FieldSchema> actualFields = new ArrayList<>();
+            FieldSchema idField = new FieldSchema();
+            idField.setAutoIncrement(true);
+            idField.setName("_sonicbase_id");
+            idField.setType(DataType.Type.BIGINT);
+            actualFields.add(idField);
+            actualFields.addAll(fields);
+            schema.setFields(actualFields);
+            schema.setName(tableName.toLowerCase());
+            schema.setPrimaryKey(primaryKey);
+            TableSchema existingSchema = server.getCommon().getTables(dbName).get(tableName);
+            if (existingSchema != null) {
+              schema.setIndices(existingSchema.getIndices());
+            }
+
+            Map<Integer, TableSchema> tables = server.getCommon().getTablesById(dbName);
+            int highTableId = 0;
+            for (int id : tables.keySet()) {
+              highTableId = Math.max(highTableId, id);
+            }
+            highTableId++;
+            schema.setTableId(highTableId);
+
+            server.getCommon().addTable(server.getClient(), dbName, server.getDataDir(), schema);
+
+            String[] primaryKeyFields = primaryKey.toArray(new String[primaryKey.size()]);
+            createIndex(dbName, tableName.toLowerCase(), "_primarykey", true, primaryKeyFields);
+
+            server.getCommon().saveSchema(server.getClient(), server.getDataDir());
           }
         }
-        if (!replayedCommand && server.getCommon().getTables(dbName).containsKey(tableName.toLowerCase())) {
-          throw new DatabaseException("Table already exists: name=" + tableName);
-        }
-
-
-        List<String> primaryKey = createTableStatement.getPrimaryKey();
-        List<FieldSchema> fields = createTableStatement.getFields();
-        List<FieldSchema> actualFields = new ArrayList<>();
-        FieldSchema idField = new FieldSchema();
-        idField.setAutoIncrement(true);
-        idField.setName("_id");
-        idField.setType(DataType.Type.BIGINT);
-        actualFields.add(idField);
-        actualFields.addAll(fields);
-        schema.setFields(actualFields);
-        schema.setName(tableName.toLowerCase());
-        schema.setPrimaryKey(primaryKey);
-        TableSchema existingSchema = server.getCommon().getTables(dbName).get(tableName);
-        if (existingSchema != null) {
-          schema.setIndices(existingSchema.getIndices());
-        }
-
-        Map<Integer, TableSchema> tables = server.getCommon().getTablesById(dbName);
-        int highTableId = 0;
-        for (int id : tables.keySet()) {
-          highTableId = Math.max(highTableId, id);
-        }
-        highTableId++;
-        schema.setTableId(highTableId);
-
-        server.getCommon().addTable(server.getClient(), dbName, server.getDataDir(), schema);
-
-        String[] primaryKeyFields = primaryKey.toArray(new String[primaryKey.size()]);
-        createIndex(dbName, tableName.toLowerCase(), "_primarykey", true, primaryKeyFields);
-
-        server.getCommon().saveSchema(server.getClient(), server.getDataDir());
       }
       finally {
         server.getCommon().getSchemaWriteLock(dbName).unlock();
@@ -345,7 +354,6 @@ public class SchemaManager {
           server.getDatabaseClient().send(null, i, rand.nextLong(), slaveObj, DatabaseClient.Replica.def);
         }
       }
-
       ComObject retObj = new ComObject();
       retObj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(serializationVersionNumber));
       return retObj;

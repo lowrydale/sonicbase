@@ -268,7 +268,7 @@ public class DatabaseSocketClient {
     private SocketChannel sock;
 
     public Connection(String host, int port) throws IOException {
-      for (int i = 0; i < 20; i++) {
+      for (int i = 0; i < 3; i++) {
         try {
           this.count_called = 0;
           this.sock = SocketChannel.open();
@@ -287,11 +287,11 @@ public class DatabaseSocketClient {
           sock.socket().setPerformancePreferences(0, 1, 0);
         }
         catch (ConnectException e) {
-          if (i == 19) {
+          if (i == 2) {
             throw new DatabaseException(e);
           }
           try {
-            Thread.sleep(1000 + (100 * (i + 1)));
+            Thread.sleep(100);//1000 + (100 * (i + 1)));
           }
           catch (InterruptedException e1) {
             throw new DatabaseException(e1);

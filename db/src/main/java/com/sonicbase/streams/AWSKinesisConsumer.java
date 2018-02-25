@@ -404,9 +404,17 @@ public class AWSKinesisConsumer implements StreamsConsumer {
   }
 
   @Override
-  public void acknowledgeMessage(Message message) {
-    if (messageCountSinceSavedSequence.incrementAndGet() % 1000 == 0) {
-      saveState(((KinesisMessage)message).shardId, ((KinesisMessage)message).sequenceNum);
+  public void acknowledgeMessages(List<Message> messages) {
+    for (Message message : messages) {
+      if (messageCountSinceSavedSequence.incrementAndGet() % 1000 == 0) {
+        saveState(((KinesisMessage) message).shardId, ((KinesisMessage) message).sequenceNum);
+      }
     }
   }
+
+  @Override
+  public void handleError(List<Message> messages, Exception e) {
+
+  }
+
 }

@@ -13,9 +13,14 @@ import com.sonicbase.streams.Message;
 import com.sonicbase.streams.StreamsConsumer;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.util.DateUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import sun.misc.BASE64Decoder;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStreamWriter;
 import java.math.BigDecimal;
 import java.sql.*;
 import java.sql.Date;
@@ -401,6 +406,10 @@ public class StreamManager {
     }
   }
 
+  private Object errorLogMutex = new Object();
+  private BufferedWriter errorLogWriter = null;
+  private long errorLogLastCreated = System.currentTimeMillis();
+
   private void processMessages(StreamsConsumer consumer, List<Message> messages) {
     if (messages == null || messages.size() == 0) {
       return;
@@ -412,11 +421,37 @@ public class StreamManager {
       array.add(msg.getBody());
     }
 
-    byte[] ret = server.getDatabaseClient().send(null, server.getShard(), 0, cobj, DatabaseClient.Replica.def);
-    //processMessages(cobj);
+    try {
+      byte[] ret = server.getDatabaseClient().send(null, server.getShard(), 0, cobj, DatabaseClient.Replica.def);
+      //processMessages(cobj);
 
-    for (Message messageObj : messages) {
-      consumer.acknowledgeMessage(messageObj);
+      consumer.acknowledgeMessages(messages);
+    }
+    catch (Exception e) {
+      try {
+        logger.error("Error processing messages", e);
+        synchronized (errorLogMutex) {
+          if (errorLogWriter != null && (System.currentTimeMillis() - errorLogLastCreated) > 6 * 60 * 60 * 1000) {
+            errorLogWriter.close();
+            errorLogWriter = null;
+          }
+          if (errorLogWriter == null) {
+            File file = new File(server.getDataDir(), "stream_errors/" + server.getShard() + "/" +
+                server.getReplica() + "/" + DateUtils.toString(new Date(System.currentTimeMillis())) + ".error");
+            file.getParentFile().mkdirs();
+            errorLogWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)));
+            errorLogLastCreated = System.currentTimeMillis();
+          }
+          for (Message msg : messages) {
+            errorLogWriter.write(msg.getBody() + "\n");
+          }
+          errorLogWriter.flush();
+        }
+        consumer.handleError(messages, e);
+      }
+      catch (Exception e1) {
+        throw new DatabaseException(e1);
+      }
     }
   }
 

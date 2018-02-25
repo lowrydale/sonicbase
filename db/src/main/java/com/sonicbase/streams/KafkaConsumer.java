@@ -327,12 +327,19 @@ public class KafkaConsumer implements StreamsConsumer {
   }
 
   @Override
-  public void acknowledgeMessage(Message message) {
-    partitionOffsets.put(((KafkaMessage)message).partition, ((KafkaMessage)message).offset);
+  public void acknowledgeMessages(List<Message> messages) {
+    for (Message message : messages) {
+      partitionOffsets.put(((KafkaMessage) message).partition, ((KafkaMessage) message).offset);
 
-    if (messageCountSinceSavedSequence.incrementAndGet() % 1000 == 0) {
-      saveState();
+      if (messageCountSinceSavedSequence.incrementAndGet() % 1000 == 0) {
+        saveState();
+      }
     }
+  }
+
+  @Override
+  public void handleError(List<Message> messages, Exception e) {
+
   }
 
 }

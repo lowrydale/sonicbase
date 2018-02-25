@@ -411,6 +411,12 @@ footer {
 	display: none;
 }
 
+.main-page-text {
+	margin-left: 2em;
+	margin-right: 2em;
+	font-size: 16px;
+}
+
 /* Mobile */
 @media (max-width: 320px) {
 	div.mobile { display: block }
@@ -428,6 +434,12 @@ footer {
 		font-weight: 200;
 		font-size: 5vw;
 
+	}
+
+	.main-page-text {
+		margin-left: 1em;
+		margin-right: 1em;
+		font-size: 16px;
 	}
 
 	mainPageH2 {
@@ -576,6 +588,12 @@ nav ul li {
 
 	}
 
+	.main-page-text {
+		margin-left: 1em;
+		margin-right: 1em;
+		font-size: 16px;
+	}
+
 	mainPageH2 {
 
 		color: #fff;
@@ -718,6 +736,13 @@ nav ul li {
 
 /* Small Desktops */
 @media (min-width: 768px) and (max-width: 1096px) {
+
+	.main-page-text {
+		margin-left: 1em;
+		margin-right: 1em;
+		font-size: 16px;
+	}
+
 .text_column {
 	width: 100%;
 }

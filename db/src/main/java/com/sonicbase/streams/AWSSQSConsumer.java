@@ -113,7 +113,15 @@ public class AWSSQSConsumer implements StreamsConsumer {
   }
 
   @Override
-  public void acknowledgeMessage(Message message) {
-    sqsClient.deleteMessage(url, ((AWSMessage)message).message.getReceiptHandle());
+  public void acknowledgeMessages(List<Message> messages) {
+    for (Message message : messages) {
+      sqsClient.deleteMessage(url, ((AWSMessage) message).message.getReceiptHandle());
+    }
   }
+
+  @Override
+  public void handleError(List<Message> messages, Exception e) {
+
+  }
+
 }

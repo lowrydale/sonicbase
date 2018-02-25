@@ -51,7 +51,12 @@ public class LocalConsumer implements StreamsConsumer {
   }
 
   @Override
-  public void acknowledgeMessage(Message message) {
+  public void acknowledgeMessages(List<Message> messages) {
+  }
+
+  @Override
+  public void handleError(List<Message> messages, Exception e) {
+
   }
 
 }

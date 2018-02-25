@@ -73,36 +73,36 @@
 
         <h3>Example</h3>
         <pre class="JSON"><code>
-    {
-        "dataDirectory": "$HOME/db-data",
-        "installDirectory": "$HOME/sonicbase",
-        "compressRecords": false,
-        "useUnsafe": true,
-        "maxJavaHeap": "60%",
-        "user": "ubuntu",
-        "clientIsPrivate": false,
-        "streams": {
-            "producers" : [
-            {
-                "className" : "com.sonicbase.streams.AWSSQSProducer",
-                "maxBatchSize" : 100,
-                "url" : "https://sqs.us-east-1.amazonaws.com/892217754330/benchmark-queue"
-            },
-            {
-                "className" : "com.sonicbase.streams.KafkaProducer",
-                "servers" : "10.0.0.231:9092",
-                "maxBatchSize" : 100,
-                "topic" : "test"
-            },
-            {
-                "className" : "com.sonicbase.streams.AWSKinesisProducer",
-                "region" : "us-east-1",
-                "streamName" : "sonicbase-test-stream",
-                "maxBatchSize" : 200
-            }
-            ]
+{
+    "dataDirectory": "$HOME/db-data",
+    "installDirectory": "$HOME/sonicbase",
+    "compressRecords": false,
+    "useUnsafe": true,
+    "maxJavaHeap": "60%",
+    "user": "ubuntu",
+    "clientIsPrivate": false,
+    "streams": {
+        "producers" : [
+        {
+            "className" : "com.sonicbase.streams.AWSSQSProducer",
+            "maxBatchSize" : 100,
+            "url" : "https://sqs.us-east-1.amazonaws.com/892217754330/benchmark-queue"
+        },
+        {
+            "className" : "com.sonicbase.streams.KafkaProducer",
+            "servers" : "10.0.0.231:9092",
+            "maxBatchSize" : 100,
+            "topic" : "test"
+        },
+        {
+            "className" : "com.sonicbase.streams.AWSKinesisProducer",
+            "region" : "us-east-1",
+            "streamName" : "sonicbase-test-stream",
+            "maxBatchSize" : 200
         }
+        ]
     }
+}
             </code></pre>
         <h2>Message Format</h2>
         <div class="mylink">

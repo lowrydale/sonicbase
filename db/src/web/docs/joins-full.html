@@ -81,11 +81,11 @@ the join criteria.
 
 <h3>Example</h3>
         <pre class="java"><code>
-    PreparedStatement stmt = conn.prepareStatement(
-        "select persons.id, persons.socialsecuritynumber, memberships.personId, memberships.membershipname, memberships.personid from persons
-        full outer join Memberships on persons.id = Memberships.PersonId where persons.id<2  order by persons.id desc");
-    <br/>
-    ResultSet ret = stmt.executeQuery();
+PreparedStatement stmt = conn.prepareStatement(
+    "select persons.id, persons.socialsecuritynumber, memberships.personId, memberships.membershipname, memberships.personid from persons
+    full outer join Memberships on persons.id = Memberships.PersonId where persons.id<2  order by persons.id desc");
+<br/>
+ResultSet ret = stmt.executeQuery();
             <br/>
 </code></pre>
 </div>

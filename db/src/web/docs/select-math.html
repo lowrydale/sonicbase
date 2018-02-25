@@ -101,11 +101,11 @@
 
         <h3>Examples</h3>
         <pre class="java"><code>
-    PreparedStatement stmt = conn.prepareStatement("select * from persons where id > 1 and id = id2 + 100 limit 3");
-    ResultSet ret = stmt.executeQuery();
-            <br/>
-    PreparedStatement stmt = conn.prepareStatement("select * from persons where id = id2 % 100");
-    ResultSet ret = stmt.executeQuery();
+PreparedStatement stmt = conn.prepareStatement("select * from persons where id > 1 and id = id2 + 100 limit 3");
+ResultSet ret = stmt.executeQuery();
+        <br/>
+PreparedStatement stmt = conn.prepareStatement("select * from persons where id = id2 % 100");
+ResultSet ret = stmt.executeQuery();
             </code></pre>
 
   </tbody>

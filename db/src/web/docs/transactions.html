@@ -61,73 +61,73 @@ SonicBase supports the read committed transaction isolation level.<br/>
 
 <h2>Simple Example</h2>
         <pre class="java"><code>
-    conn.setAutoCommit(false);
-    <br/>
-    PreparedStatement stmt = conn.prepareStatement("insert into persons (id) VALUES (?)");
-    <br/>
-    stmt.setLong(1, 100000);
-    int count = stmt.executeUpdate();
-    assertEquals(count, 1);
-    <br/>
-    conn.commit();<br/>
+conn.setAutoCommit(false);
+<br/>
+PreparedStatement stmt = conn.prepareStatement("insert into persons (id) VALUES (?)");
+<br/>
+stmt.setLong(1, 100000);
+int count = stmt.executeUpdate();
+assertEquals(count, 1);
+<br/>
+conn.commit();<br/>
             </code></pre>
 
 <h2>Concurrent Access Example</h2>
         <pre class="java"><code>
-    PreparedStatement stmt = conn.prepareStatement("truncate table persons");
-    stmt.execute();
-    <br/>
-    conn.setAutoCommit(false);
-    <br/>
-    stmt = conn.prepareStatement("insert into persons (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
-    stmt.setLong(1, 100);
-    stmt.setLong(2, (100) % 2);
-    stmt.setString(3, "933-28-" + (4));
-    stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
-    stmt.setBoolean(5, false);
-    stmt.setString(6, "m");
-    int count = stmt.executeUpdate();
-    assertEquals(count, 1);
-    <br/>
-    final CountDownLatch latch = new CountDownLatch(1);
-    Thread thread = new Thread(new Runnable() {
-        @Override
-        public void run() {
-            try {
-                PreparedStatement stmt = conn2.prepareStatement("update persons set id = ?, socialSecurityNumber=? where id=?");
-                stmt.setLong(1, 2000);
-                stmt.setString(2, "ssn");
-                stmt.setLong(3, 100);
-                int count = stmt.executeUpdate();
-                assertEquals(count, 0); // record not found
-            }
-            catch (Exception e) {
-                e.printStackTrace();
-            }
-            finally {
-                latch.countDown();
-            }
+PreparedStatement stmt = conn.prepareStatement("truncate table persons");
+stmt.execute();
+<br/>
+conn.setAutoCommit(false);
+<br/>
+stmt = conn.prepareStatement("insert into persons (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
+stmt.setLong(1, 100);
+stmt.setLong(2, (100) % 2);
+stmt.setString(3, "933-28-" + (4));
+stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+stmt.setBoolean(5, false);
+stmt.setString(6, "m");
+int count = stmt.executeUpdate();
+assertEquals(count, 1);
+<br/>
+final CountDownLatch latch = new CountDownLatch(1);
+Thread thread = new Thread(new Runnable() {
+    @Override
+    public void run() {
+        try {
+            PreparedStatement stmt = conn2.prepareStatement("update persons set id = ?, socialSecurityNumber=? where id=?");
+            stmt.setLong(1, 2000);
+            stmt.setString(2, "ssn");
+            stmt.setLong(3, 100);
+            int count = stmt.executeUpdate();
+            assertEquals(count, 0); // record not found
         }
-    });
-    thread.start();
-    <br/>
-    latch.await();
-    <br/>
-    stmt = conn.prepareStatement("update persons set id = ?, socialSecurityNumber=? where id=?");
-    stmt.setLong(1, 1000);
-    stmt.setString(2, "ssn");
-    stmt.setLong(3, 100);
-    count = stmt.executeUpdate();
-    assertEquals(count, 1);
-    <br/>
-    conn.commit();
-    <br/>
-    stmt = conn.prepareStatement("select * from persons where id=1000");
-    ResultSet resultSet = stmt.executeQuery();
-    assertTrue(resultSet.next());
-    assertEquals(resultSet.getLong("id"), 1000);
-    assertEquals(resultSet.getString("socialsecuritynumber"), "ssn");
-    <br/>
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+        finally {
+            latch.countDown();
+        }
+    }
+});
+thread.start();
+<br/>
+latch.await();
+<br/>
+stmt = conn.prepareStatement("update persons set id = ?, socialSecurityNumber=? where id=?");
+stmt.setLong(1, 1000);
+stmt.setString(2, "ssn");
+stmt.setLong(3, 100);
+count = stmt.executeUpdate();
+assertEquals(count, 1);
+<br/>
+conn.commit();
+<br/>
+stmt = conn.prepareStatement("select * from persons where id=1000");
+ResultSet resultSet = stmt.executeQuery();
+assertTrue(resultSet.next());
+assertEquals(resultSet.getLong("id"), 1000);
+assertEquals(resultSet.getString("socialsecuritynumber"), "ssn");
+<br/>
             </code></pre>
 </div>
 </div>

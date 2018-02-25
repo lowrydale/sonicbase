@@ -77,11 +77,11 @@ Describes a table. In addition to the table, the indices associated with that ta
 <br/>
 <h3>Example</h3>
         <pre class="java"><code>
-    PreparedStatement stmt = conn.prepareStatement("describe table persons")
-    ResultSet rs = stmt.executeQuery();
-    while (rs.next()) {
-        System.out.println(rs.getString(1));
-    }<br/>
+PreparedStatement stmt = conn.prepareStatement("describe table persons")
+ResultSet rs = stmt.executeQuery();
+while (rs.next()) {
+    System.out.println(rs.getString(1));
+}<br/>
             </code></pre>
 <br/>
 </div>

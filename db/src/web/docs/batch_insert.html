@@ -77,13 +77,13 @@ over a standard insert. A batch size of 100 may be effective.<br/>
 
 <h3>Example</h3>
 		<pre class="java"><code>
-	PreparedStatement stmt = conn.prepareStatement("insert into persons (name, age, occupation) values ('bob', ?, ?)")
-	for (int i = 0; i < 100; i++) {
-		stmt.setInt(1, i);
-		stmt.setString(2, "artist");
-		stmt.addBatch();
-	}
-	stmt.executeBatch()<br/>
+PreparedStatement stmt = conn.prepareStatement("insert into persons (name, age, occupation) values ('bob', ?, ?)")
+for (int i = 0; i < 100; i++) {
+	stmt.setInt(1, i);
+	stmt.setString(2, "artist");
+	stmt.addBatch();
+}
+stmt.executeBatch()<br/>
 </code></pre>
 <br/>
 </div>

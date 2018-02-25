@@ -70,33 +70,33 @@ The config file must be named "config-&lt;cluster name&gt;.json".
 
 <h2>Example</h2>
      <pre class="JSON"><code>
-    {
-        "dataDirectory": "$HOME/db-data",
-        "installDirectory": "$HOME/sonicbase",
-        "compressRecords": false,
-        "useUnsafe": true,
-        "maxJavaHeap": "60%",
-        "user": "ubuntu",
-        "clientIsPrivate": false,
-        "shards" : [
-            {
-                "replicas": [
-                    {
-                        "privateAddress": "localhost",
-                        "publicAddress": "localhost",
-                        "port": 9010
-                    }
-                ]
-            },
-         ],
-        "clients" : [
-            {
-                "privateAddress": "localhost",
-                "publicAddress": "localhost",
-                "port": 8080
-            }
-        ]
-    }
+{
+    "dataDirectory": "$HOME/db-data",
+    "installDirectory": "$HOME/sonicbase",
+    "compressRecords": false,
+    "useUnsafe": true,
+    "maxJavaHeap": "60%",
+    "user": "ubuntu",
+    "clientIsPrivate": false,
+    "shards" : [
+        {
+            "replicas": [
+                {
+                    "privateAddress": "localhost",
+                    "publicAddress": "localhost",
+                    "port": 9010
+                }
+            ]
+        },
+     ],
+    "clients" : [
+        {
+            "privateAddress": "localhost",
+            "publicAddress": "localhost",
+            "port": 8080
+        }
+    ]
+}
 </code></pre>
 <h2>Elements</h2>
   <b>dataDirectory</b> - path to the location of the database files. Note on Windows you will need to escape the

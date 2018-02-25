@@ -74,18 +74,18 @@ Returns OS statistics from all the servers.
 <br/>
 <h3>Example</h3>
         <pre class="java"><code>
-    PreparedStatement stmt = conn.prepareStatement("describe server stats")
-    ResultSet rs = stmt.executeQuery();
-    while (rs.next()) {
-        System.out.println("Host: " + rs.getString("host"))
-        System.out.println("CPU %: " + rs.getString("cpu"))
-        System.out.println("ResMem Gig: " + rs.getString("resGig"))
-        System.out.println("Java Mem Min Gig: " + rs.getString("javaMemMin"))
-        System.out.println("Java Mem Max Gig: " + rs.getString("javaMemMax"))
-        System.out.println("Net In GByte: " + rs.getString("receive"))
-        System.out.println("Net Out GByte: " + rs.getString("transmit"))
-        System.out.println("Disk Avail Gig: " + rs.getString("diskAvail"))
-    }<br/>
+PreparedStatement stmt = conn.prepareStatement("describe server stats")
+ResultSet rs = stmt.executeQuery();
+while (rs.next()) {
+    System.out.println("Host: " + rs.getString("host"))
+    System.out.println("CPU %: " + rs.getString("cpu"))
+    System.out.println("ResMem Gig: " + rs.getString("resGig"))
+    System.out.println("Java Mem Min Gig: " + rs.getString("javaMemMin"))
+    System.out.println("Java Mem Max Gig: " + rs.getString("javaMemMax"))
+    System.out.println("Net In GByte: " + rs.getString("receive"))
+    System.out.println("Net Out GByte: " + rs.getString("transmit"))
+    System.out.println("Disk Avail Gig: " + rs.getString("diskAvail"))
+}<br/>
             </code></pre>
 <br/>
 </div>

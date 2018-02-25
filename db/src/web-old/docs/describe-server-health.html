@@ -74,15 +74,15 @@ Returns health status from all the servers.
 <br/>
 <h3>Example</h3>
         <pre class="java"><code>
-    PreparedStatement stmt = conn.prepareStatement("describe server health")
-    ResultSet rs = stmt.executeQuery();
-    while (rs.next()) {
-        System.out.println("Host: " + rs.getString("host"))
-        System.out.println("Shard: " + rs.getString("shard"))
-        System.out.println("Replica: " + rs.getString("replica"))
-        System.out.println("Dead: " + rs.getString("dead"))
-        System.out.println("Master: " + rs.getString("master"))
-    }<br/>
+PreparedStatement stmt = conn.prepareStatement("describe server health")
+ResultSet rs = stmt.executeQuery();
+while (rs.next()) {
+    System.out.println("Host: " + rs.getString("host"))
+    System.out.println("Shard: " + rs.getString("shard"))
+    System.out.println("Replica: " + rs.getString("replica"))
+    System.out.println("Dead: " + rs.getString("dead"))
+    System.out.println("Master: " + rs.getString("master"))
+}<br/>
             </code></pre>
 <br/>
 </div>

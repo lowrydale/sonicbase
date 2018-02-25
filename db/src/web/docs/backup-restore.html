@@ -64,36 +64,36 @@
         be located on a shared drive or be a local drive. If the directory is shared you must
         specify this with the "sharedDirectory" setting.<br/>
         <pre class="JSON"><code>
-    {
-        "dataDirectory": "$HOME/db-data",
-        "installDirectory": "$HOME/sonicbase",
-        ...
-        "backup": {
-            "type": "fileSystem",
-            "directory": "$HOME/db-backup",
-            "sharedDirectory": true,
-            "maxBackupCount": 10,
-            "cronSchedule": "0 0 * * *"
-        }
+{
+    "dataDirectory": "$HOME/db-data",
+    "installDirectory": "$HOME/sonicbase",
+    ...
+    "backup": {
+        "type": "fileSystem",
+        "directory": "$HOME/db-backup",
+        "sharedDirectory": true,
+        "maxBackupCount": 10,
+        "cronSchedule": "0 0 * * *"
     }
+}
 </code></pre>
 
         <h3>AWS Backup</h3>
         The following configuration is used for the AWS backup. Files will be backed up to S3 using
         the specified bucket and prefix.<br/>
         <pre class="JSON"><code>
-    {
-        "dataDirectory": "$HOME/db-data",
-        "installDirectory": "$HOME/sonicbase",
-        ...
-        "backup": {
-            "type": "AWS",
-            "bucket": "bucket-name",
-            "prefix": "backups",
-            "maxBackupCount": 10
-            "cronSchedule": "0 0 * * *"
-        }
+{
+    "dataDirectory": "$HOME/db-data",
+    "installDirectory": "$HOME/sonicbase",
+    ...
+    "backup": {
+        "type": "AWS",
+        "bucket": "bucket-name",
+        "prefix": "backups",
+        "maxBackupCount": 10
+        "cronSchedule": "0 0 * * *"
     }
+}
 </code></pre>
         <br/>
         In order for AWS integration to work you must have a file named "&lt;cluster&gt;-awskeys" located in the

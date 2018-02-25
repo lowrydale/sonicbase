@@ -81,11 +81,11 @@ the left then null is returned for the left side.
 
 <h3>Example</h3>
         <pre class="java"><code>
-    PreparedStatement stmt = conn.prepareStatement(
-        "select persons.id, persons.socialsecuritynumber, memberships.personId, memberships.membershipname from persons
-        right outer join Memberships on persons.id = Memberships.PersonId where persons.id<2  order by persons.id desc");
-    <br/>
-    ResultSet ret = stmt.executeQuery();<br/>
+PreparedStatement stmt = conn.prepareStatement(
+    "select persons.id, persons.socialsecuritynumber, memberships.personId, memberships.membershipname from persons
+    right outer join Memberships on persons.id = Memberships.PersonId where persons.id<2  order by persons.id desc");
+<br/>
+ResultSet ret = stmt.executeQuery();<br/>
 </code></pre>
 </div>
 </div>

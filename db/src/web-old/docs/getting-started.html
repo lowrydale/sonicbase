@@ -131,17 +131,17 @@ You should see the inserted record displayed in the client.
 Create and run the following class:<br/>
 <br/>
 <pre class="java"><code>
-    package foo;<br/>
-    class Test {
-        public static void main(String[] args) {
-            Class.forName("Driver");
-            Connection conn = DriverManager.getConnection("jdbc:sonicbase:localhost;:9010/db");
-            PreparedStatement stmt = conn.prepareStatement("select * from persons");
-            ResultSet rs = stmt.executeQuery();
-            rs.next();
-            System.out.println(rs.getString("name") + " " + rs.getInt("age") + " " + rs.getString("ssn"));
-        }
+package foo;<br/>
+class Test {
+    public static void main(String[] args) {
+        Class.forName("Driver");
+        Connection conn = DriverManager.getConnection("jdbc:sonicbase:localhost;:9010/db");
+        PreparedStatement stmt = conn.prepareStatement("select * from persons");
+        ResultSet rs = stmt.executeQuery();
+        rs.next();
+        System.out.println(rs.getString("name") + " " + rs.getInt("age") + " " + rs.getString("ssn"));
     }
+}
     </code></pre>
 <h2>Stop Cluster</h2>
 In the client, type:<br/>

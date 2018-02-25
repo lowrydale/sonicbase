@@ -102,19 +102,19 @@ Connect to the database with the following code:<br/>
         C3P0 is a good connection pool to use. Below is an example of how to use it:<br/>
         <br/>
         <pre class="java"><code>
-    ComboPooledDataSource cpds = new ComboPooledDataSource();
-    cpds.setDriverClass("Driver");
-    cpds.setJdbcUrl("jdbc:sonicbase:localhost:9010/db");
+ComboPooledDataSource cpds = new ComboPooledDataSource();
+cpds.setDriverClass("Driver");
+cpds.setJdbcUrl("jdbc:sonicbase:localhost:9010/db");
 <br/>
-    cpds.setMinPoolSize(5);
-    cpds.setAcquireIncrement(1);
-    cpds.setMaxPoolSize(20);
+cpds.setMinPoolSize(5);
+cpds.setAcquireIncrement(1);
+cpds.setMaxPoolSize(20);
 <br/>
-    //aquire connection
-    Connection conn = cpds.getConnection();
-    <br/>
-    //release connection
-    conn.close();
+//aquire connection
+Connection conn = cpds.getConnection();
+<br/>
+//release connection
+conn.close();
             </code></pre>
 </div>
 </div>

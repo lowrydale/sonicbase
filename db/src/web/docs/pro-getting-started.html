@@ -74,51 +74,51 @@
         With the Pro version, you may add replicas to your shards. The following example partial
         configuration shows how to create a cluster with two shards, each having three replicas.<br/>
         <pre class="JSON"><code>
-    {
-        "dataDirectory": "$HOME/db-data",
-        "installDirectory": "$HOME/sonicbase",
-        ...
-        "shards" : [
-            {
-                "replicas": [
-                    {
-                        "privateAddress": "localhost",
-                        "publicAddress": "localhost",
-                        "port": 9010
-                    },
-                    {
-                        "privateAddress": "localhost",
-                        "publicAddress": "localhost",
-                        "port": 9020
-                    },
-                    {
-                        "privateAddress": "localhost",
-                        "publicAddress": "localhost",
-                        "port": 9030
-                    }
-                ]
-            },
-            {
-                "replicas": [
-                    {
-                        "privateAddress": "localhost",
-                        "publicAddress": "localhost",
-                        "port": 9040
-                    },
-                    {
-                        "privateAddress": "localhost",
-                        "publicAddress": "localhost",
-                        "port": 9050
-                    },
-                    {
-                        "privateAddress": "localhost",
-                        "publicAddress": "localhost",
-                        "port": 9060
-                    }
-                ]
-            }
-        ]
-    }
+{
+    "dataDirectory": "$HOME/db-data",
+    "installDirectory": "$HOME/sonicbase",
+    ...
+    "shards" : [
+        {
+            "replicas": [
+                {
+                    "privateAddress": "localhost",
+                    "publicAddress": "localhost",
+                    "port": 9010
+                },
+                {
+                    "privateAddress": "localhost",
+                    "publicAddress": "localhost",
+                    "port": 9020
+                },
+                {
+                    "privateAddress": "localhost",
+                    "publicAddress": "localhost",
+                    "port": 9030
+                }
+            ]
+        },
+        {
+            "replicas": [
+                {
+                    "privateAddress": "localhost",
+                    "publicAddress": "localhost",
+                    "port": 9040
+                },
+                {
+                    "privateAddress": "localhost",
+                    "publicAddress": "localhost",
+                    "port": 9050
+                },
+                {
+                    "privateAddress": "localhost",
+                    "publicAddress": "localhost",
+                    "port": 9060
+                }
+            ]
+        }
+    ]
+}
             </code></pre>
 </div>
 </div>

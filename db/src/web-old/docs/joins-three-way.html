@@ -80,12 +80,12 @@ Performs a join between three tables.
 
 <h3>Example</h3>
         <pre class="java"><code>
-    PreparedStatement stmt = conn.prepareStatement(
-        "select id, socialsecuritynumber, memberships.personId, memberships.membershipname, resorts.resortname
-        from persons inner join Memberships on persons.id = Memberships.PersonId inner join resorts on memberships.resortid = resorts.resortId
-        where persons.id<2  order by persons.id desc, memberships.membershipname desc, resorts.resortname asc");
-    <br/>
-    ResultSet ret = stmt.executeQuery();<br/>
+PreparedStatement stmt = conn.prepareStatement(
+    "select id, socialsecuritynumber, memberships.personId, memberships.membershipname, resorts.resortname
+    from persons inner join Memberships on persons.id = Memberships.PersonId inner join resorts on memberships.resortid = resorts.resortId
+    where persons.id<2  order by persons.id desc, memberships.membershipname desc, resorts.resortname asc");
+<br/>
+ResultSet ret = stmt.executeQuery();<br/>
 </code></pre>
 </div>
 </div>

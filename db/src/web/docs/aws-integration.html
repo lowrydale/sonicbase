@@ -70,14 +70,14 @@ To build your config file type "build config" in the client.<br/>
         servers and clients with code like the following:<br/><br/>
 
         <pre class="java"><code>
-        ArrayList&lt;Tag&gt; requestTags = new ArrayList&lt;<>&gt;();
-        requestTags.add(new Tag("sonicbase-server, "my-cluster"));
+ArrayList&lt;Tag&gt; requestTags = new ArrayList&lt;<>&gt;();
+requestTags.add(new Tag("sonicbase-server, "my-cluster"));
 <br/>
-        CreateTagsRequest createTagsRequest_requests = new CreateTagsRequest();
-        createTagsRequest_requests.setResources(instanceIds);
-        createTagsRequest_requests.setTags(requestTags);
+CreateTagsRequest createTagsRequest_requests = new CreateTagsRequest();
+createTagsRequest_requests.setResources(instanceIds);
+createTagsRequest_requests.setTags(requestTags);
 <br/>
-        ec2.createTags(createTagsRequest_requests);<br/>
+ec2.createTags(createTagsRequest_requests);<br/>
 </code></pre>
         <h2>Prerequisites</h2>
 In order for AWS integration to work you must have a file named "&lt;cluster&gt;-awskeys" located in the

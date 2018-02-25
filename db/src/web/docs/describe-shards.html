@@ -75,11 +75,11 @@ the boundaries for each shard are returned<br/>
 
 <h3>Example</h3>
         <pre class="java"><code>
-    PreparedStatement stmt = conn.prepareStatement("describe shards")
-    ResultSet rs = stmt.executeQuery();
-    while (rs.next()) {
-        System.out.println(rs.getString(1))
-    }<br/>
+PreparedStatement stmt = conn.prepareStatement("describe shards")
+ResultSet rs = stmt.executeQuery();
+while (rs.next()) {
+    System.out.println(rs.getString(1))
+}<br/>
             </code></pre>
 <br/>
 </div>

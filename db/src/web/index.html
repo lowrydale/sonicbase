@@ -225,16 +225,19 @@
     you to quickly load SonicBase and do analytics on your data. See <a href="docs/automated-bulk-import.html">Automated Bulk Import Documentation</a>.
     </div>
     <h2>Streaming (new)</h2>
+    Streaming allows you to injest data into the database and export it in real-time into external data stores. You could, for example, hook into
+    a financial stream to provide up to the second quotes to your database. Analytics can then be performed on the data in SonicBase. Or perhaps
+    you wan to replicate you SonicBase database to an external data store. There are many possibilities. Streaming is high-performance real-time data transfer.
     <h3>Consumers</h3>
     <div class="mylink">
-      You can connect to Kafka, Amazon Web Services Kinesis, Amazon Web Services Simple Queue Service and custom streams providers. The streams
+      You can connect to Kafka, Amazon Web Services Kinesis, Amazon Web Services Simple Queue Service and custom streams providers. The streaming
       consumer can load your SonicBase
-      database in real-time, while you perform analytics functions on your SonicBase database. See <a href="docs/streams-integration-consumer.html">Streaming Consumers</a>.
+      database in real-time, while you perform analytics functions on your SonicBase database. See <a href="docs/streaming-consumer.html">Streaming Consumers</a>.
     </div>
     <h3>Producers</h3>
     <div class="mylink">
     You can hook Kafka, Amazon Web Services Kinesis, Amazon Web Services Simple Queue Service and custom streams providers into SonicBase so that all inserts, updates and deletes will be published into your
-    streams. See <a href="docs/streams-integration-producer.html">Streaming Producers</a>.
+    streams. See <a href="docs/streaming-producer.html">Streaming Producers</a>.
     </div>
       <h2>Coming Soon</h2>
       You will be able to automatically remove data that has been in the database for a specified amount of time. This will allow you to continuously

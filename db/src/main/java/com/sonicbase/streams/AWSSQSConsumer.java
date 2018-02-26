@@ -1,8 +1,12 @@
 package com.sonicbase.streams;
 
 import com.amazonaws.ClientConfiguration;
+import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
+import com.amazonaws.auth.InstanceProfileCredentialsProvider;
+import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClient;
+import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
 import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
 import com.amazonaws.services.sqs.model.ReceiveMessageResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,7 +25,7 @@ public class AWSSQSConsumer implements StreamsConsumer {
   private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger(AWSSQSConsumer.class);
 
   private String url;
-  private AmazonSQSClient sqsClient;
+  private AmazonSQS sqsClient;
   private boolean shutdown;
 
   class AWSMessage extends Message {
@@ -48,27 +52,34 @@ public class AWSSQSConsumer implements StreamsConsumer {
     try {
       logger.info("aws sqs init - begin");
       final ClientConfiguration clientConfig = new ClientConfiguration();
-      clientConfig.setMaxConnections(10);
+      clientConfig.setMaxConnections(100);
       clientConfig.setRequestTimeout(20_000);
       clientConfig.setConnectionTimeout(60_000);
+
+      AmazonSQSClientBuilder builder = AmazonSQSClient.builder();
 
       ObjectMapper mapper = new ObjectMapper();
       ObjectNode config = (ObjectNode) mapper.readTree(jsonConfig);
       File installDir = getInstallDir(config);
       File keysFile = new File(installDir, "/keys/" + cluster + "-awskeys");
       if (!keysFile.exists()) {
-        throw new DatabaseException(cluster + "-awskeys file not found");
+        builder.setCredentials(new InstanceProfileCredentialsProvider(true));
       }
-      try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(keysFile)))) {
-        String accessKey = reader.readLine();
-        String secretKey = reader.readLine();
+      else {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(keysFile)))) {
+          String accessKey = reader.readLine();
+          String secretKey = reader.readLine();
 
-        BasicAWSCredentials awsCredentials = new BasicAWSCredentials(accessKey, secretKey);
-        sqsClient = new AmazonSQSClient(awsCredentials, clientConfig);
+          BasicAWSCredentials awsCredentials = new BasicAWSCredentials(accessKey, secretKey);
+          builder.setCredentials(new AWSStaticCredentialsProvider(awsCredentials));
+        }
+        catch (IOException e) {
+          throw new DatabaseException(e);
+        }
       }
-      catch (IOException e) {
-        throw new DatabaseException(e);
-      }
+      builder.setClientConfiguration(clientConfig);
+      sqsClient = builder.build();
+
       ObjectNode queueConfig = (ObjectNode) mapper.readTree(jsonQueueConfig);
       url = queueConfig.get("url").asText();
 

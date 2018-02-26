@@ -1,10 +1,10 @@
 cd ~/
 #delete extraneous config files
 rm sonicbase/keys/*
-zip -r sonicbase-1.2.9.zip sonicbase
-tar -czvf sonicbase-1.2.9.tgz sonicbase
-aws s3 cp sonicbase-1.2.9.tgz s3://sonicbase-downloads
-aws s3 cp sonicbase-1.2.9.zip s3://sonicbase-downloads
+zip -r sonicbase-1.2.10.zip sonicbase
+tar -czvf sonicbase-1.2.10.tgz sonicbase
+aws s3 cp sonicbase-1.2.10.tgz s3://sonicbase-downloads
+aws s3 cp sonicbase-1.2.10.zip s3://sonicbase-downloads
 echo $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 echo DID YOU OBFUSCATE THE JAR?
 echo $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$

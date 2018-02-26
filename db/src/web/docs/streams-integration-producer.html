@@ -124,7 +124,7 @@ package com.sonicbase.streams;<br/>
 
 public interface StreamProducer {<br/>
 
-    void init(String cluster, String jsonConfig, String jsonQueueConfig);<br/>
+    void init(String cluster, String jsonConfig, String jsonStreamConfig);<br/>
 
     void publish(List&lt;String&gt; messages);<br/>
 
@@ -143,69 +143,76 @@ public interface StreamProducer {<br/>
         SonicBase. For your provider to work, you must place the jar containing your code and any dependencies in the "lib"
         directory under the install directory and deploy it across the cluster.<br/>
         <pre class="java"><code>
-package com.sonicbase.streams;<br/>
+package com.sonicbase.streams;
 
-public class AWSSQSProducer implements StreamsProducer {<br/>
+public class AWSSQSProducer implements StreamsProducer {
 
-  private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger(AWSSQSProducer.class);<br/>
+  private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger(AWSSQSProducer.class);
 
   private String url;
-  private AmazonSQSClient sqsClient;<br/>
+  private AmazonSQS sqsClient;
 
   public File getInstallDir(ObjectNode config) {
     String dir = config.get("installDirectory").asText();
     return new File(dir.replace("$HOME", System.getProperty("user.home")));
-  }<br/>
+  }
 
   @Override
-  public void init(String cluster, String jsonConfig, String jsonQueueConfig) {
+  public void init(String cluster, String jsonConfig, String jsonStreamConfig) {
     try {
       logger.info("aws sqs producer init - begin");
       final ClientConfiguration clientConfig = new ClientConfiguration();
-      clientConfig.setMaxConnections(1000);
+      clientConfig.setMaxConnections(100);
       clientConfig.setRequestTimeout(20_000);
-      clientConfig.setConnectionTimeout(60_000);<br/>
+      clientConfig.setConnectionTimeout(60_000);
+
+      AmazonSQSClientBuilder builder = AmazonSQSClient.builder();
 
       ObjectMapper mapper = new ObjectMapper();
       ObjectNode config = (ObjectNode) mapper.readTree(jsonConfig);
       File installDir = getInstallDir(config);
       File keysFile = new File(installDir, "/keys/" + cluster + "-awskeys");
       if (!keysFile.exists()) {
-        throw new DatabaseException(cluster + "-awskeys file not found");
+        builder.setCredentials(new InstanceProfileCredentialsProvider(true));
       }
-      try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(keysFile)))) {
-        String accessKey = reader.readLine();
-        String secretKey = reader.readLine();<br/>
+      else {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(keysFile)))) {
+          String accessKey = reader.readLine();
+          String secretKey = reader.readLine();
 
-        BasicAWSCredentials awsCredentials = new BasicAWSCredentials(accessKey, secretKey);
-        sqsClient = new AmazonSQSClient(awsCredentials, clientConfig);
+          BasicAWSCredentials awsCredentials = new BasicAWSCredentials(accessKey, secretKey);
+          builder.setCredentials(new AWSStaticCredentialsProvider(awsCredentials));
+        }
+        catch (IOException e) {
+          throw new DatabaseException(e);
+        }
       }
-      catch (IOException e) {
-        throw new DatabaseException(e);
-      }
-      ObjectNode queueConfig = (ObjectNode) mapper.readTree(jsonQueueConfig);
-      url = queueConfig.get("url").asText();<br/>
+      builder.setClientConfiguration(clientConfig);
+      sqsClient = builder.build();
+
+      ObjectNode streamConfig = (ObjectNode) mapper.readTree(jsonStreamConfig);
+      url = streamConfig.get("url").asText();
 
       logger.info("aws sqs producer init - end");
     }
     catch (Exception e) {
       throw new DatabaseException(e);
     }
-  }<br/>
+  }
 
   @Override
-  public void publish(List<String> messages) {
+  public void publish(List&lt;String&gt; messages) {
     try {
-      Map<String, MessageAttributeValue> attributes = new HashMap<>();
-      List<SendMessageBatchRequestEntry> entries = new ArrayList<>();
+      Map&lt;String, MessageAttributeValue&gt; attributes = new HashMap&lt;&gt;();
+      List&lt;SendMessageBatchRequestEntry&gt; entries = new ArrayList&lt;&gt;();
       int offset = 0;
       for (String message : messages) {
-        SendMessageBatchRequestEntry entry = new SendMessageBatchRequestEntry();<br/>
+        SendMessageBatchRequestEntry entry = new SendMessageBatchRequestEntry();
 
         ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
         GZIPOutputStream out = new GZIPOutputStream(bytesOut);
         out.write(message.getBytes("utf-8"));
-        out.close();<br/>
+        out.close();
 
         entry.setId(String.valueOf(offset));
         entry.setMessageBody("SonicBase Publish");
@@ -215,13 +222,13 @@ public class AWSSQSProducer implements StreamsProducer {<br/>
         entries.add(entry);
         offset++;
       }
-      SendMessageBatchResult result = sqsClient.sendMessageBatch(url, entries);<br/>
+      SendMessageBatchResult result = sqsClient.sendMessageBatch(url, entries);
 
-      List<BatchResultErrorEntry> failed = result.getFailed();
+      List&lt;BatchResultErrorEntry&gt; failed = result.getFailed();
       for (int i = 0; i < 10 && !failed.isEmpty(); i++) {
-        entries.clear();<br/>
+        entries.clear();
 
-        logger.error("Error publishing message: count=" + failed.size());<br/>
+        logger.error("Error publishing message: count=" + failed.size());
 
         for (BatchResultErrorEntry curr : failed) {
           SendMessageBatchRequestEntry entry = new SendMessageBatchRequestEntry();
@@ -229,10 +236,10 @@ public class AWSSQSProducer implements StreamsProducer {<br/>
           String id = curr.getId();
           entry.addMessageAttributesEntry("message", attributes.get(id));
           entries.add(entry);
-        }<br/>
+        }
 
         result = sqsClient.sendMessageBatch(url, entries);
-        failed = result.getFailed();<br/>
+        failed = result.getFailed();
 
         if (i == 9 && !failed.isEmpty()) {
           throw new DatabaseException("Error publishing message: count=" + failed.size());
@@ -242,7 +249,7 @@ public class AWSSQSProducer implements StreamsProducer {<br/>
     catch (Exception e) {
       throw new DatabaseException(e);
     }
-  }<br/>
+  }
 
   @Override
   public void shutdown() {

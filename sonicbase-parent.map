@@ -602,21 +602,21 @@ com.sonicbase.common.AWSClient -> com.sonicbase.common.a:
     java.io.File installDir -> c
     com.amazonaws.services.s3.transfer.TransferManager transferManager -> d
     java.util.concurrent.ThreadPoolExecutor executor -> e
-    32:39:void <init>(com.sonicbase.client.DatabaseClient) -> <init>
-    43:67:com.amazonaws.services.s3.transfer.TransferManager getTransferManager() -> a
-    73:83:com.fasterxml.jackson.databind.node.ObjectNode getConfig() -> e
-    88:93:java.io.File getInstallDir() -> b
-    97:117:com.amazonaws.services.s3.AmazonS3 getS3Client() -> c
-    122:141:com.amazonaws.services.sqs.AmazonSQSClient getSQSClient() -> d
-    146:166:void deleteDirectory(java.lang.String,java.lang.String) -> a
-    170:227:void uploadDirectory(java.lang.String,java.lang.String,java.lang.String,java.io.File) -> a
-    230:250:void uploadFile(java.lang.String,java.lang.String,java.lang.String,java.io.File) -> b
-    253:266:void downloadFile(java.lang.String,java.lang.String,java.lang.String,java.io.File) -> c
-    269:285:void downloadFile(java.lang.String,java.lang.String,java.io.File) -> a
-    288:300:byte[] downloadBytes(java.lang.String,java.lang.String) -> b
-    305:421:void downloadDirectory(java.lang.String,java.lang.String,java.lang.String,java.io.File) -> d
-    424:463:java.util.List listDirectSubdirectories(java.lang.String,java.lang.String) -> c
-    468:487:long getDirectorySize(java.lang.String,java.lang.String,java.lang.String) -> a
+    33:40:void <init>(com.sonicbase.client.DatabaseClient) -> <init>
+    44:68:com.amazonaws.services.s3.transfer.TransferManager getTransferManager() -> a
+    74:84:com.fasterxml.jackson.databind.node.ObjectNode getConfig() -> e
+    89:94:java.io.File getInstallDir() -> b
+    99:120:com.amazonaws.services.s3.AmazonS3 getS3Client() -> c
+    126:146:com.amazonaws.services.sqs.AmazonSQSClient getSQSClient() -> d
+    152:172:void deleteDirectory(java.lang.String,java.lang.String) -> a
+    176:233:void uploadDirectory(java.lang.String,java.lang.String,java.lang.String,java.io.File) -> a
+    236:256:void uploadFile(java.lang.String,java.lang.String,java.lang.String,java.io.File) -> b
+    259:272:void downloadFile(java.lang.String,java.lang.String,java.lang.String,java.io.File) -> c
+    275:291:void downloadFile(java.lang.String,java.lang.String,java.io.File) -> a
+    294:306:byte[] downloadBytes(java.lang.String,java.lang.String) -> b
+    311:427:void downloadDirectory(java.lang.String,java.lang.String,java.lang.String,java.io.File) -> d
+    430:469:java.util.List listDirectSubdirectories(java.lang.String,java.lang.String) -> c
+    474:493:long getDirectorySize(java.lang.String,java.lang.String,java.lang.String) -> a
 com.sonicbase.common.ComArray -> com.sonicbase.common.ComArray:
     com.sonicbase.common.ComObject$DynamicType nestedType -> a
     java.util.List array -> b
@@ -999,10 +999,10 @@ com.sonicbase.common.Logger -> com.sonicbase.common.g:
     109:110:void disable() -> b
     125:131:void info(java.lang.String) -> a
     134:140:void warn(java.lang.String) -> b
-    144:172:void error(java.lang.String,java.lang.Throwable) -> b
-    175:176:void error(java.lang.String) -> c
-    180:195:void sendErrorToServer(java.lang.String,java.lang.Throwable) -> c
-    198:199:void setIsClient(boolean) -> b
+    144:177:void error(java.lang.String,java.lang.Throwable) -> b
+    180:181:void error(java.lang.String) -> c
+    185:205:void sendErrorToServer(java.lang.String,java.lang.Throwable) -> c
+    208:209:void setIsClient(boolean) -> b
     15:15:boolean access$000() -> c
     15:15:java.lang.String access$100() -> d
     15:15:org.apache.log4j.Logger access$200() -> e
@@ -6058,67 +6058,68 @@ com.sonicbase.server.StreamManager -> com.sonicbase.server.i:
     java.sql.Connection sysConnection -> b
     boolean streamingHasBeenStarted -> j
     java.util.concurrent.ConcurrentLinkedQueue consumers -> k
-    33:169:void <init>(com.sonicbase.server.DatabaseServer) -> <init>
-    96:125:java.sql.Connection initSysConnection(com.fasterxml.jackson.databind.node.ObjectNode) -> a
-    130:156:void initStreamsConsumerTable(java.sql.Connection) -> a
-    161:161:boolean isStreamingStarted() -> a
-    173:263:com.sonicbase.common.ComObject startStreaming(com.sonicbase.common.ComObject) -> a
-    269:283:void shutdownConsumers() -> b
-    286:376:void initConsumers(com.fasterxml.jackson.databind.node.ObjectNode,com.fasterxml.jackson.databind.node.ObjectNode) -> a
-    379:400:boolean readActiveStatus() -> c
-    406:422:void processMessages(com.sonicbase.streams.StreamsConsumer,java.util.List) -> a
-    425:620:com.sonicbase.common.ComObject processMessages(com.sonicbase.common.ComObject) -> b
-    624:648:com.sonicbase.common.ComObject stopStreaming(com.sonicbase.common.ComObject) -> c
-    652:659:void initConnection(java.lang.String) -> a
-    663:677:java.sql.Connection doInitConnection(java.lang.String) -> b
-    691:978:java.lang.Object[] getCurrRecordFromJson(com.fasterxml.jackson.databind.JsonNode,java.util.List) -> a
-    29:29:boolean access$000(com.sonicbase.server.StreamManager) -> a
-    29:29:boolean access$100(com.sonicbase.server.StreamManager) -> b
-    29:29:boolean access$200(com.sonicbase.server.StreamManager) -> c
-    29:29:boolean access$202(com.sonicbase.server.StreamManager,boolean) -> a
-    29:29:com.sonicbase.common.Logger access$300(com.sonicbase.server.StreamManager) -> d
-    29:29:void access$400(com.sonicbase.server.StreamManager) -> e
-    29:29:void access$500(com.sonicbase.server.StreamManager,com.fasterxml.jackson.databind.node.ObjectNode,com.fasterxml.jackson.databind.node.ObjectNode) -> a
-    29:29:void access$800(com.sonicbase.server.StreamManager,com.sonicbase.streams.StreamsConsumer,java.util.List) -> a
-    29:29:com.sonicbase.server.DatabaseServer access$1200(com.sonicbase.server.StreamManager) -> f
+    java.lang.Object errorLogMutex -> l
+    java.io.BufferedWriter errorLogWriter -> m
+    long errorLogLastCreated -> n
+    37:411:void <init>(com.sonicbase.server.DatabaseServer) -> <init>
+    100:129:java.sql.Connection initSysConnection(com.fasterxml.jackson.databind.node.ObjectNode) -> a
+    134:160:void initStreamsConsumerTable(java.sql.Connection) -> a
+    165:165:boolean isStreamingStarted() -> a
+    177:267:com.sonicbase.common.ComObject startStreaming(com.sonicbase.common.ComObject) -> a
+    273:287:void shutdownConsumers() -> b
+    290:380:void initConsumers(com.fasterxml.jackson.databind.node.ObjectNode,com.fasterxml.jackson.databind.node.ObjectNode) -> a
+    383:404:boolean readActiveStatus() -> c
+    414:456:void processMessages(com.sonicbase.streams.StreamsConsumer,java.util.List) -> a
+    459:654:com.sonicbase.common.ComObject processMessages(com.sonicbase.common.ComObject) -> b
+    658:682:com.sonicbase.common.ComObject stopStreaming(com.sonicbase.common.ComObject) -> c
+    686:693:void initConnection(java.lang.String) -> a
+    697:711:java.sql.Connection doInitConnection(java.lang.String) -> b
+    724:1018:java.lang.Object[] getCurrRecordFromJson(com.fasterxml.jackson.databind.JsonNode,java.util.List) -> a
+    33:33:boolean access$000(com.sonicbase.server.StreamManager) -> a
+    33:33:boolean access$100(com.sonicbase.server.StreamManager) -> b
+    33:33:boolean access$200(com.sonicbase.server.StreamManager) -> c
+    33:33:boolean access$202(com.sonicbase.server.StreamManager,boolean) -> a
+    33:33:com.sonicbase.common.Logger access$300(com.sonicbase.server.StreamManager) -> d
+    33:33:void access$400(com.sonicbase.server.StreamManager) -> e
+    33:33:void access$500(com.sonicbase.server.StreamManager,com.fasterxml.jackson.databind.node.ObjectNode,com.fasterxml.jackson.databind.node.ObjectNode) -> a
+    33:33:void access$800(com.sonicbase.server.StreamManager,com.sonicbase.streams.StreamsConsumer,java.util.List) -> a
 com.sonicbase.server.StreamManager$1 -> com.sonicbase.server.i$1:
     com.fasterxml.jackson.databind.node.ObjectNode val$config -> a
     com.fasterxml.jackson.databind.node.ObjectNode val$queueDict -> b
     com.sonicbase.server.StreamManager this$0 -> c
-    197:197:void <init>(com.sonicbase.server.StreamManager,com.fasterxml.jackson.databind.node.ObjectNode,com.fasterxml.jackson.databind.node.ObjectNode) -> <init>
-    200:224:void run() -> run
+    201:201:void <init>(com.sonicbase.server.StreamManager,com.fasterxml.jackson.databind.node.ObjectNode,com.fasterxml.jackson.databind.node.ObjectNode) -> <init>
+    204:228:void run() -> run
 com.sonicbase.server.StreamManager$2 -> com.sonicbase.server.i$2:
     com.sonicbase.server.StreamManager this$0 -> a
-    235:235:void <init>(com.sonicbase.server.StreamManager) -> <init>
-    238:254:void run() -> run
+    239:239:void <init>(com.sonicbase.server.StreamManager) -> <init>
+    242:258:void run() -> run
 com.sonicbase.server.StreamManager$3 -> com.sonicbase.server.i$3:
     com.sonicbase.streams.StreamsConsumer val$consumer -> a
-    com.fasterxml.jackson.databind.node.ObjectNode val$config -> b
-    com.fasterxml.jackson.databind.node.ObjectNode val$stream -> c
-    com.sonicbase.server.StreamManager this$0 -> d
-    316:316:void <init>(com.sonicbase.server.StreamManager,com.sonicbase.streams.StreamsConsumer,com.fasterxml.jackson.databind.node.ObjectNode,com.fasterxml.jackson.databind.node.ObjectNode) -> <init>
-    320:364:void run() -> run
+    com.fasterxml.jackson.databind.node.ObjectNode val$stream -> b
+    com.sonicbase.server.StreamManager this$0 -> c
+    320:320:void <init>(com.sonicbase.server.StreamManager,com.sonicbase.streams.StreamsConsumer,com.fasterxml.jackson.databind.node.ObjectNode) -> <init>
+    324:368:void run() -> run
 com.sonicbase.server.StreamManager$4 -> com.sonicbase.server.i$4:
     int[] $SwitchMap$com$sonicbase$schema$DataType$Type -> a
-    699:699:void <clinit>() -> <clinit>
+    739:739:void <clinit>() -> <clinit>
 com.sonicbase.server.StreamManager$ConsumerContext -> com.sonicbase.server.i$a:
     com.sonicbase.streams.StreamsConsumer consumer -> b
     java.util.List threads -> c
     com.sonicbase.server.StreamManager this$0 -> a
-    164:166:void <init>(com.sonicbase.server.StreamManager) -> <init>
-    164:164:java.util.List access$900(com.sonicbase.server.StreamManager$ConsumerContext) -> a
-    164:164:com.sonicbase.streams.StreamsConsumer access$1000(com.sonicbase.server.StreamManager$ConsumerContext) -> b
-    164:164:void <init>(com.sonicbase.server.StreamManager,com.sonicbase.server.StreamManager$1) -> <init>
-    164:164:com.sonicbase.streams.StreamsConsumer access$1002(com.sonicbase.server.StreamManager$ConsumerContext,com.sonicbase.streams.StreamsConsumer) -> a
+    168:170:void <init>(com.sonicbase.server.StreamManager) -> <init>
+    168:168:java.util.List access$900(com.sonicbase.server.StreamManager$ConsumerContext) -> a
+    168:168:com.sonicbase.streams.StreamsConsumer access$1000(com.sonicbase.server.StreamManager$ConsumerContext) -> b
+    168:168:void <init>(com.sonicbase.server.StreamManager,com.sonicbase.server.StreamManager$1) -> <init>
+    168:168:com.sonicbase.streams.StreamsConsumer access$1002(com.sonicbase.server.StreamManager$ConsumerContext,com.sonicbase.streams.StreamsConsumer) -> a
 com.sonicbase.server.StreamManager$ProcessingRequest -> com.sonicbase.server.i$b:
     java.util.List messages -> b
     com.sonicbase.streams.StreamsConsumer consumer -> c
     com.sonicbase.server.StreamManager this$0 -> a
-    86:86:void <init>(com.sonicbase.server.StreamManager) -> <init>
-    86:86:com.sonicbase.streams.StreamsConsumer access$600(com.sonicbase.server.StreamManager$ProcessingRequest) -> a
-    86:86:java.util.List access$700(com.sonicbase.server.StreamManager$ProcessingRequest) -> b
-    86:86:com.sonicbase.streams.StreamsConsumer access$602(com.sonicbase.server.StreamManager$ProcessingRequest,com.sonicbase.streams.StreamsConsumer) -> a
-    86:86:java.util.List access$702(com.sonicbase.server.StreamManager$ProcessingRequest,java.util.List) -> a
+    90:90:void <init>(com.sonicbase.server.StreamManager) -> <init>
+    90:90:com.sonicbase.streams.StreamsConsumer access$600(com.sonicbase.server.StreamManager$ProcessingRequest) -> a
+    90:90:java.util.List access$700(com.sonicbase.server.StreamManager$ProcessingRequest) -> b
+    90:90:com.sonicbase.streams.StreamsConsumer access$602(com.sonicbase.server.StreamManager$ProcessingRequest,com.sonicbase.streams.StreamsConsumer) -> a
+    90:90:java.util.List access$702(com.sonicbase.server.StreamManager$ProcessingRequest,java.util.List) -> a
 com.sonicbase.server.TransactionManager -> com.sonicbase.server.j:
     com.sonicbase.server.DatabaseServer server -> a
     java.util.concurrent.ConcurrentHashMap transactions -> b
@@ -6471,69 +6472,71 @@ com.sonicbase.streams.AWSKinesisConsumer -> com.sonicbase.streams.AWSKinesisCons
     java.sql.Connection conn -> m
     int getRecordsSleepMillis -> n
     int getRecordsRequestCount -> o
-    27:41:void <init>() -> <init>
-    58:59:java.io.File getInstallDir(com.fasterxml.jackson.databind.node.ObjectNode) -> getInstallDir
-    63:71:void shutdown() -> shutdown
-    75:105:void initConnection(com.fasterxml.jackson.databind.node.ObjectNode) -> a
-    108:134:void initTable() -> a
-    139:238:int init(java.lang.String,java.lang.String,java.lang.String) -> init
-    245:277:void initThread(java.lang.String,java.lang.String,java.lang.String) -> initThread
-    282:334:java.util.List receive() -> receive
-    338:359:void saveState(java.lang.String,java.lang.String) -> a
-    362:389:java.lang.String getSequenceNumber(java.lang.String) -> a
-    394:404:void getNewShardIterator() -> b
-    408:411:void acknowledgeMessage(com.sonicbase.streams.Message) -> acknowledgeMessage
-    29:29:void <clinit>() -> <clinit>
+    28:42:void <init>() -> <init>
+    59:60:java.io.File getInstallDir(com.fasterxml.jackson.databind.node.ObjectNode) -> getInstallDir
+    64:72:void shutdown() -> shutdown
+    76:106:void initConnection(com.fasterxml.jackson.databind.node.ObjectNode) -> a
+    109:135:void initTable() -> a
+    140:240:int init(java.lang.String,java.lang.String,java.lang.String) -> init
+    247:279:void initThread() -> initThread
+    284:336:java.util.List receive() -> receive
+    340:361:void saveState(java.lang.String,java.lang.String) -> a
+    364:391:java.lang.String getSequenceNumber(java.lang.String) -> a
+    396:406:void getNewShardIterator() -> b
+    410:415:void acknowledgeMessages(java.util.List) -> acknowledgeMessages
+    420:420:void handleError(java.util.List,java.lang.Exception) -> handleError
+    30:30:void <clinit>() -> <clinit>
 com.sonicbase.streams.AWSKinesisConsumer$1 -> com.sonicbase.streams.AWSKinesisConsumer$1:
     com.sonicbase.streams.AWSKinesisConsumer this$0 -> a
-    196:196:void <init>(com.sonicbase.streams.AWSKinesisConsumer) -> <init>
-    199:199:int compare(com.amazonaws.services.kinesis.model.Shard,com.amazonaws.services.kinesis.model.Shard) -> a
-    196:196:int compare(java.lang.Object,java.lang.Object) -> compare
+    198:198:void <init>(com.sonicbase.streams.AWSKinesisConsumer) -> <init>
+    201:201:int compare(com.amazonaws.services.kinesis.model.Shard,com.amazonaws.services.kinesis.model.Shard) -> a
+    198:198:int compare(java.lang.Object,java.lang.Object) -> compare
 com.sonicbase.streams.AWSKinesisConsumer$KinesisMessage -> com.sonicbase.streams.AWSKinesisConsumer$a:
     java.lang.String sequenceNum -> b
     java.lang.String shardId -> c
     com.sonicbase.streams.AWSKinesisConsumer this$0 -> a
-    50:54:void <init>(com.sonicbase.streams.AWSKinesisConsumer,java.lang.String,java.lang.String,java.lang.String) -> <init>
-    46:46:java.lang.String access$000(com.sonicbase.streams.AWSKinesisConsumer$KinesisMessage) -> a
-    46:46:java.lang.String access$100(com.sonicbase.streams.AWSKinesisConsumer$KinesisMessage) -> b
+    51:55:void <init>(com.sonicbase.streams.AWSKinesisConsumer,java.lang.String,java.lang.String,java.lang.String) -> <init>
+    47:47:java.lang.String access$000(com.sonicbase.streams.AWSKinesisConsumer$KinesisMessage) -> a
+    47:47:java.lang.String access$100(com.sonicbase.streams.AWSKinesisConsumer$KinesisMessage) -> b
 com.sonicbase.streams.AWSKinesisProducer -> com.sonicbase.streams.AWSKinesisProducer:
     org.apache.log4j.Logger logger -> a
     com.amazonaws.services.kinesis.AmazonKinesis kinesisClient -> b
     java.lang.String streamName -> c
-    22:22:void <init>() -> <init>
-    30:31:java.io.File getInstallDir(com.fasterxml.jackson.databind.node.ObjectNode) -> getInstallDir
-    38:78:void init(java.lang.String,java.lang.String,java.lang.String) -> init
-    84:128:void publish(java.util.List) -> publish
-    132:133:void shutdown() -> shutdown
-    24:24:void <clinit>() -> <clinit>
+    23:23:void <init>() -> <init>
+    31:32:java.io.File getInstallDir(com.fasterxml.jackson.databind.node.ObjectNode) -> getInstallDir
+    39:81:void init(java.lang.String,java.lang.String,java.lang.String) -> init
+    87:131:void publish(java.util.List) -> publish
+    135:136:void shutdown() -> shutdown
+    25:25:void <clinit>() -> <clinit>
 com.sonicbase.streams.AWSSQSConsumer -> com.sonicbase.streams.AWSSQSConsumer:
     org.apache.log4j.Logger logger -> a
     java.lang.String url -> b
-    com.amazonaws.services.sqs.AmazonSQSClient sqsClient -> c
+    com.amazonaws.services.sqs.AmazonSQS sqsClient -> c
     boolean shutdown -> d
-    19:19:void <init>() -> <init>
-    37:38:java.io.File getInstallDir(com.fasterxml.jackson.databind.node.ObjectNode) -> getInstallDir
-    42:44:void shutdown() -> shutdown
-    49:79:int init(java.lang.String,java.lang.String,java.lang.String) -> init
-    86:86:void initThread(java.lang.String,java.lang.String,java.lang.String) -> initThread
-    91:111:java.util.List receive() -> receive
-    117:118:void acknowledgeMessage(com.sonicbase.streams.Message) -> acknowledgeMessage
-    21:21:void <clinit>() -> <clinit>
+    23:23:void <init>() -> <init>
+    41:42:java.io.File getInstallDir(com.fasterxml.jackson.databind.node.ObjectNode) -> getInstallDir
+    46:48:void shutdown() -> shutdown
+    53:90:int init(java.lang.String,java.lang.String,java.lang.String) -> init
+    97:97:void initThread() -> initThread
+    102:122:java.util.List receive() -> receive
+    128:131:void acknowledgeMessages(java.util.List) -> acknowledgeMessages
+    136:136:void handleError(java.util.List,java.lang.Exception) -> handleError
+    25:25:void <clinit>() -> <clinit>
 com.sonicbase.streams.AWSSQSConsumer$AWSMessage -> com.sonicbase.streams.AWSSQSConsumer$a:
     com.amazonaws.services.sqs.model.Message message -> b
     com.sonicbase.streams.AWSSQSConsumer this$0 -> a
-    30:33:void <init>(com.sonicbase.streams.AWSSQSConsumer,com.amazonaws.services.sqs.model.Message,java.lang.String) -> <init>
-    27:27:com.amazonaws.services.sqs.model.Message access$000(com.sonicbase.streams.AWSSQSConsumer$AWSMessage) -> a
+    34:37:void <init>(com.sonicbase.streams.AWSSQSConsumer,com.amazonaws.services.sqs.model.Message,java.lang.String) -> <init>
+    31:31:com.amazonaws.services.sqs.model.Message access$000(com.sonicbase.streams.AWSSQSConsumer$AWSMessage) -> a
 com.sonicbase.streams.AWSSQSProducer -> com.sonicbase.streams.AWSSQSProducer:
     org.apache.log4j.Logger logger -> a
     java.lang.String url -> b
-    com.amazonaws.services.sqs.AmazonSQSClient sqsClient -> c
-    19:19:void <init>() -> <init>
-    27:28:java.io.File getInstallDir(com.fasterxml.jackson.databind.node.ObjectNode) -> getInstallDir
-    34:65:void init(java.lang.String,java.lang.String,java.lang.String) -> init
-    70:116:void publish(java.util.List) -> publish
-    121:121:void shutdown() -> shutdown
-    21:21:void <clinit>() -> <clinit>
+    com.amazonaws.services.sqs.AmazonSQS sqsClient -> c
+    23:23:void <init>() -> <init>
+    31:32:java.io.File getInstallDir(com.fasterxml.jackson.databind.node.ObjectNode) -> getInstallDir
+    38:76:void init(java.lang.String,java.lang.String,java.lang.String) -> init
+    81:127:void publish(java.util.List) -> publish
+    131:132:void shutdown() -> shutdown
+    25:25:void <clinit>() -> <clinit>
 com.sonicbase.streams.KafkaConsumer -> com.sonicbase.streams.KafkaConsumer:
     org.apache.log4j.Logger logger -> b
     java.lang.ThreadLocal consumer -> c
@@ -6544,30 +6547,34 @@ com.sonicbase.streams.KafkaConsumer -> com.sonicbase.streams.KafkaConsumer:
     java.util.List ownedPartitions -> h
     int sonicBaseShardCount -> i
     java.util.List consumers -> j
+    java.lang.String cluster -> k
+    java.lang.String jsonConfig -> l
+    java.lang.String jsonQueueConfig -> m
     java.util.concurrent.ConcurrentHashMap partitionOffsets -> a
-    21:301:void <init>() -> <init>
-    46:57:void shutdown() -> shutdown
-    63:74:int init(java.lang.String,java.lang.String,java.lang.String) -> init
-    80:110:void initConnection(com.fasterxml.jackson.databind.node.ObjectNode) -> a
-    113:139:void initTable() -> a
-    144:251:void initThread(java.lang.String,java.lang.String,java.lang.String) -> initThread
-    254:277:void readState() -> b
-    280:299:void saveState() -> c
-    306:319:java.util.List receive() -> receive
-    325:330:void acknowledgeMessage(com.sonicbase.streams.Message) -> acknowledgeMessage
+    21:307:void <init>() -> <init>
+    49:60:void shutdown() -> shutdown
+    66:80:int init(java.lang.String,java.lang.String,java.lang.String) -> init
+    86:116:void initConnection(com.fasterxml.jackson.databind.node.ObjectNode) -> a
+    119:145:void initTable() -> a
+    150:257:void initThread() -> initThread
+    260:283:void readState() -> b
+    286:305:void saveState() -> c
+    312:325:java.util.List receive() -> receive
+    331:338:void acknowledgeMessages(java.util.List) -> acknowledgeMessages
+    343:343:void handleError(java.util.List,java.lang.Exception) -> handleError
     23:23:void <clinit>() -> <clinit>
 com.sonicbase.streams.KafkaConsumer$1 -> com.sonicbase.streams.KafkaConsumer$1:
     com.sonicbase.streams.KafkaConsumer this$0 -> a
-    165:165:void <init>(com.sonicbase.streams.KafkaConsumer) -> <init>
-    168:168:int compare(org.apache.kafka.common.PartitionInfo,org.apache.kafka.common.PartitionInfo) -> a
-    165:165:int compare(java.lang.Object,java.lang.Object) -> compare
+    171:171:void <init>(com.sonicbase.streams.KafkaConsumer) -> <init>
+    174:174:int compare(org.apache.kafka.common.PartitionInfo,org.apache.kafka.common.PartitionInfo) -> a
+    171:171:int compare(java.lang.Object,java.lang.Object) -> compare
 com.sonicbase.streams.KafkaConsumer$KafkaMessage -> com.sonicbase.streams.KafkaConsumer$a:
     int partition -> b
     long offset -> c
     com.sonicbase.streams.KafkaConsumer this$0 -> a
-    38:42:void <init>(com.sonicbase.streams.KafkaConsumer,java.lang.String,int,long) -> <init>
-    34:34:int access$000(com.sonicbase.streams.KafkaConsumer$KafkaMessage) -> a
-    34:34:long access$100(com.sonicbase.streams.KafkaConsumer$KafkaMessage) -> b
+    41:45:void <init>(com.sonicbase.streams.KafkaConsumer,java.lang.String,int,long) -> <init>
+    37:37:int access$000(com.sonicbase.streams.KafkaConsumer$KafkaMessage) -> a
+    37:37:long access$100(com.sonicbase.streams.KafkaConsumer$KafkaMessage) -> b
 com.sonicbase.streams.KafkaProducer -> com.sonicbase.streams.KafkaProducer:
     org.apache.log4j.Logger logger -> a
     java.lang.String topic -> b
@@ -6584,9 +6591,10 @@ com.sonicbase.streams.LocalConsumer -> com.sonicbase.streams.LocalConsumer:
     10:10:void <init>() -> <init>
     18:19:void shutdown() -> shutdown
     23:23:int init(java.lang.String,java.lang.String,java.lang.String) -> init
-    29:29:void initThread(java.lang.String,java.lang.String,java.lang.String) -> initThread
+    29:29:void initThread() -> initThread
     34:49:java.util.List receive() -> receive
-    55:55:void acknowledgeMessage(com.sonicbase.streams.Message) -> acknowledgeMessage
+    55:55:void acknowledgeMessages(java.util.List) -> acknowledgeMessages
+    60:60:void handleError(java.util.List,java.lang.Exception) -> handleError
     12:12:void <clinit>() -> <clinit>
 com.sonicbase.streams.LocalProducer -> com.sonicbase.streams.LocalProducer:
     java.util.concurrent.ArrayBlockingQueue queue -> a
@@ -6603,9 +6611,10 @@ com.sonicbase.streams.Message -> com.sonicbase.streams.Message:
     18:18:java.lang.String getBody() -> getBody
 com.sonicbase.streams.StreamsConsumer -> com.sonicbase.streams.StreamsConsumer:
     int init(java.lang.String,java.lang.String,java.lang.String) -> init
-    void initThread(java.lang.String,java.lang.String,java.lang.String) -> initThread
+    void initThread() -> initThread
     java.util.List receive() -> receive
-    void acknowledgeMessage(com.sonicbase.streams.Message) -> acknowledgeMessage
+    void acknowledgeMessages(java.util.List) -> acknowledgeMessages
+    void handleError(java.util.List,java.lang.Exception) -> handleError
     void shutdown() -> shutdown
 com.sonicbase.streams.StreamsProducer -> com.sonicbase.streams.StreamsProducer:
     void init(java.lang.String,java.lang.String,java.lang.String) -> init

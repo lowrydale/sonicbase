@@ -3,6 +3,7 @@ package com.sonicbase.streams;
 import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
+import com.amazonaws.auth.InstanceProfileCredentialsProvider;
 import com.amazonaws.services.kinesis.AmazonKinesis;
 import com.amazonaws.services.kinesis.AmazonKinesisClientBuilder;
 import com.amazonaws.services.kinesis.model.*;
@@ -141,32 +142,33 @@ public class AWSKinesisConsumer implements StreamsConsumer {
       ObjectNode queueConfig = (ObjectNode) mapper.readTree(jsonQueueConfig);
       ObjectNode config = (ObjectNode) mapper.readTree(jsonConfig);
       File installDir = getInstallDir(config);
-      File keysFile = new File(installDir, "/keys/" + cluster + "-awskeys");
-      if (!keysFile.exists()) {
-        throw new DatabaseException(cluster + "-awskeys file not found");
-      }
 
       initConnection(config);
       initTable();
 
       final ClientConfiguration clientConfig = new ClientConfiguration();
-      clientConfig.setMaxConnections(1000);
+      clientConfig.setMaxConnections(100);
       clientConfig.setRequestTimeout(20_000);
       clientConfig.setConnectionTimeout(60_000);
 
       AmazonKinesisClientBuilder clientBuilder = AmazonKinesisClientBuilder.standard();
 
-      try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(keysFile)))) {
-        String accessKey = reader.readLine();
-        String secretKey = reader.readLine();
-
-        BasicAWSCredentials awsCredentials = new BasicAWSCredentials(accessKey, secretKey);
-        clientBuilder.setCredentials(new AWSStaticCredentialsProvider(awsCredentials));
+      File keysFile = new File(installDir, "/keys/" + cluster + "-awskeys");
+      if (!keysFile.exists()) {
+        clientBuilder.setCredentials(new InstanceProfileCredentialsProvider(true));
       }
-      catch (IOException e) {
-        throw new DatabaseException(e);
-      }
+      else {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(keysFile)))) {
+          String accessKey = reader.readLine();
+          String secretKey = reader.readLine();
 
+          BasicAWSCredentials awsCredentials = new BasicAWSCredentials(accessKey, secretKey);
+          clientBuilder.setCredentials(new AWSStaticCredentialsProvider(awsCredentials));
+        }
+        catch (IOException e) {
+          throw new DatabaseException(e);
+        }
+      }
       clientBuilder.setRegion(queueConfig.get("region").asText());
       clientBuilder.setClientConfiguration(clientConfig);
 

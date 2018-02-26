@@ -176,7 +176,7 @@ package com.sonicbase.streams;
 
 public interface StreamsConsumer {<br/>
 
-    int init(String cluster, String jsonConfig, String jsonQueueConfig);<br/>
+    int init(String cluster, String jsonConfig, String jsonStreamConfig);<br/>
 
     void initThread();<br/>
 
@@ -229,93 +229,100 @@ public class Message {
         SonicBase. For your provider to work, you must place the jar containing your code and any dependencies in the "lib"
         directory under the install directory and deploy it across the cluster.<br/>
         <pre class="java"><code>
-package com.sonicbase.streams;<br/>
+package com.sonicbase.streams;
 
 public class AWSSQSConsumer implements StreamsConsumer {
 
-  private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger(AWSSQSConsumer.class);<br/>
+  private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger(AWSSQSConsumer.class);
 
   private String url;
-  private AmazonSQSClient sqsClient;
-  private boolean shutdown;<br/>
+  private AmazonSQS sqsClient;
+  private boolean shutdown;
 
   class AWSMessage extends Message {
-    private final com.amazonaws.services.sqs.model.Message message;<br/>
+    private final com.amazonaws.services.sqs.model.Message message;
 
     public AWSMessage(com.amazonaws.services.sqs.model.Message message, String body) {
       super(body);
       this.message = message;
     }
-  }<br/>
+  }
 
   public File getInstallDir(ObjectNode config) {
     String dir = config.get("installDirectory").asText();
     return new File(dir.replace("$HOME", System.getProperty("user.home")));
-  }<br/>
+  }
 
   public void shutdown() {
     this.shutdown = true;
     sqsClient.shutdown();
-  }<br/>
+  }
 
   @Override
-  public int init(String cluster, String jsonConfig, String jsonQueueConfig) {
+  public int init(String cluster, String jsonConfig, String jsonStreamConfig) {
     try {
       logger.info("aws sqs init - begin");
       final ClientConfiguration clientConfig = new ClientConfiguration();
-      clientConfig.setMaxConnections(10);
+      clientConfig.setMaxConnections(100);
       clientConfig.setRequestTimeout(20_000);
-      clientConfig.setConnectionTimeout(60_000);<br/>
+      clientConfig.setConnectionTimeout(60_000);
+
+      AmazonSQSClientBuilder builder = AmazonSQSClient.builder();
 
       ObjectMapper mapper = new ObjectMapper();
       ObjectNode config = (ObjectNode) mapper.readTree(jsonConfig);
       File installDir = getInstallDir(config);
       File keysFile = new File(installDir, "/keys/" + cluster + "-awskeys");
       if (!keysFile.exists()) {
-        throw new DatabaseException(cluster + "-awskeys file not found");
+        builder.setCredentials(new InstanceProfileCredentialsProvider(true));
       }
-      try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(keysFile)))) {
-        String accessKey = reader.readLine();
-        String secretKey = reader.readLine();<br/>
+      else {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(keysFile)))) {
+          String accessKey = reader.readLine();
+          String secretKey = reader.readLine();
 
-        BasicAWSCredentials awsCredentials = new BasicAWSCredentials(accessKey, secretKey);
-        sqsClient = new AmazonSQSClient(awsCredentials, clientConfig);
+          BasicAWSCredentials awsCredentials = new BasicAWSCredentials(accessKey, secretKey);
+          builder.setCredentials(new AWSStaticCredentialsProvider(awsCredentials));
+        }
+        catch (IOException e) {
+          throw new DatabaseException(e);
+        }
       }
-      catch (IOException e) {
-        throw new DatabaseException(e);
-      }
-      ObjectNode queueConfig = (ObjectNode) mapper.readTree(jsonQueueConfig);
-      url = queueConfig.get("url").asText();<br/>
+      builder.setClientConfiguration(clientConfig);
+      sqsClient = builder.build();
+
+      ObjectNode streamConfig = (ObjectNode) mapper.readTree(jsonStreamConfig);
+      url = streamConfig.get("url").asText();
 
       logger.info("aws sqs init - end: url=" + url);
-      return queueConfig.get("threadCount").asInt();
+      return streamConfig.get("threadCount").asInt();
     }
     catch (Exception e) {
       throw new DatabaseException(e);
     }
-  }<br/>
+  }
 
   @Override
   public void initThread() {
-  }<b/>
+  }
 
   @Override
-  public List<Message> receive() {
+  public List&lt;Message&gt; receive() {
     try {
       ReceiveMessageRequest request = new ReceiveMessageRequest(url);
       request.setMaxNumberOfMessages(10);
       request.setWaitTimeSeconds(10);
-      ReceiveMessageResult receivedMessages = sqsClient.receiveMessage(request.withMessageAttributeNames("All"));<br/>
+      ReceiveMessageResult receivedMessages = sqsClient.receiveMessage(request.withMessageAttributeNames("All"));
 
       List&lt;com.amazonaws.services.sqs.model.Message&gt; innerMessages = receivedMessages.getMessages();
       List&lt;Message&gt; resultMessages = new ArrayList&lt;&gt;();
       for (com.amazonaws.services.sqs.model.Message message : innerMessages) {
         ByteBuffer buffer = message.getMessageAttributes().get("message").getBinaryValue();
         byte[] bytes = new byte[buffer.remaining()];
-        buffer.get(bytes);<br/>
+        buffer.get(bytes);
 
         GZIPInputStream in = new GZIPInputStream(new ByteArrayInputStream(bytes));
-        bytes = IOUtils.toByteArray(in);<br/>
+        bytes = IOUtils.toByteArray(in);
 
         resultMessages.add(new AWSMessage(message, new String(bytes, "utf-8")));
       }
@@ -324,21 +331,19 @@ public class AWSSQSConsumer implements StreamsConsumer {
     catch (Exception e) {
       throw new DatabaseException(e);
     }
-  }<br/>
+  }
 
   @Override
-  public void acknowledgeMessage(List&lt;Message&gt; messages) {
+  public void acknowledgeMessages(List&lt;Message&gt; messages) {
     for (Message message : messages) {
-      sqsClient.deleteMessage(url, ((AWSMessage)message).message.getReceiptHandle());
+      sqsClient.deleteMessage(url, ((AWSMessage) message).message.getReceiptHandle());
     }
-  }<br/>
+  }
 
   @Override
   public void handleError(List&lt;Message&gt; messages, Exception e) {
-  }
-
+  }<br/>
 }
-
             </code></pre>
 
     </div>

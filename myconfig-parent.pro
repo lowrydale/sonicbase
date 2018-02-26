@@ -1,5 +1,5 @@
--injars       obfuscated/target/sonicbase-parent-unobfuscated-1.2.9.jar
--outjars      obfuscated/target/sonicbase-parent-1.2.9.jar
+-injars       obfuscated/target/sonicbase-parent-unobfuscated-1.2.10.jar
+-outjars      obfuscated/target/sonicbase-parent-1.2.10.jar
 -libraryjars  <java.home>/lib/rt.jar
 -printmapping sonicbase-parent.map
 

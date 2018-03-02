@@ -2,10 +2,10 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>SonicBase - Features</title>
+<title>SonicBase - Streaming Consumers</title>
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="desription" content="Streaming consumer documentation.">
+    <meta name="desription" content="Streaming consumer documentation for SonicBase.">
     <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
 
 
@@ -103,7 +103,7 @@
             </code></pre>
         <h2>Message Format</h2>
         <br/>
-        The "actions" section contains an array of actions to perform. For "insert", the records contain the fields you
+        The "events" section contains an array of actions to perform. For "insert", the records contain the fields you
         want to store on the record. For "update" you specify the record as it appeared before the update (fields you want the candidate
         record to match) and the record
         as you want it to appear after the update. For "delete", the record contains the fields you want the candidate record to match.<br/>
@@ -113,7 +113,7 @@
         <h3>Example Message</h3>
         <pre class="JSON"><code>
 {
-    "actions": [
+    "events": [
         {
             "_sonicbase_dbname": "db",
             "_sonicbase_tablename": "my_table",

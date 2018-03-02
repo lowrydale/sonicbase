@@ -462,7 +462,7 @@ public class StreamManager {
       try {
         ObjectMapper mapper = new ObjectMapper();
         ObjectNode message = (ObjectNode) mapper.readTree((String) messages.getArray().get(i));
-        ArrayNode array = message.withArray("actions");
+        ArrayNode array = message.withArray("events");
         for (int j = 0; j < array.size(); j++) {
           JsonNode entry = array.get(j);
 

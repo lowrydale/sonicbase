@@ -164,7 +164,7 @@ public class TestPartsOfJoin {
           client.getCommon(), client, 0, 1000, tableSchema.getName(), indexSchema.getName(), false, BinaryExpression.Operator.less,
           null, null, new Object[]{100L}, null, null, null, new Object[]{100L}, null, null, "id", 0, recordCache, usedIndex,
         false, client.getCommon().getSchemaVersion(), null, null, false,
-        new AtomicLong(), null, null, false);
+        new AtomicLong(), null, null, false, false, null);
 
     Object[][][] keys = ret.getCurrKeys();
     assertEquals(keys[0][0][0], 9L);
@@ -182,7 +182,9 @@ public class TestPartsOfJoin {
       keysToRead.add(new ExpressionImpl.IdEntry(i, entry[0]));
     }
     tableSchema = client.getCommon().getTables("test").get("memberships");
-    Map<Integer, Object[][]> readKeys = ExpressionImpl.readRecords("test", client, 30000, false, tableSchema, keysToRead, new String[]{"personid"}, null, recordCache, 1000);
+    Map<Integer, Object[][]> readKeys = ExpressionImpl.readRecords("test", client, 30000,
+        false, tableSchema, keysToRead, new String[]{"personid"}, null, recordCache,
+        1000, false, null);
 
     List<ExpressionImpl.IdEntry> keysToRead2 = new ArrayList<>();
     for (int i = 0; i < readKeys.size(); i++) {

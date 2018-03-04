@@ -58,10 +58,11 @@ public class TestRebalance {
     ParameterHandler parms = new ParameterHandler();
 
     client.executeQuery("test", QueryType.update0,
-        "create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))", parms);
+        "create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))",
+        parms, false, null);
 
     client.executeQuery("test", QueryType.update0,
-        "create index socialSecurityNumber on persons(socialSecurityNumber)", parms);
+        "create index socialSecurityNumber on persons(socialSecurityNumber)", parms, false, null);
 
     client.syncSchema();
 

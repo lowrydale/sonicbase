@@ -1,4 +1,3 @@
-/* © 2017 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.database.performance;
 
 import java.io.IOException;

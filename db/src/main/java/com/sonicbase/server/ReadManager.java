@@ -8,6 +8,8 @@ import com.sonicbase.index.Index;
 
 import com.sonicbase.common.*;
 import com.sonicbase.jdbcdriver.ParameterHandler;
+import com.sonicbase.procedure.StoredProcedureContextImpl;
+import com.sonicbase.procedure.RecordImpl;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.Expression;
@@ -272,13 +274,13 @@ public class ReadManager {
           doIndexLookupOneKey(cobj.getShort(ComObject.Tag.serializationVersion), dbName, count, tableSchema, indexSchema, null, false, null,
               columnOffsets, forceSelectOnServer, null, leftKey, leftKey, leftOperator, index, ascending,
               retKeyRecords, retKeys, retRecords, server.getCommon().getSchemaVersion(), false, counters, groupContext,
-              new AtomicLong(), null, null, keyOffsets, keyContainsColumns, false);
+              new AtomicLong(), null, null, keyOffsets, keyContainsColumns, false, null);
         }
         else {
           doIndexLookupOneKey(cobj.getShort(ComObject.Tag.serializationVersion), dbName, count, tableSchema, indexSchema, null, false,
               null, columnOffsets, forceSelectOnServer, null, leftKey, leftKey, leftOperator,
               index, ascending, retKeyRecords, retKeys, retRecords, server.getCommon().getSchemaVersion(), true, counters,
-              groupContext, new AtomicLong(), null, null, keyOffsets, keyContainsColumns, false);
+              groupContext, new AtomicLong(), null, null, keyOffsets, keyContainsColumns, false, null);
 
 //          if (indexSchema.isPrimaryKeyGroup()) {
 //            if (((Long)leftKey[0]) == 5) {
@@ -370,7 +372,12 @@ public class ReadManager {
   private ConcurrentHashMap<Long, PreparedIndexLookup> preparedIndexLookups = new ConcurrentHashMap<>();
 
   private AtomicInteger lookupCount = new AtomicInteger();
+
   public ComObject indexLookup(ComObject cobj) {
+    return indexLookup(cobj, null);
+  }
+
+  public ComObject indexLookup(ComObject cobj, StoredProcedureContextImpl procedureContext) {
     //Timer.Context context = INDEX_LOOKUP_STATS.time();
     try {
 
@@ -639,13 +646,13 @@ public class ReadManager {
           entry = doIndexLookupOneKey(cobj.getShort(ComObject.Tag.serializationVersion), dbName, count, tableSchema, indexSchema, parms, evaluateExpression, expression,
               columnOffsets, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, leftOperator, index,
               ascending, retKeyRecords, retKeys, retRecords, viewVersion, keys, counters, groupContext, currOffset, limit,
-              offset, keyOffsets, keyContainsColumns, isProbe);
+              offset, keyOffsets, keyContainsColumns, isProbe, procedureContext);
         }
         else {
           entry = doIndexLookupTwoKeys(cobj.getShort(ComObject.Tag.serializationVersion), dbName, count, tableSchema, indexSchema, forceSelectOnServer, excludeKeys,
               originalLeftKey, leftKey, columnOffsets, originalRightKey, rightKey, leftOperator, rightOperator, parms,
               evaluateExpression, expression, index, ascending, retKeyRecords, retKeys, retRecords, viewVersion, false, counters,
-              groupContext, currOffset, limit, offset, keyOffsets, keyContainsColumns, isProbe);
+              groupContext, currOffset, limit, offset, keyOffsets, keyContainsColumns, isProbe, procedureContext);
         }
         //todo: support rightOperator
       }
@@ -655,13 +662,13 @@ public class ReadManager {
           entry = doIndexLookupOneKey(cobj.getShort(ComObject.Tag.serializationVersion), dbName, count, tableSchema, indexSchema, parms, evaluateExpression, expression,
               columnOffsets, forceSelectOnServer, excludeKeys, originalLeftKey, leftKey, leftOperator, index, ascending,
               retKeyRecords, retKeys, retRecords, viewVersion, true, counters, groupContext, currOffset, limit, offset,
-              keyOffsets, keyContainsColumns, isProbe);
+              keyOffsets, keyContainsColumns, isProbe, procedureContext);
         }
         else {
           entry = doIndexLookupTwoKeys(cobj.getShort(ComObject.Tag.serializationVersion), dbName, count, tableSchema, indexSchema, forceSelectOnServer, excludeKeys,
               originalLeftKey, leftKey, columnOffsets, originalRightKey, rightKey, leftOperator, rightOperator, parms,
               evaluateExpression, expression, index, ascending, retKeyRecords, retKeys, retRecords, viewVersion, true,
-              counters, groupContext, currOffset, limit, offset, keyOffsets, keyContainsColumns, isProbe);
+              counters, groupContext, currOffset, limit, offset, keyOffsets, keyContainsColumns, isProbe, procedureContext);
         }
       }
 
@@ -763,6 +770,10 @@ public class ReadManager {
   }
 
   public ComObject serverSelect(ComObject cobj) {
+    return serverSelect(cobj, false,null);
+  }
+
+  public ComObject serverSelect(ComObject cobj, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) {
     try {
       if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
         try {
@@ -792,12 +803,13 @@ public class ReadManager {
       DiskBasedResultSet diskResults = null;
       if (select.getServerSelectPageNumber() == 0) {
         select.setPageSize(1000);
-        ResultSetImpl resultSet = (ResultSetImpl) select.execute(dbName, null, null, null, null);
+        ResultSetImpl resultSet = (ResultSetImpl) select.execute(dbName, null, null, null,
+            null, restrictToThisServer, procedureContext);
         diskResults = new DiskBasedResultSet(cobj.getShort(ComObject.Tag.serializationVersion), dbName, server,
             select.getTableNames(), new int[]{0}, new ResultSetImpl[]{resultSet}, select.getOrderByExpressions(), count, select, false);
       }
       else {
-        diskResults = new DiskBasedResultSet(server, select, select.getTableNames(), select.getServerSelectResultSetId());
+        diskResults = new DiskBasedResultSet(server, select, select.getTableNames(), select.getServerSelectResultSetId(), restrictToThisServer, procedureContext);
       }
       select.setServerSelectResultSetId(diskResults.getResultSetId());
       byte[][][] records = diskResults.nextPage(select.getServerSelectPageNumber());
@@ -825,6 +837,10 @@ public class ReadManager {
   }
 
   public ComObject serverSetSelect(ComObject cobj) {
+    return serverSetSelect(cobj, false, null);
+  }
+
+  public ComObject serverSetSelect(ComObject cobj, final boolean restrictToThisServer, final StoredProcedureContextImpl procedureContext) {
     try {
       if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
         try {
@@ -896,7 +912,8 @@ public class ReadManager {
               public Object call() throws Exception {
                 SelectStatementImpl stmt = selectStatements[offset];
                 stmt.setPageSize(1000);
-                resultSets[offset] = (ResultSetImpl) stmt.execute(dbName, null, null, null, null);
+                resultSets[offset] = (ResultSetImpl) stmt.execute(dbName, null, null, null,
+                    null, restrictToThisServer, procedureContext);
                 return null;
               }
             }));
@@ -923,7 +940,7 @@ public class ReadManager {
         }
       }
       else {
-        diskResults = new DiskBasedResultSet(server, null, tableNames, resultSetId);
+        diskResults = new DiskBasedResultSet(server, null, tableNames, resultSetId, restrictToThisServer, procedureContext);
       }
       byte[][][] records = diskResults.nextPage((int)serverSelectPageNumber);
 
@@ -1039,6 +1056,10 @@ public class ReadManager {
   }
 
   public ComObject indexLookupExpression(ComObject cobj) {
+    return indexLookupExpression(cobj, null);
+  }
+
+  public ComObject indexLookupExpression(ComObject cobj, StoredProcedureContextImpl procedureContext) {
     try {
       if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
         try {
@@ -1172,7 +1193,7 @@ public class ReadManager {
         entry = doIndexLookupWithRecordsExpression(cobj.getShort(ComObject.Tag.serializationVersion), dbName,
             viewVersion, count, tableSchema, indexSchema, columnOffsets, parms, expression, index, leftKey,
             rightKey, rightOperator,
-            ascending, retRecords, counters, groupByContext, currOffset, limit, offset, isProbe);
+            ascending, retRecords, counters, groupByContext, currOffset, limit, offset, isProbe, procedureContext);
       }
       else {
         //entry = doIndexLookupExpression(count, indexSchema, columnOffsets, index, leftKey, ascending, retKeys);
@@ -1218,7 +1239,7 @@ public class ReadManager {
       Set<Integer> columnOffsets, ParameterHandler parms, Expression expression,
       Index index, Object[] leftKey, Object[] rightKey, BinaryExpression.Operator rightOperator,
       Boolean ascending, List<byte[]> ret, Counter[] counters, GroupByContext groupByContext,
-      AtomicLong currOffset, Long limit, Long offset, boolean isProbe) {
+      AtomicLong currOffset, Long limit, Long offset, boolean isProbe, StoredProcedureContextImpl procedureContext) {
 
     final AtomicInteger countSkipped = new AtomicInteger();
 
@@ -1291,42 +1312,49 @@ public class ReadManager {
             record.deserialize(dbName, server.getCommon(), bytes, null, true);
             boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
             if (pass) {
-              byte[][] currRecords = new byte[][]{bytes};
-              AtomicBoolean done = new AtomicBoolean();
-              records = processViewFlags(dbName, tableSchema, indexSchema, index, viewVersion, entry.getKey(), records, done);
-              if (records != null) {
+              if (procedureContext != null) {
+                com.sonicbase.procedure.RecordImpl procedureRecord = new RecordImpl();
+                procedureRecord.setRecord(record);
+                pass = procedureContext.getRecordEvaluator().evaluate(procedureContext, procedureRecord);
+              }
+              if (pass) {
+                byte[][] currRecords = new byte[][]{bytes};
+                AtomicBoolean done = new AtomicBoolean();
+                records = processViewFlags(dbName, tableSchema, indexSchema, index, viewVersion, entry.getKey(), records, done);
+                if (records != null) {
 
-                int[] keyOffsets = null;
-                boolean keyContainsColumns = false;
+                  int[] keyOffsets = null;
+                  boolean keyContainsColumns = false;
 
-                byte[][] currRet = applySelectToResultRecords(serializationVersion, dbName, columnOffsets, forceSelectOnServer, currRecords,
-                    entry.getKey(), tableSchema, counters, groupByContext, keyOffsets, keyContainsColumns);
-                if (counters == null) {
-                  for (byte[] currBytes : currRet) {
-                    boolean localDone = false;
-                    boolean include = true;
-                    long targetOffset = 1;
-                    currOffset.incrementAndGet();
-                    if (offset != null) {
-                      targetOffset = offset;
-                      if (currOffset.get() < offset) {
-                        include = false;
-                      }
-                    }
-                    if (include) {
-                      if (limit != null) {
-                        if (currOffset.get() >= targetOffset + limit) {
+                  byte[][] currRet = applySelectToResultRecords(serializationVersion, dbName, columnOffsets, forceSelectOnServer, currRecords,
+                      entry.getKey(), tableSchema, counters, groupByContext, keyOffsets, keyContainsColumns);
+                  if (counters == null) {
+                    for (byte[] currBytes : currRet) {
+                      boolean localDone = false;
+                      boolean include = true;
+                      long targetOffset = 1;
+                      currOffset.incrementAndGet();
+                      if (offset != null) {
+                        targetOffset = offset;
+                        if (currOffset.get() < offset) {
                           include = false;
-                          localDone = true;
                         }
                       }
-                    }
-                    if (include) {
-                      ret.add(currBytes);
-                    }
-                    if (localDone) {
-                      entry = null;
-                      break outer;
+                      if (include) {
+                        if (limit != null) {
+                          if (currOffset.get() >= targetOffset + limit) {
+                            include = false;
+                            localDone = true;
+                          }
+                        }
+                      }
+                      if (include) {
+                        ret.add(currBytes);
+                      }
+                      if (localDone) {
+                        entry = null;
+                        break outer;
+                      }
                     }
                   }
                 }
@@ -1411,7 +1439,7 @@ public class ReadManager {
       long viewVersion, boolean keys,
       Counter[] counters,
       GroupByContext groupContext, AtomicLong currOffset, Long limit, Long offset, int[] keyOffsets,
-      boolean keyContainsColumns, boolean isProbe) {
+      boolean keyContainsColumns, boolean isProbe, StoredProcedureContextImpl procedureContext) {
 
     Map.Entry<Object[], Object> entry = null;
     try {
@@ -1651,7 +1679,7 @@ public class ReadManager {
               AtomicBoolean done = new AtomicBoolean();
               handleRecord(serializationVersion, dbName, tableSchema, indexSchema, viewVersion, index, keyToUse, parms, evaluateExpression,
                   expression, columnOffsets, forceSelectOnServer, retKeyRecords, retKeys, retRecords, keys, counters, groupContext,
-                  records, currKeyRecords, currKeys, offset, currOffset, limit, done, countSkipped, isProbe);
+                  records, currKeyRecords, currKeys, offset, currOffset, limit, done, countSkipped, isProbe, procedureContext);
               if (done.get()) {
                 entry = null;
                 break outer;
@@ -1910,7 +1938,8 @@ public class ReadManager {
       long viewVersion,
       boolean keys,
       Counter[] counters,
-      GroupByContext groupContext, AtomicLong currOffset, Long limit, Long offset, int[] keyOffsets, boolean keyContainsColumns, Boolean isProbe) {
+      GroupByContext groupContext, AtomicLong currOffset, Long limit, Long offset, int[] keyOffsets,
+      boolean keyContainsColumns, Boolean isProbe, StoredProcedureContextImpl procedureContext) {
     Map.Entry<Object[], Object> entry = null;
 
     final AtomicInteger countSkipped = new AtomicInteger();
@@ -2004,7 +2033,7 @@ public class ReadManager {
             handleRecord(serializationVersion, dbName, tableSchema, indexSchema, viewVersion, index, keyToUse, parms,
                 evaluateExpresion, expression,
                 columnOffsets, forceSelectOnServer, retKeyRecords, retKeys, retRecords, keys, counters, groupContext, records,
-                currKeyRecords, currKeys, offset, currOffset, limit, done, countSkipped, isProbe);
+                currKeyRecords, currKeys, offset, currOffset, limit, done, countSkipped, isProbe, procedureContext);
             if (done.get()) {
               return null;
             }
@@ -2093,7 +2122,7 @@ public class ReadManager {
                 AtomicBoolean done = new AtomicBoolean();
                 handleRecord(serializationVersion, dbName, tableSchema, indexSchema, viewVersion, index, keyToUse, parms, evaluateExpresion,
                     expression, columnOffsets, forceSelectOnServer, retKeyRecords, retKeys, retRecords, keys, counters,
-                    groupContext, records, currKeyRecords, currKeys, offset, currOffset, limit, done, countSkipped, isProbe);
+                    groupContext, records, currKeyRecords, currKeys, offset, currOffset, limit, done, countSkipped, isProbe, procedureContext);
                 if (done.get()) {
                   entry = null;
                   return null;
@@ -2397,7 +2426,7 @@ public class ReadManager {
               AtomicBoolean done = new AtomicBoolean();
               handleRecord(serializationVersion, dbName, tableSchema, indexSchema, viewVersion, index, keyToUse, parms, evaluateExpresion,
                   expression, columnOffsets, forceSelectOnServer, retKeyRecords, retKeys, retRecords, keys, counters, groupContext,
-                  records, currKeyRecords, currKeys, offset, currOffset, limit, done, countSkipped, isProbe);
+                  records, currKeyRecords, currKeys, offset, currOffset, limit, done, countSkipped, isProbe, procedureContext);
               if (done.get()) {
                 entry = null;
                 break outer;
@@ -2569,7 +2598,8 @@ public class ReadManager {
                                Counter[] counters,
                                GroupByContext groupContext, byte[][] records, byte[][] currKeyRecords,
                                Object[][] currKeys, Long offset,
-                               AtomicLong currOffset, Long limit, AtomicBoolean done, AtomicInteger countSkipped, boolean isProbe) {
+                               AtomicLong currOffset, Long limit, AtomicBoolean done, AtomicInteger countSkipped, 
+                               boolean isProbe, StoredProcedureContextImpl procedureContext) {
     if (keys) {
       if (currKeyRecords != null) {
 
@@ -2663,37 +2693,44 @@ public class ReadManager {
             record.deserialize(dbName, server.getCommon(), bytes, null, true);
             boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
             if (pass) {
-              int[] keyOffsets = null;
-              boolean keyContainsColumns = false;
+              if (procedureContext != null) {
+                com.sonicbase.procedure.RecordImpl procedureRecord = new RecordImpl();
+                procedureRecord.setRecord(record);
+                pass = procedureContext.getRecordEvaluator().evaluate(procedureContext, procedureRecord);
+              }
+              if (pass) {
+                int[] keyOffsets = null;
+                boolean keyContainsColumns = false;
 
-              byte[][] currRecords = new byte[][]{bytes};
-              byte[][] ret = applySelectToResultRecords(serializationVersion, dbName, columnOffsets, forceSelectOnServer, currRecords,
-                  null, tableSchema, counters, groupContext, keyOffsets, keyContainsColumns);
-              if (counters == null) {
-                for (byte[] currBytes : ret) {
-                  done.set(false);
-                  boolean include = true;
-                  long targetOffset = 1;
-                  currOffset.incrementAndGet();
-                  if (offset != null) {
-                    targetOffset = offset;
-                    if (currOffset.get() < offset) {
-                      include = false;
-                    }
-                  }
-                  if (include) {
-                    if (limit != null) {
-                      if (currOffset.get() >= targetOffset + limit) {
+                byte[][] currRecords = new byte[][]{bytes};
+                byte[][] ret = applySelectToResultRecords(serializationVersion, dbName, columnOffsets, forceSelectOnServer, currRecords,
+                    null, tableSchema, counters, groupContext, keyOffsets, keyContainsColumns);
+                if (counters == null) {
+                  for (byte[] currBytes : ret) {
+                    done.set(false);
+                    boolean include = true;
+                    long targetOffset = 1;
+                    currOffset.incrementAndGet();
+                    if (offset != null) {
+                      targetOffset = offset;
+                      if (currOffset.get() < offset) {
                         include = false;
-                        done.set(true);
                       }
                     }
-                  }
-                  if (include) {
-                    retRecords.add(currBytes);
-                  }
-                  if (done.get()) {
-                    return true;
+                    if (include) {
+                      if (limit != null) {
+                        if (currOffset.get() >= targetOffset + limit) {
+                          include = false;
+                          done.set(true);
+                        }
+                      }
+                    }
+                    if (include) {
+                      retRecords.add(currBytes);
+                    }
+                    if (done.get()) {
+                      return true;
+                    }
                   }
                 }
               }

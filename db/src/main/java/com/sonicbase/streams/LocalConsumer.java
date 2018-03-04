@@ -60,3 +60,4 @@ public class LocalConsumer implements StreamsConsumer {
   }
 
 }
+

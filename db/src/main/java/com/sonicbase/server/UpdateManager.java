@@ -17,14 +17,14 @@ import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.util.DateUtils;
 import com.sun.jersey.json.impl.writer.JsonEncoder;
 import sun.misc.BASE64Encoder;
 
 import java.io.*;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
+import java.sql.*;
 import java.util.*;
+import java.util.Date;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -51,6 +51,9 @@ public class UpdateManager {
 
     initMessageQueueProducers();
     initPublisher();
+
+//    Connection conn = StreamManager.initSysConnection(server.getConfig());
+//    StreamManager.initStreamsConsumerTable(conn);
   }
 
   private class Producer {
@@ -1498,7 +1501,7 @@ class MessageRequest {
   private void buildBatchMessage(List<MessageRequest> batch, List<String> messages) {
     StringBuilder builder = new StringBuilder();
     builder.append("{");
-    builder.append("\"actions\":[");
+    builder.append("\"events\":[");
 
     int offset = 0;
     for (MessageRequest currRequest : batch) {
@@ -1665,7 +1668,7 @@ class MessageRequest {
     }
   }
 
-  private void getJsonFromRecord(StringBuilder builder, TableSchema tableSchema, Record record) {
+  public static void getJsonFromRecord(StringBuilder builder, TableSchema tableSchema, Record record) {
     String fieldName = null;
     try {
 
@@ -1714,15 +1717,23 @@ class MessageRequest {
           case ROWID:
             builder.append("\"").append(fieldName).append("\": ").append(String.valueOf(recordFields[offset]));
             break;
-          case DATE:
+          case DATE:{
+            Calendar cal = Calendar.getInstance();
+            cal.setTime((Date)recordFields[offset]);
+
+            String value = DateUtils.toDbString(cal);
+            value = JsonEncoder.encode(value);
+            builder.append("\"").append(fieldName).append("\": ").append("\"").append(value).append("\"");
+          }
+          break;
           case TIME: {
-            String value = String.valueOf(recordFields[offset]);
+            String value = DateUtils.toDbTimeString((Time)recordFields[offset]);
             value = JsonEncoder.encode(value);
             builder.append("\"").append(fieldName).append("\": ").append("\"").append(value).append("\"");
           }
           break;
           case TIMESTAMP: {
-            String value = String.valueOf(recordFields[offset]);
+            String value = DateUtils.toDbTimestampString((Timestamp)recordFields[offset]);
             value = JsonEncoder.encode(value);
             builder.append("\"").append(fieldName).append("\": \"").append(value).append("\"");
           }
@@ -2074,7 +2085,8 @@ class MessageRequest {
         destParmsStr += "?";
       }
 
-      ResultSet rs = (ResultSet) selectStatement.execute(dbName, null, null, null, null);
+      ResultSet rs = (ResultSet) selectStatement.execute(dbName, null, null, null,
+          null, false, null);
       String sql = "insert " + (ignore ? "ignore" : "") + " into " + tableName + " (" + destColumnsStr + ") values (" + destParmsStr + ")";
       System.out.println(sql);
       PreparedStatement stmt = conn.prepareStatement(sql);

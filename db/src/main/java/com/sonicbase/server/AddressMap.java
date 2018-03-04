@@ -1,14 +1,8 @@
-/* © 2017 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
 import com.sonicbase.query.DatabaseException;
-import org.apache.giraph.utils.Varint;
 import sun.misc.Unsafe;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;

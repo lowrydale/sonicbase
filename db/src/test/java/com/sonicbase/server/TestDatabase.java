@@ -1,6 +1,5 @@
 package com.sonicbase.server;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -678,7 +677,7 @@ public class TestDatabase {
            null,
            columns, "socialsecuritynumber", 0, recordCache,
            usedIndex, false, client.getCommon().getSchemaVersion(), null, null,
-         false, new AtomicLong(), null, null, false);
+         false, new AtomicLong(), null, null, false, false, null);
 
      assertEquals(ret.getCurrKeys().length, 4);
 

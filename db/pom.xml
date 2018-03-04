@@ -304,6 +304,11 @@
             <version>3.0.2</version>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>com.sonicbase</groupId>
+            <artifactId>sonicbase-parent</artifactId>
+            <version>RELEASE</version>
+        </dependency>
     </dependencies>
     <properties>
 

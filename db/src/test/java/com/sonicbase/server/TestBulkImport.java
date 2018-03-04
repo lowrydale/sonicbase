@@ -1,4 +1,3 @@
-/* © 2017 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -276,7 +275,7 @@ public class TestBulkImport {
 
 
 
-    startBulkImport((ConnectionProxy) connB, "start bulk import from persons(com.sonicbase.jdbcdriver.Driver, jdbc:sonicbase:127.0.0.1:9010/test)");
+    startBulkImport((ConnectionProxy) connB, "start bulk import from persons(Driver, jdbc:sonicbase:127.0.0.1:9010/test)");
 
     while (true) {
       String ret = bulkImportStatus((ConnectionProxy) connB);
@@ -318,7 +317,7 @@ public class TestBulkImport {
     }
     assertFalse(rs.next());
 
-    startBulkImport((ConnectionProxy) connB, "start bulk import from persons(com.sonicbase.jdbcdriver.Driver, jdbc:sonicbase:127.0.0.1:9010/test) where id > 1000");
+    startBulkImport((ConnectionProxy) connB, "start bulk import from persons(Driver, jdbc:sonicbase:127.0.0.1:9010/test) where id > 1000");
 
     while (true) {
       String ret = bulkImportStatus((ConnectionProxy) connB);

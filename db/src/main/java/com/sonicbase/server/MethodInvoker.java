@@ -56,6 +56,10 @@ public class MethodInvoker {
     this.shutdown = true;
   }
 
+  public ReadManager getReadManager() {
+    return readManager;
+  }
+
   class ReplicaFuture {
     private Future future;
     private int replica;
@@ -282,6 +286,14 @@ public class MethodInvoker {
 
   public ComObject processMessages(ComObject cobj, boolean replayedCommand) {
     return server.getStreamManager().processMessages(cobj);
+  }
+
+  public ComObject executeProcedurePrimary(final ComObject cobj, boolean replayedCommand) {
+    return server.executeProcedurePrimary(cobj);
+  }
+
+  public ComObject executeProcedure(final ComObject cobj, boolean replayedCommand) {
+    return server.executeProcedure(cobj);
   }
 
   public ComObject cancelBulkImport(final ComObject cobj, boolean replayedCommand) {

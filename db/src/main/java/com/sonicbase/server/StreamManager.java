@@ -334,7 +334,7 @@ public class StreamManager {
                     }
                     try {
                       List<Message> messages = consumer.receive();
-                      if (messages != null) {
+                      if (messages != null && messages.size() != 0) {
                         List<Message> currMessages = new ArrayList<>();
                         for (Message message : messages) {
                           currMessages.add(message);
@@ -590,12 +590,12 @@ public class StreamManager {
             Long sequence0 = null;
             Long sequence1 = null;
             Short sequence2 = null;
-            if (before.has("_sonicbase_sequence0") &&
-                before.has("_sonicbase_sequence1") &&
-                before.has("_sonicbase_sequence2")) {
-              sequence0 = before.get("_sonicbase_sequence0").asLong();
-              sequence1 = before.get("_sonicbase_sequence1").asLong();
-              sequence2 = (short)before.get("_sonicbase_sequence2").asInt();
+            if (after.has("_sonicbase_sequence0") &&
+                after.has("_sonicbase_sequence1") &&
+                after.has("_sonicbase_sequence2")) {
+              sequence0 = after.get("_sonicbase_sequence0").asLong();
+              sequence1 = after.get("_sonicbase_sequence1").asLong();
+              sequence2 = (short)after.get("_sonicbase_sequence2").asInt();
             }
             ((StatementProxy)stmt).doUpdate(sequence0, sequence1, sequence2);
           }
@@ -734,6 +734,7 @@ public class StreamManager {
       for (FieldSchema field : fields) {
         String fieldName = DatabaseClient.toLower(field.getName());
         if (fieldName.equals("_sonicbase_id")) {
+          offset++;
           continue;
         }
         switch (field.getType()) {
@@ -872,7 +873,7 @@ public class StreamManager {
             if (node != null) {
               String value = node.asText();
               if (value != null) {
-                currRecord[offset] = Date.valueOf(value);
+                currRecord[offset] = new Date(DateUtils.fromDbCalString(value).getTimeInMillis());
               }
             }
           }
@@ -882,7 +883,7 @@ public class StreamManager {
             if (node != null) {
               String value = node.asText();
               if (value != null) {
-                currRecord[offset] = Time.valueOf(value);
+                currRecord[offset] = new Time(DateUtils.fromDbTimeString(value).getTimeInMillis());
               }
             }
           }
@@ -892,7 +893,7 @@ public class StreamManager {
             if (node != null) {
               String value = node.asText();
               if (value != null) {
-                currRecord[offset] = Timestamp.valueOf(value);
+                currRecord[offset] = new Timestamp(DateUtils.fromDbCalString(value).getTimeInMillis());
               }
             }
           }

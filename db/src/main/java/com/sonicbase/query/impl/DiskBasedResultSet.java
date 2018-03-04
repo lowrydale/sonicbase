@@ -1,6 +1,7 @@
 package com.sonicbase.query.impl;
 
 import com.sonicbase.common.Record;
+import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
@@ -26,6 +27,8 @@ public class DiskBasedResultSet {
   private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
 
   private static AtomicLong nextResultSetId = new AtomicLong();
+  private StoredProcedureContextImpl procedureContext;
+  private boolean restrictToThisServer;
   private boolean setOperator;
   private List<OrderByExpressionImpl> orderByExpressions;
   private int count;
@@ -1050,7 +1053,10 @@ public class DiskBasedResultSet {
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
   @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public DiskBasedResultSet(
-      DatabaseServer databaseServer, SelectStatementImpl select, String[] tableNames, long resultSetId) {
+      DatabaseServer databaseServer, SelectStatementImpl select, String[] tableNames, long resultSetId, boolean restrictToThisServer,
+      StoredProcedureContextImpl procedureContext) {
+    this.restrictToThisServer = restrictToThisServer;
+    this.procedureContext = procedureContext;
     this.server = databaseServer;
     this.resultSetId = resultSetId;
     this.tableNames = tableNames;

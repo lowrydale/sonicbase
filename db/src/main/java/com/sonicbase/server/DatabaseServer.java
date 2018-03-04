@@ -6,11 +6,13 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
+import com.sonicbase.common.Record;
 import com.sonicbase.index.Index;
 import com.sonicbase.index.Indices;
 import com.sonicbase.index.Repartitioner;
 
 import com.sonicbase.jdbcdriver.ParameterHandler;
+import com.sonicbase.procedure.*;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.ExpressionImpl;
 import com.sonicbase.schema.TableSchema;
@@ -19,6 +21,11 @@ import com.sonicbase.util.DateUtils;
 import net.jpountz.lz4.LZ4Compressor;
 import net.jpountz.lz4.LZ4Factory;
 import net.jpountz.lz4.LZ4FastDecompressor;
+import net.sf.jsqlparser.expression.*;
+import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
+import net.sf.jsqlparser.parser.CCJSqlParserManager;
+import net.sf.jsqlparser.statement.Statement;
+import net.sf.jsqlparser.statement.execute.Execute;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -43,12 +50,10 @@ import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.text.ParseException;
 import java.util.*;
+import java.util.Date;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -194,6 +199,10 @@ public class DatabaseServer {
     }, QUEUE_SNAPSHOT_INTERVAL, QUEUE_SNAPSHOT_INTERVAL);
 */
 
+  }
+
+  public MethodInvoker getMethodInvoker() {
+    return methodInvoker;
   }
 
   public org.apache.log4j.Logger getErrorLogger() {
@@ -1256,6 +1265,157 @@ public class DatabaseServer {
     }
     return retObj;
 
+  }
+
+
+  public Parameters getParametersFromStoredProcedure(Execute execute) {
+    ExpressionList expressions = execute.getExprList();
+    Object[] parmsArray = new Object[expressions.getExpressions().size()];
+    int offset = 0;
+    for (Expression expression : expressions.getExpressions()) {
+      if (expression instanceof StringValue) {
+        parmsArray[offset] = ((StringValue)expression).getValue();
+      }
+      else if (expression instanceof LongValue) {
+        parmsArray[offset] = ((LongValue)expression).getValue();
+      }
+      else if (expression instanceof DateValue) {
+        parmsArray[offset] = ((DateValue)expression).getValue();
+      }
+      else if (expression instanceof DoubleValue) {
+        parmsArray[offset] = ((DoubleValue)expression).getValue();
+      }
+      else if (expression instanceof TimeValue) {
+        parmsArray[offset] = ((TimeValue)expression).getValue();
+      }
+      else if (expression instanceof TimestampValue) {
+        parmsArray[offset] = ((TimestampValue)expression).getValue();
+      }
+      else if (expression instanceof NullValue) {
+        parmsArray[offset] = null;
+      }
+      offset++;
+    }
+    ParametersImpl parms = new ParametersImpl(parmsArray);
+    return parms;
+  }
+
+  public Connection getConnectionForStoredProcedure(String dbName) throws ClassNotFoundException, SQLException {
+    ArrayNode array = config.withArray("shards");
+    ObjectNode replicaDict = (ObjectNode) array.get(0);
+    ArrayNode replicasArray = replicaDict.withArray("replicas");
+    final String address = config.get("clientIsPrivate").asBoolean() ?
+        replicasArray.get(0).get("privateAddress").asText() :
+        replicasArray.get(0).get("publicAddress").asText();
+    final int port = replicasArray.get(0).get("port").asInt();
+
+    Class.forName("com.sonicbase.jdbcdriver.Driver");
+    final Connection conn = DriverManager.getConnection("jdbc:sonicbase:" + address + ":" + port + "/" + dbName);
+    return conn;
+  }
+
+  public ComObject executeProcedure(final ComObject cobj) {
+    try {
+      String sql = cobj.getString(ComObject.Tag.sql);
+      CCJSqlParserManager parser = new CCJSqlParserManager();
+      Statement statement = parser.parse(new StringReader(sql));
+      if (!(statement instanceof Execute)) {
+        throw new DatabaseException("Invalid command: sql=" + sql);
+      }
+      Execute execute = (Execute) statement;
+
+      Parameters parms = getParametersFromStoredProcedure(execute);
+
+      String dbName = cobj.getString(ComObject.Tag.dbName);
+      String className = parms.getString(1);
+      StoredProcedure procedure = (StoredProcedure) Class.forName(className).newInstance();
+      StoredProcedureContextImpl context = new StoredProcedureContextImpl();
+      context.setConfig(config);
+      context.setShard(shard);
+      context.setReplica(replica);
+
+      Connection conn = getConnectionForStoredProcedure(dbName);
+
+      context.setConnection(new SonicBaseConnectionImpl(conn));
+
+      long storedProcedureId = cobj.getLong(ComObject.Tag.id);
+      context.setStoredProdecureId(storedProcedureId);
+      context.setParameters(parms);
+      StoredProcedureResponse response = procedure.execute(context);
+      return ((StoredProcedureResponseImpl)response).serialize();
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public ComObject executeProcedurePrimary(final ComObject cobj) {
+    ThreadPoolExecutor executor = null;
+    try {
+      String sql = cobj.getString(ComObject.Tag.sql);
+      CCJSqlParserManager parser = new CCJSqlParserManager();
+      Statement statement = parser.parse(new StringReader(sql));
+      if (!(statement instanceof Execute)) {
+        throw new DatabaseException("Invalid command: sql=" + sql);
+      }
+      Execute execute = (Execute) statement;
+
+      Parameters parms = getParametersFromStoredProcedure(execute);
+
+      String dbName = cobj.getString(ComObject.Tag.dbName);
+      String className = parms.getString(1);
+      StoredProcedure procedure = (StoredProcedure) Class.forName(className).newInstance();
+      StoredProcedureContextImpl context = new StoredProcedureContextImpl();
+      context.setConfig(config);
+      context.setShard(shard);
+      context.setReplica(replica);
+
+      Connection conn = getConnectionForStoredProcedure(dbName);
+
+      context.setConnection(new SonicBaseConnectionImpl(conn));
+
+      long storedProcedureId = getDatabaseClient().allocateId(dbName);
+      context.setStoredProdecureId(storedProcedureId);
+      context.setParameters(parms);
+      procedure.init(context);
+
+      cobj.put(ComObject.Tag.method, "executeProcedure");
+      cobj.put(ComObject.Tag.id, storedProcedureId);
+
+      executor = new ThreadPoolExecutor(shardCount, shardCount, 10_000, TimeUnit.MILLISECONDS,
+          new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+      // call all shards
+      List<Future> futures = new ArrayList<>();
+      for (int i = 0; i < shardCount; i++) {
+        final int shard = i;
+        futures.add(executor.submit(new Callable(){
+          @Override
+          public Object call() throws Exception {
+            return getDatabaseClient().send(null, shard, 0, cobj, DatabaseClient.Replica.def);
+          }
+        }));
+      }
+
+      List<StoredProcedureResponse> responses = new ArrayList<>();
+      for (Future future : futures) {
+        byte[] ret = (byte[]) future.get();
+        if (ret != null) {
+          StoredProcedureResponseImpl response = new StoredProcedureResponseImpl(new ComObject(ret));
+          responses.add(response);
+        }
+      }
+
+      StoredProcedureResponseImpl ret = (StoredProcedureResponseImpl) procedure.finalize(context, responses);
+      return ret.serialize();
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+    finally {
+      if (executor != null) {
+        executor.shutdownNow();
+      }
+    }
   }
 
   private static class NullX509TrustManager implements X509TrustManager {

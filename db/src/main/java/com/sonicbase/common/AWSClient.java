@@ -11,7 +11,6 @@ import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
-import com.sonicbase.common.Logger;
 import com.sonicbase.query.DatabaseException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;

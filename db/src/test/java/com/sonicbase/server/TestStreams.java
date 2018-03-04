@@ -1,13 +1,17 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.Logger;
+import com.sonicbase.common.Record;
+import com.sonicbase.index.Index;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
+import com.sonicbase.schema.FieldSchema;
+import com.sonicbase.schema.TableSchema;
 import com.sonicbase.streams.LocalProducer;
 import com.sonicbase.research.socket.NettyServer;
 import org.apache.commons.io.IOUtils;
@@ -20,6 +24,8 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.sql.*;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 
 import static org.testng.Assert.assertEquals;
@@ -173,13 +179,13 @@ public class TestStreams {
 
       Logger.setReady(false);
       //
-      PreparedStatement stmt = connA.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
+      PreparedStatement stmt = connA.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), date DATE, time TIME, timestamp TIMESTAMP, PRIMARY KEY (id))");
       stmt.executeUpdate();
 
       stmt = connA.prepareStatement("create table nokey (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20))");
       stmt.executeUpdate();
 
-      stmt = connB.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
+      stmt = connB.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), date DATE, time TIME, timestamp TIMESTAMP,  PRIMARY KEY (id))");
       stmt.executeUpdate();
 
       stmt = connB.prepareStatement("create table nokey (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20))");
@@ -190,6 +196,25 @@ public class TestStreams {
       for (DatabaseServer server : dbServers) {
         server.shutdownRepartitioner();
       }
+
+      Thread.sleep(10_000);
+
+      for (int i = 0; i < 10; i++) {
+        stmt = connA.prepareStatement("insert into persons (id, socialSecurityNumber, relatives, restricted, gender, id3, date, time, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        stmt.setLong(1, i);
+        stmt.setString(2, "933-28-" + i);
+        stmt.setString(3, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+        stmt.setBoolean(4, false);
+        stmt.setString(5, "m");
+        stmt.setLong(6, i + 1000);
+        stmt.setDate(7, new Date(1975 - 1900, 11, 12));
+        stmt.setTime(8, new Time(12, 10, 9));
+        stmt.setTimestamp(9, new Timestamp(1975 - 1900, 11, 12, 12, 10, 9, 0));
+        assertEquals(stmt.executeUpdate(), 1);
+      }
+
+      Thread.sleep(10_000);
+
     }
     catch (Exception e) {
       e.printStackTrace();
@@ -200,18 +225,6 @@ public class TestStreams {
   @Test
   public void test() throws InterruptedException, SQLException {
 
-    for (int i = 0; i < 10; i++) {
-      PreparedStatement stmt = connA.prepareStatement("insert into persons (id, socialSecurityNumber, relatives, restricted, gender, id3) VALUES (?, ?, ?, ?, ?, ?)");
-      stmt.setLong(1, i);
-      stmt.setString(2, "933-28-" + i);
-      stmt.setString(3, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
-      stmt.setBoolean(4, false);
-      stmt.setString(5, "m");
-      stmt.setLong(6, i + 1000);
-      assertEquals(stmt.executeUpdate(), 1);
-    }
-
-    Thread.sleep(10_000);
 
     PreparedStatement stmt = connB.prepareStatement("select * from persons");
     ResultSet ret = stmt.executeQuery();
@@ -307,5 +320,36 @@ public class TestStreams {
     }
     assertFalse(ret.next());
 
+  }
+
+  @Test
+  public void testDates() throws SQLException, IOException {
+    StringBuilder builder = new StringBuilder();
+    TableSchema tableSchema = clientA.getCommon().getTables("test").get("persons");
+    Index index = dbServers[0].getIndices().get("test").getIndices().get("persons").get("_1__primarykey");
+    Map.Entry<Object[], Object> entry = index.lastEntry();
+    byte[][] bytes = dbServers[0].fromUnsafeToRecords(entry.getValue());
+    Record record = new Record("test", clientA.getCommon(), bytes[0]);
+
+    builder.append("{");
+    UpdateManager.getJsonFromRecord(builder, tableSchema, record);
+    builder.append("}");
+
+    ObjectMapper mapper = new ObjectMapper();
+    ObjectNode node = (ObjectNode) mapper.readTree(builder.toString());
+    node.remove("_sonicbase_sequence0");
+    node.remove("_sonicbase_sequence1");
+    node.remove("_sonicbase_sequence2");
+
+    assertEquals(node.toString(), "{\"id\":9,\"socialsecuritynumber\":\"933-28-9\",\"relatives\":\"12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901\",\"restricted\":false,\"gender\":\"m\",\"date\":\"1975-12-12 07:00:00.000+0000\",\"time\":\"19:10:09.000+0000\",\"timestamp\":\"1975-12-12 19:10:09.000+0000\"}");
+    System.out.println(node.toString());
+    JsonNode json = mapper.readTree(builder.toString());
+    List< FieldSchema > fields = clientA.getCommon().getTables("test").get("persons").getFields();
+    Object[] ret = StreamManager.getCurrRecordFromJson(json, fields);
+
+    Object field = ret[tableSchema.getFieldOffset("date")];
+    assertEquals(field, new Date(1975 - 1900, 11, 12));
+    assertEquals(ret[tableSchema.getFieldOffset("time")], new Time(12, 10, 9));
+    assertEquals(ret[tableSchema.getFieldOffset("timestamp")], new Timestamp(1975 - 1900, 11, 12, 12, 10, 9, 0));
   }
 }

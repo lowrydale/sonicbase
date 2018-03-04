@@ -9,7 +9,6 @@ import com.google.gson.JsonParser;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
-import com.sonicbase.streams.LocalConsumer;
 import com.sonicbase.streams.LocalProducer;
 import com.sonicbase.streams.Message;
 import org.apache.commons.io.IOUtils;

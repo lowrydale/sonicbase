@@ -446,6 +446,7 @@ public class BulkImportManager {
     int offset = 0;
     for (FieldSchema field : fields) {
       if (field.getName().equals("_sonicbase_id")) {
+        offset++;
         continue;
       }
       switch (field.getType()) {
@@ -1107,7 +1108,7 @@ public class BulkImportManager {
       int fieldOffset = 0;
       for (FieldSchema field : fields) {
         if (field.getName().equals("_sonicbase_id")) {
-          //fieldOffset++;
+          fieldOffset++;
           continue;
         }
         switch (field.getType()) {

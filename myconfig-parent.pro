@@ -1,5 +1,5 @@
--injars       obfuscated/target/sonicbase-parent-unobfuscated-1.2.10.jar
--outjars      obfuscated/target/sonicbase-parent-1.2.10.jar
+-injars       db/target/sonicbase-core-unobfuscated-1.2.10.jar
+-outjars      db/target/sonicbase-core-1.2.10.jar
 -libraryjars  <java.home>/lib/rt.jar
 -printmapping sonicbase-parent.map
 
@@ -10,31 +10,29 @@
 -renamesourcefileattribute SourceFile
 -keepattributes Exceptions,InnerClasses,Signature,Deprecated,SourceFile,LineNumberTable,*Annotation*,EnclosingMethod
 
-
 -keep public class com.sonicbase.bench.CustomFunctions
 -keep public class com.sonicbase.bench.TestPerformance
--keep public class com.sonicbase.server.DatabaseServer
--keep public class Driver
--keep public class ReconfigureResults
--keep public class ConnectionProxy
--keep public enum ConnectionProxy$Replica
--keep public class ResultSetProxy
--keep public class StatementProxy
--keep public class MemUtil
--keep public class ComObject
--keep public enum ComObject$Tag
--keep public class ComArray
--keep public class DataType
--keep public class FieldSchema
--keep public class TableSchema
--keep public enum DataType$Type
--keep public class DatabaseException
--keep public class LicenseOutOfComplianceException
+-keep public class com.sonicbase.jdbcdriver.Driver
+-keep public class com.sonicbase.client.ReconfigureResults
+-keep public class com.sonicbase.jdbcdriver.ConnectionProxy
+-keep public enum com.sonicbase.jdbcdriver.ConnectionProxy$Replica
+-keep public class com.sonicbase.jdbcdriver.ResultSetProxy
+-keep public class com.sonicbase.jdbcdriver.StatementProxy
+-keep public class com.sonicbase.common.MemUtil
+-keep public class com.sonicbase.common.ComObject
+-keep public enum com.sonicbase.common.ComObject$Tag
+-keep public class com.sonicbase.common.ComArray
+-keep public class com.sonicbase.schema.DataType
+-keep public class com.sonicbase.schema.FieldSchema
+-keep public class com.sonicbase.schema.TableSchema
+-keep public enum com.sonicbase.schema.DataType$Type
+-keep public class com.sonicbase.query.DatabaseException
+-keep public class com.sonicbase.common.LicenseOutOfComplianceException
 -keep public class com.sonicbase.common.WindowsTerminal
--keep public class ResultSetImpl
--keep public class ResultSet
--keep public class DateUtils
--keep public class SchemaOutOfSyncException
+-keep public class com.sonicbase.query.impl.ResultSetImpl
+-keep public class com.sonicbase.query.ResultSet
+-keep public class com.sonicbase.util.DateUtils
+-keep public class com.sonicbase.common.SchemaOutOfSyncException
 -keep public class com.sonicbase.server.LogManager$ByteCounterStream
 
 -keepclassmembers  class com.sonicbase.bench.TestPerformance {
@@ -43,82 +41,75 @@
 -keepclassmembers  class com.sonicbase.bench.CustomFunctions {
     !private <methods>;
 }
--keepclassmembers class com.sonicbase.server.DatabaseServer {
-    !private <methods>;
-    !private <fields>;
-    !public <methods>;
-    !public <fields>;
-    public byte[] invokeMethod(byte[], boolean, boolean);
-}
 
--keepclassmembers  class Driver {
+-keepclassmembers  class com.sonicbase.jdbcdriver.Driver {
     !private <methods>;
 }
--keepclassmembers class ReconfigureResults {
+-keepclassmembers class com.sonicbase.client.ReconfigureResults {
     !private <methods>;
 }
--keepclassmembers class ConnectionProxy {
+-keepclassmembers class com.sonicbase.jdbcdriver.ConnectionProxy {
     !private <methods>;
 }
--keepclassmembers enum ConnectionProxy$Replica {
-    !private <methods>;
-    !private <fields>;
-    public static **[] values(); public static ** valueOf(java.lang.String);
-}
--keepclassmembers class ResultSetProxy {
-    !private <methods>;
-}
--keepclassmembers class StatementProxy {
-    !private <methods>;
-}
--keepclassmembers class MemUtil {
-    !private <methods>;
-}
--keepclassmembers class ComObject {
-    !private <methods>;
-}
--keepclassmembers enum ComObject$Tag {
+-keepclassmembers enum com.sonicbase.jdbcdriver.ConnectionProxy$Replica {
     !private <methods>;
     !private <fields>;
     public static **[] values(); public static ** valueOf(java.lang.String);
 }
--keepclassmembers class ComArray {
+-keepclassmembers class com.sonicbase.jdbcdriver.ResultSetProxy {
     !private <methods>;
 }
--keepclassmembers class DataType {
+-keepclassmembers class com.sonicbase.jdbcdriver.StatementProxy {
     !private <methods>;
 }
--keepclassmembers class FieldSchema {
+-keepclassmembers class com.sonicbase.common.MemUtil {
     !private <methods>;
 }
--keepclassmembers class TableSchema {
+-keepclassmembers class com.sonicbase.common.ComObject {
     !private <methods>;
 }
--keepclassmembers enum DataType$Type {
+-keepclassmembers enum com.sonicbase.common.ComObject$Tag {
     !private <methods>;
     !private <fields>;
     public static **[] values(); public static ** valueOf(java.lang.String);
 }
--keepclassmembers class DatabaseException {
+-keepclassmembers class com.sonicbase.common.ComArray {
     !private <methods>;
 }
--keepclassmembers class LicenseOutOfComplianceException {
+-keepclassmembers class com.sonicbase.schema.DataType {
+    !private <methods>;
+}
+-keepclassmembers class com.sonicbase.schema.FieldSchema {
+    !private <methods>;
+}
+-keepclassmembers class com.sonicbase.schema.TableSchema {
+    !private <methods>;
+}
+-keepclassmembers enum com.sonicbase.schema.DataType$Type {
+    !private <methods>;
+    !private <fields>;
+    public static **[] values(); public static ** valueOf(java.lang.String);
+}
+-keepclassmembers class com.sonicbase.query.DatabaseException {
+    !private <methods>;
+}
+-keepclassmembers class com.sonicbase.common.LicenseOutOfComplianceException {
     !private <methods>;
 }
 
 -keepclassmembers class com.sonicbase.common.WindowsTerminal {
     !private <methods>;
 }
--keepclassmembers class ResultSetImpl {
+-keepclassmembers class com.sonicbase.query.impl.ResultSetImpl {
     !private <methods>;
 }
--keepclassmembers class ResultSet {
+-keepclassmembers class com.sonicbase.query.ResultSet {
     !private <methods>;
 }
--keepclassmembers class DateUtils {
+-keepclassmembers class com.sonicbase.util.DateUtils {
     !private <methods>;
 }
--keepclassmembers class SchemaOutOfSyncException {
+-keepclassmembers class com.sonicbase.common.SchemaOutOfSyncException {
     !private <methods>;
 }
 
@@ -155,7 +146,60 @@
 -keep public class com.sonicbase.research.socket.NettyServer$MyChannelInitializer
 -keep public class com.sonicbase.research.socket.NettyServer$ServerHandler
 -keep public class com.sonicbase.server.MethodInvoker
+-keep public class com.sonicbase.procedure.MyStoredProcedure1
+-keep public class com.sonicbase.procedure.MyStoredProcedure2
+-keep public class com.sonicbase.procedure.MyStoredProcedure3
+-keep public class com.sonicbase.procedure.MyStoredProcedure4
+-keep public class com.sonicbase.procedure.Parameters
+-keep public class com.sonicbase.procedure.Record
+-keep public class com.sonicbase.procedure.RecordEvaluator
+-keep public class com.sonicbase.procedure.SonicBaseConnection
+-keep public class com.sonicbase.procedure.SonicBasePreparedStatement
+-keep public class com.sonicbase.procedure.StoredProcedure
+-keep public class com.sonicbase.procedure.StoredProcedureContext
+-keep public class com.sonicbase.procedure.StoredProcedureResponse
+-keep public class com.sonicbase.procedure.StoredProcedureClient
 
+-keepclassmembers  class com.sonicbase.procedure.StoredProcedureClient {
+      public static void main(java.lang.String[]);
+    !private <methods>;
+}
+-keepclassmembers  class com.sonicbase.procedure.MyStoredProcedure1 {
+    !private <methods>;
+}
+-keepclassmembers  class com.sonicbase.procedure.MyStoredProcedure2 {
+    !private <methods>;
+}
+-keepclassmembers  class com.sonicbase.procedure.MyStoredProcedure3 {
+    !private <methods>;
+}
+-keepclassmembers  class com.sonicbase.procedure.MyStoredProcedure4 {
+    !private <methods>;
+}
+-keepclassmembers  class com.sonicbase.procedure.Parameters {
+    !private <methods>;
+}
+-keepclassmembers  class com.sonicbase.procedure.Record {
+    !private <methods>;
+}
+-keepclassmembers  class com.sonicbase.procedure.RecordEvaluator {
+    !private <methods>;
+}
+-keepclassmembers  class com.sonicbase.procedure.SonicBaseConnection {
+    !private <methods>;
+}
+-keepclassmembers  class com.sonicbase.procedure.SonicBasePreparedStatement {
+    !private <methods>;
+}
+-keepclassmembers  class com.sonicbase.procedure.StoredProcedure {
+    !private <methods>;
+}
+-keepclassmembers  class com.sonicbase.procedure.StoredProcedureContext {
+    !private <methods>;
+}
+-keepclassmembers  class com.sonicbase.procedure.StoredProcedureResponse {
+    !private <methods>;
+}
 -keepclassmembers  class com.sonicbase.streams.AWSSQSProducer {
     !private <methods>;
 }

@@ -71,11 +71,6 @@
             <artifactId>sonicbase-core-unobfuscated</artifactId>
             <version>1.2.10</version>
         </dependency>
-        <dependency>
-            <groupId>com.sonicbase</groupId>
-            <artifactId>sonicbase-jdbc-unobfuscated</artifactId>
-            <version>1.2.10</version>
-        </dependency>
     </dependencies>
 
 </project>

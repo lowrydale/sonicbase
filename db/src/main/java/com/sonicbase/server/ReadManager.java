@@ -702,10 +702,10 @@ public class ReadManager {
       }
 
       retObj.put(ComObject.Tag.currOffset, currOffset.get());
-
-      if (schemaVersion < server.getSchemaVersion()) {
-        throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
-      }
+//
+//      if (schemaVersion < server.getSchemaVersion()) {
+//        throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
+//      }
 
       return retObj;
     }
@@ -1222,9 +1222,9 @@ public class ReadManager {
 
       retObj.put(ComObject.Tag.currOffset, currOffset.get());
 
-      if (schemaVersion < server.getSchemaVersion()) {
-        throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
-      }
+//      if (schemaVersion < server.getSchemaVersion()) {
+//        throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
+//      }
 
       return retObj;
     }
@@ -1313,9 +1313,20 @@ public class ReadManager {
             boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
             if (pass) {
               if (procedureContext != null) {
-                com.sonicbase.procedure.RecordImpl procedureRecord = new RecordImpl();
-                procedureRecord.setRecord(record);
-                pass = procedureContext.getRecordEvaluator().evaluate(procedureContext, procedureRecord);
+                if (procedureContext.getRecordEvaluator() == null) {
+                  pass = true;
+                }
+                else {
+                  com.sonicbase.procedure.RecordImpl procedureRecord = new RecordImpl();
+                  procedureRecord.setRecord(record);
+                  procedureRecord.setDatabase(dbName);
+                  procedureRecord.setTableSchema(tableSchema);
+                  procedureRecord.setCommon(server.getCommon());
+                  procedureRecord.setViewVersion((int) record.getDbViewNumber());
+                  procedureRecord.setIsDeleting((record.getDbViewFlags() & Record.DB_VIEW_FLAG_DELETING) != 0);
+                  procedureRecord.setIsAdding((record.getDbViewFlags() & Record.DB_VIEW_FLAG_ADDING) != 0);
+                  pass = procedureContext.getRecordEvaluator().evaluate(procedureContext, procedureRecord);
+                }
               }
               if (pass) {
                 byte[][] currRecords = new byte[][]{bytes};
@@ -1574,6 +1585,8 @@ public class ReadManager {
           if (retKeyRecords.size() >= count || retRecords.size() >= count) {
             break;
           }
+//          System.out.println("processing key: " + DatabaseCommon.keyToString(entry.getKey()) +
+//              ", shard=" + server.getShard() + ", replica=" + server.getReplica() + ", viewver=" + server.getCommon().getSchemaVersion());
           if (key != null) {
             if (excludeKeys != null) {
               for (Object[] excludeKey : excludeKeys) {
@@ -2694,9 +2707,20 @@ public class ReadManager {
             boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
             if (pass) {
               if (procedureContext != null) {
-                com.sonicbase.procedure.RecordImpl procedureRecord = new RecordImpl();
-                procedureRecord.setRecord(record);
-                pass = procedureContext.getRecordEvaluator().evaluate(procedureContext, procedureRecord);
+                if (procedureContext.getRecordEvaluator() == null) {
+                  pass = true;
+                }
+                else {
+                  com.sonicbase.procedure.RecordImpl procedureRecord = new RecordImpl();
+                  procedureRecord.setRecord(record);
+                  procedureRecord.setDatabase(dbName);
+                  procedureRecord.setTableSchema(tableSchema);
+                  procedureRecord.setCommon(server.getCommon());
+                  procedureRecord.setViewVersion((int) record.getDbViewNumber());
+                  procedureRecord.setIsDeleting((record.getDbViewFlags() & Record.DB_VIEW_FLAG_DELETING) != 0);
+                  procedureRecord.setIsAdding((record.getDbViewFlags() & Record.DB_VIEW_FLAG_ADDING) != 0);
+                  pass = procedureContext.getRecordEvaluator().evaluate(procedureContext, procedureRecord);
+                }
               }
               if (pass) {
                 int[] keyOffsets = null;
@@ -2743,31 +2767,54 @@ public class ReadManager {
 
           byte[][] ret = applySelectToResultRecords(serializationVersion, dbName, columnOffsets, forceSelectOnServer, records, null,
               tableSchema, counters, groupContext, keyOffsets, keyContainsColumns);
-          if (counters == null) {
-            for (byte[] currBytes : ret) {
-              done.set(false);
-              boolean include = true;
-              long targetOffset = 1;
-              currOffset.incrementAndGet();
-              if (offset != null) {
-                targetOffset = offset;
-                if (currOffset.get() < offset) {
-                  include = false;
-                }
+          boolean pass = true;
+          if (procedureContext != null) {
+            if (procedureContext.getRecordEvaluator() == null) {
+              pass = true;
+            }
+            else {
+              for (byte[] bytes : records) {
+                Record record = new Record(tableSchema);
+                record.deserialize(dbName, server.getCommon(), bytes, null, true);
+                com.sonicbase.procedure.RecordImpl procedureRecord = new RecordImpl();
+                procedureRecord.setRecord(record);
+                procedureRecord.setDatabase(dbName);
+                procedureRecord.setTableSchema(tableSchema);
+                procedureRecord.setCommon(server.getCommon());
+                procedureRecord.setViewVersion((int) record.getDbViewNumber());
+                procedureRecord.setIsDeleting((record.getDbViewFlags() & Record.DB_VIEW_FLAG_DELETING) != 0);
+                procedureRecord.setIsAdding((record.getDbViewFlags() & Record.DB_VIEW_FLAG_ADDING) != 0);
+                pass = procedureContext.getRecordEvaluator().evaluate(procedureContext, procedureRecord);
               }
-              if (include) {
-                if (limit != null) {
-                  if (currOffset.get() >= targetOffset + limit) {
+            }
+          }
+          if (pass) {
+            if (counters == null) {
+              for (byte[] currBytes : ret) {
+                done.set(false);
+                boolean include = true;
+                long targetOffset = 1;
+                currOffset.incrementAndGet();
+                if (offset != null) {
+                  targetOffset = offset;
+                  if (currOffset.get() < offset) {
                     include = false;
-                    done.set(true);
                   }
                 }
-              }
-              if (include) {
-                retRecords.add(currBytes);
-              }
-              if (done.get()) {
-                return true;
+                if (include) {
+                  if (limit != null) {
+                    if (currOffset.get() >= targetOffset + limit) {
+                      include = false;
+                      done.set(true);
+                    }
+                  }
+                }
+                if (include) {
+                  retRecords.add(currBytes);
+                }
+                if (done.get()) {
+                  return true;
+                }
               }
             }
           }

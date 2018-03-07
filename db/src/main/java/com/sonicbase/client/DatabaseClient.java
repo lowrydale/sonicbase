@@ -7,18 +7,13 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.common.*;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.jdbcdriver.QueryType;
-
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.*;
 import com.sonicbase.query.impl.*;
-
-import com.sonicbase.schema.FieldSchema;
+import com.sonicbase.schema.*;
 import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.socket.DatabaseSocketClient;
 import com.sonicbase.socket.DeadServerException;
-import com.sonicbase.schema.DataType;
-import com.sonicbase.schema.Schema;
-import com.sonicbase.schema.TableSchema;
 import net.sf.jsqlparser.expression.*;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.operators.arithmetic.*;
@@ -46,11 +41,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 
 import javax.net.ssl.*;
-
-import com.sonicbase.schema.IndexSchema;
-
 import java.io.*;
-import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLConnection;
 import java.security.cert.X509Certificate;
@@ -71,7 +62,7 @@ public class DatabaseClient {
   private final boolean isClient;
   private final int shard;
   private final int replica;
-  private final Object databaseServer;
+  private Object databaseServer;
   private Server[][] servers;
   private DatabaseCommon common = new DatabaseCommon();
   private ThreadPoolExecutor executor = new ThreadPoolExecutor(128, 128, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
@@ -764,6 +755,10 @@ public class DatabaseClient {
 
   public Object getDatabaseServer() {
     return databaseServer;
+  }
+
+  public void setDatabaseServer(DatabaseServer databaseServer) {
+    this.databaseServer = databaseServer;
   }
 
   static class SocketException extends Exception {
@@ -1525,8 +1520,9 @@ public class DatabaseClient {
 
   private byte[] invokeOnServer(Object dbServer, byte[] body, boolean replayedCommand, boolean enableQueuing) {
     try {
-      Method method = Class.forName("com.sonicbase.server.DatabaseServer").getMethod("invokeMethod", byte[].class, boolean.class, boolean.class);
-      return (byte[]) method.invoke(dbServer, body, replayedCommand, enableQueuing);
+      return ((DatabaseServer)dbServer).invokeMethod(body, replayedCommand, enableQueuing);
+//      Method method = Class.forName("com.sonicbase.server.DatabaseServer").getMethod("invokeMethod", byte[].class, boolean.class, boolean.class);
+//      return (byte[]) method.invoke(dbServer, body, replayedCommand, enableQueuing);
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -1706,9 +1702,14 @@ public class DatabaseClient {
           }
         }
         Statement statement;
-        if (toLower(sql.substring(0, "call".length())).startsWith("call")) {
-          sql.replace("call", "execute");
-          return doDescribe(dbName, sql);
+        if (toLower(sql.toLowerCase().substring(0, "call".length())).startsWith("call")) {
+          int pos = sql.toLowerCase().indexOf("procedure");
+          sql = sql.substring(pos + "procedure".length()).trim();
+          if (sql.charAt(0) == '(') {
+            sql = sql.substring(1);
+            sql = sql.substring(0, sql.lastIndexOf(')'));
+          }
+          sql = "execute procedure " + sql;
         }
 
         if (toLower(sql.substring(0, "describe".length())).startsWith("describe")) {
@@ -1775,7 +1776,7 @@ public class DatabaseClient {
           }
           else if (statement instanceof Execute) {
             Execute execute = (Execute) statement;
-            doExecuteProcedure(dbName, sql, execute);
+            return doExecuteProcedure(dbName, sql, execute);
           }
         }
       }
@@ -1790,7 +1791,7 @@ public class DatabaseClient {
     }
   }
 
-  private void doExecuteProcedure(String dbName, String sql, Execute execute) {
+  private ResultSetImpl doExecuteProcedure(String dbName, String sql, Execute execute) {
     ExpressionList expressions = execute.getExprList();
     if (!"procedure".equalsIgnoreCase((execute.getName()))) {
       throw new DatabaseException("invalid execute parameter: parm=" + execute.getName());
@@ -1803,8 +1804,12 @@ public class DatabaseClient {
 
     byte[] ret = send(null, ThreadLocalRandom.current().nextInt(0, getShardCount()), 0, cobj, Replica.def);
     if (ret != null) {
-      ComObject retOj = new ComObject(ret);
+
+      ComObject retObj = new ComObject(ret);
+      ResultSetImpl rs = new ResultSetImpl(this, retObj.getArray(ComObject.Tag.records));
+      return rs;
     }
+    return new ResultSetImpl(this, (ComArray)null);
   }
 
   private Object doExplain(String dbName, String sql, ParameterHandler parms) {

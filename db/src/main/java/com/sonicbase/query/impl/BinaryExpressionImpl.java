@@ -4,14 +4,13 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.Record;
 import com.sonicbase.common.SchemaOutOfSyncException;
 import com.sonicbase.jdbcdriver.ParameterHandler;
-import com.sonicbase.procedure.RecordEvaluator;
+import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.Expression;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-
 import net.sf.jsqlparser.statement.select.Limit;
 import net.sf.jsqlparser.statement.select.Offset;
 
@@ -63,6 +62,18 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
   }
 
   public BinaryExpressionImpl() {
+  }
+
+  public void setRestrictToThisServer(boolean restrictToThisServer) {
+    super.setRestrictToThisServer(restrictToThisServer);
+    leftExpression.setRestrictToThisServer(restrictToThisServer);
+    rightExpression.setRestrictToThisServer(restrictToThisServer);
+  }
+
+  public void setProcedureContext(StoredProcedureContextImpl procedureContext) {
+    super.setProcedureContext(procedureContext);
+    leftExpression.setProcedureContext(procedureContext);
+    rightExpression.setProcedureContext(procedureContext);
   }
 
   public boolean isTwoKeyLookup() {

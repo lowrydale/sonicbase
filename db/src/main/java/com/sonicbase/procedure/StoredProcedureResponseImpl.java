@@ -2,26 +2,30 @@ package com.sonicbase.procedure;
 
 import com.sonicbase.common.ComArray;
 import com.sonicbase.common.ComObject;
+import com.sonicbase.common.DatabaseCommon;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class StoredProcedureResponseImpl implements StoredProcedureResponse {
+  private DatabaseCommon common;
   private List<Record> records = new ArrayList<>();
 
-  public StoredProcedureResponseImpl(ComObject comObject) {
+  public StoredProcedureResponseImpl(DatabaseCommon common, ComObject comObject) {
+    this.common = common;
+
     ComArray array = comObject.getArray(ComObject.Tag.records);
     if (array != null) {
       for (int i = 0; i < array.getArray().size(); i++) {
         ComObject recordObj = (ComObject) array.getArray().get(i);
-        Record record = new RecordImpl(recordObj);
+        Record record = new RecordImpl(common, recordObj);
         records.add(record);
       }
     }
   }
 
-  public StoredProcedureResponseImpl() {
-
+  public StoredProcedureResponseImpl(DatabaseCommon common) {
+    this.common = common;
   }
 
   @Override

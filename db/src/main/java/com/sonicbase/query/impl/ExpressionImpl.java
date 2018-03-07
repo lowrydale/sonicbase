@@ -5,7 +5,6 @@ import com.codahale.metrics.Timer;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.jdbcdriver.ParameterHandler;
-import com.sonicbase.procedure.RecordEvaluator;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
@@ -13,7 +12,6 @@ import com.sonicbase.query.Expression;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-
 import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.server.ReadManager;
 import net.sf.jsqlparser.statement.select.Limit;
@@ -1325,9 +1323,9 @@ public abstract class ExpressionImpl implements Expression {
               cobj.put(ComObject.Tag.count, count);
               cobj.put(ComObject.Tag.method, "batchIndexLookup");
               byte[] lookupRet = client.send(null, shard, -1, cobj, DatabaseClient.Replica.def);
-              if (previousSchemaVersion < common.getSchemaVersion()) {
-                throw new SchemaOutOfSyncException();
-              }
+//              if (previousSchemaVersion < common.getSchemaVersion()) {
+//                throw new SchemaOutOfSyncException();
+//              }
               AtomicInteger serializedSchemaVersion = null;
               Record headerRecord = null;
 //              ByteArrayInputStream bytes = new ByteArrayInputStream(lookupRet);
@@ -1535,8 +1533,8 @@ public abstract class ExpressionImpl implements Expression {
       try {
         //todo: do we really want to change the view version?
         if (viewVersion == 0) {
-          throw new DatabaseException("view version not set");
-          //viewVersion = common.getSchemaVersion();
+          //throw new DatabaseException("view version not set");
+          viewVersion = common.getSchemaVersion();
         }
 
         TableSchema tableSchema = common.getTables(dbName).get(tableName);
@@ -1781,7 +1779,7 @@ public abstract class ExpressionImpl implements Expression {
             cobj.put(ComObject.Tag.isExcpliciteTrans, client.isExplicitTrans());
             cobj.put(ComObject.Tag.isCommitting, client.isCommitting());
             cobj.put(ComObject.Tag.transactionId, client.getTransactionId());
-            cobj.put(ComObject.Tag.viewVersion, viewVersion);
+            cobj.put(ComObject.Tag.viewVersion, (long)viewVersion);
 
             cobj.put(ComObject.Tag.isProbe, isProbe);
 
@@ -1892,9 +1890,9 @@ public abstract class ExpressionImpl implements Expression {
 
 
             int calledShard = localShard;
-            if (previousSchemaVersion < common.getSchemaVersion()) {
-              throw new SchemaOutOfSyncException();
-            }
+//            if (previousSchemaVersion < common.getSchemaVersion()) {
+//              throw new SchemaOutOfSyncException();
+//            }
             byte[] keyBytes = retObj.getByteArray(ComObject.Tag.keyBytes);
             if (keyBytes != null) {
               Object[] retKey = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
@@ -2163,9 +2161,9 @@ public abstract class ExpressionImpl implements Expression {
               recordCache.put(tableSchema.getName(), key, new CachedRecord(record, null));
             }
           }
-          if (previousSchemaVersion < common.getSchemaVersion()) {
-            throw new SchemaOutOfSyncException();
-          }
+//          if (previousSchemaVersion < common.getSchemaVersion()) {
+//            throw new SchemaOutOfSyncException();
+//          }
 
           return new SelectContextImpl(tableSchema.getName(), indexSchema.getName(), leftOperator, nextShard, nextKey,
               retKeys, recordCache, lastShard, currPartitions);
@@ -2374,7 +2372,7 @@ public abstract class ExpressionImpl implements Expression {
             cobj.put(ComObject.Tag.legacyGroupContext, groupByContext.serialize(client.getCommon()));
           }
           cobj.put(ComObject.Tag.isProbe, isProbe);
-          cobj.put(ComObject.Tag.viewVersion, viewVersion);
+          cobj.put(ComObject.Tag.viewVersion, (long)viewVersion);
           cobj.put(ComObject.Tag.count, count);
           cobj.put(ComObject.Tag.dbName, dbName);
           cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
@@ -2388,9 +2386,9 @@ public abstract class ExpressionImpl implements Expression {
             byte[] lookupRet = client.send(null, localShard, 0, cobj, DatabaseClient.Replica.def);
             retObj = new ComObject(lookupRet);
           }
-          if (previousSchemaVersion < common.getSchemaVersion()) {
-            throw new SchemaOutOfSyncException();
-          }
+//          if (previousSchemaVersion < common.getSchemaVersion()) {
+//            throw new SchemaOutOfSyncException();
+//          }
 
           Long retOffset = retObj.getLong(ComObject.Tag.currOffset);
           if (retOffset != null) {

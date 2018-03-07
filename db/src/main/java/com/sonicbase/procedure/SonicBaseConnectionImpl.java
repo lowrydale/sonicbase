@@ -311,4 +311,8 @@ public class SonicBaseConnectionImpl implements SonicBaseConnection {
   public boolean isWrapperFor(Class<?> iface) throws SQLException {
     return proxy.isWrapperFor(iface);
   }
+
+  public Connection getConnection() {
+    return proxy;
+  }
 }

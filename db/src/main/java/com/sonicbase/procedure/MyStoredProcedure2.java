@@ -11,8 +11,8 @@ public class MyStoredProcedure2 implements StoredProcedure {
   public void init(StoredProcedureContext context) {
     try {
       SonicBasePreparedStatement stmt = context.getConnection().prepareSonicBaseStatement(
-          context, "create table " + context.getStoredProdecureId() + "_results (id BIGINT, num DOUBLE, socialSecurityNumber " +
-              "VARCHAR(20), gender VARCHAR(8), PRIMARY KEY (id))");
+          context, "create table " + "results_" + context.getStoredProdecureId() + " (id1 BIGINT, num DOUBLE, socialSecurityNumber " +
+              "VARCHAR(20), gender VARCHAR(8), PRIMARY KEY (id1))");
       stmt.executeUpdate();
       stmt.close();
     }
@@ -24,7 +24,7 @@ public class MyStoredProcedure2 implements StoredProcedure {
   @Override
   public StoredProcedureResponse execute(final StoredProcedureContext context) {
     try {
-      String query = context.getParameters().getString(2);
+      String query = "select * from persons where id1>1 and id1<500 and gender='m'";
 
       SonicBasePreparedStatement stmt = context.getConnection().prepareSonicBaseStatement(context, query);
       stmt.restrictToThisServer(true);
@@ -35,12 +35,14 @@ public class MyStoredProcedure2 implements StoredProcedure {
         public boolean evaluate(final StoredProcedureContext context, Record record) {
           if (record.getDatabase().equalsIgnoreCase("db") &&
               record.getTableName().equalsIgnoreCase("persons")) {
-            Long id = record.getLong("id");
-            if (id != null && id > 50 && id < context.getParameters().getInt(3) && passesComplicatedLogic(record)) {
-              batch.add(record);
-              if (batch.size() >= 200) {
-                insertBatch(context, batch);
-                batch.clear();
+            Long id = record.getLong("id1");
+            if (id != null && id > 2 && id < context.getParameters().getInt(2) && passesComplicatedLogic(record)) {
+              if (!record.isDeleting()) {
+                batch.add(record);
+                if (batch.size() >= 200) {
+                  insertBatch(context, batch);
+                  batch.clear();
+                }
               }
             }
           }
@@ -68,9 +70,9 @@ public class MyStoredProcedure2 implements StoredProcedure {
   public void insertBatch(StoredProcedureContext context, List<Record> batch) {
     try {
       PreparedStatement insertStmt = context.getConnection().prepareStatement("insert into " +
-          context.getStoredProdecureId() + "_results (id, socialsecuritynumber, gender) VALUES (?, ?, ?)");
+           "results_" + context.getStoredProdecureId() + " (id1, socialsecuritynumber, gender) VALUES (?, ?, ?)");
       for (Record record : batch) {
-        insertStmt.setLong(1, record.getLong("id"));
+        insertStmt.setLong(1, record.getLong("id1"));
         insertStmt.setString(2, record.getString("socialsecuritynumber"));
         insertStmt.setString(3, record.getString("gender"));
         insertStmt.addBatch();
@@ -86,7 +88,7 @@ public class MyStoredProcedure2 implements StoredProcedure {
   public StoredProcedureResponse finalize(StoredProcedureContext context,
                                           List<StoredProcedureResponse> responses) {
     Record record = context.createRecord();
-    record.setString("tableName",context.getStoredProdecureId() + "_results");
+    record.setString("tableName", "results_" + context.getStoredProdecureId());
 
     StoredProcedureResponse response = context.createResponse();
     response.addRecord(record);

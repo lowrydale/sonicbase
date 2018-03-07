@@ -4,6 +4,7 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 
 import com.sonicbase.jdbcdriver.ParameterHandler;
+import com.sonicbase.procedure.RecordImpl;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
@@ -38,6 +39,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public class ResultSetImpl implements ResultSet {
   private static final String UTF8_STR = "utf-8";
   private static final String LENGTH_STR = "length";
+  private ComArray recordsResults;
   private StoredProcedureContextImpl procedureContext;
   private boolean restrictToThisServer;
   private Map<String, SelectFunctionImpl> functionAliases;
@@ -70,6 +72,8 @@ public class ResultSetImpl implements ResultSet {
   private Limit limit;
   private long pageSize = DatabaseClient.SELECT_PAGE_SIZE;
   private Object moreServerSetResults;
+  private RecordImpl cachedRecordResultAsRecord;
+  private ComObject cachedRecordResutslAsCObj;
 
   public ResultSetImpl(String[] describeStrs) {
     this.describeStrs = describeStrs;
@@ -93,6 +97,11 @@ public class ResultSetImpl implements ResultSet {
     this.functionAliases = functionAliases;
     this.restrictToThisServer = restrictToThisServer;
     this.procedureContext = procedureContext;
+  }
+
+  public ResultSetImpl(DatabaseClient databaseClient, ComArray records) {
+    this.databaseClient = databaseClient;
+    this.recordsResults = records;
   }
 
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP", justification = "copying the returned data is too slow")
@@ -398,6 +407,15 @@ public class ResultSetImpl implements ResultSet {
       if (currPos > describeStrs.length - 1) {
         return false;
       }
+      return true;
+    }
+    if (recordsResults != null) {
+      if (currPos > recordsResults.getArray().size() - 1) {
+        cachedRecordResultAsRecord = null;
+        return false;
+      }
+      ComObject cobj = ((ComObject)recordsResults.getArray().get(currPos));
+      cachedRecordResultAsRecord = new RecordImpl(databaseClient.getCommon(), cobj);
       return true;
     }
     if (mapResults != null) {
@@ -780,6 +798,9 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public String getString(String columnLabel) {
+    if (recordsResults != null) {
+      return cachedRecordResultAsRecord.getString(columnLabel);
+    }
     if (mapResults != null) {
       return mapResults.get(currPos).get(columnLabel);
     }
@@ -912,6 +933,9 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public Boolean getBoolean(String columnLabel) {
+    if (recordsResults != null) {
+      return cachedRecordResultAsRecord.getBoolean(columnLabel);
+    }
     FieldInfo fieldInfo = fieldInfos.get(columnLabel);
     if (canShortCircuitFieldLookup(fieldInfo)) {
       ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
@@ -959,6 +983,10 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public Byte getByte(String columnLabel) {
+    if (recordsResults != null) {
+      return cachedRecordResultAsRecord.getByte(columnLabel);
+    }
+
     FieldInfo fieldInfo = fieldInfos.get(columnLabel);
     if (canShortCircuitFieldLookup(fieldInfo)) {
       ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
@@ -1025,6 +1053,10 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public Short getShort(String columnLabel) {
+    if (recordsResults != null) {
+      return cachedRecordResultAsRecord.getShort(columnLabel);
+    }
+
     FieldInfo fieldInfo = fieldInfos.get(columnLabel);
     if (canShortCircuitFieldLookup(fieldInfo)) {
       ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
@@ -1100,6 +1132,10 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public Integer getInt(String columnLabel) {
+    if (recordsResults != null) {
+      return cachedRecordResultAsRecord.getInt(columnLabel);
+    }
+
     FieldInfo fieldInfo = fieldInfos.get(columnLabel);
     if (canShortCircuitFieldLookup(fieldInfo)) {
       ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
@@ -1213,6 +1249,10 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public Long getLong(String columnLabel) {
+    if (recordsResults != null) {
+      return cachedRecordResultAsRecord.getLong(columnLabel);
+    }
+
     FieldInfo fieldInfo = fieldInfos.get(columnLabel);
     if (canShortCircuitFieldLookup(fieldInfo)) {
       ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
@@ -1380,6 +1420,10 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public Float getFloat(String columnLabel) {
+    if (recordsResults != null) {
+      return cachedRecordResultAsRecord.getFloat(columnLabel);
+    }
+
     FieldInfo fieldInfo = fieldInfos.get(columnLabel);
     if (canShortCircuitFieldLookup(fieldInfo)) {
       ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
@@ -1476,6 +1520,10 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public Double getDouble(String columnLabel) {
+    if (recordsResults != null) {
+      return cachedRecordResultAsRecord.getDouble(columnLabel);
+    }
+
     FieldInfo fieldInfo = fieldInfos.get(columnLabel);
     if (canShortCircuitFieldLookup(fieldInfo)) {
       ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
@@ -1572,6 +1620,10 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public BigDecimal getBigDecimal(String columnLabel, int scale) {
+    if (recordsResults != null) {
+      return cachedRecordResultAsRecord.getBigDecimal(columnLabel, scale);
+    }
+
     FieldInfo fieldInfo = fieldInfos.get(columnLabel);
     if (canShortCircuitFieldLookup(fieldInfo)) {
       ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
@@ -1607,6 +1659,10 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public byte[] getBytes(String columnLabel) {
+    if (recordsResults != null) {
+      return cachedRecordResultAsRecord.getBytes(columnLabel);
+    }
+
     FieldInfo fieldInfo = fieldInfos.get(columnLabel);
     if (canShortCircuitFieldLookup(fieldInfo)) {
       ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
@@ -1629,6 +1685,10 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public Date getDate(String columnLabel) {
+    if (recordsResults != null) {
+      return cachedRecordResultAsRecord.getDate(columnLabel);
+    }
+
     FieldInfo fieldInfo = fieldInfos.get(columnLabel);
     if (canShortCircuitFieldLookup(fieldInfo)) {
       ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
@@ -1643,6 +1703,10 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public Time getTime(String columnLabel) {
+    if (recordsResults != null) {
+      return cachedRecordResultAsRecord.getTime(columnLabel);
+    }
+
     FieldInfo fieldInfo = fieldInfos.get(columnLabel);
     if (canShortCircuitFieldLookup(fieldInfo)) {
       ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
@@ -1657,6 +1721,10 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public Timestamp getTimestamp(String columnLabel) {
+    if (recordsResults != null) {
+      return cachedRecordResultAsRecord.getTimestamp(columnLabel);
+    }
+
     FieldInfo fieldInfo = fieldInfos.get(columnLabel);
     if (canShortCircuitFieldLookup(fieldInfo)) {
       ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
@@ -1699,6 +1767,10 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public InputStream getBinaryStream(String columnLabel) {
+    if (recordsResults != null) {
+      return new ByteArrayInputStream(cachedRecordResultAsRecord.getBytes(columnLabel));
+    }
+
     FieldInfo fieldInfo = fieldInfos.get(columnLabel);
     if (canShortCircuitFieldLookup(fieldInfo)) {
       ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];
@@ -1758,6 +1830,10 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public BigDecimal getBigDecimal(String columnLabel) {
+    if (recordsResults != null) {
+      return cachedRecordResultAsRecord.getBigDecimal(columnLabel, -1);
+    }
+
     FieldInfo fieldInfo = fieldInfos.get(columnLabel);
     if (canShortCircuitFieldLookup(fieldInfo)) {
       ExpressionImpl.CachedRecord ret = readRecords[currPos][fieldInfo.tableOffset];

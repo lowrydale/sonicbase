@@ -6,14 +6,12 @@ import com.sonicbase.common.ComArray;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Record;
 import com.sonicbase.common.SchemaOutOfSyncException;
-import com.sonicbase.procedure.RecordEvaluator;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.*;
-
+import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.schema.DataType;
 import com.sonicbase.server.DatabaseServer;
 import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
 import net.sf.jsqlparser.schema.Column;
@@ -719,7 +717,11 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
             for (String tableName : tableNames) {
               TableSchema tableSchema = client.getCommon().getTables(dbName).get(tableName);
               if (tableSchema == null) {
-                throw new DatabaseException("Table does not exist: name=" + tableName);
+                client.syncSchema();
+                tableSchema = client.getCommon().getTables(dbName).get(tableName);
+                if (tableSchema == null) {
+                  throw new DatabaseException("Table does not exist: name=" + tableName);
+                }
               }
               for (FieldSchema field: tableSchema.getFields()) {
                 ColumnImpl column = new ColumnImpl();
@@ -840,9 +842,9 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
               Math.abs(ThreadLocalRandom.current().nextLong()), cobj, DatabaseClient.Replica.def);
           retObj = new ComObject(recordRet);
         }
-        if (previousSchemaVersion < client.getCommon().getSchemaVersion()) {
-          throw new SchemaOutOfSyncException();
-        }
+//        if (previousSchemaVersion < client.getCommon().getSchemaVersion()) {
+//          throw new SchemaOutOfSyncException();
+//        }
 
         byte[] selectBytes = retObj.getByteArray(ComObject.Tag.legacySelectStatement);
         deserialize(selectBytes, dbName);
@@ -1027,9 +1029,9 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                 cobj.put(ComObject.Tag.tableName, fromTable);
 
                 byte[] lookupRet = client.send(null, shard, 0, cobj, DatabaseClient.Replica.master);
-                if (previousSchemaVersion < client.getCommon().getSchemaVersion()) {
-                  throw new SchemaOutOfSyncException();
-                }
+//                if (previousSchemaVersion < client.getCommon().getSchemaVersion()) {
+//                  throw new SchemaOutOfSyncException();
+//                }
                 ComObject retObj = new ComObject(lookupRet);
                 long currCount = retObj.getLong(ComObject.Tag.countLong);
                 return currCount;

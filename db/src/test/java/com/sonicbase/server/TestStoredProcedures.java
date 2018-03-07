@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
+import com.sonicbase.research.socket.NettyServer;
 import com.sonicbase.streams.LocalProducer;
 import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.util.FileUtils;
@@ -20,13 +21,10 @@ import java.io.File;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.Future;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.*;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 public class TestStoredProcedures {
 
@@ -35,7 +33,8 @@ public class TestStoredProcedures {
   DatabaseServer[] dbServers;
 
   @AfterClass
-  public void afterClass() {
+  public void afterClass() throws SQLException {
+    conn.close();
     for (DatabaseServer server : dbServers) {
       server.shutdown();
     }
@@ -58,24 +57,57 @@ public class TestStoredProcedures {
 
     DatabaseClient.getServers().clear();
 
-    dbServers = new DatabaseServer[4];
+    dbServers = new DatabaseServer[2];
     ThreadPoolExecutor executor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
     String role = "primaryMaster";
 
-    List<Future> futures = new ArrayList<>();
-    for (int i = 0; i < dbServers.length; i++) {
-      final int shard = i;
 
-      dbServers[shard] = new DatabaseServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null, true);
-      dbServers[shard].setRole(role);
-      dbServers[shard].disableLogProcessor();
-      dbServers[shard].setMinSizeForRepartition(0);
+    final CountDownLatch latch = new CountDownLatch(4);
+    final NettyServer serverA1 = new NettyServer(128);
+    Thread thread = new Thread(new Runnable(){
+      @Override
+      public void run() {
+        serverA1.startServer(new String[]{"-port", String.valueOf(9010), "-host", "localhost",
+            "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(0)}, "db/src/main/resources/config/config-2-servers-a.json", true);
+        latch.countDown();
+      }
+    });
+    thread.start();
+    while (true) {
+      if (serverA1.isRunning()) {
+        break;
+      }
+      Thread.sleep(100);
     }
-    for (Future future : futures) {
-      future.get();
+
+    final NettyServer serverA2 = new NettyServer(128);
+    thread = new Thread(new Runnable(){
+      @Override
+      public void run() {
+        serverA2.startServer(new String[]{"-port", String.valueOf(9060), "-host", "localhost",
+            "-mport", String.valueOf(9060), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(1)}, "db/src/main/resources/config/config-2-servers-a.json", true);
+        latch.countDown();
+      }
+    });
+    thread.start();
+
+    while (true) {
+      if (serverA2.isRunning()) {
+        break;
+      }
+      Thread.sleep(100);
     }
+
+    while (true) {
+      if (serverA1.isRunning() && serverA2.isRunning()) {
+        break;
+      }
+      Thread.sleep(100);
+    }
+    dbServers[0] = serverA1.getDatabaseServer();
+    dbServers[1] = serverA2.getDatabaseServer();
+
 
     for (DatabaseServer server : dbServers) {
       server.shutdownRepartitioner();
@@ -83,28 +115,28 @@ public class TestStoredProcedures {
 
     Class.forName("com.sonicbase.jdbcdriver.Driver");
 
-    conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000", "user", "password");
+    conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9010", "user", "password");
 
-    ((ConnectionProxy)conn).getDatabaseClient().createDatabase("test");
+    ((ConnectionProxy)conn).getDatabaseClient().createDatabase("db");
 
     conn.close();
 
-    conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/test", "user", "password");
+    conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9010/db", "user", "password");
 
     Logger.setReady(false);
 
     DatabaseClient client = ((ConnectionProxy)conn).getDatabaseClient();
 
 
-    PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, id3 BIGINT, id4 BIGINT, id5 BIGINT, num DOUBLE, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), timestamp TIMESTAMP, PRIMARY KEY (id))");
+    PreparedStatement stmt = conn.prepareStatement("create table Persons (id1 BIGINT, id2 BIGINT, id3 BIGINT, id4 BIGINT, id5 BIGINT, num DOUBLE, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), timestamp TIMESTAMP, PRIMARY KEY (id1))");
     stmt.executeUpdate();
 
     //test upsert
 
     LocalProducer.queue.clear();
 
-    for (int i = 0; i < 4; i++) {
-      stmt = conn.prepareStatement("insert into persons (id, id2, id3, id4, id5, num, socialSecurityNumber, relatives, restricted, gender, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    for (int i = 0; i < 10; i++) {
+      stmt = conn.prepareStatement("insert into persons (id1, id2, id3, id4, id5, num, socialSecurityNumber, relatives, restricted, gender, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
       stmt.setLong(1, i);
       stmt.setLong(2, (i + 100) % 2);
       stmt.setLong(3, -1 * (i + 100));
@@ -121,34 +153,98 @@ public class TestStoredProcedures {
       ids.add((long) i);
     }
 
-    Thread.sleep(10000);
+    for (DatabaseServer server : dbServers) {
+      server.shutdownRepartitioner();
+    }
 
+//      long size = client.getPartitionSize("test", 0, "children", "_1_socialsecuritynumber");
+//      assertEquals(size, 10);
+
+    client.beginRebalance("db", "persons", "_1__primarykey");
+
+
+    while (true) {
+      if (client.isRepartitioningComplete("db")) {
+        break;
+      }
+      Thread.sleep(1000);
+    }
+
+    for (DatabaseServer server : dbServers) {
+      server.shutdownRepartitioner();
+    }
+    client.syncSchema();
+
+    client.beginRebalance("db", "persons", "_1__primarykey");
+
+
+    while (true) {
+      if (client.isRepartitioningComplete("db")) {
+        break;
+      }
+      Thread.sleep(1000);
+    }
+
+    for (DatabaseServer server : dbServers) {
+      server.shutdownRepartitioner();
+    }
+
+    client.syncSchema();
     executor.shutdownNow();
   }
 
+
+
   @Test
-  public void test() throws SQLException {
+  public void test1() throws SQLException {
+    String query = "call procedure('com.sonicbase.procedure.MyStoredProcedure1')";
+    PreparedStatement procedureStmt = conn.prepareStatement(query);
+    ResultSet rs = procedureStmt.executeQuery();
+    int offset = 3;
+    while (true) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id1"), (long)offset);
+      assertEquals(rs.getString("socialsecuritynumber"), "s" + offset);
+      assertEquals(rs.getString("gender"), "m");
+      offset++;
+      if (offset == 9) {
+        break;
+      }
+    }
+
+    rs.close();
+    procedureStmt.close();
+  }
+
+  @Test
+  public void test2() throws SQLException {
     String tableName = null;
     try {
-      String query = "call procedure 'com.sonicbase.procedure.MyStoredProcedure2', 'select * from persons where id>1 and gender=\"m\"', 100000";
+      String query = "call procedure ('com.sonicbase.procedure.MyStoredProcedure2', 100000 ) ";
       PreparedStatement procedureStmt = conn.prepareStatement(query);
       ResultSet procedureRs = procedureStmt.executeQuery();
       if (procedureRs.next()) {
         tableName = procedureRs.getString("tableName");
-        PreparedStatement resultsStmt = conn.prepareStatement("select * from " + tableName);
-        ResultSet rsultsRs = resultsStmt.executeQuery();
-        while (rsultsRs.next()) {
-          System.out.println(
-              "id=" + rsultsRs.getLong("id") +
-                  ", socialsecuritynumber=" + rsultsRs.getString("socialsecuritynumber") +
-                  ", gender=" + rsultsRs.getString("gender"));
-        }
-        rsultsRs.close();
-        resultsStmt.close();
-
       }
+
       procedureRs.close();
       procedureStmt.close();
+
+      PreparedStatement resultsStmt = conn.prepareStatement("select * from " + tableName);
+      ResultSet rsultsRs = resultsStmt.executeQuery();
+      int offset = 3;
+      while (true) {
+        assertTrue(rsultsRs.next());
+        assertEquals(rsultsRs.getLong("id1"), (long)offset);
+        assertEquals(rsultsRs.getString("socialsecuritynumber"), "s" + offset);
+        assertEquals(rsultsRs.getString("gender"), "m");
+        offset++;
+        if (offset == 9) {
+          break;
+        }
+      }
+      rsultsRs.close();
+      resultsStmt.close();
     }
     finally {
       try {
@@ -161,9 +257,49 @@ public class TestStoredProcedures {
       catch (Exception e) {
         e.printStackTrace();
       }
-
-      conn.close();
     }
+  }
+
+  @Test
+  public void test3() throws SQLException {
+    String query = "call procedure ('com.sonicbase.procedure.MyStoredProcedure3') ";
+    PreparedStatement procedureStmt = conn.prepareStatement(query);
+    ResultSet rs = procedureStmt.executeQuery();
+    int offset = 3;
+    while (true) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id1"), (long)offset);
+      assertEquals(rs.getString("socialsecuritynumber"), "s" + offset);
+      assertEquals(rs.getString("gender"), "m");
+      offset++;
+      if (offset == 9) {
+        break;
+      }
+    }
+
+    rs.close();
+    procedureStmt.close();
+  }
+
+  @Test
+  public void test4() throws SQLException {
+    String query = "call procedure ('com.sonicbase.procedure.MyStoredProcedure4') ";
+    PreparedStatement procedureStmt = conn.prepareStatement(query);
+    ResultSet rs = procedureStmt.executeQuery();
+    int offset = 3;
+    while (true) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id1"), (long)offset);
+      assertEquals(rs.getString("socialsecuritynumber"), "s" + offset);
+      assertEquals(rs.getString("gender"), "m");
+      offset++;
+      if (offset == 9) {
+        break;
+      }
+    }
+
+    rs.close();
+    procedureStmt.close();
   }
 
 }

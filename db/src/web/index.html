@@ -218,12 +218,12 @@ Download Free Version Now
     <h2>Performance</h2>
     With a 32 server, 4 billion record cluster with replication factor equals 1 we achieved 3.8 million batch record inserts per second and
     35 million range-based record reads per second. With SonicBase you can achieve linear scalability.
-    <h2>Automated Bulk Import (new)</h2>
+    <h2>Automated Bulk Import</h2>
     <div class="mylink">
       We have added the ability to automatically load your SonicBase database from another JDBC compliant database. This will allow
     you to quickly load SonicBase and do analytics on your data. See <a href="docs/automated-bulk-import.html">Automated Bulk Import Documentation</a>.
     </div>
-    <h2>Streaming Analytics (new)</h2>
+    <h2>Streaming Analytics</h2>
     Streaming allows you to injest data into the database and export it in real-time into external data stores. You could, for example, hook into
     a financial stream to provide up to the second quotes to your database. Analytics can then be performed on the data in SonicBase. Or perhaps
     you want to replicate you SonicBase database to an external data store. There are many possibilities. Streaming is high-performance real-time data transfer.
@@ -238,6 +238,13 @@ Download Free Version Now
     You can hook Kafka, Amazon Web Services Kinesis, Amazon Web Services Simple Queue Service and custom streams providers into SonicBase so that all inserts, updates and deletes will be published into your
     streams. See <a href="docs/streaming-producer.html">Streaming Producers</a>.
     </div>
+      <h2>Stored Procedures</h2>
+      <div class="mylink">
+      SonicBase now supports stored procedures. You can run your Java code inside the SonicBase servers. With your stored procedure
+      you can build or filter results before returning to the client. These powerful procedures can be used to greatly
+      enhance performance by avoiding sending data over the wire. See <a href="docs/stored-procedures.html">Stored Procedures Overview</a> for
+      more details.
+      </div>
       <h2>Coming Soon</h2>
       You will be able to automatically remove data that has been in the database for a specified amount of time. This will allow you to continuously
       ingest data into the database without running out of space.

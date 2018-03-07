@@ -1,6 +1,7 @@
 package com.sonicbase.procedure;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.sonicbase.jdbcdriver.ConnectionProxy;
 
 
 public class StoredProcedureContextImpl implements StoredProcedureContext {
@@ -11,10 +12,16 @@ public class StoredProcedureContextImpl implements StoredProcedureContext {
   private SonicBaseConnectionImpl connection;
   private Parameters parameters;
   private RecordEvaluator recordEvaluator;
+  private int viewVersion;
 
   @Override
   public Parameters getParameters() {
     return parameters;
+  }
+
+  @Override
+  public int getViewVersion() {
+    return viewVersion;
   }
 
   public int getShard() {
@@ -39,7 +46,7 @@ public class StoredProcedureContextImpl implements StoredProcedureContext {
 
   @Override
   public StoredProcedureResponse createResponse() {
-    return new StoredProcedureResponseImpl();
+    return new StoredProcedureResponseImpl(((ConnectionProxy)connection.getConnection()).getDatabaseClient().getCommon());
   }
 
   @Override
@@ -77,5 +84,9 @@ public class StoredProcedureContextImpl implements StoredProcedureContext {
 
   public RecordEvaluator getRecordEvaluator() {
     return recordEvaluator;
+  }
+
+  public void setViewVersion(int viewVersion) {
+    this.viewVersion = viewVersion;
   }
 }

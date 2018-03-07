@@ -95,20 +95,19 @@ public class StreamManager {
   ArrayBlockingQueue<ProcessingRequest> processingQueue = new ArrayBlockingQueue<>(100);
   Connection sysConnection = null;
 
-  public static Connection initSysConnection(ObjectNode config) {
+  public static Connection initSysConnection(ObjectNode config, DatabaseServer server) {
     try {
       ArrayNode array = config.withArray("shards");
       ObjectNode replicaDict = (ObjectNode) array.get(0);
       ArrayNode replicasArray = replicaDict.withArray("replicas");
-      final String address = config.get("clientIsPrivate").asBoolean() ?
+      JsonNode node = config.get("clientIsPrivate");
+      final String address = node != null && node.asBoolean() ?
           replicasArray.get(0).get("privateAddress").asText() :
           replicasArray.get(0).get("publicAddress").asText();
       final int port = replicasArray.get(0).get("port").asInt();
 
       Class.forName("com.sonicbase.jdbcdriver.Driver");
-
-      Connection conn = DriverManager.getConnection("jdbc:sonicbase:" + address + ":" + port);
-
+      ConnectionProxy conn = new ConnectionProxy("jdbc:sonicbase:" + address + ":" + port, server);
       try {
         if (!((ConnectionProxy) conn).databaseExists("_sonicbase_sys")) {
           ((ConnectionProxy) conn).createDatabase("_sonicbase_sys");
@@ -122,7 +121,7 @@ public class StreamManager {
 
       conn.close();
 
-      conn = DriverManager.getConnection("jdbc:sonicbase:" + address + ":" + port + "/_sonicbase_sys");
+      conn = new ConnectionProxy("jdbc:sonicbase:" + address + ":" + port + "/_sonicbase_sys", server);
       return conn;
     }
     catch (Exception e) {
@@ -194,7 +193,7 @@ public class StreamManager {
       if (streams != null) {
 
         if (sysConnection == null) {
-          sysConnection = initSysConnection(config);
+          sysConnection = initSysConnection(config, server);
           initStreamsConsumerTable(sysConnection);
         }
 

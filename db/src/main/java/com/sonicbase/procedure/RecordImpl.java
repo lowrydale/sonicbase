@@ -8,6 +8,7 @@ import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.TableSchema;
 
 import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Time;
@@ -19,16 +20,18 @@ public class RecordImpl implements Record {
   private String dbName;
   private short serializationNumber;
   private DatabaseCommon common;
-  private String database;
   private TableSchema tableSchema;
   private com.sonicbase.common.Record record;
   private Map<String, Object> fieldMap = new HashMap<>();
+  private int viewVersion;
+  private boolean isDeleting;
+  private boolean isAdding;
 
   public RecordImpl(String dbName, DatabaseCommon common, short serializationNumber, String database,
                     TableSchema tableSchema, com.sonicbase.common.Record fields) {
     this.dbName = dbName;
     this.common = common;
-    this.database = database;
+    this.dbName = database;
     this.tableSchema = tableSchema;
     this.record = fields;
     this.serializationNumber = serializationNumber;
@@ -37,10 +40,13 @@ public class RecordImpl implements Record {
   public RecordImpl() {
   }
 
-  public RecordImpl(ComObject cobj) {
+  public RecordImpl(DatabaseCommon common, ComObject cobj) {
     byte[] bytes = cobj.getByteArray(ComObject.Tag.recordBytes);
     if (bytes != null) {
+      dbName = cobj.getString(ComObject.Tag.dbName);
+      tableSchema = common.getTables(dbName).get(cobj.getString(ComObject.Tag.tableName));
       record = new com.sonicbase.common.Record(dbName, common, bytes);
+      this.common = common;
     }
     else {
       ComArray array = cobj.getArray(ComObject.Tag.fields);
@@ -98,6 +104,8 @@ public class RecordImpl implements Record {
     if (tableSchema != null) {
       byte[] bytes = record.serialize(common, serializationNumber);
       ret.put(ComObject.Tag.recordBytes, bytes);
+      ret.put(ComObject.Tag.tableName, tableSchema.getName());
+      ret.put(ComObject.Tag.dbName, dbName);
     }
     else {
       ComArray array = ret.putArray(ComObject.Tag.fields, ComObject.Type.objectType);
@@ -151,16 +159,31 @@ public class RecordImpl implements Record {
   }
 
   public String getDatabase() {
-    return database;
+    return dbName;
   }
 
   public String getTableName() {
     return tableSchema.getName();
   }
 
+  @Override
+  public boolean isAdding() {
+    return isAdding;
+  }
+
+  @Override
+  public boolean isDeleting() {
+    return isDeleting;
+  }
+
+  @Override
+  public int getViewVersion() {
+    return viewVersion;
+  }
+
   public String getString(String columnLabel) {
     if (tableSchema == null) {
-      return (String) fieldMap.get(columnLabel);
+      return (String) DataType.getStringConverter().convert(fieldMap.get(columnLabel));
     }
     else {
       Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
@@ -169,69 +192,134 @@ public class RecordImpl implements Record {
   }
 
   public Long getLong(String columnLabel) {
-    Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
-    return (Long) DataType.getLongConverter().convert(ret);
+    if (tableSchema == null) {
+      return (Long) DataType.getLongConverter().convert(fieldMap.get(columnLabel));
+    }
+    else {
+      Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
+      return (Long) DataType.getLongConverter().convert(ret);
+    }
   }
 
   public boolean getBoolean(String columnLabel) {
-    Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
-    return (Boolean) DataType.getBooleanConverter().convert(ret);
+    if (tableSchema == null) {
+      return (Boolean) DataType.getBooleanConverter().convert(fieldMap.get(columnLabel));
+    }
+    else {
+      Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
+      return (Boolean) DataType.getBooleanConverter().convert(ret);
+    }
   }
 
   public byte getByte(String columnLabel) {
-    Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
-    return (Byte) DataType.getByteConverter().convert(ret);
+    if (tableSchema == null) {
+      return (Byte) DataType.getByteConverter().convert(fieldMap.get(columnLabel));
+    }
+    else {
+      Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
+      return (Byte) DataType.getByteConverter().convert(ret);
+    }
   }
 
   public short getShort(String columnLabel) {
-    Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
-    return (Short) DataType.getShortConverter().convert(ret);
+    if (tableSchema == null) {
+      return (Short) DataType.getShortConverter().convert(fieldMap.get(columnLabel));
+    }
+    else {
+      Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
+      return (Short) DataType.getShortConverter().convert(ret);
+    }
   }
 
   public int getInt(String columnLabel) {
-    Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
-    return (Integer) DataType.getIntConverter().convert(ret);
+    if (tableSchema == null) {
+      return (Integer) DataType.getIntConverter().convert(fieldMap.get(columnLabel));
+    }
+    else {
+      Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
+      return (Integer) DataType.getIntConverter().convert(ret);
+    }
   }
 
   public float getFloat(String columnLabel) {
-    Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
-    return (Float) DataType.getFloatConverter().convert(ret);
+    if (tableSchema == null) {
+      return (Float) DataType.getFloatConverter().convert(fieldMap.get(columnLabel));
+    }
+    else {
+      Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
+      return (Float) DataType.getFloatConverter().convert(ret);
+    }
   }
 
   public double getDouble(String columnLabel) {
-    Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
-    return (Double) DataType.getDoubleConverter().convert(ret);
+    if (tableSchema == null) {
+      return (Double) DataType.getDoubleConverter().convert(fieldMap.get(columnLabel));
+    }
+    else {
+      Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
+      return (Double) DataType.getDoubleConverter().convert(ret);
+    }
   }
 
   public BigDecimal getBigDecimal(String columnLabel, int scale) {
-    Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
-    return (BigDecimal) DataType.getBigDecimalConverter().convert(ret);
+    if (tableSchema == null) {
+      return (BigDecimal) DataType.getBigDecimalConverter().convert(fieldMap.get(columnLabel));
+    }
+    else {
+      Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
+      return (BigDecimal) DataType.getBigDecimalConverter().convert(ret);
+    }
   }
 
   public byte[] getBytes(String columnLabel) {
-    Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
-    return (byte[]) DataType.getByteArrayConverter().convert(ret);
+    if (tableSchema == null) {
+      return (byte[]) DataType.getByteArrayConverter().convert(fieldMap.get(columnLabel));
+    }
+    else {
+      Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
+      return (byte[]) DataType.getByteArrayConverter().convert(ret);
+    }
   }
 
   public java.sql.Date getDate(String columnLabel) {
-    Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
-    return (Date) DataType.getDateConverter().convert(ret);
+    if (tableSchema == null) {
+      return (Date) DataType.getDateConverter().convert(fieldMap.get(columnLabel));
+    }
+    else {
+      Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
+      return (Date) DataType.getDateConverter().convert(ret);
+    }
   }
 
   public java.sql.Time getTime(String columnLabel) {
-    Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
-    return (Time) DataType.getTimeConverter().convert(ret);
+    if (tableSchema == null) {
+      return (Time) DataType.getTimeConverter().convert(fieldMap.get(columnLabel));
+    }
+    else {
+      Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
+      return (Time) DataType.getTimeConverter().convert(ret);
+    }
   }
 
   public java.sql.Timestamp getTimestamp(String columnLabel) {
-    Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
-    return (Timestamp) DataType.getTimestampConverter().convert(ret);
+    if (tableSchema == null) {
+      return (Timestamp) DataType.getTimestampConverter().convert(fieldMap.get(columnLabel));
+    }
+    else {
+      Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
+      return (Timestamp) DataType.getTimestampConverter().convert(ret);
+    }
   }
 
   public java.io.InputStream getBinaryStream(String columnLabel) {
-    Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
-    byte[] bytes = (byte[]) DataType.getBlobConverter().convert(ret);
-    return new ByteArrayInputStream(bytes);
+    if (tableSchema == null) {
+      return new ByteArrayInputStream((byte[])fieldMap.get(columnLabel));
+    }
+    else {
+      Object ret = record.getFields()[tableSchema.getFieldOffset(columnLabel)];
+      byte[] bytes = (byte[]) DataType.getBlobConverter().convert(ret);
+      return new ByteArrayInputStream(bytes);
+    }
   }
 
   @Override
@@ -249,7 +337,161 @@ public class RecordImpl implements Record {
     }
   }
 
+  @Override
+  public void setLong(String columnLabel, long value) {
+    if (tableSchema == null) {
+      fieldMap.put(columnLabel, value);
+    }
+    else {
+      record.getFields()[tableSchema.getFieldOffset(columnLabel)] = value;
+    }
+  }
+
+  @Override
+  public void setBoolean(String columnLabel, boolean value) {
+    if (tableSchema == null) {
+      fieldMap.put(columnLabel, value);
+    }
+    else {
+      record.getFields()[tableSchema.getFieldOffset(columnLabel)] = value;
+    }
+  }
+
+  @Override
+  public void setByte(String columnLabel, byte value) {
+    if (tableSchema == null) {
+      fieldMap.put(columnLabel, value);
+    }
+    else {
+      record.getFields()[tableSchema.getFieldOffset(columnLabel)] = value;
+    }
+  }
+
+  @Override
+  public void setShort(String columnLabel, short value) {
+    if (tableSchema == null) {
+      fieldMap.put(columnLabel, value);
+    }
+    else {
+      record.getFields()[tableSchema.getFieldOffset(columnLabel)] = value;
+    }
+  }
+
+  @Override
+  public void setInt(String columnLabel, int value) {
+    if (tableSchema == null) {
+      fieldMap.put(columnLabel, value);
+    }
+    else {
+      record.getFields()[tableSchema.getFieldOffset(columnLabel)] = value;
+    }
+  }
+
+  @Override
+  public void setFloat(String columnLabel, float value) {
+    if (tableSchema == null) {
+      fieldMap.put(columnLabel, value);
+    }
+    else {
+      record.getFields()[tableSchema.getFieldOffset(columnLabel)] = value;
+    }
+  }
+
+  @Override
+  public void setDouble(String columnLabel, double value) {
+    if (tableSchema == null) {
+      fieldMap.put(columnLabel, value);
+    }
+    else {
+      record.getFields()[tableSchema.getFieldOffset(columnLabel)] = value;
+    }
+  }
+
+  @Override
+  public void setBigDecimal(String columnLabel, BigDecimal value) {
+    if (tableSchema == null) {
+      fieldMap.put(columnLabel, value);
+    }
+    else {
+      record.getFields()[tableSchema.getFieldOffset(columnLabel)] = value;
+    }
+  }
+
+  @Override
+  public void setBytes(String columnLabel, byte[] value) {
+    if (tableSchema == null) {
+      fieldMap.put(columnLabel, value);
+    }
+    else {
+      record.getFields()[tableSchema.getFieldOffset(columnLabel)] = value;
+    }
+  }
+
+  @Override
+  public void setDate(String columnLabel, Date value) {
+    if (tableSchema == null) {
+      fieldMap.put(columnLabel, value);
+    }
+    else {
+      record.getFields()[tableSchema.getFieldOffset(columnLabel)] = value;
+    }
+  }
+
+  @Override
+  public void setTime(String columnLabel, Time value) {
+    if (tableSchema == null) {
+      fieldMap.put(columnLabel, value);
+    }
+    else {
+      record.getFields()[tableSchema.getFieldOffset(columnLabel)] = value;
+    }
+  }
+
+  @Override
+  public void setTimestamp(String columnLabel, Timestamp value) {
+    if (tableSchema == null) {
+      fieldMap.put(columnLabel, value);
+    }
+    else {
+      record.getFields()[tableSchema.getFieldOffset(columnLabel)] = value;
+    }
+  }
+
+  @Override
+  public void setBinaryStream(String columnLabel, InputStream value) {
+    if (tableSchema == null) {
+      fieldMap.put(columnLabel, value);
+    }
+    else {
+      record.getFields()[tableSchema.getFieldOffset(columnLabel)] = value;
+    }
+  }
+
   public void setRecord(com.sonicbase.common.Record record) {
     this.record = record;
+  }
+
+  public void setDatabase(String database) {
+    this.dbName = database;
+  }
+
+  public void setTableSchema(TableSchema tableSchema) {
+    this.tableSchema = tableSchema;
+  }
+
+  public void setCommon(DatabaseCommon common) {
+    this.common = common;
+  }
+
+  public void setViewVersion(int viewVersion) {
+    this.viewVersion = viewVersion;
+  }
+
+  public void setIsDeleting(boolean isDeleting) {
+    this.isDeleting = isDeleting;
+  }
+
+  public void setIsAdding(boolean isAdding) {
+    this.isAdding = isAdding;
   }
 }

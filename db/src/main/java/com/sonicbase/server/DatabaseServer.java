@@ -11,6 +11,7 @@ import com.sonicbase.index.Index;
 import com.sonicbase.index.Indices;
 import com.sonicbase.index.Repartitioner;
 
+import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.procedure.*;
 import com.sonicbase.query.DatabaseException;
@@ -762,7 +763,7 @@ public class DatabaseServer {
         public void run() {
           try {
             if (sysConnection == null) {
-              sysConnection = StreamManager.initSysConnection(config);
+              sysConnection = StreamManager.initSysConnection(config, DatabaseServer.this);
               StreamManager.initStreamsConsumerTable(sysConnection);
             }
             while (!shutdown) {
@@ -1300,22 +1301,30 @@ public class DatabaseServer {
     return parms;
   }
 
-  public Connection getConnectionForStoredProcedure(String dbName) throws ClassNotFoundException, SQLException {
+  public ConnectionProxy getConnectionForStoredProcedure(String dbName) throws ClassNotFoundException, SQLException {
     ArrayNode array = config.withArray("shards");
     ObjectNode replicaDict = (ObjectNode) array.get(0);
     ArrayNode replicasArray = replicaDict.withArray("replicas");
-    final String address = config.get("clientIsPrivate").asBoolean() ?
+    JsonNode node = config.get("clientIsPrivate");
+    final String address = node != null && node.asBoolean() ?
         replicasArray.get(0).get("privateAddress").asText() :
         replicasArray.get(0).get("publicAddress").asText();
     final int port = replicasArray.get(0).get("port").asInt();
 
     Class.forName("com.sonicbase.jdbcdriver.Driver");
-    final Connection conn = DriverManager.getConnection("jdbc:sonicbase:" + address + ":" + port + "/" + dbName);
+    final ConnectionProxy conn = new ConnectionProxy("jdbc:sonicbase:" + address + ":" + port + "/" + dbName, this);
+
+    conn.getDatabaseClient().syncSchema();
     return conn;
   }
 
   public ComObject executeProcedure(final ComObject cobj) {
+    ConnectionProxy conn = null;
     try {
+      if (!common.haveProLicense()) {
+        throw new InsufficientLicense("You must have a pro license to use stored procedures");
+      }
+
       String sql = cobj.getString(ComObject.Tag.sql);
       CCJSqlParserManager parser = new CCJSqlParserManager();
       Statement statement = parser.parse(new StringReader(sql));
@@ -1334,7 +1343,9 @@ public class DatabaseServer {
       context.setShard(shard);
       context.setReplica(replica);
 
-      Connection conn = getConnectionForStoredProcedure(dbName);
+      conn = getConnectionForStoredProcedure(dbName);
+      int viewVersion = conn.getDatabaseClient().getCommon().getSchemaVersion();
+      context.setViewVersion(viewVersion);
 
       context.setConnection(new SonicBaseConnectionImpl(conn));
 
@@ -1342,16 +1353,32 @@ public class DatabaseServer {
       context.setStoredProdecureId(storedProcedureId);
       context.setParameters(parms);
       StoredProcedureResponse response = procedure.execute(context);
+      if (response == null) {
+        return null;
+      }
       return ((StoredProcedureResponseImpl)response).serialize();
     }
     catch (Exception e) {
       throw new DatabaseException(e);
+    }
+    finally {
+      if (conn != null) {
+        try {
+          conn.close();
+        }
+        catch (SQLException e) {
+          throw new DatabaseException(e);
+        }
+      }
     }
   }
 
   public ComObject executeProcedurePrimary(final ComObject cobj) {
     ThreadPoolExecutor executor = null;
     try {
+      if (!common.haveProLicense()) {
+        throw new InsufficientLicense("You must have a pro license to use stored procedures");
+      }
       String sql = cobj.getString(ComObject.Tag.sql);
       CCJSqlParserManager parser = new CCJSqlParserManager();
       Statement statement = parser.parse(new StringReader(sql));
@@ -1400,7 +1427,7 @@ public class DatabaseServer {
       for (Future future : futures) {
         byte[] ret = (byte[]) future.get();
         if (ret != null) {
-          StoredProcedureResponseImpl response = new StoredProcedureResponseImpl(new ComObject(ret));
+          StoredProcedureResponseImpl response = new StoredProcedureResponseImpl(common, new ComObject(ret));
           responses.add(response);
         }
       }

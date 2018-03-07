@@ -1753,11 +1753,4 @@ public class TestDatabaseAdvanced {
     assertEquals(ret.getLong("id"), 4);
     assertFalse(ret.next());
   }
-
-  @Test
-  public void testProcedure() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("execute procedure 'com.sonicbase.procedure.StoredProcedure', x, 5.4, 'testing'");
-    ResultSet rs = stmt.executeQuery();
-    System.out.println("called");
-  }
 }

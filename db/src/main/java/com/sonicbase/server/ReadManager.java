@@ -1428,7 +1428,7 @@ public class ReadManager {
   private Map.Entry<Object[], Object> doIndexLookupTwoKeys(
       short serializationVersion,
       String dbName,
-      int count,
+      final int count,
       TableSchema tableSchema,
       IndexSchema indexSchema,
       boolean forceSelectOnServer, List<Object[]> excludeKeys,
@@ -1580,13 +1580,13 @@ public class ReadManager {
           }
         }
 
+        Map.Entry<Object[], Object>[] entries = new Map.Entry[]{entry};
         outer:
         while (entry != null) {
           if (retKeyRecords.size() >= count || retRecords.size() >= count) {
             break;
           }
-//          System.out.println("processing key: " + DatabaseCommon.keyToString(entry.getKey()) +
-//              ", shard=" + server.getShard() + ", replica=" + server.getReplica() + ", viewver=" + server.getCommon().getSchemaVersion());
+
           if (key != null) {
             if (excludeKeys != null) {
               for (Object[] excludeKey : excludeKeys) {
@@ -1660,27 +1660,27 @@ public class ReadManager {
               }
             }
             else {
-              Object unsafeAddress = entry.getValue();//index.get(entry.getKey());
-              if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
-                records = server.fromUnsafeToRecords(unsafeAddress);
-                while (records == null) {
-                  try {
-                    Thread.sleep(100);
-                    System.out.println("null records ************************************");
-                  }
-                  catch (InterruptedException e) {
-                    throw new DatabaseException(e);
-                  }
-                  entry.setValue(index.get(entry.getKey()));
-                  unsafeAddress = entry.getValue();//index.get(entry.getKey());
-                  if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
-                    records = server.fromUnsafeToRecords(unsafeAddress);
-                  }
-                  else {
-                    break;
-                  }
-                }
-              }
+//              Object unsafeAddress = entry.getValue();//index.get(entry.getKey());
+//              if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
+//                records = server.fromUnsafeToRecords(unsafeAddress);
+//                while (records == null) {
+//                  try {
+//                    Thread.sleep(100);
+//                    System.out.println("null records ************************************");
+//                  }
+//                  catch (InterruptedException e) {
+//                    throw new DatabaseException(e);
+//                  }
+//                  entry.setValue(index.get(entry.getKey()));
+//                  unsafeAddress = entry.getValue();//index.get(entry.getKey());
+//                  if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
+//                    records = server.fromUnsafeToRecords(unsafeAddress);
+//                  }
+//                  else {
+//                    break;
+//                  }
+//                }
+//              }
             }
 
             if (entry.getValue() != null) {
@@ -1858,6 +1858,354 @@ public class ReadManager {
               break;
             }
           }
+
+//          for (Map.Entry<Object[], Object> currEntry : entries) {
+//            entry = currEntry;
+//
+//            if (currEntry == null) {
+//              break outer;
+//            }
+//            if (entry != null) {
+//              if (entry.getKey() == null) {
+//                throw new DatabaseException("entry key is null");
+//              }
+//              if (lessOriginalKey == null) {
+//                throw new DatabaseException("original less key is null");
+//              }
+//              int compareValue = server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), lessOriginalKey);
+//              if ((0 == compareValue || 1 == compareValue) && lessOp == BinaryExpression.Operator.less) {
+//                entry = null;
+//                break outer;
+//              }
+//              if (1 == compareValue) {
+//                entry = null;
+//                break outer;
+//              }
+//              compareValue = 1;
+//              if (greaterOriginalKey != null) {
+//                compareValue = server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), greaterOriginalKey);
+//              }
+//              if (0 == compareValue && greaterOp == BinaryExpression.Operator.greater) {
+//                entry = null;
+//                break outer;
+//              }
+//              if (-1 == compareValue) {
+//                entry = null;
+//                break outer;
+//              }
+//            }
+//
+////          System.out.println("processing key: " + DatabaseCommon.keyToString(entry.getKey()) +
+////              ", shard=" + server.getShard() + ", replica=" + server.getReplica() + ", viewver=" + server.getCommon().getSchemaVersion());
+//            if (key != null) {
+//              if (excludeKeys != null) {
+//                for (Object[] excludeKey : excludeKeys) {
+//                  if (server.getCommon().compareKey(indexSchema.getComparators(), excludeKey, key) == 0) {
+//                    continue outer;
+//                  }
+//                }
+//              }
+//
+//              boolean rightIsDone = false;
+//              int compareRight = 1;
+//              if (lessOriginalKey != null) {
+//                compareRight = server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), lessOriginalKey);
+//              }
+//              if (lessOp.equals(BinaryExpression.Operator.less) && compareRight >= 0) {
+//                rightIsDone = true;
+//              }
+//              if (lessOp.equals(BinaryExpression.Operator.lessEqual) && compareRight > 0) {
+//                rightIsDone = true;
+//              }
+//              if (rightIsDone) {
+//                entry = null;
+//                break;
+//              }
+//            }
+//            Object[][] currKeys = null;
+//            byte[][] currKeyRecords = null;
+//            byte[][] records = null;
+//
+//            boolean shouldProcess = true;
+//            if (isProbe) {
+//              if (countSkipped.incrementAndGet() < OPTIMIZED_RANGE_PAGE_SIZE) {
+//                shouldProcess = false;
+//              }
+//              else {
+//                countSkipped.set(0);
+//              }
+//            }
+//            if (shouldProcess) {
+//
+//              //synchronized (index.getMutex(entry.getKey())) {
+//              //if (entry.getValue() instanceof Long) {
+//              //TODO: unsafe
+//              //entry.setValue(index.get(entry.getKey()));
+//              //}
+//              if (entry.getValue() != null && !entry.getValue().equals(0L)) {
+//                if (keys) {
+//                  currKeyRecords = server.fromUnsafeToKeys(entry.getValue());
+//                }
+//                else {
+//                  records = server.fromUnsafeToRecords(entry.getValue());
+//                }
+//              }
+//              //}
+//              if (keys) {
+//                if (keyContainsColumns) {
+//                  ProcessKeyContainsColumns processKeyContainsColumns = new ProcessKeyContainsColumns(serializationVersion, dbName, tableSchema,
+//                      indexSchema, parms, evaluateExpression, expression, columnOffsets, forceSelectOnServer, index,
+//                      viewVersion, counters, groupContext, keyOffsets, keyContainsColumns, entry, entry, currKeyRecords,
+//                      records).invoke();
+//                  //                    if (processKeyContainsColumns.is())
+//                  //                      break outer;
+//                  currKeys = processKeyContainsColumns.getCurrKeys();
+//                  currKeyRecords = processKeyContainsColumns.getCurrKeyRecords();
+//                  records = processKeyContainsColumns.getRecords();
+//                  entry = processKeyContainsColumns.getEntry();
+//                }
+//                else {
+//                  Object unsafeAddress = entry.getValue();
+//                  currKeyRecords = server.fromUnsafeToKeys(unsafeAddress);
+//                }
+//              }
+//              else {
+//                Object unsafeAddress = entry.getValue();//index.get(entry.getKey());
+//                if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
+//                  records = server.fromUnsafeToRecords(unsafeAddress);
+//                  while (records == null) {
+//                    try {
+//                      Thread.sleep(100);
+//                      System.out.println("null records ************************************");
+//                    }
+//                    catch (InterruptedException e) {
+//                      throw new DatabaseException(e);
+//                    }
+//                    entry.setValue(index.get(entry.getKey()));
+//                    unsafeAddress = entry.getValue();//index.get(entry.getKey());
+//                    if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
+//                      records = server.fromUnsafeToRecords(unsafeAddress);
+//                    }
+//                    else {
+//                      break;
+//                    }
+//                  }
+//                }
+//              }
+//
+//              if (entry.getValue() != null) {
+//                Object[] keyToUse = entry.getKey();//key;
+//                if (keyToUse == null) {
+//                  keyToUse = originalLeftKey;
+//                }
+//
+//                AtomicBoolean done = new AtomicBoolean();
+//                handleRecord(serializationVersion, dbName, tableSchema, indexSchema, viewVersion, index, keyToUse, parms, evaluateExpression,
+//                    expression, columnOffsets, forceSelectOnServer, retKeyRecords, retKeys, retRecords, keys, counters, groupContext,
+//                    records, currKeyRecords, currKeys, offset, currOffset, limit, done, countSkipped, isProbe, procedureContext);
+//                if (done.get()) {
+//                  entry = null;
+//                  break outer;
+//                }
+//
+//
+//                //          for (byte[] currKey : currKeyRecords) {
+//                //            boolean localDone = false;
+//                //            boolean include = true;
+//                //            long targetOffset = 1;
+//                //            currOffset.incrementAndGet();
+//                //            if (offset != null) {
+//                //              targetOffset = offset;
+//                //              if (currOffset.get() < offset) {
+//                //                include = false;
+//                //              }
+//                //            }
+//                //            if (include) {
+//                //              if (limit != null) {
+//                //                if (currOffset.get() >= targetOffset + limit) {
+//                //                  include = false;
+//                //                  localDone = true;
+//                //                }
+//                //              }
+//                //            }
+//                //            if (include) {
+//                //              retKeyRecords.add(currKey);
+//                //            }
+//                //            if (localDone) {
+//                //              entry = null;
+//                //              break outer;
+//                //            }
+//                //          }
+//                //        }
+//                //        else {
+//                //          AtomicBoolean done = new AtomicBoolean();
+//                //          records = processViewFlags(dbName, tableSchema, indexSchema, index, viewVersion, entry.getKey(), records, done);
+//                //          if (records == null) {
+//                //            if (done.get()) {
+//                //              entry = null;
+//                //              break outer;
+//                //            }
+//                //          }
+//                //          else {
+//                //            if (parms != null && expression != null && evaluateExpression) {
+//                //              for (byte[] bytes : records) {
+//                //                Record record = new Record(tableSchema);
+//                //                record.deserialize(dbName, server.getCommon(), bytes, null, true);
+//                //                boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
+//                //                if (pass) {
+//                //                  byte[][] currRecords = new byte[][]{bytes};
+//                //
+//                //                  byte[][] ret = applySelectToResultRecords(serializationVersion, dbName, columnOffsets, forceSelectOnServer, currRecords,
+//                //                      entry.getKey(), tableSchema, counters, groupContext, null, false);
+//                //                  if (counters == null) {
+//                //                    for (byte[] currBytes : ret) {
+//                //                      boolean localDone = false;
+//                //                      boolean include = true;
+//                //                      long targetOffset = 1;
+//                //                      currOffset.incrementAndGet();
+//                //                      if (offset != null) {
+//                //                        targetOffset = offset;
+//                //                        if (currOffset.get() < offset) {
+//                //                          include = false;
+//                //                        }
+//                //                      }
+//                //                      if (include) {
+//                //                        if (limit != null) {
+//                //                          if (currOffset.get() >= targetOffset + limit) {
+//                //                            include = false;
+//                //                            localDone = true;
+//                //                          }
+//                //                        }
+//                //                      }
+//                //                      if (include) {
+//                //                        retRecords.add(currBytes);
+//                //                      }
+//                //                      if (localDone) {
+//                //                        entry = null;
+//                //                        break outer;
+//                //                      }
+//                //                    }
+//                //                  }
+//                //                }
+//                //              }
+//                //            } else {
+//                //              if (records.length > 2) {
+//                //                logger.error("Records size: " + records.length);
+//                //              }
+//                //
+//                //              byte[][] ret = applySelectToResultRecords(serializationVersion, dbName, columnOffsets, forceSelectOnServer, records,
+//                //                  entry.getKey(), tableSchema, counters, groupContext, null, false);
+//                //              if (counters == null) {
+//                //                for (byte[] currBytes : ret) {
+//                //                  boolean localDone = false;
+//                //                  boolean include = true;
+//                //                  long targetOffset = 1;
+//                //                  currOffset.incrementAndGet();
+//                //                  if (offset != null) {
+//                //                    targetOffset = offset;
+//                //                    if (currOffset.get() < offset) {
+//                //                      include = false;
+//                //                    }
+//                //                  }
+//                //                  if (include) {
+//                //                    if (limit != null) {
+//                //                      if (currOffset.get() >= targetOffset + limit) {
+//                //                        include = false;
+//                //                        localDone = true;
+//                //                      }
+//                //                    }
+//                //                  }
+//                //                  if (include) {
+//                //                    retRecords.add(currBytes);
+//                //                  }
+//                //                  if (localDone) {
+//                //                    entry = null;
+//                //                    break outer;
+//                //                  }
+//                //                }
+//                //              }
+//                //            }
+//                //          }
+//
+//              }
+//            }
+//            //        if (operator.equals(QueryEvaluator.BinaryRelationalOperator.Operator.equal)) {
+//            //          entry = null;
+//            //          break;
+//            //        }
+//
+//          }
+//
+//
+//
+//          if (entry == null) {
+//            break outer;
+//          }
+//          final int diff = Math.max(retRecords.size(), retKeyRecords.size());
+//          if (count - diff <= 0) {
+//            break outer;
+//          }
+//          if (ascending != null && !ascending) {
+//            if (true) {
+//              final AtomicInteger countRead = new AtomicInteger();
+//              final List<MapEntry<Object[], Object>> currEntries = new ArrayList<>();
+//              index.visitHeadMap(entry.getKey(), new Index.Visitor() {
+//                @Override
+//                public boolean visit(Object[] key, Object value) throws IOException {
+//                  MapEntry<Object[], Object> curr = new MapEntry<>();
+//                  curr.setKey(key);
+//                  curr.setValue(value);
+//                  currEntries.add(curr);
+//                  if (countRead.incrementAndGet() >= count - diff) {
+//                    return false;
+//                  }
+//                  return true;
+//                }
+//              });
+//              entries = currEntries.toArray(new Map.Entry[currEntries.size()]);
+//            }
+//            else {
+//              entries = index.lowerEntries((entry.getKey()), entries);
+//            }
+//          }
+//          else {
+//            if (true) {
+//              final AtomicInteger countRead = new AtomicInteger();
+//              final MapEntry<Object[], Object>[] currEntries = new MapEntry[count - diff];
+//              final AtomicBoolean first = new AtomicBoolean(true);
+//              index.visitTailMap(entry.getKey(), new Index.Visitor() {
+//                @Override
+//                public boolean visit(Object[] key, Object value) throws IOException {
+//                  if (first.get()) {
+//                    first.set(false);
+//                    return true;
+//                  }
+//                  MapEntry<Object[], Object> curr = new MapEntry<>();
+//                  curr.setKey(key);
+//                  curr.setValue(value);
+//                  currEntries[countRead.get()] = curr;
+//                  if (countRead.incrementAndGet() >= count - diff) {
+//                    return false;
+//                  }
+//                  return true;
+//                }
+//              });
+//              entries = currEntries;
+//            }
+//            else {
+//              entries = index.higherEntries(entry.getKey(), entries);
+//            }
+//          }
+//          if (entries == null || entries.length == 0) {
+//            entry = null;
+//            break outer;
+//          }
+//
+//
+//
+//
+//
+
         }
       }
     }

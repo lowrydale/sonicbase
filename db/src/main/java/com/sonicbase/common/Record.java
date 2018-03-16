@@ -124,15 +124,9 @@ public class Record {
     }
   }
 
-  public static long getDbViewNumber(byte[] bytes) {
+  public static int getDbViewNumber(byte[] bytes) {
     int offset = 2 + 8 + 8 + 2; //serialization version + sequence numbers
-    DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes, offset, 4));
-    try {
-      return in.readInt();
-    }
-    catch (IOException e) {
-      throw new DatabaseException(e);
-    }
+    return DataUtils.bytesToInt(bytes, offset);
   }
 
   public static long getUpdateTime(byte[] bytes) {
@@ -141,36 +135,17 @@ public class Record {
 
   public static long getSequence1(byte[] bytes) {
     int offset = 2 + 8;
-    DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes, offset, 8));
-    try {
-      return in.readLong();
-    }
-    catch (IOException e) {
-      throw new DatabaseException(e);
-    }
+    return DataUtils.bytesToLong(bytes, offset);
   }
 
   public static long getSequence0(byte[] bytes) {
     int offset = 2;
-    DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes, offset, 8));
-    try {
-      return in.readLong();
-    }
-    catch (IOException e) {
-      throw new DatabaseException(e);
-    }
+    return DataUtils.bytesToLong(bytes, offset);
   }
 
-
-  public static long getDbViewFlags(byte[] bytes) {
+  public static short getDbViewFlags(byte[] bytes) {
     int offset = 2 + 8 + 8 + 2 + 4; //serialization version + sequence numbers
-    DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes, offset, bytes.length - offset));
-    try {
-      return in.readShort();
-    }
-    catch (IOException e) {
-      throw new DatabaseException(e);
-    }
+    return DataUtils.bytesToShort(bytes, offset);
   }
 
   public long getUpdateTime() {

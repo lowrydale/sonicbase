@@ -522,7 +522,7 @@ public class DeltaManager {
       logger.info("begin recoveringSnapshot - applying deletes - begin");
       int cores = Runtime.getRuntime().availableProcessors();
 
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(cores, cores, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+      ThreadPoolExecutor executor = new ThreadPoolExecutor(cores * 16, cores * 16, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
       try {
         List<Future> futures = new ArrayList<>();
         for (int currDeltaDirNum = getHighestCommittedSnapshotVersion(dataRootDir, logger); currDeltaDirNum >= -1; currDeltaDirNum--) {

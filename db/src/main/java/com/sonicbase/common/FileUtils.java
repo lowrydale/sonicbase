@@ -1,6 +1,7 @@
 package com.sonicbase.common;
 
 import java.io.File;
+import java.io.IOException;
 
 public class FileUtils {
 
@@ -23,5 +24,28 @@ public class FileUtils {
       }
     }
     return ret;
+  }
+
+
+  public static void delete(File file) throws IOException {
+
+    File[] files = file.listFiles();
+    if (files == null) {
+      return;
+    }
+    for (File childFile : files) {
+      if (childFile.isDirectory()) {
+        delete(childFile);
+      }
+      else {
+        if (!childFile.delete()) {
+          throw new IOException();
+        }
+      }
+    }
+
+    if (!file.delete()) {
+      throw new IOException();
+    }
   }
 }

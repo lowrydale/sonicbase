@@ -848,12 +848,14 @@ public abstract class ExpressionImpl implements Expression {
     }
 
     public ConcurrentHashMap<Key, CachedRecord> getRecordsForTable(String tableName) {
-      ConcurrentHashMap<Key, CachedRecord> records = null;
-      synchronized (this) {
-        records = recordsForTable.get(tableName);
-        if (records == null) {
-          recordsForTable.put(tableName, new ConcurrentHashMap<Key, CachedRecord>());
+      ConcurrentHashMap<Key, CachedRecord> records = recordsForTable.get(tableName);
+      if (records == null) {
+        synchronized (this) {
           records = recordsForTable.get(tableName);
+          if (records == null) {
+            recordsForTable.put(tableName, new ConcurrentHashMap<Key, CachedRecord>());
+            records = recordsForTable.get(tableName);
+          }
         }
       }
       return records;
@@ -868,12 +870,14 @@ public abstract class ExpressionImpl implements Expression {
     }
 
     public void put(String tableName, Object[] key, CachedRecord record) {
-      ConcurrentHashMap<Key, CachedRecord> records = null;
-      synchronized (this) {
-        records = recordsForTable.get(tableName);
-        if (records == null) {
-          recordsForTable.put(tableName, new ConcurrentHashMap<Key, CachedRecord>());
+      ConcurrentHashMap<Key, CachedRecord> records = recordsForTable.get(tableName);
+      if (records == null) {
+        synchronized (this) {
           records = recordsForTable.get(tableName);
+          if (records == null) {
+            recordsForTable.put(tableName, new ConcurrentHashMap<Key, CachedRecord>());
+            records = recordsForTable.get(tableName);
+          }
         }
       }
       records.put(new Key(key), record);

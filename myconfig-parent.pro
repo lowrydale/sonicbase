@@ -159,7 +159,12 @@
 -keep public class com.sonicbase.procedure.StoredProcedureContext
 -keep public class com.sonicbase.procedure.StoredProcedureResponse
 -keep public class com.sonicbase.procedure.StoredProcedureClient
+-keep public class com.sonicbase.misc.BenchmarkClient
 
+-keepclassmembers  class com.sonicbase.misc.BenchmarkClient {
+      public static void main(java.lang.String[]);
+    !private <methods>;
+}
 -keepclassmembers  class com.sonicbase.procedure.StoredProcedureClient {
       public static void main(java.lang.String[]);
     !private <methods>;

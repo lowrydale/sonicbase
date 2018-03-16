@@ -154,7 +154,7 @@ public class DeleteManager {
           AtomicInteger currPartition = new AtomicInteger(0);
           File deletedDir = databaseServer.getDeltaManager().getDeletedDeltaDir(dbName,
               deltaNum == -1 ? "full" : String.valueOf(deltaNum), table.getKey(), index.getKey());
-          FileUtils.deleteDirectory(deletedDir);
+          com.sonicbase.common.FileUtils.delete(deletedDir);
           deletedDir.mkdirs();
           AtomicReference<File> deletedFile = new AtomicReference<>(new File(deletedDir, currPartition + ".bin"));
 
@@ -222,6 +222,7 @@ public class DeleteManager {
             MergeEntry deleteEntry = null;
             MergeEntry pushedDeleteEntry = null;
             DeltaManager.MergeEntry deltaEntry = null;
+            int entryCount = 0;
             while (true) {
               while (true) {
                 if (deleteIn != null) {
@@ -275,7 +276,9 @@ public class DeleteManager {
                     break;
                   }
                   deltaManager.writeEntry(deletedStream.get(), table.getValue(), index.getKey(), deltaEntry);
-                  cycleDeletedFile(deletedStream, deletedFile, currPartition, sizePerPartition, table.getKey(), index.getKey());
+                  if (entryCount++ % 10_000 == 0) {
+                    cycleDeletedFile(deletedStream, deletedFile, currPartition, sizePerPartition, table.getKey(), index.getKey());
+                  }
                   deltaEntry = deltaManager.readEntry(dbName, deltaNum, deltaContext, table.getValue(), index.getValue(), finishedBytes);//readRow(deltaContext);
                   if (deltaEntry == null) {
                     break;
@@ -335,7 +338,9 @@ public class DeleteManager {
                 }
                 else {
                   deltaManager.writeEntry(deletedStream.get(), table.getValue(), index.getKey(), deltaEntry);
-                  cycleDeletedFile(deletedStream, deletedFile, currPartition, sizePerPartition, table.getKey(), index.getKey());
+                  if (entryCount++ % 10_000 == 0) {
+                    cycleDeletedFile(deletedStream, deletedFile, currPartition, sizePerPartition, table.getKey(), index.getKey());
+                  }
                 }
 
                 deltaEntry = deltaManager.readEntry(dbName, deltaNum, deltaContext, table.getValue(), index.getValue(), finishedBytes);//readRow(deltaContext);
@@ -414,7 +419,7 @@ public class DeleteManager {
   public void delteTempDirs() {
     File file = new File(getDeltaRoot(), "tmp");
     try {
-      FileUtils.deleteDirectory(file);
+      com.sonicbase.common.FileUtils.delete(file);
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -426,7 +431,7 @@ public class DeleteManager {
     ThreadPoolExecutor executor = new ThreadPoolExecutor(cores, cores, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
     try {
       File file = new File(getDeltaRoot(), "tmp");
-      FileUtils.deleteDirectory(file);
+      com.sonicbase.common.FileUtils.delete(file);
 
       Map<Integer, Map<Integer, OutputState>> streams = new HashMap<>();
       for (Map.Entry<String, TableSchema> table : databaseServer.getCommon().getTables(dbName).entrySet()) {
@@ -1230,7 +1235,7 @@ public class DeleteManager {
       File destDir = getReplicaRoot();
       subDirectory += "/deletes/" + databaseServer.getShard() + "/0";
 
-      FileUtils.deleteDirectory(destDir);
+      com.sonicbase.common.FileUtils.delete(destDir);
       destDir.mkdirs();
 
       awsClient.downloadDirectory(bucket, prefix, subDirectory, destDir);
@@ -1262,7 +1267,7 @@ public class DeleteManager {
     try {
       File destDir = getReplicaRoot();
       if (destDir.exists()) {
-        FileUtils.deleteDirectory(destDir);
+        com.sonicbase.common.FileUtils.delete(destDir);
       }
       destDir.mkdirs();
       File srcDir = new File(directory, subDirectory + "/deletes/" + databaseServer.getShard() + "/0");

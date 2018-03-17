@@ -2370,6 +2370,11 @@ com.sonicbase.misc.TestDeleteMap$Key -> com.sonicbase.misc.a$a:
     13:15:void <init>(java.lang.Object[]) -> <init>
     18:18:int hashCode() -> hashCode
     23:23:boolean equals(java.lang.Object) -> equals
+com.sonicbase.misc.TestMissing -> com.sonicbase.misc.TestMissing:
+    6:6:void <init>() -> <init>
+    9:18:void main(java.lang.String[]) -> main
+    21:41:void validate(java.sql.Connection,java.lang.String[]) -> a
+    44:63:void load(java.sql.Connection,java.lang.String[]) -> b
 com.sonicbase.misc.TestSocket -> com.sonicbase.misc.b:
     13:13:void <init>() -> <init>
     17:57:void main(java.lang.String[]) -> a
@@ -2387,26 +2392,26 @@ com.sonicbase.misc.TestTableScan -> com.sonicbase.misc.TestTableScan:
 com.sonicbase.procedure.MyStoredProcedure1 -> com.sonicbase.procedure.MyStoredProcedure1:
     11:11:void <init>() -> <init>
     14:14:void init(com.sonicbase.procedure.StoredProcedureContext) -> init
-    19:54:com.sonicbase.procedure.StoredProcedureResponse execute(com.sonicbase.procedure.StoredProcedureContext) -> execute
-    60:74:com.sonicbase.procedure.StoredProcedureResponse finalize(com.sonicbase.procedure.StoredProcedureContext,java.util.List) -> finalize
-    79:79:boolean passesComplicatedLogic(com.sonicbase.procedure.Record) -> a
+    19:55:com.sonicbase.procedure.StoredProcedureResponse execute(com.sonicbase.procedure.StoredProcedureContext) -> execute
+    61:75:com.sonicbase.procedure.StoredProcedureResponse finalize(com.sonicbase.procedure.StoredProcedureContext,java.util.List) -> finalize
+    80:80:boolean passesComplicatedLogic(com.sonicbase.procedure.Record) -> a
     11:11:boolean access$000(com.sonicbase.procedure.MyStoredProcedure1,com.sonicbase.procedure.Record) -> access$000
 com.sonicbase.procedure.MyStoredProcedure1$1 -> com.sonicbase.procedure.MyStoredProcedure1$1:
     com.sonicbase.procedure.MyStoredProcedure1 this$0 -> a
-    24:24:void <init>(com.sonicbase.procedure.MyStoredProcedure1) -> <init>
-    27:37:boolean evaluate(com.sonicbase.procedure.StoredProcedureContext,com.sonicbase.procedure.Record) -> evaluate
+    26:26:void <init>(com.sonicbase.procedure.MyStoredProcedure1) -> <init>
+    29:39:boolean evaluate(com.sonicbase.procedure.StoredProcedureContext,com.sonicbase.procedure.Record) -> evaluate
 com.sonicbase.procedure.MyStoredProcedure1$2 -> com.sonicbase.procedure.MyStoredProcedure1$2:
     com.sonicbase.procedure.MyStoredProcedure1 this$0 -> a
-    65:65:void <init>(com.sonicbase.procedure.MyStoredProcedure1) -> <init>
-    68:68:int compare(com.sonicbase.procedure.Record,com.sonicbase.procedure.Record) -> a
-    65:65:int compare(java.lang.Object,java.lang.Object) -> compare
+    66:66:void <init>(com.sonicbase.procedure.MyStoredProcedure1) -> <init>
+    69:69:int compare(com.sonicbase.procedure.Record,com.sonicbase.procedure.Record) -> a
+    66:66:int compare(java.lang.Object,java.lang.Object) -> compare
 com.sonicbase.procedure.MyStoredProcedure2 -> com.sonicbase.procedure.MyStoredProcedure2:
     9:9:void <init>() -> <init>
     13:22:void init(com.sonicbase.procedure.StoredProcedureContext) -> init
-    27:62:com.sonicbase.procedure.StoredProcedureResponse execute(com.sonicbase.procedure.StoredProcedureContext) -> execute
-    67:67:boolean passesComplicatedLogic(com.sonicbase.procedure.Record) -> a
-    72:86:void insertBatch(com.sonicbase.procedure.StoredProcedureContext,java.util.List) -> insertBatch
-    90:96:com.sonicbase.procedure.StoredProcedureResponse finalize(com.sonicbase.procedure.StoredProcedureContext,java.util.List) -> finalize
+    27:61:com.sonicbase.procedure.StoredProcedureResponse execute(com.sonicbase.procedure.StoredProcedureContext) -> execute
+    66:66:boolean passesComplicatedLogic(com.sonicbase.procedure.Record) -> a
+    71:85:void insertBatch(com.sonicbase.procedure.StoredProcedureContext,java.util.List) -> insertBatch
+    89:95:com.sonicbase.procedure.StoredProcedureResponse finalize(com.sonicbase.procedure.StoredProcedureContext,java.util.List) -> finalize
     9:9:boolean access$000(com.sonicbase.procedure.MyStoredProcedure2,com.sonicbase.procedure.Record) -> access$000
 com.sonicbase.procedure.MyStoredProcedure2$1 -> com.sonicbase.procedure.MyStoredProcedure2$1:
     java.util.List val$batch -> a
@@ -2767,8 +2772,8 @@ com.sonicbase.procedure.StoredProcedure -> com.sonicbase.procedure.StoredProcedu
     com.sonicbase.procedure.StoredProcedureResponse execute(com.sonicbase.procedure.StoredProcedureContext) -> execute
     com.sonicbase.procedure.StoredProcedureResponse finalize(com.sonicbase.procedure.StoredProcedureContext,java.util.List) -> finalize
 com.sonicbase.procedure.StoredProcedureClient -> com.sonicbase.procedure.StoredProcedureClient:
-    6:6:void <init>() -> <init>
-    9:96:void main(java.lang.String[]) -> main
+    5:5:void <init>() -> <init>
+    8:86:void main(java.lang.String[]) -> main
 com.sonicbase.procedure.StoredProcedureContext -> com.sonicbase.procedure.StoredProcedureContext:
     int getShard() -> getShard
     int getReplica() -> getReplica

@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.procedure;
 
 import java.sql.*;
@@ -11,50 +10,43 @@ public class StoredProcedureClient {
 
     if (args[0].equals("1")) {
       String query = "call procedure 'com.sonicbase.procedure.MyStoredProcedure1'";
-      PreparedStatement procedureStmt = conn.prepareStatement(query);
-      ResultSet rs = procedureStmt.executeQuery();
-      while (rs.next()) {
-        System.out.println("id=" + rs.getLong("id1") + ", socialsecuritynumber=" +
-            rs.getString("socialsecuritynumber") + ", gender=" + rs.getString("gender"));
+      try (PreparedStatement procedureStmt = conn.prepareStatement(query);
+          ResultSet rs = procedureStmt.executeQuery()) {
+        while (rs.next()) {
+          System.out.println("id=" + rs.getLong("id1") + ", socialsecuritynumber=" +
+              rs.getString("socialsecuritynumber") + ", gender=" + rs.getString("gender"));
+        }
+        System.out.println("Finished");
       }
-
-      System.out.println("Finished");
-      rs.close();
-      procedureStmt.close();
     }
     else if (args[0].equals("2")) {
       String tableName = null;
       try {
         String query = "call procedure 'com.sonicbase.procedure.MyStoredProcedure2', 1000";
-        PreparedStatement procedureStmt = conn.prepareStatement(query);
-        ResultSet procedureRs = procedureStmt.executeQuery();
-        if (procedureRs.next()) {
-          tableName = procedureRs.getString("tableName");
+        try (PreparedStatement procedureStmt = conn.prepareStatement(query);
+             ResultSet procedureRs = procedureStmt.executeQuery()) {
+          if (procedureRs.next()) {
+            tableName = procedureRs.getString("tableName");
+          }
+          System.out.println("tableName=" + tableName);
         }
 
-        System.out.println("tableName=" + tableName);
-
-        procedureRs.close();
-        procedureStmt.close();
-
-        PreparedStatement resultsStmt = conn.prepareStatement("select * from " + tableName);
-        ResultSet rs = resultsStmt.executeQuery();
-        int offset = 3;
-        while (rs.next()) {
-          System.out.println("id=" + rs.getLong("id1") + ", socialsecuritynumber=" +
-              rs.getString("socialsecuritynumber") + ", gender=" + rs.getString("gender"));
+        try (PreparedStatement resultsStmt = conn.prepareStatement("select * from " + tableName);
+            ResultSet rs = resultsStmt.executeQuery()) {
+          int offset = 3;
+          while (rs.next()) {
+            System.out.println("id=" + rs.getLong("id1") + ", socialsecuritynumber=" +
+                rs.getString("socialsecuritynumber") + ", gender=" + rs.getString("gender"));
+          }
         }
-        rs.close();
-        resultsStmt.close();
-
         System.out.println("finished");
       }
       finally {
         try {
           if (tableName != null) {
-            PreparedStatement stmt = conn.prepareStatement("drop table " + tableName);
-            stmt.executeUpdate();
-            stmt.close();
+            try (PreparedStatement stmt = conn.prepareStatement("drop table " + tableName)) {
+              stmt.executeUpdate();
+            }
           }
         }
         catch (Exception e) {
@@ -64,34 +56,32 @@ public class StoredProcedureClient {
     }
     else if (args[0].equals("3")) {
       String query = "call procedure 'com.sonicbase.procedure.MyStoredProcedure3'";
-      PreparedStatement procedureStmt = conn.prepareStatement(query);
-      ResultSet rs = procedureStmt.executeQuery();
-      int offset = 3;
-      while (true) {
-        if (!rs.next()) {
-          break;
+      try (PreparedStatement procedureStmt = conn.prepareStatement(query);
+          ResultSet rs = procedureStmt.executeQuery()) {
+        int offset = 3;
+        while (true) {
+          if (!rs.next()) {
+            break;
+          }
+          System.out.println("id=" + rs.getLong("id1") + ", socialsecuritynumber=" +
+              rs.getString("socialsecuritynumber") + ", gender=" + rs.getString("gender"));
         }
-        System.out.println("id=" + rs.getLong("id1") + ", socialsecuritynumber=" +
-            rs.getString("socialsecuritynumber") + ", gender=" + rs.getString("gender"));
+        System.out.println("Finished");
       }
-      System.out.println("Finished");
-      rs.close();
-      procedureStmt.close();
     }
     else if (args[0].equals("4")) {
       String query = "call procedure 'com.sonicbase.procedure.MyStoredProcedure4'";
-      PreparedStatement procedureStmt = conn.prepareStatement(query);
-      ResultSet rs = procedureStmt.executeQuery();
-      while (true) {
-        if (!rs.next()) {
-          break;
+      try (PreparedStatement procedureStmt = conn.prepareStatement(query);
+           ResultSet rs = procedureStmt.executeQuery()) {
+        while (true) {
+          if (!rs.next()) {
+            break;
+          }
+          System.out.println("id=" + rs.getLong("id1") + ", socialsecuritynumber=" +
+              rs.getString("socialsecuritynumber") + ", gender=" + rs.getString("gender"));
         }
-        System.out.println("id=" + rs.getLong("id1") + ", socialsecuritynumber=" +
-            rs.getString("socialsecuritynumber") + ", gender=" + rs.getString("gender"));
+        System.out.println("Finished");
       }
-      System.out.println("Finished");
-      rs.close();
-      procedureStmt.close();
     }
   }
 }

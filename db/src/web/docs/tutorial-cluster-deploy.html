@@ -94,56 +94,81 @@ Edit the "config-test.json" file in the sonicbase/config directory. See <a href=
 On Windows the directory may look like "c:\\\\db-data". On linux it may look like "/mnt/db-data". On linux and mac
 you also have the option of prefixing your path with "$HOME" to specify the home directory. This option is not available on Windows.
         <h2>Configure Servers</h2>
+      <div class="mylink">
         Set the addresses and ports of each of your servers in the config file. If you have a pro license or 30-day trial you
         may configure multiple servers as replicas. Below is an example of configuring two shards and two replicas. A shard is a subset
-        of the data located on server and its replicas.
-
-        <h3>2 shards, 2 replicas</h3>
+        of the data located on server and its replicas. See <a href="shards-and-replicas.html?framed=true">Shards and Replicas</a>.
+      </div>
+        <h3>Example With 2 Shards and 2 Replicas</h3>
         <pre class="java"><code>
-"shards" : [ {
-    "replicas" : [ {
-      "publicAddress" : "18.232.5.217",
-      "privateAddress" : "10.0.0.205",
-      "port" : 9010
-    },
-    {
-      "publicAddress" : "10.0.0.141",
-      "privateAddress" : "10.0.0.141",
-      "port" : 9010
-    } ]
-  }, {
-    "replicas" : [ {
-      "publicAddress" : "10.0.0.42",
-      "privateAddress" : "10.0.0.42",
-      "port" : 9010
-    },
-    {
-      "publicAddress" : "10.0.0.252",
-      "privateAddress" : "10.0.0.252",
-      "port" : 9010
-    } ]
-  } ],</code></pre>
+"shards" :
+[
+  {
+    "replicas" :
+    [
+      {
+        "publicAddress" : "18.232.5.217",
+        "privateAddress" : "10.0.0.205",
+        "port" : 9010
+      },
+      {
+        "publicAddress" : "10.0.0.141",
+        "privateAddress" : "10.0.0.141",
+        "port" : 9010
+      }
+    ]
+  },
+  {
+    "replicas" :
+    [
+      {
+        "publicAddress" : "10.0.0.42",
+        "privateAddress" : "10.0.0.42",
+        "port" : 9010
+      },
+      {
+        "publicAddress" : "10.0.0.252",
+        "privateAddress" : "10.0.0.252",
+        "port" : 9010
+      }
+    ]
+  }
+]</code></pre>
 
-        <h3>2 shards, 1 replica</h3>
+        <h3>Example With 2 Shards, 1 Replica</h3>
         <pre class="java"><code>
-"shards" : [ {
-    "replicas" : [ {
-      "publicAddress" : "18.232.5.217",
-      "privateAddress" : "10.0.0.205",
-      "port" : 9010
-    }]
-  }, {
-    "replicas" : [ {
-      "publicAddress" : "10.0.0.42",
-      "privateAddress" : "10.0.0.42",
-      "port" : 9010
-    }]
-  } ],</code></pre>
+"shards" :
+[
+  {
+    "replicas" :
+    [
+      {
+        "publicAddress" : "18.232.5.217",
+        "privateAddress" : "10.0.0.205",
+        "port" : 9010
+      }
+    ]
+  },
+  {
+    "replicas" :
+    [
+      {
+        "publicAddress" : "10.0.0.42",
+        "privateAddress" : "10.0.0.42",
+        "port" : 9010
+      }
+    ]
+  }
+]</code></pre>
         If you want to deploy from your laptop to the cluster, the first server listed needs a public address that can be accessed
         from you laptop.
 <h2>Start Admin Client</h2>
 Change to the sonicbase/bin directory and type "./cli" for MacOS and Linux and "./cli.bat" for cygwin and "cli.bat" for Windows.
         This will start the SonicBase admin client.
+<h2>Start License Server</h2>
+      <div class="mylink">
+      If you have more that one replica configured you will need to <a href="../downloads.html?framed=true">purchase licenses</a> and start the license server. For more details see <a href="license-server.html?framed=true">License Server</a>.
+      </div>
 <h2>Use Cluster</h2>
 In the client, type:<br/>
 &nbsp;&nbsp;use cluster test<br/><br/>
@@ -159,7 +184,7 @@ in the sonicbase/config directory. The name of the file must be "config-&lt;clus
         in your cluster.
         <h2>PowerShell for Windows</h2>
         <div class="mylink">
-        To administer your cluster on Windows you need to install PowerShell. For more detais, see <a href="setup-windows.html">Setup Windows</a>.
+        To administer your cluster on Windows you need to install PowerShell. For more detais, see <a href="setup-windows.html?framed=true">Setup Windows</a>.
         </div>
         <h2>Deploy Cluster</h2>
         In the client, type:<br/>
@@ -193,7 +218,7 @@ You should see the inserted record displayed in the client.
 <h2>Access From JDBC Driver</h2>
         <div class="mylink">
         Include the SonicBase jdbc driver in your application. The jar is located in the "lib" directory of the install directory.
-        It is named "sonicbase-&lt;version&gt;.jar". For more details, see <a href="docs/jdbc-driver.html">JDBC Driver</a>.<br/>
+        It is named "sonicbase-&lt;version&gt;.jar". For more details, see <a href="jdbc-driver.html?framed=true">JDBC Driver</a>.<br/>
         </div>
         <br/>
         Create and run the following class:<br/>

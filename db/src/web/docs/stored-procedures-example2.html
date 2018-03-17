@@ -71,48 +71,40 @@
         <pre class="java"><code>
   @Test
   public void test2() throws SQLException {
-    String tableName = null;
-    try {
-      String query = "call procedure 'com.sonicbase.procedure.MyStoredProcedure2', 100000";
-      PreparedStatement procedureStmt = conn.prepareStatement(query);
-      ResultSet procedureRs = procedureStmt.executeQuery();
-      if (procedureRs.next()) {
-        tableName = procedureRs.getString("tableName");
-      }
-
-      procedureRs.close();
-      procedureStmt.close();
-
-      PreparedStatement resultsStmt = conn.prepareStatement("select * from " + tableName);
-      ResultSet rsultsRs = resultsStmt.executeQuery();
-      int offset = 3;
-      while (true) {
-        assertTrue(rsultsRs.next());
-        assertEquals(rsultsRs.getLong("id1"), (long)offset);
-        assertEquals(rsultsRs.getString("socialsecuritynumber"), "s" + offset);
-        assertEquals(rsultsRs.getString("gender"), "m");
-        offset++;
-        if (offset == 9) {
-          break;
-        }
-      }
-      rsultsRs.close();
-      resultsStmt.close();
-    }
-    finally {
+      String tableName = null;
       try {
-        if (tableName != null) {
-          PreparedStatement stmt = conn.prepareStatement("drop table " + tableName);
-          stmt.executeUpdate();
-          stmt.close();
+        String query = "call procedure 'com.sonicbase.procedure.MyStoredProcedure2', 1000";
+        try (PreparedStatement procedureStmt = conn.prepareStatement(query);
+             ResultSet procedureRs = procedureStmt.executeQuery()) {
+          if (procedureRs.next()) {
+            tableName = procedureRs.getString("tableName");
+          }
+          System.out.println("tableName=" + tableName);
+        }
+
+        try (PreparedStatement resultsStmt = conn.prepareStatement("select * from " + tableName);
+            ResultSet rs = resultsStmt.executeQuery()) {
+          int offset = 3;
+          while (rs.next()) {
+            System.out.println("id=" + rs.getLong("id1") + ", socialsecuritynumber=" +
+                rs.getString("socialsecuritynumber") + ", gender=" + rs.getString("gender"));
+          }
+        }
+        System.out.println("finished");
+      }
+      finally {
+        try {
+          if (tableName != null) {
+            try (PreparedStatement stmt = conn.prepareStatement("drop table " + tableName)) {
+              stmt.executeUpdate();
+            }
+          }
+        }
+        catch (Exception e) {
+          e.printStackTrace();
         }
       }
-      catch (Exception e) {
-        e.printStackTrace();
-      }
-    }
-  }
-        </code></pre>
+    }</code></pre>
 
         <h2>Stored Procedure Code</h2>
         <pre class="java"><code>
@@ -120,11 +112,11 @@ public class MyStoredProcedure2 implements StoredProcedure {
 
   public void init(StoredProcedureContext context) {
     try {
-      SonicBasePreparedStatement stmt = context.getConnection().prepareSonicBaseStatement(
+      try (SonicBasePreparedStatement stmt = context.getConnection().prepareSonicBaseStatement(
           context, "create table " + "results_" + context.getStoredProdecureId() + " (id1 BIGINT, num DOUBLE, socialSecurityNumber " +
-              "VARCHAR(20), gender VARCHAR(8), PRIMARY KEY (id1))");
-      stmt.executeUpdate();
-      stmt.close();
+              "VARCHAR(20), gender VARCHAR(8), PRIMARY KEY (id1))")) {
+        stmt.executeUpdate();
+      }
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -136,35 +128,34 @@ public class MyStoredProcedure2 implements StoredProcedure {
     try {
       String query = "select * from persons where id1>1 and id1<500 and gender='m'";
 
-      SonicBasePreparedStatement stmt = context.getConnection().prepareSonicBaseStatement(context, query);
-      stmt.restrictToThisServer(true);
+      try (SonicBasePreparedStatement stmt = context.getConnection().prepareSonicBaseStatement(context, query)) {
+        stmt.restrictToThisServer(true);
 
-      final List&lt;Record&gt; batch = new ArrayList<>();
-      stmt.executeQueryWithEvaluator(new RecordEvaluator() {
-        @Override
-        public boolean evaluate(final StoredProcedureContext context, Record record) {
-          if (record.getDatabase().equalsIgnoreCase("db") &&
-              record.getTableName().equalsIgnoreCase("persons")) {
-            Long id = record.getLong("id1");
-            if (id != null && id > 2 && id < context.getParameters().getInt(2) && passesComplicatedLogic(record)) {
-              if (!record.isDeleting()) {
-                batch.add(record);
-                if (batch.size() >= 200) {
-                  insertBatch(context, batch);
-                  batch.clear();
+        final List&lt;Record&gt; batch = new ArrayList<>();
+        stmt.executeQueryWithEvaluator(new RecordEvaluator() {
+          @Override
+          public boolean evaluate(final StoredProcedureContext context, Record record) {
+            if (record.getDatabase().equalsIgnoreCase("db") &&
+                record.getTableName().equalsIgnoreCase("persons")) {
+              Long id = record.getLong("id1");
+              if (id != null && id > 2 && id < context.getParameters().getInt(2) && passesComplicatedLogic(record)) {
+                if (!record.isDeleting()) {
+                  batch.add(record);
+                  if (batch.size() >= 200) {
+                    insertBatch(context, batch);
+                    batch.clear();
+                  }
                 }
               }
             }
+            return false;
           }
-          return false;
+        });
+
+        if (batch.size() != 0) {
+          insertBatch(context, batch);
         }
-      });
-
-      if (batch.size() != 0) {
-        insertBatch(context, batch);
       }
-
-      stmt.close();
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -205,8 +196,7 @@ public class MyStoredProcedure2 implements StoredProcedure {
 
     return response;
   }
-}
-        </code></pre>
+}</code></pre>
 </div>
 </div>
 </body>

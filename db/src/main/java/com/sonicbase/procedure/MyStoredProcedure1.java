@@ -18,36 +18,37 @@ public class MyStoredProcedure1 implements StoredProcedure {
     try {
       String query = "select * from persons where id1>1 and id1<500 and gender='m'";
 
-      SonicBasePreparedStatement stmt = context.getConnection().prepareSonicBaseStatement(context, query);
-      stmt.restrictToThisServer(true);
-
-      ResultSet rs = stmt.executeQueryWithEvaluator(new RecordEvaluator(){
-        @Override
-        public boolean evaluate(final StoredProcedureContext context, Record record) {
-          if (!record.getDatabase().equalsIgnoreCase("db") ||
-              !record.getTableName().equalsIgnoreCase("persons")) {
-            return false;
-          }
-          Long id = record.getLong("id1");
-          if (id != null && id > 2 && id < 100 && passesComplicatedLogic(record)) {
-            if (!record.isDeleting()) {
-              return true;
-            }
-          }
-          return false;
-        }
-      });
-
       StoredProcedureResponse response = context.createResponse();
 
-      while(rs.next()) {
-        Record record = context.createRecord();
-        record.setLong("id1", rs.getLong("id1"));
-        record.setString("socialsecuritynumber", rs.getString("socialsecuritynumber"));
-        record.setString("gender", rs.getString("gender"));
-        response.addRecord(record);
+      try (SonicBasePreparedStatement stmt = context.getConnection().prepareSonicBaseStatement(context, query)) {
+        stmt.restrictToThisServer(true);
+
+        try (ResultSet rs = stmt.executeQueryWithEvaluator(new RecordEvaluator() {
+          @Override
+          public boolean evaluate(final StoredProcedureContext context, Record record) {
+            if (!record.getDatabase().equalsIgnoreCase("db") ||
+                !record.getTableName().equalsIgnoreCase("persons")) {
+              return false;
+            }
+            Long id = record.getLong("id1");
+            if (id != null && id > 2 && id < 100 && passesComplicatedLogic(record)) {
+              if (!record.isDeleting()) {
+                return true;
+              }
+            }
+            return false;
+          }
+        })) {
+
+          while (rs.next()) {
+            Record record = context.createRecord();
+            record.setLong("id1", rs.getLong("id1"));
+            record.setString("socialsecuritynumber", rs.getString("socialsecuritynumber"));
+            record.setString("gender", rs.getString("gender"));
+            response.addRecord(record);
+          }
+        }
       }
-      stmt.close();
       return response;
     }
     catch (Exception e) {

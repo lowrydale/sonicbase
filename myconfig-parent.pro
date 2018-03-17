@@ -160,8 +160,13 @@
 -keep public class com.sonicbase.procedure.StoredProcedureResponse
 -keep public class com.sonicbase.procedure.StoredProcedureClient
 -keep public class com.sonicbase.misc.BenchmarkClient
+-keep public class com.sonicbase.website.Tutorial
 
 -keepclassmembers  class com.sonicbase.misc.BenchmarkClient {
+      public static void main(java.lang.String[]);
+    !private <methods>;
+}
+-keepclassmembers  class com.sonicbase.website.Tutorial {
       public static void main(java.lang.String[]);
     !private <methods>;
 }

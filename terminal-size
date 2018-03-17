@@ -1,0 +1,4 @@
+cols=$COLUMNS
+lines=$LINES
+
+stty size >> "tmp/size.txt"

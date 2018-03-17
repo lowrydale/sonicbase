@@ -84,7 +84,7 @@ mvn install:install-file -Dfile=/home/user/sonicbase-0.9.2.jar -DgroupId=com.son
 <h2>Prerequisites</h2>
 <div class="mylink">
 Before you connect to the database you need to create the database using the administrative client. See the
-<a class="mylink" href="getting-started.html?framed=true">Getting Started Guide</a> for an example.<br/>
+<a class="mylink" href="tutorial-local-deploy.html?framed=true">Getting Started Guide</a> for an example.<br/>
 </div>
 
 <h2>JDK Requirements</h2>
@@ -93,7 +93,7 @@ The jvm running the jdbc driver needs to be at least version 7.
 
 <h2>Connecting</h2>
 Include the following line before creating a connection:<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;Class.forName("Driver");
+&nbsp;&nbsp;&nbsp;&nbsp;Class.forName("com.sonicbase.jdbcdriver.Driver");
 <br/>
 <br/>
 Connect to the database with the following code:<br/>

@@ -7198,3 +7198,6 @@ com.sonicbase.util.DateUtils -> com.sonicbase.util.DateUtils:
     94:107:java.util.Calendar fromDbCalString(java.lang.String) -> fromDbCalString
     118:131:java.util.Calendar fromDbTimeString(java.lang.String) -> fromDbTimeString
     76:110:void <clinit>() -> <clinit>
+com.sonicbase.website.Tutorial -> com.sonicbase.website.Tutorial:
+    6:6:void <init>() -> <init>
+    8:15:void main(java.lang.String[]) -> main

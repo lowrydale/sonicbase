@@ -83,6 +83,7 @@ public class DatabaseServer {
   private static org.apache.log4j.Logger errorLogger = org.apache.log4j.Logger.getLogger("com.sonicbase.errorLogger");
   private static org.apache.log4j.Logger clientErrorLogger = org.apache.log4j.Logger.getLogger("com.sonicbase.clientErrorLogger");
 
+  public static final boolean USE_SNAPSHOT_MGR_OLD = true;
   public static final boolean ENABLE_RECORD_COMPRESSION = false;
   private AtomicLong commandCount = new AtomicLong();
   private int port;
@@ -175,8 +176,8 @@ public class DatabaseServer {
   private String masterAddress;
   private int masterPort;
   private UpdateManager updateManager;
-  //private SnapshotManager snapshotManager;
-  private DeltaManager deltaManager;
+  //private SnapshotManagerImpl snapshotManager;
+  private SnapshotManager deltaManager;
   private TransactionManager transactionManager;
   private ReadManager readManager;
   private LogManager logManager;
@@ -320,8 +321,13 @@ public class DatabaseServer {
 
     this.deleteManager = new DeleteManager(this);
     this.updateManager = new UpdateManager(this);
-    //this.snapshotManager = new SnapshotManager(this);
-    this.deltaManager = new DeltaManager(this);
+    //this.snapshotManager = new SnapshotManagerImpl(this);
+    if (USE_SNAPSHOT_MGR_OLD) {
+      this.deltaManager = new SnapshotManagerImpl(this);
+    }
+    else {
+      this.deltaManager = new DeltaManager(this);
+    }
     this.transactionManager = new TransactionManager(this);
     this.readManager = new ReadManager(this);
     this.logManager = new LogManager(this, new File(dataDir, "log"));
@@ -1244,7 +1250,7 @@ public class DatabaseServer {
     return streamManager;
   }
 
-  public DeltaManager getDeltaManager() {
+  public SnapshotManager getDeltaManager() {
     return deltaManager;
   }
 
@@ -2737,7 +2743,13 @@ public class DatabaseServer {
         String bucket = backupConfig.get("bucket").asText();
         String prefix = backupConfig.get("prefix").asText();
 
-        String key = prefix + "/" + subDirectory + "/delta/" + getShard() + "/0/schema.bin";
+        String key = null;
+        if (USE_SNAPSHOT_MGR_OLD) {
+          key = prefix + "/" + subDirectory + "/snapshot/" + getShard() + "/0/schema.bin";
+        }
+        else {
+          key = prefix + "/" + subDirectory + "/delta/" + getShard() + "/0/schema.bin";
+        }
         byte[] bytes = awsClient.downloadBytes(bucket, key);
         synchronized (common) {
           common.deserializeSchema(bytes);
@@ -2749,7 +2761,12 @@ public class DatabaseServer {
         currDirectory = currDirectory.replace("$HOME", System.getProperty("user.home"));
 
         File file = new File(currDirectory, subDirectory);
-        file = new File(file, "delta/" + getShard() + "/0/schema.bin");
+        if (USE_SNAPSHOT_MGR_OLD) {
+          file = new File(file, "snapshot/" + getShard() + "/0/schema.bin");
+        }
+        else {
+          file = new File(file, "delta/" + getShard() + "/0/schema.bin");
+        }
         BufferedInputStream in = new BufferedInputStream(new FileInputStream(file));
         ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
         IOUtils.copy(in, bytesOut);
@@ -3991,7 +4008,13 @@ public class DatabaseServer {
     ComArray array = retObj.getArray(ComObject.Tag.dbNames);
     for (int i = 0; i < array.getArray().size(); i++) {
       String dbName = (String) array.getArray().get(i);
-      File file = new File(dataDir, "delta/" + shard + "/" + replica + "/" + dbName);
+      File file = null;
+      if (USE_SNAPSHOT_MGR_OLD) {
+        file = new File(dataDir, "snapshot/" + shard + "/" + replica + "/" + dbName);
+      }
+      else {
+        file = new File(dataDir, "delta/" + shard + "/" + replica + "/" + dbName);
+      }
       file.mkdirs();
       logger.info("Received database name: name=" + dbName);
     }
@@ -3999,7 +4022,13 @@ public class DatabaseServer {
 
 
   public List<String> getDbNames(String dataDir) {
-    File file = new File(dataDir, "delta/" + shard + "/" + replica);
+    File file = null;
+    if (USE_SNAPSHOT_MGR_OLD) {
+      new File(dataDir, "snapshot/" + shard + "/" + replica);
+    }
+    else {
+      new File(dataDir, "delta/" + shard + "/" + replica);
+    }
     String[] dirs = file.list();
     List<String> ret = new ArrayList<>();
     if (dirs != null) {
@@ -4278,7 +4307,12 @@ public class DatabaseServer {
 
         filename = fixReplica("deletes", filename);
         filename = fixReplica("lrc", filename);
-        filename = fixReplica("delta", filename);
+        if (USE_SNAPSHOT_MGR_OLD) {
+          filename = fixReplica("snapshot", filename);
+        }
+        else {
+          filename = fixReplica("delta", filename);
+        }
         filename = fixReplica("log", filename);
         filename = fixReplica("nextRecordId", filename);
         filename = fixReplica("logSequenceNum", filename);
@@ -5154,10 +5188,10 @@ public class DatabaseServer {
     common.getSchemaReadLock(dbName).lock();
     try {
       logger.info("Requesting next record id - begin");
-      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
-      if (schemaVersion < getSchemaVersion()) {
-        throw new SchemaOutOfSyncException("currVer:" + common.getSchemaVersion() + ":");
-      }
+//      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
+//      if (schemaVersion < getSchemaVersion()) {
+//        throw new SchemaOutOfSyncException("currVer:" + common.getSchemaVersion() + ":");
+//      }
       long nextId;
       long maxId;
       synchronized (nextIdLock) {

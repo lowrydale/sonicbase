@@ -1227,7 +1227,7 @@ public class DatabaseClient {
                 body.put(ComObject.Tag.method, "queueForOtherServer");
                 //body.put(ComObject.Tag.replica, (int)auth_user);
 
-                //String queueCommand = "DatabaseServer:queueForOtherServer:1:" + SnapshotManager.SERIALIZATION_VERSION + ":1:__none__:" + (int) auth_user;
+                //String queueCommand = "DatabaseServer:queueForOtherServer:1:" + SnapshotManagerImpl.SERIALIZATION_VERSION + ":1:__none__:" + (int) auth_user;
 
                 int masterReplica = common.getServersConfig().getShards()[shard].getMasterReplica();
                 if (shard == this.shard && masterReplica == this.replica && databaseServer != null) {
@@ -1349,7 +1349,7 @@ public class DatabaseClient {
                             body.put(ComObject.Tag.method, "queueForOtherServer");
                             //body.put(ComObject.Tag.replica, (int)auth_user);
 
-                            //String queueCommand = "DatabaseServer:queueForOtherServer:1:" + SnapshotManager.SERIALIZATION_VERSION + ":1:__none__:" + (int) auth_user;
+                            //String queueCommand = "DatabaseServer:queueForOtherServer:1:" + SnapshotManagerImpl.SERIALIZATION_VERSION + ":1:__none__:" + (int) auth_user;
 
                             masterReplica = common.getServersConfig().getShards()[shard].getMasterReplica();
                             if (shard == this.shard && masterReplica == this.replica && databaseServer != null) {
@@ -1547,7 +1547,7 @@ public class DatabaseClient {
 //          try {
 //            Thread.sleep(10000);
 //
-//            String command = "DatabaseServer:healthCheck:1:" + SnapshotManager.SERIALIZATION_VERSION + ":1:__none__";
+//            String command = "DatabaseServer:healthCheck:1:" + SnapshotManagerImpl.SERIALIZATION_VERSION + ":1:__none__";
 //
 //            byte[] bytes = replica.do_send(null, command, null);
 //            if (new String(bytes, "utf-8").equals("{\"status\" : \"ok\"}")) {

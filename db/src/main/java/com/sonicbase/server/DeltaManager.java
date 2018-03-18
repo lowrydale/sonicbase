@@ -5,23 +5,18 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
 import com.sonicbase.index.Indices;
-
-import com.sonicbase.common.ComObject;
-import com.sonicbase.common.DatabaseCommon;
-import com.sonicbase.common.Logger;
-import com.sonicbase.common.Record;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.giraph.utils.Varint;
 
 import java.io.*;
-import java.text.ParseException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -29,7 +24,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 
-public class DeltaManager {
+public class DeltaManager implements SnapshotManager {
 
   public static final int SNAPSHOT_PARTITION_COUNT = 128;
 
@@ -157,6 +152,13 @@ public class DeltaManager {
               Thread.sleep(1000);
             }
 
+            File file = new File(getSnapshotReplicaDir(), "serializationVersion");
+            file.delete();
+            file.getParentFile().mkdirs();
+            try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
+              writer.write(String.valueOf(DatabaseClient.SERIALIZATION_VERSION));
+            }
+
             List<String> dbNames = server.getDbNames(server.getDataDir());
             for (String dbName : dbNames) {
               runSnapshot(dbName);
@@ -206,7 +208,7 @@ public class DeltaManager {
     server.getClient().sendToAllShards(null, 0, cobj, DatabaseClient.Replica.def);
   }
 
-  public void runSnapshot(final String dbName) throws IOException, InterruptedException, ParseException {
+  public void runSnapshot(final String dbName) throws IOException, InterruptedException {
     lastSnapshot = System.currentTimeMillis();
 
     long begin = System.currentTimeMillis();

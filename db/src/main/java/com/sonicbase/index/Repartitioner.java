@@ -717,7 +717,7 @@ public class Repartitioner extends Thread {
 //    try {
 //      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
 //      DataOutputStream out = new DataOutputStream(bytesOut);
-//      Varint.writeSignedVarLong(out, SnapshotManager.SERIALIZATION_VERSION);
+//      Varint.writeSignedVarLong(out, SnapshotManagerImpl.SERIALIZATION_VERSION);
 //      boolean finished = isRepartitioningRecordsByIdComplete();
 //      out.writeBoolean(finished);
 //      return bytesOut.toByteArray();
@@ -748,7 +748,7 @@ public class Repartitioner extends Thread {
 //    try {
 //      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
 //      DataOutputStream out = new DataOutputStream(bytesOut);
-//      Varint.writeSignedVarLong(out, SnapshotManager.SERIALIZATION_VERSION);
+//      Varint.writeSignedVarLong(out, SnapshotManagerImpl.SERIALIZATION_VERSION);
 //      boolean finished = isDeletingComplete();
 //      out.writeBoolean(finished);
 //      return bytesOut.toByteArray();

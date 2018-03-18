@@ -2370,6 +2370,11 @@ com.sonicbase.misc.TestDeleteMap$Key -> com.sonicbase.misc.a$a:
     13:15:void <init>(java.lang.Object[]) -> <init>
     18:18:int hashCode() -> hashCode
     23:23:boolean equals(java.lang.Object) -> equals
+com.sonicbase.misc.TestMissing -> com.sonicbase.misc.TestMissing:
+    6:6:void <init>() -> <init>
+    9:18:void main(java.lang.String[]) -> main
+    21:41:void validate(java.sql.Connection,java.lang.String[]) -> a
+    44:63:void load(java.sql.Connection,java.lang.String[]) -> b
 com.sonicbase.misc.TestSocket -> com.sonicbase.misc.b:
     13:13:void <init>() -> <init>
     17:57:void main(java.lang.String[]) -> a
@@ -2387,26 +2392,26 @@ com.sonicbase.misc.TestTableScan -> com.sonicbase.misc.TestTableScan:
 com.sonicbase.procedure.MyStoredProcedure1 -> com.sonicbase.procedure.MyStoredProcedure1:
     11:11:void <init>() -> <init>
     14:14:void init(com.sonicbase.procedure.StoredProcedureContext) -> init
-    19:54:com.sonicbase.procedure.StoredProcedureResponse execute(com.sonicbase.procedure.StoredProcedureContext) -> execute
-    60:74:com.sonicbase.procedure.StoredProcedureResponse finalize(com.sonicbase.procedure.StoredProcedureContext,java.util.List) -> finalize
-    79:79:boolean passesComplicatedLogic(com.sonicbase.procedure.Record) -> a
+    19:55:com.sonicbase.procedure.StoredProcedureResponse execute(com.sonicbase.procedure.StoredProcedureContext) -> execute
+    61:75:com.sonicbase.procedure.StoredProcedureResponse finalize(com.sonicbase.procedure.StoredProcedureContext,java.util.List) -> finalize
+    80:80:boolean passesComplicatedLogic(com.sonicbase.procedure.Record) -> a
     11:11:boolean access$000(com.sonicbase.procedure.MyStoredProcedure1,com.sonicbase.procedure.Record) -> access$000
 com.sonicbase.procedure.MyStoredProcedure1$1 -> com.sonicbase.procedure.MyStoredProcedure1$1:
     com.sonicbase.procedure.MyStoredProcedure1 this$0 -> a
-    24:24:void <init>(com.sonicbase.procedure.MyStoredProcedure1) -> <init>
-    27:37:boolean evaluate(com.sonicbase.procedure.StoredProcedureContext,com.sonicbase.procedure.Record) -> evaluate
+    26:26:void <init>(com.sonicbase.procedure.MyStoredProcedure1) -> <init>
+    29:39:boolean evaluate(com.sonicbase.procedure.StoredProcedureContext,com.sonicbase.procedure.Record) -> evaluate
 com.sonicbase.procedure.MyStoredProcedure1$2 -> com.sonicbase.procedure.MyStoredProcedure1$2:
     com.sonicbase.procedure.MyStoredProcedure1 this$0 -> a
-    65:65:void <init>(com.sonicbase.procedure.MyStoredProcedure1) -> <init>
-    68:68:int compare(com.sonicbase.procedure.Record,com.sonicbase.procedure.Record) -> a
-    65:65:int compare(java.lang.Object,java.lang.Object) -> compare
+    66:66:void <init>(com.sonicbase.procedure.MyStoredProcedure1) -> <init>
+    69:69:int compare(com.sonicbase.procedure.Record,com.sonicbase.procedure.Record) -> a
+    66:66:int compare(java.lang.Object,java.lang.Object) -> compare
 com.sonicbase.procedure.MyStoredProcedure2 -> com.sonicbase.procedure.MyStoredProcedure2:
     9:9:void <init>() -> <init>
     13:22:void init(com.sonicbase.procedure.StoredProcedureContext) -> init
-    27:62:com.sonicbase.procedure.StoredProcedureResponse execute(com.sonicbase.procedure.StoredProcedureContext) -> execute
-    67:67:boolean passesComplicatedLogic(com.sonicbase.procedure.Record) -> a
-    72:86:void insertBatch(com.sonicbase.procedure.StoredProcedureContext,java.util.List) -> insertBatch
-    90:96:com.sonicbase.procedure.StoredProcedureResponse finalize(com.sonicbase.procedure.StoredProcedureContext,java.util.List) -> finalize
+    27:61:com.sonicbase.procedure.StoredProcedureResponse execute(com.sonicbase.procedure.StoredProcedureContext) -> execute
+    66:66:boolean passesComplicatedLogic(com.sonicbase.procedure.Record) -> a
+    71:85:void insertBatch(com.sonicbase.procedure.StoredProcedureContext,java.util.List) -> insertBatch
+    89:95:com.sonicbase.procedure.StoredProcedureResponse finalize(com.sonicbase.procedure.StoredProcedureContext,java.util.List) -> finalize
     9:9:boolean access$000(com.sonicbase.procedure.MyStoredProcedure2,com.sonicbase.procedure.Record) -> access$000
 com.sonicbase.procedure.MyStoredProcedure2$1 -> com.sonicbase.procedure.MyStoredProcedure2$1:
     java.util.List val$batch -> a
@@ -2767,8 +2772,8 @@ com.sonicbase.procedure.StoredProcedure -> com.sonicbase.procedure.StoredProcedu
     com.sonicbase.procedure.StoredProcedureResponse execute(com.sonicbase.procedure.StoredProcedureContext) -> execute
     com.sonicbase.procedure.StoredProcedureResponse finalize(com.sonicbase.procedure.StoredProcedureContext,java.util.List) -> finalize
 com.sonicbase.procedure.StoredProcedureClient -> com.sonicbase.procedure.StoredProcedureClient:
-    6:6:void <init>() -> <init>
-    9:96:void main(java.lang.String[]) -> main
+    5:5:void <init>() -> <init>
+    8:86:void main(java.lang.String[]) -> main
 com.sonicbase.procedure.StoredProcedureContext -> com.sonicbase.procedure.StoredProcedureContext:
     int getShard() -> getShard
     int getReplica() -> getReplica
@@ -5273,7 +5278,7 @@ com.sonicbase.server.DatabaseServer -> com.sonicbase.server.c:
     java.lang.String masterAddress -> ax
     int masterPort -> ay
     com.sonicbase.server.UpdateManager updateManager -> az
-    com.sonicbase.server.DeltaManager deltaManager -> aA
+    com.sonicbase.server.SnapshotManager deltaManager -> aA
     com.sonicbase.server.TransactionManager transactionManager -> aB
     com.sonicbase.server.ReadManager readManager -> aC
     com.sonicbase.server.LogManager logManager -> aD
@@ -5340,7 +5345,7 @@ com.sonicbase.server.DatabaseServer -> com.sonicbase.server.c:
     1236:1236:boolean haveProLicense() -> q
     1240:1240:com.sonicbase.common.Logger getLogger() -> r
     1244:1244:com.sonicbase.server.StreamManager getStreamManager() -> s
-    1248:1248:com.sonicbase.server.DeltaManager getDeltaManager() -> t
+    1248:1248:com.sonicbase.server.SnapshotManager getDeltaManager() -> t
     1252:1268:com.sonicbase.common.ComObject getRecoverProgress() -> u
     1274:1302:com.sonicbase.procedure.Parameters getParametersFromStoredProcedure(net.sf.jsqlparser.statement.execute.Execute) -> a
     1306:1319:com.sonicbase.jdbcdriver.ConnectionProxy getConnectionForStoredProcedure(java.lang.String) -> a
@@ -5516,7 +5521,7 @@ com.sonicbase.server.DatabaseServer -> com.sonicbase.server.c:
     78:78:void access$2900(com.sonicbase.server.DatabaseServer,java.lang.String,java.lang.String,java.lang.String) -> a
     78:78:com.sonicbase.server.DeleteManager access$3000(com.sonicbase.server.DatabaseServer) -> p
     78:78:com.sonicbase.server.LongRunningCalls access$3100(com.sonicbase.server.DatabaseServer) -> q
-    78:78:com.sonicbase.server.DeltaManager access$3200(com.sonicbase.server.DatabaseServer) -> r
+    78:78:com.sonicbase.server.SnapshotManager access$3200(com.sonicbase.server.DatabaseServer) -> r
     78:78:java.lang.String access$3300(com.sonicbase.server.DatabaseServer) -> s
     78:78:com.sonicbase.server.LogManager access$3400(com.sonicbase.server.DatabaseServer) -> t
     78:78:boolean access$3502(com.sonicbase.server.DatabaseServer,boolean) -> b
@@ -5777,45 +5782,45 @@ com.sonicbase.server.DeleteManager -> com.sonicbase.server.d:
     long totalBytes -> i
     java.util.concurrent.atomic.AtomicLong bytesRead -> j
     java.util.concurrent.atomic.AtomicBoolean isForcingDeletes -> k
-    35:1310:void <init>(com.sonicbase.server.DatabaseServer) -> <init>
+    35:1314:void <init>(com.sonicbase.server.DatabaseServer) -> <init>
     45:45:com.sonicbase.server.LogManager getDeltaLogManager() -> a
     49:70:void deleteOldLogs(long) -> a
     73:81:void shutdown() -> b
-    141:372:void applyDeletesToSnapshot(java.lang.String,int,java.util.concurrent.atomic.AtomicLong) -> a
-    377:387:com.sonicbase.server.DeleteManager$MergeEntry readRow(com.sonicbase.server.DeleteManager$DeleteContext) -> a
-    394:404:com.sonicbase.server.DeltaManager$MergeEntry readRow(com.sonicbase.server.DeleteManager$DeltaContext) -> a
-    410:417:void cycleDeletedFile(java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicInteger,long,java.lang.String,java.lang.String) -> a
-    420:427:void delteTempDirs() -> c
-    430:465:void buildDeletionsFiles(java.lang.String,java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong) -> a
-    469:492:void mergeSort(java.lang.String,java.util.Map,java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong) -> a
-    509:597:void mergeSort(java.lang.String,int,int,java.io.File,java.util.concurrent.atomic.AtomicLong) -> a
-    601:612:java.io.DataOutputStream writeRow(com.sonicbase.server.DeleteManager$MergeEntry,java.io.DataOutputStream,com.sonicbase.schema.TableSchema,com.sonicbase.schema.IndexSchema,java.util.concurrent.atomic.AtomicInteger,java.util.concurrent.atomic.AtomicInteger,java.io.File) -> a
-    617:632:com.sonicbase.server.DeleteManager$MergeEntry readRow(java.lang.String,com.sonicbase.schema.TableSchema,com.sonicbase.schema.IndexSchema,java.io.DataInputStream) -> a
-    637:707:void writeLogDeletes(java.util.concurrent.ThreadPoolExecutor,java.lang.String,java.util.Map,java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong) -> a
-    711:721:void closeFiles(java.lang.String,java.util.Map) -> a
-    726:823:void writeBatchDeletes(java.util.concurrent.ThreadPoolExecutor,java.lang.String,java.util.Map,java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong) -> b
-    827:865:void cycleFile(java.lang.String,int,int,com.sonicbase.server.DeleteManager$OutputState,boolean,boolean) -> a
-    870:886:void saveDeleteForRecord(java.lang.String,java.lang.String,java.lang.String,long,long,com.sonicbase.server.DeleteManager$DeleteRequestForRecord) -> a
-    891:909:void saveDeleteForKeyRecord(java.lang.String,java.lang.String,java.lang.String,long,long,com.sonicbase.server.DeleteManager$DeleteRequestForKeyRecord) -> a
-    913:915:void saveDeletesForRecords(java.lang.String,java.lang.String,java.lang.String,long,long,java.util.concurrent.ConcurrentLinkedQueue) -> a
-    919:921:void saveDeletesForKeyRecords(java.lang.String,java.lang.String,java.lang.String,long,long,java.util.concurrent.ConcurrentLinkedQueue) -> b
-    926:951:void doSaveDeletesForRecords(java.io.File,java.lang.String,java.lang.String,java.lang.String,long,long,java.util.concurrent.ConcurrentLinkedQueue) -> a
-    956:983:void doSaveDeletesForKeyRecords(java.io.File,java.lang.String,java.lang.String,java.lang.String,long,long,java.util.concurrent.ConcurrentLinkedQueue) -> b
-    989:1162:void doDeletes(boolean) -> a
-    1173:1189:void doFreeMemory(java.util.List) -> b
-    1192:1192:java.io.File getReplicaRoot() -> i
-    1196:1196:java.io.File getStandardRoot() -> j
-    1200:1200:java.io.File getDeltaRoot() -> k
-    1205:1220:void start() -> d
-    1223:1230:void backupAWS(java.lang.String,java.lang.String,java.lang.String) -> a
-    1234:1246:void restoreAWS(java.lang.String,java.lang.String,java.lang.String) -> b
-    1249:1250:long getBackupLocalFileSystemSize() -> e
-    1255:1264:void backupFileSystem(java.lang.String,java.lang.String) -> a
-    1268:1281:void restoreFileSystem(java.lang.String,java.lang.String) -> b
-    1284:1291:void getFiles(java.util.List) -> a
-    1298:1307:double getPercentDeleteComplete() -> f
-    1313:1313:boolean isForcingDeletes() -> g
-    1317:1339:void forceDeletes() -> h
+    141:376:void applyDeletesToSnapshot(java.lang.String,int,java.util.concurrent.atomic.AtomicLong) -> a
+    381:391:com.sonicbase.server.DeleteManager$MergeEntry readRow(com.sonicbase.server.DeleteManager$DeleteContext) -> a
+    398:408:com.sonicbase.server.DeltaManager$MergeEntry readRow(com.sonicbase.server.DeleteManager$DeltaContext) -> a
+    414:421:void cycleDeletedFile(java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicInteger,long,java.lang.String,java.lang.String) -> a
+    424:431:void delteTempDirs() -> c
+    434:469:void buildDeletionsFiles(java.lang.String,java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong) -> a
+    473:496:void mergeSort(java.lang.String,java.util.Map,java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong) -> a
+    513:601:void mergeSort(java.lang.String,int,int,java.io.File,java.util.concurrent.atomic.AtomicLong) -> a
+    605:616:java.io.DataOutputStream writeRow(com.sonicbase.server.DeleteManager$MergeEntry,java.io.DataOutputStream,com.sonicbase.schema.TableSchema,com.sonicbase.schema.IndexSchema,java.util.concurrent.atomic.AtomicInteger,java.util.concurrent.atomic.AtomicInteger,java.io.File) -> a
+    621:636:com.sonicbase.server.DeleteManager$MergeEntry readRow(java.lang.String,com.sonicbase.schema.TableSchema,com.sonicbase.schema.IndexSchema,java.io.DataInputStream) -> a
+    641:711:void writeLogDeletes(java.util.concurrent.ThreadPoolExecutor,java.lang.String,java.util.Map,java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong) -> a
+    715:725:void closeFiles(java.lang.String,java.util.Map) -> a
+    730:827:void writeBatchDeletes(java.util.concurrent.ThreadPoolExecutor,java.lang.String,java.util.Map,java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong) -> b
+    831:869:void cycleFile(java.lang.String,int,int,com.sonicbase.server.DeleteManager$OutputState,boolean,boolean) -> a
+    874:890:void saveDeleteForRecord(java.lang.String,java.lang.String,java.lang.String,long,long,com.sonicbase.server.DeleteManager$DeleteRequestForRecord) -> a
+    895:913:void saveDeleteForKeyRecord(java.lang.String,java.lang.String,java.lang.String,long,long,com.sonicbase.server.DeleteManager$DeleteRequestForKeyRecord) -> a
+    917:919:void saveDeletesForRecords(java.lang.String,java.lang.String,java.lang.String,long,long,java.util.concurrent.ConcurrentLinkedQueue) -> a
+    923:925:void saveDeletesForKeyRecords(java.lang.String,java.lang.String,java.lang.String,long,long,java.util.concurrent.ConcurrentLinkedQueue) -> b
+    930:955:void doSaveDeletesForRecords(java.io.File,java.lang.String,java.lang.String,java.lang.String,long,long,java.util.concurrent.ConcurrentLinkedQueue) -> a
+    960:987:void doSaveDeletesForKeyRecords(java.io.File,java.lang.String,java.lang.String,java.lang.String,long,long,java.util.concurrent.ConcurrentLinkedQueue) -> b
+    993:1166:void doDeletes(boolean) -> a
+    1177:1193:void doFreeMemory(java.util.List) -> b
+    1196:1196:java.io.File getReplicaRoot() -> i
+    1200:1200:java.io.File getStandardRoot() -> j
+    1204:1204:java.io.File getDeltaRoot() -> k
+    1209:1224:void start() -> d
+    1227:1234:void backupAWS(java.lang.String,java.lang.String,java.lang.String) -> a
+    1238:1250:void restoreAWS(java.lang.String,java.lang.String,java.lang.String) -> b
+    1253:1254:long getBackupLocalFileSystemSize() -> e
+    1259:1268:void backupFileSystem(java.lang.String,java.lang.String) -> a
+    1272:1285:void restoreFileSystem(java.lang.String,java.lang.String) -> b
+    1288:1295:void getFiles(java.util.List) -> a
+    1302:1311:double getPercentDeleteComplete() -> f
+    1317:1317:boolean isForcingDeletes() -> g
+    1321:1343:void forceDeletes() -> h
     24:24:com.sonicbase.server.DatabaseServer access$1400(com.sonicbase.server.DeleteManager) -> a
     24:24:void access$1500(com.sonicbase.server.DeleteManager,java.lang.String,int,int,com.sonicbase.server.DeleteManager$OutputState,boolean,boolean) -> a
     24:24:com.sonicbase.server.LogManager access$1600(com.sonicbase.server.DeleteManager) -> b
@@ -5825,56 +5830,56 @@ com.sonicbase.server.DeleteManager -> com.sonicbase.server.d:
 com.sonicbase.server.DeleteManager$1 -> com.sonicbase.server.d$1:
     java.util.Comparator[] val$keyComparator -> a
     com.sonicbase.server.DeleteManager this$0 -> b
-    525:525:void <init>(com.sonicbase.server.DeleteManager,java.util.Comparator[]) -> <init>
-    528:528:int compare(com.sonicbase.server.DeleteManager$MergeRow,com.sonicbase.server.DeleteManager$MergeRow) -> a
-    525:525:int compare(java.lang.Object,java.lang.Object) -> compare
+    529:529:void <init>(com.sonicbase.server.DeleteManager,java.util.Comparator[]) -> <init>
+    532:532:int compare(com.sonicbase.server.DeleteManager$MergeRow,com.sonicbase.server.DeleteManager$MergeRow) -> a
+    529:529:int compare(java.lang.Object,java.lang.Object) -> compare
 com.sonicbase.server.DeleteManager$2 -> com.sonicbase.server.d$2:
     java.util.concurrent.atomic.AtomicLong val$finishedBytes -> a
     java.io.File val$file -> b
     java.lang.String val$dbName -> c
     java.util.Map val$streams -> d
     com.sonicbase.server.DeleteManager this$0 -> e
-    646:646:void <init>(com.sonicbase.server.DeleteManager,java.util.concurrent.atomic.AtomicLong,java.io.File,java.lang.String,java.util.Map) -> <init>
-    649:694:java.lang.Object call() -> call
+    650:650:void <init>(com.sonicbase.server.DeleteManager,java.util.concurrent.atomic.AtomicLong,java.io.File,java.lang.String,java.util.Map) -> <init>
+    653:698:java.lang.Object call() -> call
 com.sonicbase.server.DeleteManager$2$1 -> com.sonicbase.server.d$2$1:
     com.sonicbase.server.DeleteManager$2 this$1 -> a
-    649:649:void <init>(com.sonicbase.server.DeleteManager$2) -> <init>
-    653:691:boolean visit(byte[]) -> a
+    653:653:void <init>(com.sonicbase.server.DeleteManager$2) -> <init>
+    657:695:boolean visit(byte[]) -> a
 com.sonicbase.server.DeleteManager$3 -> com.sonicbase.server.d$3:
     com.sonicbase.server.DeleteManager this$0 -> a
-    740:740:void <init>(com.sonicbase.server.DeleteManager) -> <init>
-    743:743:int compare(java.io.File,java.io.File) -> a
-    740:740:int compare(java.lang.Object,java.lang.Object) -> compare
+    744:744:void <init>(com.sonicbase.server.DeleteManager) -> <init>
+    747:747:int compare(java.io.File,java.io.File) -> a
+    744:744:int compare(java.lang.Object,java.lang.Object) -> compare
 com.sonicbase.server.DeleteManager$4 -> com.sonicbase.server.d$4:
     java.util.concurrent.atomic.AtomicLong val$finishedBytes -> a
     java.io.File val$file -> b
     java.lang.String val$dbName -> c
     java.util.Map val$streams -> d
     com.sonicbase.server.DeleteManager this$0 -> e
-    748:748:void <init>(com.sonicbase.server.DeleteManager,java.util.concurrent.atomic.AtomicLong,java.io.File,java.lang.String,java.util.Map) -> <init>
-    751:809:java.lang.Object call() -> call
+    752:752:void <init>(com.sonicbase.server.DeleteManager,java.util.concurrent.atomic.AtomicLong,java.io.File,java.lang.String,java.util.Map) -> <init>
+    755:813:java.lang.Object call() -> call
 com.sonicbase.server.DeleteManager$5 -> com.sonicbase.server.d$5:
     java.util.Comparator[] val$comparators -> a
     com.sonicbase.server.DeleteManager this$0 -> b
-    836:836:void <init>(com.sonicbase.server.DeleteManager,java.util.Comparator[]) -> <init>
-    839:839:int compare(com.sonicbase.server.DeleteManager$MergeEntry,com.sonicbase.server.DeleteManager$MergeEntry) -> a
-    836:836:int compare(java.lang.Object,java.lang.Object) -> compare
+    840:840:void <init>(com.sonicbase.server.DeleteManager,java.util.Comparator[]) -> <init>
+    843:843:int compare(com.sonicbase.server.DeleteManager$MergeEntry,com.sonicbase.server.DeleteManager$MergeEntry) -> a
+    840:840:int compare(java.lang.Object,java.lang.Object) -> compare
 com.sonicbase.server.DeleteManager$6 -> com.sonicbase.server.d$6:
     com.sonicbase.server.DeleteManager this$0 -> a
-    995:995:void <init>(com.sonicbase.server.DeleteManager) -> <init>
-    998:998:int compare(java.io.File,java.io.File) -> a
-    995:995:int compare(java.lang.Object,java.lang.Object) -> compare
+    999:999:void <init>(com.sonicbase.server.DeleteManager) -> <init>
+    1002:1002:int compare(java.io.File,java.io.File) -> a
+    999:999:int compare(java.lang.Object,java.lang.Object) -> compare
 com.sonicbase.server.DeleteManager$7 -> com.sonicbase.server.d$7:
     java.util.List val$currBatch -> a
     com.sonicbase.index.Index val$index -> b
     com.sonicbase.schema.IndexSchema val$indexSchema -> c
     com.sonicbase.server.DeleteManager this$0 -> d
-    1054:1054:void <init>(com.sonicbase.server.DeleteManager,java.util.List,com.sonicbase.index.Index,com.sonicbase.schema.IndexSchema) -> <init>
-    1057:1087:java.lang.Object call() -> call
+    1058:1058:void <init>(com.sonicbase.server.DeleteManager,java.util.List,com.sonicbase.index.Index,com.sonicbase.schema.IndexSchema) -> <init>
+    1061:1091:java.lang.Object call() -> call
 com.sonicbase.server.DeleteManager$8 -> com.sonicbase.server.d$8:
     com.sonicbase.server.DeleteManager this$0 -> a
-    1205:1205:void <init>(com.sonicbase.server.DeleteManager) -> <init>
-    1208:1217:void run() -> run
+    1209:1209:void <init>(com.sonicbase.server.DeleteManager) -> <init>
+    1212:1221:void run() -> run
 com.sonicbase.server.DeleteManager$DeleteContext -> com.sonicbase.server.d$a:
     java.io.DataInputStream in -> c
     java.util.concurrent.ArrayBlockingQueue entries -> d
@@ -5911,23 +5916,23 @@ com.sonicbase.server.DeleteManager$MergeEntry -> com.sonicbase.server.d$f:
     long sequence0 -> b
     long sequence1 -> c
     byte[] primaryKey -> d
-    494:494:void <init>() -> <init>
-    494:494:java.lang.Object[] access$200(com.sonicbase.server.DeleteManager$MergeEntry) -> a
-    494:494:byte[] access$300(com.sonicbase.server.DeleteManager$MergeEntry) -> b
-    494:494:long access$400(com.sonicbase.server.DeleteManager$MergeEntry) -> c
-    494:494:long access$500(com.sonicbase.server.DeleteManager$MergeEntry) -> d
-    494:494:java.lang.Object[] access$202(com.sonicbase.server.DeleteManager$MergeEntry,java.lang.Object[]) -> a
-    494:494:long access$402(com.sonicbase.server.DeleteManager$MergeEntry,long) -> a
-    494:494:long access$502(com.sonicbase.server.DeleteManager$MergeEntry,long) -> b
-    494:494:byte[] access$302(com.sonicbase.server.DeleteManager$MergeEntry,byte[]) -> a
+    498:498:void <init>() -> <init>
+    498:498:java.lang.Object[] access$200(com.sonicbase.server.DeleteManager$MergeEntry) -> a
+    498:498:byte[] access$300(com.sonicbase.server.DeleteManager$MergeEntry) -> b
+    498:498:long access$400(com.sonicbase.server.DeleteManager$MergeEntry) -> c
+    498:498:long access$500(com.sonicbase.server.DeleteManager$MergeEntry) -> d
+    498:498:java.lang.Object[] access$202(com.sonicbase.server.DeleteManager$MergeEntry,java.lang.Object[]) -> a
+    498:498:long access$402(com.sonicbase.server.DeleteManager$MergeEntry,long) -> a
+    498:498:long access$502(com.sonicbase.server.DeleteManager$MergeEntry,long) -> b
+    498:498:byte[] access$302(com.sonicbase.server.DeleteManager$MergeEntry,byte[]) -> a
 com.sonicbase.server.DeleteManager$MergeRow -> com.sonicbase.server.d$g:
     int streamOffset -> a
     com.sonicbase.server.DeleteManager$MergeEntry row -> b
-    501:501:void <init>() -> <init>
-    501:501:com.sonicbase.server.DeleteManager$MergeEntry access$1200(com.sonicbase.server.DeleteManager$MergeRow) -> a
-    501:501:com.sonicbase.server.DeleteManager$MergeEntry access$1202(com.sonicbase.server.DeleteManager$MergeRow,com.sonicbase.server.DeleteManager$MergeEntry) -> a
-    501:501:int access$1302(com.sonicbase.server.DeleteManager$MergeRow,int) -> a
-    501:501:int access$1300(com.sonicbase.server.DeleteManager$MergeRow) -> b
+    505:505:void <init>() -> <init>
+    505:505:com.sonicbase.server.DeleteManager$MergeEntry access$1200(com.sonicbase.server.DeleteManager$MergeRow) -> a
+    505:505:com.sonicbase.server.DeleteManager$MergeEntry access$1202(com.sonicbase.server.DeleteManager$MergeRow,com.sonicbase.server.DeleteManager$MergeEntry) -> a
+    505:505:int access$1302(com.sonicbase.server.DeleteManager$MergeRow,int) -> a
+    505:505:int access$1300(com.sonicbase.server.DeleteManager$MergeRow) -> b
 com.sonicbase.server.DeleteManager$OutputState -> com.sonicbase.server.d$h:
     java.io.DataOutputStream out -> b
     int currFileNum -> c
@@ -5963,51 +5968,51 @@ com.sonicbase.server.DeltaManager -> com.sonicbase.server.e:
     java.lang.Exception errorRecovering -> q
     java.lang.Thread snapshotThread -> c
     java.lang.Object[] lastkey -> r
-    43:140:void <init>(com.sonicbase.server.DatabaseServer) -> <init>
-    53:54:void shutdown() -> a
-    57:82:int getHighestCommittedSnapshotVersion(java.io.File,com.sonicbase.common.Logger) -> a
-    86:108:int getHighestUnCommittedSnapshotVersion(java.io.File) -> a
-    119:126:void getPercentRecoverComplete(com.sonicbase.common.ComObject) -> a
-    129:129:java.lang.Exception getErrorRecovering() -> b
-    134:134:java.io.File getSnapshotReplicaDir() -> i
-    137:137:java.lang.String getSnapshotRootDir(java.lang.String) -> c
-    142:176:void runSnapshotLoop() -> c
-    182:207:void deleteRecord(java.lang.String,java.lang.String,com.sonicbase.schema.TableSchema,com.sonicbase.schema.IndexSchema,java.lang.Object[],byte[],int[]) -> a
-    210:474:void runSnapshot(java.lang.String) -> a
-    486:569:void recoverFromSnapshot(java.lang.String) -> b
-    572:573:java.io.File getDeletedDeltaDir(java.lang.String,java.lang.String,java.lang.String,java.lang.String) -> a
-    577:597:void deleteDeletedDirs() -> d
-    600:601:java.io.File getDeletedDeltaDir(java.lang.String,java.lang.String) -> a
-    605:610:java.io.File getSortedDeltaFile(java.lang.String,java.lang.String,java.lang.String,java.lang.String,int) -> a
-    614:615:java.io.File getSortedDeltaDir(java.lang.String,java.lang.String) -> b
-    620:633:void writeEntry(java.io.DataOutputStream,com.sonicbase.schema.TableSchema,java.lang.String,com.sonicbase.server.DeltaManager$MergeEntry) -> a
-    640:672:com.sonicbase.server.DeltaManager$MergeEntry readEntry(java.lang.String,int,com.sonicbase.server.DeleteManager$DeltaContext,com.sonicbase.schema.TableSchema,com.sonicbase.schema.IndexSchema,java.util.concurrent.atomic.AtomicLong) -> a
-    699:734:void recoverDeltaPreprocess(java.lang.String,java.lang.String,int) -> a
-    737:767:void getDeltaSize(java.lang.String,java.lang.String,int,java.util.concurrent.ThreadPoolExecutor) -> a
-    770:896:void recoverDelta(java.lang.String,java.lang.String,int,java.util.concurrent.ThreadPoolExecutor) -> b
-    899:911:void enableSnapshot(boolean) -> a
-    914:922:void deleteSnapshots() -> e
-    926:946:void backupFileSystemSchema(java.lang.String,java.lang.String) -> c
-    949:950:long getBackupLocalFileSystemSize() -> f
-    955:967:void backupFileSystem(java.lang.String,java.lang.String) -> d
-    971:986:void restoreFileSystem(java.lang.String,java.lang.String) -> e
-    989:1000:void backupAWSSchema(java.lang.String,java.lang.String,java.lang.String) -> a
-    1003:1008:void backupAWS(java.lang.String,java.lang.String,java.lang.String) -> b
-    1012:1024:void restoreAWS(java.lang.String,java.lang.String,java.lang.String) -> c
-    1027:1029:void getFilesForCurrentSnapshot(java.util.List) -> a
-    1032:1043:void getFilesFromDirectory(java.io.File,java.util.List) -> a
-    1047:1053:void deleteTempDirs() -> g
-    1056:1074:void doDeleteTempDirs(java.io.File) -> b
-    1077:1077:boolean isRecovering() -> h
-    32:32:long access$000(com.sonicbase.server.DeltaManager) -> a
-    32:32:boolean access$100(com.sonicbase.server.DeltaManager) -> b
-    32:32:com.sonicbase.server.DatabaseServer access$200(com.sonicbase.server.DeltaManager) -> c
-    32:32:void access$700(com.sonicbase.server.DeltaManager,java.lang.String,java.lang.String,int) -> a
-    32:32:java.util.concurrent.atomic.AtomicLong access$1100(com.sonicbase.server.DeltaManager) -> d
+    38:135:void <init>(com.sonicbase.server.DatabaseServer) -> <init>
+    48:49:void shutdown() -> a
+    52:77:int getHighestCommittedSnapshotVersion(java.io.File,com.sonicbase.common.Logger) -> a
+    81:103:int getHighestUnCommittedSnapshotVersion(java.io.File) -> a
+    114:121:void getPercentRecoverComplete(com.sonicbase.common.ComObject) -> a
+    124:124:java.lang.Exception getErrorRecovering() -> b
+    129:129:java.io.File getSnapshotReplicaDir() -> i
+    132:132:java.lang.String getSnapshotRootDir(java.lang.String) -> c
+    137:171:void runSnapshotLoop() -> c
+    177:202:void deleteRecord(java.lang.String,java.lang.String,com.sonicbase.schema.TableSchema,com.sonicbase.schema.IndexSchema,java.lang.Object[],byte[],int[]) -> a
+    205:469:void runSnapshot(java.lang.String) -> a
+    481:564:void recoverFromSnapshot(java.lang.String) -> b
+    567:568:java.io.File getDeletedDeltaDir(java.lang.String,java.lang.String,java.lang.String,java.lang.String) -> a
+    572:592:void deleteDeletedDirs() -> d
+    595:596:java.io.File getDeletedDeltaDir(java.lang.String,java.lang.String) -> a
+    600:605:java.io.File getSortedDeltaFile(java.lang.String,java.lang.String,java.lang.String,java.lang.String,int) -> a
+    609:610:java.io.File getSortedDeltaDir(java.lang.String,java.lang.String) -> b
+    615:628:void writeEntry(java.io.DataOutputStream,com.sonicbase.schema.TableSchema,java.lang.String,com.sonicbase.server.DeltaManager$MergeEntry) -> a
+    635:667:com.sonicbase.server.DeltaManager$MergeEntry readEntry(java.lang.String,int,com.sonicbase.server.DeleteManager$DeltaContext,com.sonicbase.schema.TableSchema,com.sonicbase.schema.IndexSchema,java.util.concurrent.atomic.AtomicLong) -> a
+    694:729:void recoverDeltaPreprocess(java.lang.String,java.lang.String,int) -> a
+    732:762:void getDeltaSize(java.lang.String,java.lang.String,int,java.util.concurrent.ThreadPoolExecutor) -> a
+    765:891:void recoverDelta(java.lang.String,java.lang.String,int,java.util.concurrent.ThreadPoolExecutor) -> b
+    894:906:void enableSnapshot(boolean) -> a
+    909:917:void deleteSnapshots() -> e
+    921:941:void backupFileSystemSchema(java.lang.String,java.lang.String) -> c
+    944:945:long getBackupLocalFileSystemSize() -> f
+    950:962:void backupFileSystem(java.lang.String,java.lang.String) -> d
+    966:981:void restoreFileSystem(java.lang.String,java.lang.String) -> e
+    984:995:void backupAWSSchema(java.lang.String,java.lang.String,java.lang.String) -> a
+    998:1003:void backupAWS(java.lang.String,java.lang.String,java.lang.String) -> b
+    1007:1019:void restoreAWS(java.lang.String,java.lang.String,java.lang.String) -> c
+    1022:1024:void getFilesForCurrentSnapshot(java.util.List) -> a
+    1027:1038:void getFilesFromDirectory(java.io.File,java.util.List) -> a
+    1042:1048:void deleteTempDirs() -> g
+    1051:1069:void doDeleteTempDirs(java.io.File) -> b
+    1072:1072:boolean isRecovering() -> h
+    27:27:long access$000(com.sonicbase.server.DeltaManager) -> a
+    27:27:boolean access$100(com.sonicbase.server.DeltaManager) -> b
+    27:27:com.sonicbase.server.DatabaseServer access$200(com.sonicbase.server.DeltaManager) -> c
+    27:27:void access$700(com.sonicbase.server.DeltaManager,java.lang.String,java.lang.String,int) -> a
+    27:27:java.util.concurrent.atomic.AtomicLong access$1100(com.sonicbase.server.DeltaManager) -> d
 com.sonicbase.server.DeltaManager$1 -> com.sonicbase.server.e$1:
     com.sonicbase.server.DeltaManager this$0 -> a
-    142:142:void <init>(com.sonicbase.server.DeltaManager) -> <init>
-    147:173:void run() -> run
+    137:137:void <init>(com.sonicbase.server.DeltaManager) -> <init>
+    142:168:void run() -> run
 com.sonicbase.server.DeltaManager$2 -> com.sonicbase.server.e$2:
     java.util.Map$Entry val$indexEntry -> a
     java.util.Map$Entry val$tableEntry -> b
@@ -6020,8 +6025,8 @@ com.sonicbase.server.DeltaManager$2 -> com.sonicbase.server.e$2:
     java.lang.Long val$deleteIfOlder -> i
     java.util.concurrent.atomic.AtomicLong val$lastLogged -> j
     com.sonicbase.server.DeltaManager this$0 -> k
-    303:303:void <init>(com.sonicbase.server.DeltaManager,java.util.Map$Entry,java.util.Map$Entry,java.lang.String,java.io.File,java.util.concurrent.atomic.AtomicLong,boolean,java.lang.Long,java.util.concurrent.atomic.AtomicLong,java.lang.Long,java.util.concurrent.atomic.AtomicLong) -> <init>
-    307:420:java.lang.Object call() -> call
+    298:298:void <init>(com.sonicbase.server.DeltaManager,java.util.Map$Entry,java.util.Map$Entry,java.lang.String,java.io.File,java.util.concurrent.atomic.AtomicLong,boolean,java.lang.Long,java.util.concurrent.atomic.AtomicLong,java.lang.Long,java.util.concurrent.atomic.AtomicLong) -> <init>
+    302:415:java.lang.Object call() -> call
 com.sonicbase.server.DeltaManager$2$1 -> com.sonicbase.server.e$2$1:
     com.sonicbase.index.Index val$index -> a
     boolean val$isPrimaryKey -> b
@@ -6030,15 +6035,15 @@ com.sonicbase.server.DeltaManager$2$1 -> com.sonicbase.server.e$2$1:
     java.util.concurrent.atomic.AtomicLong val$savedCount -> e
     long val$subBegin -> f
     com.sonicbase.server.DeltaManager$2 this$1 -> g
-    329:329:void <init>(com.sonicbase.server.DeltaManager$2,com.sonicbase.index.Index,boolean,com.sonicbase.server.DeltaManager$OutContext,int[],java.util.concurrent.atomic.AtomicLong,long) -> <init>
-    332:401:boolean visit(java.lang.Object[],java.lang.Object) -> a
+    324:324:void <init>(com.sonicbase.server.DeltaManager$2,com.sonicbase.index.Index,boolean,com.sonicbase.server.DeltaManager$OutContext,int[],java.util.concurrent.atomic.AtomicLong,long) -> <init>
+    327:396:boolean visit(java.lang.Object[],java.lang.Object) -> a
 com.sonicbase.server.DeltaManager$3 -> com.sonicbase.server.e$3:
     java.lang.String val$dbName -> a
     java.lang.String val$dataRoot -> b
     int val$currDelta -> c
     com.sonicbase.server.DeltaManager this$0 -> d
-    530:530:void <init>(com.sonicbase.server.DeltaManager,java.lang.String,java.lang.String,int) -> <init>
-    533:534:java.lang.Object call() -> call
+    525:525:void <init>(com.sonicbase.server.DeltaManager,java.lang.String,java.lang.String,int) -> <init>
+    528:529:java.lang.Object call() -> call
 com.sonicbase.server.DeltaManager$4 -> com.sonicbase.server.e$4:
     java.io.File val$indexFile -> a
     com.sonicbase.schema.IndexSchema val$indexSchema -> b
@@ -6051,52 +6056,52 @@ com.sonicbase.server.DeltaManager$4 -> com.sonicbase.server.e$4:
     java.lang.String val$indexName -> i
     long val$indexBegin -> j
     com.sonicbase.server.DeltaManager this$0 -> k
-    809:809:void <init>(com.sonicbase.server.DeltaManager,java.io.File,com.sonicbase.schema.IndexSchema,com.sonicbase.schema.TableSchema,com.sonicbase.index.Index,java.util.concurrent.atomic.AtomicLong,int,java.util.concurrent.atomic.AtomicLong,java.lang.String,java.lang.String,long) -> <init>
-    813:863:java.lang.Boolean call() -> a
-    809:809:java.lang.Object call() -> call
+    804:804:void <init>(com.sonicbase.server.DeltaManager,java.io.File,com.sonicbase.schema.IndexSchema,com.sonicbase.schema.TableSchema,com.sonicbase.index.Index,java.util.concurrent.atomic.AtomicLong,int,java.util.concurrent.atomic.AtomicLong,java.lang.String,java.lang.String,long) -> <init>
+    808:858:java.lang.Boolean call() -> a
+    804:804:java.lang.Object call() -> call
 com.sonicbase.server.DeltaManager$ByteCounterStream -> com.sonicbase.server.e$a:
     java.io.FileInputStream stream -> a
     java.util.concurrent.atomic.AtomicLong finishedBytes -> b
-    1084:1087:void <init>(java.util.concurrent.atomic.AtomicLong,java.io.FileInputStream) -> <init>
-    1090:1091:void reset() -> reset
-    1094:1094:boolean markSupported() -> markSupported
-    1098:1099:void mark(int) -> mark
-    1102:1102:long skip(long) -> skip
-    1106:1106:int available() -> available
-    1110:1111:void close() -> close
-    1114:1118:int read(byte[]) -> read
-    1122:1126:int read(byte[],int,int) -> read
-    1131:1135:int read() -> read
+    1079:1082:void <init>(java.util.concurrent.atomic.AtomicLong,java.io.FileInputStream) -> <init>
+    1085:1086:void reset() -> reset
+    1089:1089:boolean markSupported() -> markSupported
+    1093:1094:void mark(int) -> mark
+    1097:1097:long skip(long) -> skip
+    1101:1101:int available() -> available
+    1105:1106:void close() -> close
+    1109:1113:int read(byte[]) -> read
+    1117:1121:int read(byte[],int,int) -> read
+    1126:1130:int read() -> read
 com.sonicbase.server.DeltaManager$MergeEntry -> com.sonicbase.server.e$b:
     java.lang.Object[] key -> b
     long updateTime -> c
     byte[][] records -> d
     com.sonicbase.server.DeltaManager this$0 -> a
-    678:678:void <init>(com.sonicbase.server.DeltaManager) -> <init>
-    685:685:java.lang.Object[] getKey() -> a
-    689:689:byte[][] getRecords() -> b
-    693:694:void setRecords(byte[][]) -> a
-    678:678:java.lang.Object[] access$800(com.sonicbase.server.DeltaManager$MergeEntry) -> a
-    678:678:long access$900(com.sonicbase.server.DeltaManager$MergeEntry) -> b
-    678:678:byte[][] access$1000(com.sonicbase.server.DeltaManager$MergeEntry) -> c
-    678:678:java.lang.Object[] access$802(com.sonicbase.server.DeltaManager$MergeEntry,java.lang.Object[]) -> a
-    678:678:long access$902(com.sonicbase.server.DeltaManager$MergeEntry,long) -> a
-    678:678:byte[][] access$1002(com.sonicbase.server.DeltaManager$MergeEntry,byte[][]) -> a
+    673:673:void <init>(com.sonicbase.server.DeltaManager) -> <init>
+    680:680:java.lang.Object[] getKey() -> a
+    684:684:byte[][] getRecords() -> b
+    688:689:void setRecords(byte[][]) -> a
+    673:673:java.lang.Object[] access$800(com.sonicbase.server.DeltaManager$MergeEntry) -> a
+    673:673:long access$900(com.sonicbase.server.DeltaManager$MergeEntry) -> b
+    673:673:byte[][] access$1000(com.sonicbase.server.DeltaManager$MergeEntry) -> c
+    673:673:java.lang.Object[] access$802(com.sonicbase.server.DeltaManager$MergeEntry,java.lang.Object[]) -> a
+    673:673:long access$902(com.sonicbase.server.DeltaManager$MergeEntry,long) -> a
+    673:673:byte[][] access$1002(com.sonicbase.server.DeltaManager$MergeEntry,byte[][]) -> a
 com.sonicbase.server.DeltaManager$OutContext -> com.sonicbase.server.e$c:
     java.io.DataOutputStream out -> b
     int fileOffset -> c
     long totalCount -> d
     long currOffset -> e
     com.sonicbase.server.DeltaManager this$0 -> a
-    476:476:void <init>(com.sonicbase.server.DeltaManager) -> <init>
-    476:476:java.io.DataOutputStream access$302(com.sonicbase.server.DeltaManager$OutContext,java.io.DataOutputStream) -> a
-    476:476:long access$402(com.sonicbase.server.DeltaManager$OutContext,long) -> a
-    476:476:long access$502(com.sonicbase.server.DeltaManager$OutContext,long) -> b
-    476:476:int access$602(com.sonicbase.server.DeltaManager$OutContext,int) -> a
-    476:476:long access$500(com.sonicbase.server.DeltaManager$OutContext) -> a
-    476:476:long access$404(com.sonicbase.server.DeltaManager$OutContext) -> b
-    476:476:java.io.DataOutputStream access$300(com.sonicbase.server.DeltaManager$OutContext) -> c
-    476:476:int access$604(com.sonicbase.server.DeltaManager$OutContext) -> d
+    471:471:void <init>(com.sonicbase.server.DeltaManager) -> <init>
+    471:471:java.io.DataOutputStream access$302(com.sonicbase.server.DeltaManager$OutContext,java.io.DataOutputStream) -> a
+    471:471:long access$402(com.sonicbase.server.DeltaManager$OutContext,long) -> a
+    471:471:long access$502(com.sonicbase.server.DeltaManager$OutContext,long) -> b
+    471:471:int access$602(com.sonicbase.server.DeltaManager$OutContext,int) -> a
+    471:471:long access$500(com.sonicbase.server.DeltaManager$OutContext) -> a
+    471:471:long access$404(com.sonicbase.server.DeltaManager$OutContext) -> b
+    471:471:java.io.DataOutputStream access$300(com.sonicbase.server.DeltaManager$OutContext) -> c
+    471:471:int access$604(com.sonicbase.server.DeltaManager$OutContext) -> d
 com.sonicbase.server.LogManager -> com.sonicbase.server.LogManager:
     java.lang.String UTF8_STR -> a
     java.util.List logWriters -> b
@@ -6120,56 +6125,56 @@ com.sonicbase.server.LogManager -> com.sonicbase.server.LogManager:
     boolean shouldSlice -> t
     boolean didSlice -> u
     java.util.List allCurrentSources -> v
-    30:867:void <init>(com.sonicbase.server.DatabaseServer,java.io.File) -> <init>
-    80:87:void shutdown() -> a
-    91:100:void startLoggingForPeer(int) -> a
-    103:131:void skipToMaxSequenceNumber() -> b
-    135:146:com.sonicbase.common.ComObject setMaxSequenceNum(com.sonicbase.common.ComObject) -> a
-    151:151:long getNextSequencenNum() -> c
-    155:170:void pushMaxSequenceNum() -> d
-    173:173:void enableLogWriter(boolean) -> a
-    176:177:void replayLogs() -> e
-    180:180:long getCountLogged() -> f
-    185:217:java.lang.String sliceLogs(boolean) -> b
-    222:231:void deleteLogs() -> g
-    234:241:long getBackupLocalFileSystemSize() -> h
-    246:259:void backupFileSystem(java.lang.String,java.lang.String,java.lang.String) -> a
-    262:281:void backupLogDir(java.lang.String,java.io.File,java.io.File) -> a
-    284:301:void backupLogDirToAWS(com.sonicbase.common.AWSClient,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.io.File) -> a
-    305:319:void restoreFileSystem(java.lang.String,java.lang.String) -> a
-    322:330:void restoreLogDir(java.io.File,java.io.File) -> a
-    333:348:void backupAWS(java.lang.String,java.lang.String,java.lang.String,java.lang.String) -> a
-    352:364:void restoreAWS(java.lang.String,java.lang.String,java.lang.String) -> b
-    368:382:com.sonicbase.common.ComObject getLogFile(com.sonicbase.common.ComObject) -> b
-    387:388:com.sonicbase.common.ComObject deletePeerLogs(com.sonicbase.common.ComObject) -> c
-    393:404:com.sonicbase.common.ComObject sendLogsToPeer(int) -> b
-    409:420:void deletePeerLogs(int) -> c
-    423:443:void logRequestForPeer(byte[],long,long,int) -> a
-    447:458:void receiveExternalLog(int,java.lang.String,byte[]) -> a
-    461:465:boolean hasLogsForPeer(int) -> d
-    469:478:double getPercentApplyQueuesComplete() -> i
-    604:604:java.lang.String getLogRoot() -> o
-    608:609:void bindQueues() -> j
-    612:613:void unbindQueues() -> k
-    617:648:void applyLogs() -> l
-    651:693:void getLogsFromPeer(int) -> e
-    696:696:java.io.File getLogReplicaDir() -> p
-    843:852:void applyLogsFromPeers(java.lang.String) -> a
-    856:865:void applyLogsAfterSlice(java.lang.String) -> b
-    874:885:java.util.List getLogFiles() -> m
-    893:923:void visitQueueEntries(java.io.DataInputStream,com.sonicbase.server.LogManager$LogVisitor) -> a
-    926:1112:void replayQueues(java.io.File,java.lang.String,boolean,boolean) -> a
-    1116:1160:com.sonicbase.server.DatabaseServer$LogRequest logRequest(byte[],boolean,java.lang.String,java.lang.Long,java.lang.Long,java.util.concurrent.atomic.AtomicLong) -> a
-    1165:1208:void deleteOldLogs(long,boolean) -> a
-    27:27:com.sonicbase.common.Logger access$100() -> n
-    27:27:boolean access$200(com.sonicbase.server.LogManager) -> a
-    27:27:java.util.concurrent.atomic.AtomicLong access$300(com.sonicbase.server.LogManager) -> b
-    27:27:java.lang.String access$400(com.sonicbase.server.LogManager) -> c
-    27:27:java.lang.String access$502(com.sonicbase.server.LogManager,java.lang.String) -> a
-    27:27:java.lang.String access$600(com.sonicbase.server.LogManager) -> d
-    27:27:java.lang.String access$402(com.sonicbase.server.LogManager,java.lang.String) -> b
-    27:27:boolean access$202(com.sonicbase.server.LogManager,boolean) -> a
-    27:27:com.sonicbase.server.DatabaseServer access$700(com.sonicbase.server.LogManager) -> e
+    33:870:void <init>(com.sonicbase.server.DatabaseServer,java.io.File) -> <init>
+    83:90:void shutdown() -> a
+    94:103:void startLoggingForPeer(int) -> a
+    106:134:void skipToMaxSequenceNumber() -> b
+    138:149:com.sonicbase.common.ComObject setMaxSequenceNum(com.sonicbase.common.ComObject) -> a
+    154:154:long getNextSequencenNum() -> c
+    158:173:void pushMaxSequenceNum() -> d
+    176:176:void enableLogWriter(boolean) -> a
+    179:180:void replayLogs() -> e
+    183:183:long getCountLogged() -> f
+    188:220:java.lang.String sliceLogs(boolean) -> b
+    225:234:void deleteLogs() -> g
+    237:244:long getBackupLocalFileSystemSize() -> h
+    249:262:void backupFileSystem(java.lang.String,java.lang.String,java.lang.String) -> a
+    265:284:void backupLogDir(java.lang.String,java.io.File,java.io.File) -> a
+    287:304:void backupLogDirToAWS(com.sonicbase.common.AWSClient,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.io.File) -> a
+    308:322:void restoreFileSystem(java.lang.String,java.lang.String) -> a
+    325:333:void restoreLogDir(java.io.File,java.io.File) -> a
+    336:351:void backupAWS(java.lang.String,java.lang.String,java.lang.String,java.lang.String) -> a
+    355:367:void restoreAWS(java.lang.String,java.lang.String,java.lang.String) -> b
+    371:385:com.sonicbase.common.ComObject getLogFile(com.sonicbase.common.ComObject) -> b
+    390:391:com.sonicbase.common.ComObject deletePeerLogs(com.sonicbase.common.ComObject) -> c
+    396:407:com.sonicbase.common.ComObject sendLogsToPeer(int) -> b
+    412:423:void deletePeerLogs(int) -> c
+    426:446:void logRequestForPeer(byte[],long,long,int) -> a
+    450:461:void receiveExternalLog(int,java.lang.String,byte[]) -> a
+    464:468:boolean hasLogsForPeer(int) -> d
+    472:481:double getPercentApplyQueuesComplete() -> i
+    607:607:java.lang.String getLogRoot() -> o
+    611:612:void bindQueues() -> j
+    615:616:void unbindQueues() -> k
+    620:651:void applyLogs() -> l
+    654:696:void getLogsFromPeer(int) -> e
+    699:699:java.io.File getLogReplicaDir() -> p
+    846:855:void applyLogsFromPeers(java.lang.String) -> a
+    859:868:void applyLogsAfterSlice(java.lang.String) -> b
+    877:888:java.util.List getLogFiles() -> m
+    896:926:void visitQueueEntries(java.io.DataInputStream,com.sonicbase.server.LogManager$LogVisitor) -> a
+    929:1152:void replayQueues(java.io.File,java.lang.String,boolean,boolean) -> a
+    1156:1200:com.sonicbase.server.DatabaseServer$LogRequest logRequest(byte[],boolean,java.lang.String,java.lang.Long,java.lang.Long,java.util.concurrent.atomic.AtomicLong) -> a
+    1205:1248:void deleteOldLogs(long,boolean) -> a
+    30:30:com.sonicbase.common.Logger access$100() -> n
+    30:30:boolean access$200(com.sonicbase.server.LogManager) -> a
+    30:30:java.util.concurrent.atomic.AtomicLong access$300(com.sonicbase.server.LogManager) -> b
+    30:30:java.lang.String access$400(com.sonicbase.server.LogManager) -> c
+    30:30:java.lang.String access$502(com.sonicbase.server.LogManager,java.lang.String) -> a
+    30:30:java.lang.String access$600(com.sonicbase.server.LogManager) -> d
+    30:30:java.lang.String access$402(com.sonicbase.server.LogManager,java.lang.String) -> b
+    30:30:boolean access$202(com.sonicbase.server.LogManager,boolean) -> a
+    30:30:com.sonicbase.server.DatabaseServer access$700(com.sonicbase.server.LogManager) -> e
 com.sonicbase.server.LogManager$1 -> com.sonicbase.server.LogManager$1:
     com.sonicbase.research.socket.NettyServer$Request val$request -> a
     java.util.concurrent.atomic.AtomicInteger val$countProcessed -> b
@@ -6179,14 +6184,14 @@ com.sonicbase.server.LogManager$1 -> com.sonicbase.server.LogManager$1:
     long val$begin -> f
     java.util.concurrent.atomic.AtomicLong val$countFinished -> g
     com.sonicbase.server.LogManager this$0 -> h
-    1025:1025:void <init>(com.sonicbase.server.LogManager,com.sonicbase.research.socket.NettyServer$Request,java.util.concurrent.atomic.AtomicInteger,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong,long,java.util.concurrent.atomic.AtomicLong) -> <init>
-    1028:1045:void run() -> run
+    1065:1065:void <init>(com.sonicbase.server.LogManager,com.sonicbase.research.socket.NettyServer$Request,java.util.concurrent.atomic.AtomicInteger,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong,long,java.util.concurrent.atomic.AtomicLong) -> <init>
+    1068:1085:void run() -> run
 com.sonicbase.server.LogManager$ByteCounterStream -> com.sonicbase.server.LogManager$ByteCounterStream:
     long count -> a
     java.io.InputStream in -> b
-    703:705:void <init>(java.io.InputStream) -> <init>
-    709:710:int read() -> read
-    714:714:long getCount() -> getCount
+    706:708:void <init>(java.io.InputStream) -> <init>
+    712:713:int read() -> read
+    717:717:long getCount() -> getCount
 com.sonicbase.server.LogManager$LogSource -> com.sonicbase.server.LogManager$a:
     long totalBytes -> g
     java.lang.String filename -> h
@@ -6197,14 +6202,14 @@ com.sonicbase.server.LogManager$LogSource -> com.sonicbase.server.LogManager$a:
     byte[] buffer -> d
     java.util.List requests -> e
     int offset -> f
-    729:742:void <init>(java.io.File,com.sonicbase.server.DatabaseServer,com.sonicbase.common.Logger) -> <init>
-    745:745:long getTotalBytes() -> a
-    749:749:long getBytesRead() -> b
-    753:754:boolean take(com.sonicbase.server.DatabaseServer,com.sonicbase.common.Logger) -> a
-    759:810:void readNext(com.sonicbase.server.DatabaseServer,com.sonicbase.common.Logger) -> b
-    813:829:com.sonicbase.research.socket.NettyServer$Request readRequest(com.sonicbase.server.DatabaseServer) -> a
-    833:834:void close() -> c
-    837:837:byte[] getBuffer() -> d
+    732:745:void <init>(java.io.File,com.sonicbase.server.DatabaseServer,com.sonicbase.common.Logger) -> <init>
+    748:748:long getTotalBytes() -> a
+    752:752:long getBytesRead() -> b
+    756:757:boolean take(com.sonicbase.server.DatabaseServer,com.sonicbase.common.Logger) -> a
+    762:813:void readNext(com.sonicbase.server.DatabaseServer,com.sonicbase.common.Logger) -> b
+    816:832:com.sonicbase.research.socket.NettyServer$Request readRequest(com.sonicbase.server.DatabaseServer) -> a
+    836:837:void close() -> c
+    840:840:byte[] getBuffer() -> d
 com.sonicbase.server.LogManager$LogVisitor -> com.sonicbase.server.LogManager$b:
     boolean visit(byte[]) -> a
 com.sonicbase.server.LogManager$LogWriter -> com.sonicbase.server.LogManager$c:
@@ -6217,15 +6222,15 @@ com.sonicbase.server.LogManager$LogWriter -> com.sonicbase.server.LogManager$c:
     long currQueueTime -> h
     java.io.DataOutputStream writer -> i
     com.sonicbase.server.LogManager this$0 -> a
-    498:510:void <init>(com.sonicbase.server.LogManager,int,int,java.util.concurrent.ArrayBlockingQueue,java.io.File,int,int) -> <init>
-    516:531:void run() -> run
-    536:557:void logRequests(java.util.List) -> a
-    560:588:void closeAndCreateLog() -> b
-    591:600:void shutdown() -> a
-    491:491:void access$000(com.sonicbase.server.LogManager$LogWriter) -> a
+    501:513:void <init>(com.sonicbase.server.LogManager,int,int,java.util.concurrent.ArrayBlockingQueue,java.io.File,int,int) -> <init>
+    519:534:void run() -> run
+    539:560:void logRequests(java.util.List) -> a
+    563:591:void closeAndCreateLog() -> b
+    594:603:void shutdown() -> a
+    494:494:void access$000(com.sonicbase.server.LogManager$LogWriter) -> a
 com.sonicbase.server.LogManager$QueueEntry -> com.sonicbase.server.LogManager$d:
     byte[] request -> a
-    486:488:void <init>(byte[]) -> <init>
+    489:491:void <init>(byte[]) -> <init>
 com.sonicbase.server.LongRunningCalls -> com.sonicbase.server.f:
     com.sonicbase.common.Logger logger -> b
     com.sonicbase.server.DatabaseServer server -> c
@@ -6279,7 +6284,7 @@ com.sonicbase.server.MethodInvoker -> com.sonicbase.server.MethodInvoker:
     com.sonicbase.common.Logger logger -> d
     com.sonicbase.server.BulkImportManager bulkImportManager -> e
     com.sonicbase.server.DeleteManager deleteManager -> f
-    com.sonicbase.server.DeltaManager deltaManager -> g
+    com.sonicbase.server.SnapshotManager deltaManager -> g
     com.sonicbase.server.UpdateManager updateManager -> h
     com.sonicbase.server.TransactionManager transactionManager -> i
     com.sonicbase.server.ReadManager readManager -> j
@@ -6293,7 +6298,7 @@ com.sonicbase.server.MethodInvoker -> com.sonicbase.server.MethodInvoker:
     java.util.concurrent.atomic.AtomicInteger blockCount -> a
     java.util.concurrent.atomic.AtomicInteger echoCount -> b
     java.util.concurrent.atomic.AtomicInteger echo2Count -> c
-    36:53:void <init>(com.sonicbase.server.DatabaseServer,com.sonicbase.server.BulkImportManager,com.sonicbase.server.DeleteManager,com.sonicbase.server.DeltaManager,com.sonicbase.server.UpdateManager,com.sonicbase.server.TransactionManager,com.sonicbase.server.ReadManager,com.sonicbase.server.LogManager,com.sonicbase.server.SchemaManager) -> <init>
+    36:53:void <init>(com.sonicbase.server.DatabaseServer,com.sonicbase.server.BulkImportManager,com.sonicbase.server.DeleteManager,com.sonicbase.server.SnapshotManager,com.sonicbase.server.UpdateManager,com.sonicbase.server.TransactionManager,com.sonicbase.server.ReadManager,com.sonicbase.server.LogManager,com.sonicbase.server.SchemaManager) -> <init>
     56:57:void shutdown() -> shutdown
     60:60:com.sonicbase.server.ReadManager getReadManager() -> getReadManager
     69:69:int getTestWriteCallCount() -> getTestWriteCallCount
@@ -6599,7 +6604,129 @@ com.sonicbase.server.SchemaManager$AutoIncrementValue -> com.sonicbase.server.i$
     35:42:void <init>(com.sonicbase.schema.DataType$Type) -> <init>
     45:46:void setInitialValue() -> a
     49:52:java.lang.Object increment() -> b
-com.sonicbase.server.StreamManager -> com.sonicbase.server.j:
+com.sonicbase.server.SnapshotManager -> com.sonicbase.server.j:
+    void enableSnapshot(boolean) -> a
+    boolean isRecovering() -> h
+    void getPercentRecoverComplete(com.sonicbase.common.ComObject) -> a
+    java.lang.Exception getErrorRecovering() -> b
+    long getBackupLocalFileSystemSize() -> f
+    void deleteTempDirs() -> g
+    void deleteDeletedDirs() -> d
+    void backupFileSystem(java.lang.String,java.lang.String) -> d
+    void backupFileSystemSchema(java.lang.String,java.lang.String) -> c
+    void backupAWS(java.lang.String,java.lang.String,java.lang.String) -> b
+    void backupAWSSchema(java.lang.String,java.lang.String,java.lang.String) -> a
+    void deleteSnapshots() -> e
+    void restoreFileSystem(java.lang.String,java.lang.String) -> e
+    void restoreAWS(java.lang.String,java.lang.String,java.lang.String) -> c
+    void shutdown() -> a
+    void runSnapshotLoop() -> c
+    void runSnapshot(java.lang.String) -> a
+    void recoverFromSnapshot(java.lang.String) -> b
+    void getFilesForCurrentSnapshot(java.util.List) -> a
+    java.io.File getSortedDeltaFile(java.lang.String,java.lang.String,java.lang.String,java.lang.String,int) -> a
+    java.io.File getDeletedDeltaDir(java.lang.String,java.lang.String,java.lang.String,java.lang.String) -> a
+com.sonicbase.server.SnapshotManagerImpl -> com.sonicbase.server.k:
+    int SNAPSHOT_PARTITION_COUNT -> a
+    java.lang.String SNAPSHOT_STR -> d
+    java.lang.String INDEX_STR -> e
+    java.lang.String RATE_STR -> f
+    java.lang.String DURATION_STR -> g
+    com.sonicbase.common.Logger logger -> b
+    com.sonicbase.server.DatabaseServer server -> h
+    long lastSnapshot -> i
+    boolean enableSnapshot -> j
+    boolean isRecovering -> k
+    long totalBytes -> l
+    java.util.concurrent.atomic.AtomicLong finishedBytes -> m
+    int totalFileCount -> n
+    int finishedFileCount -> o
+    java.lang.Exception errorRecovering -> p
+    java.lang.Thread snapshotThread -> c
+    36:297:void <init>(com.sonicbase.server.DatabaseServer) -> <init>
+    46:69:int getHighestCommittedSnapshotVersion(java.io.File,com.sonicbase.common.Logger) -> a
+    73:95:int getHighestUnCommittedSnapshotVersion(java.io.File) -> a
+    105:112:void getPercentRecoverComplete(com.sonicbase.common.ComObject) -> a
+    116:116:java.lang.Exception getErrorRecovering() -> b
+    121:122:long getBackupLocalFileSystemSize() -> f
+    127:288:void recoverFromSnapshot(java.lang.String) -> b
+    291:291:java.io.File getSnapshotReplicaDir() -> i
+    294:294:java.lang.String getSnapshotRootDir(java.lang.String) -> c
+    299:333:void runSnapshotLoop() -> c
+    337:362:void deleteRecord(java.lang.String,java.lang.String,com.sonicbase.schema.TableSchema,com.sonicbase.schema.IndexSchema,java.lang.Object[],byte[],int[]) -> a
+    365:523:void runSnapshot(java.lang.String) -> a
+    526:544:void deleteOldSnapshots(java.lang.String) -> d
+    547:559:void enableSnapshot(boolean) -> a
+    562:570:void deleteSnapshots() -> e
+    574:594:void backupFileSystemSchema(java.lang.String,java.lang.String) -> c
+    598:610:void backupFileSystem(java.lang.String,java.lang.String) -> d
+    614:629:void restoreFileSystem(java.lang.String,java.lang.String) -> e
+    632:643:void backupAWSSchema(java.lang.String,java.lang.String,java.lang.String) -> a
+    646:651:void backupAWS(java.lang.String,java.lang.String,java.lang.String) -> b
+    655:667:void restoreAWS(java.lang.String,java.lang.String,java.lang.String) -> c
+    672:672:void shutdown() -> a
+    675:677:void getFilesForCurrentSnapshot(java.util.List) -> a
+    681:681:java.io.File getSortedDeltaFile(java.lang.String,java.lang.String,java.lang.String,java.lang.String,int) -> a
+    686:686:java.io.File getDeletedDeltaDir(java.lang.String,java.lang.String,java.lang.String,java.lang.String) -> a
+    690:701:void getFilesFromDirectory(java.io.File,java.util.List) -> a
+    705:711:void deleteTempDirs() -> g
+    716:716:void deleteDeletedDirs() -> d
+    719:732:void doDeleteTempDirs(java.io.File) -> b
+    735:735:boolean isRecovering() -> h
+    25:25:java.util.concurrent.atomic.AtomicLong access$000(com.sonicbase.server.SnapshotManagerImpl) -> a
+    25:25:com.sonicbase.server.DatabaseServer access$100(com.sonicbase.server.SnapshotManagerImpl) -> b
+    25:25:long access$200(com.sonicbase.server.SnapshotManagerImpl) -> c
+    25:25:boolean access$300(com.sonicbase.server.SnapshotManagerImpl) -> d
+com.sonicbase.server.SnapshotManagerImpl$1 -> com.sonicbase.server.k$1:
+    java.io.File val$indexFile -> a
+    com.sonicbase.schema.IndexSchema val$indexSchema -> b
+    com.sonicbase.schema.TableSchema val$tableSchema -> c
+    com.sonicbase.index.Index val$index -> d
+    java.util.concurrent.atomic.AtomicLong val$recoveredCount -> e
+    int val$currOffset -> f
+    java.util.concurrent.atomic.AtomicLong val$lastLogged -> g
+    java.lang.String val$tableName -> h
+    java.lang.String val$indexName -> i
+    long val$indexBegin -> j
+    com.sonicbase.server.SnapshotManagerImpl this$0 -> k
+    205:205:void <init>(com.sonicbase.server.SnapshotManagerImpl,java.io.File,com.sonicbase.schema.IndexSchema,com.sonicbase.schema.TableSchema,com.sonicbase.index.Index,java.util.concurrent.atomic.AtomicLong,int,java.util.concurrent.atomic.AtomicLong,java.lang.String,java.lang.String,long) -> <init>
+    208:252:java.lang.Boolean call() -> a
+    205:205:java.lang.Object call() -> call
+com.sonicbase.server.SnapshotManagerImpl$2 -> com.sonicbase.server.k$2:
+    com.sonicbase.server.SnapshotManagerImpl this$0 -> a
+    299:299:void <init>(com.sonicbase.server.SnapshotManagerImpl) -> <init>
+    304:330:void run() -> run
+com.sonicbase.server.SnapshotManagerImpl$3 -> com.sonicbase.server.k$3:
+    java.util.concurrent.atomic.AtomicLong val$countSaved -> a
+    com.sonicbase.index.Index val$index -> b
+    boolean val$isPrimaryKey -> c
+    java.io.DataOutputStream[] val$outStreams -> d
+    java.util.Map$Entry val$tableEntry -> e
+    java.util.Map$Entry val$indexEntry -> f
+    java.lang.Long val$deleteIfOlder -> g
+    java.lang.String val$dbName -> h
+    int[] val$fieldOffsets -> i
+    java.util.concurrent.atomic.AtomicLong val$savedCount -> j
+    java.util.concurrent.atomic.AtomicLong val$lastLogged -> k
+    long val$subBegin -> l
+    com.sonicbase.server.SnapshotManagerImpl this$0 -> m
+    429:429:void <init>(com.sonicbase.server.SnapshotManagerImpl,java.util.concurrent.atomic.AtomicLong,com.sonicbase.index.Index,boolean,java.io.DataOutputStream[],java.util.Map$Entry,java.util.Map$Entry,java.lang.Long,java.lang.String,int[],java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong,long) -> <init>
+    432:486:boolean visit(java.lang.Object[],java.lang.Object) -> a
+com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream -> com.sonicbase.server.k$a:
+    java.io.FileInputStream stream -> b
+    java.util.concurrent.atomic.AtomicLong finishedBytes -> c
+    com.sonicbase.server.SnapshotManagerImpl this$0 -> a
+    742:745:void <init>(com.sonicbase.server.SnapshotManagerImpl,java.util.concurrent.atomic.AtomicLong,java.io.FileInputStream) -> <init>
+    748:749:void reset() -> reset
+    752:752:boolean markSupported() -> markSupported
+    756:757:void mark(int) -> mark
+    760:760:long skip(long) -> skip
+    764:764:int available() -> available
+    768:769:void close() -> close
+    772:776:int read(byte[]) -> read
+    780:784:int read(byte[],int,int) -> read
+    789:793:int read() -> read
+com.sonicbase.server.StreamManager -> com.sonicbase.server.l:
     com.sonicbase.common.Logger logger -> c
     com.sonicbase.server.DatabaseServer server -> d
     java.util.concurrent.ConcurrentHashMap connections -> e
@@ -6636,26 +6763,26 @@ com.sonicbase.server.StreamManager -> com.sonicbase.server.j:
     33:33:void access$400(com.sonicbase.server.StreamManager) -> e
     33:33:void access$500(com.sonicbase.server.StreamManager,com.fasterxml.jackson.databind.node.ObjectNode,com.fasterxml.jackson.databind.node.ObjectNode) -> a
     33:33:void access$800(com.sonicbase.server.StreamManager,com.sonicbase.streams.StreamsConsumer,java.util.List) -> a
-com.sonicbase.server.StreamManager$1 -> com.sonicbase.server.j$1:
+com.sonicbase.server.StreamManager$1 -> com.sonicbase.server.l$1:
     com.fasterxml.jackson.databind.node.ObjectNode val$config -> a
     com.fasterxml.jackson.databind.node.ObjectNode val$queueDict -> b
     com.sonicbase.server.StreamManager this$0 -> c
     200:200:void <init>(com.sonicbase.server.StreamManager,com.fasterxml.jackson.databind.node.ObjectNode,com.fasterxml.jackson.databind.node.ObjectNode) -> <init>
     203:227:void run() -> run
-com.sonicbase.server.StreamManager$2 -> com.sonicbase.server.j$2:
+com.sonicbase.server.StreamManager$2 -> com.sonicbase.server.l$2:
     com.sonicbase.server.StreamManager this$0 -> a
     238:238:void <init>(com.sonicbase.server.StreamManager) -> <init>
     241:257:void run() -> run
-com.sonicbase.server.StreamManager$3 -> com.sonicbase.server.j$3:
+com.sonicbase.server.StreamManager$3 -> com.sonicbase.server.l$3:
     com.sonicbase.streams.StreamsConsumer val$consumer -> a
     com.fasterxml.jackson.databind.node.ObjectNode val$stream -> b
     com.sonicbase.server.StreamManager this$0 -> c
     319:319:void <init>(com.sonicbase.server.StreamManager,com.sonicbase.streams.StreamsConsumer,com.fasterxml.jackson.databind.node.ObjectNode) -> <init>
     323:367:void run() -> run
-com.sonicbase.server.StreamManager$4 -> com.sonicbase.server.j$4:
+com.sonicbase.server.StreamManager$4 -> com.sonicbase.server.l$4:
     int[] $SwitchMap$com$sonicbase$schema$DataType$Type -> a
     739:739:void <clinit>() -> <clinit>
-com.sonicbase.server.StreamManager$ConsumerContext -> com.sonicbase.server.j$a:
+com.sonicbase.server.StreamManager$ConsumerContext -> com.sonicbase.server.l$a:
     com.sonicbase.streams.StreamsConsumer consumer -> b
     java.util.List threads -> c
     com.sonicbase.server.StreamManager this$0 -> a
@@ -6664,7 +6791,7 @@ com.sonicbase.server.StreamManager$ConsumerContext -> com.sonicbase.server.j$a:
     167:167:com.sonicbase.streams.StreamsConsumer access$1000(com.sonicbase.server.StreamManager$ConsumerContext) -> b
     167:167:void <init>(com.sonicbase.server.StreamManager,com.sonicbase.server.StreamManager$1) -> <init>
     167:167:com.sonicbase.streams.StreamsConsumer access$1002(com.sonicbase.server.StreamManager$ConsumerContext,com.sonicbase.streams.StreamsConsumer) -> a
-com.sonicbase.server.StreamManager$ProcessingRequest -> com.sonicbase.server.j$b:
+com.sonicbase.server.StreamManager$ProcessingRequest -> com.sonicbase.server.l$b:
     java.util.List messages -> b
     com.sonicbase.streams.StreamsConsumer consumer -> c
     com.sonicbase.server.StreamManager this$0 -> a
@@ -6673,7 +6800,7 @@ com.sonicbase.server.StreamManager$ProcessingRequest -> com.sonicbase.server.j$b
     90:90:java.util.List access$700(com.sonicbase.server.StreamManager$ProcessingRequest) -> b
     90:90:com.sonicbase.streams.StreamsConsumer access$602(com.sonicbase.server.StreamManager$ProcessingRequest,com.sonicbase.streams.StreamsConsumer) -> a
     90:90:java.util.List access$702(com.sonicbase.server.StreamManager$ProcessingRequest,java.util.List) -> a
-com.sonicbase.server.TransactionManager -> com.sonicbase.server.k:
+com.sonicbase.server.TransactionManager -> com.sonicbase.server.m:
     com.sonicbase.server.DatabaseServer server -> a
     java.util.concurrent.ConcurrentHashMap transactions -> b
     java.util.concurrent.ConcurrentHashMap locks -> c
@@ -6684,13 +6811,13 @@ com.sonicbase.server.TransactionManager -> com.sonicbase.server.k:
     131:147:com.sonicbase.common.ComObject abortTransaction(java.lang.String,byte[]) -> a
     151:185:void deleteLock(java.lang.String,java.lang.String,java.lang.String,long,com.sonicbase.schema.TableSchema,java.lang.Object[]) -> a
     193:266:void preHandleTransaction(java.lang.String,java.lang.String,java.lang.String,boolean,boolean,long,java.lang.Object[],java.util.concurrent.atomic.AtomicBoolean,java.util.concurrent.atomic.AtomicBoolean) -> a
-com.sonicbase.server.TransactionManager$1 -> com.sonicbase.server.k$1:
+com.sonicbase.server.TransactionManager$1 -> com.sonicbase.server.m$1:
     java.util.Comparator[] val$comparators -> a
     com.sonicbase.server.TransactionManager this$0 -> b
     208:208:void <init>(com.sonicbase.server.TransactionManager,java.util.Comparator[]) -> <init>
     211:223:int compare(java.lang.Object[],java.lang.Object[]) -> a
     208:208:int compare(java.lang.Object,java.lang.Object) -> compare
-com.sonicbase.server.TransactionManager$Operation -> com.sonicbase.server.k$a:
+com.sonicbase.server.TransactionManager$Operation -> com.sonicbase.server.m$a:
     com.sonicbase.server.TransactionManager$OperationType type -> a
     byte[] body -> b
     java.lang.String command -> c
@@ -6700,7 +6827,7 @@ com.sonicbase.server.TransactionManager$Operation -> com.sonicbase.server.k$a:
     91:91:java.lang.String getCommand() -> b
     95:95:byte[] getBody() -> c
     99:99:boolean getReplayed() -> d
-com.sonicbase.server.TransactionManager$OperationType -> com.sonicbase.server.k$b:
+com.sonicbase.server.TransactionManager$OperationType -> com.sonicbase.server.m$b:
     com.sonicbase.server.TransactionManager$OperationType batchInsertWithRecord -> a
     com.sonicbase.server.TransactionManager$OperationType insertWithRecord -> b
     com.sonicbase.server.TransactionManager$OperationType batchInsert -> c
@@ -6714,7 +6841,7 @@ com.sonicbase.server.TransactionManager$OperationType -> com.sonicbase.server.k$
     21:21:com.sonicbase.server.TransactionManager$OperationType valueOf(java.lang.String) -> a
     21:21:void <init>(java.lang.String,int) -> <init>
     21:29:void <clinit>() -> <clinit>
-com.sonicbase.server.TransactionManager$RecordLock -> com.sonicbase.server.k$c:
+com.sonicbase.server.TransactionManager$RecordLock -> com.sonicbase.server.m$c:
     com.sonicbase.server.TransactionManager$Transaction transaction -> a
     java.lang.String tableName -> b
     java.lang.String indexName -> c
@@ -6734,7 +6861,7 @@ com.sonicbase.server.TransactionManager$RecordLock -> com.sonicbase.server.k$c:
     53:53:java.lang.Object[] access$202(com.sonicbase.server.TransactionManager$RecordLock,java.lang.Object[]) -> a
     53:53:com.sonicbase.server.TransactionManager$Transaction access$400(com.sonicbase.server.TransactionManager$RecordLock) -> d
     53:53:int access$308(com.sonicbase.server.TransactionManager$RecordLock) -> e
-com.sonicbase.server.TransactionManager$Transaction -> com.sonicbase.server.k$d:
+com.sonicbase.server.TransactionManager$Transaction -> com.sonicbase.server.m$d:
     long id -> a
     java.util.List locks -> b
     java.util.concurrent.ConcurrentHashMap records -> c
@@ -6746,7 +6873,7 @@ com.sonicbase.server.TransactionManager$Transaction -> com.sonicbase.server.k$d:
     126:126:java.util.List getLocks() -> c
     103:103:java.util.List access$000(com.sonicbase.server.TransactionManager$Transaction) -> a
     103:103:long access$600(com.sonicbase.server.TransactionManager$Transaction) -> b
-com.sonicbase.server.UpdateManager -> com.sonicbase.server.l:
+com.sonicbase.server.UpdateManager -> com.sonicbase.server.n:
     com.sonicbase.common.Logger logger -> a
     java.lang.String CURR_VER_STR -> b
     com.sonicbase.server.DatabaseServer server -> c
@@ -6806,7 +6933,7 @@ com.sonicbase.server.UpdateManager -> com.sonicbase.server.l:
     38:38:java.util.concurrent.ArrayBlockingQueue access$1300(com.sonicbase.server.UpdateManager) -> b
     38:38:void access$1400(com.sonicbase.server.UpdateManager,java.util.List) -> a
     38:38:com.sonicbase.common.Logger access$1500(com.sonicbase.server.UpdateManager) -> c
-com.sonicbase.server.UpdateManager$1 -> com.sonicbase.server.l$1:
+com.sonicbase.server.UpdateManager$1 -> com.sonicbase.server.n$1:
     java.util.List val$currRequests -> a
     com.sonicbase.common.ComObject val$cobj -> b
     long val$transactionId -> c
@@ -6814,7 +6941,7 @@ com.sonicbase.server.UpdateManager$1 -> com.sonicbase.server.l$1:
     com.sonicbase.server.UpdateManager this$0 -> e
     672:672:void <init>(com.sonicbase.server.UpdateManager,java.util.List,com.sonicbase.common.ComObject,long,boolean) -> <init>
     675:679:java.lang.Object call() -> call
-com.sonicbase.server.UpdateManager$2 -> com.sonicbase.server.l$2:
+com.sonicbase.server.UpdateManager$2 -> com.sonicbase.server.n$2:
     com.sonicbase.index.Repartitioner$MoveRequest val$moveRequest -> a
     com.sonicbase.common.ComObject val$cobj -> b
     java.lang.String val$dbName -> c
@@ -6825,7 +6952,7 @@ com.sonicbase.server.UpdateManager$2 -> com.sonicbase.server.l$2:
     com.sonicbase.server.UpdateManager this$0 -> h
     1202:1202:void <init>(com.sonicbase.server.UpdateManager,com.sonicbase.index.Repartitioner$MoveRequest,com.sonicbase.common.ComObject,java.lang.String,com.sonicbase.index.Index,java.lang.String,com.sonicbase.schema.IndexSchema,boolean) -> <init>
     1205:1210:java.lang.Object call() -> call
-com.sonicbase.server.UpdateManager$3 -> com.sonicbase.server.l$3:
+com.sonicbase.server.UpdateManager$3 -> com.sonicbase.server.n$3:
     com.sonicbase.index.Repartitioner$MoveRequest val$moveRequest -> a
     java.lang.String val$tableName -> b
     com.sonicbase.index.Index val$index -> c
@@ -6833,15 +6960,15 @@ com.sonicbase.server.UpdateManager$3 -> com.sonicbase.server.l$3:
     com.sonicbase.server.UpdateManager this$0 -> e
     1232:1232:void <init>(com.sonicbase.server.UpdateManager,com.sonicbase.index.Repartitioner$MoveRequest,java.lang.String,com.sonicbase.index.Index,com.sonicbase.schema.IndexSchema) -> <init>
     1235:1239:java.lang.Object call() -> call
-com.sonicbase.server.UpdateManager$4 -> com.sonicbase.server.l$4:
+com.sonicbase.server.UpdateManager$4 -> com.sonicbase.server.n$4:
     com.sonicbase.server.UpdateManager this$0 -> a
     1442:1442:void <init>(com.sonicbase.server.UpdateManager) -> <init>
     1445:1469:void run() -> run
-com.sonicbase.server.UpdateManager$5 -> com.sonicbase.server.l$5:
+com.sonicbase.server.UpdateManager$5 -> com.sonicbase.server.n$5:
     int[] $SwitchMap$com$sonicbase$server$TransactionManager$OperationType -> a
     int[] $SwitchMap$com$sonicbase$schema$DataType$Type -> b
     991:1692:void <clinit>() -> <clinit>
-com.sonicbase.server.UpdateManager$InsertRequest -> com.sonicbase.server.l$a:
+com.sonicbase.server.UpdateManager$InsertRequest -> com.sonicbase.server.n$a:
     com.sonicbase.common.ComObject innerObj -> a
     long sequence0 -> b
     long sequence1 -> c
@@ -6855,7 +6982,7 @@ com.sonicbase.server.UpdateManager$InsertRequest -> com.sonicbase.server.l$a:
     580:580:short access$300(com.sonicbase.server.UpdateManager$InsertRequest) -> d
     580:580:boolean access$400(com.sonicbase.server.UpdateManager$InsertRequest) -> e
     580:580:boolean access$500(com.sonicbase.server.UpdateManager$InsertRequest) -> f
-com.sonicbase.server.UpdateManager$MessageRequest -> com.sonicbase.server.l$b:
+com.sonicbase.server.UpdateManager$MessageRequest -> com.sonicbase.server.n$b:
     java.lang.String dbName -> b
     java.lang.String tableName -> c
     byte[] recordBytes -> d
@@ -6873,12 +7000,12 @@ com.sonicbase.server.UpdateManager$MessageRequest -> com.sonicbase.server.l$b:
     1422:1422:byte[] access$1600(com.sonicbase.server.UpdateManager$MessageRequest) -> d
     1422:1422:byte[] access$1000(com.sonicbase.server.UpdateManager$MessageRequest) -> e
     1422:1422:byte[] access$1602(com.sonicbase.server.UpdateManager$MessageRequest,byte[]) -> b
-com.sonicbase.server.UpdateManager$Producer -> com.sonicbase.server.l$c:
+com.sonicbase.server.UpdateManager$Producer -> com.sonicbase.server.n$c:
     com.sonicbase.streams.StreamsProducer producer -> a
     int maxBatchSize -> b
     com.sonicbase.server.UpdateManager this$0 -> c
     63:66:void <init>(com.sonicbase.server.UpdateManager,com.sonicbase.streams.StreamsProducer,java.lang.Integer) -> <init>
-com.sonicbase.server.UpdateManager$UpdateType -> com.sonicbase.server.l$d:
+com.sonicbase.server.UpdateManager$UpdateType -> com.sonicbase.server.n$d:
     com.sonicbase.server.UpdateManager$UpdateType insert -> a
     com.sonicbase.server.UpdateManager$UpdateType update -> b
     com.sonicbase.server.UpdateManager$UpdateType delete -> c

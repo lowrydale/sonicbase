@@ -6,8 +6,8 @@ import com.sonicbase.common.ComArray;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Logger;
 import com.sonicbase.query.DatabaseException;
-import com.sonicbase.util.DateUtils;
 import com.sonicbase.research.socket.NettyServer;
+import com.sonicbase.util.DateUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.giraph.utils.Varint;
@@ -15,7 +15,10 @@ import org.apache.giraph.utils.Varint;
 import java.io.*;
 import java.text.ParseException;
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -37,7 +40,7 @@ public class LogManager {
 
   private AtomicLong countLogged = new AtomicLong();
   private final DatabaseServer server;
-  private ArrayBlockingQueue<DatabaseServer.LogRequest> logRequests = new ArrayBlockingQueue<>(1000);
+  private ArrayBlockingQueue<DatabaseServer.LogRequest> logRequests = new ArrayBlockingQueue<>(2_000);
   private Map<Integer, ArrayBlockingQueue<DatabaseServer.LogRequest>> peerLogRequests = new ConcurrentHashMap<>();
   private AtomicBoolean unbindQueues = new AtomicBoolean();
   private final Object logLock = new Object();
@@ -979,6 +982,43 @@ public class LogManager {
         final AtomicLong countSubmitted = new AtomicLong();
         final AtomicLong countFinished = new AtomicLong();
         try {
+//          if (false) {
+//            for (int i = 0; i < sources.size(); i++) {
+//              while (true) {
+//                try {
+//                  LogSource src = sources.get(i);
+//                  if (src.buffer == null) {
+//                    break;
+//                  }
+//                  countSubmitted.incrementAndGet();
+//                  final byte[] buffer = src.buffer;
+//                  final long sequence0 = src.sequence0;
+//                  final long sequence1 = src.sequence1;
+//
+//                  batchCount.incrementAndGet();
+//                  server.invokeMethod(buffer, sequence0, sequence1, true, false, null, null);
+//                  countProcessed.incrementAndGet();
+//                  if (System.currentTimeMillis() - lastLogged.get() > 2000) {
+//                    lastLogged.set(System.currentTimeMillis());
+//                    logger.info("applyLogs - progress: count=" + countProcessed.get() +
+//                        ", countBatched=" + countBatched.get() +
+//                        ", avgBatchSize=" + (countProcessed.get() / batchCount.get()) +
+//                        ", rate=" + (double) countProcessed.get() / (double) (System.currentTimeMillis() - begin) * 1000d);
+//                  }
+//                  if (!src.take(server, logger)) {
+//                    break;
+//                  }
+//                }
+//                catch (Exception e) {
+//                  logger.error("Error replaying request", e);
+//                }
+//                finally {
+//                  countFinished.incrementAndGet();
+//                }
+//              }
+//            }
+//          }
+//          else {
           while (true) {
             long minSequence0 = Long.MAX_VALUE;
             long minSequence1 = Long.MAX_VALUE;
@@ -1030,7 +1070,7 @@ public class LogManager {
                       countProcessed.incrementAndGet();
                       if (System.currentTimeMillis() - lastLogged.get() > 2000) {
                         lastLogged.set(System.currentTimeMillis());
-                        logger.info("applyLogs - progress: count=" + countProcessed.get() +
+                        logger.info("applyLogs - multiple requests - progress: count=" + countProcessed.get() +
                             ", countBatched=" + countBatched.get() +
                             ", avgBatchSize=" + (countProcessed.get() / batchCount.get()) +
                             ", rate=" + (double) countProcessed.get() / (double) (System.currentTimeMillis() - begin) * 1000d);
@@ -1062,7 +1102,7 @@ public class LogManager {
                   countProcessed.incrementAndGet();
                   if (System.currentTimeMillis() - lastLogged.get() > 2000) {
                     lastLogged.set(System.currentTimeMillis());
-                    logger.info("applyLogs - progress: count=" + countProcessed.get() +
+                    logger.info("applyLogs - single request - progress: count=" + countProcessed.get() +
                         ", countBatched=" + countBatched.get() +
                         ", avgBatchSize=" + (countProcessed.get() / batchCount.get()) +
                         ", rate=" + (double) countProcessed.get() / (double) (System.currentTimeMillis() - begin) * 1000d);

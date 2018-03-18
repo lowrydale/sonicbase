@@ -24,7 +24,7 @@ public class MethodInvoker {
 
   private final BulkImportManager bulkImportManager;
   private final DeleteManager deleteManager;
-  private final DeltaManager deltaManager;
+  private final SnapshotManager deltaManager;
   private final UpdateManager updateManager;
   private final TransactionManager transactionManager;
   private final ReadManager readManager;
@@ -37,7 +37,7 @@ public class MethodInvoker {
 
 
   public MethodInvoker(DatabaseServer server, BulkImportManager bulkImportManager, DeleteManager deleteManager,
-                       DeltaManager deltaManager, UpdateManager updateManager, TransactionManager transactionManager, ReadManager readManager, LogManager logManager, SchemaManager schemaManager) {
+                       SnapshotManager deltaManager, UpdateManager updateManager, TransactionManager transactionManager, ReadManager readManager, LogManager logManager, SchemaManager schemaManager) {
     this.server = server;
     this.common = server.getCommon();
     this.bulkImportManager = bulkImportManager;
@@ -138,7 +138,7 @@ public class MethodInvoker {
 //        out.write(body);
 //      }
 //      out.close();
-//      String queueCommand = "DatabaseServer:queueForOtherServer:1:" + SnapshotManager.SERIALIZATION_VERSION + ":1:__none__:" + i;
+//      String queueCommand = "DatabaseServer:queueForOtherServer:1:" + SnapshotManagerImpl.SERIALIZATION_VERSION + ":1:__none__:" + i;
 //      replicas[common.getServersConfig().getShards()[shard].getMasterReplica()].do_send(
 //          null, queueCommand, bytesOut.toByteArray())
 //

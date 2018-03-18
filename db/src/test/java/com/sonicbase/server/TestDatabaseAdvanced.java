@@ -241,19 +241,20 @@ public class TestDatabaseAdvanced {
 
   @Test
   public void testMathLeftExpressionJustMath() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("select id, id5 from persons where id < 2 + 1 order by id asc");
-    ResultSet ret = stmt.executeQuery();
+    try (PreparedStatement stmt = conn.prepareStatement("select id, id5 from persons where id < 2 + 1 order by id asc");
+          ResultSet ret = stmt.executeQuery()) {
 
-    assertTrue(ret.next());
-    assertEquals(ret.getLong("id"), 0);
-    assertEquals(ret.getLong("id5"), 1);
-    assertTrue(ret.next());
-    assertEquals(ret.getLong("id"), 1);
-    assertEquals(ret.getLong("id5"), 1);
-    assertTrue(ret.next());
-    assertEquals(ret.getLong("id"), 2);
-    assertEquals(ret.getLong("id5"), 1);
-    assertFalse(ret.next());
+      assertTrue(ret.next());
+      assertEquals(ret.getLong("id"), 0);
+      assertEquals(ret.getLong("id5"), 1);
+      assertTrue(ret.next());
+      assertEquals(ret.getLong("id"), 1);
+      assertEquals(ret.getLong("id5"), 1);
+      assertTrue(ret.next());
+      assertEquals(ret.getLong("id"), 2);
+      assertEquals(ret.getLong("id5"), 1);
+      assertFalse(ret.next());
+    }
   }
 
   @Test (enabled=false)

@@ -3,6 +3,7 @@ package com.sonicbase.common;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.*;
+import com.sonicbase.server.DatabaseServer;
 import org.apache.giraph.utils.Varint;
 
 import java.io.*;
@@ -94,7 +95,13 @@ public class DatabaseCommon {
     try {
       internalWriteLock.lock();
       try {
-        String dataRoot = new File(dataDir, "delta/" + shard + "/" + replica).getAbsolutePath();
+        String dataRoot = null;
+        if (DatabaseServer.USE_SNAPSHOT_MGR_OLD) {
+          dataRoot = new File(dataDir, "snapshot/" + shard + "/" + replica).getAbsolutePath();
+        }
+        else {
+          dataRoot = new File(dataDir, "delta/" + shard + "/" + replica).getAbsolutePath();
+        }
         File schemaFile = new File(dataRoot, "schema.bin");
         logger.info("Loading schema: file=" + schemaFile.getAbsolutePath());
         if (schemaFile.exists()) {
@@ -130,7 +137,13 @@ public class DatabaseCommon {
   public void saveSchema(byte[] bytes, String dataDir) {
     try {
       internalWriteLock.lock();
-        String dataRoot = new File(dataDir, "delta/" + shard + "/" + replica).getAbsolutePath();
+      String dataRoot = null;
+      if (DatabaseServer.USE_SNAPSHOT_MGR_OLD) {
+        dataRoot = new File(dataDir, "snapshot/" + shard + "/" + replica).getAbsolutePath();
+      }
+      else {
+        dataRoot = new File(dataDir, "delta/" + shard + "/" + replica).getAbsolutePath();
+      }
         File schemaFile = new File(dataRoot, "schema.bin");
         if (schemaFile.exists()) {
           schemaFile.delete();
@@ -161,7 +174,13 @@ public class DatabaseCommon {
   public void saveSchema(DatabaseClient client, String dataDir) {
     try {
       internalWriteLock.lock();
-      String dataRoot = new File(dataDir, "delta/" + shard + "/" + replica).getAbsolutePath();
+      String dataRoot = null;
+      if (DatabaseServer.USE_SNAPSHOT_MGR_OLD) {
+        dataRoot = new File(dataDir, "snapshot/" + shard + "/" + replica).getAbsolutePath();
+      }
+      else {
+        dataRoot = new File(dataDir, "delta/" + shard + "/" + replica).getAbsolutePath();
+      }
       File schemaFile = new File(dataRoot, "schema.bin");
       if (schemaFile.exists()) {
         schemaFile.delete();
@@ -182,7 +201,7 @@ public class DatabaseCommon {
 //        String command = "DatabaseServer:ComObject:saveSchema:";
 //        ComObject cobj = new ComObject();
 //        cobj.put(ComObject.Tag.method, "saveSchema");
-//        cobj.put(ComObject.Tag.schemaBytes, serializeSchema(SnapshotManager.SERIALIZATION_VERSION));
+//        cobj.put(ComObject.Tag.schemaBytes, serializeSchema(SnapshotManagerImpl.SERIALIZATION_VERSION));
 //        client.send(null, 0, getReplica(), command, cobj, DatabaseClient.Replica.specified);
 //      }
 
@@ -1253,7 +1272,13 @@ public class DatabaseCommon {
   public void saveServersConfig(String dataDir) throws IOException {
     try {
       internalWriteLock.lock();
-      String dataRoot = new File(dataDir, "delta/" + shard + "/" + replica).getAbsolutePath();
+      String dataRoot = null;
+      if (DatabaseServer.USE_SNAPSHOT_MGR_OLD) {
+        dataRoot = new File(dataDir, "snapshot/" + shard + "/" + replica).getAbsolutePath();
+      }
+      else {
+        dataRoot = new File(dataDir, "delta/" + shard + "/" + replica).getAbsolutePath();
+      }
       File configFile = new File(dataRoot, "config.bin");
       if (configFile.exists()) {
         configFile.delete();

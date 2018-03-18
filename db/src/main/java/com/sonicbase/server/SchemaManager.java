@@ -129,7 +129,13 @@ public class SchemaManager {
           throw new DatabaseException("Database already exists: name=" + dbName);
         }
         logger.info("Create database: shard=" + server.getShard() + ", replica=" + server.getReplica() + ", name=" + dbName);
-        File dir = new File(server.getDataDir(), "delta/" + server.getShard() + "/" + server.getReplica() + "/" + dbName);
+        File dir = null;
+        if (DatabaseServer.USE_SNAPSHOT_MGR_OLD) {
+          dir = new File(server.getDataDir(), "snapshot/" + server.getShard() + "/" + server.getReplica() + "/" + dbName);
+        }
+        else {
+          dir = new File(server.getDataDir(), "delta/" + server.getShard() + "/" + server.getReplica() + "/" + dbName);
+        }
         if (!dir.exists() && !dir.mkdirs()) {
           throw new DatabaseException("Error creating database directory: dir=" + dir.getAbsolutePath());
         }
@@ -167,7 +173,13 @@ public class SchemaManager {
     }
 
     logger.info("Create database: shard=" + server.getShard() + ", replica=" + server.getReplica() + ", name=" + dbName);
-    File dir = new File(server.getDataDir(), "delta/" + server.getShard() + "/" + server.getReplica() + "/" + dbName);
+    File dir = null;
+    if (DatabaseServer.USE_SNAPSHOT_MGR_OLD) {
+      dir = new File(server.getDataDir(), "snapshot/" + server.getShard() + "/" + server.getReplica() + "/" + dbName);
+    }
+    else {
+      dir = new File(server.getDataDir(), "delta/" + server.getShard() + "/" + server.getReplica() + "/" + dbName);
+    }
     if (!dir.exists() && !dir.mkdirs()) {
       throw new DatabaseException("Error creating database directory: dir=" + dir.getAbsolutePath());
     }

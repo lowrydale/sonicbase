@@ -27,7 +27,7 @@ public class FileUtils {
   }
 
 
-  public static void delete(File file) throws IOException {
+  public static void deleteDirectory(File file) throws IOException {
 
     File[] files = file.listFiles();
     if (files == null) {
@@ -35,7 +35,7 @@ public class FileUtils {
     }
     for (File childFile : files) {
       if (childFile.isDirectory()) {
-        delete(childFile);
+        deleteDirectory(childFile);
       }
       else {
         if (!childFile.delete()) {

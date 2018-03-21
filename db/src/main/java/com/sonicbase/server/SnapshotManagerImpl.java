@@ -210,9 +210,11 @@ public class SnapshotManagerImpl implements SnapshotManager {
                                                 boolean isPrimaryKey = indexSchema.isPrimaryKey();
                                                 while (true) {
 
+                                                  //logger.info("pre check");
                                                   if (!inStream.readBoolean()) {
                                                     break;
                                                   }
+                                                  //logger.info("post check");
                                                   Object[] key = DatabaseCommon.deserializeKey(tableSchema, inStream);
 
                                                   long updateTime = Varint.readUnsignedVarLong(inStream);
@@ -314,12 +316,12 @@ public class SnapshotManagerImpl implements SnapshotManager {
               Thread.sleep(1000);
             }
 
-            File file = new File(getSnapshotReplicaDir(), "serializationVersion");
-            file.delete();
-            file.getParentFile().mkdirs();
-            try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
-              writer.write(String.valueOf(DatabaseClient.SERIALIZATION_VERSION));
-            }
+//            File file = new File(getSnapshotReplicaDir(), "serializationVersion");
+//            file.delete();
+//            file.getParentFile().mkdirs();
+//            try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
+//              writer.write(String.valueOf(DatabaseClient.SERIALIZATION_VERSION));
+//            }
 
             List<String> dbNames = server.getDbNames(server.getDataDir());
             for (String dbName : dbNames) {
@@ -447,7 +449,7 @@ public class SnapshotManagerImpl implements SnapshotManager {
                 synchronized (index.getMutex(key)) {
                   Object currValue = index.get(key);
                   if (currValue == null || currValue.equals(0L)) {
-                    logger.error("null record: key=" + DatabaseCommon.keyToString(key));
+                    //logger.error("null record: key=" + DatabaseCommon.keyToString(key));
                   }
                   else {
                     if (isPrimaryKey) {
@@ -675,7 +677,15 @@ public class SnapshotManagerImpl implements SnapshotManager {
 
   @Override
   public void shutdown() {
-
+    if (snapshotThread != null) {
+      snapshotThread.interrupt();
+      try {
+        snapshotThread.join();
+      }
+      catch (InterruptedException e) {
+        throw new DatabaseException(e);
+      }
+    }
   }
 
   public void getFilesForCurrentSnapshot(List<String> files) {

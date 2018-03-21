@@ -2534,7 +2534,7 @@ to act on classes which have been obfuscated.
   <field class="com.sonicbase.server.DatabaseServer" name="isServerRoloadRunning" map="C"/>
   <field class="com.sonicbase.server.DatabaseServer" name="transactionManager" map="D"/>
   <field class="com.sonicbase.server.DatabaseServer" name="FOUR_SERVER_LICENSE" map="E"/>
-  <field class="com.sonicbase.server.DatabaseServer" name="deleteManager" map="F"/>
+  <field class="com.sonicbase.server.DatabaseServer" name="deleteManagerImpl" map="F"/>
   <field class="com.sonicbase.server.DatabaseServer" name="batchReadLock" map="G"/>
   <field class="com.sonicbase.server.DatabaseServer" name="doingBackup" map="H"/>
   <field class="com.sonicbase.server.DatabaseServer" name="restoreAwsMutex" map="I"/>
@@ -2672,7 +2672,7 @@ to act on classes which have been obfuscated.
   <method class="com.sonicbase.server.DatabaseServer" name="int access$300(com.sonicbase.server.DatabaseServer)" map="F"/>
   <method class="com.sonicbase.server.DatabaseServer" name="com.sonicbase.server.SchemaManager getSchemaManager()" map="X"/>
   <method class="com.sonicbase.server.DatabaseServer" name="void access$1100(com.sonicbase.server.DatabaseServer)" map="G"/>
-  <method class="com.sonicbase.server.DatabaseServer" name="com.sonicbase.server.DeleteManager getDeleteManager()" map="Y"/>
+  <method class="com.sonicbase.server.DatabaseServer" name="com.sonicbase.server.DeleteManagerImpl getDeleteManager()" map="Y"/>
   <method class="com.sonicbase.server.DatabaseServer" name="void access$3000(com.sonicbase.server.DatabaseServer, java.lang.String, java.lang.String, java.lang.String)" map="B"/>
   <method class="com.sonicbase.server.DatabaseServer" name="void backupAWSSingleDir(java.lang.String, java.lang.String, java.lang.String, java.lang.String)" map="A"/>
   <method class="com.sonicbase.server.DatabaseServer" name="ComObject areAllLongRunningCommandsComplete(ComObject)" map="G"/>
@@ -2808,7 +2808,7 @@ to act on classes which have been obfuscated.
   <method class="com.sonicbase.server.DatabaseServer" name="ComObject doRestoreAWS(ComObject)" map="d"/>
   <method class="com.sonicbase.server.DatabaseServer" name="boolean isNoLongerMaster()" map="&#x00cf;"/>
   <method class="com.sonicbase.server.DatabaseServer" name="boolean access$4802(com.sonicbase.server.DatabaseServer, boolean)" map="E"/>
-  <method class="com.sonicbase.server.DatabaseServer" name="com.sonicbase.server.DeleteManager access$2100(com.sonicbase.server.DatabaseServer)" map="V"/>
+  <method class="com.sonicbase.server.DatabaseServer" name="com.sonicbase.server.DeleteManagerImpl access$2100(com.sonicbase.server.DatabaseServer)" map="V"/>
   <method class="com.sonicbase.server.DatabaseServer" name="DatabaseCommon getCommon()" map="&#x00d0;"/>
   <method class="com.sonicbase.server.DatabaseServer" name="int getReplica()" map="&#x00d1;"/>
   <method class="com.sonicbase.server.DatabaseServer" name="void shutdown()" map="&#x00d2;"/>
@@ -2859,7 +2859,7 @@ to act on classes which have been obfuscated.
   <field class="com.sonicbase.server.MethodInvoker" name="readManager" map="K"/>
   <field class="com.sonicbase.server.MethodInvoker" name="logManager" map="L"/>
   <field class="com.sonicbase.server.MethodInvoker" name="logger" map="M"/>
-  <field class="com.sonicbase.server.MethodInvoker" name="deleteManager" map="N"/>
+  <field class="com.sonicbase.server.MethodInvoker" name="deleteManagerImpl" map="N"/>
   <method class="com.sonicbase.server.MethodInvoker" name="java.lang.Long getExistingSequence1(java.lang.String)" map="A"/>
   <method class="com.sonicbase.server.MethodInvoker" name="java.lang.Long getExistingSequence0(java.lang.String)" map="B"/>
   <class name="com.sonicbase.server.UpdateManager$1" map="1"/>
@@ -2990,35 +2990,35 @@ to act on classes which have been obfuscated.
   <method class="com.sonicbase.server.SnapshotManagerImpl" name="void getFilesForCurrentSnapshot(java.util.List)" map="A"/>
   <method class="com.sonicbase.server.SnapshotManagerImpl" name="void deleteSnapshots()" map="H"/>
   <method class="com.sonicbase.server.SnapshotManagerImpl" name="void backupFileSystem(java.lang.String, java.lang.String)" map="C"/>
-  <class name="com.sonicbase.server.DeleteManager$3" map="3"/>
-  <field class="com.sonicbase.server.DeleteManager$3" name="this$0" map="A"/>
-  <method class="com.sonicbase.server.DeleteManager$3" name="void run()" map="run"/>
-  <class name="com.sonicbase.server.DeleteManager$2" map="2"/>
-  <field class="com.sonicbase.server.DeleteManager$2" name="this$0" map="A"/>
-  <field class="com.sonicbase.server.DeleteManager$2" name="val$index" map="B"/>
-  <field class="com.sonicbase.server.DeleteManager$2" name="val$currBatch" map="C"/>
-  <method class="com.sonicbase.server.DeleteManager$2" name="java.lang.Object call()" map="call"/>
-  <class name="com.sonicbase.server.DeleteManager$1" map="1"/>
-  <field class="com.sonicbase.server.DeleteManager$1" name="this$0" map="A"/>
-  <method class="com.sonicbase.server.DeleteManager$1" name="int compare(java.lang.Object, java.lang.Object)" map="compare"/>
-  <method class="com.sonicbase.server.DeleteManager$1" name="int compare(java.io.File, java.io.File)" map="A"/>
-  <class name="com.sonicbase.server.DeleteManager" map="G"/>
-  <field class="com.sonicbase.server.DeleteManager" name="logger" map="A"/>
-  <field class="com.sonicbase.server.DeleteManager" name="mainThread" map="B"/>
-  <field class="com.sonicbase.server.DeleteManager" name="databaseServer" map="C"/>
-  <field class="com.sonicbase.server.DeleteManager" name="executor" map="D"/>
-  <method class="com.sonicbase.server.DeleteManager" name="com.sonicbase.server.DatabaseServer access$000(com.sonicbase.server.DeleteManager)" map="A"/>
-  <method class="com.sonicbase.server.DeleteManager" name="void getFiles(java.util.List)" map="A"/>
-  <method class="com.sonicbase.server.DeleteManager" name="void backupFileSystem(java.lang.String, java.lang.String)" map="A"/>
-  <method class="com.sonicbase.server.DeleteManager" name="void saveDeletes(java.lang.String, java.lang.String, java.lang.String, java.util.concurrent.ConcurrentLinkedQueue)" map="A"/>
-  <method class="com.sonicbase.server.DeleteManager" name="void restoreAWS(java.lang.String, java.lang.String, java.lang.String)" map="A"/>
-  <method class="com.sonicbase.server.DeleteManager" name="java.io.File getReplicaRoot()" map="A"/>
-  <method class="com.sonicbase.server.DeleteManager" name="void start()" map="B"/>
-  <method class="com.sonicbase.server.DeleteManager" name="void backupAWS(java.lang.String, java.lang.String, java.lang.String)" map="B"/>
-  <method class="com.sonicbase.server.DeleteManager" name="Logger access$100(com.sonicbase.server.DeleteManager)" map="B"/>
-  <method class="com.sonicbase.server.DeleteManager" name="void restoreFileSystem(java.lang.String, java.lang.String)" map="B"/>
-  <method class="com.sonicbase.server.DeleteManager" name="void forceDeletes()" map="C"/>
-  <method class="com.sonicbase.server.DeleteManager" name="void doDeletes()" map="D"/>
+  <class name="com.sonicbase.server.DeleteManagerImpl$3" map="3"/>
+  <field class="com.sonicbase.server.DeleteManagerImpl$3" name="this$0" map="A"/>
+  <method class="com.sonicbase.server.DeleteManagerImpl$3" name="void run()" map="run"/>
+  <class name="com.sonicbase.server.DeleteManagerImpl$2" map="2"/>
+  <field class="com.sonicbase.server.DeleteManagerImpl$2" name="this$0" map="A"/>
+  <field class="com.sonicbase.server.DeleteManagerImpl$2" name="val$index" map="B"/>
+  <field class="com.sonicbase.server.DeleteManagerImpl$2" name="val$currBatch" map="C"/>
+  <method class="com.sonicbase.server.DeleteManagerImpl$2" name="java.lang.Object call()" map="call"/>
+  <class name="com.sonicbase.server.DeleteManagerImpl$1" map="1"/>
+  <field class="com.sonicbase.server.DeleteManagerImpl$1" name="this$0" map="A"/>
+  <method class="com.sonicbase.server.DeleteManagerImpl$1" name="int compare(java.lang.Object, java.lang.Object)" map="compare"/>
+  <method class="com.sonicbase.server.DeleteManagerImpl$1" name="int compare(java.io.File, java.io.File)" map="A"/>
+  <class name="com.sonicbase.server.DeleteManagerImpl" map="G"/>
+  <field class="com.sonicbase.server.DeleteManagerImpl" name="logger" map="A"/>
+  <field class="com.sonicbase.server.DeleteManagerImpl" name="mainThread" map="B"/>
+  <field class="com.sonicbase.server.DeleteManagerImpl" name="databaseServer" map="C"/>
+  <field class="com.sonicbase.server.DeleteManagerImpl" name="executor" map="D"/>
+  <method class="com.sonicbase.server.DeleteManagerImpl" name="com.sonicbase.server.DatabaseServer access$000(com.sonicbase.server.DeleteManagerImpl)" map="A"/>
+  <method class="com.sonicbase.server.DeleteManagerImpl" name="void getFiles(java.util.List)" map="A"/>
+  <method class="com.sonicbase.server.DeleteManagerImpl" name="void backupFileSystem(java.lang.String, java.lang.String)" map="A"/>
+  <method class="com.sonicbase.server.DeleteManagerImpl" name="void saveDeletes(java.lang.String, java.lang.String, java.lang.String, java.util.concurrent.ConcurrentLinkedQueue)" map="A"/>
+  <method class="com.sonicbase.server.DeleteManagerImpl" name="void restoreAWS(java.lang.String, java.lang.String, java.lang.String)" map="A"/>
+  <method class="com.sonicbase.server.DeleteManagerImpl" name="java.io.File getReplicaRoot()" map="A"/>
+  <method class="com.sonicbase.server.DeleteManagerImpl" name="void start()" map="B"/>
+  <method class="com.sonicbase.server.DeleteManagerImpl" name="void backupAWS(java.lang.String, java.lang.String, java.lang.String)" map="B"/>
+  <method class="com.sonicbase.server.DeleteManagerImpl" name="Logger access$100(com.sonicbase.server.DeleteManagerImpl)" map="B"/>
+  <method class="com.sonicbase.server.DeleteManagerImpl" name="void restoreFileSystem(java.lang.String, java.lang.String)" map="B"/>
+  <method class="com.sonicbase.server.DeleteManagerImpl" name="void forceDeletes()" map="C"/>
+  <method class="com.sonicbase.server.DeleteManagerImpl" name="void doDeletes()" map="D"/>
   <class name="com.sonicbase.server.LogManager$LogWriter" map="_A"/>
   <field class="com.sonicbase.server.LogManager$LogWriter" name="replica" map="A"/>
   <field class="com.sonicbase.server.LogManager$LogWriter" name="currLogRequests" map="B"/>

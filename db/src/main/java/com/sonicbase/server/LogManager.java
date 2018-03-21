@@ -15,10 +15,7 @@ import org.apache.giraph.utils.Varint;
 import java.io.*;
 import java.text.ParseException;
 import java.util.*;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -30,6 +27,7 @@ import java.util.zip.GZIPInputStream;
 public class LogManager {
 
   private static final String UTF8_STR = "utf-8";
+  private static boolean PARALLEL_APPLY_LOGS = true;
   private final List<LogWriter> logWriters = new ArrayList<>();
   private final List<LogWriter> peerLogWriters = new ArrayList<>();
   private static Logger logger;
@@ -926,151 +924,187 @@ public class LogManager {
   }
 
   private void replayQueues(File dataRootDir, final String slicePoint, final boolean beforeSlice, boolean peerFiles) throws IOException {
-    allCurrentSources.clear();
-    synchronized (logLock) {
-      File[] files = dataRootDir.listFiles();
-      if (files == null) {
-        logger.warn("No files to restore: shard=" + server.getShard() + ", replica=" + server.getReplica());
-      }
-      else {
-        final AtomicInteger countProcessed = new AtomicInteger();
-        logger.info("applyLogs - begin: fileCount=" + files.length);
-        List<LogSource> sources = new ArrayList<>();
-        Set<String> sliceFiles = new HashSet<>();
-        if (slicePoint != null) {
-          BufferedReader reader = new BufferedReader(new StringReader(slicePoint));
-          while (true) {
-            String line = reader.readLine();
-            if (line == null) {
-              break;
-            }
-            sliceFiles.add(line);
-          }
+    ThreadPoolExecutor executor = new ThreadPoolExecutor(32, 32, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(2_000), new ThreadPoolExecutor.CallerRunsPolicy());
+    try {
+      allCurrentSources.clear();
+      synchronized (logLock) {
+        File[] files = dataRootDir.listFiles();
+        if (files == null) {
+          logger.warn("No files to restore: shard=" + server.getShard() + ", replica=" + server.getReplica());
         }
-        for (File file : files) {
-          if (peerFiles) {
-            if (!file.getName().startsWith("peer")) {
+        else {
+          final AtomicInteger countProcessed = new AtomicInteger();
+          logger.info("applyLogs - begin: fileCount=" + files.length);
+          List<LogSource> sources = new ArrayList<>();
+          Set<String> sliceFiles = new HashSet<>();
+          if (slicePoint != null) {
+            BufferedReader reader = new BufferedReader(new StringReader(slicePoint));
+            while (true) {
+              String line = reader.readLine();
+              if (line == null) {
+                break;
+              }
+              sliceFiles.add(line);
+            }
+          }
+          for (File file : files) {
+            if (peerFiles) {
+              if (!file.getName().startsWith("peer")) {
+                continue;
+              }
+            }
+            if (slicePoint == null) {
+              LogSource src = new LogSource(file, server, logger);
+              sources.add(src);
+              allCurrentSources.add(src);
               continue;
             }
-          }
-          if (slicePoint == null) {
-            LogSource src = new LogSource(file, server, logger);
-            sources.add(src);
-            allCurrentSources.add(src);
-            continue;
-          }
-          if (beforeSlice) {
-            if (sliceFiles.contains(file.getAbsolutePath())) {
-              LogSource src = new LogSource(file, server, logger);
-              sources.add(src);
-              allCurrentSources.add(src);
+            if (beforeSlice) {
+              if (sliceFiles.contains(file.getAbsolutePath())) {
+                LogSource src = new LogSource(file, server, logger);
+                sources.add(src);
+                allCurrentSources.add(src);
+              }
             }
-          }
 
-          if (!beforeSlice) {
-            if (!sliceFiles.contains(file.getAbsolutePath())) {
-              LogSource src = new LogSource(file, server, logger);
-              sources.add(src);
-              allCurrentSources.add(src);
+            if (!beforeSlice) {
+              if (!sliceFiles.contains(file.getAbsolutePath())) {
+                LogSource src = new LogSource(file, server, logger);
+                sources.add(src);
+                allCurrentSources.add(src);
+              }
             }
           }
-        }
-        final long begin = System.currentTimeMillis();
-        final AtomicLong lastLogged = new AtomicLong(System.currentTimeMillis());
-        final AtomicLong countBatched = new AtomicLong();
-        final AtomicLong batchCount = new AtomicLong();
-        final AtomicLong countSubmitted = new AtomicLong();
-        final AtomicLong countFinished = new AtomicLong();
-        try {
-//          if (false) {
-//            for (int i = 0; i < sources.size(); i++) {
-//              while (true) {
-//                try {
-//                  LogSource src = sources.get(i);
-//                  if (src.buffer == null) {
-//                    break;
-//                  }
-//                  countSubmitted.incrementAndGet();
-//                  final byte[] buffer = src.buffer;
-//                  final long sequence0 = src.sequence0;
-//                  final long sequence1 = src.sequence1;
-//
-//                  batchCount.incrementAndGet();
-//                  server.invokeMethod(buffer, sequence0, sequence1, true, false, null, null);
-//                  countProcessed.incrementAndGet();
-//                  if (System.currentTimeMillis() - lastLogged.get() > 2000) {
-//                    lastLogged.set(System.currentTimeMillis());
-//                    logger.info("applyLogs - progress: count=" + countProcessed.get() +
-//                        ", countBatched=" + countBatched.get() +
-//                        ", avgBatchSize=" + (countProcessed.get() / batchCount.get()) +
-//                        ", rate=" + (double) countProcessed.get() / (double) (System.currentTimeMillis() - begin) * 1000d);
-//                  }
-//                  if (!src.take(server, logger)) {
-//                    break;
-//                  }
-//                }
-//                catch (Exception e) {
-//                  logger.error("Error replaying request", e);
-//                }
-//                finally {
-//                  countFinished.incrementAndGet();
-//                }
-//              }
-//            }
-//          }
-//          else {
-          while (true) {
-            long minSequence0 = Long.MAX_VALUE;
-            long minSequence1 = Long.MAX_VALUE;
-            int minOffset = -1;
-            for (int i = 0; i < sources.size(); i++) {
-              if (sources.get(i).requests != null) {
-                if (sources.get(i).offset < sources.get(i).requests.size()) {
-                  long sequence0 = sources.get(i).requests.get(sources.get(i).offset).getSequence0();
-                  long sequence1 = sources.get(i).requests.get(sources.get(i).offset).getSequence1();
-                  if (sequence0 < minSequence0 && sequence1 < minSequence1) {
+          final long begin = System.currentTimeMillis();
+          final AtomicLong lastLogged = new AtomicLong(System.currentTimeMillis());
+          final AtomicLong countBatched = new AtomicLong();
+          final AtomicLong batchCount = new AtomicLong();
+          final AtomicLong countSubmitted = new AtomicLong();
+          final AtomicLong countFinished = new AtomicLong();
+          try {
+            //          if (false) {
+            //            for (int i = 0; i < sources.size(); i++) {
+            //              while (true) {
+            //                try {
+            //                  LogSource src = sources.get(i);
+            //                  if (src.buffer == null) {
+            //                    break;
+            //                  }
+            //                  countSubmitted.incrementAndGet();
+            //                  final byte[] buffer = src.buffer;
+            //                  final long sequence0 = src.sequence0;
+            //                  final long sequence1 = src.sequence1;
+            //
+            //                  batchCount.incrementAndGet();
+            //                  server.invokeMethod(buffer, sequence0, sequence1, true, false, null, null);
+            //                  countProcessed.incrementAndGet();
+            //                  if (System.currentTimeMillis() - lastLogged.get() > 2000) {
+            //                    lastLogged.set(System.currentTimeMillis());
+            //                    logger.info("applyLogs - progress: count=" + countProcessed.get() +
+            //                        ", countBatched=" + countBatched.get() +
+            //                        ", avgBatchSize=" + (countProcessed.get() / batchCount.get()) +
+            //                        ", rate=" + (double) countProcessed.get() / (double) (System.currentTimeMillis() - begin) * 1000d);
+            //                  }
+            //                  if (!src.take(server, logger)) {
+            //                    break;
+            //                  }
+            //                }
+            //                catch (Exception e) {
+            //                  logger.error("Error replaying request", e);
+            //                }
+            //                finally {
+            //                  countFinished.incrementAndGet();
+            //                }
+            //              }
+            //            }
+            //          }
+            //          else {
+            List<NettyServer.Request> batch = new ArrayList<>();
+            while (true) {
+              long minSequence0 = Long.MAX_VALUE;
+              long minSequence1 = Long.MAX_VALUE;
+              int minOffset = -1;
+              for (int i = 0; i < sources.size(); i++) {
+                if (sources.get(i).requests != null) {
+                  if (sources.get(i).offset < sources.get(i).requests.size()) {
+                    long sequence0 = sources.get(i).requests.get(sources.get(i).offset).getSequence0();
+                    long sequence1 = sources.get(i).requests.get(sources.get(i).offset).getSequence1();
+                    if (sequence0 < minSequence0 && sequence1 < minSequence1) {
+                      minSequence0 = sequence0;
+                      minSequence1 = sequence1;
+                      minOffset = i;
+                    }
+                  }
+                  throw new DatabaseException("Processing batch");
+                }
+                else {
+                  long sequence0 = sources.get(i).sequence0;
+                  long sequence1 = sources.get(i).sequence1;
+                  if (sequence0 <= minSequence0 && sequence1 <= minSequence1) {
                     minSequence0 = sequence0;
                     minSequence1 = sequence1;
                     minOffset = i;
                   }
                 }
-                throw new DatabaseException("Processing batch");
               }
-              else {
-                long sequence0 = sources.get(i).sequence0;
-                long sequence1 = sources.get(i).sequence1;
-                if (sequence0 <= minSequence0 && sequence1 <= minSequence1) {
-                  minSequence0 = sequence0;
-                  minSequence1 = sequence1;
-                  minOffset = i;
-                }
+              if (minOffset == -1) {
+                break;
               }
-            }
-            if (minOffset == -1) {
-              break;
-            }
-            final LogSource minSource = sources.get(minOffset);
-            try {
-              batchCount.incrementAndGet();
-              if (minSource.requests != null) {
-                final NettyServer.Request request = minSource.requests.get(minSource.offset++);
-                if (minSource.requests.size() <= minSource.offset) {
-                  minSource.offset = 0;
-                  if (!minSource.take(server, logger)) {
-                    sources.remove(minOffset);
+              final LogSource minSource = sources.get(minOffset);
+              try {
+                batchCount.incrementAndGet();
+                if (minSource.requests != null) {
+                  final NettyServer.Request request = minSource.requests.get(minSource.offset++);
+                  if (minSource.requests.size() <= minSource.offset) {
+                    minSource.offset = 0;
+                    if (!minSource.take(server, logger)) {
+                      sources.remove(minOffset);
+                    }
                   }
+                  countBatched.incrementAndGet();
+                  countSubmitted.incrementAndGet();
+                  executor.submit(new Runnable() {
+                    public void run() {
+                      try {
+                        server.invokeMethod(request.getBody(), request.getSequence0(),
+                            request.getSequence1(), true, false, null, null);
+                        countProcessed.incrementAndGet();
+                        if (System.currentTimeMillis() - lastLogged.get() > 2000) {
+                          lastLogged.set(System.currentTimeMillis());
+                          logger.info("applyLogs - multiple requests - progress: count=" + countProcessed.get() +
+                              ", countBatched=" + countBatched.get() +
+                              ", avgBatchSize=" + (countProcessed.get() / batchCount.get()) +
+                              ", rate=" + (double) countProcessed.get() / (double) (System.currentTimeMillis() - begin) * 1000d);
+                        }
+                      }
+                      catch (Exception e) {
+                        logger.error("Error replaying request", e);
+                      }
+                      finally {
+                        countFinished.incrementAndGet();
+                      }
+                    }
+                  });
+                  throw new DatabaseException("Processing batch");
                 }
-                countBatched.incrementAndGet();
-                countSubmitted.incrementAndGet();
-                executor.submit(new Runnable() {
-                  public void run() {
+                else {
+                  if (minSource.buffer == null) {
+                    sources.remove(minOffset);
+                    continue;
+                  }
+
+                  final byte[] buffer = minSource.buffer;
+                  final long sequence0 = minSource.sequence0;
+                  final long sequence1 = minSource.sequence1;
+
+                  if (!PARALLEL_APPLY_LOGS) {
                     try {
-                      server.invokeMethod(request.getBody(), request.getSequence0(),
-                          request.getSequence1(), true, false, null, null);
+                      countSubmitted.incrementAndGet();
+                      server.invokeMethod(buffer, sequence0, sequence1, true, false, null, null);
                       countProcessed.incrementAndGet();
                       if (System.currentTimeMillis() - lastLogged.get() > 2000) {
                         lastLogged.set(System.currentTimeMillis());
-                        logger.info("applyLogs - multiple requests - progress: count=" + countProcessed.get() +
+                        logger.info("applyLogs - single request - progress: count=" + countProcessed.get() +
                             ", countBatched=" + countBatched.get() +
                             ", avgBatchSize=" + (countProcessed.get() / batchCount.get()) +
                             ", rate=" + (double) countProcessed.get() / (double) (System.currentTimeMillis() - begin) * 1000d);
@@ -1083,71 +1117,98 @@ public class LogManager {
                       countFinished.incrementAndGet();
                     }
                   }
-                });
-                throw new DatabaseException("Processing batch");
-              }
-              else {
-                if (minSource.buffer == null) {
-                  sources.remove(minOffset);
-                  continue;
-                }
+                  else {
+                    NettyServer.Request request = new NettyServer.Request();
+                    request.setBody(buffer);
+                    request.setSequence0(sequence0);
+                    request.setSequence1(sequence1);
+                    batch.add(request);
+                    if (batch.size() > 200) {
+                      final List<NettyServer.Request> finalBatch = batch;
+                      countSubmitted.incrementAndGet();
+                      executor.submit(new Callable(){
+                        @Override
+                        public Object call() throws Exception {
+                          for (NettyServer.Request request : finalBatch) {
+                            try {
+                              server.invokeMethod(request.getBody(), request.getSequence0(), request.getSequence1(), true, false, null, null);
+                              countProcessed.incrementAndGet();
+                              if (System.currentTimeMillis() - lastLogged.get() > 2000) {
+                                lastLogged.set(System.currentTimeMillis());
+                                logger.info("applyLogs - single request - progress: count=" + countProcessed.get() +
+                                    ", countBatched=" + countBatched.get() +
+                                    ", avgBatchSize=" + (countProcessed.get() / batchCount.get()) +
+                                    ", rate=" + (double) countProcessed.get() / (double) (System.currentTimeMillis() - begin) * 1000d);
+                              }
+                            }
+                            catch(Exception e){
+                              logger.error("Error replaying request", e);
+                            }
+                            finally{
+                              countFinished.incrementAndGet();
+                            }
+                          }
+                          return null;
+                        }
+                      });
+                      batch = new ArrayList<>();
+                    }
+                  }
 
-                countSubmitted.incrementAndGet();
-                final byte[] buffer = minSource.buffer;
-                final long sequence0 = minSource.sequence0;
-                final long sequence1 = minSource.sequence1;
-
-                try {
-                  server.invokeMethod(buffer, sequence0, sequence1, true, false, null, null);
-                  countProcessed.incrementAndGet();
-                  if (System.currentTimeMillis() - lastLogged.get() > 2000) {
-                    lastLogged.set(System.currentTimeMillis());
-                    logger.info("applyLogs - single request - progress: count=" + countProcessed.get() +
-                        ", countBatched=" + countBatched.get() +
-                        ", avgBatchSize=" + (countProcessed.get() / batchCount.get()) +
-                        ", rate=" + (double) countProcessed.get() / (double) (System.currentTimeMillis() - begin) * 1000d);
+                  if (!minSource.take(server, logger)) {
+                    sources.remove(minOffset);
                   }
                 }
-                catch (Exception e) {
-                  logger.error("Error replaying request", e);
-                }
-                finally {
-                  countFinished.incrementAndGet();
-                }
-                if (!minSource.take(server, logger)) {
-                  sources.remove(minOffset);
-                }
+              }
+              catch (Exception t) {
+                logger.error("Error replaying request", t);
               }
             }
-            catch (Exception t) {
-              logger.error("Error replaying request", t);
-            }
-          }
-          if (countSubmitted.get() > 0) {
-            while (countSubmitted.get() > countFinished.get()) {
+            for (NettyServer.Request request : batch) {
               try {
-                Thread.sleep(100);
+                server.invokeMethod(request.getBody(), request.getSequence0(), request.getSequence1(), true, false, null, null);
+                countProcessed.incrementAndGet();
+                if (System.currentTimeMillis() - lastLogged.get() > 2000) {
+                  lastLogged.set(System.currentTimeMillis());
+                  logger.info("applyLogs - single request - progress: count=" + countProcessed.get() +
+                      ", countBatched=" + countBatched.get() +
+                      ", avgBatchSize=" + (countProcessed.get() / batchCount.get()) +
+                      ", rate=" + (double) countProcessed.get() / (double) (System.currentTimeMillis() - begin) * 1000d);
+                }
               }
-              catch (InterruptedException e) {
-                throw new DatabaseException(e);
+              catch (Exception e) {
+                logger.error("Error replaying request", e);
               }
             }
+            if (countSubmitted.get() > 0) {
+              while (countSubmitted.get() > countFinished.get()) {
+                try {
+                  Thread.sleep(100);
+                }
+                catch (InterruptedException e) {
+                  throw new DatabaseException(e);
+                }
+              }
+            }
+            if (countFinished.get() == 0) {
+              logger.info("Processed no requests: shard=" + server.getShard() + ", replica=" + server.getReplica());
+            }
           }
-          if (countFinished.get() == 0) {
-            logger.info("Processed no requests: shard=" + server.getShard() + ", replica=" + server.getReplica());
-          }
-        }
-        finally {
-          logger.info("applyLogs - finished: count=" + countProcessed.get() +
-              ", rate=" + (double) countProcessed.get() / (double) (System.currentTimeMillis() - begin) * 1000d);
+          finally {
+            logger.info("applyLogs - finished: count=" + countProcessed.get() +
+                ", rate=" + (double) countProcessed.get() / (double) (System.currentTimeMillis() - begin) * 1000d);
 
-          allCurrentSources.clear();
-          for (LogSource source : sources) {
-            source.close();
+            allCurrentSources.clear();
+            for (LogSource source : sources) {
+              source.close();
+            }
           }
+          logger.info("applyQueue requestCount=" + countProcessed.get());
         }
-        logger.info("applyQueue requestCount=" + countProcessed.get());
       }
+    }
+    finally {
+      executor.shutdownNow();
     }
   }
 

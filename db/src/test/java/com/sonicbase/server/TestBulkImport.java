@@ -214,6 +214,25 @@ public class TestBulkImport {
       for (DatabaseServer server : dbServers) {
         server.shutdownRepartitioner();
       }
+
+      clientA.beginRebalance("test", "persons", "_1__primarykey");
+
+
+      while (true) {
+        if (clientA.isRepartitioningComplete("test")) {
+          break;
+        }
+        Thread.sleep(200);
+      }
+
+      for (DatabaseServer server : dbServers) {
+        server.shutdownRepartitioner();
+      }
+
+//      dbServers[0].getDeleteManager().forceDeletes();
+//      dbServers[1].getDeleteManager().forceDeletes();
+//      dbServers[2].getDeleteManager().forceDeletes();
+//      dbServers[3].getDeleteManager().forceDeletes();
     }
     catch (Exception e) {
       e.printStackTrace();
@@ -245,7 +264,7 @@ public class TestBulkImport {
     rs = stmt.executeQuery();
     for (int i = 0; i < 10_000; i++) {
       assertTrue(rs.next());
-      assertEquals(rs.getLong("id"), i);
+       assertEquals(rs.getLong("id"), i);
     }
     assertFalse(rs.next());
 

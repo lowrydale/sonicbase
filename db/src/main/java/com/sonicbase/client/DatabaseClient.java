@@ -865,6 +865,10 @@ public class DatabaseClient {
           localLogger.info("Client received config from server: sourceReplica=" + receivedReplica +
               ", config=" + common.getServersConfig());
         }
+        if (common.getServersConfig() == null) {
+          Thread.sleep(1_000);
+          continue;
+        }
         break;
       }
       catch (Exception t) {

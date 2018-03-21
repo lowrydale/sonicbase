@@ -23,7 +23,7 @@ public class MethodInvoker {
   private Logger logger;
 
   private final BulkImportManager bulkImportManager;
-  private final DeleteManager deleteManager;
+  private final DeleteManager deleteManagerImpl;
   private final SnapshotManager deltaManager;
   private final UpdateManager updateManager;
   private final TransactionManager transactionManager;
@@ -36,12 +36,12 @@ public class MethodInvoker {
   private AtomicInteger testWriteCallCount = new AtomicInteger();
 
 
-  public MethodInvoker(DatabaseServer server, BulkImportManager bulkImportManager, DeleteManager deleteManager,
+  public MethodInvoker(DatabaseServer server, BulkImportManager bulkImportManager, DeleteManager deleteManagerImpl,
                        SnapshotManager deltaManager, UpdateManager updateManager, TransactionManager transactionManager, ReadManager readManager, LogManager logManager, SchemaManager schemaManager) {
     this.server = server;
     this.common = server.getCommon();
     this.bulkImportManager = bulkImportManager;
-    this.deleteManager = deleteManager;
+    this.deleteManagerImpl = deleteManagerImpl;
     this.deltaManager = deltaManager;
     this.updateManager = updateManager;
     this.transactionManager = transactionManager;
@@ -1220,7 +1220,7 @@ public class MethodInvoker {
   }
 
   public ComObject forceDeletes(ComObject cobj, boolean replayedCommand) {
-    deleteManager.forceDeletes();
+    deleteManagerImpl.forceDeletes();
     return null;
   }
 

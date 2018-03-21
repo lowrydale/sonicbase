@@ -1130,7 +1130,7 @@ com.sonicbase.index.Repartitioner -> com.sonicbase.d.c:
     1432:1487:void deleteRecordsOnOtherReplicas(java.lang.String,java.lang.String,java.lang.String,java.util.concurrent.ConcurrentLinkedQueue) -> a
     1490:1512:void sendDeletes(java.util.concurrent.ThreadPoolExecutor,ComObject,java.util.List) -> a
     1516:1587:ComObject deleteMovedRecords(ComObject,boolean) -> b
-    1592:1645:void doDeleteMovedEntry(java.util.concurrent.ConcurrentLinkedQueue,IndexSchema,com.sonicbase.index.Index,com.sonicbase.server.DeleteManager$DeleteRequest) -> a
+    1592:1645:void doDeleteMovedEntry(java.util.concurrent.ConcurrentLinkedQueue,IndexSchema,com.sonicbase.index.Index,com.sonicbase.server.DeleteManagerImpl$DeleteRequest) -> a
     1659:1834:void doProcessEntries(com.sonicbase.index.Repartitioner$MoveProcessor[],int,java.lang.String,java.lang.String,java.util.List,com.sonicbase.index.Index,IndexSchema,java.lang.String,int[],TableSchema,ComObject) -> a
     1837:1844:java.util.concurrent.ConcurrentHashMap getIndicesToDeleteFrom(java.lang.String,java.lang.String) -> a
     1957:2007:void moveIndexEntriesToShard(java.lang.String,java.lang.String,java.lang.String,boolean,int,java.util.List) -> a
@@ -1153,7 +1153,7 @@ com.sonicbase.index.Repartitioner -> com.sonicbase.d.c:
     31:31:long access$2502(com.sonicbase.index.Repartitioner,long) -> a
     31:31:com.sonicbase.index.Repartitioner$MoveProcessor[] access$2600(com.sonicbase.index.Repartitioner) -> d
     31:31:void access$2700(com.sonicbase.index.Repartitioner,com.sonicbase.index.Repartitioner$MoveProcessor[],int,java.lang.String,java.lang.String,java.util.List,com.sonicbase.index.Index,IndexSchema,java.lang.String,int[],TableSchema,ComObject) -> a
-    31:31:void access$2800(com.sonicbase.index.Repartitioner,java.util.concurrent.ConcurrentLinkedQueue,IndexSchema,com.sonicbase.index.Index,com.sonicbase.server.DeleteManager$DeleteRequest) -> a
+    31:31:void access$2800(com.sonicbase.index.Repartitioner,java.util.concurrent.ConcurrentLinkedQueue,IndexSchema,com.sonicbase.index.Index,com.sonicbase.server.DeleteManagerImpl$DeleteRequest) -> a
     465:465:void <clinit>() -> <clinit>
 com.sonicbase.index.Repartitioner$1 -> com.sonicbase.d.c$1:
     long[] val$currPartitionSizes -> a
@@ -1188,10 +1188,10 @@ com.sonicbase.index.Repartitioner$12 -> com.sonicbase.d.c$4:
     java.util.concurrent.ConcurrentLinkedQueue val$keysToDeleteExpanded -> a
     IndexSchema val$indexSchema -> b
     com.sonicbase.index.Index val$index -> c
-    com.sonicbase.server.DeleteManager$DeleteRequest val$request -> d
+    com.sonicbase.server.DeleteManagerImpl$DeleteRequest val$request -> d
     java.util.concurrent.atomic.AtomicInteger val$count -> e
     com.sonicbase.index.Repartitioner this$0 -> f
-    1543:1543:void <init>(com.sonicbase.index.Repartitioner,java.util.concurrent.ConcurrentLinkedQueue,IndexSchema,com.sonicbase.index.Index,com.sonicbase.server.DeleteManager$DeleteRequest,java.util.concurrent.atomic.AtomicInteger) -> <init>
+    1543:1543:void <init>(com.sonicbase.index.Repartitioner,java.util.concurrent.ConcurrentLinkedQueue,IndexSchema,com.sonicbase.index.Index,com.sonicbase.server.DeleteManagerImpl$DeleteRequest,java.util.concurrent.atomic.AtomicInteger) -> <init>
     1546:1550:java.lang.Object call() -> call
 com.sonicbase.index.Repartitioner$2 -> com.sonicbase.d.c$5:
     com.sonicbase.index.Repartitioner this$0 -> a
@@ -4118,7 +4118,7 @@ com.sonicbase.server.DatabaseServer -> com.sonicbase.server.b:
     java.lang.String xmx -> y
     java.lang.String installDir -> z
     boolean throttleInsert -> A
-    com.sonicbase.server.DeleteManager deleteManager -> B
+    com.sonicbase.server.DeleteManagerImpl deleteManagerImpl -> B
     java.util.concurrent.locks.ReentrantReadWriteLock batchLock -> C
     java.util.concurrent.locks.ReentrantReadWriteLock$ReadLock batchReadLock -> D
     java.util.concurrent.locks.ReentrantReadWriteLock$WriteLock batchWriteLock -> E
@@ -4284,7 +4284,7 @@ com.sonicbase.server.DatabaseServer -> com.sonicbase.server.b:
     2448:2457:java.lang.String getDiskAvailWindows() -> N
     2462:2463:void setThrottleInsert(boolean) -> b
     2466:2466:boolean isThrottleInsert() -> O
-    2470:2470:com.sonicbase.server.DeleteManager getDeleteManager() -> P
+    2470:2470:com.sonicbase.server.DeleteManagerImpl getDeleteManager() -> P
     2474:2474:java.util.concurrent.locks.ReentrantReadWriteLock$ReadLock getBatchReadLock() -> Q
     2478:2478:java.util.concurrent.locks.ReentrantReadWriteLock$WriteLock getBatchWriteLock() -> R
     2487:2487:java.util.concurrent.locks.Lock getThrottleWriteLock() -> S
@@ -4377,7 +4377,7 @@ com.sonicbase.server.DatabaseServer -> com.sonicbase.server.b:
     69:69:org.apache.log4j.Logger access$1900() -> aq
     69:69:void access$2000(com.sonicbase.server.DatabaseServer,java.util.concurrent.atomic.AtomicBoolean,java.util.concurrent.atomic.AtomicBoolean) -> a
     69:69:void access$2100(com.sonicbase.server.DatabaseServer,java.lang.String,java.lang.String,java.lang.String) -> a
-    69:69:com.sonicbase.server.DeleteManager access$2200(com.sonicbase.server.DatabaseServer) -> l
+    69:69:com.sonicbase.server.DeleteManagerImpl access$2200(com.sonicbase.server.DatabaseServer) -> l
     69:69:com.sonicbase.server.LongRunningCalls access$2300(com.sonicbase.server.DatabaseServer) -> m
     69:69:com.sonicbase.server.DeltaManager access$2400(com.sonicbase.server.DatabaseServer) -> n
     69:69:java.lang.String access$2500(com.sonicbase.server.DatabaseServer) -> o
@@ -4608,7 +4608,7 @@ com.sonicbase.server.DatabaseServer$StatsMonitor -> com.sonicbase.server.b$l:
     4722:4722:void <init>(com.sonicbase.server.DatabaseServer) -> <init>
     4727:4739:void run() -> run
     4722:4722:void <init>(com.sonicbase.server.DatabaseServer,com.sonicbase.server.DatabaseServer$1) -> <init>
-com.sonicbase.server.DeleteManager -> com.sonicbase.server.c:
+com.sonicbase.server.DeleteManagerImpl -> com.sonicbase.server.c:
     Logger logger -> a
     com.sonicbase.server.DatabaseServer databaseServer -> b
     java.util.concurrent.ThreadPoolExecutor executor -> c
@@ -4623,20 +4623,20 @@ com.sonicbase.server.DeleteManager -> com.sonicbase.server.c:
     49:49:com.sonicbase.server.LogManager getDeltaLogManager() -> a
     53:74:void deleteOldLogs(long) -> a
     129:353:void applyDeletesToSnapshot(java.lang.String,int,java.util.concurrent.atomic.AtomicLong) -> a
-    358:368:com.sonicbase.server.DeleteManager$MergeEntry readRow(com.sonicbase.server.DeleteManager$DeleteContext) -> a
-    375:385:com.sonicbase.server.DeltaManager$MergeEntry readRow(com.sonicbase.server.DeleteManager$DeltaContext) -> a
+    358:368:com.sonicbase.server.DeleteManagerImpl$MergeEntry readRow(com.sonicbase.server.DeleteManagerImpl$DeleteContext) -> a
+    375:385:com.sonicbase.server.DeltaManager$MergeEntry readRow(com.sonicbase.server.DeleteManagerImpl$DeltaContext) -> a
     391:398:void cycleDeletedFile(java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicInteger,long,java.lang.String,java.lang.String) -> a
     402:436:void buildDeletionsFiles(java.lang.String,java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong) -> a
     440:463:void mergeSort(java.lang.String,java.util.Map,java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong) -> a
     480:568:void mergeSort(java.lang.String,int,int,java.io.File,java.util.concurrent.atomic.AtomicLong) -> a
-    572:583:java.io.DataOutputStream writeRow(com.sonicbase.server.DeleteManager$MergeEntry,java.io.DataOutputStream,TableSchema,IndexSchema,java.util.concurrent.atomic.AtomicInteger,java.util.concurrent.atomic.AtomicInteger,java.io.File) -> a
-    588:603:com.sonicbase.server.DeleteManager$MergeEntry readRow(java.lang.String,TableSchema,IndexSchema,java.io.DataInputStream) -> a
+    572:583:java.io.DataOutputStream writeRow(com.sonicbase.server.DeleteManagerImpl$MergeEntry,java.io.DataOutputStream,TableSchema,IndexSchema,java.util.concurrent.atomic.AtomicInteger,java.util.concurrent.atomic.AtomicInteger,java.io.File) -> a
+    588:603:com.sonicbase.server.DeleteManagerImpl$MergeEntry readRow(java.lang.String,TableSchema,IndexSchema,java.io.DataInputStream) -> a
     608:681:void writeLogDeletes(java.util.concurrent.ThreadPoolExecutor,java.lang.String,java.util.Map,java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong) -> a
     685:695:void closeFiles(java.lang.String,java.util.Map) -> a
     700:797:void writeBatchDeletes(java.util.concurrent.ThreadPoolExecutor,java.util.Map,java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong) -> a
-    801:839:void cycleFile(java.lang.String,int,int,com.sonicbase.server.DeleteManager$OutputState,boolean,boolean) -> a
-    844:860:void saveDeleteForRecord(java.lang.String,java.lang.String,java.lang.String,long,long,com.sonicbase.server.DeleteManager$DeleteRequestForRecord) -> a
-    865:883:void saveDeleteForKeyRecord(java.lang.String,java.lang.String,java.lang.String,long,long,com.sonicbase.server.DeleteManager$DeleteRequestForKeyRecord) -> a
+    801:839:void cycleFile(java.lang.String,int,int,com.sonicbase.server.DeleteManagerImpl$OutputState,boolean,boolean) -> a
+    844:860:void saveDeleteForRecord(java.lang.String,java.lang.String,java.lang.String,long,long,com.sonicbase.server.DeleteManagerImpl$DeleteRequestForRecord) -> a
+    865:883:void saveDeleteForKeyRecord(java.lang.String,java.lang.String,java.lang.String,long,long,com.sonicbase.server.DeleteManagerImpl$DeleteRequestForKeyRecord) -> a
     887:889:void saveDeletesForRecords(java.lang.String,java.lang.String,java.lang.String,long,long,java.util.concurrent.ConcurrentLinkedQueue) -> a
     893:895:void saveDeletesForKeyRecords(java.lang.String,java.lang.String,java.lang.String,long,long,java.util.concurrent.ConcurrentLinkedQueue) -> b
     900:925:void doSaveDeletesForRecords(java.io.File,java.lang.String,java.lang.String,java.lang.String,long,long,java.util.concurrent.ConcurrentLinkedQueue) -> a
@@ -4655,133 +4655,133 @@ com.sonicbase.server.DeleteManager -> com.sonicbase.server.c:
     1267:1276:double getPercentDeleteComplete() -> c
     1282:1282:boolean isForcingDeletes() -> d
     1286:1308:void forceDeletes() -> e
-    29:29:com.sonicbase.server.DatabaseServer access$1600(com.sonicbase.server.DeleteManager) -> a
-    29:29:void access$1700(com.sonicbase.server.DeleteManager,java.lang.String,int,int,com.sonicbase.server.DeleteManager$OutputState,boolean,boolean) -> a
-    29:29:com.sonicbase.server.LogManager access$1800(com.sonicbase.server.DeleteManager) -> b
-    29:29:Logger access$1900(com.sonicbase.server.DeleteManager) -> c
-    29:29:void access$2200(com.sonicbase.server.DeleteManager,java.util.List) -> a
-com.sonicbase.server.DeleteManager$1 -> com.sonicbase.server.c$1:
+    29:29:com.sonicbase.server.DatabaseServer access$1600(com.sonicbase.server.DeleteManagerImpl) -> a
+    29:29:void access$1700(com.sonicbase.server.DeleteManagerImpl,java.lang.String,int,int,com.sonicbase.server.DeleteManagerImpl$OutputState,boolean,boolean) -> a
+    29:29:com.sonicbase.server.LogManager access$1800(com.sonicbase.server.DeleteManagerImpl) -> b
+    29:29:Logger access$1900(com.sonicbase.server.DeleteManagerImpl) -> c
+    29:29:void access$2200(com.sonicbase.server.DeleteManagerImpl,java.util.List) -> a
+com.sonicbase.server.DeleteManagerImpl$1 -> com.sonicbase.server.c$1:
     java.util.Comparator[] val$keyComparator -> a
-    com.sonicbase.server.DeleteManager this$0 -> b
-    496:496:void <init>(com.sonicbase.server.DeleteManager,java.util.Comparator[]) -> <init>
-    499:499:int compare(com.sonicbase.server.DeleteManager$MergeRow,com.sonicbase.server.DeleteManager$MergeRow) -> a
+    com.sonicbase.server.DeleteManagerImpl this$0 -> b
+    496:496:void <init>(com.sonicbase.server.DeleteManagerImpl,java.util.Comparator[]) -> <init>
+    499:499:int compare(com.sonicbase.server.DeleteManagerImpl$MergeRow,com.sonicbase.server.DeleteManagerImpl$MergeRow) -> a
     496:496:int compare(java.lang.Object,java.lang.Object) -> compare
-com.sonicbase.server.DeleteManager$2 -> com.sonicbase.server.c$2:
+com.sonicbase.server.DeleteManagerImpl$2 -> com.sonicbase.server.c$2:
     java.util.concurrent.atomic.AtomicLong val$finishedBytes -> a
     java.io.File val$file -> b
     java.lang.String val$dbName -> c
     java.util.Map val$streams -> d
-    com.sonicbase.server.DeleteManager this$0 -> e
-    617:617:void <init>(com.sonicbase.server.DeleteManager,java.util.concurrent.atomic.AtomicLong,java.io.File,java.lang.String,java.util.Map) -> <init>
+    com.sonicbase.server.DeleteManagerImpl this$0 -> e
+    617:617:void <init>(com.sonicbase.server.DeleteManagerImpl,java.util.concurrent.atomic.AtomicLong,java.io.File,java.lang.String,java.util.Map) -> <init>
     620:665:java.lang.Object call() -> call
-com.sonicbase.server.DeleteManager$2$1 -> com.sonicbase.server.c$2$1:
-    com.sonicbase.server.DeleteManager$2 this$1 -> a
-    620:620:void <init>(com.sonicbase.server.DeleteManager$2) -> <init>
+com.sonicbase.server.DeleteManagerImpl$2$1 -> com.sonicbase.server.c$2$1:
+    com.sonicbase.server.DeleteManagerImpl$2 this$1 -> a
+    620:620:void <init>(com.sonicbase.server.DeleteManagerImpl$2) -> <init>
     624:662:boolean visit(byte[]) -> a
-com.sonicbase.server.DeleteManager$3 -> com.sonicbase.server.c$3:
-    com.sonicbase.server.DeleteManager this$0 -> a
-    714:714:void <init>(com.sonicbase.server.DeleteManager) -> <init>
+com.sonicbase.server.DeleteManagerImpl$3 -> com.sonicbase.server.c$3:
+    com.sonicbase.server.DeleteManagerImpl this$0 -> a
+    714:714:void <init>(com.sonicbase.server.DeleteManagerImpl) -> <init>
     717:717:int compare(java.io.File,java.io.File) -> a
     714:714:int compare(java.lang.Object,java.lang.Object) -> compare
-com.sonicbase.server.DeleteManager$4 -> com.sonicbase.server.c$4:
+com.sonicbase.server.DeleteManagerImpl$4 -> com.sonicbase.server.c$4:
     java.util.concurrent.atomic.AtomicLong val$finishedBytes -> a
     java.io.File val$file -> b
     java.util.Map val$streams -> c
-    com.sonicbase.server.DeleteManager this$0 -> d
-    722:722:void <init>(com.sonicbase.server.DeleteManager,java.util.concurrent.atomic.AtomicLong,java.io.File,java.util.Map) -> <init>
+    com.sonicbase.server.DeleteManagerImpl this$0 -> d
+    722:722:void <init>(com.sonicbase.server.DeleteManagerImpl,java.util.concurrent.atomic.AtomicLong,java.io.File,java.util.Map) -> <init>
     725:780:java.lang.Object call() -> call
-com.sonicbase.server.DeleteManager$5 -> com.sonicbase.server.c$5:
+com.sonicbase.server.DeleteManagerImpl$5 -> com.sonicbase.server.c$5:
     java.util.Comparator[] val$comparators -> a
-    com.sonicbase.server.DeleteManager this$0 -> b
-    810:810:void <init>(com.sonicbase.server.DeleteManager,java.util.Comparator[]) -> <init>
-    813:813:int compare(com.sonicbase.server.DeleteManager$MergeEntry,com.sonicbase.server.DeleteManager$MergeEntry) -> a
+    com.sonicbase.server.DeleteManagerImpl this$0 -> b
+    810:810:void <init>(com.sonicbase.server.DeleteManagerImpl,java.util.Comparator[]) -> <init>
+    813:813:int compare(com.sonicbase.server.DeleteManagerImpl$MergeEntry,com.sonicbase.server.DeleteManagerImpl$MergeEntry) -> a
     810:810:int compare(java.lang.Object,java.lang.Object) -> compare
-com.sonicbase.server.DeleteManager$6 -> com.sonicbase.server.c$6:
-    com.sonicbase.server.DeleteManager this$0 -> a
-    969:969:void <init>(com.sonicbase.server.DeleteManager) -> <init>
+com.sonicbase.server.DeleteManagerImpl$6 -> com.sonicbase.server.c$6:
+    com.sonicbase.server.DeleteManagerImpl this$0 -> a
+    969:969:void <init>(com.sonicbase.server.DeleteManagerImpl) -> <init>
     972:972:int compare(java.io.File,java.io.File) -> a
     969:969:int compare(java.lang.Object,java.lang.Object) -> compare
-com.sonicbase.server.DeleteManager$7 -> com.sonicbase.server.c$7:
+com.sonicbase.server.DeleteManagerImpl$7 -> com.sonicbase.server.c$7:
     java.util.List val$currBatch -> a
     com.sonicbase.index.Index val$index -> b
     IndexSchema val$indexSchema -> c
-    com.sonicbase.server.DeleteManager this$0 -> d
-    1028:1028:void <init>(com.sonicbase.server.DeleteManager,java.util.List,com.sonicbase.index.Index,IndexSchema) -> <init>
+    com.sonicbase.server.DeleteManagerImpl this$0 -> d
+    1028:1028:void <init>(com.sonicbase.server.DeleteManagerImpl,java.util.List,com.sonicbase.index.Index,IndexSchema) -> <init>
     1031:1061:java.lang.Object call() -> call
-com.sonicbase.server.DeleteManager$8 -> com.sonicbase.server.c$8:
-    com.sonicbase.server.DeleteManager this$0 -> a
-    1179:1179:void <init>(com.sonicbase.server.DeleteManager) -> <init>
+com.sonicbase.server.DeleteManagerImpl$8 -> com.sonicbase.server.c$8:
+    com.sonicbase.server.DeleteManagerImpl this$0 -> a
+    1179:1179:void <init>(com.sonicbase.server.DeleteManagerImpl) -> <init>
     1184:1189:void run() -> run
-com.sonicbase.server.DeleteManager$DeleteContext -> com.sonicbase.server.c$a:
+com.sonicbase.server.DeleteManagerImpl$DeleteContext -> com.sonicbase.server.c$a:
     java.io.DataInputStream in -> c
     java.util.concurrent.ArrayBlockingQueue entries -> d
     boolean finished -> a
-    com.sonicbase.server.DeleteManager this$0 -> b
-    121:123:void <init>(com.sonicbase.server.DeleteManager) -> <init>
-    121:121:void <init>(com.sonicbase.server.DeleteManager,com.sonicbase.server.DeleteManager$1) -> <init>
-    121:121:java.io.DataInputStream access$102(com.sonicbase.server.DeleteManager$DeleteContext,java.io.DataInputStream) -> a
-    121:121:java.io.DataInputStream access$100(com.sonicbase.server.DeleteManager$DeleteContext) -> a
-    121:121:java.util.concurrent.ArrayBlockingQueue access$800(com.sonicbase.server.DeleteManager$DeleteContext) -> b
-com.sonicbase.server.DeleteManager$DeleteRequest -> com.sonicbase.server.c$b:
+    com.sonicbase.server.DeleteManagerImpl this$0 -> b
+    121:123:void <init>(com.sonicbase.server.DeleteManagerImpl) -> <init>
+    121:121:void <init>(com.sonicbase.server.DeleteManagerImpl,com.sonicbase.server.DeleteManagerImpl$1) -> <init>
+    121:121:java.io.DataInputStream access$102(com.sonicbase.server.DeleteManagerImpl$DeleteContext,java.io.DataInputStream) -> a
+    121:121:java.io.DataInputStream access$100(com.sonicbase.server.DeleteManagerImpl$DeleteContext) -> a
+    121:121:java.util.concurrent.ArrayBlockingQueue access$800(com.sonicbase.server.DeleteManagerImpl$DeleteContext) -> b
+com.sonicbase.server.DeleteManagerImpl$DeleteRequest -> com.sonicbase.server.c$b:
     java.lang.Object[] key -> a
     79:81:void <init>(java.lang.Object[]) -> <init>
     84:84:java.lang.Object[] getKey() -> a
-    76:76:java.lang.Object[] access$2100(com.sonicbase.server.DeleteManager$DeleteRequest) -> a
-com.sonicbase.server.DeleteManager$DeleteRequestForKeyRecord -> com.sonicbase.server.c$c:
+    76:76:java.lang.Object[] access$2100(com.sonicbase.server.DeleteManagerImpl$DeleteRequest) -> a
+com.sonicbase.server.DeleteManagerImpl$DeleteRequestForKeyRecord -> com.sonicbase.server.c$c:
     byte[] primaryKeyBytes -> a
     98:99:void <init>(java.lang.Object[]) -> <init>
     102:104:void <init>(java.lang.Object[],byte[]) -> <init>
-    94:94:byte[] access$2000(com.sonicbase.server.DeleteManager$DeleteRequestForKeyRecord) -> a
-com.sonicbase.server.DeleteManager$DeleteRequestForRecord -> com.sonicbase.server.c$d:
+    94:94:byte[] access$2000(com.sonicbase.server.DeleteManagerImpl$DeleteRequestForKeyRecord) -> a
+com.sonicbase.server.DeleteManagerImpl$DeleteRequestForRecord -> com.sonicbase.server.c$d:
     90:91:void <init>(java.lang.Object[]) -> <init>
-com.sonicbase.server.DeleteManager$DeltaContext -> com.sonicbase.server.c$e:
+com.sonicbase.server.DeleteManagerImpl$DeltaContext -> com.sonicbase.server.c$e:
     java.io.DataInputStream in -> c
     java.util.concurrent.ArrayBlockingQueue entries -> d
     boolean finished -> a
-    com.sonicbase.server.DeleteManager this$0 -> b
-    115:117:void <init>(com.sonicbase.server.DeleteManager) -> <init>
-    115:115:void <init>(com.sonicbase.server.DeleteManager,com.sonicbase.server.DeleteManager$1) -> <init>
-    115:115:java.io.DataInputStream access$302(com.sonicbase.server.DeleteManager$DeltaContext,java.io.DataInputStream) -> a
-    115:115:java.io.DataInputStream access$300(com.sonicbase.server.DeleteManager$DeltaContext) -> a
-    115:115:java.util.concurrent.ArrayBlockingQueue access$900(com.sonicbase.server.DeleteManager$DeltaContext) -> b
-com.sonicbase.server.DeleteManager$MergeEntry -> com.sonicbase.server.c$f:
+    com.sonicbase.server.DeleteManagerImpl this$0 -> b
+    115:117:void <init>(com.sonicbase.server.DeleteManagerImpl) -> <init>
+    115:115:void <init>(com.sonicbase.server.DeleteManagerImpl,com.sonicbase.server.DeleteManagerImpl$1) -> <init>
+    115:115:java.io.DataInputStream access$302(com.sonicbase.server.DeleteManagerImpl$DeltaContext,java.io.DataInputStream) -> a
+    115:115:java.io.DataInputStream access$300(com.sonicbase.server.DeleteManagerImpl$DeltaContext) -> a
+    115:115:java.util.concurrent.ArrayBlockingQueue access$900(com.sonicbase.server.DeleteManagerImpl$DeltaContext) -> b
+com.sonicbase.server.DeleteManagerImpl$MergeEntry -> com.sonicbase.server.c$f:
     java.lang.Object[] key -> a
     long sequence0 -> b
     long sequence1 -> c
     byte[] primaryKey -> d
     465:465:void <init>() -> <init>
-    465:465:java.lang.Object[] access$400(com.sonicbase.server.DeleteManager$MergeEntry) -> a
-    465:465:byte[] access$500(com.sonicbase.server.DeleteManager$MergeEntry) -> b
-    465:465:long access$600(com.sonicbase.server.DeleteManager$MergeEntry) -> c
-    465:465:long access$700(com.sonicbase.server.DeleteManager$MergeEntry) -> d
-    465:465:java.lang.Object[] access$402(com.sonicbase.server.DeleteManager$MergeEntry,java.lang.Object[]) -> a
-    465:465:long access$602(com.sonicbase.server.DeleteManager$MergeEntry,long) -> a
-    465:465:long access$702(com.sonicbase.server.DeleteManager$MergeEntry,long) -> b
-    465:465:byte[] access$502(com.sonicbase.server.DeleteManager$MergeEntry,byte[]) -> a
-com.sonicbase.server.DeleteManager$MergeRow -> com.sonicbase.server.c$g:
+    465:465:java.lang.Object[] access$400(com.sonicbase.server.DeleteManagerImpl$MergeEntry) -> a
+    465:465:byte[] access$500(com.sonicbase.server.DeleteManagerImpl$MergeEntry) -> b
+    465:465:long access$600(com.sonicbase.server.DeleteManagerImpl$MergeEntry) -> c
+    465:465:long access$700(com.sonicbase.server.DeleteManagerImpl$MergeEntry) -> d
+    465:465:java.lang.Object[] access$402(com.sonicbase.server.DeleteManagerImpl$MergeEntry,java.lang.Object[]) -> a
+    465:465:long access$602(com.sonicbase.server.DeleteManagerImpl$MergeEntry,long) -> a
+    465:465:long access$702(com.sonicbase.server.DeleteManagerImpl$MergeEntry,long) -> b
+    465:465:byte[] access$502(com.sonicbase.server.DeleteManagerImpl$MergeEntry,byte[]) -> a
+com.sonicbase.server.DeleteManagerImpl$MergeRow -> com.sonicbase.server.c$g:
     int streamOffset -> a
-    com.sonicbase.server.DeleteManager$MergeEntry row -> b
+    com.sonicbase.server.DeleteManagerImpl$MergeEntry row -> b
     472:472:void <init>() -> <init>
-    472:472:com.sonicbase.server.DeleteManager$MergeEntry access$1400(com.sonicbase.server.DeleteManager$MergeRow) -> a
-    472:472:com.sonicbase.server.DeleteManager$MergeEntry access$1402(com.sonicbase.server.DeleteManager$MergeRow,com.sonicbase.server.DeleteManager$MergeEntry) -> a
-    472:472:int access$1502(com.sonicbase.server.DeleteManager$MergeRow,int) -> a
-    472:472:int access$1500(com.sonicbase.server.DeleteManager$MergeRow) -> b
-com.sonicbase.server.DeleteManager$OutputState -> com.sonicbase.server.c$h:
+    472:472:com.sonicbase.server.DeleteManagerImpl$MergeEntry access$1400(com.sonicbase.server.DeleteManagerImpl$MergeRow) -> a
+    472:472:com.sonicbase.server.DeleteManagerImpl$MergeEntry access$1402(com.sonicbase.server.DeleteManagerImpl$MergeRow,com.sonicbase.server.DeleteManagerImpl$MergeEntry) -> a
+    472:472:int access$1502(com.sonicbase.server.DeleteManagerImpl$MergeRow,int) -> a
+    472:472:int access$1500(com.sonicbase.server.DeleteManagerImpl$MergeRow) -> b
+com.sonicbase.server.DeleteManagerImpl$OutputState -> com.sonicbase.server.c$h:
     java.io.DataOutputStream out -> b
     int currFileNum -> c
     int currOffset -> d
     java.io.File dir -> e
     java.util.concurrent.ArrayBlockingQueue entries -> a
     107:112:void <init>() -> <init>
-    107:107:int access$1002(com.sonicbase.server.DeleteManager$OutputState,int) -> a
-    107:107:int access$1102(com.sonicbase.server.DeleteManager$OutputState,int) -> b
-    107:107:int access$1000(com.sonicbase.server.DeleteManager$OutputState) -> a
-    107:107:java.io.File access$1202(com.sonicbase.server.DeleteManager$OutputState,java.io.File) -> a
-    107:107:java.io.DataOutputStream access$1302(com.sonicbase.server.DeleteManager$OutputState,java.io.DataOutputStream) -> a
-    107:107:java.io.File access$1200(com.sonicbase.server.DeleteManager$OutputState) -> b
-    107:107:int access$1108(com.sonicbase.server.DeleteManager$OutputState) -> c
-    107:107:java.io.DataOutputStream access$1300(com.sonicbase.server.DeleteManager$OutputState) -> d
-    107:107:int access$1004(com.sonicbase.server.DeleteManager$OutputState) -> e
+    107:107:int access$1002(com.sonicbase.server.DeleteManagerImpl$OutputState,int) -> a
+    107:107:int access$1102(com.sonicbase.server.DeleteManagerImpl$OutputState,int) -> b
+    107:107:int access$1000(com.sonicbase.server.DeleteManagerImpl$OutputState) -> a
+    107:107:java.io.File access$1202(com.sonicbase.server.DeleteManagerImpl$OutputState,java.io.File) -> a
+    107:107:java.io.DataOutputStream access$1302(com.sonicbase.server.DeleteManagerImpl$OutputState,java.io.DataOutputStream) -> a
+    107:107:java.io.File access$1200(com.sonicbase.server.DeleteManagerImpl$OutputState) -> b
+    107:107:int access$1108(com.sonicbase.server.DeleteManagerImpl$OutputState) -> c
+    107:107:java.io.DataOutputStream access$1300(com.sonicbase.server.DeleteManagerImpl$OutputState) -> d
+    107:107:int access$1004(com.sonicbase.server.DeleteManagerImpl$OutputState) -> e
 com.sonicbase.server.DeltaManager -> com.sonicbase.server.d:
     int SNAPSHOT_PARTITION_COUNT -> a
     java.lang.String DELTA_STR -> d
@@ -5094,7 +5094,7 @@ com.sonicbase.server.LongRunningCalls$Type -> com.sonicbase.server.e$b:
 com.sonicbase.server.MethodInvoker -> com.sonicbase.server.MethodInvoker:
     Logger logger -> d
     com.sonicbase.server.BulkImportManager bulkImportManager -> e
-    com.sonicbase.server.DeleteManager deleteManager -> f
+    com.sonicbase.server.DeleteManagerImpl deleteManagerImpl -> f
     com.sonicbase.server.DeltaManager deltaManager -> g
     com.sonicbase.server.UpdateManager updateManager -> h
     com.sonicbase.server.TransactionManager transactionManager -> i
@@ -5109,7 +5109,7 @@ com.sonicbase.server.MethodInvoker -> com.sonicbase.server.MethodInvoker:
     java.util.concurrent.atomic.AtomicInteger blockCount -> a
     java.util.concurrent.atomic.AtomicInteger echoCount -> b
     java.util.concurrent.atomic.AtomicInteger echo2Count -> c
-    36:53:void <init>(com.sonicbase.server.DatabaseServer,com.sonicbase.server.BulkImportManager,com.sonicbase.server.DeleteManager,com.sonicbase.server.DeltaManager,com.sonicbase.server.UpdateManager,com.sonicbase.server.TransactionManager,com.sonicbase.server.ReadManager,com.sonicbase.server.LogManager,com.sonicbase.server.SchemaManager) -> <init>
+    36:53:void <init>(com.sonicbase.server.DatabaseServer,com.sonicbase.server.BulkImportManager,com.sonicbase.server.DeleteManagerImpl,com.sonicbase.server.DeltaManager,com.sonicbase.server.UpdateManager,com.sonicbase.server.TransactionManager,com.sonicbase.server.ReadManager,com.sonicbase.server.LogManager,com.sonicbase.server.SchemaManager) -> <init>
     56:57:void shutdown() -> shutdown
     65:65:int getTestWriteCallCount() -> getTestWriteCallCount
     107:247:byte[] invokeMethod(byte[],long,long,boolean,boolean,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong) -> invokeMethod

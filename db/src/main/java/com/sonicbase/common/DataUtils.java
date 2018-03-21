@@ -31,6 +31,13 @@ public class DataUtils {
     array[offset+3] = (byte)(0xff & value);
   }
 
+  public static void intToAddress(int value, long address, Unsafe unsafe) {
+    unsafe.putByte(address + 0, (byte)(0xff & (value >> 24)));
+    unsafe.putByte(address + 1, (byte)(0xff & (value >> 16)));
+    unsafe.putByte(address + 2, (byte)(0xff & (value >> 8)));
+    unsafe.putByte(address + 3, (byte)(0xff & value));
+  }
+
 
   public static byte[] longToBytes(long l) {
     byte[] result = new byte[8];

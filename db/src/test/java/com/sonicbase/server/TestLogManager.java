@@ -107,7 +107,7 @@ public class TestLogManager {
     stmt.executeUpdate();
 
     futures = new ArrayList<>();
-    for (int i = 0; i < 1_000_000; i++) {
+    for (int i = 0; i < 100_000; i++) {
       final int offset =i;
       futures.add(executor.submit(new Callable(){
         @Override

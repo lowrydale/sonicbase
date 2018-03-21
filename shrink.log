@@ -715,7 +715,7 @@
 	<method signature="ComObject deleteMovedRecords(ComObject,boolean)" class="com.sonicbase.server.MethodInvoker" />
 	<method signature="ComObject indexLookup(ComObject,boolean)" class="com.sonicbase.server.MethodInvoker" />
 	<method signature="ComObject getKeyAtOffset(ComObject,boolean)" class="com.sonicbase.server.MethodInvoker" />
-	<method signature="void &lt;init&gt;(com.sonicbase.server.DatabaseServer,com.sonicbase.server.DeleteManager,com.sonicbase.server.SnapshotManagerImpl,com.sonicbase.server.UpdateManager,com.sonicbase.server.TransactionManager,com.sonicbase.server.ReadManager,com.sonicbase.server.LogManager,com.sonicbase.server.SchemaManager)" class="com.sonicbase.server.MethodInvoker" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.DatabaseServer,com.sonicbase.server.DeleteManagerImpl,com.sonicbase.server.SnapshotManagerImpl,com.sonicbase.server.UpdateManager,com.sonicbase.server.TransactionManager,com.sonicbase.server.ReadManager,com.sonicbase.server.LogManager,com.sonicbase.server.SchemaManager)" class="com.sonicbase.server.MethodInvoker" />
 	<method signature="ComObject createDatabase(ComObject,boolean)" class="com.sonicbase.server.MethodInvoker" />
 	<method signature="ComObject doRebalanceOrderedIndex(ComObject,boolean)" class="com.sonicbase.server.MethodInvoker" />
 	<method signature="ComObject finishBackup(ComObject,boolean)" class="com.sonicbase.server.MethodInvoker" />
@@ -760,7 +760,7 @@
 	<field name="repartitioner" class="com.sonicbase.server.MethodInvoker" />
 	<field name="priorityCommands" class="com.sonicbase.server.MethodInvoker" />
 	<field name="common" class="com.sonicbase.server.MethodInvoker" />
-	<field name="deleteManager" class="com.sonicbase.server.MethodInvoker" />
+	<field name="deleteManagerImpl" class="com.sonicbase.server.MethodInvoker" />
 	<field name="echo2Count" class="com.sonicbase.server.MethodInvoker" />
 	<field name="updateManager" class="com.sonicbase.server.MethodInvoker" />
 	<field name="transactionManager" class="com.sonicbase.server.MethodInvoker" />
@@ -828,25 +828,25 @@
 	<field name="val$ret" class="com.sonicbase.index.Repartitioner$10" />
 	<field name="val$dbName" class="com.sonicbase.index.Repartitioner$10" />
 	<field name="val$shard" class="com.sonicbase.index.Repartitioner$10" />
-	<class name="com.sonicbase.server.DeleteManager" />
-	<method signature="java.io.File getReplicaRoot()" class="com.sonicbase.server.DeleteManager" />
-	<method signature="void getFiles(java.util.List)" class="com.sonicbase.server.DeleteManager" />
-	<method signature="void restoreAWS(java.lang.String,java.lang.String,java.lang.String)" class="com.sonicbase.server.DeleteManager" />
-	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.server.DeleteManager" />
-	<method signature="void backupFileSystem(java.lang.String,java.lang.String)" class="com.sonicbase.server.DeleteManager" />
-	<method signature="void doDeletes()" class="com.sonicbase.server.DeleteManager" />
-	<method signature="com.sonicbase.server.DatabaseServer access$000(com.sonicbase.server.DeleteManager)" class="com.sonicbase.server.DeleteManager" />
-	<method signature="void &lt;init&gt;(com.sonicbase.server.DatabaseServer)" class="com.sonicbase.server.DeleteManager" />
-	<method signature="void restoreFileSystem(java.lang.String,java.lang.String)" class="com.sonicbase.server.DeleteManager" />
-	<method signature="void saveDeletes(java.lang.String,java.lang.String,java.lang.String,java.util.concurrent.ConcurrentLinkedQueue)" class="com.sonicbase.server.DeleteManager" />
-	<method signature="void forceDeletes()" class="com.sonicbase.server.DeleteManager" />
-	<method signature="void start()" class="com.sonicbase.server.DeleteManager" />
-	<method signature="void backupAWS(java.lang.String,java.lang.String,java.lang.String)" class="com.sonicbase.server.DeleteManager" />
-	<method signature="Logger access$100(com.sonicbase.server.DeleteManager)" class="com.sonicbase.server.DeleteManager" />
-	<field name="mainThread" class="com.sonicbase.server.DeleteManager" />
-	<field name="databaseServer" class="com.sonicbase.server.DeleteManager" />
-	<field name="executor" class="com.sonicbase.server.DeleteManager" />
-	<field name="logger" class="com.sonicbase.server.DeleteManager" />
+	<class name="com.sonicbase.server.DeleteManagerImpl" />
+	<method signature="java.io.File getReplicaRoot()" class="com.sonicbase.server.DeleteManagerImpl" />
+	<method signature="void getFiles(java.util.List)" class="com.sonicbase.server.DeleteManagerImpl" />
+	<method signature="void restoreAWS(java.lang.String,java.lang.String,java.lang.String)" class="com.sonicbase.server.DeleteManagerImpl" />
+	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.server.DeleteManagerImpl" />
+	<method signature="void backupFileSystem(java.lang.String,java.lang.String)" class="com.sonicbase.server.DeleteManagerImpl" />
+	<method signature="void doDeletes()" class="com.sonicbase.server.DeleteManagerImpl" />
+	<method signature="com.sonicbase.server.DatabaseServer access$000(com.sonicbase.server.DeleteManagerImpl)" class="com.sonicbase.server.DeleteManagerImpl" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.DatabaseServer)" class="com.sonicbase.server.DeleteManagerImpl" />
+	<method signature="void restoreFileSystem(java.lang.String,java.lang.String)" class="com.sonicbase.server.DeleteManagerImpl" />
+	<method signature="void saveDeletes(java.lang.String,java.lang.String,java.lang.String,java.util.concurrent.ConcurrentLinkedQueue)" class="com.sonicbase.server.DeleteManagerImpl" />
+	<method signature="void forceDeletes()" class="com.sonicbase.server.DeleteManagerImpl" />
+	<method signature="void start()" class="com.sonicbase.server.DeleteManagerImpl" />
+	<method signature="void backupAWS(java.lang.String,java.lang.String,java.lang.String)" class="com.sonicbase.server.DeleteManagerImpl" />
+	<method signature="Logger access$100(com.sonicbase.server.DeleteManagerImpl)" class="com.sonicbase.server.DeleteManagerImpl" />
+	<field name="mainThread" class="com.sonicbase.server.DeleteManagerImpl" />
+	<field name="databaseServer" class="com.sonicbase.server.DeleteManagerImpl" />
+	<field name="executor" class="com.sonicbase.server.DeleteManagerImpl" />
+	<field name="logger" class="com.sonicbase.server.DeleteManagerImpl" />
 	<class name="com.sonicbase.bench.TestRebalance$1" />
 	<method signature="void &lt;init&gt;(com.sonicbase.bench.TestRebalance,com.sonicbase.server.DatabaseServer[],int,com.sonicbase.util.JsonDict)" class="com.sonicbase.bench.TestRebalance$1" />
 	<method signature="java.lang.Object call()" class="com.sonicbase.bench.TestRebalance$1" />
@@ -1142,7 +1142,7 @@
 	<method signature="org.apache.log4j.Logger access$1900()" class="com.sonicbase.server.DatabaseServer" />
 	<method signature="byte[][] fromUnsafeToRecords(java.lang.Object)" class="com.sonicbase.server.DatabaseServer" />
 	<method signature="java.util.concurrent.locks.ReentrantReadWriteLock$WriteLock getBatchWriteLock()" class="com.sonicbase.server.DatabaseServer" />
-	<method signature="com.sonicbase.server.DeleteManager getDeleteManager()" class="com.sonicbase.server.DatabaseServer" />
+	<method signature="com.sonicbase.server.DeleteManagerImpl getDeleteManager()" class="com.sonicbase.server.DatabaseServer" />
 	<method signature="void setShardCount(int)" class="com.sonicbase.server.DatabaseServer" />
 	<method signature="int access$1500(com.sonicbase.server.DatabaseServer)" class="com.sonicbase.server.DatabaseServer" />
 	<method signature="ComObject getOSStats(ComObject)" class="com.sonicbase.server.DatabaseServer" />
@@ -1167,7 +1167,7 @@
 	<method signature="DatabaseClient getClient()" class="com.sonicbase.server.DatabaseServer" />
 	<method signature="void startLicenseValidator()" class="com.sonicbase.server.DatabaseServer" />
 	<method signature="ComObject areAllLongRunningCommandsComplete(ComObject)" class="com.sonicbase.server.DatabaseServer" />
-	<method signature="com.sonicbase.server.DeleteManager access$2100(com.sonicbase.server.DatabaseServer)" class="com.sonicbase.server.DatabaseServer" />
+	<method signature="com.sonicbase.server.DeleteManagerImpl access$2100(com.sonicbase.server.DatabaseServer)" class="com.sonicbase.server.DatabaseServer" />
 	<method signature="boolean access$3202(com.sonicbase.server.DatabaseServer,boolean)" class="com.sonicbase.server.DatabaseServer" />
 	<method signature="boolean access$4200()" class="com.sonicbase.server.DatabaseServer" />
 	<method signature="java.lang.String getDataDir()" class="com.sonicbase.server.DatabaseServer" />
@@ -1326,7 +1326,7 @@
 	<field name="LICENSE_KEY" class="com.sonicbase.server.DatabaseServer" />
 	<field name="deathOverride" class="com.sonicbase.server.DatabaseServer" />
 	<field name="executor" class="com.sonicbase.server.DatabaseServer" />
-	<field name="deleteManager" class="com.sonicbase.server.DatabaseServer" />
+	<field name="deleteManagerImpl" class="com.sonicbase.server.DatabaseServer" />
 	<field name="host" class="com.sonicbase.server.DatabaseServer" />
 	<field name="transactionManager" class="com.sonicbase.server.DatabaseServer" />
 	<field name="avgTransRate" class="com.sonicbase.server.DatabaseServer" />
@@ -4161,11 +4161,11 @@
 	<method signature="int getSqlTypeWrapping()" class="Parameter$Null" />
 	<field name="sqlType" class="Parameter$Null" />
 	<field name="typeName" class="Parameter$Null" />
-	<class name="com.sonicbase.server.DeleteManager$1" />
-	<method signature="void &lt;init&gt;(com.sonicbase.server.DeleteManager)" class="com.sonicbase.server.DeleteManager$1" />
-	<method signature="int compare(java.io.File,java.io.File)" class="com.sonicbase.server.DeleteManager$1" />
-	<method signature="int compare(java.lang.Object,java.lang.Object)" class="com.sonicbase.server.DeleteManager$1" />
-	<field name="this$0" class="com.sonicbase.server.DeleteManager$1" />
+	<class name="com.sonicbase.server.DeleteManagerImpl$1" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.DeleteManagerImpl)" class="com.sonicbase.server.DeleteManagerImpl$1" />
+	<method signature="int compare(java.io.File,java.io.File)" class="com.sonicbase.server.DeleteManagerImpl$1" />
+	<method signature="int compare(java.lang.Object,java.lang.Object)" class="com.sonicbase.server.DeleteManagerImpl$1" />
+	<field name="this$0" class="com.sonicbase.server.DeleteManagerImpl$1" />
 	<class name="Expression" />
 	<method signature="void &lt;clinit&gt;()" class="Expression" />
 	<class name="com.sonicbase.index.Repartitioner$GetKeyAtOffset" />
@@ -4189,20 +4189,20 @@
 	<method signature="void setTableName(java.lang.String)" class="CreateIndexStatement" />
 	<method signature="int execute(java.lang.String)" class="CreateIndexStatement" />
 	<method signature="void setColumns(java.util.List)" class="CreateIndexStatement" />
-	<class name="com.sonicbase.server.DeleteManager$3" />
-	<method signature="void run()" class="com.sonicbase.server.DeleteManager$3" />
-	<method signature="void &lt;init&gt;(com.sonicbase.server.DeleteManager)" class="com.sonicbase.server.DeleteManager$3" />
-	<field name="this$0" class="com.sonicbase.server.DeleteManager$3" />
+	<class name="com.sonicbase.server.DeleteManagerImpl$3" />
+	<method signature="void run()" class="com.sonicbase.server.DeleteManagerImpl$3" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.DeleteManagerImpl)" class="com.sonicbase.server.DeleteManagerImpl$3" />
+	<field name="this$0" class="com.sonicbase.server.DeleteManagerImpl$3" />
 	<class name="com.sonicbase.bench.TestRebalance" />
 	<method signature="void testBasics()" class="com.sonicbase.bench.TestRebalance" />
 	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.bench.TestRebalance" />
 	<method signature="void &lt;init&gt;()" class="com.sonicbase.bench.TestRebalance" />
-	<class name="com.sonicbase.server.DeleteManager$2" />
-	<method signature="void &lt;init&gt;(com.sonicbase.server.DeleteManager,java.util.List,com.sonicbase.index.Index)" class="com.sonicbase.server.DeleteManager$2" />
-	<method signature="java.lang.Object call()" class="com.sonicbase.server.DeleteManager$2" />
-	<field name="val$currBatch" class="com.sonicbase.server.DeleteManager$2" />
-	<field name="this$0" class="com.sonicbase.server.DeleteManager$2" />
-	<field name="val$index" class="com.sonicbase.server.DeleteManager$2" />
+	<class name="com.sonicbase.server.DeleteManagerImpl$2" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.DeleteManagerImpl,java.util.List,com.sonicbase.index.Index)" class="com.sonicbase.server.DeleteManagerImpl$2" />
+	<method signature="java.lang.Object call()" class="com.sonicbase.server.DeleteManagerImpl$2" />
+	<field name="val$currBatch" class="com.sonicbase.server.DeleteManagerImpl$2" />
+	<field name="this$0" class="com.sonicbase.server.DeleteManagerImpl$2" />
+	<field name="val$index" class="com.sonicbase.server.DeleteManagerImpl$2" />
 	<class name="SelectStatementImpl$KeyEntry" />
 	<method signature="void &lt;init&gt;(SelectStatementImpl,java.lang.Object[][],java.util.Comparator[][])" class="SelectStatementImpl$KeyEntry" />
 	<method signature="int hashCode()" class="SelectStatementImpl$KeyEntry" />

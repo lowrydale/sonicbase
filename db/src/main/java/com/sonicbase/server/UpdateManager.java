@@ -226,18 +226,47 @@ public class UpdateManager {
               }
             }
           }
-          if (deletedRecords.size() != 0) {
-            if (indexSchema.getValue().isPrimaryKey()) {
-              DeleteManager.DeleteRequestForRecord request = new DeleteManager.DeleteRequestForRecord(key);
-              server.getDeleteManager().saveDeleteForRecord(dbName, tableName, indexSchema.getKey(), sequence0, sequence1, request);
-            }
-            else {
-              for (byte[] bytes: deletedRecords) {
-                DeleteManager.DeleteRequestForKeyRecord request = new DeleteManager.DeleteRequestForKeyRecord(key, KeyRecord.getPrimaryKey(bytes));
-                server.getDeleteManager().saveDeleteForKeyRecord(dbName, tableName, indexSchema.getKey(), sequence0, sequence1, request);
-              }
-            }
-          }
+//            if (records != null) {
+//              byte[][] newRecords = new byte[records.length - 1][];
+//              boolean found = false;
+//              int offset = 0;
+//              for (int i = 0; i < records.length; i++) {
+//                if (Arrays.equals(KeyRecord.getPrimaryKey(records[i]), primaryKeyBytes)) {
+//                  found = true;
+//                  deletedRecords.add(records[i]);
+//                }
+//                else {
+//                  newRecords[offset++] = records[i];
+//                }
+//              }
+//              if (found) {
+//                if (newRecords.length == 0) {
+//                  Object obj = index.remove(key);
+//                  if (obj != null) {
+//                    server.freeUnsafeIds(obj);
+//                  }
+//                }
+//                else {
+//                  index.put(key, server.toUnsafeFromKeys(newRecords));
+//                  if (value != null) {
+//                    server.freeUnsafeIds(value);
+//                  }
+//                }
+//              }
+//            }
+//          }
+//          if (deletedRecords.size() != 0) {
+//            if (indexSchema.getValue().isPrimaryKey()) {
+//              DeleteManagerImpl.DeleteRequestForRecord request = new DeleteManagerImpl.DeleteRequestForRecord(key);
+//              server.getDeleteManager().saveDeleteForRecord(dbName, tableName, indexSchema.getKey(), sequence0, sequence1, request);
+//            }
+//            else {
+//              for (byte[] bytes: deletedRecords) {
+//                DeleteManagerImpl.DeleteRequestForKeyRecord request = new DeleteManagerImpl.DeleteRequestForKeyRecord(key, KeyRecord.getPrimaryKey(bytes));
+//                server.getDeleteManager().saveDeleteForKeyRecord(dbName, tableName, indexSchema.getKey(), sequence0, sequence1, request);
+//              }
+//            }
+//          }
         }
 
         if (indexSchema.getValue().isPrimaryKey()) {
@@ -1835,8 +1864,8 @@ class MessageRequest {
           }
         }
 
-        DeleteManager.DeleteRequestForRecord request = new DeleteManager.DeleteRequestForRecord(key);
-        server.getDeleteManager().saveDeleteForRecord(dbName, tableName, indexName, sequence0, sequence1, request);
+        //DeleteManagerImpl.DeleteRequestForRecord request = new DeleteManagerImpl.DeleteRequestForRecord(key);
+        //server.getDeleteManager().saveDeleteForRecord(dbName, tableName, indexName, sequence0, sequence1, request);
 
         if (tableSchema.getIndices().get(indexName).isPrimaryKey()) {
           for (byte[] innerBytes : bytes) {
@@ -2022,16 +2051,16 @@ class MessageRequest {
         }
       }
     }
-    if (deletedRecord != null) {
-      if (tableSchema.getIndexes().get(indexName).isPrimaryKey()) {
-        DeleteManager.DeleteRequestForRecord request = new DeleteManager.DeleteRequestForRecord(key);
-        server.getDeleteManager().saveDeleteForRecord(dbName, tableSchema.getName(), indexName, sequence0, sequence1, request);
-      }
-      else {
-        DeleteManager.DeleteRequestForKeyRecord request = new DeleteManager.DeleteRequestForKeyRecord(key, KeyRecord.getPrimaryKey(deletedRecord));
-        server.getDeleteManager().saveDeleteForKeyRecord(dbName, tableSchema.getName(), indexName, sequence0, sequence1, request);
-      }
-    }
+//    if (deletedRecord != null) {
+//      if (tableSchema.getIndexes().get(indexName).isPrimaryKey()) {
+//        DeleteManagerImpl.DeleteRequestForRecord request = new DeleteManagerImpl.DeleteRequestForRecord(key);
+//        server.getDeleteManager().saveDeleteForRecord(dbName, tableSchema.getName(), indexName, sequence0, sequence1, request);
+//      }
+//      else {
+//        DeleteManagerImpl.DeleteRequestForKeyRecord request = new DeleteManagerImpl.DeleteRequestForKeyRecord(key, KeyRecord.getPrimaryKey(deletedRecord));
+//        server.getDeleteManager().saveDeleteForKeyRecord(dbName, tableSchema.getName(), indexName, sequence0, sequence1, request);
+//      }
+//    }
   }
 
 

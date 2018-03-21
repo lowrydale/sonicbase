@@ -97,7 +97,6 @@ public class DatabaseServer {
   private ThreadPoolExecutor executor;
   private AtomicBoolean aboveMemoryThreshold = new AtomicBoolean();
   private Exception exception;
-  private byte[] bytes;
   private boolean compressRecords = false;
   private boolean useUnsafe;
   private String gclog;
@@ -317,9 +316,16 @@ public class DatabaseServer {
     logger = new Logger(getDatabaseClient(), shard, replica);
     logger.info("config=" + config.toString());
 
+    logger.info("useUnsafe=" + useUnsafe);
+
     this.awsClient = new AWSClient(client.get());
 
-    this.deleteManager = new DeleteManager(this);
+    if (USE_SNAPSHOT_MGR_OLD) {
+      this.deleteManager = new DeleteManagerOld(this);
+    }
+    else {
+      this.deleteManager = new DeleteManagerImpl(this);
+    }
     this.updateManager = new UpdateManager(this);
     //this.snapshotManager = new SnapshotManagerImpl(this);
     if (USE_SNAPSHOT_MGR_OLD) {
@@ -2968,7 +2974,7 @@ public class DatabaseServer {
   }
 
   public void recoverFromSnapshot() throws Exception {
-    //common.loadSchema(dataDir);
+    common.loadSchema(dataDir);
     for (String dbName : getDbNames(dataDir)) {
 //      snapshotManager.recoverFromSnapshot(dbName);
       deltaManager.recoverFromSnapshot(dbName);
@@ -4024,10 +4030,10 @@ public class DatabaseServer {
   public List<String> getDbNames(String dataDir) {
     File file = null;
     if (USE_SNAPSHOT_MGR_OLD) {
-      new File(dataDir, "snapshot/" + shard + "/" + replica);
+      file = new File(dataDir, "snapshot/" + shard + "/" + replica);
     }
     else {
-      new File(dataDir, "delta/" + shard + "/" + replica);
+      file = new File(dataDir, "delta/" + shard + "/" + replica);
     }
     String[] dirs = file.list();
     List<String> ret = new ArrayList<>();
@@ -4528,9 +4534,10 @@ public class DatabaseServer {
           recordsLen += record.length;
         }
 
-        byte[] bytes = new byte[4 + 4 + (4 * records.length) + recordsLen];
+        byte[] bytes = new byte[4 + (4 * records.length) + recordsLen];
         //out.writeInt(0);
-        int offset = 4; //update time
+        int actualLen = 0;
+        int offset = 0; //update time
         DataUtils.intToBytes(records.length, bytes, offset);
         offset += 4;
         for (byte[] record : records) {
@@ -4539,6 +4546,7 @@ public class DatabaseServer {
           System.arraycopy(record, 0, bytes, offset, record.length);
           offset += record.length;
         }
+        actualLen = bytes.length;
 
         int origLen = -1;
         if (compressRecords) {
@@ -4552,9 +4560,9 @@ public class DatabaseServer {
           int compressedLength = compressor.compress(bytes, 0, bytes.length, compressed, 0, maxCompressedLength);
           bytes = new byte[compressedLength];
           System.arraycopy(compressed, 0, bytes, 0, compressedLength);
+          actualLen = bytes.length;
         }
 
-        DataUtils.intToBytes(origLen, bytes, 0);
 
         //System.arraycopy(lenBuffer, 0, bytes, 0, lenBuffer.length);
 
@@ -4562,15 +4570,18 @@ public class DatabaseServer {
           throw new DatabaseException("Invalid allocation: size=" + bytes.length);
         }
 
-        long address = unsafe.allocateMemory(bytes.length + 8);
+        long address = unsafe.allocateMemory(bytes.length + 16);
+
+        DataUtils.intToAddress(origLen, address + 8, unsafe);
+        DataUtils.intToAddress(actualLen, address + 8 + 4, unsafe);
 
         for (int i = 7; i >= 0; i--) {
-          unsafe.putByte(address + i, (byte)(updateTime & 0xFF));
+          unsafe.putByte(address + 16 + i, (byte)(updateTime & 0xFF));
           updateTime >>= 8;
         }
 
         for (int i = 0; i < bytes.length; i++) {
-          unsafe.putByte(address + 8 + i, bytes[i]);
+          unsafe.putByte(address + 16 + i, bytes[i]);
         }
 
         if (address == 0 || address == -1L) {
@@ -4736,8 +4747,8 @@ public class DatabaseServer {
           try {
             Long innerAddress = addressMap.getAddress((Long) obj);
             if (innerAddress == null) {
-              System.out.println("null address ******************* outerAddress=" + (long) obj);
-              new Exception().printStackTrace();
+//              System.out.println("null address ******************* outerAddress=" + (long) obj);
+//              new Exception().printStackTrace();
               return null;
             }
 
@@ -4757,21 +4768,25 @@ public class DatabaseServer {
                 ((unsafe.getByte(innerAddress + 8 + 2) & 0xff) << 8) |
                 (unsafe.getByte(innerAddress + 8 + 3) & 0xff);
 
+            int actualLen = ((unsafe.getByte(innerAddress + 12 + 0) & 0xff) << 24) |
+                ((unsafe.getByte(innerAddress + 12 + 1) & 0xff) << 16) |
+                ((unsafe.getByte(innerAddress + 12 + 2) & 0xff) << 8) |
+                (unsafe.getByte(innerAddress + 12 + 3) & 0xff);
             //          byte[] bytes = new byte[count];
             //          for (int i = 0; i < count; i++) {
             //            bytes[i] = unsafe.getByte(innerAddress + i + 8 + 8);
             //          }
             if (origLen == -1) {
               int offset = 0;
-              int recCount = DataUtils.addressToInt(innerAddress + offset + 12, unsafe);
+              int recCount = DataUtils.addressToInt(innerAddress + offset + 16, unsafe);
               offset += 4;
               byte[][] ret = new byte[recCount][];
               for (int i = 0; i < ret.length; i++) {
-                int len = DataUtils.addressToInt(innerAddress + offset + 12, unsafe);
+                int len = DataUtils.addressToInt(innerAddress + offset + 16, unsafe);
                 offset += 4;
                 byte[] record = new byte[len];
                 for (int j = 0; j < len; j++) {
-                  record[j] = unsafe.getByte(innerAddress + offset + 12);
+                  record[j] = unsafe.getByte(innerAddress + offset + 16);
                   offset++;
                 }
                 ret[i] = record;
@@ -4782,6 +4797,11 @@ public class DatabaseServer {
             if (origLen != -1) {
               LZ4Factory factory = LZ4Factory.fastestInstance();
 
+              byte[] bytes = new byte[actualLen];
+              for (int j = 0; j < actualLen; j++) {
+                bytes[j] = unsafe.getByte(innerAddress + 16 + j);
+              }
+
               LZ4FastDecompressor decompressor = factory.fastDecompressor();
               byte[] restored = new byte[origLen];
               decompressor.decompress(bytes, 0, restored, 0, origLen);
@@ -4790,9 +4810,9 @@ public class DatabaseServer {
               DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
               //in.readInt(); //byte count
               //in.readInt(); //orig len
-              byte[][] ret = new byte[(int) Varint.readSignedVarLong(in)][];
+              byte[][] ret = new byte[(int) in.readInt()][];
               for (int i = 0; i < ret.length; i++) {
-                int len = (int) Varint.readSignedVarLong(in);
+                int len = (int) in.readInt();
                 byte[] record = new byte[len];
                 in.readFully(record);
                 ret[i] = record;

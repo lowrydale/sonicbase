@@ -11,7 +11,7 @@ import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.Schema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
-import com.sonicbase.server.DeleteManager;
+import com.sonicbase.server.DeleteManagerImpl;
 import com.sonicbase.socket.DeadServerException;
 import org.apache.commons.lang.exception.ExceptionUtils;
 
@@ -1515,8 +1515,8 @@ public class Repartitioner extends Thread {
 
   public ComObject deleteMovedRecords(ComObject cobj, boolean replayedCommand) {
     try {
-      ConcurrentLinkedQueue<DeleteManager.DeleteRequest> keysToDelete = new ConcurrentLinkedQueue<>();
-      final ConcurrentLinkedQueue<DeleteManager.DeleteRequest> keysToDeleteExpanded = new ConcurrentLinkedQueue<>();
+      ConcurrentLinkedQueue<DeleteManagerImpl.DeleteRequest> keysToDelete = new ConcurrentLinkedQueue<>();
+      final ConcurrentLinkedQueue<DeleteManagerImpl.DeleteRequest> keysToDeleteExpanded = new ConcurrentLinkedQueue<>();
       final long sequence0 = cobj.getLong(ComObject.Tag.sequence0);
       final long sequence1 = cobj.getLong(ComObject.Tag.sequence1);
       String dbName = cobj.getString(ComObject.Tag.dbName);
@@ -1529,10 +1529,10 @@ public class Repartitioner extends Thread {
         for (int i = 0; i < keys.getArray().size(); i++) {
           Object[] key = DatabaseCommon.deserializeKey(tableSchema, (byte[]) keys.getArray().get(i));
           if (indexSchema.isPrimaryKey()) {
-            keysToDelete.add(new DeleteManager.DeleteRequestForRecord(key));
+            keysToDelete.add(new DeleteManagerImpl.DeleteRequestForRecord(key));
           }
           else {
-            keysToDelete.add(new DeleteManager.DeleteRequestForKeyRecord(key));
+            keysToDelete.add(new DeleteManagerImpl.DeleteRequestForKeyRecord(key));
           }
         }
       }
@@ -1541,7 +1541,7 @@ public class Repartitioner extends Thread {
       final Index index = databaseServer.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
       if (replayedCommand) {
         List<Future> futures = new ArrayList<>();
-        for (final DeleteManager.DeleteRequest request : keysToDelete) {
+        for (final DeleteManagerImpl.DeleteRequest request : keysToDelete) {
           futures.add(databaseServer.getExecutor().submit(new Callable(){
             @Override
             public Object call() throws Exception {
@@ -1558,7 +1558,7 @@ public class Repartitioner extends Thread {
         }
       }
       else {
-        for (DeleteManager.DeleteRequest request : keysToDelete) {
+        for (DeleteManagerImpl.DeleteRequest request : keysToDelete) {
           doDeleteMovedEntry(keysToDeleteExpanded, indexSchema, index, request);
           if (count.incrementAndGet() % 100000 == 0) {
             logger.info("deleteMovedRecords progress: count=" + count.get());
@@ -1589,8 +1589,8 @@ public class Repartitioner extends Thread {
     return null;
   }
 
-  private void doDeleteMovedEntry(ConcurrentLinkedQueue<DeleteManager.DeleteRequest> keysToDeleteExpanded,
-                                  IndexSchema indexSchema, Index index, DeleteManager.DeleteRequest request) {
+  private void doDeleteMovedEntry(ConcurrentLinkedQueue<DeleteManagerImpl.DeleteRequest> keysToDeleteExpanded,
+                                  IndexSchema indexSchema, Index index, DeleteManagerImpl.DeleteRequest request) {
     synchronized (index.getMutex(request.getKey())) {
 //          Object toFree = index.remove(key);
 //          if (toFree != null) {
@@ -1609,7 +1609,7 @@ public class Repartitioner extends Thread {
       }
       if (content != null) {
         if (indexSchema.isPrimaryKey()) {
-          keysToDeleteExpanded.add(new DeleteManager.DeleteRequestForRecord(request.getKey()));
+          keysToDeleteExpanded.add(new DeleteManagerImpl.DeleteRequestForRecord(request.getKey()));
 
           byte[][] newContent = new byte[content.length][];
           for (int i = 0; i < content.length; i++) {
@@ -1635,7 +1635,7 @@ public class Repartitioner extends Thread {
             KeyRecord.setDbViewNumber(content[i], common.getSchemaVersion());
             newContent[i] = content[i];
 
-            keysToDeleteExpanded.add(new DeleteManager. DeleteRequestForKeyRecord(request.getKey(), KeyRecord.getPrimaryKey(content[i])));
+            keysToDeleteExpanded.add(new DeleteManagerImpl. DeleteRequestForKeyRecord(request.getKey(), KeyRecord.getPrimaryKey(content[i])));
           }
           //toFree.add(value);
           Object newValue = databaseServer.toUnsafeFromRecords(newContent);

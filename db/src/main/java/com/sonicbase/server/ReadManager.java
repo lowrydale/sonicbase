@@ -2759,23 +2759,23 @@ public class ReadManager {
                 Object unsafeAddress = currEntry.getValue();//index.get(entry.getKey());
                 if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
                   records = server.fromUnsafeToRecords(unsafeAddress);
-                  while (records == null) {
-                    try {
-                      Thread.sleep(100);
-                      System.out.println("null records ************************************");
-                    }
-                    catch (InterruptedException e) {
-                      throw new DatabaseException(e);
-                    }
-                    currEntry.setValue(index.get(currEntry.getKey()));
-                    unsafeAddress = currEntry.getValue();//index.get(entry.getKey());
-                    if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
-                      records = server.fromUnsafeToRecords(unsafeAddress);
-                    }
-                    else {
-                      break;
-                    }
-                  }
+//                  while (records == null) {
+//                    try {
+//                      Thread.sleep(100);
+//                      System.out.println("null records ************************************");
+//                    }
+//                    catch (InterruptedException e) {
+//                      throw new DatabaseException(e);
+//                    }
+//                    currEntry.setValue(index.get(currEntry.getKey()));
+//                    unsafeAddress = currEntry.getValue();//index.get(entry.getKey());
+//                    if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
+//                      records = server.fromUnsafeToRecords(unsafeAddress);
+//                    }
+//                    else {
+//                      break;
+//                    }
+//                  }
                 }
               }
             //}
@@ -2878,7 +2878,7 @@ public class ReadManager {
   private byte[][] processViewFlags(String dbName, TableSchema tableSchema, IndexSchema indexSchema, Index index,
                                     long viewVersion, Object[] key, byte[][] records, AtomicBoolean done) {
     if (records == null) {
-      System.out.println("null records *******************");
+      //System.out.println("null records *******************");
     }
     else {
       if (indexSchema == null || server.getCommon().getTables(dbName).get(tableSchema.getName()).getIndices().get(indexSchema.getName()).getLastPartitions() != null) {
@@ -3031,7 +3031,7 @@ public class ReadManager {
     else {
       List<byte[]> remaining = new ArrayList<>();
       if (records == null) {
-        System.out.println("null records *******************");
+        //System.out.println("null records *******************");
       }
       else {
         for (byte[] bytes : records) {

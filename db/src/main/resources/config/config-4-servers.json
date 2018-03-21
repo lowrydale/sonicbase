@@ -9,6 +9,7 @@
   "maxProcessMemory": "90%",
   "optimizeReadsFor": "totalThroughput",
   "useUnsafe": true,
+  "compressRecords" : false,
   "backup" : {
     "type" : "fileSystem",
     "directory": "$HOME/db/db-backup",

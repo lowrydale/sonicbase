@@ -349,7 +349,7 @@ public class DeltaManager implements SnapshotManager {
                       synchronized (index.getMutex(key)) {
                         Object currValue = index.get(key);
                         if (currValue == null || currValue.equals(0L)) {
-                          logger.error("null record: key=" + DatabaseCommon.keyToString(key));
+                          //logger.error("null record: key=" + DatabaseCommon.keyToString(key));
                         }
                         else {
                           if (isPrimaryKey) {
@@ -634,7 +634,7 @@ public class DeltaManager implements SnapshotManager {
     }
   }
 
-  public MergeEntry readEntry(String dbName, int deltaNum, DeleteManager.DeltaContext deltaContext, TableSchema tableSchema,
+  public MergeEntry readEntry(String dbName, int deltaNum, DeleteManagerImpl.DeltaContext deltaContext, TableSchema tableSchema,
                               IndexSchema indexSchema, AtomicLong finishedBytes) {
     try {
       while (true) {

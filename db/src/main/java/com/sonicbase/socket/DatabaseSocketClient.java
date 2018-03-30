@@ -20,13 +20,8 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.GZIPInputStream;
@@ -48,6 +43,7 @@ public class DatabaseSocketClient {
 
   private static AtomicInteger connectionCount = new AtomicInteger();
   private List<Thread> batchThreads = new ArrayList<>();
+  private static ConcurrentLinkedQueue<Connection> openConnections = new ConcurrentLinkedQueue<>();
 
 
   public static int getConnectionCount() {
@@ -75,6 +71,7 @@ public class DatabaseSocketClient {
           try {
             connectionCount.incrementAndGet();
             sock = new Connection(host, port);//new NioClient(host, port);
+            openConnections.add(sock);
           }
           catch (Exception t) {
             throw new Exception("Error creating connection: host=" + host + ", port=" + port, t);
@@ -123,6 +120,44 @@ public class DatabaseSocketClient {
     synchronized (batchThreads) {
       for (Thread thread : batchThreads) {
         thread.interrupt();
+        try {
+          thread.join();
+        }
+        catch (InterruptedException e) {
+          throw new DatabaseException(e);
+        }
+      }
+    }
+    if (true) {
+      synchronized (DatabaseSocketClient.class) {
+        for (ArrayBlockingQueue<Connection> pool : pools.values()) {
+          while (true) {
+            try {
+              Connection conn = pool.poll(1, TimeUnit.MILLISECONDS);
+              if (conn == null) {
+                break;
+              }
+            }
+            catch (InterruptedException e) {
+              logger.error("Error closing connection pool");
+            }
+          }
+        }
+        List<Connection> toRemove = new ArrayList<>();
+        for (Connection conn : openConnections) {
+          try {
+            conn.sock.shutdownInput();
+            conn.sock.shutdownOutput();
+            conn.sock.close();
+            toRemove.add(conn);
+          }
+          catch (IOException e) {
+            logger.info("Error closing connection");
+          }
+        }
+        for (Connection curr : toRemove) {
+          openConnections.remove(curr);
+        }
       }
     }
   }
@@ -304,8 +339,6 @@ public class DatabaseSocketClient {
   public static final boolean ENABLE_BATCH = true;
   private static final int BATCH_SIZE = 160; //last was 80
 
-  private Map<String, ArrayBlockingQueue<Request>> requestQueues = new HashMap<>();
-
   public static class Request {
     private byte[] body;
     private byte[] response;
@@ -351,97 +384,6 @@ public class DatabaseSocketClient {
 
     public void setSocketClient(DatabaseSocketClient socketClient) {
       this.socketClient = socketClient;
-    }
-  }
-
-  private static AtomicInteger batchCount = new AtomicInteger();
-  private static AtomicLong batchTotalEntryCount = new AtomicLong();
-
-  static class BatchSender implements Runnable {
-
-    private final ArrayBlockingQueue<Request> queue;
-    private final String host;
-    private final int port;
-
-    public BatchSender(String host, int port, ArrayBlockingQueue<Request> requests) {
-      this.queue = requests;
-      this.host = host;
-      this.port = port;
-    }
-
-    @Override
-    public void run() {
-
-      while (true) {
-        List<Request> requests = new ArrayList<>();
-        try {
-
-          Request request = queue.poll(30000, TimeUnit.MILLISECONDS);
-          if (request == null) {
-            Thread.sleep(1);
-            continue;
-          }
-          requests.add(request);
-          String batchKey = request.batchKey;
-          Thread.sleep(0, 100);
-          for (int i = 0; i < BATCH_SIZE; i++) {
-            request = queue.poll();
-            if (request == null) {
-              break;
-            }
-            if (batchKey == null || request.batchKey == null || !batchKey.equals(request.batchKey)) {
-              try {
-                List<Request> nonMatchingRequets = new ArrayList<>();
-                nonMatchingRequets.add(request);
-                sendBatch(host, port, nonMatchingRequets);
-              }
-              catch (Exception t) {
-                request.exception = t;
-                request.latch.countDown();
-              }
-              break;
-            }
-            requests.add(request);
-          }
-          //queue.drainTo(requests, BATCH_SIZE);
-
-//            for (int i = 0; i < BATCH_SIZE; i++) {
-//              request = queue.poll(0, TimeUnit.MILLISECONDS);
-//              if (request != null) {
-//                requests.add(request);
-//              }
-//            }
-          if (requests.size() == 0) {
-            continue;
-          }
-          sendBatch(host, port, requests);
-
-          batchTotalEntryCount.addAndGet(requests.size());
-          if (batchCount.incrementAndGet() % 100000 == 0) {
-            logger.info("Batch stats: count=" + batchCount.get() + ", avgSize=" + (batchTotalEntryCount.get() / batchCount.get()));
-          }
-//          requests.add(request);
-//
-//          for (int i = 0; i < BATCH_SIZE; i++) {
-//            request = queue.poll(0, TimeUnit.MILLISECONDS);
-//            if (request != null) {
-//              requests.add(request);
-//            }
-//          }
-//          sendBatch(host, port, requests);
-
-        }
-        catch (InterruptedException e) {
-          break;
-        }
-        catch (Exception t) {
-          for (Request request : requests) {
-            request.exception = t;
-            request.latch.countDown();
-          }
-          //t.printStackTrace();
-        }
-      }
     }
   }
 
@@ -620,6 +562,7 @@ public class DatabaseSocketClient {
       catch (Exception e) {
         if (sock != null && sock.sock != null) {
           sock.sock.close();//clientHandler.channel.close();
+          openConnections.remove(sock);
         }
         connectionCount.decrementAndGet();
         shouldReturn = false;
@@ -630,6 +573,7 @@ public class DatabaseSocketClient {
           if (sock.count_called > 100000) {
             if (sock != null && sock.sock != null) {
               sock.sock.close();//clientHandler.channel.close();
+              openConnections.remove(sock);
             }
           }
           else {
@@ -652,7 +596,7 @@ public class DatabaseSocketClient {
     long beginResponse = 0;
     boolean first = true;
     ByteBuffer buf = ByteBuffer.allocateDirect(intBuff.length - totalRead);
-    while ((nBytes = sock.sock.read(buf)) > 0) {
+    while (!Thread.interrupted() && (nBytes = sock.sock.read(buf)) > 0) {
       if (first) {
         processingDuration.addAndGet(System.nanoTime() - processingBegin);
         beginResponse = System.nanoTime();
@@ -752,22 +696,6 @@ public class DatabaseSocketClient {
     bytesOut.write(body);
   }
 
-  private static final int BATCH_THREAD_COUNT = 2;
-
-  private static void initBatchSender(String host, int port, DatabaseSocketClient socketClient) {
-    socketClient.requestQueues.put(host + ":" + port, new ArrayBlockingQueue<Request>(1000));
-
-
-    for (int i = 0; i < BATCH_THREAD_COUNT; i++) {
-      Thread thread = new Thread(new BatchSender(host, port, socketClient.requestQueues.get(host + ":" + port)), "BatchSender: host=" + host + ", port=" + port + ", offset=" + i);
-      thread.start();
-      synchronized (socketClient.batchThreads) {
-        socketClient.batchThreads.add(thread);
-      }
-    }
-  }
-
-
   public static final boolean COMPRESS = true;
   public static final boolean LZO_COMPRESSION = true;
 
@@ -775,54 +703,31 @@ public class DatabaseSocketClient {
   @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public byte[] do_send(String batchKey, byte[] body, String hostPort) {
     try {
-      if (ENABLE_BATCH) {
-        ArrayBlockingQueue<Request> queue = null;
-        synchronized (this) {
-          queue = requestQueues.get(hostPort);
-          if (queue == null) {
-            String[] parts = hostPort.split(":");
-            initBatchSender(parts[0], Integer.valueOf(parts[1]), this);
-            queue = requestQueues.get(hostPort);
-          }
-        }
-        Request request = new Request();
-        request.batchKey = batchKey;
-        request.body = body;
+      Request request = new Request();
+      request.batchKey = batchKey;
+      request.body = body;
 
-        batchKey = null; //disabling batch
-        if (batchKey == null) {
-          try {
-            List<Request> nonMatchingRequets = new ArrayList<>();
-            nonMatchingRequets.add(request);
-            String[] parts = hostPort.split(":");
-            sendBatch(parts[0], Integer.valueOf(parts[1]), nonMatchingRequets);
-          }
-          catch (Exception t) {
-            request.exception = t;
-            request.latch.countDown();
-          }
-        }
-        else {
-          queue.put(request);
-
-          if (!request.latch.await(365, TimeUnit.DAYS)) {
-            throw new Exception("Request timeout");
-          }
-        }
-
-        if (request.exception != null) {
-          throw new DeadServerException(request.exception);
-        }
-        if (!request.success) {
-          String exceptionStr = new String(request.response, "utf-8");
-          if (exceptionStr.contains("Server not running")) {
-            throw new DeadServerException();
-          }
-          throw new Exception(exceptionStr);
-        }
-        return request.response;
+      try {
+        List<Request> nonMatchingRequets = new ArrayList<>();
+        nonMatchingRequets.add(request);
+        String[] parts = hostPort.split(":");
+        sendBatch(parts[0], Integer.valueOf(parts[1]), nonMatchingRequets);
       }
-      return null;
+      catch (Exception t) {
+        request.exception = t;
+        request.latch.countDown();
+      }
+      if (request.exception != null) {
+        throw new DeadServerException(request.exception);
+      }
+      if (!request.success) {
+        String exceptionStr = new String(request.response, "utf-8");
+        if (exceptionStr.contains("Server not running")) {
+          throw new DeadServerException();
+        }
+        throw new Exception(exceptionStr);
+      }
+      return request.response;
     }
     catch (DeadServerException e) {
       String[] parts = hostPort.split(":");
@@ -839,39 +744,23 @@ public class DatabaseSocketClient {
   public static byte[] do_send(List<Request> requests) {
     try {
 
-      if (ENABLE_BATCH) {
-        ArrayBlockingQueue<Request> queue = null;
-        for (Request request : requests) {
-          synchronized (request.socketClient) {
-            queue = request.socketClient.requestQueues.get(request.hostPort);
-            if (queue == null) {
-              String[] parts = request.hostPort.split(":");
-              initBatchSender(parts[0], Integer.valueOf(parts[1]), request.socketClient);
-              queue = request.socketClient.requestQueues.get(request.hostPort);
-            }
-          }
-          queue.add(request);
-        }
+      String[] parts = requests.get(0).hostPort.split(":");
+      sendBatch(parts[0], Integer.valueOf(parts[1]), requests);
 
-        for (Request request : requests) {
-          if (!request.latch.await(365, TimeUnit.DAYS)) {
-            throw new Exception("Request timeout");
-          }
-
-          if (request.exception != null) {
-            throw request.exception;
-          }
-          if (!request.success) {
-            String exceptionStr = new String(request.response, "utf-8");
-            if (exceptionStr.contains("Server not running")) {
-              throw new DeadServerException();
-            }
-            throw new Exception(exceptionStr);
-          }
+      for (Request request : requests) {
+        if (request.exception != null) {
+          throw request.exception;
         }
-        return requests.get(0).response;
+        if (!request.success) {
+          String exceptionStr = new String(request.response, "utf-8");
+          if (exceptionStr.contains("Server not running")) {
+            throw new DeadServerException();
+          }
+          throw new Exception(exceptionStr);
+        }
       }
-      return null;
+      return requests.get(0).response;
+
     }
     catch (Exception e) {
       throw new DatabaseException(e);

@@ -6,12 +6,14 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
+import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.query.impl.ColumnImpl;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.util.FileUtils;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -40,6 +42,19 @@ public class TestFailover {
 
   DatabaseClient client = null;
   final DatabaseServer[][] dbServers = new DatabaseServer[2][];
+
+  @AfterClass
+  public void afterClass() throws SQLException {
+    conn.close();
+
+    for (DatabaseServer[] servers : dbServers) {
+      for (DatabaseServer server : servers) {
+        server.shutdown();
+      }
+    }
+    Logger.queue.clear();
+
+  }
 
   @BeforeClass
   public void beforeClass() throws Exception {
@@ -167,7 +182,8 @@ public class TestFailover {
         ComObject cobj = new ComObject();
         cobj.put(ComObject.Tag.method, "areAllLongRunningCommandsComplete");
         byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().sendToMaster(cobj);
-        if (new String(bytes).equals("true")) {
+        ComObject retObj = new ComObject(bytes);
+        if (retObj.getBoolean(ComObject.Tag.isComplete)) {
           break;
         }
         Thread.sleep(1000);
@@ -208,7 +224,7 @@ public class TestFailover {
     DatabaseServer.initDeathOverride(2, 2);
     DatabaseServer.deathOverride[1][1] = true;
     try {
-      Thread.sleep(4000);
+      Thread.sleep(20_000);
 
       client.syncSchema();
       assertEquals(client.getCommon().getServersConfig().getShards()[1].getMasterReplica(), 0);

@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.common.Logger;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.server.DatabaseServer;
-
 import com.sonicbase.socket.DatabaseSocketClient;
 import com.sonicbase.socket.Util;
 import io.netty.bootstrap.ServerBootstrap;
@@ -27,6 +26,8 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.CRC32;
@@ -56,9 +57,39 @@ public class NettyServer {
   private ChannelFuture f;
   private EventLoopGroup bossGroup;
   private EventLoopGroup workerGroup;
+  private ServerBootstrap bootstrap;
   private AtomicLong totalRequestSize = new AtomicLong();
   private AtomicLong totalResponseSize = new AtomicLong();
   private AtomicLong totalTimeProcessing = new AtomicLong();
+
+  private Thread nettyThread = null;
+  private Thread serverThread = null;
+
+  public void shutdown() {
+    try {
+      serverThread.interrupt();
+      shutdownNetty();
+      nettyThread.interrupt();
+
+      serverThread.join();
+      nettyThread.join();
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  private void shutdownNetty() throws ExecutionException, InterruptedException {
+    f.channel().close();
+    if (f.channel().parent() != null) {
+      f.channel().parent().close();
+    }
+
+    Future future1 = bossGroup.shutdownGracefully();
+    Future future2 = workerGroup.shutdownGracefully();
+    future1.get();
+    future2.get();
+  }
 
   public static class Request {
     private byte[] body;
@@ -749,13 +780,13 @@ public class NettyServer {
   }
 
   public void run() {
-    EventLoopGroup bossGroup = new NioEventLoopGroup(); // (1)
-    EventLoopGroup workerGroup = new NioEventLoopGroup(threadCount);
+    bossGroup = new NioEventLoopGroup(); // (1)
+    workerGroup = new NioEventLoopGroup(threadCount);
     try {
 
-      ServerBootstrap b = new ServerBootstrap(); // (2)
+      bootstrap = new ServerBootstrap(); // (2)
       logger.info("creating group");
-      b.group(bossGroup, workerGroup)
+      bootstrap.group(bossGroup, workerGroup)
           .channel(NioServerSocketChannel.class) // (3)
           .childHandler(new MyChannelInitializer())
           .option(ChannelOption.SO_BACKLOG, 128)          // (5)
@@ -765,7 +796,7 @@ public class NettyServer {
       ;
       // Bind and start to accept incoming connections.
       logger.info("binding port");
-      ChannelFuture f = b.bind(port).sync(); // (7)
+      f = bootstrap.bind(port).sync(); // (7)
 
       // Wait until the server socket is closed.
       // In this example, this does not happen, but you can do that to gracefully
@@ -776,10 +807,6 @@ public class NettyServer {
     }
     catch (InterruptedException e) {
       throw new DatabaseException(e);
-    }
-    finally {
-      workerGroup.shutdownGracefully();
-      bossGroup.shutdownGracefully();
     }
   }
 
@@ -838,7 +865,6 @@ public class NettyServer {
 
 
       int port = Integer.valueOf(portStr);
-      Thread nettyThread = null;
       try {
 
         final DatabaseServer databaseServer = new DatabaseServer();
@@ -870,7 +896,7 @@ public class NettyServer {
         });
         nettyThread.start();
 
-        Thread thread = new Thread(new Runnable() {
+        serverThread = new Thread(new Runnable() {
           @Override
           public void run() {
             try {
@@ -903,7 +929,7 @@ public class NettyServer {
             }
           }
         });
-        thread.start();
+        serverThread.start();
       }
       catch (Exception e) {
         File file = new File(System.getProperty("user.home"), "startupError.txt");

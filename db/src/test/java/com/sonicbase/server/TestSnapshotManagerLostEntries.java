@@ -1,4 +1,4 @@
-package com.sonicbase.database;
+package com.sonicbase.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -7,14 +7,16 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
-import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.util.FileUtils;
 import org.junit.Test;
 
 import java.io.BufferedInputStream;
 import java.io.File;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -29,11 +31,11 @@ public class TestSnapshotManagerLostEntries {
 
   ConcurrentHashMap<Long, Long> foundIds = new ConcurrentHashMap<>();
   AtomicInteger countPlayed = new AtomicInteger();
-  int recordCount = 10_000_000;
+  int recordCount = 10_000;
 
   class MonitorServer extends DatabaseServer {
-    public byte[] invokeMethod(final byte[] body, long logSequence0, short logSequence1,
-                                boolean replayedCommand, boolean enableQueuing, AtomicLong timeLogging, AtomicLong handlerTime) {
+    public byte[] invokeMethod(final byte[] body, long logSequence0, long logSequence1,
+                               boolean replayedCommand, boolean enableQueuing, AtomicLong timeLogging, AtomicLong handlerTime) {
       if (replayedCommand) {
         if (countPlayed.incrementAndGet() % 10000 == 0) {
           System.out.println("count=" + countPlayed.get());
@@ -53,7 +55,7 @@ public class TestSnapshotManagerLostEntries {
   public void test() throws Exception {
     String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
     ObjectMapper mapper = new ObjectMapper();
-    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+    ObjectNode config = (ObjectNode) mapper.readTree(configStr);
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -63,7 +65,7 @@ public class TestSnapshotManagerLostEntries {
 
     DatabaseClient.getServers().clear();
 
-    final DatabaseServer[] dbServers = new DatabaseServer[4];
+    DatabaseServer[] dbServers = new DatabaseServer[4];
     ThreadPoolExecutor executor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
     String role = "primaryMaster";
@@ -119,24 +121,24 @@ public class TestSnapshotManagerLostEntries {
     dbServers[2].runSnapshot();
     dbServers[3].runSnapshot();
 
+    conn.close();
 
-  }
+    dbServers[0].shutdown();
+    dbServers[1].shutdown();
+    dbServers[2].shutdown();
+    dbServers[3].shutdown();
 
-  @Test
-  public void validate() throws Exception {
-    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-    ObjectMapper mapper = new ObjectMapper();
-    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+    configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
+    mapper = new ObjectMapper();
+    config = (ObjectNode) mapper.readTree(configStr);
 
-    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
-
-    ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
+    array = new ArrayNode(JsonNodeFactory.instance);
     array.add(DatabaseServer.FOUR_SERVER_LICENSE);
     config.put("licenseKeys", array);
 
-    final DatabaseServer[] dbServers = new DatabaseServer[4];
+    dbServers = new DatabaseServer[4];
 
-    String role = "primaryMaster";
+    role = "primaryMaster";
 
     for (int i = 0; i < dbServers.length; i++) {
       final int shard = i;
@@ -167,13 +169,13 @@ public class TestSnapshotManagerLostEntries {
 
     Class.forName("com.sonicbase.jdbcdriver.Driver");
 
-    Connection conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/test", "user", "password");
+    conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/test", "user", "password");
 
-    DatabaseClient client = ((ConnectionProxy) conn).getDatabaseClient();
+    client = ((ConnectionProxy) conn).getDatabaseClient();
 
     int countMissing = 0;
     Long firstMissing = null;
-    PreparedStatement stmt = conn.prepareStatement("select * from persons where id=?");
+    stmt = conn.prepareStatement("select * from persons where id=?");
     for (int i = 0; i < recordCount; i++) {
       stmt.setLong(1, i);
       ResultSet rs = stmt.executeQuery();
@@ -191,5 +193,13 @@ public class TestSnapshotManagerLostEntries {
       }
     }
     System.out.println("missing count=" + countMissing + ", firstMissing=" + firstMissing);
+
+    conn.close();
+
+    dbServers[0].shutdown();
+    dbServers[1].shutdown();
+    dbServers[2].shutdown();
+    dbServers[3].shutdown();
+
   }
 }

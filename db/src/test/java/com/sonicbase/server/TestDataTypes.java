@@ -39,7 +39,9 @@ public class TestDataTypes {
   DatabaseServer[] dbServers;
 
   @AfterClass
-  public void afterClass() {
+  public void afterClass() throws SQLException {
+    conn.close();
+
     for (DatabaseServer server : dbServers) {
       server.shutdown();
     }

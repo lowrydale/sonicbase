@@ -5,14 +5,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
-import com.sonicbase.common.*;
-import com.sonicbase.jdbcdriver.ConnectionProxy;
+import com.sonicbase.common.ComArray;
+import com.sonicbase.common.ComObject;
+import com.sonicbase.common.InsufficientLicense;
+import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.StatementProxy;
 import com.sonicbase.query.DatabaseException;
-import com.sonicbase.streams.Message;
-import com.sonicbase.streams.StreamsConsumer;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.streams.Message;
+import com.sonicbase.streams.StreamsConsumer;
 import com.sonicbase.util.DateUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import sun.misc.BASE64Decoder;
@@ -93,41 +95,6 @@ public class StreamManager {
   }
 
   ArrayBlockingQueue<ProcessingRequest> processingQueue = new ArrayBlockingQueue<>(100);
-  Connection sysConnection = null;
-
-  public static Connection initSysConnection(ObjectNode config, DatabaseServer server) {
-    try {
-      ArrayNode array = config.withArray("shards");
-      ObjectNode replicaDict = (ObjectNode) array.get(0);
-      ArrayNode replicasArray = replicaDict.withArray("replicas");
-      JsonNode node = config.get("clientIsPrivate");
-      final String address = node != null && node.asBoolean() ?
-          replicasArray.get(0).get("privateAddress").asText() :
-          replicasArray.get(0).get("publicAddress").asText();
-      final int port = replicasArray.get(0).get("port").asInt();
-
-      Class.forName("com.sonicbase.jdbcdriver.Driver");
-      ConnectionProxy conn = new ConnectionProxy("jdbc:sonicbase:" + address + ":" + port, server);
-      try {
-        if (!((ConnectionProxy) conn).databaseExists("_sonicbase_sys")) {
-          ((ConnectionProxy) conn).createDatabase("_sonicbase_sys");
-        }
-      }
-      catch (Exception e) {
-        if (!ExceptionUtils.getFullStackTrace(e).toLowerCase().contains("database already exists")) {
-          throw new DatabaseException(e);
-        }
-      }
-
-      conn.close();
-
-      conn = new ConnectionProxy("jdbc:sonicbase:" + address + ":" + port + "/_sonicbase_sys", server);
-      return conn;
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-  }
 
   public static void initStreamsConsumerTable(Connection conn) {
     PreparedStatement stmt = null;
@@ -192,10 +159,8 @@ public class StreamManager {
       ArrayNode streams = queueDict.withArray("consumers");
       if (streams != null) {
 
-        if (sysConnection == null) {
-          sysConnection = initSysConnection(config, server);
-          initStreamsConsumerTable(sysConnection);
-        }
+        Connection conn = server.getSysConnection();
+        initStreamsConsumerTable(conn);
 
         activeCheckThread = new Thread(new Runnable() {
           @Override
@@ -381,7 +346,7 @@ public class StreamManager {
   private boolean readActiveStatus() {
     PreparedStatement stmt = null;
     try {
-      stmt = sysConnection.prepareStatement("select * from streams_consumer_state where shard=? and replica=?");
+      stmt = server.getSysConnection().prepareStatement("select * from streams_consumer_state where shard=? and replica=?");
       stmt.setInt(1, server.getShard());
       stmt.setInt(2, server.getReplica());
       ResultSet rs = stmt.executeQuery();
@@ -669,10 +634,6 @@ public class StreamManager {
           thread.join();
         }
         processingThreads = null;
-      }
-      if (sysConnection != null) {
-        sysConnection.close();
-        sysConnection = null;
       }
     }
     catch (Exception e) {

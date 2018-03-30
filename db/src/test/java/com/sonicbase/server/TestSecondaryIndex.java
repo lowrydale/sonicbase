@@ -1,5 +1,5 @@
 
-package com.sonicbase.database;
+package com.sonicbase.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -7,10 +7,11 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
+import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
-import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.util.FileUtils;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -38,6 +39,17 @@ public class TestSecondaryIndex {
   List<Long> ids = new ArrayList<>();
 
   DatabaseClient client = null;
+  private DatabaseServer[] dbServers;
+
+  @AfterClass
+  public void afterClass() throws SQLException {
+    conn.close();
+
+    for (DatabaseServer server : dbServers) {
+      server.shutdown();
+    }
+    Logger.queue.clear();
+  }
 
   @BeforeClass
   public void beforeClass() throws Exception {
@@ -47,6 +59,7 @@ public class TestSecondaryIndex {
       final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+      FileUtils.deleteDirectory(new File("/data/db-backup"));
 
       ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
       array.add(DatabaseServer.FOUR_SERVER_LICENSE);
@@ -54,7 +67,7 @@ public class TestSecondaryIndex {
 
       DatabaseClient.getServers().clear();
 
-      final DatabaseServer[] dbServers = new DatabaseServer[4];
+      dbServers = new DatabaseServer[4];
       ThreadPoolExecutor executor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
       String role = "primaryMaster";

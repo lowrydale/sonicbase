@@ -40,23 +40,12 @@ public class ReadManager {
   private final DatabaseServer server;
   private Thread preparedReaper;
   private Thread diskReaper;
+  private boolean shutdown;
 
   public ReadManager(DatabaseServer databaseServer) {
 
     this.server = databaseServer;
     this.logger = new Logger(databaseServer.getDatabaseClient());
-
-    new java.util.Timer().scheduleAtFixedRate(new TimerTask() {
-      @Override
-      public void run() {
-        logger.info("IndexLookup stats: count=" + INDEX_LOOKUP_STATS.getCount() + ", rate=" + INDEX_LOOKUP_STATS.getFiveMinuteRate() +
-            ", durationAvg=" + INDEX_LOOKUP_STATS.getSnapshot().getMean() / 1000000d +
-            ", duration99.9=" + INDEX_LOOKUP_STATS.getSnapshot().get999thPercentile() / 1000000d);
-        logger.info("BatchIndexLookup stats: count=" + BATCH_INDEX_LOOKUP_STATS.getCount() + ", rate=" + BATCH_INDEX_LOOKUP_STATS.getFiveMinuteRate() +
-            ", durationAvg=" + BATCH_INDEX_LOOKUP_STATS.getSnapshot().getMean() / 1000000d +
-            ", duration99.9=" + BATCH_INDEX_LOOKUP_STATS.getSnapshot().get999thPercentile() / 1000000d);
-      }
-    }, 20 * 1000, 20 * 1000);
 
     startPreparedReaper();
 
@@ -64,10 +53,10 @@ public class ReadManager {
   }
 
   private void startDiskResultsReaper() {
-    diskReaper = new Thread(new Runnable(){
+    diskReaper = ThreadUtil.createThread(new Runnable(){
       @Override
       public void run() {
-        while (true) {
+        while (!shutdown) {
           try {
             DiskBasedResultSet.deleteOldResultSets(server);
           }
@@ -82,7 +71,7 @@ public class ReadManager {
           }
         }
       }
-    });
+    }, "SonicBase Disk Results Reaper Thread");
     diskReaper.start();
   }
 
@@ -126,7 +115,7 @@ public class ReadManager {
       }
     }
     TableSchema tableSchema = server.getCommon().getTables(dbName).get(fromTable);
-    Index index = server.getIndices(dbName).getIndices().get(fromTable).get(primaryKeyIndex);
+    Index index = server.getIndex(dbName, fromTable, primaryKeyIndex);
 
     int countColumnOffset = 0;
     if (countColumn != null) {
@@ -159,7 +148,7 @@ public class ReadManager {
           }
         //}
         for (byte[] bytes : records) {
-          if (Record.DB_VIEW_FLAG_DELETING == Record.getDbViewFlags(bytes)) {
+          if ((Record.getDbViewFlags(bytes) & Record.DB_VIEW_FLAG_DELETING) != 0) {
             continue;
           }
           Record record = new Record(tableSchema);
@@ -214,10 +203,10 @@ public class ReadManager {
       String indexName = cobj.getString(ComObject.Tag.indexName);
 
       TableSchema tableSchema = server.getCommon().getSchema(dbName).getTables().get(tableName);
-      IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
+      IndexSchema indexSchema = server.getIndexSchema(dbName, tableSchema.getName(), indexName);
       AtomicInteger AtomicInteger = new AtomicInteger();
 
-      Index index = server.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexName);
+      Index index = server.getIndex(dbName, tableSchema.getName(), indexName);
       Boolean ascending = null;
 
       ComObject retObj = new ComObject();
@@ -239,7 +228,7 @@ public class ReadManager {
       for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
         if (entry.getValue().isPrimaryKey()) {
           primaryKeyIndexSchema = entry.getValue();
-          primaryKeyIndex = server.getIndices(dbName).getIndices().get(tableSchema.getName()).get(entry.getKey());
+          primaryKeyIndex = server.getIndex(dbName, tableSchema.getName(), entry.getKey());
         }
       }
 
@@ -335,10 +324,10 @@ public class ReadManager {
   }
 
   public void startPreparedReaper() {
-    preparedReaper = new Thread(new Runnable(){
+    preparedReaper = ThreadUtil.createThread(new Runnable(){
       @Override
       public void run() {
-        while (true) {
+        while (!shutdown) {
           try {
             for (Map.Entry<Long, PreparedIndexLookup> prepared : preparedIndexLookups.entrySet()) {
               if (prepared.getValue().lastTimeUsed != 0 &&
@@ -348,14 +337,33 @@ public class ReadManager {
             }
             Thread.sleep(10 * 1000);
           }
+          catch (InterruptedException e) {
+            break;
+          }
           catch (Exception e) {
             logger.error("Error in prepared reaper thread", e);
           }
         }
       }
-    });
+    }, "SonicBase Prepared Statement Reaper Thread");
     preparedReaper.start();
   }
+
+  public void shutdown() {
+    try {
+      shutdown = true;
+      if (diskReaper != null) {
+        diskReaper.interrupt();
+        diskReaper.join();
+      }
+      preparedReaper.interrupt();
+      preparedReaper.join();
+    }
+    catch (InterruptedException e) {
+      throw new DatabaseException(e);
+    }
+  }
+
   class PreparedIndexLookup {
 
     public long lastTimeUsed;
@@ -572,7 +580,7 @@ public class ReadManager {
       Long limit = cobj.getLong(ComObject.Tag.limitLong);
       AtomicLong currOffset = new AtomicLong(cobj.getLong(ComObject.Tag.currOffset));
 
-      Index index = server.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexName);
+      Index index = server.getIndex(dbName, tableSchema.getName(), indexName);
       Map.Entry<Object[], Object> entry = null;
 
       Boolean ascending = null;
@@ -900,8 +908,7 @@ public class ReadManager {
 
       DiskBasedResultSet diskResults = null;
       if (serverSelectPageNumber == 0) {
-        ThreadPoolExecutor executor = new ThreadPoolExecutor(selectStatements.length, selectStatements.length, 10_000,
-            TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+        ThreadPoolExecutor executor = ThreadUtil.createExecutor(selectStatements.length, "SonicBase ReadManager serverSetSelect Thread");
         final ResultSetImpl[] resultSets = new ResultSetImpl[selectStatements.length];
         try {
           List<Future> futures = new ArrayList<>();
@@ -1005,7 +1012,7 @@ public class ReadManager {
       }
     }
     else {
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(resultSets.length, resultSets.length, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+      ThreadPoolExecutor executor = ThreadUtil.createExecutor(resultSets.length, "SonicBase ReadManager buildUniqueResultSet Thread");
       List<Future> futures = new ArrayList<>();
       try {
         for (int i = 0; i < resultSets.length; i++) {
@@ -1126,7 +1133,7 @@ public class ReadManager {
       long viewVersion = cobj.getLong(ComObject.Tag.viewVersion);
 
       TableSchema tableSchema = server.getCommon().getSchema(dbName).getTables().get(tableName);
-      IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
+      IndexSchema indexSchema = server.getIndexSchema(dbName, tableSchema.getName(), indexName);
 
       byte[] leftKeyBytes = cobj.getByteArray(ComObject.Tag.leftKey);
       Object[] leftKey = null;
@@ -1174,7 +1181,7 @@ public class ReadManager {
         isProbe = false;
       }
 
-      Index index = server.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexName);
+      Index index = server.getIndex(dbName, tableSchema.getName(), indexName);
       Map.Entry<Object[], Object> entry = null;
 
       Boolean ascending = null;
@@ -2881,7 +2888,7 @@ public class ReadManager {
       //System.out.println("null records *******************");
     }
     else {
-      if (indexSchema == null || server.getCommon().getTables(dbName).get(tableSchema.getName()).getIndices().get(indexSchema.getName()).getLastPartitions() != null) {
+      if (indexSchema == null || server.getIndexSchema(dbName, tableSchema.getName(), indexSchema.getName()).getLastPartitions() != null) {
         List<byte[]> remaining = new ArrayList<>();
         for (byte[] bytes : records) {
           if (!processViewFlags(viewVersion, remaining, bytes)) {
@@ -3203,7 +3210,7 @@ public class ReadManager {
       }
       byte[] maxKey = null;
       byte[] minKey = null;
-      Index index = server.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
+      Index index = server.getIndex(dbName, tableName, indexName);
       Map.Entry<Object[], Object> entry = index.lastEntry();
       if (entry != null) {
         byte[][] records = null;
@@ -3295,7 +3302,7 @@ public class ReadManager {
       }
       Object[] key = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
 
-      Index index = server.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
+      Index index = server.getIndex(dbName, tableName, indexName);
       //synchronized (index.getMutex(key)) {
         Object unsafeAddress = index.get(key);
         if (unsafeAddress != null) {

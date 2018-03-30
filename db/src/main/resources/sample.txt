@@ -1,56 +1,725 @@
-9NDD-D1K,MNKR-N6J
-LKK3-YCD,LY1Y-P34
-LJGH-ZB2,LT62-LB1 attempted fix on 2/21/18
-KW6F-T9J,LN8Z-LVR
-LYQ7-WY8,LYQQ-D27
-9VDW-K4D,9VDW-K41
-KNR5-CXJ,KPWL-52R
-K8JV-R1N,KZ5P-2MG
-KF2S-VML,LLSW-VGP
-LTF3-HP7,9NLX-67D
-LTVH-J6R,LL7P-HXW
-MJQT-B97,9K8W-4CZ
-LRFL-S53,LRHT-4HP
-LBMK-G2R,9W4S-7MV
-L785-QM8,LQTH-6KG
-LZBP-X8V,LFP6-1GW
-LCJC-NTM,LJTJ-2KW
-LXCZ-38G,KLJP-VD3
-LZBP-X8V,K81C-NSS
-LDS3-FR4,LDS9-88C
-L5FG-VY7,KZSF-S8Y
-LYQ7-31X,M4D2-V2H
-LZBP-X8V,K242-1VG
-LRK6-XY3,LX7K-T4M
-9F71-BC2,9ZWL-ZJZ
-K8XR-JJ1,MVB2-473
-KGND-661,KGND-6X9 attempted fix on 2/21/18
-LFHZ-NRY,KWHJ-15C
-LTJW-Q24,L697-G1D
-KJGM-7Y2,KJGM-7YJ
-LZRS-5K8,L5LJ-V9Z
-KN13-QJC,KN13-QV8
-99B7-8D9,LRQZ-N5Y
-KN13-QJC,KN13-QV4
-LRNC-6Z7,LRNC-S7C
-LYQQ-BSZ,LYQQ-V2N
-LHFW-K1B,LX37-P9Q
-9ZW2-Y4D,9ZW2-Y46
-967X-VD3,K69D-MDL
-LY3G-D3T,LY3G-D2J
-LYQQ-RH5,KFRX-JPN
-LNKM-316,LNKM-312
-LWW8-WBL,LWW8-WBN
-KW6F-T9J,LF48-1QN
-27MQ-N79,27MQ-NQB
-LYQQ-2H6,KD77-KWP
-M3BK-Z4B,M3BK-Z4F
-KCB5-Z2R,KDB1-CKV
-LYYZ-W3S,LYYZ-DTJ
-LQR4-L9F,KLB9-Q5K
-LYQQ-RHC,LYQQ-RTN
-9VHD-W56,LYQ7-W5Y
-LDJ4-P82,L8SR-B54
-KZF1-ZQS,KHQQ-XSV
-K8Q8-Z2R,LYQQ-SG4
-LZBP-X8V,KLXB-FPM
+"Thread-183" #422 daemon prio=5 os_prio=31 tid=0x00007feb2d149800 nid=0x6e8b runnable [0x000070000822a000]
+   java.lang.Thread.State: RUNNABLE
+	at java.io.FileInputStream.readBytes(Native Method)
+	at java.io.FileInputStream.read(FileInputStream.java:255)
+	at java.io.BufferedInputStream.read1(BufferedInputStream.java:284)
+	at java.io.BufferedInputStream.read(BufferedInputStream.java:345)
+	- locked <0x000000076e8109b8> (a java.lang.UNIXProcess$ProcessPipeInputStream)
+	at sun.nio.cs.StreamDecoder.readBytes(StreamDecoder.java:284)
+	at sun.nio.cs.StreamDecoder.implRead(StreamDecoder.java:326)
+	at sun.nio.cs.StreamDecoder.read(StreamDecoder.java:178)
+	- locked <0x000000076e815c38> (a java.io.InputStreamReader)
+	at java.io.InputStreamReader.read(InputStreamReader.java:184)
+	at java.io.BufferedReader.fill(BufferedReader.java:161)
+	at java.io.BufferedReader.readLine(BufferedReader.java:324)
+	- locked <0x000000076e815c38> (a java.io.InputStreamReader)
+	at java.io.BufferedReader.readLine(BufferedReader.java:389)
+	at org.apache.maven.surefire.shade.org.apache.maven.shared.utils.cli.StreamPumper.run(StreamPumper.java:76)
+
+"Thread-182" #421 daemon prio=5 os_prio=31 tid=0x00007feb33bba000 nid=0x6067 runnable [0x0000700008127000]
+   java.lang.Thread.State: RUNNABLE
+	at java.io.FileInputStream.available(Native Method)
+	at java.io.BufferedInputStream.available(BufferedInputStream.java:410)
+	- locked <0x000000076e80e8f8> (a java.lang.UNIXProcess$ProcessPipeInputStream)
+	at sun.nio.cs.StreamDecoder.inReady(StreamDecoder.java:363)
+	at sun.nio.cs.StreamDecoder.implRead(StreamDecoder.java:324)
+	at sun.nio.cs.StreamDecoder.read(StreamDecoder.java:178)
+	- locked <0x000000076e812fa0> (a java.io.InputStreamReader)
+	at java.io.InputStreamReader.read(InputStreamReader.java:184)
+	at java.io.BufferedReader.fill(BufferedReader.java:161)
+	at java.io.BufferedReader.readLine(BufferedReader.java:324)
+	- locked <0x000000076e812fa0> (a java.io.InputStreamReader)
+	at java.io.BufferedReader.readLine(BufferedReader.java:389)
+	at org.apache.maven.surefire.shade.org.apache.maven.shared.utils.cli.StreamPumper.run(StreamPumper.java:76)
+
+"Thread-181" #420 daemon prio=5 os_prio=31 tid=0x00007feb33c3d800 nid=0x6c63 waiting on condition [0x0000700008024000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x000000076e289dd0> (a java.util.concurrent.Semaphore$NonfairSync)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer.parkAndCheckInterrupt(AbstractQueuedSynchronizer.java:836)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer.doAcquireSharedInterruptibly(AbstractQueuedSynchronizer.java:997)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer.acquireSharedInterruptibly(AbstractQueuedSynchronizer.java:1304)
+	at java.util.concurrent.Semaphore.acquire(Semaphore.java:312)
+	at org.apache.maven.plugin.surefire.booterclient.lazytestprovider.TestLessInputStream.awaitNextCommand(TestLessInputStream.java:156)
+	at org.apache.maven.plugin.surefire.booterclient.lazytestprovider.TestLessInputStream.beforeNextCommand(TestLessInputStream.java:127)
+	at org.apache.maven.plugin.surefire.booterclient.lazytestprovider.AbstractCommandStream.read(AbstractCommandStream.java:101)
+	at org.apache.maven.surefire.shade.org.apache.maven.shared.utils.cli.StreamFeeder.feed(StreamFeeder.java:123)
+	at org.apache.maven.surefire.shade.org.apache.maven.shared.utils.cli.StreamFeeder.run(StreamFeeder.java:60)
+
+"ThreadedStreamConsumer" #419 daemon prio=5 os_prio=31 tid=0x00007feb31ef8800 nid=0x6803 waiting on condition [0x0000700007f21000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x000000076e803fd8> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.maven.plugin.surefire.booterclient.output.ThreadedStreamConsumer$Pumper.run(ThreadedStreamConsumer.java:71)
+	at java.lang.Thread.run(Thread.java:748)
+
+"surefire-fork-starter" #303 daemon prio=5 os_prio=31 tid=0x00007feb33a94000 nid=0x658b in Object.wait() [0x0000700007e1e000]
+   java.lang.Thread.State: WAITING (on object monitor)
+	at java.lang.Object.wait(Native Method)
+	- waiting on <0x000000076e80c6a0> (a java.lang.UNIXProcess)
+	at java.lang.Object.wait(Object.java:502)
+	at java.lang.UNIXProcess.waitFor(UNIXProcess.java:395)
+	- locked <0x000000076e80c6a0> (a java.lang.UNIXProcess)
+	at org.apache.maven.surefire.shade.org.apache.maven.shared.utils.cli.CommandLineUtils$1.call(CommandLineUtils.java:260)
+	at org.apache.maven.plugin.surefire.booterclient.ForkStarter.fork(ForkStarter.java:550)
+	at org.apache.maven.plugin.surefire.booterclient.ForkStarter.fork(ForkStarter.java:460)
+	at org.apache.maven.plugin.surefire.booterclient.ForkStarter.access$400(ForkStarter.java:110)
+	at org.apache.maven.plugin.surefire.booterclient.ForkStarter$2.call(ForkStarter.java:379)
+	at org.apache.maven.plugin.surefire.booterclient.ForkStarter$2.call(ForkStarter.java:356)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:266)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at java.lang.Thread.run(Thread.java:748)
+
+"ping-timer-10sec" #301 daemon prio=5 os_prio=31 tid=0x00007feb2caf6000 nid=0x678b waiting on condition [0x0000700007d1b000]
+   java.lang.Thread.State: TIMED_WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x0000000777ddd050> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.parkNanos(LockSupport.java:215)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.awaitNanos(AbstractQueuedSynchronizer.java:2078)
+	at java.util.concurrent.ScheduledThreadPoolExecutor$DelayedWorkQueue.take(ScheduledThreadPoolExecutor.java:1093)
+	at java.util.concurrent.ScheduledThreadPoolExecutor$DelayedWorkQueue.take(ScheduledThreadPoolExecutor.java:809)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at java.lang.Thread.run(Thread.java:748)
+
+"resolver-5" #16 daemon prio=5 os_prio=31 tid=0x00007feb30017000 nid=0x5d03 waiting on condition [0x0000700007c18000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000006c047fe60> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at java.lang.Thread.run(Thread.java:748)
+
+"resolver-4" #15 daemon prio=5 os_prio=31 tid=0x00007feb30828800 nid=0x5b03 waiting on condition [0x0000700007b15000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000006c047fe60> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at java.lang.Thread.run(Thread.java:748)
+
+"resolver-3" #14 daemon prio=5 os_prio=31 tid=0x00007feb30827800 nid=0x5903 waiting on condition [0x0000700007a12000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000006c047fe60> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at java.lang.Thread.run(Thread.java:748)
+
+"resolver-2" #13 daemon prio=5 os_prio=31 tid=0x00007feb33912000 nid=0x1107 waiting on condition [0x000070000790f000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000006c047fe60> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at java.lang.Thread.run(Thread.java:748)
+
+"resolver-1" #12 daemon prio=5 os_prio=31 tid=0x00007feb2d22c000 nid=0x1007 waiting on condition [0x0000700006422000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000006c047fe60> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at java.lang.Thread.run(Thread.java:748)
+
+"process reaper" #10 daemon prio=10 os_prio=31 tid=0x00007feb2e8eb000 nid=0x5703 runnable [0x000070000780c000]
+   java.lang.Thread.State: RUNNABLE
+	at java.lang.UNIXProcess.waitForProcessExit(Native Method)
+	at java.lang.UNIXProcess.lambda$initStreams$3(UNIXProcess.java:289)
+	at java.lang.UNIXProcess$$Lambda$7/245565335.run(Unknown Source)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at java.lang.Thread.run(Thread.java:748)
+
+"Service Thread" #9 daemon prio=9 os_prio=31 tid=0x00007feb2e854000 nid=0x5303 runnable [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+
+"C1 CompilerThread3" #8 daemon prio=9 os_prio=31 tid=0x00007feb2e853000 nid=0x5103 waiting on condition [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+
+"C2 CompilerThread2" #7 daemon prio=9 os_prio=31 tid=0x00007feb2c808800 nid=0x4f03 waiting on condition [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+
+"C2 CompilerThread1" #6 daemon prio=9 os_prio=31 tid=0x00007feb2d81e800 nid=0x4d03 waiting on condition [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+
+"C2 CompilerThread0" #5 daemon prio=9 os_prio=31 tid=0x00007feb2d81d000 nid=0x4b03 waiting on condition [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+
+"Signal Dispatcher" #4 daemon prio=9 os_prio=31 tid=0x00007feb2d81b000 nid=0x4903 waiting on condition [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+
+"Finalizer" #3 daemon prio=8 os_prio=31 tid=0x00007feb2e81f000 nid=0x3803 in Object.wait() [0x0000700007049000]
+   java.lang.Thread.State: WAITING (on object monitor)
+	at java.lang.Object.wait(Native Method)
+	- waiting on <0x00000006c0eb93d0> (a java.lang.ref.ReferenceQueue$Lock)
+	at java.lang.ref.ReferenceQueue.remove(ReferenceQueue.java:143)
+	- locked <0x00000006c0eb93d0> (a java.lang.ref.ReferenceQueue$Lock)
+	at java.lang.ref.ReferenceQueue.remove(ReferenceQueue.java:164)
+	at java.lang.ref.Finalizer$FinalizerThread.run(Finalizer.java:209)
+
+"Reference Handler" #2 daemon prio=10 os_prio=31 tid=0x00007feb2e81c000 nid=0x3603 in Object.wait() [0x0000700006f46000]
+   java.lang.Thread.State: WAITING (on object monitor)
+	at java.lang.Object.wait(Native Method)
+	- waiting on <0x00000006c16f4c48> (a java.lang.ref.Reference$Lock)
+	at java.lang.Object.wait(Object.java:502)
+	at java.lang.ref.Reference.tryHandlePending(Reference.java:191)
+	- locked <0x00000006c16f4c48> (a java.lang.ref.Reference$Lock)
+	at java.lang.ref.Reference$ReferenceHandler.run(Reference.java:153)
+
+"main" #1 prio=5 os_prio=31 tid=0x00007feb2c809800 nid=0x1b03 waiting on condition [0x0000700006527000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x0000000777ee2bf0> (a java.util.concurrent.FutureTask)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.FutureTask.awaitDone(FutureTask.java:429)
+	at java.util.concurrent.FutureTask.get(FutureTask.java:191)
+	at org.apache.maven.plugin.surefire.booterclient.ForkStarter.awaitResultsDone(ForkStarter.java:409)
+	at org.apache.maven.plugin.surefire.booterclient.ForkStarter.runSuitesForkPerTestSet(ForkStarter.java:391)
+	at org.apache.maven.plugin.surefire.booterclient.ForkStarter.run(ForkStarter.java:242)
+	at org.apache.maven.plugin.surefire.booterclient.ForkStarter.run(ForkStarter.java:201)
+	at org.apache.maven.plugin.surefire.AbstractSurefireMojo.executeProvider(AbstractSurefireMojo.java:1026)
+	at org.apache.maven.plugin.surefire.AbstractSurefireMojo.executeAfterPreconditionsChecked(AbstractSurefireMojo.java:862)
+	at org.apache.maven.plugin.surefire.AbstractSurefireMojo.execute(AbstractSurefireMojo.java:755)
+	at org.apache.maven.plugin.DefaultBuildPluginManager.executeMojo(DefaultBuildPluginManager.java:134)
+	at org.apache.maven.lifecycle.internal.MojoExecutor.execute(MojoExecutor.java:208)
+	at org.apache.maven.lifecycle.internal.MojoExecutor.execute(MojoExecutor.java:154)
+	at org.apache.maven.lifecycle.internal.MojoExecutor.execute(MojoExecutor.java:146)
+	at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject(LifecycleModuleBuilder.java:117)
+	at org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject(LifecycleModuleBuilder.java:81)
+	at org.apache.maven.lifecycle.internal.builder.singlethreaded.SingleThreadedBuilder.build(SingleThreadedBuilder.java:51)
+	at org.apache.maven.lifecycle.internal.LifecycleStarter.execute(LifecycleStarter.java:128)
+	at org.apache.maven.DefaultMaven.doExecute(DefaultMaven.java:309)
+	at org.apache.maven.DefaultMaven.doExecute(DefaultMaven.java:194)
+	at org.apache.maven.DefaultMaven.execute(DefaultMaven.java:107)
+	at org.apache.maven.cli.MavenCli.execute(MavenCli.java:993)
+	at org.apache.maven.cli.MavenCli.doMain(MavenCli.java:345)
+	at org.apache.maven.cli.MavenCli.main(MavenCli.java:191)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at org.codehaus.plexus.classworlds.launcher.Launcher.launchEnhanced(Launcher.java:289)
+	at org.codehaus.plexus.classworlds.launcher.Launcher.launch(Launcher.java:229)
+	at org.codehaus.plexus.classworlds.launcher.Launcher.mainWithExitCode(Launcher.java:415)
+	at org.codehaus.plexus.classworlds.launcher.Launcher.main(Launcher.java:356)
+
+"VM Thread" os_prio=31 tid=0x00007feb2f040800 nid=0x3403 runnable
+
+"GC task thread#0 (ParallelGC)" os_prio=31 tid=0x00007feb2f003800 nid=0x2403 runnable
+
+"GC task thread#1 (ParallelGC)" os_prio=31 tid=0x00007feb2f004000 nid=0x2603 runnable
+
+"GC task thread#2 (ParallelGC)" os_prio=31 tid=0x00007feb2f004800 nid=0x2803 runnable
+
+"GC task thread#3 (ParallelGC)" os_prio=31 tid=0x00007feb2f005000 nid=0x2a03 runnable
+
+"GC task thread#4 (ParallelGC)" os_prio=31 tid=0x00007feb2f006000 nid=0x2c03 runnable
+
+"GC task thread#5 (ParallelGC)" os_prio=31 tid=0x00007feb2d805000 nid=0x2e03 runnable
+
+"GC task thread#6 (ParallelGC)" os_prio=31 tid=0x00007feb2d805800 nid=0x3003 runnable
+
+"GC task thread#7 (ParallelGC)" os_prio=31 tid=0x00007feb2e801000 nid=0x3203 runnable
+
+"VM Periodic Task Thread" os_prio=31 tid=0x00007feb2d81c000 nid=0x5503 waiting on condition
+
+JNI global references: 364
+
+Heap
+ PSYoungGen      total 245760K, used 71064K [0x000000076ab00000, 0x000000077f200000, 0x00000007c0000000)
+  eden space 215552K, 30% used [0x000000076ab00000,0x000000076eba53c8,0x0000000777d80000)
+  from space 30208K, 16% used [0x0000000777d80000,0x0000000778240ff0,0x0000000779b00000)
+  to   space 30720K, 0% used [0x000000077d400000,0x000000077d400000,0x000000077f200000)
+ ParOldGen       total 128512K, used 66357K [0x00000006c0000000, 0x00000006c7d80000, 0x000000076ab00000)
+  object space 128512K, 51% used [0x00000006c0000000,0x00000006c40cd650,0x00000006c7d80000)
+ Metaspace       used 32955K, capacity 33868K, committed 34048K, reserved 1079296K
+  class space    used 3685K, capacity 3984K, committed 4096K, reserved 1048576K
+2018-03-22 08:48:35
+
+Full thread dump Java HotSpot(TM) 64-Bit Server VM (25.144-b01 mixed mode):
+"ShortestPathTest" #38 daemon prio=5 os_prio=31 tid=0x00007fce1438e800 nid=0x8c03 waiting on condition [0x000070000fe85000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007735903e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"ShortestPathTest" #37 daemon prio=5 os_prio=31 tid=0x00007fce14996000 nid=0x8a03 waiting on condition [0x000070000fd81000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x000000076b3d6e30> (a java.util.concurrent.CountDownLatch$Sync)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer.parkAndCheckInterrupt(AbstractQueuedSynchronizer.java:836)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer.doAcquireSharedInterruptibly(AbstractQueuedSynchronizer.java:997)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer.acquireSharedInterruptibly(AbstractQueuedSynchronizer.java:1304)
+	at java.util.concurrent.CountDownLatch.await(CountDownLatch.java:231)
+	at org.familysearch.treegraph.traverse.ShortestPath.waitForLatch(ShortestPath.java:292)
+	at org.familysearch.treegraph.traverse.ShortestPath.processLatches(ShortestPath.java:283)
+	at org.familysearch.treegraph.traverse.ShortestPath.traverseEachGeneration(ShortestPath.java:235)
+	at org.familysearch.treegraph.traverse.ShortestPath.traverseAncestors(ShortestPath.java:154)
+	at org.familysearch.treegraph.traverse.ShortestPath.lambda$doAncestorTraversals$3(ShortestPath.java:635)
+	at org.familysearch.treegraph.traverse.ShortestPath$$Lambda$11/1483298597.call(Unknown Source)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:266)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"ShortestPathTest" #36 daemon prio=5 os_prio=31 tid=0x00007fce158d4000 nid=0x8803 waiting on condition [0x000070000fc7f000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007735903e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"ShortestPathTest" #35 daemon prio=5 os_prio=31 tid=0x00007fce1438d800 nid=0x8603 waiting on condition [0x000070000fb7c000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007735903e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"ShortestPathTest" #34 daemon prio=5 os_prio=31 tid=0x00007fce1345c800 nid=0x8403 waiting on condition [0x000070000fa79000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007735903e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"ShortestPathTest" #33 daemon prio=5 os_prio=31 tid=0x00007fce170cb000 nid=0x8203 waiting on condition [0x000070000f976000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007735903e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"ShortestPathTest" #32 daemon prio=5 os_prio=31 tid=0x00007fce142be800 nid=0x8003 waiting on condition [0x000070000f873000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007735903e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"ShortestPathTest" #31 daemon prio=5 os_prio=31 tid=0x00007fce142bd800 nid=0x7e03 waiting on condition [0x000070000f770000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007735903e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"ShortestPathTest" #30 daemon prio=5 os_prio=31 tid=0x00007fce142b5800 nid=0x7c03 waiting on condition [0x000070000f66d000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007735903e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"ShortestPathTest" #29 daemon prio=5 os_prio=31 tid=0x00007fce13b66000 nid=0x7a03 waiting on condition [0x000070000f56a000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007735903e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"ShortestPathTest" #28 daemon prio=5 os_prio=31 tid=0x00007fce168e5000 nid=0x7803 waiting on condition [0x000070000f467000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007735903e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"ShortestPathTest" #27 daemon prio=5 os_prio=31 tid=0x00007fce168e4800 nid=0x7603 waiting on condition [0x000070000f364000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007735903e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"ShortestPathTest" #26 daemon prio=5 os_prio=31 tid=0x00007fce1630f000 nid=0x7403 waiting on condition [0x000070000f261000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007735903e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"ShortestPathTest" #25 daemon prio=5 os_prio=31 tid=0x00007fce1630e800 nid=0x7203 waiting on condition [0x000070000f15e000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007735903e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"ShortestPathTest" #24 daemon prio=5 os_prio=31 tid=0x00007fce142dc000 nid=0x7003 waiting on condition [0x000070000f05b000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007735903e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"ShortestPathTest" #23 daemon prio=5 os_prio=31 tid=0x00007fce142db000 nid=0x6e03 waiting on condition [0x000070000ef58000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007735903e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"ShortestPathTest" #22 daemon prio=5 os_prio=31 tid=0x00007fce142da800 nid=0x6c03 waiting on condition [0x000070000ee55000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007735903e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"ShortestPathTest" #21 daemon prio=5 os_prio=31 tid=0x00007fce142d9800 nid=0x6a03 waiting on condition [0x000070000ed52000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007735903e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"ShortestPathTest" #20 daemon prio=5 os_prio=31 tid=0x00007fce142d9000 nid=0x6803 waiting on condition [0x000070000ec4f000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007735903e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"ShortestPathTest" #19 daemon prio=5 os_prio=31 tid=0x00007fce142d8000 nid=0x6603 waiting on condition [0x000070000eb4c000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007735903e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"ShortestPathTest" #18 daemon prio=5 os_prio=31 tid=0x00007fce142d7800 nid=0x6403 waiting on condition [0x000070000ea49000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007735903e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"ShortestPathTest" #17 daemon prio=5 os_prio=31 tid=0x00007fce142b4800 nid=0x6203 waiting on condition [0x000070000e946000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007735903e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"ShortestPathTest" #16 daemon prio=5 os_prio=31 tid=0x00007fce142b7000 nid=0x6003 waiting on condition [0x000070000e843000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007735903e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"ShortestPathTest" #15 daemon prio=5 os_prio=31 tid=0x00007fce142b6800 nid=0x5e03 waiting on condition [0x000070000e740000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007735903e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"ShortestPathTest" #14 daemon prio=5 os_prio=31 tid=0x00007fce142b4000 nid=0x5c03 waiting on condition [0x000070000e63d000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007735903e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"ShortestPathTest" #13 daemon prio=5 os_prio=31 tid=0x00007fce142ae800 nid=0x5a03 waiting on condition [0x000070000e53a000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007735903e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor.lambda$mdcWrap$1(MdcThreadPoolExecutor.java:62)
+	at org.familysearch.treegraph.common.thread.MdcThreadPoolExecutor$$Lambda$12/1567705314.run(Unknown Source)
+	at java.lang.Thread.run(Thread.java:748)
+"surefire-forkedjvm-command-thread" #11 daemon prio=5 os_prio=31 tid=0x00007fce1400c000 nid=0x5803 runnable [0x000070000e437000]
+   java.lang.Thread.State: RUNNABLE
+	at java.io.FileInputStream.readBytes(Native Method)
+	at java.io.FileInputStream.read(FileInputStream.java:255)
+	at java.io.BufferedInputStream.fill(BufferedInputStream.java:246)
+	at java.io.BufferedInputStream.read(BufferedInputStream.java:265)
+	- locked <0x00000007735aab28> (a java.io.BufferedInputStream)
+	at java.io.DataInputStream.readInt(DataInputStream.java:387)
+	at org.apache.maven.surefire.booter.MasterProcessCommand.decode(MasterProcessCommand.java:117)
+	at org.apache.maven.surefire.booter.CommandReader$CommandRunnable.run(CommandReader.java:360)
+	at java.lang.Thread.run(Thread.java:748)
+"last-ditch-daemon-shutdown-thread-30sec" #10 daemon prio=5 os_prio=31 tid=0x00007fce1384d000 nid=0x5603 waiting on condition [0x000070000e334000]
+   java.lang.Thread.State: TIMED_WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x0000000773590e30> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.parkNanos(LockSupport.java:215)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.awaitNanos(AbstractQueuedSynchronizer.java:2078)
+	at java.util.concurrent.ScheduledThreadPoolExecutor$DelayedWorkQueue.take(ScheduledThreadPoolExecutor.java:1093)
+	at java.util.concurrent.ScheduledThreadPoolExecutor$DelayedWorkQueue.take(ScheduledThreadPoolExecutor.java:809)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at java.lang.Thread.run(Thread.java:748)
+"Service Thread" #9 daemon prio=9 os_prio=31 tid=0x00007fce14000800 nid=0x5203 runnable [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+"C1 CompilerThread3" #8 daemon prio=9 os_prio=31 tid=0x00007fce16818000 nid=0x5003 waiting on condition [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+"C2 CompilerThread2" #7 daemon prio=9 os_prio=31 tid=0x00007fce1680c000 nid=0x4e03 waiting on condition [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+"C2 CompilerThread1" #6 daemon prio=9 os_prio=31 tid=0x00007fce13033800 nid=0x4c03 waiting on condition [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+"C2 CompilerThread0" #5 daemon prio=9 os_prio=31 tid=0x00007fce13003800 nid=0x4a03 waiting on condition [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+"Signal Dispatcher" #4 daemon prio=9 os_prio=31 tid=0x00007fce13003000 nid=0x4803 waiting on condition [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+"Finalizer" #3 daemon prio=8 os_prio=31 tid=0x00007fce14006800 nid=0x3803 in Object.wait() [0x000070000da99000]
+   java.lang.Thread.State: WAITING (on object monitor)
+	at java.lang.Object.wait(Native Method)
+	- waiting on <0x00000007735ab2d8> (a java.lang.ref.ReferenceQueue$Lock)
+	at java.lang.ref.ReferenceQueue.remove(ReferenceQueue.java:143)
+	- locked <0x00000007735ab2d8> (a java.lang.ref.ReferenceQueue$Lock)
+	at java.lang.ref.ReferenceQueue.remove(ReferenceQueue.java:164)
+	at java.lang.ref.Finalizer$FinalizerThread.run(Finalizer.java:209)
+"Reference Handler" #2 daemon prio=10 os_prio=31 tid=0x00007fce14004000 nid=0x3603 in Object.wait() [0x000070000d996000]
+   java.lang.Thread.State: WAITING (on object monitor)
+	at java.lang.Object.wait(Native Method)
+	- waiting on <0x000000077359a730> (a java.lang.ref.Reference$Lock)
+	at java.lang.Object.wait(Object.java:502)
+	at java.lang.ref.Reference.tryHandlePending(Reference.java:191)
+	- locked <0x000000077359a730> (a java.lang.ref.Reference$Lock)
+	at java.lang.ref.Reference$ReferenceHandler.run(Reference.java:153)
+"main" #1 prio=5 os_prio=31 tid=0x00007fce13804000 nid=0x1b03 waiting on condition [0x000070000cf76000]
+   java.lang.Thread.State: WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x000000076b3d74b0> (a java.util.concurrent.FutureTask)
+	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	at java.util.concurrent.FutureTask.awaitDone(FutureTask.java:429)
+	at java.util.concurrent.FutureTask.get(FutureTask.java:191)
+	at org.familysearch.treegraph.traverse.ShortestPath.doAncestorTraversals(ShortestPath.java:644)
+	at org.familysearch.treegraph.traverse.ShortestPath.doFindCommonAncestor(ShortestPath.java:469)
+	at org.familysearch.treegraph.traverse.ShortestPath.findCommonAncestor(ShortestPath.java:709)
+	at org.familysearch.treegraph.traverse.ShortestPathTest.testCommonAncestor_hint(ShortestPathTest.java:519)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at org.testng.internal.MethodInvocationHelper.invokeMethod(MethodInvocationHelper.java:85)
+	at org.testng.internal.Invoker.invokeMethod(Invoker.java:639)
+	at org.testng.internal.Invoker.invokeTestMethod(Invoker.java:821)
+	at org.testng.internal.Invoker.invokeTestMethods(Invoker.java:1131)
+	at org.testng.internal.TestMethodWorker.invokeTestMethods(TestMethodWorker.java:124)
+	at org.testng.internal.TestMethodWorker.run(TestMethodWorker.java:108)
+	at org.testng.TestRunner.privateRun(TestRunner.java:773)
+	at org.testng.TestRunner.run(TestRunner.java:623)
+	at org.testng.SuiteRunner.runTest(SuiteRunner.java:357)
+	at org.testng.SuiteRunner.runSequentially(SuiteRunner.java:352)
+	at org.testng.SuiteRunner.privateRun(SuiteRunner.java:310)
+	at org.testng.SuiteRunner.run(SuiteRunner.java:259)
+	at org.testng.SuiteRunnerWorker.runSuite(SuiteRunnerWorker.java:52)
+	at org.testng.SuiteRunnerWorker.run(SuiteRunnerWorker.java:86)
+	at org.testng.TestNG.runSuitesSequentially(TestNG.java:1185)
+	at org.testng.TestNG.runSuitesLocally(TestNG.java:1110)
+	at org.testng.TestNG.run(TestNG.java:1018)
+	at org.apache.maven.surefire.testng.TestNGExecutor.run(TestNGExecutor.java:132)
+	at org.apache.maven.surefire.testng.TestNGDirectoryTestSuite.executeSingleClass(TestNGDirectoryTestSuite.java:112)
+	at org.apache.maven.surefire.testng.TestNGDirectoryTestSuite.execute(TestNGDirectoryTestSuite.java:99)
+	at org.apache.maven.surefire.testng.TestNGProvider.invoke(TestNGProvider.java:147)
+	at org.apache.maven.surefire.booter.ForkedBooter.invokeProviderInSameClassLoader(ForkedBooter.java:290)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:242)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:121)
+"VM Thread" os_prio=31 tid=0x00007fce16007800 nid=0x3403 runnable
+"GC task thread#0 (ParallelGC)" os_prio=31 tid=0x00007fce16004800 nid=0x2403 runnable
+"GC task thread#1 (ParallelGC)" os_prio=31 tid=0x00007fce15801000 nid=0x2603 runnable
+"GC task thread#2 (ParallelGC)" os_prio=31 tid=0x00007fce16800000 nid=0x2803 runnable
+"GC task thread#3 (ParallelGC)" os_prio=31 tid=0x00007fce14003000 nid=0x2a03 runnable
+"GC task thread#4 (ParallelGC)" os_prio=31 tid=0x00007fce16801000 nid=0x2c03 runnable
+"GC task thread#5 (ParallelGC)" os_prio=31 tid=0x00007fce16801800 nid=0x2e03 runnable
+"GC task thread#6 (ParallelGC)" os_prio=31 tid=0x00007fce16802000 nid=0x3003 runnable
+"GC task thread#7 (ParallelGC)" os_prio=31 tid=0x00007fce16802800 nid=0x3203 runnable
+"VM Periodic Task Thread" os_prio=31 tid=0x00007fce17008000 nid=0x5403 waiting on condition
+JNI global references: 245
+Heap
+ PSYoungGen      total 141824K, used 23394K [0x000000076ab00000, 0x0000000774000000, 0x00000007c0000000)
+  eden space 131072K, 9% used [0x000000076ab00000,0x000000076b75d3f0,0x0000000772b00000)
+  from space 10752K, 99% used [0x0000000773580000,0x0000000773ffb5e0,0x0000000774000000)
+  to   space 10752K, 0% used [0x0000000772b00000,0x0000000772b00000,0x0000000773580000)
+ ParOldGen       total 175104K, used 1718K [0x00000006c0000000, 0x00000006cab00000, 0x000000076ab00000)
+  object space 175104K, 0% used [0x00000006c0000000,0x00000006c01ad8f0,0x00000006cab00000)
+ Metaspace       used 12853K, capacity 13074K, committed 13440K, reserved 1060864K
+  class space    used 1494K, capacity 1585K, committed 1664K, reserved 1048576K
+

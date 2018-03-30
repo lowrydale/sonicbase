@@ -2,7 +2,6 @@ package com.sonicbase.index;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
-
 import com.sonicbase.common.*;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
@@ -112,7 +111,7 @@ public class Repartitioner extends Thread {
 
   public byte[] beginRebalance(final String dbName, final List<String> toRebalance) {
 
-    ThreadPoolExecutor executor = new ThreadPoolExecutor(databaseServer.getShardCount(), databaseServer.getShardCount(), 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+    ThreadPoolExecutor executor = ThreadUtil.createExecutor(databaseServer.getShardCount(), "SonicBase beginRebalance Thread");
     try {
       while (!isComplete.compareAndSet(true, false)) {
         try {
@@ -623,7 +622,7 @@ public class Repartitioner extends Thread {
       }
     }
 
-    ThreadPoolExecutor executor = new ThreadPoolExecutor(newPartitions.size(), newPartitions.size(), 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+    ThreadPoolExecutor executor = ThreadUtil.createExecutor(newPartitions.size(), "SonicBase calculatePartitions Thread");
     try {
       Map<Integer, List<OffsetEntry>> shards = new HashMap<>();
       for (int i = 0; i < newPartitions.size(); i++) {
@@ -1074,11 +1073,8 @@ public class Repartitioner extends Thread {
       this.index = index;
       this.keysToDelete = keysToDelete;
       this.shard = shard;
-      this.executor = new ThreadPoolExecutor(Runtime.getRuntime().availableProcessors(),
-          Runtime.getRuntime().availableProcessors(), 10000, TimeUnit.MILLISECONDS,
-          new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+      this.executor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors(), "SonicBase MoveProcessor Thread");
     }
-
 
     public void shutdown() {
       this.shutdown = true;
@@ -1247,9 +1243,7 @@ public class Repartitioner extends Thread {
       Map.Entry<Object[], Object> entry = index.firstEntry();
       if (entry != null) {
         final AtomicLong countVisited = new AtomicLong();
-        final ThreadPoolExecutor executor = new ThreadPoolExecutor(Runtime.getRuntime().availableProcessors() * 8,
-            Runtime.getRuntime().availableProcessors() * 8, 10000, TimeUnit.MILLISECONDS,
-            new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+        final ThreadPoolExecutor executor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors() * 8, "SonicBase doRebalanceOrderedIndex Thread");
         final AtomicInteger countSubmitted = new AtomicInteger();
         final AtomicInteger countFinished = new AtomicInteger();
         moveProcessors = new MoveProcessor[databaseServer.getShardCount()];
@@ -1431,7 +1425,7 @@ public class Repartitioner extends Thread {
   private void deleteRecordsOnOtherReplicas(final String dbName, String tableName, String indexName,
                                             ConcurrentLinkedQueue<Object[]> keysToDelete) {
 
-    ThreadPoolExecutor executor = new ThreadPoolExecutor(16, 16, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+    ThreadPoolExecutor executor = ThreadUtil.createExecutor(16, "SonicBase deleteRecordsOnOtherReplicas Thread");
     List<Future> futures = new ArrayList<>();
     try {
       int count = 0;
@@ -2010,47 +2004,47 @@ public class Repartitioner extends Thread {
 
   public ComObject moveIndexEntries(ComObject cobj, boolean replayedCommand) {
     try {
-        databaseServer.getBatchRepartCount().incrementAndGet();
-        String dbName = cobj.getString(ComObject.Tag.dbName);
+      databaseServer.getBatchRepartCount().incrementAndGet();
+      String dbName = cobj.getString(ComObject.Tag.dbName);
 
-        String tableName = cobj.getString(ComObject.Tag.tableName);
-        String indexName = cobj.getString(ComObject.Tag.indexName);
-        ComArray keys = cobj.getArray(ComObject.Tag.keys);
-        List<MoveRequest> moveRequests = new ArrayList<>();
-        if (keys != null) {
-          logger.info("moveIndexEntries: table=" + tableName + ", index=" + indexName + ", count=" + keys.getArray().size());
-          int lockCount = 0;
-          try {
-            for (int i = 0; i < keys.getArray().size(); i++) {
-              if (lockCount == 0) {
-                //databaseServer.getThrottleWriteLock().lock();
-              }
-              if (lockCount++ == 2) {
-                //databaseServer.getThrottleWriteLock().unlock();
-                lockCount = 0;
-              }
-              ComObject keyObj = (ComObject) keys.getArray().get(i);
-              Object[] key = DatabaseCommon.deserializeKey(common.getTables(dbName).get(tableName), keyObj.getByteArray(ComObject.Tag.keyBytes));
-              ComArray records = keyObj.getArray(ComObject.Tag.records);
-              if (records != null) {
-                byte[][] content = new byte[records.getArray().size()][];
-                for (int j = 0; j < content.length; j++) {
-                  content[j] = (byte[]) records.getArray().get(j);
-                }
-                moveRequests.add(new MoveRequest(key, content, false));
-              }
+      String tableName = cobj.getString(ComObject.Tag.tableName);
+      String indexName = cobj.getString(ComObject.Tag.indexName);
+      ComArray keys = cobj.getArray(ComObject.Tag.keys);
+      List<MoveRequest> moveRequests = new ArrayList<>();
+      if (keys != null) {
+        logger.info("moveIndexEntries: table=" + tableName + ", index=" + indexName + ", count=" + keys.getArray().size());
+        int lockCount = 0;
+        try {
+          for (int i = 0; i < keys.getArray().size(); i++) {
+            if (lockCount == 0) {
+              //databaseServer.getThrottleWriteLock().lock();
             }
-          }
-          finally {
-            if (lockCount != 0) {
+            if (lockCount++ == 2) {
               //databaseServer.getThrottleWriteLock().unlock();
+              lockCount = 0;
+            }
+            ComObject keyObj = (ComObject) keys.getArray().get(i);
+            Object[] key = DatabaseCommon.deserializeKey(common.getTables(dbName).get(tableName), keyObj.getByteArray(ComObject.Tag.keyBytes));
+            ComArray records = keyObj.getArray(ComObject.Tag.records);
+            if (records != null) {
+              byte[][] content = new byte[records.getArray().size()][];
+              for (int j = 0; j < content.length; j++) {
+                content[j] = (byte[]) records.getArray().get(j);
+              }
+              moveRequests.add(new MoveRequest(key, content, false));
             }
           }
         }
-        TableSchema tableSchema = common.getTables(dbName).get(tableName);
-        Index index = databaseServer.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexName);
-        IndexSchema indexSchema = common.getTables(dbName).get(tableName).getIndices().get(indexName);
-        databaseServer.getUpdateManager().doInsertKeys(cobj, dbName, moveRequests, index, tableName, indexSchema, replayedCommand, true);
+        finally {
+          if (lockCount != 0) {
+            //databaseServer.getThrottleWriteLock().unlock();
+          }
+        }
+      }
+      Index index = databaseServer.getIndex(dbName, tableName, indexName);
+
+      IndexSchema indexSchema = databaseServer.getIndexSchema(dbName, tableName, indexName);
+      databaseServer.getUpdateManager().doInsertKeys(cobj, dbName, moveRequests, index, tableName, indexSchema, replayedCommand, true);
 
       return null;
     }
@@ -2061,7 +2055,6 @@ public class Repartitioner extends Thread {
       databaseServer.getBatchRepartCount().decrementAndGet();
     }
   }
-
 
   public ComObject getIndexCounts(ComObject cobj) {
     try {

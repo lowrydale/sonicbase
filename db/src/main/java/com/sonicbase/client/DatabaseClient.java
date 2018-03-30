@@ -49,6 +49,7 @@ import java.sql.SQLException;
 import java.sql.Types;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -64,14 +65,17 @@ public class DatabaseClient {
   private final int replica;
   private Object databaseServer;
   private Server[][] servers;
+  private AtomicBoolean isShutdown = new AtomicBoolean();
+  private static AtomicInteger clientRefCount = new AtomicInteger();
   private DatabaseCommon common = new DatabaseCommon();
-  private ThreadPoolExecutor executor = new ThreadPoolExecutor(128, 128, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+  private static ThreadPoolExecutor executor = null;
 
   private static org.apache.log4j.Logger localLogger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
   private static Logger logger;
 
 
-  public static final short SERIALIZATION_VERSION = 25;
+  public static final short SERIALIZATION_VERSION = 26;
+  public static final short SERIALIZATION_VERSION_26 = 26;
   public static final short SERIALIZATION_VERSION_25 = 25;
   public static final short SERIALIZATION_VERSION_24 = 24;
   public static final short SERIALIZATION_VERSION_23 = 23;
@@ -165,6 +169,20 @@ public class DatabaseClient {
 
   private static Set<String> writeVerbs = new HashSet<String>();
 
+  private Set<String> parallel_verbs = new HashSet<String>();
+  private static String[] parallel_verbs_array = new String[]{
+      "insert",
+      "insertIndexEntryByKey",
+      "insertIndexEntryByKeyWithRecord",
+      "moveIndexEntries",
+      "batchInsertIndexEntryByKeyWithRecord",
+      "batchInsertIndexEntryByKey",
+      "moveIndexEntries",
+      "moveRecord",
+  };
+
+  private static Set<String> parallelVerbs = new HashSet<String>();
+
   public DatabaseClient(String host, int port, int shard, int replica, boolean isClient) {
     this(new String[]{host + ":" + port}, shard, replica, isClient, null, null);
   }
@@ -177,6 +195,12 @@ public class DatabaseClient {
     this(new String[]{host + ":" + port}, shard, replica, isClient, common, databaseServer);
   }
   public DatabaseClient(String[] hosts, int shard, int replica, boolean isClient, DatabaseCommon common, Object databaseServer) {
+    synchronized (DatabaseClient.class) {
+      if (executor == null) {
+        executor = ThreadUtil.createExecutor(128, "SonicBase Client Thread");
+      }
+      clientRefCount.incrementAndGet();
+    }
     servers = new Server[1][];
     servers[0] = new Server[hosts.length];
     this.shard = shard;
@@ -238,9 +262,16 @@ public class DatabaseClient {
     return writeVerbs;
   }
 
+  public static Set<String> getParallelVerbs() {
+    return parallelVerbs;
+  }
+
   static {
     for (String verb : write_verbs_array) {
       writeVerbs.add(verb);
+    }
+    for (String verb : parallel_verbs_array) {
+      parallelVerbs.add(verb);
     }
   }
 
@@ -472,14 +503,23 @@ public class DatabaseClient {
   }
 
   public void shutdown() {
+    if (isShutdown.get()) {
+      return;
+    }
+    isShutdown.set(true);
     if (statsTimer != null) {
       statsTimer.cancel();
     }
-    ExpressionImpl.stopPreparedReaper();
-    executor.shutdownNow();
-    for (Server[] shard : servers) {
-      for (Server replica : shard) {
-        replica.getSocketClient().shutdown();
+    synchronized (DatabaseClient.class) {
+      if (clientRefCount.decrementAndGet() == 0) {
+        executor.shutdownNow();
+        executor = null;
+        ExpressionImpl.stopPreparedReaper();
+        for (Server[] shard : servers) {
+          for (Server replica : shard) {
+            replica.getSocketClient().shutdown();
+          }
+        }
       }
     }
   }
@@ -813,18 +853,22 @@ public class DatabaseClient {
         }
       }
     }
-    servers = new Server[shards.length][];
-    for (int i = 0; i < servers.length; i++) {
-      ServersConfig.Shard shard = shards[i];
-      servers[i] = new Server[shard.getReplicas().length];
-      for (int j = 0; j < servers[i].length; j++) {
-        ServersConfig.Host replicaHost = shard.getReplicas()[j];
+    try {
+      servers = new Server[shards.length][];
+      for (int i = 0; i < servers.length; i++) {
+        ServersConfig.Shard shard = shards[i];
+        servers[i] = new Server[shard.getReplicas().length];
+        for (int j = 0; j < servers[i].length; j++) {
+          ServersConfig.Host replicaHost = shard.getReplicas()[j];
 
-        servers[i][j] = new Server(isPrivate ? replicaHost.getPrivateAddress() : replicaHost.getPublicAddress(), replicaHost.getPort());
+          servers[i][j] = new Server(isPrivate ? replicaHost.getPrivateAddress() : replicaHost.getPublicAddress(), replicaHost.getPort());
+        }
       }
     }
-    for (Thread thread : threads) {
-      thread.interrupt();
+    finally {
+      for (Thread thread : threads) {
+        thread.interrupt();
+      }
     }
   }
 
@@ -1476,8 +1520,8 @@ public class DatabaseClient {
                         throw s;
                       }
                       catch (Exception t) {
-                        localLogger.error("Error synching schema", t);
-                        localLogger.error("Error sending request", e);
+//                        localLogger.error("Error synching schema", t);
+//                        localLogger.error("Error sending request", e);
                         lastException = t;
                       }
                     }

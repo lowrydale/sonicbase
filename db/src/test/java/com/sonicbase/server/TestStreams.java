@@ -40,12 +40,20 @@ public class TestStreams {
   private DatabaseClient clientA;
   private DatabaseClient clientB;
   private DatabaseServer[] dbServers;
+  NettyServer serverA1;
+  NettyServer serverA2;
 
   @AfterClass
-  public void afterClass() {
+  public void afterClass() throws SQLException {
+    connA.close();
+    connB.close();
+
     for (DatabaseServer server : dbServers) {
       server.shutdown();
     }
+    serverA1.shutdown();
+    serverA2.shutdown();
+
     Logger.queue.clear();
   }
 
@@ -72,7 +80,7 @@ public class TestStreams {
 
 
       final CountDownLatch latch = new CountDownLatch(4);
-      final NettyServer serverA1 = new NettyServer(128);
+      serverA1 = new NettyServer(128);
       Thread thread = new Thread(new Runnable(){
         @Override
         public void run() {
@@ -89,7 +97,7 @@ public class TestStreams {
         Thread.sleep(100);
       }
 
-      final NettyServer serverA2 = new NettyServer(128);
+      serverA2 = new NettyServer(128);
       thread = new Thread(new Runnable(){
         @Override
         public void run() {

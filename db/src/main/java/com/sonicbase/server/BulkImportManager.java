@@ -3,10 +3,7 @@ package com.sonicbase.server;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
-import com.sonicbase.common.ComArray;
-import com.sonicbase.common.ComObject;
-import com.sonicbase.common.DatabaseCommon;
-import com.sonicbase.common.Logger;
+import com.sonicbase.common.*;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
@@ -30,6 +27,7 @@ public class BulkImportManager {
 
   private final Logger logger;
   private final DatabaseServer server;
+  private boolean shutdown;
 
   public BulkImportManager(final DatabaseServer server) {
     this.server = server;
@@ -92,6 +90,10 @@ public class BulkImportManager {
 //      });
 //      thread.start();
 //    }
+  }
+
+  public void shutdown() {
+    this.shutdown = true;
   }
 
   private static class BulkImportStatus {
@@ -210,8 +212,7 @@ public class BulkImportManager {
       Thread thread = new Thread(new Runnable() {
         @Override
         public void run() {
-          final ThreadPoolExecutor executor = new ThreadPoolExecutor(8, 8, 10_000,
-              TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+          final ThreadPoolExecutor executor = ThreadUtil.createExecutor(8, "SonicBase startBulkImportOnServer Thread");
           countBulkImportRunning.incrementAndGet();
           try {
             final ComArray keys = cobj.getArray(ComObject.Tag.keys);
@@ -234,193 +235,198 @@ public class BulkImportManager {
             final int port = replicasArray.get(0).get("port").asInt();
 
             Class.forName("com.sonicbase.jdbcdriver.Driver");
-            final Connection insertConn = DriverManager.getConnection("jdbc:sonicbase:" + address + ":" + port + "/" + dbName);
-
-            final StringBuilder fieldsStr = new StringBuilder();
-            final StringBuilder parmsStr = new StringBuilder();
-            boolean first = true;
-            for (FieldSchema field : fields) {
-              if (field.getName().equals("_sonicbase_id")) {
-                continue;
+            try (Connection insertConn = DriverManager.getConnection("jdbc:sonicbase:" + address + ":" + port + "/" + dbName)) {
+              final StringBuilder fieldsStr = new StringBuilder();
+              final StringBuilder parmsStr = new StringBuilder();
+              boolean first = true;
+              for (FieldSchema field : fields) {
+                if (field.getName().equals("_sonicbase_id")) {
+                  continue;
+                }
+                if (first) {
+                  first = false;
+                }
+                else {
+                  fieldsStr.append(",");
+                  parmsStr.append(",");
+                }
+                fieldsStr.append(field.getName());
+                parmsStr.append("?");
               }
-              if (first) {
-                first = false;
-              }
-              else {
-                fieldsStr.append(",");
-                parmsStr.append(",");
-              }
-              fieldsStr.append(field.getName());
-              parmsStr.append("?");
-            }
 
 
-            for (int i = 0; i < keys.getArray().size(); i++) {
-              final int currSlice = i;
-              threads[i] = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                  final List<Future> futures = new ArrayList<>();
-                  Connection localConn = null;
-                  try {
-                    Object[] key = DatabaseCommon.deserializeKey(tableSchema, (byte[]) keys.getArray().get(currSlice));
-                    logger.info("bulkImport starting slave thread: currSlice=" + currSlice + ", key=" + DatabaseCommon.keyToString(key));
-                    String user = cobj.getString(ComObject.Tag.user);
-                    String password = cobj.getString(ComObject.Tag.password);
+              for (int i = 0; i < keys.getArray().size(); i++) {
+                if (shutdown) {
+                  break;
+                }
+                final int currSlice = i;
+                threads[i] = new Thread(new Runnable() {
+                  @Override
+                  public void run() {
+                    final List<Future> futures = new ArrayList<>();
+                    Connection localConn = null;
+                    try {
+                      Object[] key = DatabaseCommon.deserializeKey(tableSchema, (byte[]) keys.getArray().get(currSlice));
+                      logger.info("bulkImport starting slave thread: currSlice=" + currSlice + ", key=" + DatabaseCommon.keyToString(key));
+                      String user = cobj.getString(ComObject.Tag.user);
+                      String password = cobj.getString(ComObject.Tag.password);
 
-                    if (user != null) {
-                      localConn = DriverManager.getConnection(cobj.getString(ComObject.Tag.connectString), user, password);
-                    }
-                    else {
-                      localConn = DriverManager.getConnection(cobj.getString(ComObject.Tag.connectString));
-                    }
-
-                    IndexSchema indexSchema = null;
-                    for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
-                      if (entry.getValue().isPrimaryKey()) {
-                        indexSchema = entry.getValue();
-                        break;
-                      }
-                    }
-                    String[] keyFields = indexSchema.getFields();
-
-                    StringBuilder builder = new StringBuilder("bulkImport slave thread: table=" + tableName + ", keyFields=");
-                    for (String field : keyFields) {
-                      builder.append(",").append(field);
-                    }
-                    logger.info(builder.toString());
-
-                    PreparedStatement stmt = null;
-                    String statementStr = null;
-                    boolean haveExpression = true;
-                    if (currSlice == 0) {
-                      if (keys.getArray().size() == 1) {
-                        statementStr = "select " + fieldsStr.toString() + " from " + tableName;
-                        haveExpression = false;
+                      if (user != null) {
+                        localConn = DriverManager.getConnection(cobj.getString(ComObject.Tag.connectString), user, password);
                       }
                       else {
-                        Object[] currKey = DatabaseCommon.deserializeKey(tableSchema, (byte[]) keys.getArray().get(1));
-                        Object[] lowerKey = cobj.getByteArray(ComObject.Tag.lowerKey) == null ? null : DatabaseCommon.deserializeKey(tableSchema, cobj.getByteArray(ComObject.Tag.lowerKey));
-                        if (lowerKey != null) {
-                          statementStr = "select " + fieldsStr.toString() + " from " + tableName + " where (" + keyFields[0] +
-                              " >= " + lowerKey[0] + " and " + keyFields[0] + " < " + currKey[0] + ")";
+                        localConn = DriverManager.getConnection(cobj.getString(ComObject.Tag.connectString));
+                      }
+
+                      IndexSchema indexSchema = null;
+                      for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
+                        if (entry.getValue().isPrimaryKey()) {
+                          indexSchema = entry.getValue();
+                          break;
+                        }
+                      }
+                      String[] keyFields = indexSchema.getFields();
+
+                      StringBuilder builder = new StringBuilder("bulkImport slave thread: table=" + tableName + ", keyFields=");
+                      for (String field : keyFields) {
+                        builder.append(",").append(field);
+                      }
+                      logger.info(builder.toString());
+
+                      PreparedStatement stmt = null;
+                      String statementStr = null;
+                      boolean haveExpression = true;
+                      if (currSlice == 0) {
+                        if (keys.getArray().size() == 1) {
+                          statementStr = "select " + fieldsStr.toString() + " from " + tableName;
+                          haveExpression = false;
                         }
                         else {
-                          statementStr = "select " + fieldsStr.toString() + " from " + tableName + " where (" + keyFields[0] + " < " + currKey[0] + ")";
+                          Object[] currKey = DatabaseCommon.deserializeKey(tableSchema, (byte[]) keys.getArray().get(1));
+                          Object[] lowerKey = cobj.getByteArray(ComObject.Tag.lowerKey) == null ? null : DatabaseCommon.deserializeKey(tableSchema, cobj.getByteArray(ComObject.Tag.lowerKey));
+                          if (lowerKey != null) {
+                            statementStr = "select " + fieldsStr.toString() + " from " + tableName + " where (" + keyFields[0] +
+                                " >= " + lowerKey[0] + " and " + keyFields[0] + " < " + currKey[0] + ")";
+                          }
+                          else {
+                            statementStr = "select " + fieldsStr.toString() + " from " + tableName + " where (" + keyFields[0] + " < " + currKey[0] + ")";
+                          }
+                          //todo: expand key
                         }
-                        //todo: expand key
                       }
-                    }
-                    else if (currSlice == keys.getArray().size() - 1) {
-                      Object[] currKey = DatabaseCommon.deserializeKey(tableSchema, (byte[]) keys.getArray().get(currSlice));
-                      Object[] upperKey = cobj.getByteArray(ComObject.Tag.nextKey) == null ? null : DatabaseCommon.deserializeKey(tableSchema, cobj.getByteArray(ComObject.Tag.nextKey));
-                      if (upperKey != null) {
+                      else if (currSlice == keys.getArray().size() - 1) {
+                        Object[] currKey = DatabaseCommon.deserializeKey(tableSchema, (byte[]) keys.getArray().get(currSlice));
+                        Object[] upperKey = cobj.getByteArray(ComObject.Tag.nextKey) == null ? null : DatabaseCommon.deserializeKey(tableSchema, cobj.getByteArray(ComObject.Tag.nextKey));
+                        if (upperKey != null) {
+                          statementStr = "select " + fieldsStr.toString() + " from " + tableName + " where (" + keyFields[0] +
+                              " >= " + currKey[0] + " and " + keyFields[0] + " < " + upperKey[0] + ")";
+                        }
+                        else {
+                          statementStr = "select " + fieldsStr.toString() + " from " + tableName + " where (" +
+                              keyFields[0] + " >= " + currKey[0] + ")";
+                        }
+                      }
+                      else {
+                        Object[] lowerKey = DatabaseCommon.deserializeKey(tableSchema, (byte[]) keys.getArray().get(currSlice));
+                        Object[] upperKey = DatabaseCommon.deserializeKey(tableSchema, (byte[]) keys.getArray().get(currSlice + 1));
                         statementStr = "select " + fieldsStr.toString() + " from " + tableName + " where (" + keyFields[0] +
-                            " >= " + currKey[0] + " and " + keyFields[0] + " < " + upperKey[0] + ")";
-                      }
-                      else {
-                        statementStr = "select " + fieldsStr.toString() + " from " + tableName + " where (" +
-                            keyFields[0] + " >= " + currKey[0] + ")";
-                      }
-                    }
-                    else {
-                      Object[] lowerKey = DatabaseCommon.deserializeKey(tableSchema, (byte[]) keys.getArray().get(currSlice));
-                      Object[] upperKey = DatabaseCommon.deserializeKey(tableSchema, (byte[]) keys.getArray().get(currSlice + 1));
-                      statementStr = "select " + fieldsStr.toString() + " from " + tableName + " where (" + keyFields[0] +
-                          " >= " + lowerKey[0] + " and " + keyFields[0] + " < " + upperKey[0] + ")";
-                    }
-
-                    String whereClause = cobj.getString(ComObject.Tag.whereClause);
-                    if (whereClause != null) {
-                      int pos = whereClause.toLowerCase().indexOf("where");
-                      whereClause = whereClause.substring(pos + "where".length()).trim();
-                      if (haveExpression) {
-                        statementStr = statementStr + " and (" + whereClause + ")";
-                      }
-                      else {
-                        statementStr = statementStr + " where " + whereClause;
-                      }
-                    }
-
-                    stmt = localConn.prepareStatement(statementStr);
-                    logger.info("bulkImport select statement: slice=" + currSlice + ", str=" + statementStr);
-                    logger.info("bulkImport upsert statement: slice=" + currSlice + ", str=upsert into " + tableName +
-                        " (" + fieldsStr.toString() + ") VALUES (" + parmsStr.toString() + ")");
-
-                    try {
-                      ResultSet rs = null;
-                      try {
-                        rs = stmt.executeQuery();
-                      }
-                      catch (Exception e) {
-                        throw new DatabaseException("Error executing query: sql=" + statementStr, e);
+                            " >= " + lowerKey[0] + " and " + keyFields[0] + " < " + upperKey[0] + ")";
                       }
 
-                      int batchSize = 100;
-                      List<Object[]> currBatch = new ArrayList<>();
-                      while (rs.next() && !cancelBulkImport.get(dbName + ":" + tableName).get()) {
-
-                        final Object[] currRecord = getCurrRecordFromResultSet(rs, fields);
-
-//                        if (returned.put((Long)currRecord[0], 0L) != null) {
-//                          System.out.println("dup: " + currRecord[0]);
-//                        }
-                        currBatch.add(currRecord);
-                        countRead.incrementAndGet();
-
-                        if (currBatch.size() >= batchSize && !cancelBulkImport.get(dbName + ":" + tableName).get()) {
-                          countSubmitted.incrementAndGet();
-                          final List<Object[]> batchToProcess = currBatch;
-                          currBatch = new ArrayList<>();
-                          futures.add(executor.submit(new Runnable() {
-                            @Override
-                            public void run() {
-                              insertRecords(insertConn, countProcessed, countFinished, batchToProcess, tableName,
-                                  fields, fieldsStr, parmsStr);
-                            }
-                          }));
+                      String whereClause = cobj.getString(ComObject.Tag.whereClause);
+                      if (whereClause != null) {
+                        int pos = whereClause.toLowerCase().indexOf("where");
+                        whereClause = whereClause.substring(pos + "where".length()).trim();
+                        if (haveExpression) {
+                          statementStr = statementStr + " and (" + whereClause + ")";
+                        }
+                        else {
+                          statementStr = statementStr + " where " + whereClause;
                         }
                       }
-                      if (currBatch.size() > 0 && !cancelBulkImport.get(dbName + ":" + tableName).get()) {
-                        countSubmitted.incrementAndGet();
-                        insertRecords(insertConn, countProcessed, countFinished, currBatch, tableName, fields, fieldsStr, parmsStr);
+
+                      stmt = localConn.prepareStatement(statementStr);
+                      logger.info("bulkImport select statement: slice=" + currSlice + ", str=" + statementStr);
+                      logger.info("bulkImport upsert statement: slice=" + currSlice + ", str=upsert into " + tableName +
+                          " (" + fieldsStr.toString() + ") VALUES (" + parmsStr.toString() + ")");
+
+                      try {
+                        ResultSet rs = null;
+                        try {
+                          rs = stmt.executeQuery();
+                        }
+                        catch (Exception e) {
+                          throw new DatabaseException("Error executing query: sql=" + statementStr, e);
+                        }
+
+                        int batchSize = 100;
+                        List<Object[]> currBatch = new ArrayList<>();
+                        while (rs.next() && !cancelBulkImport.get(dbName + ":" + tableName).get()) {
+                          if (shutdown) {
+                            break;
+                          }
+                          final Object[] currRecord = getCurrRecordFromResultSet(rs, fields);
+
+                          //                        if (returned.put((Long)currRecord[0], 0L) != null) {
+                          //                          System.out.println("dup: " + currRecord[0]);
+                          //                        }
+                          currBatch.add(currRecord);
+                          countRead.incrementAndGet();
+
+                          if (currBatch.size() >= batchSize && !cancelBulkImport.get(dbName + ":" + tableName).get()) {
+                            countSubmitted.incrementAndGet();
+                            final List<Object[]> batchToProcess = currBatch;
+                            currBatch = new ArrayList<>();
+                            futures.add(executor.submit(new Runnable() {
+                              @Override
+                              public void run() {
+                                insertRecords(insertConn, countProcessed, countFinished, batchToProcess, tableName,
+                                    fields, fieldsStr, parmsStr);
+                              }
+                            }));
+                          }
+                        }
+                        if (currBatch.size() > 0 && !cancelBulkImport.get(dbName + ":" + tableName).get()) {
+                          countSubmitted.incrementAndGet();
+                          insertRecords(insertConn, countProcessed, countFinished, currBatch, tableName, fields, fieldsStr, parmsStr);
+                        }
+                        logger.info("bulkImport finished reading records: currSlice=" + currSlice);
                       }
-                      logger.info("bulkImport finished reading records: currSlice=" + currSlice);
+                      finally {
+                        if (stmt != null) {
+                          stmt.close();
+                        }
+                      }
+                      for (Future future : futures) {
+                        future.get();
+                      }
+                    }
+                    catch (Exception e) {
+                      logger.error("Error importing records", e);
+
+                      String exceptionStr = ExceptionUtils.getStackTrace(e);
+                      importException.put(dbName + ":" + tableName, exceptionStr);
                     }
                     finally {
-                      if (stmt != null) {
-                        stmt.close();
+                      try {
+                        if (localConn != null) {
+                          localConn.close();
+                        }
+                      }
+                      catch (SQLException e) {
+                        logger.error("Error closing connection", e);
                       }
                     }
-                    for (Future future : futures) {
-                      future.get();
-                    }
                   }
-                  catch (Exception e) {
-                    logger.error("Error importing records", e);
+                });
 
-                    String exceptionStr = ExceptionUtils.getStackTrace(e);
-                    importException.put(dbName + ":" + tableName, exceptionStr);
-                  }
-                  finally {
-                    try {
-                      if (localConn != null) {
-                        localConn.close();
-                      }
-                    }
-                    catch (SQLException e) {
-                      logger.error("Error closing connection", e);
-                    }
-                  }
-                }
-              });
-
-              threads[i].start();
+                threads[i].start();
+              }
+              for (int i = 0; i < threads.length; i++) {
+                threads[i].join();
+              }
+              importFinished.put(dbName + ":" + tableName, true);
             }
-            for (int i = 0; i < threads.length; i++) {
-              threads[i].join();
-            }
-            importFinished.put(dbName + ":" + tableName, true);
           }
           catch (Exception e) {
             logger.error("Error importing records", e);
@@ -829,8 +835,7 @@ public class BulkImportManager {
       PreparedStatement stmt = conn.prepareStatement(statementStr);
 
       List<Future> futures = new ArrayList<>();
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(8, 8, 10_000, TimeUnit.MILLISECONDS,
-          new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+      ThreadPoolExecutor executor = ThreadUtil.createExecutor(8, "SonicBase doImportForNoPrimaryKey Thread");
       try {
         ObjectNode dict = server.getConfig();
         ObjectNode databaseDict = dict;
@@ -844,37 +849,39 @@ public class BulkImportManager {
 
         //todo: make failsafe
         Class.forName("com.sonicbase.jdbcdriver.Driver");
-        final Connection insertConn = DriverManager.getConnection("jdbc:sonicbase:" + address + ":" + port + "/" + dbName);
+        try (Connection insertConn = DriverManager.getConnection("jdbc:sonicbase:" + address + ":" + port + "/" + dbName)) {
+          final AtomicInteger countSubmitted = new AtomicInteger();
+          final AtomicInteger countFinished = new AtomicInteger();
+          final AtomicLong countProcessed = importCountProcessed.get(dbName + ":" + tableName);
+          ResultSet rs = stmt.executeQuery();
+          int batchSize = 100;
+          List<Object[]> currBatch = new ArrayList<>();
+          while (rs.next() && !cancelBulkImport.get(dbName + ":" + tableName).get()) {
+            if (shutdown) {
+              break;
+            }
+            final Object[] currRecord = getCurrRecordFromResultSet(rs, fields);
 
-        final AtomicInteger countSubmitted = new AtomicInteger();
-        final AtomicInteger countFinished = new AtomicInteger();
-        final AtomicLong countProcessed = importCountProcessed.get(dbName + ":" + tableName);
-        ResultSet rs = stmt.executeQuery();
-        int batchSize = 100;
-        List<Object[]> currBatch = new ArrayList<>();
-        while (rs.next() && !cancelBulkImport.get(dbName + ":" + tableName).get()) {
+            currBatch.add(currRecord);
 
-          final Object[] currRecord = getCurrRecordFromResultSet(rs, fields);
-
-          currBatch.add(currRecord);
-
-          if (currBatch.size() >= batchSize && !cancelBulkImport.get(dbName + ":" + tableName).get()) {
-            countSubmitted.incrementAndGet();
-            final List<Object[]> batchToProcess = currBatch;
-            currBatch = new ArrayList<>();
-            futures.add(executor.submit(new Runnable() {
-              @Override
-              public void run() {
-                insertRecords(insertConn, countProcessed, countFinished, batchToProcess, tableName, fields, fieldsStr, parmsStr);
-              }
-            }));
+            if (currBatch.size() >= batchSize && !cancelBulkImport.get(dbName + ":" + tableName).get()) {
+              countSubmitted.incrementAndGet();
+              final List<Object[]> batchToProcess = currBatch;
+              currBatch = new ArrayList<>();
+              futures.add(executor.submit(new Runnable() {
+                @Override
+                public void run() {
+                  insertRecords(insertConn, countProcessed, countFinished, batchToProcess, tableName, fields, fieldsStr, parmsStr);
+                }
+              }));
+            }
           }
+          if (currBatch.size() > 0 && !cancelBulkImport.get(dbName + ":" + tableName).get()) {
+            countSubmitted.incrementAndGet();
+            insertRecords(insertConn, countProcessed, countFinished, currBatch, tableName, fields, fieldsStr, parmsStr);
+          }
+          logger.info("bulkImport finished reading records");
         }
-        if (currBatch.size() > 0 && !cancelBulkImport.get(dbName + ":" + tableName).get()) {
-          countSubmitted.incrementAndGet();
-          insertRecords(insertConn, countProcessed, countFinished, currBatch, tableName, fields, fieldsStr, parmsStr);
-        }
-        logger.info("bulkImport finished reading records");
       }
       finally {
         if (stmt != null) {
@@ -1549,6 +1556,9 @@ public class BulkImportManager {
             try {
               outer:
               while (!cancelBulkImport.get(dbName + ":" + tableName).get()) {
+                if (shutdown) {
+                  break;
+                }
                 int offset = 0;
                 for (int shard = 0; shard < server.getShardCount(); shard++) {
                   for (int replica = 0; replica < server.getReplicationFactor(); replica++) {

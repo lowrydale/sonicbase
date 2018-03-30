@@ -24,7 +24,7 @@ public class Logger {
   static {
     try {
       hostName = "host";//InetAddress.getLocalHost().getHostName();
-      sendThread = new Thread(new Runnable() {
+      sendThread = ThreadUtil.createThread(new Runnable() {
         @Override
         public void run() {
           while (true) {
@@ -63,7 +63,7 @@ public class Logger {
             }
           }
         }
-      });
+      }, "SonicBase Log Sender Thread");
       sendThread.start();
     }
     catch (Exception e) {

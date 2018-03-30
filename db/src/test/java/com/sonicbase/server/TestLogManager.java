@@ -5,14 +5,16 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.util.FileUtils;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.io.BufferedInputStream;
 import java.io.File;
-import java.io.IOException;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,6 +22,8 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 /**
  * Responsible for
@@ -27,22 +31,31 @@ import static org.testng.Assert.assertEquals;
 public class TestLogManager {
 
   private Connection conn;
-  private int recordCount = 10;
-  List<Long> ids = new ArrayList<>();
-
   DatabaseClient client = null;
   DatabaseServer[] dbServers;
 
 
-  @Test
-  public void test() throws IOException, ExecutionException, InterruptedException, ClassNotFoundException, SQLException {
-    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-2-servers-a.json")), "utf-8");
-    ObjectMapper mapper = new ObjectMapper();
-     final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+  @AfterClass
+  public void afterClass() throws SQLException {
+    conn.close();
 
-     ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
-     config.put("licenseKeys", array);
-     array.add(DatabaseServer.FOUR_SERVER_LICENSE);
+    for (DatabaseServer server : dbServers) {
+      server.shutdown();
+    }
+    Logger.queue.clear();
+  }
+
+  @BeforeClass
+  public void beforeClass() throws Exception {
+    Logger.disable();
+
+    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
+    ObjectMapper mapper = new ObjectMapper();
+    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+
+    ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
+    config.put("licenseKeys", array);
+    array.add(DatabaseServer.FOUR_SERVER_LICENSE);
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -108,8 +121,8 @@ public class TestLogManager {
 
     futures = new ArrayList<>();
     for (int i = 0; i < 100_000; i++) {
-      final int offset =i;
-      futures.add(executor.submit(new Callable(){
+      final int offset = i;
+      futures.add(executor.submit(new Callable() {
         @Override
         public Object call() throws Exception {
           PreparedStatement stmt2 = conn.prepareStatement("insert into persons (id, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?)");
@@ -166,16 +179,6 @@ public class TestLogManager {
       Thread.sleep(1000);
     }
 
-//    client.beginRebalance("test", "persons", "_1__primarykey");
-//
-//
-//    while (true) {
-//      if (client.isRepartitioningComplete("test")) {
-//        break;
-//      }
-//      Thread.sleep(1000);
-//    }
-
     for (DatabaseServer server : dbServers) {
       server.shutdownRepartitioner();
     }
@@ -185,28 +188,20 @@ public class TestLogManager {
     while (ret.next()) {
       System.out.println(ret.getString(1));
     }
+  }
 
-    stmt = conn.prepareStatement("select id, id2 from persons where id>=0 order by id asc");
-    ret = stmt.executeQuery();
+  @Test
+  public void test() throws SQLException {
 
-    int offset = 0;
+    PreparedStatement stmt = conn.prepareStatement("select id, id2 from persons where id>=0 order by id asc");
+    ResultSet ret = stmt.executeQuery();
+
     boolean inError = false;
-     for (int i = 0; i < 100_000; i++) {
-       //assertTrue(ret.next());
-       if (ret.next()) {
-         if (ret.getInt("id") != offset) {
-           if (!inError) {
-             System.out.println("Error: id=" + i);
-           }
-           inError = true;
-         }
-         else {
-           inError = false;
-         }
-         offset = i;
-       }
-       //assertEquals(ret.getInt("id"), i);
-     }
+    for (int i = 0; i < 100_000; i++) {
+      assertTrue(ret.next());
+      assertEquals(ret.getInt("id"), i);
+    }
+    assertFalse(ret.next());
 
     for (DatabaseServer server : dbServers) {
       server.truncateTablesQuietly();
@@ -218,33 +213,41 @@ public class TestLogManager {
       stmt = conn.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
       stmt.executeUpdate();
     }
-    catch (Exception e){
+    catch (Exception e) {
 
+    }
+
+    for (DatabaseServer server : dbServers) {
+      System.out.println("count logged: shard=" + server.getShard() + ", replica=" + server.getReplica() + ", count=" + server.getLogManager().getCountLogged());
     }
 
     for (DatabaseServer server : dbServers) {
       server.replayLogs();
     }
 
-     //test select returns multiple records with an index using operator '<'
-     stmt = conn.prepareStatement("select id, id2 from persons where id>=0 order by id asc");
+    for (DatabaseServer server : dbServers) {
+      System.out.println("count replayed: shard=" + server.getShard() + ", replica=" + server.getReplica() + ", count=" + server.getLogManager().getCountReplayed());
+    }
+
+    stmt = conn.prepareStatement("select count(*) from persons");
+    ret = stmt.executeQuery();
+    assertEquals(ret.getInt(1), 100_000);
+
+    //test select returns multiple records with an index using operator '<'
+    stmt = conn.prepareStatement("select id, id2 from persons where id>=0 order by id asc");
     ret = stmt.executeQuery();
 
-    offset = 0;
     inError = false;
-      for (int i = 0; i < 100_000; i++) {
-        if (ret.next()) {
-          if (ret.getInt("id") != offset) {
-            if (!inError) {
-              System.out.println("apply error: " + i);
-            }
-            inError = true;
-          }
-          else {
-            inError = false;
-          }
+    int missing = 0;
+    for (int i = 0; i < 100_000; i++) {
+      if(ret.next()) {
+        if (i != ret.getInt("id")) {
+          missing++;
         }
-        offset = i;
       }
+      //assertEquals(ret.getInt("id"), i);
+    }
+    assertFalse(ret.next());
+    assertEquals(missing, 0);
   }
 }

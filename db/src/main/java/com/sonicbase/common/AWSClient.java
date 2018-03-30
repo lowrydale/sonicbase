@@ -6,7 +6,9 @@ import com.amazonaws.auth.InstanceProfileCredentialsProvider;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.*;
-import com.amazonaws.services.s3.transfer.*;
+import com.amazonaws.services.s3.transfer.MultipleFileDownload;
+import com.amazonaws.services.s3.transfer.MultipleFileUpload;
+import com.amazonaws.services.s3.transfer.TransferManager;
 import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -16,8 +18,10 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 
 import java.io.*;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Created by lowryda on 6/16/17.
@@ -34,10 +38,6 @@ public class AWSClient {
     this.logger = new Logger(client);
 
   }
-
-  private ThreadPoolExecutor executor = new ThreadPoolExecutor(Runtime.getRuntime().availableProcessors(),
-      Runtime.getRuntime().availableProcessors(), 10000, TimeUnit.MILLISECONDS,
-      new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
   public TransferManager getTransferManager() {
     synchronized (this) {
@@ -180,55 +180,6 @@ public class AWSClient {
     catch (InterruptedException e) {
       throw new DatabaseException(e);
     }
-    if (false) {
-          List<Future> futures = new ArrayList<>();
-          File[] files = srcDir.listFiles();
-          if (files != null) {
-            for (final File file : files) {
-              if (file.isDirectory()) {
-                uploadDirectory(bucket, prefix, path + "/" + file.getName(), file);
-              }
-              else {
-                futures.add(executor.submit(new Callable() {
-                  @Override
-                  public Object call() throws Exception {
-                    for (int i = 0; i < 10; i++) {
-                      try {
-                        uploadFile(bucket, prefix, path, file);
-                        break;
-                      }
-                      catch (Exception e) {
-                        logger.error("Error uploading file: srcDir=" + file.getAbsolutePath(), e);
-                        if (i == 9) {
-                          throw new DatabaseException(e);
-                        }
-                        try {
-                          Thread.sleep(2000);
-                        }
-                        catch (InterruptedException e1) {
-                          throw new DatabaseException(e1);
-                        }
-                      }
-                    }
-                    return null;
-                  }
-                }));
-              }
-            }
-          }
-          for (Future future : futures) {
-            try {
-              future.get();
-            }
-            catch (Exception e) {
-              throw new DatabaseException(e);
-            }
-          }
-//      finally {
-//        transferManager.shutdownNow();
-//      }
-
-        }
   }
 
   public void uploadFile(String bucket, String prefix, final String path, final File srcFile) {
@@ -333,96 +284,6 @@ public class AWSClient {
     catch (IOException e) {
       throw new DatabaseException(e);
     }
-
-    if (false) {
-  AmazonS3 s3client = getS3Client();
-  if (prefix.charAt(0) == '/') {
-    prefix = prefix.substring(1);
-  }
-  List<Future> futures = new ArrayList<>();
-  try {
-    final ListObjectsV2Request req = new ListObjectsV2Request().withBucketName(bucket).withPrefix(prefix + "/" + subDirectory);
-    ListObjectsV2Result result;
-    do {
-      result = s3client.listObjectsV2(req);
-
-      for (S3ObjectSummary objectSummary :
-          result.getObjectSummaries()) {
-        String key = objectSummary.getKey();
-
-        if (key.charAt(0) == '/') {
-          key = key.substring(1);
-        }
-        final String finalKey = key;
-        final File destFile = new File(destDir, key.substring((prefix + "/" + subDirectory).length()));
-        destFile.getParentFile().mkdirs();
-        futures.add(executor.submit(new Runnable() {
-          @Override
-          public void run() {
-            try {
-              for (int i = 0; i < 10; i++) {
-                try {
-                  downloadFile(bucket, finalKey, destFile);
-                  break;
-                }
-                catch (Exception e) {
-                  logger.error("Error downloading file: key=" + finalKey, e);
-                  if (i == 9) {
-                    throw new DatabaseException(e);
-                  }
-                  Thread.sleep(2000);
-                }
-              }
-            }
-            catch (Exception e) {
-              logger.error("Error downloading file", e);
-            }
-          }
-        }));
-
-      }
-      req.setContinuationToken(result.getNextContinuationToken());
-    }
-    while (result.isTruncated() == true);
-  }
-  catch (Exception e) {
-    throw new DatabaseException(e);
-  }
-
-  for (Future future : futures) {
-    try {
-      future.get();
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-  }
-}
-//    try {
-//      MultipleFileDownload xfer = transferManager.downloadDirectory(
-//          bucket, prefix + "/" + subDirectory, destDir);
-//      // loop with Transfer.isDone()
-//      File tmpDir = new File(destDir, prefix + "/" + subDirectory);
-//      File[] files = tmpDir.listFiles();
-//      if (files != null) {
-//        for (File file : files) {
-//          file.renameTo(new File(destDir, file.getName()));
-//        }
-//      }
-//      xfer.waitForCompletion();
-//      int pos = prefix.indexOf("/", 1);
-//      if (pos != -1) {
-//        prefix = prefix.substring(0, pos);
-//      }
-//      File dir = new File(destDir, prefix);
-//      FileUtils.deleteDirectory(dir);
-//    }
-//    catch (Exception e) {
-//      throw new DatabaseException(e);
-//    }
-//    finally {
-//      transferManager.shutdownNow();
-//    }
   }
 
   public List<String> listDirectSubdirectories(String bucket, String prefix) {

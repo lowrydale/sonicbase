@@ -296,7 +296,7 @@ public class DeltaManager implements SnapshotManager {
     final AtomicInteger tableCount = new AtomicInteger();
     final AtomicInteger indexCount = new AtomicInteger();
     List<Future> futures = new ArrayList<>();
-    ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+    ThreadPoolExecutor executor = ThreadUtil.createExecutor(1, "SonicBase DeltaManager runSnapshot Thread");
     try {
       for (final Map.Entry<String, TableSchema> tableEntry : server.getCommon().getTables(dbName).entrySet()) {
         tableCount.incrementAndGet();
@@ -524,7 +524,7 @@ public class DeltaManager implements SnapshotManager {
       logger.info("begin recoveringSnapshot - applying deletes - begin");
       int cores = Runtime.getRuntime().availableProcessors();
 
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(cores * 16, cores * 16, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+      ThreadPoolExecutor executor = ThreadUtil.createExecutor(cores * 16, "SonicBase DelteManager recoverFromSnapshot Thread");
       try {
         List<Future> futures = new ArrayList<>();
         for (int currDeltaDirNum = getHighestCommittedSnapshotVersion(dataRootDir, logger); currDeltaDirNum >= -1; currDeltaDirNum--) {
@@ -548,7 +548,7 @@ public class DeltaManager implements SnapshotManager {
 
       begin = System.currentTimeMillis();
       logger.info("begin recoveringSnapshot - begin");
-      executor = new ThreadPoolExecutor(cores * 32, cores * 32, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+      executor = ThreadUtil.createExecutor(cores * 32, "SonicBase DeltaManager recoverFromSnapshot2 Thread");
       try {
         currStage.set("recoveringSnapshot");
         totalBytes.set(0);

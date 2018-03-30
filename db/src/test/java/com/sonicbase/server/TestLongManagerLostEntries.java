@@ -1,4 +1,4 @@
-package com.sonicbase.database;
+package com.sonicbase.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -6,23 +6,24 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
-import com.sonicbase.server.DatabaseServer;
-import com.sonicbase.server.LogManager;
+import com.sonicbase.query.DatabaseException;
 import org.apache.commons.io.IOUtils;
+import org.apache.giraph.utils.Varint;
 import org.codehaus.plexus.util.FileUtils;
 import org.testng.annotations.Test;
 
-import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.assertEquals;
 
 /**
  * Created by lowryda on 9/4/17.
@@ -40,13 +41,42 @@ public class TestLongManagerLostEntries {
           System.out.println("count=" + countPlayed.get());
         }
         ComObject cobj = new ComObject(body);
-        long value = cobj.getLong(ComObject.Tag.countLong);
+        long value = cobj.getInt(ComObject.Tag.count);
         if (null != foundIds.put(value, value)) {
           System.out.println("Value already set");
         }
       }
       return super.invokeMethod(body, logSequence0, logSequence1, replayedCommand, enableQueuing, timeLogging, handlerTime);
     }
+  }
+
+  public static void main(String[] args) throws IOException {
+    int countRead = 0;
+    File dir = new File("/Users/lowryda/db/database/log/0/0/self");
+    for (File file : dir.listFiles()) {
+      DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(file)));
+      while (true) {
+        try {
+          in.readInt();
+          short serializationVersion = (short) Varint.readSignedVarLong(in);
+          Varint.readSignedVarLong(in);
+          Varint.readSignedVarLong(in);
+          int size = in.readInt();
+          if (size == 0) {
+            throw new DatabaseException("Invalid size: size=0");
+          }
+          byte[] buffer = size == 0 ? null : new byte[size];
+          if (buffer != null) {
+            in.readFully(buffer);
+          }
+          countRead++;
+        }
+        catch (EOFException e) {
+          break;
+        }
+      }
+    }
+    System.out.println("count=" + countRead);
   }
 
   @Test
@@ -89,8 +119,11 @@ public class TestLongManagerLostEntries {
     dbServers[2].enableSnapshot(false);
     dbServers[3].enableSnapshot(false);
 
-    int countToProcess = 1_000_000;
+    int countToProcess = 100_000;
     LogManager logManager = dbServers[0].getLogManager();
+
+    logManager.setCycleLogsMillis(100);
+
     AtomicLong timeLogging = new AtomicLong();
     List<DatabaseServer.LogRequest> requests = new ArrayList<>();
     for (int i = 0; i < countToProcess; i++) {
@@ -101,7 +134,7 @@ public class TestLongManagerLostEntries {
         System.out.println("upsert progress: count=" + i);
       }
       ComObject cobj = new ComObject();
-      cobj.put(ComObject.Tag.countLong, (long)i);
+      cobj.put(ComObject.Tag.count, i);
       cobj.put(ComObject.Tag.method, "echoWrite");
       requests.add(logManager.logRequest(cobj.serialize(), true, "echoWrite", (long)i, (long)i, timeLogging));
     }
@@ -110,6 +143,7 @@ public class TestLongManagerLostEntries {
       request.getLatch().await();
     }
 
+    System.out.println("count logged: " + logManager.getCountLogged());
     countPlayed.set(0);
     logManager.applyLogs();
 
@@ -124,6 +158,7 @@ public class TestLongManagerLostEntries {
         countMissing++;
       }
     }
+    assertEquals(countMissing, 0);
     System.out.println("count missing=" + countMissing);
     foundIds.clear();
 
@@ -160,5 +195,10 @@ public class TestLongManagerLostEntries {
 //    }
 
     System.out.println("count missing=" + countMissing);
+
+    dbServers[0].shutdown();
+    dbServers[1].shutdown();
+    dbServers[2].shutdown();
+    dbServers[3].shutdown();
   }
 }

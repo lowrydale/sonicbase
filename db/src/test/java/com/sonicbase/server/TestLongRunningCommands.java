@@ -1,4 +1,4 @@
-package com.sonicbase.database;
+package com.sonicbase.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -6,9 +6,6 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
-import com.sonicbase.server.MethodInvoker;
-import com.sonicbase.server.DatabaseServer;
-import com.sonicbase.server.LongRunningCalls;
 import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.util.FileUtils;
 import org.testng.annotations.Test;
@@ -46,20 +43,22 @@ public class TestLongRunningCommands {
 
     ComObject cobj  = new ComObject();
     cobj.put(ComObject.Tag.method, "echo");
+    cobj.put(ComObject.Tag.count, 10);
     LongRunningCalls.SingleCommand command = server.getLongRunningCommands().createSingleCommand(cobj.serialize());
     //LongRunningCalls.SingleCommand command2 = server.getLongRunningCommands().createSingleCommand("DatabaseServer:echo2:1:1:test:10", null);
     server.getLongRunningCommands().addCommand(command);
     //server.getLongRunningCommands().addCommand(command2);
 
-//    while (true) {
-//      if (DatabaseServer.echoCount.get() == 10) {
-//        System.out.println("Echoed");
-//        break;
-//      }
-//      Thread.sleep(1000);
-//    }
+    while (true) {
+      if (MethodInvoker.echoCount.get() == 10) {
+        System.out.println("Echoed");
+        break;
+      }
+      Thread.sleep(1000);
+    }
     Thread.sleep(1000);
 
+    cobj.put(ComObject.Tag.count, 11);
     server.getLongRunningCommands().addCommand(server.getLongRunningCommands().createSingleCommand(cobj.serialize()));
 
     while (true) {

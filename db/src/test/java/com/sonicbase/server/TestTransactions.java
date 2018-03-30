@@ -13,6 +13,7 @@ import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.schema.TableSchema;
 import org.apache.commons.io.IOUtils;
 import org.codehaus.plexus.util.FileUtils;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -37,6 +38,18 @@ public class TestTransactions {
   private int recordCount = 10;
   List<Long> ids = new ArrayList<>();
   private Connection conn2;
+  DatabaseServer[] dbServers;
+
+  @AfterClass
+  public void afterClass() throws SQLException {
+    conn.close();
+    conn2.close();
+
+    for (DatabaseServer server : dbServers) {
+      server.shutdown();
+    }
+    Logger.queue.clear();
+  }
 
   @BeforeClass
   public void beforeClass() throws Exception {
@@ -53,7 +66,7 @@ public class TestTransactions {
     config.put("licenseKeys", array);
     DatabaseClient.getServers().clear();
 
-    final DatabaseServer[] dbServers = new DatabaseServer[4];
+    dbServers = new DatabaseServer[4];
     ThreadPoolExecutor executor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
     String role = "primaryMaster";

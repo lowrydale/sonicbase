@@ -489,13 +489,18 @@ public class ResultSetProxy implements java.sql.ResultSet {
   }
 
   public InputStream getUnicodeStream(int columnIndex) throws SQLException {
-    InputStream ret = (InputStream)resultSet.getField(columnIndex);
-    if (ret == null) {
-      wasNull = true;
-      return null;
+    try {
+      InputStream ret = (InputStream) resultSet.getField(columnIndex);
+      if (ret == null) {
+        wasNull = true;
+        return null;
+      }
+      wasNull = false;
+      return ret;
     }
-    wasNull = false;
-    return ret;
+    catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   public String getString(String columnLabel) throws SQLException {

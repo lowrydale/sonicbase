@@ -35,13 +35,25 @@ public class TestBulkImport {
   private DatabaseClient clientA;
   private DatabaseClient clientB;
   private DatabaseServer[] dbServers;
+  private NettyServer serverA1;
+  private NettyServer serverA2;
+  private NettyServer serverB1;
+  private NettyServer serverB2;
 
   @AfterClass
-  public void afterClass() {
+  public void afterClass() throws SQLException {
+    connA.close();
+    connB.close();
+
     for (DatabaseServer server : dbServers) {
       server.shutdown();
     }
     Logger.queue.clear();
+    serverA1.shutdown();
+    serverA2.shutdown();
+    serverB1.shutdown();
+    serverB2.shutdown();
+    System.out.println("finished");
   }
 
   @BeforeClass
@@ -67,7 +79,7 @@ public class TestBulkImport {
 
 
       final CountDownLatch latch = new CountDownLatch(4);
-      final NettyServer serverA1 = new NettyServer(128);
+      serverA1 = new NettyServer(128);
       Thread thread = new Thread(new Runnable(){
         @Override
         public void run() {
@@ -84,7 +96,7 @@ public class TestBulkImport {
         Thread.sleep(100);
       }
 
-      final NettyServer serverA2 = new NettyServer(128);
+      serverA2 = new NettyServer(128);
       thread = new Thread(new Runnable(){
         @Override
         public void run() {
@@ -102,7 +114,7 @@ public class TestBulkImport {
         Thread.sleep(100);
       }
 
-      final NettyServer serverB1 = new NettyServer(128);
+      serverB1 = new NettyServer(128);
       thread = new Thread(new Runnable(){
         @Override
         public void run() {
@@ -119,7 +131,7 @@ public class TestBulkImport {
         Thread.sleep(100);
       }
 
-      final NettyServer serverB2 = new NettyServer(128);
+      serverB2 = new NettyServer(128);
       thread = new Thread(new Runnable(){
         @Override
         public void run() {

@@ -148,7 +148,7 @@ public class MethodInvoker {
           Integer replica = header.getInt(ComObject.Tag.replica);
           String innerMethod = header.getString(ComObject.Tag.method);
           request.put(ComObject.Tag.method, innerMethod);
-          logManager.logRequestForPeer(requestBytes, System.currentTimeMillis(), logManager.getNextSequencenNum(), replica);
+          logManager.logRequestForPeer(requestBytes, innerMethod, System.currentTimeMillis(), logManager.getNextSequencenNum(), replica);
           return null;
         }
         catch (Exception e) {
@@ -226,7 +226,7 @@ public class MethodInvoker {
           catch (Exception e) {
             int index = ExceptionUtils.indexOfThrowable(e, DeadServerException.class);
             if (-1 != index) {
-              logManager.logRequestForPeer(newMessage.serialize(), sequence0, sequence1, future.replica);
+              logManager.logRequestForPeer(newMessage.serialize(), methodStr, sequence0, sequence1, future.replica);
             }
             else {
               logger.error("Error sending command to slave", e);
@@ -724,12 +724,14 @@ public class MethodInvoker {
 
   public ComObject echo(ComObject cobj, boolean replayedCommand) {
     logger.info("called echo");
-    echoCount.set(cobj.getInt(ComObject.Tag.count));
+    if (cobj.getInt(ComObject.Tag.count) != null) {
+      echoCount.set(cobj.getInt(ComObject.Tag.count));
+    }
     return cobj;
   }
 
   public ComObject echoWrite(ComObject cobj, boolean replayedCommand) {
-    logger.info("called echo");
+    //logger.info("called echo");
     echoCount.set(cobj.getInt(ComObject.Tag.count));
     return cobj;
   }

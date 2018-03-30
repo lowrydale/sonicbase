@@ -15,6 +15,7 @@ import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.procedure.*;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.ExpressionImpl;
+import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.socket.DeadServerException;
 import com.sonicbase.util.DateUtils;
@@ -30,7 +31,9 @@ import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.ReversedLinesFileReader;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.giraph.utils.Varint;
+import org.jetbrains.annotations.Nullable;
 import org.quartz.*;
 import org.quartz.impl.StdSchedulerFactory;
 import sun.misc.Unsafe;
@@ -141,6 +144,21 @@ public class DatabaseServer {
   private boolean finishedRestoreFileCopy;
   private Connection sysConnection;
   private Thread streamsConsumerMonitorthread;
+  private Thread netMonitorThread;
+  private Thread statsThread;
+  private ArrayList<Thread> masterMonitorThreadsForShards;
+  private Thread masterMonitorThread;
+  private Thread licenseValidatorThread;
+  private Thread backupFileSystemThread;
+  private Thread backupAWSThread;
+  private Thread backupMainThread;
+  private Thread restoreFileSystemThread;
+  private Thread restoreAWSThread;
+  private Thread restoreMainThread;
+  private Thread memoryMonitorThread;
+  private Thread reloadServerThread;
+  private Connection connectionForStoredProcedure;
+  private Timer isStreamingStartedTimer;
 
   @SuppressWarnings("restriction")
   private static Unsafe getUnsafe() {
@@ -203,6 +221,100 @@ public class DatabaseServer {
 
   }
 
+  public void shutdown() {
+    try {
+      shutdown = true;
+
+      if (isStreamingStartedTimer != null) {
+        isStreamingStartedTimer.cancel();
+      }
+      if (reloadServerThread != null) {
+        reloadServerThread.interrupt();
+        reloadServerThread.join();
+      }
+      if (memoryMonitorThread != null) {
+        memoryMonitorThread.interrupt();
+        memoryMonitorThread.join();
+      }
+
+      if (restoreMainThread != null) {
+        restoreMainThread.interrupt();
+        restoreMainThread.join();
+      }
+      if (restoreAWSThread != null) {
+        restoreAWSThread.interrupt();
+        restoreAWSThread.join();
+      }
+
+      if (restoreFileSystemThread != null) {
+        restoreFileSystemThread.interrupt();
+        restoreFileSystemThread.join();
+      }
+      if (backupAWSThread != null) {
+        backupAWSThread.interrupt();
+        backupAWSThread.join();
+      }
+
+      if (backupFileSystemThread != null) {
+        backupFileSystemThread.interrupt();
+        backupFileSystemThread.join();
+      }
+      if (licenseValidatorThread != null) {
+        licenseValidatorThread.interrupt();
+        licenseValidatorThread.join();
+      }
+      if (masterMonitorThread != null) {
+        masterMonitorThread.interrupt();
+        masterMonitorThread.join();
+      }
+
+      if (masterMonitorThreadsForShards != null) {
+        for (Thread thread : masterMonitorThreadsForShards) {
+          thread.interrupt();
+        }
+        for (Thread thread : masterMonitorThreadsForShards) {
+          thread.join();
+        }
+      }
+
+      statsThread.interrupt();
+      statsThread.join();
+
+      netMonitorThread.interrupt();
+      netMonitorThread.join();
+
+      if (streamsConsumerMonitorthread != null) {
+        streamsConsumerMonitorthread.interrupt();
+        streamsConsumerMonitorthread.join();
+      }
+
+      shutdownDeathMonitor();
+      shutdownRepartitioner();
+      shutdownMasterLicenseValidator();
+      deleteManager.shutdown();
+      deltaManager.shutdown();
+      logManager.shutdown();
+      executor.shutdownNow();
+      methodInvoker.shutdown();
+      client.get().shutdown();
+      if (sysConnection != null) {
+        sysConnection.close();
+      }
+      if (connectionForStoredProcedure != null) {
+        connectionForStoredProcedure.close();
+      }
+      readManager.shutdown();
+      transactionManager.shutdown();
+      updateManager.shutdown();
+      bulkImportManager.shutdown();
+
+      executor.shutdownNow();
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
   public MethodInvoker getMethodInvoker() {
     return methodInvoker;
   }
@@ -261,9 +373,7 @@ public class DatabaseServer {
 
     ObjectNode firstServer = (ObjectNode) shards.get(0).withArray("replicas").get(0);
     ServersConfig serversConfig = null;
-    executor = new ThreadPoolExecutor(Runtime.getRuntime().availableProcessors() * 128,
-        Runtime.getRuntime().availableProcessors() * 128, 10000, TimeUnit.MILLISECONDS,
-        new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+    executor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors() * 128, "Sonicbase DatabaseServer Thread");
 //    if (!skipLicense) {
 //      validateLicense(config);
 //    }
@@ -349,13 +459,13 @@ public class DatabaseServer {
 
     scheduleBackup();
 
-    Thread thread = new Thread(new NetMonitor());
-    thread.start();
+    netMonitorThread = ThreadUtil.createThread(new NetMonitor(), "SonicBase Network Monitor Threwad");
+    netMonitorThread.start();
 
-    Thread statsThread = new Thread(new StatsMonitor());
+    statsThread = ThreadUtil.createThread(new StatsMonitor(), "SonicBase Stats Monitor Thread");
     statsThread.start();
 
-    while (true) {
+    while (!shutdown) {
       try {
         if (shard != 0 || replica != 0) {
           syncDbNames();
@@ -423,8 +533,8 @@ public class DatabaseServer {
     logger.info("Started server");
 
 
-    Timer timer = new Timer();
-    timer.schedule(new TimerTask(){
+    isStreamingStartedTimer = new Timer("SonicBase IsStreamingStarted Timer");
+    isStreamingStartedTimer.schedule(new TimerTask(){
       @Override
       public void run() {
         ComObject cobj = new ComObject();
@@ -473,7 +583,7 @@ public class DatabaseServer {
       Thread thread = new Thread(new Runnable() {
         @Override
         public void run() {
-          while (true) {
+          while (!shutdown) {
             try {
               promoteToMaster(null);
               break;
@@ -494,7 +604,9 @@ public class DatabaseServer {
       return;
     }
 
-    Thread thread = new Thread(new Runnable() {
+    masterMonitorThreadsForShards = new ArrayList<>();
+
+    masterMonitorThread = ThreadUtil.createThread(new Runnable() {
       @Override
       public void run() {
         final int[] monitorShards = {0, 0, 0};
@@ -518,7 +630,7 @@ public class DatabaseServer {
 
           for (int i = 0; i < shardCount; i++) {
             final int shard = i;
-            Thread masterThread = new Thread(new Runnable() {
+            Thread masterThreadForShard = ThreadUtil.createThread(new Runnable() {
               @Override
               public void run() {
                 AtomicInteger nextMonitor = new AtomicInteger(-1);
@@ -531,7 +643,7 @@ public class DatabaseServer {
                     logger.error("Error electing master: shard=" + shard, e);
                   }
                 }
-                while (true) {
+                while (!shutdown) {
                   try {
                     Thread.sleep(deathOverride == null ? 2000 : 1000);
 
@@ -558,13 +670,14 @@ public class DatabaseServer {
                   }
                 }
               }
-            });
-            masterThread.start();
+            }, "SonicBase Master Monitor Thread for Shard: " + shard);
+            masterThreadForShard.start();
+            masterMonitorThreadsForShards.add(masterThreadForShard);
           }
         }
       }
-    });
-    thread.start();
+    }, "SonicBase Maste Monitor Thread");
+    masterMonitorThread.start();
   }
 
   private boolean electNewMaster(int shard, int oldMasterReplica, int[] monitorShards, int[] monitorReplicas, AtomicInteger nextMonitor) throws InterruptedException, IOException {
@@ -605,7 +718,7 @@ public class DatabaseServer {
     else {
       logger.error("ElectNewMaster, shard=" + shard + ", checking candidates");
       outer:
-      while (true) {
+      while (!shutdown) {
         for (int j = 0; j < replicationFactor; j++) {
           if (j == oldMasterReplica) {
             continue;
@@ -769,20 +882,66 @@ public class DatabaseServer {
     }
   }
 
+  public Connection getSysConnection() {
+    try {
+      synchronized (this) {
+        if (sysConnection != null) {
+          return sysConnection;
+        }
+      }
+      ArrayNode array = config.withArray("shards");
+      ObjectNode replicaDict = (ObjectNode) array.get(0);
+      ArrayNode replicasArray = replicaDict.withArray("replicas");
+      JsonNode node = config.get("clientIsPrivate");
+      final String address = node != null && node.asBoolean() ?
+          replicasArray.get(0).get("privateAddress").asText() :
+          replicasArray.get(0).get("publicAddress").asText();
+      final int port = replicasArray.get(0).get("port").asInt();
+
+      Class.forName("com.sonicbase.jdbcdriver.Driver");
+      ConnectionProxy conn = new ConnectionProxy("jdbc:sonicbase:" + address + ":" + port, this);
+      try {
+        if (!((ConnectionProxy) conn).databaseExists("_sonicbase_sys")) {
+          ((ConnectionProxy) conn).createDatabase("_sonicbase_sys");
+        }
+      }
+      catch (Exception e) {
+        if (!ExceptionUtils.getFullStackTrace(e).toLowerCase().contains("database already exists")) {
+          throw new DatabaseException(e);
+        }
+      }
+
+      conn.close();
+
+      sysConnection = new ConnectionProxy("jdbc:sonicbase:" + address + ":" + port + "/_sonicbase_sys", this);
+      return sysConnection;
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
   private void startStreamsConsumerMonitor() {
     if (streamsConsumerMonitorthread == null) {
-      streamsConsumerMonitorthread = new Thread(new Runnable() {
+      streamsConsumerMonitorthread = ThreadUtil.createThread(new Runnable() {
         @Override
         public void run() {
           try {
-            if (sysConnection == null) {
-              sysConnection = StreamManager.initSysConnection(config, DatabaseServer.this);
-              StreamManager.initStreamsConsumerTable(sysConnection);
-            }
-            while (!shutdown) {
+            Connection conn = getSysConnection();
+            StreamManager.initStreamsConsumerTable(conn);
+
+            while (!shutdown && !Thread.interrupted()) {
               try {
                 StringBuilder builder = new StringBuilder();
-                Map<String, Boolean> currState = readStreamConsumerState();
+                Map<String, Boolean> currState = null;
+                try {
+                  currState = readStreamConsumerState();
+                }
+                catch (Exception e) {
+                  logger.error("Error reading stream consumer state - will retry: msg=" + e.getMessage());
+                  Thread.sleep(2_000);
+                  continue;
+                }
                 for (int shard = 0; shard < shardCount; shard++) {
                   int aliveReplica = -1;
                   for (int replica = 0; replica < replicationFactor; replica++) {
@@ -813,7 +972,7 @@ public class DatabaseServer {
             streamsConsumerMonitorthread = null;
           }
         }
-      });
+      }, "SonicBase Streams Consumer Monitor Thread");
       streamsConsumerMonitorthread.start();
     }
   }
@@ -903,10 +1062,10 @@ public class DatabaseServer {
   private void startDeathMonitor() {
     synchronized (deathMonitorMutex) {
 
-      deathReportThread = new Thread(new Runnable() {
+      deathReportThread = ThreadUtil.createThread(new Runnable() {
         @Override
         public void run() {
-          while (true) {
+          while (!shutdown) {
             try {
               Thread.sleep(10000);
               StringBuilder builder = new StringBuilder();
@@ -934,7 +1093,7 @@ public class DatabaseServer {
             }
           }
         }
-      }, "Death Reporting Thread");
+      }, "SonicBase Death Reporting Thread");
       deathReportThread.start();
 
       shutdownDeathMonitor = false;
@@ -953,7 +1112,7 @@ public class DatabaseServer {
             }
             continue;
           }
-          deathMonitorThreads[i][j] = new Thread(new Runnable() {
+          deathMonitorThreads[i][j] = ThreadUtil.createThread(new Runnable() {
             @Override
             public void run() {
               while (!shutdownDeathMonitor) {
@@ -995,7 +1154,7 @@ public class DatabaseServer {
                 }
               }
             }
-          }, "Death Monitor Thread: shard=" + i + ", replica=" + j);
+          }, "SonicBase Death Monitor Thread: shard=" + i + ", replica=" + j);
           deathMonitorThreads[i][j].start();
         }
       }
@@ -1041,7 +1200,7 @@ public class DatabaseServer {
 
     final AtomicBoolean finished = new AtomicBoolean();
     isHealthy.set(false);
-    Thread checkThread = new Thread(new Runnable() {
+    Thread checkThread = ThreadUtil.createThread(new Runnable() {
       private ComObject recoverStatus;
 
       @Override
@@ -1085,7 +1244,7 @@ public class DatabaseServer {
           }
         //}
       }
-    });
+    }, "SonicBase Check Health of Server Thread");
     checkThread.start();
 
     int i = 0;
@@ -1315,20 +1474,25 @@ public class DatabaseServer {
   }
 
   public ConnectionProxy getConnectionForStoredProcedure(String dbName) throws ClassNotFoundException, SQLException {
-    ArrayNode array = config.withArray("shards");
-    ObjectNode replicaDict = (ObjectNode) array.get(0);
-    ArrayNode replicasArray = replicaDict.withArray("replicas");
-    JsonNode node = config.get("clientIsPrivate");
-    final String address = node != null && node.asBoolean() ?
-        replicasArray.get(0).get("privateAddress").asText() :
-        replicasArray.get(0).get("publicAddress").asText();
-    final int port = replicasArray.get(0).get("port").asInt();
+    synchronized (this) {
+      if (connectionForStoredProcedure != null) {
+        return (ConnectionProxy) connectionForStoredProcedure;
+      }
+      ArrayNode array = config.withArray("shards");
+      ObjectNode replicaDict = (ObjectNode) array.get(0);
+      ArrayNode replicasArray = replicaDict.withArray("replicas");
+      JsonNode node = config.get("clientIsPrivate");
+      final String address = node != null && node.asBoolean() ?
+          replicasArray.get(0).get("privateAddress").asText() :
+          replicasArray.get(0).get("publicAddress").asText();
+      final int port = replicasArray.get(0).get("port").asInt();
 
-    Class.forName("com.sonicbase.jdbcdriver.Driver");
-    final ConnectionProxy conn = new ConnectionProxy("jdbc:sonicbase:" + address + ":" + port + "/" + dbName, this);
+      Class.forName("com.sonicbase.jdbcdriver.Driver");
+      connectionForStoredProcedure = new ConnectionProxy("jdbc:sonicbase:" + address + ":" + port + "/" + dbName, this);
 
-    conn.getDatabaseClient().syncSchema();
-    return conn;
+      ((ConnectionProxy)connectionForStoredProcedure).getDatabaseClient().syncSchema();
+      return (ConnectionProxy) connectionForStoredProcedure;
+    }
   }
 
   public ComObject executeProcedure(final ComObject cobj) {
@@ -1374,16 +1538,6 @@ public class DatabaseServer {
     catch (Exception e) {
       throw new DatabaseException(e);
     }
-    finally {
-      if (conn != null) {
-        try {
-          conn.close();
-        }
-        catch (SQLException e) {
-          throw new DatabaseException(e);
-        }
-      }
-    }
   }
 
   public ComObject executeProcedurePrimary(final ComObject cobj) {
@@ -1422,8 +1576,7 @@ public class DatabaseServer {
       cobj.put(ComObject.Tag.method, "executeProcedure");
       cobj.put(ComObject.Tag.id, storedProcedureId);
 
-      executor = new ThreadPoolExecutor(shardCount, shardCount, 10_000, TimeUnit.MILLISECONDS,
-          new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+      executor = ThreadUtil.createExecutor(shardCount, "SonicBase executeProcedurePrimary Thread");
       // call all shards
       List<Future> futures = new ArrayList<>();
       for (int i = 0; i < shardCount; i++) {
@@ -1523,7 +1676,7 @@ public class DatabaseServer {
       final AtomicBoolean lastHaveProLicense = new AtomicBoolean(haveProLicense);
 
       doValidateLicense(address, licensePort, lastHaveProLicense, haventSet);
-      masterLicenseValidatorThread = new Thread(new Runnable() {
+      masterLicenseValidatorThread = ThreadUtil.createThread(new Runnable() {
       @Override
       public void run() {
         while (!shutdownMasterValidatorThread) {
@@ -1550,7 +1703,7 @@ public class DatabaseServer {
           }
         }
           }
-    });
+    }, "SonicBase Master License Validator Thread");
       masterLicenseValidatorThread.start();
     }
     catch (Exception e) {
@@ -1700,10 +1853,10 @@ public class DatabaseServer {
 
       final AtomicBoolean lastHaveProLicense = new AtomicBoolean(haveProLicense);
 
-      Thread thread = new Thread(new Runnable() {
+      licenseValidatorThread = ThreadUtil.createThread(new Runnable() {
         @Override
         public void run() {
-          while (true) {
+          while (!shutdown) {
             boolean hadError = false;
             try {
               checkLicense(lastHaveProLicense, haventSet);
@@ -1734,8 +1887,8 @@ public class DatabaseServer {
             }
           }
         }
-      });
-      thread.start();
+      }, "SonicBase License Validator Thread");
+      licenseValidatorThread.start();
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -2029,7 +2182,7 @@ public class DatabaseServer {
   }
 
   public ComObject doBackupFileSystem(final ComObject cobj) {
-    Thread thread = new Thread(new Runnable() {
+    backupFileSystemThread = ThreadUtil.createThread(new Runnable() {
 
       @Override
       public void run() {
@@ -2070,8 +2223,8 @@ public class DatabaseServer {
           backupException = e;
         }
       }
-    });
-    thread.start();
+    }, "SonicBase Backup FileSystem Thread");
+    backupFileSystemThread.start();
     return null;
   }
 
@@ -2089,7 +2242,7 @@ public class DatabaseServer {
   }
 
   public ComObject doBackupAWS(final ComObject cobj) {
-    Thread thread = new Thread(new Runnable() {
+    backupAWSThread = ThreadUtil.createThread(new Runnable() {
       @Override
       public void run() {
         try {
@@ -2125,8 +2278,8 @@ public class DatabaseServer {
           backupException = e;
         }
       }
-    });
-    thread.start();
+    }, "SonicBase Backup AWS Thread");
+    backupAWSThread.start();
     return null;
   }
 
@@ -2221,7 +2374,7 @@ public class DatabaseServer {
 
     final boolean wasDoingBackup = doingBackup;
     doingBackup = true;
-    Thread thread = new Thread(new Runnable() {
+    backupMainThread = ThreadUtil.createThread(new Runnable() {
       @Override
       public void run() {
         try {
@@ -2237,8 +2390,8 @@ public class DatabaseServer {
           logger.error("Error doing backup", e);
         }
       }
-    });
-    thread.start();
+    }, "SonicBase Backup Main Thread");
+    backupMainThread.start();
     return null;
   }
 
@@ -2375,7 +2528,7 @@ public class DatabaseServer {
         logger.info("Backup Master - doBackupFileSystem - end");
       }
 
-      while (true) {
+      while (!shutdown) {
         ComObject iscobj = new ComObject();
         iscobj.put(ComObject.Tag.dbName, "__none__");
         iscobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
@@ -2521,7 +2674,7 @@ public class DatabaseServer {
 
   public ComObject doRestoreFileSystem(final ComObject cobj) {
 
-    Thread thread = new Thread(new Runnable() {
+    restoreFileSystemThread = ThreadUtil.createThread(new Runnable() {
       @Override
       public void run() {
         try {
@@ -2577,8 +2730,8 @@ public class DatabaseServer {
           restoreException = e;
         }
       }
-    });
-    thread.start();
+    }, "SonicBase Restore FileSystem Thread");
+    restoreFileSystemThread.start();
 
     return null;
   }
@@ -2602,7 +2755,7 @@ public class DatabaseServer {
   }
 
   public ComObject doRestoreAWS(final ComObject cobj) {
-    Thread thread = new Thread(new Runnable() {
+    restoreAWSThread = ThreadUtil.createThread(new Runnable() {
       @Override
       public void run() {
         try {
@@ -2634,8 +2787,8 @@ public class DatabaseServer {
           restoreException = e;
         }
       }
-    });
-    thread.start();
+    }, "SonicBase Restore AWS Thread");
+    restoreAWSThread.start();
 
     return null;
   }
@@ -2711,7 +2864,7 @@ public class DatabaseServer {
       throw new InsufficientLicense("You must have a pro license to start a restore");
     }
     doingRestore = true;
-    Thread thread = new Thread(new Runnable() {
+    restoreMainThread = ThreadUtil.createThread(new Runnable() {
       @Override
       public void run() {
         try {
@@ -2723,8 +2876,8 @@ public class DatabaseServer {
           logger.error("Error restoring backup", e);
         }
       }
-    });
-    thread.start();
+    }, "SonicBase Restore Main Thread");
+    restoreMainThread.start();
     return null;
   }
 
@@ -2774,12 +2927,10 @@ public class DatabaseServer {
           file = new File(file, "delta/" + getShard() + "/0/schema.bin");
         }
         BufferedInputStream in = new BufferedInputStream(new FileInputStream(file));
-        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-        IOUtils.copy(in, bytesOut);
-        bytesOut.close();
+        byte[] bytes = IOUtils.toByteArray(in);
 
         synchronized (common) {
-          common.deserializeSchema(bytesOut.toByteArray());
+          common.deserializeSchema(bytes);
           common.saveSchema(getClient(), getDataDir());
         }
       }
@@ -2825,7 +2976,7 @@ public class DatabaseServer {
         ret = getDatabaseClient().sendToAllShards(null, 0, cobj, DatabaseClient.Replica.all, true);
       }
 
-      while (true) {
+      while (!shutdown) {
         cobj = new ComObject();
         cobj.put(ComObject.Tag.dbName, "__none__");
         cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
@@ -2875,7 +3026,7 @@ public class DatabaseServer {
       for (String dbName : getDbNames(getDataDir())) {
         getClient().beginRebalance(dbName, "persons", "_1__primarykey");
 
-        while (true) {
+        while (!shutdown) {
           if (getClient().isRepartitioningComplete(dbName)) {
             break;
           }
@@ -2931,6 +3082,66 @@ public class DatabaseServer {
       this.client.set(client);
       return this.client.get();
     }
+  }
+
+  public IndexSchema getIndexSchema(String dbName, String tableName, String indexName) {
+    TableSchema tableSchema = common.getTables(dbName).get(tableName);
+    IndexSchema indexSchema = null;
+    for (int i = 0; i < 10; i++) {
+      if (tableSchema == null) {
+        getClient().syncSchema();
+        tableSchema = common.getTables(dbName).get(tableName);
+      }
+      if (tableSchema != null) {
+        indexSchema = tableSchema.getIndices().get(indexName);
+        if (indexSchema == null) {
+          getClient().syncSchema();
+          indexSchema = tableSchema.getIndices().get(indexName);
+        }
+      }
+      if (indexSchema != null) {
+        break;
+      }
+      try {
+        Thread.sleep(1_000);
+      }
+      catch (InterruptedException e) {
+        throw new DatabaseException(e);
+      }
+    }
+    return indexSchema;
+  }
+
+
+  @Nullable
+  public Index getIndex(String dbName, String tableName, String indexName) {
+    TableSchema tableSchema = common.getTables(dbName).get(tableName);
+    ConcurrentHashMap<String, ConcurrentHashMap<String, Index>> indices = getIndices(dbName).getIndices();
+    Index index = null;
+    for (int i = 0; i < 10; i++) {
+      ConcurrentHashMap<String, Index> table = indices.get(tableSchema.getName());
+      if (table == null) {
+        getClient().syncSchema();
+        table = indices.get(tableSchema.getName());
+      }
+      if (table != null) {
+        index = table.get(indexName);
+        if (index == null) {
+          getClient().syncSchema();
+          index = getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexName);
+        }
+      }
+      if (index != null) {
+        break;
+      }
+      try {
+        Thread.sleep(1_000);
+      }
+      catch (InterruptedException e) {
+        throw new DatabaseException(e);
+      }
+    }
+    return index;
   }
 
   public int getSchemaVersion() {
@@ -3146,10 +3357,10 @@ public class DatabaseServer {
   }
 
   private void startMemoryMonitor() {
-    Thread thread = new Thread(new Runnable() {
+    memoryMonitorThread = ThreadUtil.createThread(new Runnable() {
       @Override
       public void run() {
-        while (true) {
+        while (!shutdown && !Thread.interrupted()) {
           try {
             Thread.sleep(30000);
 
@@ -3157,17 +3368,20 @@ public class DatabaseServer {
 
             checkJavaHeap(totalGig);
           }
+          catch (InterruptedException e) {
+            break;
+          }
           catch (Exception e) {
             logger.error("Error in memory check thread", e);
           }
         }
 
       }
-    });
-    thread.start();
+    }, "SonicBase Memory Monitor Thread");
+    memoryMonitorThread.start();
   }
 
-  private Double checkResidentMemory() {
+  private Double checkResidentMemory() throws InterruptedException {
     Double totalGig = null;
     JsonNode node = config.get("maxProcessMemoryTrigger");
     String max = node == null ? null : node.asText();
@@ -3196,7 +3410,7 @@ public class DatabaseServer {
         builder = new ProcessBuilder().command("top", "-l", "1", "-pid", String.valueOf(pid));
         p = builder.start();
         try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-          while (true) {
+          while (!shutdown) {
             String line = in.readLine();
             if (line == null) {
               break;
@@ -3236,7 +3450,7 @@ public class DatabaseServer {
         p = builder.start();
         try {
           BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-          while (true) {
+          while (!shutdown) {
             String line = in.readLine();
             if (line == null) {
               break;
@@ -3301,6 +3515,9 @@ public class DatabaseServer {
         }
       }
     }
+    catch (InterruptedException e) {
+      throw e;
+    }
     catch (Exception e) {
       logger.error("Error checking memory: line2=" + secondToLastLine + ", line1=" + lastLine, e);
     }
@@ -3318,14 +3535,14 @@ public class DatabaseServer {
       List<Double> recRate = new ArrayList<>();
       try {
         if (isMac()) {
-          while (true) {
+          while (!shutdown) {
             ProcessBuilder builder = new ProcessBuilder().command("ifstat");
             Process p = builder.start();
             try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
               String firstLine = null;
               String secondLine = null;
               Set<Integer> toSkip = new HashSet<>();
-              while (true) {
+              while (!shutdown) {
                 String line = in.readLine();
                 if (line == null) {
                   break;
@@ -3392,7 +3609,7 @@ public class DatabaseServer {
           }
         }
         else if (isUnix()) {
-          while (true) {
+          while (!shutdown) {
             int count = 0;
             File file = new File(installDir, "tmp/dstat.out");
             file.getParentFile().mkdirs();
@@ -3404,12 +3621,12 @@ public class DatabaseServer {
                 Thread.sleep(1000);
               }
               outer:
-              while (true) {
+              while (!shutdown) {
                 try (BufferedReader in = new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
                   int recvPos = 0;
                   int sendPos = 0;
                   boolean nextIsValid = false;
-                  while (true) {
+                  while (!shutdown) {
                     String line = in.readLine();
                     if (line == null) {
                       break;
@@ -3491,11 +3708,11 @@ public class DatabaseServer {
           Double lastReceive = null;
           Double lastTransmit = null;
           long lastRecorded = 0;
-          while (true) {
+          while (!shutdown) {
             ProcessBuilder builder = new ProcessBuilder().command("netstat", "-e");
             Process p = builder.start();
             try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-              while (true) {
+              while (!shutdown) {
                 String line = in.readLine();
                 if (line.startsWith("Bytes")) {
                   String[] parts = line.split("\\s+");
@@ -3544,7 +3761,7 @@ public class DatabaseServer {
       int bestLineAmountMatch = 0;
       int mountOffset = 0;
       try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-        while (true) {
+        while (!shutdown) {
           String line = in.readLine();
           if (line == null) {
             break;
@@ -3596,7 +3813,7 @@ public class DatabaseServer {
     String diskAvail;
   }
 
-  public OSStats doGetOSStats() {
+  public OSStats doGetOSStats() throws InterruptedException {
     OSStats ret = new OSStats();
     String secondToLastLine = null;
     String lastLine = null;
@@ -3607,7 +3824,7 @@ public class DatabaseServer {
         ProcessBuilder builder = new ProcessBuilder().command("top", "-l", "1", "-pid", String.valueOf(pid));
         Process p = builder.start();
         try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-          while (true) {
+          while (!shutdown) {
             String line = in.readLine();
             if (line == null) {
               break;
@@ -3639,7 +3856,7 @@ public class DatabaseServer {
         ProcessBuilder builder = new ProcessBuilder().command("top", "-b", "-n", "1", "-p", String.valueOf(pid));
         Process p = builder.start();
         try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-          while (true) {
+          while (!shutdown) {
             String line = in.readLine();
             if (line == null) {
               break;
@@ -3685,6 +3902,9 @@ public class DatabaseServer {
       ret.javaMemMax = javaMemMax.get() == null ? 0 : javaMemMax.get();
       ret.avgRecRate = avgRecRate;
       ret.avgTransRate = avgTransRate;
+    }
+    catch (InterruptedException e) {
+      throw e;
     }
     catch (Exception e) {
       logger.error("Error checking memory: line2=" + secondToLastLine + ", line1=" + lastLine, e);
@@ -3775,7 +3995,7 @@ public class DatabaseServer {
   }
 
 
-  private void checkJavaHeap(Double totalGig) throws IOException {
+  private void checkJavaHeap(Double totalGig) throws IOException, InterruptedException {
     String line = null;
     try {
       String max = null;
@@ -3868,6 +4088,7 @@ public class DatabaseServer {
         while (ch != null);
       }
     }
+
     catch (Exception e) {
       logger.error("Error checking java memory: line=" + line, e);
     }
@@ -4183,7 +4404,7 @@ public class DatabaseServer {
       logSlicePoint = logManager.sliceLogs(true);
 
       BufferedReader reader = new BufferedReader(new StringReader(logSlicePoint));
-      while (true) {
+      while (!shutdown) {
         String line = reader.readLine();
         if (line == null) {
           break;
@@ -4227,7 +4448,7 @@ public class DatabaseServer {
   private boolean isServerRoloadRunning = false;
 
   public ComObject reloadServer(ComObject cobj) {
-    Thread thread = new Thread(new Runnable() {
+    reloadServerThread = ThreadUtil.createThread(new Runnable() {
       @Override
       public void run() {
         try {
@@ -4272,8 +4493,8 @@ public class DatabaseServer {
           isServerRoloadRunning = false;
         }
       }
-    });
-    thread.start();
+    }, "SonicBase Reload Server Thread");
+    reloadServerThread.start();
 
     return null;
   }
@@ -4407,18 +4628,6 @@ public class DatabaseServer {
 
   private boolean shutdown = false;
 
-  public void shutdown() {
-    shutdown = true;
-
-    shutdownDeathMonitor();
-    shutdownRepartitioner();
-    shutdownMasterLicenseValidator();
-    deleteManager.shutdown();
-    deltaManager.shutdown();
-    logManager.shutdown();
-    executor.shutdownNow();
-    methodInvoker.shutdown();
-  }
 
 //  public static class AddressMap {
 //    private ConcurrentHashMap<Long, Long>  map = new ConcurrentHashMap<>();
@@ -5004,14 +5213,6 @@ public class DatabaseServer {
       return latch;
     }
 
-    public void setLatch(CountDownLatch latch) {
-      this.latch = latch;
-    }
-
-    public void setBuffers(List<byte[]> buffers) {
-      this.buffers = buffers;
-    }
-
     public List<byte[]> getBuffers() {
       return buffers;
     }
@@ -5367,9 +5568,11 @@ public class DatabaseServer {
   private class StatsMonitor implements Runnable {
     @Override
     public void run() {
-      while (true) {
+      while (!shutdown && !Thread.interrupted()) {
         try {
-          Thread.sleep(30000);
+          for (int i = 0; i < 100; i++) {
+            Thread.sleep(300);
+          }
           OSStats stats = doGetOSStats();
           logger.info("OS Stats: CPU=" + String.format("%.2f", stats.cpu) + ", resGig=" + String.format("%.2f", stats.resGig) +
               ", javaMemMin=" + String.format("%.2f", stats.javaMemMin) + ", javaMemMax=" + String.format("%.2f", stats.javaMemMax) +

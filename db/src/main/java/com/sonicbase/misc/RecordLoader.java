@@ -49,7 +49,7 @@ public class RecordLoader {
     stmt.executeUpdate();
 
     int id = 0;
-    int batchSize = 100;
+    int batchSize = 200;
     long begin = System.currentTimeMillis();
     while (true) {
       stmt = conn.prepareStatement("insert into persons (id1, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");

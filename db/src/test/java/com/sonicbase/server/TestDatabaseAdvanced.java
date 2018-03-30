@@ -45,7 +45,8 @@ public class TestDatabaseAdvanced {
   DatabaseServer[] dbServers;
 
   @AfterClass
-  public void afterClass() {
+  public void afterClass() throws SQLException {
+    conn.close();
     for (DatabaseServer server : dbServers) {
       server.shutdown();
     }
@@ -237,6 +238,14 @@ public class TestDatabaseAdvanced {
     Thread.sleep(10000);
 
     executor.shutdownNow();
+  }
+
+  @Test
+  public void testSize() throws SQLException {
+    try (PreparedStatement stmt = conn.prepareStatement("select count(*) from persons");
+         ResultSet ret = stmt.executeQuery()) {
+      assertEquals(ret.getInt(1), 2 * recordCount);
+    }
   }
 
   @Test

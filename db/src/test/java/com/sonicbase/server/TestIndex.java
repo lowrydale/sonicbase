@@ -1,4 +1,4 @@
-package com.sonicbase.database;
+package com.sonicbase.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -482,7 +482,7 @@ public class TestIndex {
     }
     System.out.println(value);
   }
-  @Test
+  @Test(enabled=false)
   public void testCopy() {
 
     ConcurrentSkipListMap<Object[], Object> map = new ConcurrentSkipListMap<>(comparator);
@@ -505,7 +505,7 @@ public class TestIndex {
     System.out.println("duration=" + (System.currentTimeMillis() - begin));
   }
 
-  @Test
+  @Test(enabled=false)
   public void testSort() {
     List<Long> list = new ArrayList<>();
     Random rand = new Random(System.currentTimeMillis());

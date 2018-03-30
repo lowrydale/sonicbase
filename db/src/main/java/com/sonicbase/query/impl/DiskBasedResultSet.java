@@ -1,6 +1,7 @@
 package com.sonicbase.query.impl;
 
 import com.sonicbase.common.Record;
+import com.sonicbase.common.ThreadUtil;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.FieldSchema;
@@ -117,7 +118,7 @@ public class DiskBasedResultSet {
       getKeepers(dbName, databaseServer, tableNames, tableOffsets2, keepers, columnName, tableName);
     }
 
-    ThreadPoolExecutor executor = new ThreadPoolExecutor(resultSets.length, resultSets.length, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+    ThreadPoolExecutor executor = ThreadUtil.createExecutor(resultSets.length, "SonicBase DiskBasedResultsSet Thread");
     List<Future> futures = new ArrayList<>();
 
     try {

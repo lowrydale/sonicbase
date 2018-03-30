@@ -29,6 +29,15 @@ import static org.testng.Assert.assertEquals;
  */
 public class TestLite {
 
+  @Test
+  public void testFileDate() throws IOException {
+    File file = new File(System.getProperty("user.hom"), "/tmp/test.txt");
+    file.getParentFile().mkdirs();
+    BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)));
+    writer.write("test");
+    writer.close();
+    System.out.println(file.lastModified());
+  }
 
   @Test
   public void testBoundaryTimestamp() {

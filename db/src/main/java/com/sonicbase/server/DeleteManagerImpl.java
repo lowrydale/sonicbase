@@ -35,9 +35,8 @@ public class DeleteManagerImpl implements DeleteManager {
   public DeleteManagerImpl(DatabaseServer databaseServer) {
     this.databaseServer = databaseServer;
     logger = new Logger(databaseServer.getDatabaseClient());
-    this.executor = new ThreadPoolExecutor(Runtime.getRuntime().availableProcessors() * 2,
-        Runtime.getRuntime().availableProcessors() * 2, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
-    this.freeExecutor = new ThreadPoolExecutor(4, 4, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+    this.executor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors() * 2, "SonicBase DeleteManagerImpl Thread");
+    this.freeExecutor = ThreadUtil.createExecutor(4, "SonicBase DeleteManagerImpl FreeExecutor Thread");
     this.deltaLogManager = new LogManager(databaseServer, new File(getDeltaRoot(), "log"));
   }
 
@@ -432,7 +431,7 @@ public class DeleteManagerImpl implements DeleteManager {
 
   public void buildDeletionsFiles(String dbName, AtomicReference<String> currStage, AtomicLong totalBytes, AtomicLong finishedBytes) {
     int cores = Runtime.getRuntime().availableProcessors();
-    ThreadPoolExecutor executor = new ThreadPoolExecutor(cores, cores, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+    ThreadPoolExecutor executor = ThreadUtil.createExecutor(cores, "SonicBase buildDeletionsFiles Thread");
     try {
       File file = new File(getDeltaRoot(), "tmp");
       com.sonicbase.common.FileUtils.deleteDirectory(file);
@@ -762,7 +761,7 @@ public class DeleteManagerImpl implements DeleteManager {
               TableSchema tableSchema = databaseServer.getCommon().getTables(currDbName).get(tableName);
 
               String indexName = in.readUTF();
-              final IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
+              final IndexSchema indexSchema = databaseServer.getIndexSchema(dbName, tableSchema.getName(), indexName);
               long sequence0 = in.readLong();
               long sequence1 = in.readLong();
               boolean isRecord = in.readBoolean();
@@ -874,7 +873,7 @@ public class DeleteManagerImpl implements DeleteManager {
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
       TableSchema tableSchema = databaseServer.getCommon().getTables(dbName).get(tableName);
-      IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
+      IndexSchema indexSchema = databaseServer.getIndexSchema(dbName, tableSchema.getName(), indexName);
       out.writeUTF(dbName);
       Varint.writeSignedVarLong(tableSchema.getTableId(), out);
       Varint.writeSignedVarLong(indexSchema.getIndexId(), out);
@@ -895,7 +894,7 @@ public class DeleteManagerImpl implements DeleteManager {
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
       TableSchema tableSchema = databaseServer.getCommon().getTables(dbName).get(tableName);
-      IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
+      IndexSchema indexSchema = databaseServer.getIndexSchema(dbName, tableSchema.getName(), indexName);
       out.writeUTF(dbName);
       Varint.writeSignedVarLong(tableSchema.getTableId(), out);
       Varint.writeSignedVarLong(indexSchema.getIndexId(), out);
@@ -1025,7 +1024,7 @@ public class DeleteManagerImpl implements DeleteManager {
               if (!ignoreVersion && schemaVersionToDeleteAt > databaseServer.getCommon().getSchemaVersion()) {
                 return;
               }
-              final Index index = databaseServer.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
+              final Index index = databaseServer.getIndex(dbName, tableName, indexName);
               List<Object[]> batch = new ArrayList<>();
               int errorsInARow = 0;
               while (true) {

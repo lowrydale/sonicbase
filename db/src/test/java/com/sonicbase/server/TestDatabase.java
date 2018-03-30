@@ -57,6 +57,17 @@ public class TestDatabase {
   DatabaseClient client = null;
   DatabaseServer[] dbServers;
 
+  @AfterClass
+  public void afterClass() throws SQLException {
+    conn.close();
+
+    for (DatabaseServer server : dbServers) {
+      server.shutdown();
+    }
+    Logger.queue.clear();
+
+  }
+
   @BeforeClass
   public void beforeClass() throws Exception {
     try {
@@ -492,6 +503,10 @@ public class TestDatabase {
           break;
         }
       }
+      dbServers[0].enableSnapshot(false);
+      dbServers[1].enableSnapshot(false);
+      dbServers[2].enableSnapshot(false);
+      dbServers[3].enableSnapshot(false);
 
       client.syncSchema();
       for (Map.Entry<String, TableSchema> entry : client.getCommon().getTables("test").entrySet()) {
@@ -525,14 +540,6 @@ public class TestDatabase {
       e.printStackTrace();
       throw e;
     }
-  }
-
-  @AfterClass
-  public void afterClass() {
-    for (DatabaseServer server : dbServers) {
-      server.shutdown();
-    }
-    Logger.queue.clear();
   }
 
   @Test

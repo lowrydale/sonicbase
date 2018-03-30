@@ -1472,9 +1472,11 @@ public abstract class ExpressionImpl implements Expression {
   private static Thread preparedReaper;
 
   public static void stopPreparedReaper() {
-    if (preparedReaper != null) {
-      preparedReaper.interrupt();
-      preparedReaper = null;
+    synchronized (ExpressionImpl.class) {
+      if (preparedReaper != null) {
+        preparedReaper.interrupt();
+        preparedReaper = null;
+      }
     }
   }
 
@@ -1482,7 +1484,7 @@ public abstract class ExpressionImpl implements Expression {
   public static void startPreparedReaper(final DatabaseClient client) {
     synchronized (ExpressionImpl.class) {
       if (preparedReaper == null) {
-        preparedReaper = new Thread(new Runnable() {
+        preparedReaper = ThreadUtil.createThread(new Runnable() {
           @Override
           public void run() {
             while (true) {
@@ -1510,7 +1512,7 @@ public abstract class ExpressionImpl implements Expression {
               }
             }
           }
-        });
+        }, "SonicBase Prepared Stamement Reaper");
         preparedReaper.start();
       }
     }

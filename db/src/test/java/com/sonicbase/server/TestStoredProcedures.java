@@ -31,6 +31,8 @@ public class TestStoredProcedures {
   private Connection conn;
   List<Long> ids = new ArrayList<>();
   DatabaseServer[] dbServers;
+  private NettyServer serverA1;
+  private NettyServer serverA2;
 
   @AfterClass
   public void afterClass() throws SQLException {
@@ -39,13 +41,17 @@ public class TestStoredProcedures {
       server.shutdown();
     }
     Logger.queue.clear();
+    serverA1.shutdown();
+    serverA2.shutdown();
+
+    System.out.println("shutdown complete");
   }
 
   @BeforeClass
   public void beforeClass() throws Exception {
     Logger.disable();
 
-    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
+    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-2-servers-a.json")), "utf-8");
     ObjectMapper mapper = new ObjectMapper();
     final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
 
@@ -64,7 +70,7 @@ public class TestStoredProcedures {
 
 
     final CountDownLatch latch = new CountDownLatch(4);
-    final NettyServer serverA1 = new NettyServer(128);
+    serverA1 = new NettyServer(128);
     Thread thread = new Thread(new Runnable(){
       @Override
       public void run() {
@@ -81,7 +87,7 @@ public class TestStoredProcedures {
       Thread.sleep(100);
     }
 
-    final NettyServer serverA2 = new NettyServer(128);
+    serverA2 = new NettyServer(128);
     thread = new Thread(new Runnable(){
       @Override
       public void run() {

@@ -50,6 +50,10 @@ public class TransactionManager {
     return transactions.get(transactionId);
   }
 
+  public void shutdown() {
+
+  }
+
   public static class RecordLock {
     private Transaction transaction;
     private String tableName;

@@ -353,6 +353,9 @@ public class ConnectionProxy implements Connection {
         entry.client.shutdown();
         clients.remove(url);
       }
+      if (client != null) {
+        client.shutdown();
+      }
     }
     catch (Exception e) {
       throw new SQLException(e);

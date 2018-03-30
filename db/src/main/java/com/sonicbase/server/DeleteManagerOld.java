@@ -32,9 +32,8 @@ public class DeleteManagerOld implements DeleteManager {
   public DeleteManagerOld(DatabaseServer databaseServer) {
     this.databaseServer = databaseServer;
     logger = new Logger(databaseServer.getDatabaseClient());
-    this.executor = new ThreadPoolExecutor(Runtime.getRuntime().availableProcessors() * 2,
-        Runtime.getRuntime().availableProcessors() * 2, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
-    this.freeExecutor = new ThreadPoolExecutor(4, 4, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+    this.executor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors() * 2, "SonicBase DeleteManagerOld Thread");
+    this.freeExecutor = ThreadUtil.createExecutor(4, "SonicBase DeleteManagerOld FreeExecutor Thread");
   }
 
   public void saveDeletes(String dbName, String tableName, String indexName, ConcurrentLinkedQueue<DeleteManagerImpl.DeleteRequest> deleteRequests) {

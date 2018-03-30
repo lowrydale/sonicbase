@@ -44,6 +44,8 @@ public class UpdateManager {
   private List<StreamsProducer> producers = new ArrayList<>();
   private int maxPublishBatchSize = 10;
   private int publisherThreadCount;
+  private Thread[] publisherThreads;
+  private boolean shutdown;
 
   public UpdateManager(DatabaseServer databaseServer) {
     this.server = databaseServer;
@@ -54,6 +56,21 @@ public class UpdateManager {
 
 //    Connection conn = StreamManager.initSysConnection(server.getConfig());
 //    StreamManager.initStreamsConsumerTable(conn);
+  }
+
+  public void shutdown() {
+    this.shutdown = true;
+    for (Thread thread : publisherThreads) {
+      thread.interrupt();
+    }
+    for (Thread thread : publisherThreads) {
+      try {
+        thread.join();
+      }
+      catch (InterruptedException e) {
+        throw new DatabaseException(e);
+      }
+    }
   }
 
   private class Producer {
@@ -189,7 +206,7 @@ public class UpdateManager {
         }
 
         if (shouldExecute.get()) {
-          Index index = server.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexSchema.getKey());
+          Index index = server.getIndex(dbName, tableSchema.getName(), indexSchema.getKey());
           byte[][] records = null;
           List<byte[]> deletedRecords = new ArrayList<>();
           synchronized (index.getMutex(key)) {
@@ -215,6 +232,7 @@ public class UpdateManager {
                   Object obj = index.remove(key);
                   if (obj != null) {
                     server.freeUnsafeIds(obj);
+                    index.addAndGetCount(-1);
                   }
                 }
                 else {
@@ -303,7 +321,7 @@ public class UpdateManager {
       }
     }
 
-    Index primaryKeyIndex = server.getIndices().get(dbName).getIndices().get(tableName).get(primaryKeyIndexName);
+    Index primaryKeyIndex = server.getIndex(dbName, tableName, primaryKeyIndexName);
     Map.Entry<Object[], Object> entry = primaryKeyIndex.firstEntry();
     while (entry != null) {
       //  server.getCommon().getSchemaReadLock(dbName).lock();
@@ -552,7 +570,7 @@ public class UpdateManager {
       IndexSchema indexSchema = tableSchema.getIndexes().get(indexName);
       KeyRecord keyRecord = new KeyRecord(KeyRecordBytes);
 
-      Index index = server.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexName);
+      Index index = server.getIndex(dbName, tableSchema.getName(), indexName);
 
       Object[] primaryKey = DatabaseCommon.deserializeKey(tableSchema, keyRecord.getPrimaryKey());
 
@@ -889,7 +907,7 @@ private static class InsertRequest {
       server.getTransactionManager().preHandleTransaction(dbName, tableName, indexName, isExpliciteTrans, isCommitting, transactionId, primaryKey, shouldExecute, shouldDeleteLock);
 
       List<Integer> selectedShards = null;
-      Index index = server.getIndices(dbName).getIndices().get(tableName).get(indexName);
+      Index index = server.getIndex(dbName, tableName, indexName);
       boolean alreadyExisted = false;
       if (shouldExecute.get()) {
 
@@ -1152,7 +1170,7 @@ private static class InsertRequest {
 
       if (shouldExecute.get()) {
         //because this is the primary key index we won't have more than one index entry for the key
-        Index index = server.getIndices(dbName).getIndices().get(tableName).get(indexName);
+        Index index = server.getIndex(dbName, tableName, indexName);
         Object newValue = server.toUnsafeFromRecords(new byte[][]{bytes});
         byte[] existingBytes = null;
         synchronized (index.getMutex(primaryKey)) {
@@ -1160,13 +1178,13 @@ private static class InsertRequest {
           if (value != null) {
             byte[][] content = server.fromUnsafeToRecords(value);
             existingBytes = content[0];
-            if (Record.DB_VIEW_FLAG_DELETING == Record.getDbViewFlags(content[0])) {
-              if (Record.DB_VIEW_FLAG_DELETING != Record.getDbViewFlags(bytes)) {
+            if ((Record.getDbViewFlags(content[0]) & Record.DB_VIEW_FLAG_DELETING) != 0) {
+              if ((Record.getDbViewFlags(bytes) & Record.DB_VIEW_FLAG_DELETING) == 0) {
                 index.addAndGetCount(1);
               }
             }
             else {
-              if (Record.DB_VIEW_FLAG_DELETING == Record.getDbViewFlags(bytes)) {
+              if ((Record.getDbViewFlags(bytes) & Record.DB_VIEW_FLAG_DELETING) != 0) {
                 index.addAndGetCount(-1);
               }
             }
@@ -1408,12 +1426,12 @@ private static class InsertRequest {
             server.freeUnsafeIds(newUnsafeRecords);
             throw new DatabaseException("Unique constraint violated: table=" + tableName + ", index=" + indexName + ", key=" + DatabaseCommon.keyToString(key));
           }
-          if (Record.DB_VIEW_FLAG_DELETING == Record.getDbViewFlags(bytes[0])) {
-            if (Record.DB_VIEW_FLAG_DELETING != Record.getDbViewFlags(recordBytes)) {
+          if ((Record.getDbViewFlags(bytes[0]) & Record.DB_VIEW_FLAG_DELETING) != 0) {
+            if ((Record.getDbViewFlags(recordBytes) & Record.DB_VIEW_FLAG_DELETING) == 0) {
               index.addAndGetCount(1);
             }
           }
-          else if (Record.DB_VIEW_FLAG_DELETING == Record.getDbViewFlags(recordBytes)) {
+          else if ((Record.getDbViewFlags(recordBytes) & Record.DB_VIEW_FLAG_DELETING) != 0) {
             index.addAndGetCount(-1);
           }
           server.freeUnsafeIds(existingValue);
@@ -1466,14 +1484,14 @@ class MessageRequest {
       throw new InsufficientLicense("You must have a pro license to use message queue integration");
     }
 
-    Thread[] threads = new Thread[publisherThreadCount];
-    for (int i = 0; i < threads.length; i++) {
-      threads[i] = new Thread(new Runnable() {
+    publisherThreads = new Thread[publisherThreadCount];
+    for (int i = 0; i < publisherThreads.length; i++) {
+      publisherThreads[i] = new Thread(new Runnable() {
         @Override
         public void run() {
           List<MessageRequest> toProcess = new ArrayList<>();
           long lastTimePublished = System.currentTimeMillis();
-          while (true) {
+          while (!shutdown) {
             try {
               for (int i = 0; i < maxPublishBatchSize * 4; i++) {
                 MessageRequest initialRequest = publishQueue.poll(100, TimeUnit.MILLISECONDS);
@@ -1499,7 +1517,7 @@ class MessageRequest {
           }
         }
       });
-      threads[i].start();
+      publisherThreads[i].start();
     }
   }
 
@@ -1836,12 +1854,13 @@ class MessageRequest {
     if (shouldExecute.get()) {
 
       byte[][] bytes = null;
-      Index index = server.getIndices(dbName).getIndices().get(tableName).get(indexName);
+      Index index = server.getIndex(dbName, tableName, indexName);
       synchronized (index.getMutex(key)) {
         Object value = index.remove(key);
         if (value != null) {
           bytes = server.fromUnsafeToRecords(value);
           server.freeUnsafeIds(value);
+          index.addAndGetCount(-1);
         }
       }
 
@@ -1891,7 +1910,7 @@ class MessageRequest {
     TableSchema tableSchema = server.getCommon().getTables(dbName).get(table);
     if (tableSchema != null) {
       for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
-        Index index = server.getIndices(dbName).getIndices().get(table).get(entry.getKey());
+        Index index = server.getIndex(dbName, table, entry.getKey());
         if (entry.getValue().isPrimaryKey()) {
           if (phase.equals("primary")) {
             Map.Entry<Object[], Object> indexEntry = index.firstEntry();
@@ -1957,9 +1976,9 @@ class MessageRequest {
       String dbName, TableSchema tableSchema, String primaryKeyIndexName, Object[] primaryKey, String indexName,
       Object[] key, long sequence0, long sequence1) {
 
-    Comparator[] comparators = tableSchema.getIndices().get(primaryKeyIndexName).getComparators();
+    Comparator[] comparators = server.getIndex(dbName, tableSchema.getName(), primaryKeyIndexName).getComparators();
 
-    Index index = server.getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexName);
+    Index index = server.getIndex(dbName, tableSchema.getName(), indexName);
     byte[] deletedRecord = null;
     synchronized (index.getMutex(key)) {
       Object value = index.get(key);

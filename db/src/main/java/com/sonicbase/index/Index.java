@@ -270,6 +270,7 @@ public class Index {
       objectSkipIndex.clear();
     }
     size.set(0);
+    count.set(0);
   }
 
   public long rawSize() {

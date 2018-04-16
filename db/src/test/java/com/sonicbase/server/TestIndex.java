@@ -6,12 +6,14 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.DatabaseCommon;
+import com.sonicbase.common.Logger;
 import com.sonicbase.index.Index;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.IOUtils;
-import org.codehaus.plexus.util.FileUtils;
+import org.apache.commons.io.FileUtils;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -42,6 +44,23 @@ import static org.testng.Assert.assertEquals;
 public class TestIndex {
 
   DatabaseClient client;
+  final DatabaseServer[] dbServers = new DatabaseServer[4];
+  Connection conn;
+
+  @AfterClass(alwaysRun = true)
+  public void afterClass() throws SQLException {
+    conn.close();
+
+    for (DatabaseServer server : dbServers) {
+      server.shutdown();
+    }
+    Logger.queue.clear();
+    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size() + ", class=TestIndex");
+    for (DatabaseClient client : DatabaseClient.allClients) {
+      System.out.println("Stack:\n" + client.getAllocatedStack());
+    }
+
+  }
 
   @BeforeClass
   public void before() throws ClassNotFoundException, SQLException, IOException, ExecutionException, InterruptedException {
@@ -57,9 +76,6 @@ public class TestIndex {
 
         DatabaseClient.getServers().clear();
 
-        final DatabaseServer[] dbServers = new DatabaseServer[4];
-        ThreadPoolExecutor executor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
-
         String role = "primaryMaster";
 
         List<Future> futures = new ArrayList<>();
@@ -71,7 +87,7 @@ public class TestIndex {
     //          String role = "primaryMaster";
 
           dbServers[shard] = new DatabaseServer();
-          dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null, true);
+          dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
           dbServers[shard].setRole(role);
           dbServers[shard].disableLogProcessor();
           dbServers[shard].setMinSizeForRepartition(0);
@@ -88,7 +104,7 @@ public class TestIndex {
         }
     Class.forName("com.sonicbase.jdbcdriver.Driver");
 
-     Connection conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000", "user", "password");
+     conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000", "user", "password");
 
      ((ConnectionProxy) conn).getDatabaseClient().createDatabase("test");
 

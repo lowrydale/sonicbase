@@ -3,7 +3,6 @@ package com.sonicbase.query.impl;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 
-import com.sonicbase.procedure.RecordEvaluator;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
@@ -46,8 +45,8 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
   }
 
   @Override
-  public Object execute(String dbName, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
-                        boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) throws DatabaseException {
+  public Object execute(String dbName, String sqlToUse, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
+                        boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) throws DatabaseException {
 
     while (true) {
       try {
@@ -71,7 +70,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
         getWhereClause().reset();
         while (true) {
 
-          ExpressionImpl.NextReturn ret = getWhereClause().next(explain, new AtomicLong(), null, null);
+          ExpressionImpl.NextReturn ret = getWhereClause().next(explain, new AtomicLong(), new AtomicLong(), null, null, schemaRetryCount);
           if (ret == null || ret.getIds() == null) {
             return countUpdated;
           }
@@ -98,7 +97,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
             if (record == null) {
               boolean forceSelectOnServer = false;
               record = whereClause.doReadRecord(dbName, client, forceSelectOnServer, recordCache, entry[0], tableName,
-                  null, null, null, client.getCommon().getSchemaVersion(), false, restrictToThisServer, procedureContext);
+                  null, null, null, client.getCommon().getSchemaVersion(), false, restrictToThisServer, procedureContext, schemaRetryCount);
             }
 
             Object[] newPrimaryKey = new Object[entry.length];
@@ -195,7 +194,9 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
 
               ComObject cobj = new ComObject();
               cobj.put(ComObject.Tag.dbName, dbName);
-              cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+              if (schemaRetryCount < 2) {
+                cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+              }
               cobj.put(ComObject.Tag.method, "updateRecord");
               cobj.put(ComObject.Tag.tableName, tableName);
               cobj.put(ComObject.Tag.indexName, indexSchema.getName());
@@ -227,13 +228,13 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
                 ConcurrentSkipListMap<Object[], DatabaseClient.KeyInfo> newMap = orderedKeyInfosNew.get(previousEntry.getKey());
                 if (newMap == null) {
                   for (Map.Entry<Object[], DatabaseClient.KeyInfo> prevEntry : previousEntry.getValue().entrySet()) {
-                    client.deleteKey(dbName, tableSchema.getName(), prevEntry.getValue(), indexSchema.getName(), entry[0]);
+                    client.deleteKey(dbName, tableSchema.getName(), prevEntry.getValue(), indexSchema.getName(), entry[0], schemaRetryCount);
                   }
                 }
                 else {
                   for (Map.Entry<Object[], DatabaseClient.KeyInfo> prevEntry : previousEntry.getValue().entrySet()) {
                     if (!newMap.containsKey(prevEntry.getKey())) {
-                      client.deleteKey(dbName, tableSchema.getName(), prevEntry.getValue(), indexSchema.getName(), entry[0]);
+                      client.deleteKey(dbName, tableSchema.getName(), prevEntry.getValue(), indexSchema.getName(), entry[0], schemaRetryCount);
                     }
                   }
                 }
@@ -248,7 +249,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
                     keyRecord.setPrimaryKey(primaryKeyBytes);
                     keyRecord.setDbViewNumber(client.getCommon().getSchemaVersion());
                     client.insertKey(dbName, tableSchema.getName(), innerNewEntry.getValue(), indexSchema.getName(),
-                        newPrimaryKey, keyRecord, -1, -1, false);
+                        newPrimaryKey, keyRecord, -1, -1, false, schemaRetryCount);
                   }
                 }
                 else {
@@ -263,7 +264,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
                       keyRecord.setPrimaryKey(primaryKeyBytes);
                       keyRecord.setDbViewNumber(client.getCommon().getSchemaVersion());
                       client.insertKey(dbName, tableSchema.getName(), innerNewEntry.getValue(), indexSchema.getName(),
-                          newPrimaryKey, keyRecord, -1, -1, false);
+                          newPrimaryKey, keyRecord, -1, -1, false, schemaRetryCount);
                     }
                   }
                 }

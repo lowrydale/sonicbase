@@ -4,14 +4,14 @@
     <groupId>com.sonicbase</groupId>
     <artifactId>sonicbase-core-unobfuscated</artifactId>
     <packaging>jar</packaging>
-    <version>1.2.11</version>
+    <version>1.2.12</version>
     <name>sonicbase-core</name>
     <url>http://maven.apache.org</url>
 
     <parent>
         <groupId>com.sonicbase</groupId>
         <artifactId>sonicbase-root</artifactId>
-        <version>1.2.11</version>
+        <version>1.2.12</version>
     </parent>
 
     <build>
@@ -29,6 +29,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-jar-plugin</artifactId>
+                    <version>2.2</version>
                     <executions>
                         <execution>
                             <goals>
@@ -73,6 +74,60 @@
 
     <dependencies>
         <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>24.0-jre</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-util</artifactId>
+            <version>8.0.0.v20110901</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-server</artifactId>
+            <version>8.0.0.v20110901</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-http</artifactId>
+            <version>8.0.0.v20110901</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-continuation</artifactId>
+            <version>8.0.0.v20110901</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-io</artifactId>
+            <version>8.0.0.v20110901</version>
+            <scope>provided</scope>
+        </dependency>
+
+
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+            <version>4.0.0</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.dropwizard.metrics</groupId>
+            <artifactId>metrics-core</artifactId>
+            <version>4.0.2</version>
+        </dependency>
+        <dependency>
             <groupId>org.apache.ignite</groupId>
             <artifactId>ignite-core</artifactId>
             <version>2.3.0</version>
@@ -101,7 +156,7 @@
         <dependency>
             <groupId>com.sonicbase</groupId>
             <artifactId>sonicbase-jdbc-unobfuscated</artifactId>
-            <version>1.2.11</version>
+            <version>1.2.12</version>
         </dependency>
 
         <dependency>
@@ -109,6 +164,12 @@
             <artifactId>giraph-core</artifactId>
             <version>1.2.0</version>
             <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <artifactId>com.yammer.metrics</artifactId>
+                    <groupId>:metrics-core</groupId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
@@ -315,13 +376,6 @@
         <!--<version>4.0.36.Final</version>-->
         <!--</dependency>-->
 
-        <!--Apache 2.0 - license confirmed-->
-        <dependency>
-            <groupId>com.codahale.metrics</groupId>
-            <artifactId>metrics-core</artifactId>
-            <version>3.0.2</version>
-            <scope>provided</scope>
-        </dependency>
         <dependency>
             <groupId>com.sonicbase</groupId>
             <artifactId>sonicbase-parent</artifactId>

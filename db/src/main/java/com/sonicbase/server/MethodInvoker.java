@@ -1,5 +1,6 @@
 package com.sonicbase.server;
 
+import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.socket.DeadServerException;
@@ -11,8 +12,11 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.*;
-import java.util.concurrent.Future;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -32,12 +36,14 @@ public class MethodInvoker {
   private final SchemaManager schemaManager;
   private final DatabaseServer server;
   private final DatabaseCommon common;
+  private final MonitorManager monitorManager;
   private boolean shutdown;
   private AtomicInteger testWriteCallCount = new AtomicInteger();
-
+  private ConcurrentHashMap<String, Method> methodMap = new ConcurrentHashMap<>();
 
   public MethodInvoker(DatabaseServer server, BulkImportManager bulkImportManager, DeleteManager deleteManagerImpl,
-                       SnapshotManager deltaManager, UpdateManager updateManager, TransactionManager transactionManager, ReadManager readManager, LogManager logManager, SchemaManager schemaManager) {
+                       SnapshotManager deltaManager, UpdateManager updateManager, TransactionManager transactionManager,
+                       ReadManager readManager, LogManager logManager, SchemaManager schemaManager, MonitorManager monitorManager) {
     this.server = server;
     this.common = server.getCommon();
     this.bulkImportManager = bulkImportManager;
@@ -48,8 +54,19 @@ public class MethodInvoker {
     this.readManager = readManager;
     this.logManager = logManager;
     this.schemaManager = schemaManager;
+    this.monitorManager = monitorManager;
 
-    logger = new Logger(server.getDatabaseClient());
+    Method[] methods = MethodInvoker.class.getMethods();
+    for (Method method : methods) {
+      Class[] parms = method.getParameterTypes();
+      if (parms.length == 2) {
+        if (parms[0] == ComObject.class && parms[1] == boolean.class) {
+          methodMap.put(method.getName(), method);
+        }
+      }
+    }
+
+    logger = new Logger(null/*server.getDatabaseClient()*/);
   }
 
   public void shutdown() {
@@ -121,9 +138,10 @@ public class MethodInvoker {
         replayedCommand = true;
       }
 
-      if (server.shouldDisableNow() && server.isUsingMultipleReplicas()) {
+      if (server.isRecovered() && server.shouldDisableNow() && server.isUsingMultipleReplicas()) {
         if (!methodStr.equals("healthCheck") && !methodStr.equals("healthCheckPriority") &&
             !methodStr.equals("getConfig") &&
+            !methodStr.equals("licenseCheckin") &&
             !methodStr.equals("getSchema") && !methodStr.equals("getDbNames")) {
           throw new LicenseOutOfComplianceException("Licenses out of compliance");
         }
@@ -163,7 +181,7 @@ public class MethodInvoker {
           existingSequence0, existingSequence1, timeLogging);
       ComObject ret = null;
 
-      if (!replayedCommand && !server.isRunning() && !priorityCommands.contains(methodStr)) {
+      if (!replayedCommand && !server.isRecovered() && !priorityCommands.contains(methodStr)) {
         throw new DeadServerException("Server not running: method=" + methodStr);
       }
 
@@ -188,7 +206,8 @@ public class MethodInvoker {
           else {
             request.put(ComObject.Tag.currRequestIsMaster, false);
           }
-          Method method = getClass().getMethod(methodStr, ComObject.class, boolean.class);
+
+          Method method = methodMap.get(methodStr);//getClass().getMethod(methodStr, ComObject.class, boolean.class);
           ret = (ComObject) method.invoke(this, request, replayedCommand);
           if (handlerTime != null) {
             handlerTime.addAndGet(System.nanoTime() - handleBegin);
@@ -254,6 +273,12 @@ public class MethodInvoker {
         throw new DatabaseException(e); //don't log
       }
       if (e.getCause() instanceof SchemaOutOfSyncException) {
+        throw new DatabaseException(e);
+      }
+      if (-1 != ExceptionUtils.indexOfThrowable(e, UniqueConstraintViolationException.class)) {
+        throw new DatabaseException(e); //don't log
+      }
+      if (e.getMessage().contains("Shutdown in progress")) {
         throw new DatabaseException(e);
       }
       logger.error("Error handling command: method=" + new ComObject(requestBytes).getString(ComObject.Tag.method), e);
@@ -348,11 +373,42 @@ public class MethodInvoker {
     return schemaManager.createDatabase(cobj, replayedCommand);
   }
 
+  public ComObject registerQueryForStats(ComObject cobj, boolean replayedCommand) {
+    return monitorManager.registerQueryForStats(cobj, replayedCommand);
+  }
+
+  public ComObject registerStats(ComObject cobj, boolean replayedCommand) {
+    return monitorManager.registerStats(cobj, replayedCommand);
+  }
+
+
+  public ComObject addColumnSlave(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
+    common.getSchemaWriteLock(dbName).lock();
+    try {
+      return schemaManager.addColumnSlave(cobj, replayedCommand);
+    }
+    finally {
+      common.getSchemaWriteLock(dbName).unlock();
+    }
+  }
+
   public ComObject addColumn(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaWriteLock(dbName).lock();
     try {
-      return schemaManager.addColumn(cobj);
+      return schemaManager.addColumn(cobj, replayedCommand);
+    }
+    finally {
+      common.getSchemaWriteLock(dbName).unlock();
+    }
+  }
+
+  public ComObject dropColumnSlave(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
+    common.getSchemaWriteLock(dbName).lock();
+    try {
+      return schemaManager.dropColumnSlave(cobj, replayedCommand);
     }
     finally {
       common.getSchemaWriteLock(dbName).unlock();
@@ -363,7 +419,7 @@ public class MethodInvoker {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaWriteLock(dbName).lock();
     try {
-      return schemaManager.dropColumn(cobj);
+      return schemaManager.dropColumn(cobj, replayedCommand);
     }
     finally {
       common.getSchemaWriteLock(dbName).unlock();
@@ -706,10 +762,68 @@ public class MethodInvoker {
   public ComObject getSchema(ComObject cobj, boolean replayedCommand) {
     short serializationVersionNumber = cobj.getShort(ComObject.Tag.serializationVersion);
     try {
+
+      if (cobj.getBoolean(ComObject.Tag.force) != null && cobj.getBoolean(ComObject.Tag.force)) {
+        final ComObject cobj2 = new ComObject();
+        cobj2.put(ComObject.Tag.dbName, "__none__");
+        cobj2.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+        cobj2.put(ComObject.Tag.method, "getSchema");
+
+        int threadCount = server.getShardCount() * server.getReplicationFactor();
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(threadCount, threadCount, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+        try {
+          logger.info("forcing schema sync: version=" + common.getSchemaVersion());
+          List<Future> futures = new ArrayList<>();
+          for (int i = 0; i < server.getShardCount(); i++) {
+            for (int j = 0; j < server.getReplicationFactor(); j++) {
+              try {
+                if (common.getServersConfig().getShards()[i].getReplicas()[j].isDead()) {
+                  continue;
+                }
+                if (i == server.getShard() && j == server.getReplica()) {
+                  continue;
+                }
+
+                final int shard = i;
+                final int replica = j;
+
+                futures.add(executor.submit(new Callable(){
+                  @Override
+                  public Object call() throws Exception {
+                    byte[] bytes = server.getClient().send(null, shard, replica, cobj2, DatabaseClient.Replica.specified);
+                    ComObject retObj = new ComObject(bytes);
+                    DatabaseCommon tmpCommon = new DatabaseCommon();
+                    tmpCommon.deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
+                    synchronized (common) {
+                      if (tmpCommon.getSchemaVersion() > common.getSchemaVersion()) {
+                        logger.info("Found schema with higher version: version=" + tmpCommon.getSchemaVersion() +
+                            ", currVersion=" + common.getSchemaVersion() + ", shard=" + shard + ", replica=" + replica);
+                        common.deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
+                      }
+                    }
+                    return null;
+                  }
+                }));
+              }
+              catch (Exception e) {
+                logger.error("Error getting schema: shard=" + i + ", replica=" + j, e);
+              }
+            }
+          }
+          for (Future future : futures) {
+            future.get();
+          }
+          server.pushSchema();
+        }
+        catch (Exception e) {
+          logger.error("Error pushing schema", e);
+        }
+        finally {
+          executor.shutdownNow();
+        }
+      }
       ComObject retObj = new ComObject();
-
       retObj.put(ComObject.Tag.schemaBytes, common.serializeSchema(serializationVersionNumber));
-
       return retObj;
     }
     catch (Exception e) {

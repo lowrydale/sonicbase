@@ -7,7 +7,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
 import org.apache.commons.io.IOUtils;
-import org.codehaus.plexus.util.FileUtils;
+import org.apache.commons.io.FileUtils;
 import org.testng.annotations.Test;
 
 import java.io.BufferedInputStream;
@@ -37,71 +37,88 @@ public class TestLongRunningCommands {
     DatabaseClient.getServers().clear();
 
     DatabaseServer server = new DatabaseServer();
-    server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true), null, true);
-    server.disableLogProcessor();
-    server.shutdownRepartitioner();
+    try {
+      server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true), new AtomicBoolean(true), null, true);
+      server.disableLogProcessor();
+      server.shutdownRepartitioner();
 
-    ComObject cobj  = new ComObject();
-    cobj.put(ComObject.Tag.method, "echo");
-    cobj.put(ComObject.Tag.count, 10);
-    LongRunningCalls.SingleCommand command = server.getLongRunningCommands().createSingleCommand(cobj.serialize());
-    //LongRunningCalls.SingleCommand command2 = server.getLongRunningCommands().createSingleCommand("DatabaseServer:echo2:1:1:test:10", null);
-    server.getLongRunningCommands().addCommand(command);
-    //server.getLongRunningCommands().addCommand(command2);
+      ComObject cobj = new ComObject();
+      cobj.put(ComObject.Tag.method, "echo");
+      cobj.put(ComObject.Tag.count, 10);
+      LongRunningCalls.SingleCommand command = server.getLongRunningCommands().createSingleCommand(cobj.serialize());
+      //LongRunningCalls.SingleCommand command2 = server.getLongRunningCommands().createSingleCommand("DatabaseServer:echo2:1:1:test:10", null);
+      server.getLongRunningCommands().addCommand(command);
+      //server.getLongRunningCommands().addCommand(command2);
 
-    while (true) {
-      if (MethodInvoker.echoCount.get() == 10) {
-        System.out.println("Echoed");
-        break;
+      while (true) {
+        if (MethodInvoker.echoCount.get() == 10) {
+          System.out.println("Echoed");
+          break;
+        }
+        Thread.sleep(1000);
       }
       Thread.sleep(1000);
-    }
-    Thread.sleep(1000);
 
-    cobj.put(ComObject.Tag.count, 11);
-    server.getLongRunningCommands().addCommand(server.getLongRunningCommands().createSingleCommand(cobj.serialize()));
+      cobj.put(ComObject.Tag.count, 11);
+      server.getLongRunningCommands().addCommand(server.getLongRunningCommands().createSingleCommand(cobj.serialize()));
 
-    while (true) {
-      if (MethodInvoker.echoCount.get() == 11) {
-        System.out.println("Echoed");
-        break;
+      while (true) {
+        if (MethodInvoker.echoCount.get() == 11) {
+          System.out.println("Echoed");
+          break;
+        }
+        Thread.sleep(1000);
       }
+
       Thread.sleep(1000);
+
+      //    while (true) {
+      //      if (DatabaseServer.echo2Count.get() == 10) {
+      //        System.out.println("Echoed");
+      //        break;
+      //      }
+      //      Thread.sleep(1000);
+      //    }
+      assertEquals(server.getLongRunningCommands().getCommandCount(), 0);
+
+      server.getLongRunningCommands().load();
+
+      assertEquals(server.getLongRunningCommands().getCommandCount(), 0);
+
+      cobj = new ComObject();
+      cobj.put(ComObject.Tag.dbName, "__none__");
+      cobj.put(ComObject.Tag.schemaVersion, 1L);
+      cobj.put(ComObject.Tag.method, "block");
+      server.getLongRunningCommands().addCommand(server.getLongRunningCommands().createSingleCommand(cobj.serialize()));
+
+      Thread.sleep(1000);
+
     }
-
-    Thread.sleep(1000);
-
-//    while (true) {
-//      if (DatabaseServer.echo2Count.get() == 10) {
-//        System.out.println("Echoed");
-//        break;
-//      }
-//      Thread.sleep(1000);
-//    }
-    assertEquals(server.getLongRunningCommands().getCommandCount(), 0);
-
-    server.getLongRunningCommands().load();
-
-    assertEquals(server.getLongRunningCommands().getCommandCount(), 0);
-
-    cobj = new ComObject();
-    cobj.put(ComObject.Tag.dbName, "__none__");
-    cobj.put(ComObject.Tag.schemaVersion, 1L);
-    cobj.put(ComObject.Tag.method, "block");
-    server.getLongRunningCommands().addCommand(server.getLongRunningCommands().createSingleCommand(cobj.serialize()));
-
-    Thread.sleep(1000);
+    finally {
+      server.shutdown();
+    }
 
     int count = MethodInvoker.blockCount.get();
 
-    server = new DatabaseServer();
-    server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true), null, true);
-    server.disableLogProcessor();
-    server.shutdownRepartitioner();
+    try {
+      server = new DatabaseServer();
+      server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true), new AtomicBoolean(true), null, true);
+      server.disableLogProcessor();
+      server.shutdownRepartitioner();
 
-    Thread.sleep(1000);
+      Thread.sleep(1000);
 
-    assertEquals(MethodInvoker.blockCount.get(), count + 1);
+      assertEquals(MethodInvoker.blockCount.get(), count + 1);
+    }
+    finally {
+      server.shutdown();
+
+      System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size() + ", class=TestLongRunningCommands");
+      for (DatabaseClient client : DatabaseClient.allClients) {
+        System.out.println("Stack:\n" + client.getAllocatedStack());
+      }
+    }
+
 
   }
 }

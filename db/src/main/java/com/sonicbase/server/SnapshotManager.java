@@ -2,6 +2,8 @@
 package com.sonicbase.server;
 
 import com.sonicbase.common.ComObject;
+import com.sonicbase.schema.IndexSchema;
+import com.sonicbase.schema.TableSchema;
 
 import java.io.File;
 import java.io.IOException;
@@ -50,4 +52,12 @@ public interface SnapshotManager {
   File getSortedDeltaFile(String dbName, String s, String key, String key1, int i);
 
   File getDeletedDeltaDir(String dbName, String s, String key, String key1);
+
+  void saveIndexSchema(String dbName, int schemaVersion, TableSchema tableSchema, IndexSchema indexSchema);
+
+  void saveTableSchema(String dbName, int schemaVersion, String tableName, TableSchema tableSchema);
+
+  void deleteTableSchema(String dbName, int schemaVersion, String tableName);
+
+  void deleteIndexSchema(String dbName, int schemaVersion, String table, String indexName);
 }

@@ -8,6 +8,8 @@ import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
+import net.sf.jsqlparser.statement.select.Limit;
+import net.sf.jsqlparser.statement.select.Offset;
 import org.anarres.lzo.LzoDecompressor1x;
 import org.anarres.lzo.LzoInputStream;
 import org.anarres.lzo.LzoOutputStream;
@@ -16,7 +18,10 @@ import org.apache.giraph.utils.Varint;
 
 import java.io.*;
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -28,6 +33,10 @@ public class DiskBasedResultSet {
   private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
 
   private static AtomicLong nextResultSetId = new AtomicLong();
+  private int countReturned;
+  private int currOffset;
+  private Limit limit;
+  private Offset offset;
   private StoredProcedureContextImpl procedureContext;
   private boolean restrictToThisServer;
   private boolean setOperator;
@@ -45,12 +54,18 @@ public class DiskBasedResultSet {
       final short serializationVersion,
       final String dbName,
       DatabaseServer databaseServer,
+      Offset offset,
+      Limit limit,
       final String[] tableNames, int[] tableOffsets, final ResultSetImpl[] resultSets, final List<OrderByExpressionImpl> orderByExpressions,
       int count, SelectStatementImpl select, boolean setOperator) {
     this.server = databaseServer;
     this.tableNames = tableNames;
     this.select = select;
     this.count = count;
+    this.currOffset = 0;
+    this.countReturned = 0;
+    this.offset = offset;
+    this.limit = limit;
     this.setOperator = setOperator;
     File file = null;
     this.orderByExpressions = orderByExpressions;
@@ -157,7 +172,8 @@ public class DiskBasedResultSet {
               rs.setPageSize(1000);
               rs.forceSelectOnServer();
               long begin = System.currentTimeMillis();
-              rs.getMoreResults();
+              int schemaRetryCount = 0;
+              rs.getMoreResults(schemaRetryCount);
               records = rs.getReadRecordsAndSerializedRecords();
               if (records == null) {
                 break;
@@ -229,6 +245,28 @@ public class DiskBasedResultSet {
     }
     mergeSort(serializationVersion, dbName, file);
 
+    File offsetLimitFile = new File(file, "offset-limit.txt");
+    try {
+      try (DataOutputStream out = new DataOutputStream(new FileOutputStream(offsetLimitFile))) {
+        if (offset == null) {
+          out.writeBoolean(false);
+        }
+        else {
+          out.writeBoolean(true);
+          out.writeLong(offset.getOffset());
+        }
+        if (limit == null) {
+          out.writeBoolean(false);
+        }
+        else {
+          out.writeBoolean(true);
+          out.writeLong(limit.getRowCount());
+        }
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
     updateAccessTime(file);
   }
 

@@ -9,16 +9,13 @@ import com.sonicbase.common.ComObject;
 import com.sonicbase.query.DatabaseException;
 import org.apache.commons.io.IOUtils;
 import org.apache.giraph.utils.Varint;
-import org.codehaus.plexus.util.FileUtils;
+import org.apache.commons.io.FileUtils;
 import org.testng.annotations.Test;
 
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -94,111 +91,115 @@ public class TestLongManagerLostEntries {
     DatabaseClient.getServers().clear();
 
     final DatabaseServer[] dbServers = new DatabaseServer[4];
-    ThreadPoolExecutor executor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
     String role = "primaryMaster";
 
     for (int i = 0; i < dbServers.length; i++) {
       final int shard = i;
       dbServers[shard] = new MonitorServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null, true);
+      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
       dbServers[shard].setRole(role);
       dbServers[shard].disableLogProcessor();
       dbServers[shard].setMinSizeForRepartition(0);
     }
 
+    try {
+      DatabaseServer.initDeathOverride(2, 2);
+      DatabaseServer.deathOverride[0][0] = false;
+      DatabaseServer.deathOverride[0][1] = false;
+      DatabaseServer.deathOverride[1][0] = false;
+      DatabaseServer.deathOverride[1][1] = false;
 
-    DatabaseServer.initDeathOverride(2, 2);
-    DatabaseServer.deathOverride[0][0] = false;
-    DatabaseServer.deathOverride[0][1] = false;
-    DatabaseServer.deathOverride[1][0] = false;
-    DatabaseServer.deathOverride[1][1] = false;
+      dbServers[0].enableSnapshot(false);
+      dbServers[1].enableSnapshot(false);
+      dbServers[2].enableSnapshot(false);
+      dbServers[3].enableSnapshot(false);
 
-    dbServers[0].enableSnapshot(false);
-    dbServers[1].enableSnapshot(false);
-    dbServers[2].enableSnapshot(false);
-    dbServers[3].enableSnapshot(false);
+      int countToProcess = 100_000;
+      LogManager logManager = dbServers[0].getLogManager();
 
-    int countToProcess = 100_000;
-    LogManager logManager = dbServers[0].getLogManager();
+      logManager.setCycleLogsMillis(100);
 
-    logManager.setCycleLogsMillis(100);
-
-    AtomicLong timeLogging = new AtomicLong();
-    List<DatabaseServer.LogRequest> requests = new ArrayList<>();
-    for (int i = 0; i < countToProcess; i++) {
-      if (i % 1000 == 0) {
-        Thread.sleep(100);
-      }
-      if (i % 10_000 == 0) {
-        System.out.println("upsert progress: count=" + i);
-      }
-      ComObject cobj = new ComObject();
-      cobj.put(ComObject.Tag.count, i);
-      cobj.put(ComObject.Tag.method, "echoWrite");
-      requests.add(logManager.logRequest(cobj.serialize(), true, "echoWrite", (long)i, (long)i, timeLogging));
-    }
-
-    for (DatabaseServer.LogRequest request : requests) {
-      request.getLatch().await();
-    }
-
-    System.out.println("count logged: " + logManager.getCountLogged());
-    countPlayed.set(0);
-    logManager.applyLogs();
-
-    boolean first = true;
-    int countMissing = 0;
-    for (int i = 0; i < countToProcess; i++) {
-      if (!foundIds.containsKey((long)i)) {
-        if (first) {
-          System.out.println("doesn't contain: " + i);
-          first = false;
+      AtomicLong timeLogging = new AtomicLong();
+      List<DatabaseServer.LogRequest> requests = new ArrayList<>();
+      for (int i = 0; i < countToProcess; i++) {
+        if (i % 1000 == 0) {
+          Thread.sleep(100);
         }
-        countMissing++;
+        if (i % 10_000 == 0) {
+          System.out.println("upsert progress: count=" + i);
+        }
+        ComObject cobj = new ComObject();
+        cobj.put(ComObject.Tag.count, i);
+        cobj.put(ComObject.Tag.method, "echoWrite");
+        requests.add(logManager.logRequest(cobj.serialize(), true, "echoWrite", (long) i, (long) i, timeLogging));
       }
+
+      for (DatabaseServer.LogRequest request : requests) {
+        request.getLatch().await();
+      }
+
+      System.out.println("count logged: " + logManager.getCountLogged());
+      countPlayed.set(0);
+      logManager.applyLogs();
+
+      boolean first = true;
+      int countMissing = 0;
+      for (int i = 0; i < countToProcess; i++) {
+        if (!foundIds.containsKey((long) i)) {
+          if (first) {
+            System.out.println("doesn't contain: " + i);
+            first = false;
+          }
+          countMissing++;
+        }
+      }
+      assertEquals(countMissing, 0);
+      System.out.println("count missing=" + countMissing);
+      foundIds.clear();
+
+      //    int count = 0;
+      //    File dir = new File(dbServers[0].getDataDir(), "/queue/0/0/self");
+      //    File[] files = dir.listFiles();
+      //    for (File file : files) {
+      //      LogManager.LogSource source = new LogManager.LogSource(file, dbServers[0], dbServers[0].getLogger());
+      //      while (true) {
+      //        if (source.getCommand() == null) {
+      //          break;
+      //        }
+      //        if (count++ % 10000 == 0) {
+      //          System.out.println("progress: " + count);
+      //        }
+      //        byte[] body = source.getBuffer();
+      //        ComObject cobj = new ComObject(body);
+      //        long id = cobj.getLong(ComObject.Tag.countLong);
+      //        foundIds.put(id, id);
+      //
+      //        source.readNext(dbServers[0], dbServers[0].getLogger());
+      //      }
+      //    }
+      //    first = true;
+      //    countMissing = 0;
+      //    for (int i = 0; i < countToProcess; i++) {
+      //      if (!foundIds.containsKey((long)i)) {
+      //        if (first) {
+      //          System.out.println("doesn't contain: " + i);
+      //          first = false;
+      //        }
+      //        countMissing++;
+      //      }
+      //    }
+
+      System.out.println("count missing=" + countMissing);
     }
-    assertEquals(countMissing, 0);
-    System.out.println("count missing=" + countMissing);
-    foundIds.clear();
+    finally {
+      dbServers[0].shutdown();
+      dbServers[1].shutdown();
+      dbServers[2].shutdown();
+      dbServers[3].shutdown();
+    }
 
-//    int count = 0;
-//    File dir = new File(dbServers[0].getDataDir(), "/queue/0/0/self");
-//    File[] files = dir.listFiles();
-//    for (File file : files) {
-//      LogManager.LogSource source = new LogManager.LogSource(file, dbServers[0], dbServers[0].getLogger());
-//      while (true) {
-//        if (source.getCommand() == null) {
-//          break;
-//        }
-//        if (count++ % 10000 == 0) {
-//          System.out.println("progress: " + count);
-//        }
-//        byte[] body = source.getBuffer();
-//        ComObject cobj = new ComObject(body);
-//        long id = cobj.getLong(ComObject.Tag.countLong);
-//        foundIds.put(id, id);
-//
-//        source.readNext(dbServers[0], dbServers[0].getLogger());
-//      }
-//    }
-//    first = true;
-//    countMissing = 0;
-//    for (int i = 0; i < countToProcess; i++) {
-//      if (!foundIds.containsKey((long)i)) {
-//        if (first) {
-//          System.out.println("doesn't contain: " + i);
-//          first = false;
-//        }
-//        countMissing++;
-//      }
-//    }
+    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size());
 
-    System.out.println("count missing=" + countMissing);
-
-    dbServers[0].shutdown();
-    dbServers[1].shutdown();
-    dbServers[2].shutdown();
-    dbServers[3].shutdown();
   }
 }

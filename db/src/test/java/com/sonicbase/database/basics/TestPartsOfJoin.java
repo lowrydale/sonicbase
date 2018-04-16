@@ -44,7 +44,7 @@ public class TestPartsOfJoin {
     ObjectMapper mapper = new ObjectMapper();
     final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
 
-    org.codehaus.plexus.util.FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+    org.apache.commons.io.FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
     ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
     array.add(DatabaseServer.FOUR_SERVER_LICENSE);
@@ -66,7 +66,7 @@ public class TestPartsOfJoin {
           String role = "primaryMaster";
 
           dbServers[shard] = new DatabaseServer();
-          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null, true);
+          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
           dbServers[shard].setRole(role);
           dbServers[shard].disableLogProcessor();
           return null;
@@ -164,7 +164,7 @@ public class TestPartsOfJoin {
           client.getCommon(), client, 0, 1000, tableSchema.getName(), indexSchema.getName(), false, BinaryExpression.Operator.less,
           null, null, new Object[]{100L}, null, null, null, new Object[]{100L}, null, null, "id", 0, recordCache, usedIndex,
         false, client.getCommon().getSchemaVersion(), null, null, false,
-        new AtomicLong(), null, null, false, false, null);
+        new AtomicLong(), new AtomicLong(),null, null, false, false, null, 0);
 
     Object[][][] keys = ret.getCurrKeys();
     assertEquals(keys[0][0][0], 9L);
@@ -184,7 +184,7 @@ public class TestPartsOfJoin {
     tableSchema = client.getCommon().getTables("test").get("memberships");
     Map<Integer, Object[][]> readKeys = ExpressionImpl.readRecords("test", client, 30000,
         false, tableSchema, keysToRead, new String[]{"personid"}, null, recordCache,
-        1000, false, null);
+        1000, false, null, 0);
 
     List<ExpressionImpl.IdEntry> keysToRead2 = new ArrayList<>();
     for (int i = 0; i < readKeys.size(); i++) {

@@ -65,9 +65,9 @@ public class TestPerformance {
 
     List<String> methods = new ArrayList<>();
 
-    methods.add("testInnerJoin");
-    methods.add("testLeftOuterJoin");
-    methods.add("testRightOuterJoin");
+//    methods.add("testInnerJoin");
+//    methods.add("testLeftOuterJoin");
+//    methods.add("testRightOuterJoin");
     methods.add("testIdLookup");
     methods.add("testMath");
     methods.add("testIdNoKey");
@@ -326,9 +326,11 @@ public class TestPerformance {
         conn = DriverManager.getConnection("jdbc:mysql://127.0.0.1:3306/db", "root", "pass");
       }
       else {
-        conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9010", "user", "password");
-        ((ConnectionProxy) conn).getDatabaseClient().createDatabase("test");
-        conn.close();
+        if (server) {
+          conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9010", "user", "password");
+          ((ConnectionProxy) conn).getDatabaseClient().createDatabase("test");
+          conn.close();
+        }
 
         conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9010/test", "user", "password");
         client = ((ConnectionProxy) conn).getDatabaseClient();
@@ -338,7 +340,7 @@ public class TestPerformance {
 
       Logger.setReady(false);
 
-      if (server) {
+      if (true || server) {
         //
         PreparedStatement stmt = null;
         try {
@@ -409,8 +411,10 @@ public class TestPerformance {
 
 
         //rebalance
-        for (DatabaseServer server : dbServers) {
-          server.shutdownRepartitioner();
+        if (server) {
+          for (DatabaseServer server : dbServers) {
+            server.shutdownRepartitioner();
+          }
         }
 
         List<Future> futures = new ArrayList<>();
@@ -505,8 +509,10 @@ public class TestPerformance {
             Thread.sleep(200);
           }
 
-          for (DatabaseServer server : dbServers) {
-            server.shutdownRepartitioner();
+          if (server) {
+            for (DatabaseServer server : dbServers) {
+              server.shutdownRepartitioner();
+            }
           }
 
           client.beginRebalance("test", "persons", "_1__primarykey");
@@ -518,8 +524,10 @@ public class TestPerformance {
             Thread.sleep(200);
           }
 
-          for (DatabaseServer server : dbServers) {
-            server.shutdownRepartitioner();
+          if (server) {
+            for (DatabaseServer server : dbServers) {
+              server.shutdownRepartitioner();
+            }
           }
         }
       }

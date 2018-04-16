@@ -10,7 +10,7 @@ import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import org.apache.commons.io.IOUtils;
-import org.codehaus.plexus.util.FileUtils;
+import org.apache.commons.io.FileUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -41,7 +41,7 @@ public class TestSecondaryIndex {
   DatabaseClient client = null;
   private DatabaseServer[] dbServers;
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void afterClass() throws SQLException {
     conn.close();
 
@@ -49,6 +49,11 @@ public class TestSecondaryIndex {
       server.shutdown();
     }
     Logger.queue.clear();
+    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size());
+    for (DatabaseClient client : DatabaseClient.allClients) {
+      System.out.println("Stack:\n" + client.getAllocatedStack());
+    }
+
   }
 
   @BeforeClass
@@ -58,7 +63,7 @@ public class TestSecondaryIndex {
       ObjectMapper mapper = new ObjectMapper();
       final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
 
-      FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+          FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
       FileUtils.deleteDirectory(new File("/data/db-backup"));
 
       ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
@@ -81,7 +86,7 @@ public class TestSecondaryIndex {
         //          String role = "primaryMaster";
 
         dbServers[shard] = new DatabaseServer();
-        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null, true);
+        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
         dbServers[shard].setRole(role);
         dbServers[shard].disableLogProcessor();
         dbServers[shard].setMinSizeForRepartition(0);

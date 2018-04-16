@@ -8,7 +8,7 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import org.apache.commons.io.IOUtils;
-import org.codehaus.plexus.util.FileUtils;
+import org.apache.commons.io.FileUtils;
 import org.junit.Test;
 
 import java.io.BufferedInputStream;
@@ -73,60 +73,63 @@ public class TestSnapshotManagerLostEntries {
     for (int i = 0; i < dbServers.length; i++) {
       final int shard = i;
       dbServers[shard] = new MonitorServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null, true);
+      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
       dbServers[shard].setRole(role);
       dbServers[shard].disableLogProcessor();
       dbServers[shard].setMinSizeForRepartition(0);
     }
 
+    Connection conn = null;
+    try {
+      DatabaseServer.initDeathOverride(2, 2);
+      DatabaseServer.deathOverride[0][0] = false;
+      DatabaseServer.deathOverride[0][1] = false;
+      DatabaseServer.deathOverride[1][0] = false;
+      DatabaseServer.deathOverride[1][1] = false;
 
-    DatabaseServer.initDeathOverride(2, 2);
-    DatabaseServer.deathOverride[0][0] = false;
-    DatabaseServer.deathOverride[0][1] = false;
-    DatabaseServer.deathOverride[1][0] = false;
-    DatabaseServer.deathOverride[1][1] = false;
-
-    dbServers[0].enableSnapshot(false);
-    dbServers[1].enableSnapshot(false);
-    dbServers[2].enableSnapshot(false);
-    dbServers[3].enableSnapshot(false);
+      dbServers[0].enableSnapshot(false);
+      dbServers[1].enableSnapshot(false);
+      dbServers[2].enableSnapshot(false);
+      dbServers[3].enableSnapshot(false);
 
 
-    Class.forName("com.sonicbase.jdbcdriver.Driver");
+      Class.forName("com.sonicbase.jdbcdriver.Driver");
 
-    Connection conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000", "user", "password");
+      conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000", "user", "password");
 
-    ((ConnectionProxy) conn).getDatabaseClient().createDatabase("test");
+      ((ConnectionProxy) conn).getDatabaseClient().createDatabase("test");
 
-    conn.close();
+      conn.close();
 
-    conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/test", "user", "password");
+      conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/test", "user", "password");
 
-    DatabaseClient client = ((ConnectionProxy) conn).getDatabaseClient();
+      DatabaseClient client = ((ConnectionProxy) conn).getDatabaseClient();
 
-    PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, PRIMARY KEY (id))");
-    stmt.executeUpdate();
+      PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, PRIMARY KEY (id))");
+      stmt.executeUpdate();
 
-    for (int i = 0; i < recordCount; i++) {
-      stmt = conn.prepareStatement("insert into persons (id) VALUES (?)");
-      stmt.setLong(1, i);
-      assertEquals(stmt.executeUpdate(), 1);
-      if (i % 10_000 == 0) {
-        System.out.println("upsert progress: count=" + i);
+      for (int i = 0; i < recordCount; i++) {
+        stmt = conn.prepareStatement("insert into persons (id) VALUES (?)");
+        stmt.setLong(1, i);
+        assertEquals(stmt.executeUpdate(), 1);
+        if (i % 10_000 == 0) {
+          System.out.println("upsert progress: count=" + i);
+        }
       }
+
+      dbServers[0].runSnapshot();
+      dbServers[1].runSnapshot();
+      dbServers[2].runSnapshot();
+      dbServers[3].runSnapshot();
     }
+    finally {
+      conn.close();
 
-    dbServers[0].runSnapshot();
-    dbServers[1].runSnapshot();
-    dbServers[2].runSnapshot();
-    dbServers[3].runSnapshot();
-
-    conn.close();
-
-    dbServers[0].shutdown();
-    dbServers[1].shutdown();
-    dbServers[2].shutdown();
-    dbServers[3].shutdown();
+      dbServers[0].shutdown();
+      dbServers[1].shutdown();
+      dbServers[2].shutdown();
+      dbServers[3].shutdown();
+    }
 
     configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
     mapper = new ObjectMapper();
@@ -143,63 +146,66 @@ public class TestSnapshotManagerLostEntries {
     for (int i = 0; i < dbServers.length; i++) {
       final int shard = i;
       dbServers[shard] = new MonitorServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null, true);
+      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
       dbServers[shard].setRole(role);
       dbServers[shard].disableLogProcessor();
       dbServers[shard].setMinSizeForRepartition(0);
     }
 
+    try {
+      DatabaseServer.initDeathOverride(2, 2);
+      DatabaseServer.deathOverride[0][0] = false;
+      DatabaseServer.deathOverride[0][1] = false;
+      DatabaseServer.deathOverride[1][0] = false;
+      DatabaseServer.deathOverride[1][1] = false;
 
-    DatabaseServer.initDeathOverride(2, 2);
-    DatabaseServer.deathOverride[0][0] = false;
-    DatabaseServer.deathOverride[0][1] = false;
-    DatabaseServer.deathOverride[1][0] = false;
-    DatabaseServer.deathOverride[1][1] = false;
+      dbServers[0].enableSnapshot(false);
+      dbServers[1].enableSnapshot(false);
+      dbServers[2].enableSnapshot(false);
+      dbServers[3].enableSnapshot(false);
 
-    dbServers[0].enableSnapshot(false);
-    dbServers[1].enableSnapshot(false);
-    dbServers[2].enableSnapshot(false);
-    dbServers[3].enableSnapshot(false);
-
-    dbServers[0].recoverFromSnapshot();
-    dbServers[1].recoverFromSnapshot();
-    dbServers[2].recoverFromSnapshot();
-    dbServers[3].recoverFromSnapshot();
+      dbServers[0].recoverFromSnapshot();
+      dbServers[1].recoverFromSnapshot();
+      dbServers[2].recoverFromSnapshot();
+      dbServers[3].recoverFromSnapshot();
 
 
-    Class.forName("com.sonicbase.jdbcdriver.Driver");
+      Class.forName("com.sonicbase.jdbcdriver.Driver");
 
-    conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/test", "user", "password");
+      conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/test", "user", "password");
 
-    client = ((ConnectionProxy) conn).getDatabaseClient();
+      DatabaseClient client = ((ConnectionProxy) conn).getDatabaseClient();
 
-    int countMissing = 0;
-    Long firstMissing = null;
-    stmt = conn.prepareStatement("select * from persons where id=?");
-    for (int i = 0; i < recordCount; i++) {
-      stmt.setLong(1, i);
-      ResultSet rs = stmt.executeQuery();
-      if (!rs.next()) {
-        if (firstMissing == null) {
-          firstMissing = rs.getLong("id");
+      int countMissing = 0;
+      Long firstMissing = null;
+      PreparedStatement stmt = conn.prepareStatement("select * from persons where id=?");
+      for (int i = 0; i < recordCount; i++) {
+        stmt.setLong(1, i);
+        ResultSet rs = stmt.executeQuery();
+        if (!rs.next()) {
+          if (firstMissing == null) {
+            firstMissing = rs.getLong("id");
+          }
+          countMissing++;
         }
-        countMissing++;
+        else {
+          assertEquals(rs.getLong("id"), i);
+        }
+        if (i % 10_000 == 0) {
+          System.out.println("read progress: count=" + i);
+        }
       }
-      else {
-        assertEquals(rs.getLong("id"), i);
-      }
-      if (i % 10_000 == 0) {
-        System.out.println("read progress: count=" + i);
-      }
+      System.out.println("missing count=" + countMissing + ", firstMissing=" + firstMissing);
     }
-    System.out.println("missing count=" + countMissing + ", firstMissing=" + firstMissing);
+    finally {
+      conn.close();
 
-    conn.close();
+      dbServers[0].shutdown();
+      dbServers[1].shutdown();
+      dbServers[2].shutdown();
+      dbServers[3].shutdown();
+    }
 
-    dbServers[0].shutdown();
-    dbServers[1].shutdown();
-    dbServers[2].shutdown();
-    dbServers[3].shutdown();
-
+    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size());
   }
 }

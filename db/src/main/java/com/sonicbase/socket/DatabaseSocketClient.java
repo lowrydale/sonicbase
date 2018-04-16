@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -42,15 +43,15 @@ public class DatabaseSocketClient {
   private static ConcurrentHashMap<String, ArrayBlockingQueue<Connection>> pools = new ConcurrentHashMap<>();
 
   private static AtomicInteger connectionCount = new AtomicInteger();
-  private List<Thread> batchThreads = new ArrayList<>();
   private static ConcurrentLinkedQueue<Connection> openConnections = new ConcurrentLinkedQueue<>();
+  private static boolean shutdown;
 
 
   public static int getConnectionCount() {
     return connectionCount.get();
   }
 
-  private static Connection borrow_connection(String host, int port) {
+  private static Connection borrow_connection(final String host, final int port) {
     for (int i = 0; i < 1; i++) {
       try {
         Connection sock = null;
@@ -69,9 +70,31 @@ public class DatabaseSocketClient {
         sock = pool.poll(0, TimeUnit.MILLISECONDS);
         if (sock == null) {
           try {
+            final CountDownLatch latch = new CountDownLatch(1);
+            final AtomicReference<Connection> newSock = new AtomicReference<>();
             connectionCount.incrementAndGet();
-            sock = new Connection(host, port);//new NioClient(host, port);
-            openConnections.add(sock);
+            Thread thread = new Thread(new Runnable(){
+              @Override
+              public void run() {
+                try {
+                  newSock.set(new Connection(host, port));//new NioClient(host, port);
+                  openConnections.add(newSock.get());
+                  latch.countDown();
+                }
+                catch (Exception e) {
+                  logger.error("Error connecting to server: host=" + host + ", port=" + port);
+                }
+              }
+            });
+            thread.start();
+            if (latch.await(20_000, TimeUnit.MILLISECONDS)) {
+              sock = newSock.get();
+            }
+            else {
+              thread.interrupt();
+              thread.join();
+              throw new DatabaseException("Error connecting to server: host=" + host + ", port=" + port);
+            }
           }
           catch (Exception t) {
             throw new Exception("Error creating connection: host=" + host + ", port=" + port, t);
@@ -112,52 +135,37 @@ public class DatabaseSocketClient {
 
   private static EventLoopGroup clientGroup = new NioEventLoopGroup(); // NIO event loops are also OK
 
-  public List<Thread> getBatchThreads() {
-    return batchThreads;
-  }
 
-  public void shutdown() {
-    synchronized (batchThreads) {
-      for (Thread thread : batchThreads) {
-        thread.interrupt();
-        try {
-          thread.join();
-        }
-        catch (InterruptedException e) {
-          throw new DatabaseException(e);
+  public static void shutdown() {
+    shutdown = true;
+    synchronized (DatabaseSocketClient.class) {
+      for (ArrayBlockingQueue<Connection> pool : pools.values()) {
+        while (true) {
+          try {
+            Connection conn = pool.poll(1, TimeUnit.MILLISECONDS);
+            if (conn == null) {
+              break;
+            }
+          }
+          catch (InterruptedException e) {
+            logger.error("Error closing connection pool");
+          }
         }
       }
-    }
-    if (true) {
-      synchronized (DatabaseSocketClient.class) {
-        for (ArrayBlockingQueue<Connection> pool : pools.values()) {
-          while (true) {
-            try {
-              Connection conn = pool.poll(1, TimeUnit.MILLISECONDS);
-              if (conn == null) {
-                break;
-              }
-            }
-            catch (InterruptedException e) {
-              logger.error("Error closing connection pool");
-            }
-          }
+      List<Connection> toRemove = new ArrayList<>();
+      for (Connection conn : openConnections) {
+        try {
+          conn.sock.shutdownInput();
+          conn.sock.shutdownOutput();
+          conn.sock.close();
+          toRemove.add(conn);
         }
-        List<Connection> toRemove = new ArrayList<>();
-        for (Connection conn : openConnections) {
-          try {
-            conn.sock.shutdownInput();
-            conn.sock.shutdownOutput();
-            conn.sock.close();
-            toRemove.add(conn);
-          }
-          catch (IOException e) {
-            logger.info("Error closing connection");
-          }
+        catch (IOException e) {
+          logger.info("Error closing connection");
         }
-        for (Connection curr : toRemove) {
-          openConnections.remove(curr);
-        }
+      }
+      for (Connection curr : toRemove) {
+        openConnections.remove(curr);
       }
     }
   }

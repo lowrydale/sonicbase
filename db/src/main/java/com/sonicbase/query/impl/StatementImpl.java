@@ -1,7 +1,6 @@
 package com.sonicbase.query.impl;
 
 import com.sonicbase.jdbcdriver.ParameterHandler;
-import com.sonicbase.procedure.RecordEvaluator;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.*;
 import com.sonicbase.schema.DataType;
@@ -26,8 +25,8 @@ public abstract class StatementImpl implements Statement {
     return parms;
   }
 
-  public abstract Object execute(String dbName, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1,
-                                 Short sequence2, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) throws DatabaseException;
+  public abstract Object execute(String dbName, String sqlToUse, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1,
+                                 Short sequence2, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) throws DatabaseException;
 
   @Override
   public BinaryExpression createBinaryExpression(String id, BinaryExpression.Operator op, long value) {

@@ -2,7 +2,6 @@ package com.sonicbase.query.impl;
 
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
-
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.procedure.RecordImpl;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
@@ -28,7 +27,10 @@ import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -39,6 +41,9 @@ import java.util.concurrent.atomic.AtomicReference;
 public class ResultSetImpl implements ResultSet {
   private static final String UTF8_STR = "utf-8";
   private static final String LENGTH_STR = "length";
+  private String sqlToUse;
+  private AtomicLong currOffset = new AtomicLong();
+  private AtomicLong countReturned = new AtomicLong();
   private ComArray recordsResults;
   private StoredProcedureContextImpl procedureContext;
   private boolean restrictToThisServer;
@@ -268,13 +273,15 @@ public class ResultSetImpl implements ResultSet {
 
   public ResultSetImpl(
       String dbName,
+      String sqlToUse,
       DatabaseClient databaseClient, SelectStatementImpl selectStatement,
       ParameterHandler parms, Set<SelectStatementImpl.DistinctRecord> uniqueRecords, SelectContextImpl selectContext,
       Record[] retRecords,
       List<ColumnImpl> columns,
-      String indexUsed, Counter[] counters, Limit limit, Offset offset,
+      String indexUsed, Counter[] counters, Limit limit, Offset offset, AtomicLong currOffset, AtomicLong countReturned,
       List<Expression> groupByColumns, GroupByContext groupContext, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) throws Exception {
     this.dbName = dbName;
+    this.sqlToUse = sqlToUse;
     this.databaseClient = databaseClient;
     this.selectStatement = selectStatement;
     this.aliases = selectStatement.getAliases();
@@ -286,10 +293,13 @@ public class ResultSetImpl implements ResultSet {
     this.indexUsed = indexUsed;
     this.columns = columns;
     this.recordCache = selectContext.getRecordCache();
-    this.readRecords = readRecords(new ExpressionImpl.NextReturn(selectContext.getTableNames(), selectContext.getCurrKeys()));
+    int schemaRetryCount = 0;
+    this.readRecords = readRecords(new ExpressionImpl.NextReturn(selectContext.getTableNames(), selectContext.getCurrKeys()), schemaRetryCount);
     this.counters = counters;
     this.limit = limit;
     this.offset = offset;
+    this.currOffset = currOffset;
+    this.countReturned = countReturned;
     this.groupByColumns = groupByColumns;
     this.groupByContext = groupContext;
     this.pageSize = selectStatement.getPageSize();
@@ -454,14 +464,16 @@ public class ResultSetImpl implements ResultSet {
         boolean first = false;
         if (currPos == 0) {
           first = true;
+          int schemaRetryCount = 0;
           while (true) {
             try {
-              getMoreResults();
+              getMoreResults(schemaRetryCount);
               if (selectContext.getCurrKeys() == null) {
                 break;
               }
             }
             catch (SchemaOutOfSyncException e) {
+              schemaRetryCount++;
               continue;
             }
             catch (Exception e) {
@@ -531,12 +543,14 @@ public class ResultSetImpl implements ResultSet {
       while (true) {
         currPos++;
         if ((selectContext.getCurrKeys().length == 0 || currPos >= selectContext.getCurrKeys().length)) {
+          int schemaRetryCount = 0;
           while (true) {
             try {
-              getMoreResults();
+              getMoreResults(schemaRetryCount);
               break;
             }
             catch (SchemaOutOfSyncException e) {
+              schemaRetryCount++;
               continue;
             }
             catch (Exception e) {
@@ -597,12 +611,14 @@ public class ResultSetImpl implements ResultSet {
       if (offset != null) {
         while (currTotalPos < offset.getOffset() - 1) {
           if ((selectContext.getCurrKeys().length == 0 || currPos >= selectContext.getCurrKeys().length)) {
+            int schemaRetryCount = 0;
             while (true) {
               try {
-                getMoreResults();
+                getMoreResults(schemaRetryCount);
                 break;
               }
               catch (SchemaOutOfSyncException e) {
+                schemaRetryCount++;
                 continue;
               }
               catch (Exception e) {
@@ -618,12 +634,14 @@ public class ResultSetImpl implements ResultSet {
 
     if ((setOperation != null && (retKeys.length == 0 || currPos >= retKeys.length)) ||
         (setOperation == null && (selectContext.getCurrKeys().length == 0 || currPos >= selectContext.getCurrKeys().length))) {
+      int schemaRetryCount = 0;
       while (true) {
         try {
-          getMoreResults();
+          getMoreResults(schemaRetryCount);
           break;
         }
         catch (SchemaOutOfSyncException e) {
+          schemaRetryCount++;
           continue;
         }
         catch (Exception e) {
@@ -662,12 +680,12 @@ public class ResultSetImpl implements ResultSet {
   }
 
 
-  private Record doReadRecord(Object[] key, String tableName) throws Exception {
+  private Record doReadRecord(Object[] key, String tableName, int schemaRetryCount) throws Exception {
 
     return ExpressionImpl.doReadRecord(dbName, databaseClient, selectStatement.isForceSelectOnServer(), parms,
         selectStatement.getWhereClause(), recordCache, key, tableName, columns,
         ((ExpressionImpl) selectStatement.getWhereClause()).getViewVersion(), false,
-        selectContext.isRestrictToThisServer(), selectContext.getProcedureContext());
+        selectContext.isRestrictToThisServer(), selectContext.getProcedureContext(), schemaRetryCount);
   }
 
 
@@ -2233,302 +2251,514 @@ public class ResultSetImpl implements ResultSet {
   private List<Object[]> probedKeys = new ArrayList<>();
   private boolean first = true;
 
-  public void getMoreResults() {
+  public void getMoreResults(final int schemaRetryCount) {
 
-    if (setOperation != null) {
-      getMoreServerSetResults();
-      return;
+
+    DatabaseClient.HistogramEntry histogramEntry = null;
+    if (sqlToUse != null) {
+      histogramEntry = databaseClient.registerQueryForStats(databaseClient.getCluster(), dbName, "(next page) " + sqlToUse);
     }
-
-    if (selectContext.getSelectStatement() != null) {
-      if (!selectStatement.isOnServer() && selectStatement.isServerSelect()) {
-        getMoreServerResults(selectStatement);
+    long beginNanos = System.nanoTime();
+    long beginMillis = System.currentTimeMillis();
+    try {
+      if (setOperation != null) {
+        getMoreServerSetResults();
+        return;
       }
-      else {
-        lastReadRecords = readRecords;
-        readRecords = null;
 
-        final ExpressionImpl topMostExpression = selectStatement.getExpression();
+      if (selectContext.getSelectStatement() != null) {
+        if (!selectStatement.isOnServer() && selectStatement.isServerSelect()) {
+          getMoreServerResults(selectStatement);
+        }
+        else {
+          lastReadRecords = readRecords;
+          readRecords = null;
+
+          final ExpressionImpl topMostExpression = selectStatement.getExpression();
 
 
-        boolean shouldOptimizeForThroughput = databaseClient.getCommon().getServersConfig().shouldOptimizeForThroughput();
-        OptimizationSettings optimizationSettings = null;
-        if (!shouldOptimizeForThroughput && counters == null && (selectStatement.getJoins() == null || selectStatement.getJoins().size() == 0) &&
-            !selectStatement.isServerSelect() &&
-            (topMostExpression instanceof BinaryExpressionImpl || topMostExpression instanceof AllRecordsExpressionImpl)) {
-          selectStatement.getExpression().next((int) count, null, new AtomicLong(), limit, offset, false, true);
-          ExpressionImpl binaryTopMost = topMostExpression;
-          ExpressionImpl lookupExpression = findLookupExpression(binaryTopMost);
-          BinaryExpressionImpl binaryLookupExpression = null;
-          if (lookupExpression instanceof BinaryExpressionImpl) {
-            binaryLookupExpression = (BinaryExpressionImpl) lookupExpression;
-          }
-          if (binaryTopMost instanceof AllRecordsExpressionImpl) {
-            lookupExpression = binaryTopMost;
-          }
-          BinaryExpressionImpl parentExpression = null;
-          if (lookupExpression != null) {
-            parentExpression = findExpressionParent(lookupExpression, topMostExpression);
+          boolean shouldOptimizeForThroughput = databaseClient.getCommon().getServersConfig().shouldOptimizeForThroughput();
+          OptimizationSettings optimizationSettings = null;
+          if (!shouldOptimizeForThroughput && counters == null && (selectStatement.getJoins() == null || selectStatement.getJoins().size() == 0) &&
+              !selectStatement.isServerSelect() &&
+              (topMostExpression instanceof BinaryExpressionImpl || topMostExpression instanceof AllRecordsExpressionImpl)) {
+            selectStatement.getExpression().next((int) count, null, currOffset, countReturned, limit, offset, false, true, schemaRetryCount);
+            ExpressionImpl binaryTopMost = topMostExpression;
+            ExpressionImpl lookupExpression = findLookupExpression(binaryTopMost);
+            BinaryExpressionImpl binaryLookupExpression = null;
+            if (lookupExpression instanceof BinaryExpressionImpl) {
+              binaryLookupExpression = (BinaryExpressionImpl) lookupExpression;
+            }
+            if (binaryTopMost instanceof AllRecordsExpressionImpl) {
+              lookupExpression = binaryTopMost;
+            }
+            BinaryExpressionImpl parentExpression = null;
+            if (lookupExpression != null) {
+              parentExpression = findExpressionParent(lookupExpression, topMostExpression);
 
-            if (lookupExpression instanceof AllRecordsExpressionImpl) {
-              OptimizationSettings settings = optimizationSettings = new OptimizationSettings();
-              settings.fromTable = selectStatement.getFromTable();
-              TableSchema tableSchema = databaseClient.getCommon().getTables(dbName).get(settings.fromTable);
-              boolean found = false;
-              for (Map.Entry<String, IndexSchema> indexSchema : tableSchema.getIndices().entrySet()) {
-                if (indexSchema.getValue().isPrimaryKey()) {
-                  String[] fields = indexSchema.getValue().getFields();
-                  settings.leftColumn = new ColumnSettings();
-                  settings.leftColumn.columnName = fields[0];
-                  settings.leftColumn.columnTableName = settings.fromTable;
-                  int offset = tableSchema.getFieldOffset(fields[0]);
-                  FieldSchema fieldSchema = tableSchema.getFields().get(offset);
-                  settings.leftColumn.columnType = fieldSchema.getType();
-                  settings.leftColumn.fieldOffset = tableSchema.getFieldOffset(settings.leftColumn.columnName);
-                  found = true;
-                  break;
+              if (lookupExpression instanceof AllRecordsExpressionImpl) {
+                OptimizationSettings settings = optimizationSettings = new OptimizationSettings();
+                settings.fromTable = selectStatement.getFromTable();
+                TableSchema tableSchema = databaseClient.getCommon().getTables(dbName).get(settings.fromTable);
+                boolean found = false;
+                for (Map.Entry<String, IndexSchema> indexSchema : tableSchema.getIndices().entrySet()) {
+                  if (indexSchema.getValue().isPrimaryKey()) {
+                    String[] fields = indexSchema.getValue().getFields();
+                    settings.leftColumn = new ColumnSettings();
+                    settings.leftColumn.columnName = fields[0];
+                    settings.leftColumn.columnTableName = settings.fromTable;
+                    int offset = tableSchema.getFieldOffset(fields[0]);
+                    FieldSchema fieldSchema = tableSchema.getFields().get(offset);
+                    settings.leftColumn.columnType = fieldSchema.getType();
+                    settings.leftColumn.fieldOffset = tableSchema.getFieldOffset(settings.leftColumn.columnName);
+                    found = true;
+                    break;
+                  }
+                }
+                if (!found) {
+                  settings = null;
+                }
+                else {
+                  settings.leftColumn.operator = BinaryExpression.Operator.greaterEqual;
                 }
               }
-              if (!found) {
-                settings = null;
+              else if (binaryLookupExpression.isOneKeyLookup()) {
+                if (binaryLookupExpression.getLeftExpression() instanceof ConstantImpl ||
+                    binaryLookupExpression.getLeftExpression() instanceof ParameterImpl) {
+                  Object value = ExpressionImpl.getValueFromExpression(selectStatement.getParms(), binaryLookupExpression.getLeftExpression());
+                  if (binaryLookupExpression.getRightExpression() instanceof ColumnImpl) {
+                    optimizationSettings = getOptimizationSettings(binaryLookupExpression, binaryLookupExpression.getRightExpression(), value);
+                  }
+                }
+                else if (binaryLookupExpression.getRightExpression() instanceof ConstantImpl ||
+                    binaryLookupExpression.getRightExpression() instanceof ParameterImpl) {
+                  Object value = ExpressionImpl.getValueFromExpression(selectStatement.getParms(), binaryLookupExpression.getRightExpression());
+                  if (binaryLookupExpression.getLeftExpression() instanceof ColumnImpl) {
+                    optimizationSettings = getOptimizationSettings(binaryLookupExpression, binaryLookupExpression.getLeftExpression(), value);
+                  }
+                }
               }
-              else {
-                settings.leftColumn.operator = BinaryExpression.Operator.greaterEqual;
+              else if (binaryLookupExpression.isTwoKeyLookup()) {
+                optimizationSettings = getOptimizationSettingsForTwoKeyLookup(binaryLookupExpression);
+              }
+              else if (binaryLookupExpression.isTableScan()) {
+                OptimizationSettings settings = optimizationSettings = new OptimizationSettings();
+                settings.isTableScan = true;
+                settings.fromTable = selectStatement.getFromTable();
+                TableSchema tableSchema = databaseClient.getCommon().getTables(dbName).get(settings.fromTable);
+                boolean found = false;
+                for (Map.Entry<String, IndexSchema> indexSchema : tableSchema.getIndices().entrySet()) {
+                  if (indexSchema.getValue().isPrimaryKey()) {
+                    String[] fields = indexSchema.getValue().getFields();
+                    settings.leftColumn = new ColumnSettings();
+                    settings.leftColumn.columnName = fields[0];
+                    settings.leftColumn.columnTableName = settings.fromTable;
+                    int offset = tableSchema.getFieldOffset(fields[0]);
+                    FieldSchema fieldSchema = tableSchema.getFields().get(offset);
+                    settings.leftColumn.columnType = fieldSchema.getType();
+                    settings.leftColumn.fieldOffset = tableSchema.getFieldOffset(settings.leftColumn.columnName);
+                    found = true;
+                    break;
+                  }
+                }
+                if (!found) {
+                  settings = null;
+                }
+                else {
+                  settings.leftColumn.operator = BinaryExpression.Operator.greaterEqual;
+                }
               }
             }
-            else if (binaryLookupExpression.isOneKeyLookup()) {
-              if (binaryLookupExpression.getLeftExpression() instanceof ConstantImpl ||
-                  binaryLookupExpression.getLeftExpression() instanceof ParameterImpl) {
-                Object value = ExpressionImpl.getValueFromExpression(selectStatement.getParms(), binaryLookupExpression.getLeftExpression());
-                if (binaryLookupExpression.getRightExpression() instanceof ColumnImpl) {
-                  optimizationSettings = getOptimizationSettings(binaryLookupExpression, binaryLookupExpression.getRightExpression(), value);
+
+            if (optimizationSettings != null) {
+              optimizationSettings.parentExpression = parentExpression;
+              optimizationSettings.lookupExpression = lookupExpression;
+
+              optimizationSettings.ascend = true;
+              List<OrderByExpressionImpl> orderBy = selectStatement.getOrderByExpressions();
+              if (orderBy != null && orderBy.size() != 0) {
+                OrderByExpressionImpl order = orderBy.get(0);
+                optimizationSettings.orderBy = order;
+              }
+              if (optimizationSettings.orderBy != null) {
+                if (optimizationSettings.orderBy.getColumnName().equals(optimizationSettings.leftColumn.columnName) &&
+                    (optimizationSettings.orderBy.getTableName() == null || optimizationSettings.orderBy.getTableName().equals(optimizationSettings.leftColumn.columnTableName))) {
+                  if (!optimizationSettings.orderBy.isAscending()) {
+                    optimizationSettings.ascend = false;
+                  }
                 }
-              }
-              else if (binaryLookupExpression.getRightExpression() instanceof ConstantImpl ||
-                  binaryLookupExpression.getRightExpression() instanceof ParameterImpl) {
-                Object value = ExpressionImpl.getValueFromExpression(selectStatement.getParms(), binaryLookupExpression.getRightExpression());
-                if (binaryLookupExpression.getLeftExpression() instanceof ColumnImpl) {
-                  optimizationSettings = getOptimizationSettings(binaryLookupExpression, binaryLookupExpression.getLeftExpression(), value);
-                }
-              }
-            }
-            else if (binaryLookupExpression.isTwoKeyLookup()) {
-              optimizationSettings = getOptimizationSettingsForTwoKeyLookup(binaryLookupExpression);
-            }
-            else if (binaryLookupExpression.isTableScan()) {
-              OptimizationSettings settings = optimizationSettings = new OptimizationSettings();
-              settings.isTableScan = true;
-              settings.fromTable = selectStatement.getFromTable();
-              TableSchema tableSchema = databaseClient.getCommon().getTables(dbName).get(settings.fromTable);
-              boolean found = false;
-              for (Map.Entry<String, IndexSchema> indexSchema : tableSchema.getIndices().entrySet()) {
-                if (indexSchema.getValue().isPrimaryKey()) {
-                  String[] fields = indexSchema.getValue().getFields();
-                  settings.leftColumn = new ColumnSettings();
-                  settings.leftColumn.columnName = fields[0];
-                  settings.leftColumn.columnTableName = settings.fromTable;
-                  int offset = tableSchema.getFieldOffset(fields[0]);
-                  FieldSchema fieldSchema = tableSchema.getFields().get(offset);
-                  settings.leftColumn.columnType = fieldSchema.getType();
-                  settings.leftColumn.fieldOffset = tableSchema.getFieldOffset(settings.leftColumn.columnName);
-                  found = true;
-                  break;
-                }
-              }
-              if (!found) {
-                settings = null;
-              }
-              else {
-                settings.leftColumn.operator = BinaryExpression.Operator.greaterEqual;
               }
             }
           }
 
           if (optimizationSettings != null) {
-            optimizationSettings.parentExpression = parentExpression;
-            optimizationSettings.lookupExpression = lookupExpression;
+            final OptimizationSettings settings = optimizationSettings;
+            List<Future> futures = new ArrayList<>();
+            final byte[] selectBytes = selectStatement.serialize();
+            if (probeThread == null) {
+              probeThread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                  SelectStatementImpl selectStatement = new SelectStatementImpl(databaseClient);
+                  selectStatement.deserialize(selectBytes, dbName);
+                  //outer.setRecordCache(recordCache);
 
-            optimizationSettings.ascend = true;
-            List<OrderByExpressionImpl> orderBy = selectStatement.getOrderByExpressions();
-            if (orderBy != null && orderBy.size() != 0) {
-              OrderByExpressionImpl order = orderBy.get(0);
-              optimizationSettings.orderBy = order;
-            }
-            if (optimizationSettings.orderBy != null) {
-              if (optimizationSettings.orderBy.getColumnName().equals(optimizationSettings.leftColumn.columnName) &&
-                  (optimizationSettings.orderBy.getTableName() == null || optimizationSettings.orderBy.getTableName().equals(optimizationSettings.leftColumn.columnTableName))) {
-                if (!optimizationSettings.orderBy.isAscending()) {
-                  optimizationSettings.ascend = false;
-                }
-              }
-            }
-          }
-        }
+                  //                if (settings.isTableScan) {
+                  //                  AllRecordsExpressionImpl allExpression = new AllRecordsExpressionImpl();
+                  //                  allExpression.setTableName(selectStatement.getFromTable());
+                  //                  allExpression.setFromTable(selectStatement.getFromTable());
+                  //                  allExpression.setClient(databaseClient);
+                  //                  allExpression.setViewVersion(databaseClient.getCommon().getSchemaVersion());
+                  //                  allExpression.setRecordCache(recordCache);
+                  //                  allExpression.setOrderByExpressions(selectStatement.getOrderByExpressions());
+                  //                  allExpression.setDbName(dbName);
+                  //                  allExpression.setParms(selectStatement.getParms());
+                  //
+                  //                  selectStatement.setExpression(allExpression);
+                  //                }
+                  selectStatement.setRecordCache(recordCache);
+                  selectStatement.setPageSize(10);
+                  selectStatement.setProbe(true);
+                  selectStatement.setServerSelectPageNumber(-1);
+                  selectStatement.setServerSelectShardNumber(-1);
+                  selectStatement.setServerSelectReplicaNumber(-1);
+                  selectStatement.setServerSelectResultSetId(-1);
+                  //                if (selectStatement.isServerSelect()) {
+                  //                  //selectStatement.setIsOnServer(true);
+                  //                  selectStatement.forceSelectOnServer(false);
+                  //                }
+                  ExpressionImpl outer = selectStatement.getExpression();
+                  outer.setTableName(selectStatement.getFromTable());
+                  outer.setClient(databaseClient);
+                  outer.setViewVersion(databaseClient.getCommon().getSchemaVersion());
 
-        if (optimizationSettings != null) {
-          final OptimizationSettings settings = optimizationSettings;
-          List<Future> futures = new ArrayList<>();
-          final byte[] selectBytes = selectStatement.serialize();
-          if (probeThread == null) {
-            probeThread = new Thread(new Runnable() {
-              @Override
-              public void run() {
-                SelectStatementImpl selectStatement = new SelectStatementImpl(databaseClient);
-                selectStatement.deserialize(selectBytes, dbName);
-                //outer.setRecordCache(recordCache);
+                  int iteration = 0;
+                  while (true) {
+                    int pageSize = 10 + (iteration++ * 20);
+                    selectStatement.setPageSize(pageSize);
+                    selectStatement.setColumns(new ArrayList<ColumnImpl>());
 
-//                if (settings.isTableScan) {
-//                  AllRecordsExpressionImpl allExpression = new AllRecordsExpressionImpl();
-//                  allExpression.setTableName(selectStatement.getFromTable());
-//                  allExpression.setFromTable(selectStatement.getFromTable());
-//                  allExpression.setClient(databaseClient);
-//                  allExpression.setViewVersion(databaseClient.getCommon().getSchemaVersion());
-//                  allExpression.setRecordCache(recordCache);
-//                  allExpression.setOrderByExpressions(selectStatement.getOrderByExpressions());
-//                  allExpression.setDbName(dbName);
-//                  allExpression.setParms(selectStatement.getParms());
-//
-//                  selectStatement.setExpression(allExpression);
-//                }
-                selectStatement.setRecordCache(recordCache);
-                selectStatement.setPageSize(10);
-                selectStatement.setProbe(true);
-                selectStatement.setServerSelectPageNumber(-1);
-                selectStatement.setServerSelectShardNumber(-1);
-                selectStatement.setServerSelectReplicaNumber(-1);
-                selectStatement.setServerSelectResultSetId(-1);
-//                if (selectStatement.isServerSelect()) {
-//                  //selectStatement.setIsOnServer(true);
-//                  selectStatement.forceSelectOnServer(false);
-//                }
-                ExpressionImpl outer = selectStatement.getExpression();
-                outer.setTableName(selectStatement.getFromTable());
-                outer.setClient(databaseClient);
-                outer.setViewVersion(databaseClient.getCommon().getSchemaVersion());
-
-                int iteration = 0;
-                while (true) {
-                  int pageSize = 10 + (iteration++ * 20);
-                  selectStatement.setPageSize(pageSize);
-                  selectStatement.setColumns(new ArrayList<ColumnImpl>());
-
-                  ExpressionImpl.NextReturn ids = selectStatement.next(dbName, null,
-                      restrictToThisServer, procedureContext);
-                  if (ids == null || ids.getKeys() == null || ids.getKeys().length == 0) {
-                    break;
-                  }
-                  for (Object[][] key : ids.getKeys()) {
-                    ExpressionImpl.CachedRecord record = outer.getRecordCache().get(settings.leftColumn.columnTableName, key[0]);
-                    if (lastKey.get() != null) {
-                      synchronized (probedKeys) {
-                        probedKeys.add(lastKey.get());
+                    ExpressionImpl.NextReturn ids = selectStatement.next(dbName, null,
+                        restrictToThisServer, procedureContext, schemaRetryCount);
+                    if (ids == null || ids.getKeys() == null || ids.getKeys().length == 0) {
+                      break;
+                    }
+                    for (Object[][] key : ids.getKeys()) {
+                      ExpressionImpl.CachedRecord record = outer.getRecordCache().get(settings.leftColumn.columnTableName, key[0]);
+                      if (lastKey.get() != null) {
+                        synchronized (probedKeys) {
+                          probedKeys.add(lastKey.get());
+                        }
+                      }
+                      if (record != null && record.getRecord() != null) {
+                        Object value = record.getRecord().getFields()[settings.leftColumn.fieldOffset];
+                        lastKey.set(new Object[]{value});
                       }
                     }
-                    if (record != null && record.getRecord() != null) {
-                      Object value = record.getRecord().getFields()[settings.leftColumn.fieldOffset];
-                      lastKey.set(new Object[]{value});
-                    }
                   }
+                  doneProbing.set(true);
+
                 }
-                doneProbing.set(true);
-
-              }
-            });
-            probeThread.start();
+              });
+              probeThread.start();
 
 
-            Object[] key = null;
-            while (true) {
-              synchronized (probedKeys) {
-                if (probedKeys.size() != 0) {
-                  key = probedKeys.get(0);
-                }
-              }
-              if (key != null) {
-                break;
-              }
-              if (doneProbing.get()) {
+              Object[] key = null;
+              while (true) {
                 synchronized (probedKeys) {
                   if (probedKeys.size() != 0) {
                     key = probedKeys.get(0);
                   }
                 }
-                if (key == null) {
+                if (key != null) {
                   break;
                 }
-              }
-              try {
-                Thread.sleep(5);
-              }
-              catch (InterruptedException e) {
-                throw new DatabaseException(e);
-              }
-            }
-            //final Object[] nextKey = probedKeys.get(0);
-
-            final Object[] finalKey = key;
-            futures.add(databaseClient.getExecutor().submit(new Callable() {
-              @Override
-              public Object call() throws Exception {
+                if (doneProbing.get()) {
+                  synchronized (probedKeys) {
+                    if (probedKeys.size() != 0) {
+                      key = probedKeys.get(0);
+                    }
+                  }
+                  if (key == null) {
+                    break;
+                  }
+                }
                 try {
+                  Thread.sleep(5);
+                }
+                catch (InterruptedException e) {
+                  throw new DatabaseException(e);
+                }
+              }
+              //final Object[] nextKey = probedKeys.get(0);
+
+              final Object[] finalKey = key;
+              futures.add(databaseClient.getExecutor().submit(new Callable() {
+                @Override
+                public Object call() throws Exception {
+                  try {
+                    SelectStatementImpl selectStatement = new SelectStatementImpl(databaseClient);
+                    selectStatement.deserialize(selectBytes, dbName);
+                    selectStatement.setRecordCache(recordCache);
+                    selectStatement.setPageSize(100_000);
+
+                    BinaryExpressionImpl outer = null;
+
+                    Object[] value = getValueForExpression(settings);
+
+                    if (settings.isTwoKeyLookup) {
+                      if (finalKey == null) {
+                        if (!settings.ascend) {
+                          outer = createExpressionForKeys(value, new Object[]{settings.leftColumn.value},
+                              BinaryExpression.Operator.less, settings.leftColumn.operator, settings);
+                        }
+                        else {
+                          outer = createExpressionForKeys(value, new Object[]{settings.rightColumn.value},
+                              BinaryExpression.Operator.greater, settings.rightColumn.operator, settings);
+                        }
+                      }
+                      else {
+                        if (!settings.ascend) {
+                          outer = createExpressionForKeys(finalKey, value,
+                              BinaryExpression.Operator.greater/*settings.leftColumn.operator*/, BinaryExpression.Operator.less, settings);
+                        }
+                        else {
+                          outer = createExpressionForKeys(value, finalKey, BinaryExpression.Operator.greater,
+                              BinaryExpression.Operator.less, settings);
+                        }
+                      }
+                    }
+                    else {
+                      if (finalKey == null) {
+                        if (settings.leftColumn.operator == BinaryExpression.Operator.less || settings.leftColumn.operator == BinaryExpression.Operator.lessEqual) {
+                          if (!settings.ascend) {
+                            outer = createExpressionForSingleKey(selectStatement, value, BinaryExpression.Operator.less, settings);
+                          }
+                          else {
+                            outer = createExpressionForKeys(value, new Object[]{settings.leftColumn.value},
+                                BinaryExpression.Operator.greater, settings.leftColumn.operator, settings);
+                          }
+                        }
+                        else {
+                          outer = createExpressionForSingleKey(selectStatement, value, BinaryExpression.Operator.greater, settings);
+                        }
+                      }
+                      else {
+                        if (!settings.ascend) {
+                          outer = createExpressionForKeys(finalKey, value, BinaryExpression.Operator.greater,
+                              BinaryExpression.Operator.less, settings);
+                        }
+                        else {
+                          outer = createExpressionForKeys(value, finalKey, BinaryExpression.Operator.greater,
+                              BinaryExpression.Operator.less, settings);
+                        }
+                      }
+                    }
+
+                    if (settings.isTableScan) {
+                      BinaryExpressionImpl parent = new BinaryExpressionImpl();
+                      parent.setLeftExpression(outer);
+                      parent.setRightExpression(selectStatement.getExpression());
+                      parent.setOperator(BinaryExpression.Operator.and);
+                      selectStatement.setExpression(parent);
+                    }
+                    else {
+                      if (settings.parentExpression == null) {
+                        selectStatement.setExpression(outer);
+                      }
+                      else {
+                        ExpressionImpl topMostExpression = (ExpressionImpl) selectStatement.getExpression().getTopLevelExpression();
+                        BinaryExpressionImpl lookupExpression = findLookupExpression(topMostExpression);
+                        BinaryExpressionImpl parentExpression = findExpressionParent(lookupExpression, topMostExpression);
+                        if (parentExpression.getLeftExpression() == lookupExpression) {
+                          parentExpression.setLeftExpression(outer);
+                        }
+                        else if (parentExpression.getRightExpression() == lookupExpression) {
+                          parentExpression.setRightExpression(outer);
+                        }
+                        else {
+                          throw new DatabaseException("Can't find expression for replacement");
+                        }
+                      }
+                    }
+
+                    ExpressionImpl expression = selectStatement.getExpression();
+                    expression.setTableName(selectStatement.getFromTable());
+                    expression.setClient(databaseClient);
+                    expression.setViewVersion(databaseClient.getCommon().getSchemaVersion());
+                    expression.setRecordCache(recordCache);
+                    expression.setOrderByExpressions(selectStatement.getOrderByExpressions());
+                    expression.setTopLevelExpression(expression);
+                    expression.setParms(selectStatement.getParms());
+
+                    selectStatement.setColumns(new ArrayList<ColumnImpl>());
+                    ExpressionImpl.NextReturn ids = selectStatement.next(dbName, null,
+                        restrictToThisServer, procedureContext, schemaRetryCount);
+                    if (ids == null || ids.getKeys() == null || ids.getKeys().length == 0) {
+                      return null;
+                    }
+                    return ids;
+                  }
+                  catch (Exception e) {
+                    throw new DatabaseException(e);
+                  }
+                }
+              }));
+            }
+
+
+            outer:
+            for (int i = 0; i < 8; i++) {
+              boolean isLastKey = false;
+              Object[] key = null;
+              Object[] nextKey = null;
+              while (true) {
+                synchronized (probedKeys) {
+                  if (probedKeys.size() != 0) {
+                    key = probedKeys.remove(0);
+                    if (probedKeys.size() != 0) {
+                      nextKey = probedKeys.get(0);
+                    }
+                  }
+                }
+                if (key != null) {
+                  if (nextKey == null) {
+                    if (doneProbing.get()) {
+                      nextKey = lastKey.get();
+                      lastKey.set(null);
+                      isLastKey = true;
+                    }
+                    else {
+                      while (true) {
+                        if (probedKeys.size() != 0) {
+                          nextKey = probedKeys.get(0);
+                          if (nextKey != null) {
+                            break;
+                          }
+                        }
+                        try {
+                          Thread.sleep(5);
+                        }
+                        catch (InterruptedException e) {
+                          throw new DatabaseException(e);
+                        }
+                      }
+                    }
+                  }
+                  break;
+                }
+                if (doneProbing.get()) {
+                  synchronized (probedKeys) {
+                    if (probedKeys.size() != 0) {
+                      key = probedKeys.remove(0);
+                      if (probedKeys.size() != 0) {
+                        nextKey = probedKeys.get(0);
+                      }
+                      if (key != null) {
+                        if (nextKey == null) {
+                          nextKey = lastKey.get();
+                          lastKey.set(null);
+                          isLastKey = true;
+                        }
+                        break;
+                      }
+
+                    }
+                    if (key == null) {
+                      key = lastKey.get();
+                      lastKey.set(null);
+                      if (key == null) {
+                        break outer;
+                      }
+                      else {
+                        isLastKey = true;
+                        break;
+                      }
+                    }
+                  }
+                }
+                try {
+                  Thread.sleep(5);
+                }
+                catch (InterruptedException e) {
+                  throw new DatabaseException(e);
+                }
+              }
+
+              final boolean finalIsLastKey = isLastKey;
+              final Object[] finalKey = key;
+              final Object[] finalNextKey = nextKey;
+              futures.add(databaseClient.getExecutor().submit(new Callable() {
+                @Override
+                public Object call() throws Exception {
                   SelectStatementImpl selectStatement = new SelectStatementImpl(databaseClient);
                   selectStatement.deserialize(selectBytes, dbName);
                   selectStatement.setRecordCache(recordCache);
                   selectStatement.setPageSize(100_000);
 
                   BinaryExpressionImpl outer = null;
-
-                  Object[] value = getValueForExpression(settings);
-
                   if (settings.isTwoKeyLookup) {
-                    if (finalKey == null) {
-                      if (!settings.ascend) {
-                        outer = createExpressionForKeys(value, new Object[]{settings.leftColumn.value},
-                            BinaryExpression.Operator.less, settings.leftColumn.operator, settings);
+                    if (finalIsLastKey || finalNextKey == null) {
+                      if (settings.leftColumn.operator == BinaryExpression.Operator.less ||
+                          settings.leftColumn.operator == BinaryExpression.Operator.lessEqual) {
+                        //todo: not tested
+                        outer = createExpressionForKeys(finalKey, new Object[]{settings.leftColumn.value},
+                            BinaryExpression.Operator.greaterEqual, settings.leftColumn.operator, settings);
                       }
                       else {
-                        outer = createExpressionForKeys(value, new Object[]{settings.rightColumn.value},
-                            BinaryExpression.Operator.greater, settings.rightColumn.operator, settings);
+                        boolean handled = false;
+                        if (!settings.ascend) {
+                          outer = createExpressionForKeys(finalKey, new Object[]{settings.leftColumn.value},
+                              BinaryExpression.Operator.lessEqual, settings.leftColumn.operator, settings);
+                          handled = true;
+                        }
+                        if (!handled) {
+                          outer = createExpressionForKeys(finalKey, new Object[]{settings.rightColumn.value}, BinaryExpression.Operator.greaterEqual,
+                              settings.rightColumn.operator, settings);
+                        }
                       }
                     }
                     else {
                       if (!settings.ascend) {
-                        outer = createExpressionForKeys(finalKey, value,
-                            BinaryExpression.Operator.greater/*settings.leftColumn.operator*/, BinaryExpression.Operator.less, settings);
+                        outer = createExpressionForKeys(finalKey, finalNextKey,
+                            BinaryExpression.Operator.lessEqual, BinaryExpression.Operator.greater, settings);
                       }
                       else {
-                        outer = createExpressionForKeys(value, finalKey, BinaryExpression.Operator.greater,
+                        outer = createExpressionForKeys(finalKey, finalNextKey, BinaryExpression.Operator.greaterEqual,
                             BinaryExpression.Operator.less, settings);
                       }
                     }
                   }
                   else {
-                    if (finalKey == null) {
-                      if (settings.leftColumn.operator == BinaryExpression.Operator.less || settings.leftColumn.operator == BinaryExpression.Operator.lessEqual) {
-                        if (!settings.ascend) {
-                          outer = createExpressionForSingleKey(selectStatement, value, BinaryExpression.Operator.less, settings);
-                        }
-                        else {
-                          outer = createExpressionForKeys(value, new Object[]{settings.leftColumn.value},
-                              BinaryExpression.Operator.greater, settings.leftColumn.operator, settings);
-                        }
+                    if (finalIsLastKey || finalNextKey == null) {
+                      if (settings.leftColumn.operator == BinaryExpression.Operator.less ||
+                          settings.leftColumn.operator == BinaryExpression.Operator.lessEqual) {
+                        outer = createExpressionForKeys(finalKey, new Object[]{settings.leftColumn.value},
+                            BinaryExpression.Operator.greaterEqual, settings.leftColumn.operator, settings);
                       }
                       else {
-                        outer = createExpressionForSingleKey(selectStatement, value, BinaryExpression.Operator.greater, settings);
+                        boolean handled = false;
+                        if (!settings.ascend) {
+                          outer = createExpressionForKeys(finalKey, new Object[]{settings.leftColumn.value},
+                              BinaryExpression.Operator.lessEqual, settings.leftColumn.operator, settings);
+                          handled = true;
+                        }
+                        if (!handled) {
+                          outer = createExpressionForSingleKey(selectStatement, finalKey, BinaryExpression.Operator.greaterEqual, settings);
+                        }
                       }
                     }
                     else {
                       if (!settings.ascend) {
-                        outer = createExpressionForKeys(finalKey, value, BinaryExpression.Operator.greater,
-                            BinaryExpression.Operator.less, settings);
+                        outer = createExpressionForKeys(finalKey, finalNextKey,
+                            BinaryExpression.Operator.lessEqual, BinaryExpression.Operator.greater, settings);
                       }
                       else {
-                        outer = createExpressionForKeys(value, finalKey, BinaryExpression.Operator.greater,
+                        outer = createExpressionForKeys(finalKey, finalNextKey, BinaryExpression.Operator.greaterEqual,
                             BinaryExpression.Operator.less, settings);
                       }
                     }
                   }
-
                   if (settings.isTableScan) {
                     BinaryExpressionImpl parent = new BinaryExpressionImpl();
                     parent.setLeftExpression(outer);
@@ -2567,349 +2797,152 @@ public class ResultSetImpl implements ResultSet {
 
                   selectStatement.setColumns(new ArrayList<ColumnImpl>());
                   ExpressionImpl.NextReturn ids = selectStatement.next(dbName, null,
-                      restrictToThisServer, procedureContext);
+                      restrictToThisServer, procedureContext, schemaRetryCount);
                   if (ids == null || ids.getKeys() == null || ids.getKeys().length == 0) {
                     return null;
                   }
                   return ids;
                 }
-                catch (Exception e) {
-                  throw new DatabaseException(e);
-                }
-              }
-            }));
-          }
-
-
-          outer:
-          for (int i = 0; i < 8; i++) {
-            boolean isLastKey = false;
-            Object[] key = null;
-            Object[] nextKey = null;
-            while (true) {
-              synchronized (probedKeys) {
-                if (probedKeys.size() != 0) {
-                  key = probedKeys.remove(0);
-                  if (probedKeys.size() != 0) {
-                    nextKey = probedKeys.get(0);
-                  }
-                }
-              }
-              if (key != null) {
-                if (nextKey == null) {
-                  if (doneProbing.get()) {
-                    nextKey = lastKey.get();
-                    lastKey.set(null);
-                    isLastKey = true;
-                  }
-                  else {
-                    while (true) {
-                      if (probedKeys.size() != 0) {
-                        nextKey = probedKeys.get(0);
-                        if (nextKey != null) {
-                          break;
-                        }
-                      }
-                      try {
-                        Thread.sleep(5);
-                      }
-                      catch (InterruptedException e) {
-                        throw new DatabaseException(e);
-                      }
-                    }
-                  }
-                }
-                break;
-              }
-              if (doneProbing.get()) {
-                synchronized (probedKeys) {
-                  if (probedKeys.size() != 0) {
-                    key = probedKeys.remove(0);
-                    if (probedKeys.size() != 0) {
-                      nextKey = probedKeys.get(0);
-                    }
-                    if (key != null) {
-                      if (nextKey == null) {
-                        nextKey = lastKey.get();
-                        lastKey.set(null);
-                        isLastKey = true;
-                      }
-                      break;
-                    }
-
-                  }
-                  if (key == null) {
-                    key = lastKey.get();
-                    lastKey.set(null);
-                    if (key == null) {
-                      break outer;
-                    }
-                    else {
-                      isLastKey = true;
-                      break;
-                    }
-                  }
-                }
-              }
+              }));
+            }
+            ExpressionImpl.NextReturn allIds = null;
+            for (Future future : futures) {
               try {
-                Thread.sleep(5);
+                ExpressionImpl.NextReturn ids = (ExpressionImpl.NextReturn) future.get();
+                if (allIds == null || allIds.getKeys() == null || allIds.getKeys().length == 0) {
+                  allIds = ids;
+                }
+                else if (ids != null && ids.getKeys() != null && ids.getKeys().length != 0) {
+                  Object[][][] keys = ids.getKeys();
+                  if (keys != null) {
+                    Object[][][] newKeys = new Object[keys.length + allIds.getKeys().length][][];
+                    System.arraycopy(allIds.getKeys(), 0, newKeys, 0, allIds.getKeys().length);
+                    System.arraycopy(keys, 0, newKeys, allIds.getKeys().length, keys.length);
+                    keys = newKeys;
+                    allIds.setIds(keys);
+                  }
+                }
               }
-              catch (InterruptedException e) {
+              catch (Exception e) {
                 throw new DatabaseException(e);
               }
             }
-
-            final boolean finalIsLastKey = isLastKey;
-            final Object[] finalKey = key;
-            final Object[] finalNextKey = nextKey;
-            futures.add(databaseClient.getExecutor().submit(new Callable() {
-              @Override
-              public Object call() throws Exception {
-                SelectStatementImpl selectStatement = new SelectStatementImpl(databaseClient);
-                selectStatement.deserialize(selectBytes, dbName);
-                selectStatement.setRecordCache(recordCache);
-                selectStatement.setPageSize(100_000);
-
-                BinaryExpressionImpl outer = null;
-                if (settings.isTwoKeyLookup) {
-                  if (finalIsLastKey || finalNextKey == null) {
-                    if (settings.leftColumn.operator == BinaryExpression.Operator.less ||
-                        settings.leftColumn.operator == BinaryExpression.Operator.lessEqual) {
-                      //todo: not tested
-                      outer = createExpressionForKeys(finalKey, new Object[]{settings.leftColumn.value},
-                          BinaryExpression.Operator.greaterEqual, settings.leftColumn.operator, settings);
-                    }
-                    else {
-                      boolean handled = false;
-                      if (!settings.ascend) {
-                        outer = createExpressionForKeys(finalKey, new Object[]{settings.leftColumn.value},
-                            BinaryExpression.Operator.lessEqual, settings.leftColumn.operator, settings);
-                        handled = true;
-                      }
-                      if (!handled) {
-                        outer = createExpressionForKeys(finalKey, new Object[]{settings.rightColumn.value}, BinaryExpression.Operator.greaterEqual,
-                            settings.rightColumn.operator, settings);
-                      }
-                    }
-                  }
-                  else {
-                    if (!settings.ascend) {
-                      outer = createExpressionForKeys(finalKey, finalNextKey,
-                          BinaryExpression.Operator.lessEqual, BinaryExpression.Operator.greater, settings);
-                    }
-                    else {
-                      outer = createExpressionForKeys(finalKey, finalNextKey, BinaryExpression.Operator.greaterEqual,
-                          BinaryExpression.Operator.less, settings);
-                    }
-                  }
-                }
-                else {
-                  if (finalIsLastKey || finalNextKey == null) {
-                    if (settings.leftColumn.operator == BinaryExpression.Operator.less ||
-                        settings.leftColumn.operator == BinaryExpression.Operator.lessEqual) {
-                      outer = createExpressionForKeys(finalKey, new Object[]{settings.leftColumn.value},
-                          BinaryExpression.Operator.greaterEqual, settings.leftColumn.operator, settings);
-                    }
-                    else {
-                      boolean handled = false;
-                      if (!settings.ascend) {
-                        outer = createExpressionForKeys(finalKey, new Object[]{settings.leftColumn.value},
-                            BinaryExpression.Operator.lessEqual, settings.leftColumn.operator, settings);
-                        handled = true;
-                      }
-                      if (!handled) {
-                        outer = createExpressionForSingleKey(selectStatement, finalKey, BinaryExpression.Operator.greaterEqual, settings);
-                      }
-                    }
-                  }
-                  else {
-                    if (!settings.ascend) {
-                      outer = createExpressionForKeys(finalKey, finalNextKey,
-                          BinaryExpression.Operator.lessEqual, BinaryExpression.Operator.greater, settings);
-                    }
-                    else {
-                      outer = createExpressionForKeys(finalKey, finalNextKey, BinaryExpression.Operator.greaterEqual,
-                          BinaryExpression.Operator.less, settings);
-                    }
-                  }
-                }
-                if (settings.isTableScan) {
-                  BinaryExpressionImpl parent = new BinaryExpressionImpl();
-                  parent.setLeftExpression(outer);
-                  parent.setRightExpression(selectStatement.getExpression());
-                  parent.setOperator(BinaryExpression.Operator.and);
-                  selectStatement.setExpression(parent);
-                }
-                else {
-                  if (settings.parentExpression == null) {
-                    selectStatement.setExpression(outer);
-                  }
-                  else {
-                    ExpressionImpl topMostExpression = (ExpressionImpl) selectStatement.getExpression().getTopLevelExpression();
-                    BinaryExpressionImpl lookupExpression = findLookupExpression(topMostExpression);
-                    BinaryExpressionImpl parentExpression = findExpressionParent(lookupExpression, topMostExpression);
-                    if (parentExpression.getLeftExpression() == lookupExpression) {
-                      parentExpression.setLeftExpression(outer);
-                    }
-                    else if (parentExpression.getRightExpression() == lookupExpression) {
-                      parentExpression.setRightExpression(outer);
-                    }
-                    else {
-                      throw new DatabaseException("Can't find expression for replacement");
-                    }
-                  }
-                }
-
-                ExpressionImpl expression = selectStatement.getExpression();
-                expression.setTableName(selectStatement.getFromTable());
-                expression.setClient(databaseClient);
-                expression.setViewVersion(databaseClient.getCommon().getSchemaVersion());
-                expression.setRecordCache(recordCache);
-                expression.setOrderByExpressions(selectStatement.getOrderByExpressions());
-                expression.setTopLevelExpression(expression);
-                expression.setParms(selectStatement.getParms());
-
-                selectStatement.setColumns(new ArrayList<ColumnImpl>());
-                ExpressionImpl.NextReturn ids = selectStatement.next(dbName, null,
-                    restrictToThisServer, procedureContext);
-                if (ids == null || ids.getKeys() == null || ids.getKeys().length == 0) {
-                  return null;
-                }
-                return ids;
-              }
-            }));
-          }
-          ExpressionImpl.NextReturn allIds = null;
-          for (Future future : futures) {
-            try {
-              ExpressionImpl.NextReturn ids = (ExpressionImpl.NextReturn) future.get();
-              if (allIds == null || allIds.getKeys() == null || allIds.getKeys().length == 0) {
-                allIds = ids;
-              }
-              else if (ids != null && ids.getKeys() != null && ids.getKeys().length != 0) {
-                Object[][][] keys = ids.getKeys();
-                if (keys != null) {
-                  Object[][][] newKeys = new Object[keys.length + allIds.getKeys().length][][];
-                  System.arraycopy(allIds.getKeys(), 0, newKeys, 0, allIds.getKeys().length);
-                  System.arraycopy(keys, 0, newKeys, allIds.getKeys().length, keys.length);
-                  keys = newKeys;
-                  allIds.setIds(keys);
-                }
-              }
+            if (allIds != null && allIds.getIds() != null) {
+              selectStatement.applyDistinct(dbName, selectContext.getTableNames(), allIds, uniqueRecords);
             }
-            catch (Exception e) {
-              throw new DatabaseException(e);
+            readRecords = readRecords(allIds, schemaRetryCount);
+            if (allIds != null && allIds.getIds() != null && allIds.getIds().length != 0) {
+              selectContext.setCurrKeys(allIds.getKeys());
+            }
+            else {
+              selectContext.setCurrKeys((Object[][][]) null);
             }
           }
-          if (allIds != null && allIds.getIds() != null) {
-            selectStatement.applyDistinct(dbName, selectContext.getTableNames(), allIds, uniqueRecords);
-          }
-          readRecords = readRecords(allIds);
-          if (allIds != null && allIds.getIds() != null && allIds.getIds().length != 0) {
-            selectContext.setCurrKeys(allIds.getKeys());
-          }
           else {
-            selectContext.setCurrKeys((Object[][][]) null);
-          }
-        }
-        else {
-          selectStatement.setPageSize(pageSize);
-          ExpressionImpl.NextReturn ids = selectStatement.next(dbName, null,
-              selectContext.isRestrictToThisServer(), selectContext.getProcedureContext());
-          if (ids != null && ids.getIds() != null) {
-            selectStatement.applyDistinct(dbName, selectContext.getTableNames(), ids, uniqueRecords);
-          }
+            selectStatement.setPageSize(pageSize);
+            ExpressionImpl.NextReturn ids = selectStatement.next(dbName, null,
+                selectContext.isRestrictToThisServer(), selectContext.getProcedureContext(), schemaRetryCount);
+            if (ids != null && ids.getIds() != null) {
+              selectStatement.applyDistinct(dbName, selectContext.getTableNames(), ids, uniqueRecords);
+            }
 
-          readRecords = readRecords(ids);
-          if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
-            selectContext.setCurrKeys(ids.getKeys());
+            readRecords = readRecords(ids, schemaRetryCount);
+            if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
+              selectContext.setCurrKeys(ids.getKeys());
+            }
+            else {
+              selectContext.setCurrKeys((Object[][][]) null);
+            }
           }
-          else {
-            selectContext.setCurrKeys((Object[][][]) null);
-          }
+          currPos = 0;
         }
-        currPos = 0;
+        return;
       }
-      return;
+
+      if (selectContext.getNextShard() == -1)
+
+      {
+        selectContext.setCurrKeys((Object[][][]) null);
+        currPos = 0;
+        return;
+      }
+      //    while (true) {
+      //
+      //      //todo: support multiple tables
+      //      TableSchema tableSchema = databaseClient.getCommon().getTables().get(selectContext.getTableNames()[0]);
+      //      Random rand = new Random(System.currentTimeMillis());
+      //      String command = "DatabaseServer:indexLookup:1:" + databaseClient.getCommon().getSchemaVersion() + ":" + rand.nextLong() + ":query0";
+      //      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+      //      DataOutputStream out = new DataOutputStream(bytesOut);
+      //      out.writeUTF(tableSchema.getName());
+      //      out.writeUTF(selectContext.getIndexName());
+      //      Boolean ascending = null;
+      //      if (selectStatement.getOrderByExpressions() == null) {
+      //        out.writeInt(0);
+      //      }
+      //      else {
+      //        out.writeInt(selectStatement.getOrderByExpressions().size());
+      //        for (int j = 0; j < selectStatement.getOrderByExpressions().size(); j++) {
+      //          OrderByExpressionImpl expression = selectStatement.getOrderByExpressions().get(j);
+      //          if (expression.getColumnName().equals(tableSchema.getIndices().get(selectContext.getIndexName()).getFields()[0])) {
+      //            ascending = expression.isAscending();
+      //          }
+      //          expression.serialize(out);
+      //        }
+      //      }
+      //      if (selectContext.getNextKey() == null) {
+      //        out.writeBoolean(false);
+      //      }
+      //      else {
+      //        out.writeBoolean(true);
+      //        out.write(DatabaseCommon.serializeKey(tableSchema, selectContext.getIndexName(), selectContext.getNextKey()));
+      //      }
+      //      if (selectContext.getOperator() == BinaryExpression.Operator.greater) {
+      //        selectContext.setOperator(BinaryExpression.Operator.greaterEqual);
+      //      }
+      //      if (selectContext.getOperator() == BinaryExpression.Operator.less) {
+      //        selectContext.setOperator(BinaryExpression.Operator.lessEqual);
+      //      }
+      //      out.writeInt(selectContext.getOperator().getId());
+      //      out.close();
+      //
+      //      AtomicReference<String> selectedHost = new AtomicReference<>();
+      //
+      //      int previousSchemaVersion = databaseClient.getCommon().getSchemaVersion();
+      //      byte[] lookupRet = databaseClient.send(selectContext.getNextShard(), rand.nextLong(), command, bytesOut.toByteArray(), DatabaseClient.Replica.def, 30000, selectedHost);
+      //      if (previousSchemaVersion < databaseClient.getCommon().getSchemaVersion()) {
+      //        throw new SchemaOutOfSyncException();
+      //      }
+      //      ByteArrayInputStream bytes = new ByteArrayInputStream(lookupRet);
+      //      DataInputStream in = new DataInputStream(bytes);
+      //      int serializationVersion = in.readInt();
+      //      if (in.readBoolean()) {
+      //        selectContext.setNextKey(DatabaseCommon.deserializeKey(tableSchema, in));
+      //      }
+      //      else {
+      //        selectContext.setNextKey(null);
+      //        selectContext.setNextShard(selectContext.getNextShard() + (ascending == null || ascending ? 1 : -1));
+      //      }
+      //      int count = in.readInt();
+      //      long[] currRet = new long[count];
+      //      for (int k = 0; k < count; k++) {
+      //        currRet[k] = in.readLong();
+      //      }
+      //      selectContext.setCurrKeys(currRet);
+      //
+      //      currPos = 0;
+      //      if (count != 0 || (ascending == null || ascending ? selectContext.getNextShard() > databaseClient.getShardCount() :
+      //          selectContext.getNextShard() < 0)) {
+      //        break;
+      //      }
+      //    }
+    }
+    finally {
+      if (histogramEntry != null) {
+        databaseClient.registerCompletedQueryForStats(dbName, histogramEntry, beginMillis, beginNanos);
+      }
     }
 
-    if (selectContext.getNextShard() == -1)
-
-    {
-      selectContext.setCurrKeys((Object[][][]) null);
-      currPos = 0;
-      return;
-    }
-//    while (true) {
-//
-//      //todo: support multiple tables
-//      TableSchema tableSchema = databaseClient.getCommon().getTables().get(selectContext.getTableNames()[0]);
-//      Random rand = new Random(System.currentTimeMillis());
-//      String command = "DatabaseServer:indexLookup:1:" + databaseClient.getCommon().getSchemaVersion() + ":" + rand.nextLong() + ":query0";
-//      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-//      DataOutputStream out = new DataOutputStream(bytesOut);
-//      out.writeUTF(tableSchema.getName());
-//      out.writeUTF(selectContext.getIndexName());
-//      Boolean ascending = null;
-//      if (selectStatement.getOrderByExpressions() == null) {
-//        out.writeInt(0);
-//      }
-//      else {
-//        out.writeInt(selectStatement.getOrderByExpressions().size());
-//        for (int j = 0; j < selectStatement.getOrderByExpressions().size(); j++) {
-//          OrderByExpressionImpl expression = selectStatement.getOrderByExpressions().get(j);
-//          if (expression.getColumnName().equals(tableSchema.getIndices().get(selectContext.getIndexName()).getFields()[0])) {
-//            ascending = expression.isAscending();
-//          }
-//          expression.serialize(out);
-//        }
-//      }
-//      if (selectContext.getNextKey() == null) {
-//        out.writeBoolean(false);
-//      }
-//      else {
-//        out.writeBoolean(true);
-//        out.write(DatabaseCommon.serializeKey(tableSchema, selectContext.getIndexName(), selectContext.getNextKey()));
-//      }
-//      if (selectContext.getOperator() == BinaryExpression.Operator.greater) {
-//        selectContext.setOperator(BinaryExpression.Operator.greaterEqual);
-//      }
-//      if (selectContext.getOperator() == BinaryExpression.Operator.less) {
-//        selectContext.setOperator(BinaryExpression.Operator.lessEqual);
-//      }
-//      out.writeInt(selectContext.getOperator().getId());
-//      out.close();
-//
-//      AtomicReference<String> selectedHost = new AtomicReference<>();
-//
-//      int previousSchemaVersion = databaseClient.getCommon().getSchemaVersion();
-//      byte[] lookupRet = databaseClient.send(selectContext.getNextShard(), rand.nextLong(), command, bytesOut.toByteArray(), DatabaseClient.Replica.def, 30000, selectedHost);
-//      if (previousSchemaVersion < databaseClient.getCommon().getSchemaVersion()) {
-//        throw new SchemaOutOfSyncException();
-//      }
-//      ByteArrayInputStream bytes = new ByteArrayInputStream(lookupRet);
-//      DataInputStream in = new DataInputStream(bytes);
-//      int serializationVersion = in.readInt();
-//      if (in.readBoolean()) {
-//        selectContext.setNextKey(DatabaseCommon.deserializeKey(tableSchema, in));
-//      }
-//      else {
-//        selectContext.setNextKey(null);
-//        selectContext.setNextShard(selectContext.getNextShard() + (ascending == null || ascending ? 1 : -1));
-//      }
-//      int count = in.readInt();
-//      long[] currRet = new long[count];
-//      for (int k = 0; k < count; k++) {
-//        currRet[k] = in.readLong();
-//      }
-//      selectContext.setCurrKeys(currRet);
-//
-//      currPos = 0;
-//      if (count != 0 || (ascending == null || ascending ? selectContext.getNextShard() > databaseClient.getShardCount() :
-//          selectContext.getNextShard() < 0)) {
-//        break;
-//      }
-//    }
   }
 
   private Object[] getValueForExpression(ResultSetImpl.OptimizationSettings settings) {
@@ -3337,6 +3370,7 @@ public class ResultSetImpl implements ResultSet {
   }
 
   private void getMoreServerResults(SelectStatementImpl selectStatement) {
+    int schemaRetryCount = 0;
     while (true) {
       try {
         ComObject cobj = new ComObject();
@@ -3345,6 +3379,8 @@ public class ResultSetImpl implements ResultSet {
         cobj.put(ComObject.Tag.dbName, dbName);
         cobj.put(ComObject.Tag.count, DatabaseClient.SELECT_PAGE_SIZE);
         cobj.put(ComObject.Tag.method, "serverSelect");
+        cobj.put(ComObject.Tag.currOffset, currOffset.get());
+        cobj.put(ComObject.Tag.countReturned, countReturned.get());
 
         byte[] recordRet = databaseClient.send(null, selectStatement.getServerSelectShardNumber(),
             selectStatement.getServerSelectReplicaNumber(), cobj, DatabaseClient.Replica.specified);
@@ -3352,6 +3388,12 @@ public class ResultSetImpl implements ResultSet {
         ComObject retObj = new ComObject(recordRet);
         selectStatement.deserialize(retObj.getByteArray(ComObject.Tag.legacySelectStatement), dbName);
 
+        if (retObj.getLong(ComObject.Tag.currOffset) != null) {
+          currOffset.set(retObj.getLong(ComObject.Tag.currOffset));
+        }
+        if (retObj.getLong(ComObject.Tag.countReturned) != null) {
+          countReturned.set(retObj.getLong(ComObject.Tag.countReturned));
+        }
         String[] tableNames = selectStatement.getTableNames();
         TableSchema[] tableSchemas = new TableSchema[tableNames.length];
         for (int i = 0; i < tableNames.length; i++) {
@@ -3412,18 +3454,19 @@ public class ResultSetImpl implements ResultSet {
         }
 
         ExpressionImpl.NextReturn ret = new ExpressionImpl.NextReturn(tableNames, retKeys);
-        readRecords = readRecords(ret);
+        readRecords = readRecords(ret, schemaRetryCount);
         currPos = 0;
         break;
       }
       catch (SchemaOutOfSyncException e) {
+        schemaRetryCount++;
         continue;
       }
     }
 
   }
 
-  public ExpressionImpl.CachedRecord[][] readRecords(ExpressionImpl.NextReturn nextReturn) {
+  public ExpressionImpl.CachedRecord[][] readRecords(ExpressionImpl.NextReturn nextReturn, int schemaRetryCount) {
     if (nextReturn == null || nextReturn.getKeys() == null) {
       return null;
     }
@@ -3487,7 +3530,7 @@ public class ResultSetImpl implements ResultSet {
               retRecords[i][j] = cachedRecord;
               if (retRecords[i][j] == null) {
                 //todo: batch these reads
-                Record record = doReadRecord(actualIds[i][j], nextReturn.getTableNames()[j]);
+                Record record = doReadRecord(actualIds[i][j], nextReturn.getTableNames()[j], schemaRetryCount);
                 retRecords[i][j] = new ExpressionImpl.CachedRecord(record, record.serialize(databaseClient.getCommon(), DatabaseClient.SERIALIZATION_VERSION));
               }
             }

@@ -13,7 +13,7 @@ import com.sonicbase.query.DatabaseException;
 import com.sonicbase.streams.LocalProducer;
 import com.sonicbase.research.socket.NettyServer;
 import org.apache.commons.io.IOUtils;
-import org.codehaus.plexus.util.FileUtils;
+import org.apache.commons.io.FileUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -29,6 +29,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
+
 public class TestBulkImport {
   private Connection connA;
   private Connection connB;
@@ -40,7 +41,7 @@ public class TestBulkImport {
   private NettyServer serverB1;
   private NettyServer serverB2;
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void afterClass() throws SQLException {
     connA.close();
     connB.close();
@@ -53,6 +54,9 @@ public class TestBulkImport {
     serverA2.shutdown();
     serverB1.shutdown();
     serverB2.shutdown();
+
+    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size());
+
     System.out.println("finished");
   }
 
@@ -106,7 +110,6 @@ public class TestBulkImport {
         }
       });
       thread.start();
-
       while (true) {
         if (serverA2.isRunning()) {
           break;
@@ -141,9 +144,15 @@ public class TestBulkImport {
         }
       });
       thread.start();
+      while (true) {
+        if (serverB2.isRunning()) {
+          break;
+        }
+        Thread.sleep(100);
+      }
 
       while (true) {
-        if (serverA1.isRunning() && serverA2.isRunning() && serverB1.isRunning() && serverB2.isRunning()) {
+        if (serverA1.isRecovered() && serverA2.isRecovered() && serverB1.isRecovered() && serverB2.isRecovered()) {
           break;
         }
         Thread.sleep(100);

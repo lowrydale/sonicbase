@@ -17,6 +17,7 @@ then
   export SEARCH_HOME=$HOME/$SEARCH_HOME
 fi
 
+
 cd $SEARCH_HOME
 echo "start-search_home=$SEARCH_HOME"
 

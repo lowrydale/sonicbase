@@ -66,7 +66,7 @@ public class TestAWSBackup {
         //          String role = "primaryMaster";
 
         dbServers[shard] = new DatabaseServer();
-        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null, true);
+        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
         dbServers[shard].setRole(role);
         dbServers[shard].disableLogProcessor();
         dbServers[shard].setMinSizeForRepartition(0);

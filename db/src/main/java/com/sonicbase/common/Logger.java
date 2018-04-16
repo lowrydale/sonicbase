@@ -64,7 +64,7 @@ public class Logger {
           }
         }
       }, "SonicBase Log Sender Thread");
-      sendThread.start();
+      //sendThread.start();
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -157,17 +157,17 @@ public class Logger {
         }
       }
       if (ready && databaseClient != null) {
-        if (queue.size() < 9_000) {
-          if (shard != -1) {
-            queue.put(new Error(databaseClient, "shard=" + shard + ", replica=" + replica + " " + msg, e));
-          }
-          else {
-            queue.put(new Error(databaseClient, msg, e));
-          }
-        }
-        else {
-          logger.error(msg, e);
-        }
+//        if (queue.size() < 9_000) {
+//          if (shard != -1) {
+//            queue.put(new Error(databaseClient, "shard=" + shard + ", replica=" + replica + " " + msg, e));
+//          }
+//          else {
+//            queue.put(new Error(databaseClient, msg, e));
+//          }
+//        }
+//        else {
+//          logger.error(msg, e);
+//        }
       }
     }
     catch (Exception e1) {
@@ -185,20 +185,20 @@ public class Logger {
         return;
       }
       if (ready) {
-        if (queue.size() < 9_000) {
-          if (shard != -1) {
-            queue.put(new Error(databaseClient, "shard=" + shard + ", replica=" + replica + " " + msg, e));
-          }
-          else {
-            queue.put(new Error(databaseClient, msg, e));
-          }
-        }
-        else {
-          logger.error(msg, e);
-        }
+//        if (queue.size() < 9_000) {
+//          if (shard != -1) {
+//            queue.put(new Error(databaseClient, "shard=" + shard + ", replica=" + replica + " " + msg, e));
+//          }
+//          else {
+//            queue.put(new Error(databaseClient, msg, e));
+//          }
+//        }
+//        else {
+//          logger.error(msg, e);
+//        }
       }
     }
-    catch (InterruptedException e1) {
+    catch (Exception e1) {
       throw new DatabaseException(e1);
     }
   }

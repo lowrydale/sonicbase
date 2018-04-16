@@ -74,7 +74,7 @@ public class Repartitioner extends Thread {
 
   public Repartitioner(DatabaseServer databaseServer, DatabaseCommon common) {
     super("Repartitioner Thread");
-    logger = new Logger(databaseServer.getDatabaseClient());
+    logger = new Logger(null /*databaseServer.getDatabaseClient()*/);
     this.databaseServer = databaseServer;
     this.common = common;
     this.indices = databaseServer.getIndices();
@@ -309,6 +309,7 @@ public class Repartitioner extends Thread {
         finally {
           //common.getSchemaWriteLock(dbName).unlock();
         }
+
         databaseServer.pushSchema();
 
         isRepartitioningIndex.set(true);
@@ -431,7 +432,6 @@ public class Repartitioner extends Thread {
         }
 
         common.saveSchema(databaseServer.getClient(), databaseServer.getDataDir());
-        common.loadSchema(databaseServer.getDataDir());
         logger.info("master - Post-save schemaVersion=" + common.getSchemaVersion() + ", shard=" + common.getShard() +
             ", replica=" + common.getReplica());
         databaseServer.pushSchema();
@@ -2219,11 +2219,11 @@ public class Repartitioner extends Thread {
         isInternal = config.get("clientIsPrivate").asBoolean();
       }
 
-      boolean optimizedForThroughput = false;
+      boolean optimizedForThroughput = true;
       if (config.has("optimizeReadsFor")) {
         String text = config.get("optimizeReadsFor").asText();
-        if (text.equalsIgnoreCase("totalThroughput")) {
-          optimizedForThroughput = true;
+        if (!text.equalsIgnoreCase("totalThroughput")) {
+          optimizedForThroughput = false;
         }
       }
 

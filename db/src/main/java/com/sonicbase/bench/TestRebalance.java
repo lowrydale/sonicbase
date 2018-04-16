@@ -6,8 +6,8 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.jdbcdriver.QueryType;
 import com.sonicbase.server.DatabaseServer;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.codehaus.plexus.util.FileUtils;
 import org.testng.annotations.Test;
 
 import java.io.BufferedInputStream;
@@ -43,7 +43,7 @@ public class TestRebalance {
         public Object call() throws Exception {
           String role = "primaryMaster";
           dbServers[shard] = new DatabaseServer();
-          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null, true);
+          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
           dbServers[shard].setRole(role);
           dbServers[shard].disableLogProcessor();
           return null;
@@ -59,10 +59,10 @@ public class TestRebalance {
 
     client.executeQuery("test", QueryType.update0,
         "create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))",
-        parms, false, null);
+        parms, false, null, true);
 
     client.executeQuery("test", QueryType.update0,
-        "create index socialSecurityNumber on persons(socialSecurityNumber)", parms, false, null);
+        "create index socialSecurityNumber on persons(socialSecurityNumber)", parms, false, null, true);
 
     client.syncSchema();
 

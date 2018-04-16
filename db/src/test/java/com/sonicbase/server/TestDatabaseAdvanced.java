@@ -14,7 +14,7 @@ import com.sonicbase.streams.LocalProducer;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.TableSchema;
 import org.apache.commons.io.IOUtils;
-import org.codehaus.plexus.util.FileUtils;
+import org.apache.commons.io.FileUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -44,13 +44,17 @@ public class TestDatabaseAdvanced {
   List<Long> ids = new ArrayList<>();
   DatabaseServer[] dbServers;
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void afterClass() throws SQLException {
     conn.close();
     for (DatabaseServer server : dbServers) {
       server.shutdown();
     }
     Logger.queue.clear();
+    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size() + ", class=TestDatabaseAdvanced");
+    for (DatabaseClient client : DatabaseClient.allClients) {
+      System.out.println("Stack:\n" + client.getAllocatedStack());
+    }
   }
 
   @BeforeClass
@@ -80,7 +84,7 @@ public class TestDatabaseAdvanced {
       final int shard = i;
 
       dbServers[shard] = new DatabaseServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null, true);
+      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
       dbServers[shard].setRole(role);
       dbServers[shard].disableLogProcessor();
       dbServers[shard].setMinSizeForRepartition(0);
@@ -117,6 +121,9 @@ public class TestDatabaseAdvanced {
     stmt = conn.prepareStatement("create table Resorts (resortId BIGINT, resortName VARCHAR(20), PRIMARY KEY (resortId))");
     stmt.executeUpdate();
 
+    stmt = conn.prepareStatement("create table LimitOffset (id1 BIGINT, id2 BIGINT, id3 BIGINT, PRIMARY KEY (id1))");
+    stmt.executeUpdate();
+
     stmt = conn.prepareStatement("create index socialSecurityNumber on persons(socialSecurityNumber)");
     stmt.executeUpdate();
 
@@ -129,6 +136,11 @@ public class TestDatabaseAdvanced {
     stmt = conn.prepareStatement("create index id on nokeysecondaryindex(id)");
     stmt.executeUpdate();
 
+    stmt = conn.prepareStatement("create index id3 on limitoffset(id3)");
+    stmt.executeUpdate();
+
+    stmt = conn.prepareStatement("create index id2 on persons(id2)");
+    stmt.executeUpdate();
     //test upsert
 
     LocalProducer.queue.clear();
@@ -199,6 +211,14 @@ public class TestDatabaseAdvanced {
       ids.add((long) (i + 100));
     }
 
+    for (int i = 0; i < 1000; i++) {
+      stmt = conn.prepareStatement("insert into LimitOffset (id1, id2, id3) VALUES (?, ?, ?)");
+      stmt.setLong(1, i);
+      stmt.setLong(2, i * 2);
+      stmt.setLong(3, i);
+      assertEquals(stmt.executeUpdate(), 1);
+    }
+
     for (int i = 0; i < recordCount; i++) {
       stmt = conn.prepareStatement("insert into nokey (id, id2) VALUES (?, ?)");
       stmt.setLong(1, i);
@@ -238,6 +258,97 @@ public class TestDatabaseAdvanced {
     Thread.sleep(10000);
 
     executor.shutdownNow();
+  }
+
+  @Test
+  public void testUpsertNotUnique() throws SQLException {
+    try {
+      PreparedStatement stmt = conn.prepareStatement("insert ignore into persons (id, id2) values (1000, 1000)");
+      stmt.executeUpdate();
+      stmt = conn.prepareStatement("insert ignore into persons (id, id2) values (?, 1001)");
+      stmt.setLong(1, 1000);
+      stmt.executeUpdate();
+
+      stmt = conn.prepareStatement("select * from persons where  id2=1000");
+      ResultSet rs = stmt.executeQuery();
+      assertFalse(rs.next());
+    }
+    finally {
+      PreparedStatement stmt = conn.prepareStatement("delete from persons where id=1000");
+      stmt.executeUpdate();
+      stmt = conn.prepareStatement("delete from persons where id2=1000");
+      stmt.executeUpdate();
+    }
+  }
+
+  @Test
+  public void testOffsetLimit() throws SQLException {
+
+    try (PreparedStatement stmt = conn.prepareStatement("select * from limitoffset order by id1 asc limit 2 offset 2");
+         ResultSet rs = stmt.executeQuery()) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id1"), 1);
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id1"), 2);
+      assertFalse(rs.next());
+    }
+
+    try (PreparedStatement stmt = conn.prepareStatement("select * from limitoffset order by id1 desc limit 2 offset 2");
+         ResultSet rs = stmt.executeQuery()) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id1"), 998);
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id1"), 997);
+      assertFalse(rs.next());
+    }
+
+    try (PreparedStatement stmt = conn.prepareStatement("select * from limitoffset order by id3 asc limit 2 offset 2");
+         ResultSet rs = stmt.executeQuery()) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id3"), 1);
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id3"), 2);
+      assertFalse(rs.next());
+    }
+
+    try (PreparedStatement stmt = conn.prepareStatement("select * from limitoffset order by id1 asc limit 150 offset 100");
+         ResultSet rs = stmt.executeQuery()) {
+      for (int i = 99; i < 249; i++) {
+        assertTrue(rs.next());
+        assertEquals(rs.getLong("id1"), i);
+      }
+      assertFalse(rs.next());
+    }
+
+    try (PreparedStatement stmt = conn.prepareStatement("select * from limitoffset order by id1 desc limit 50 offset 150");
+         ResultSet rs = stmt.executeQuery()) {
+      for (int i = 850; i > 800; i--) {
+        assertTrue(rs.next());
+        assertEquals(rs.getLong("id1"), i);
+      }
+      assertFalse(rs.next());
+    }
+
+    try (PreparedStatement stmt = conn.prepareStatement("select * from limitoffset order by id3 asc limit 150 offset 100");
+         ResultSet rs = stmt.executeQuery()) {
+      for (int i = 99; i < 249; i++) {
+        assertTrue(rs.next());
+        assertEquals(rs.getLong("id1"), i);
+      }
+      assertFalse(rs.next());
+    }
+
+
+    int pageSize = ((ConnectionProxy)conn).getDatabaseClient().getPageSize();
+    ((ConnectionProxy)conn).getDatabaseClient().setPageSize(1);
+    try (PreparedStatement stmt = conn.prepareStatement("select * from limitoffset order by id2 asc limit 2 offset 2");
+          ResultSet rs = stmt.executeQuery()) {
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id2"), 4);
+      assertTrue(rs.next());
+      assertEquals(rs.getLong("id2"), 6);
+    }
+    ((ConnectionProxy)conn).getDatabaseClient().setPageSize(pageSize);
   }
 
   @Test
@@ -690,10 +801,10 @@ public class TestDatabaseAdvanced {
     ret.next();
     assertEquals(ret.getLong("id2"), 1);
     assertEquals(ret.getLong("id"), 109);
-    ret.next();
-    assertEquals(ret.getLong("id2"), 0);
-    assertTrue(ret.wasNull());
-    assertEquals(ret.getLong("id"), 4);
+    assertFalse(ret.next());
+//    assertEquals(ret.getLong("id2"), 0);
+//    assertTrue(ret.wasNull());
+//    assertEquals(ret.getLong("id"), 4);
     //assertFalse(ret.next());
 
   }

@@ -3,7 +3,6 @@ package com.sonicbase.query.impl;
 
 import com.sonicbase.common.ComArray;
 import com.sonicbase.common.ComObject;
-import com.sonicbase.procedure.RecordEvaluator;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.InsertStatement;
@@ -33,10 +32,10 @@ public class InsertStatementImpl extends StatementImpl implements InsertStatemen
   }
 
   @Override
-  public Object execute(String dbName, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
-                        boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) throws DatabaseException {
+  public Object execute(String dbName, String sqlToUse, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
+                        boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) throws DatabaseException {
     try {
-      return client.doInsert(dbName, this, getParms());
+      return client.doInsert(dbName, this, getParms(), schemaRetryCount);
     }
     catch (Exception e) {
       throw new DatabaseException(e);

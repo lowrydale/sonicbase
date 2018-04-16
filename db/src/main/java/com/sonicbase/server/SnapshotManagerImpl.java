@@ -14,9 +14,7 @@ import org.apache.giraph.utils.Varint;
 
 import java.io.*;
 import java.text.ParseException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -35,12 +33,12 @@ public class SnapshotManagerImpl implements SnapshotManager {
   private final DatabaseServer server;
   private long lastSnapshot = -1;
   private boolean enableSnapshot = true;
-  private boolean isRecovering;
+  private boolean isRecovering = true;
   private boolean shutdown;
 
   public SnapshotManagerImpl(DatabaseServer databaseServer) {
     this.server = databaseServer;
-    this.logger = new Logger(databaseServer.getDatabaseClient());
+    this.logger = new Logger(null/*databaseServer.getDatabaseClient()*/);
   }
 
   public static int getHighestCommittedSnapshotVersion(File snapshotRootDir, Logger logger) {
@@ -125,6 +123,7 @@ public class SnapshotManagerImpl implements SnapshotManager {
 
   public void recoverFromSnapshot(String dbName) throws Exception {
 
+    logger.info("recovering snapshot: db=" + dbName);
     totalFileCount = 0;
     finishedFileCount = 0;
     totalBytes = 0;
@@ -167,7 +166,7 @@ public class SnapshotManagerImpl implements SnapshotManager {
 
         final long indexBegin = System.currentTimeMillis();
         recoveredCount.set(0);
-        final AtomicLong lastLogged = new AtomicLong(System.currentTimeMillis());
+        final  AtomicLong lastLogged = new AtomicLong(System.currentTimeMillis());
         File file = snapshotDir;
 
         if (file.exists()) {
@@ -194,16 +193,16 @@ public class SnapshotManagerImpl implements SnapshotManager {
               final String indexName = indexDir.getName();
               List<Future> futures = new ArrayList<>();
               final AtomicInteger offset = new AtomicInteger();
+              logger.info("Recovering: table=" + tableName + INDEX_STR + indexName);
               for (final File indexFile : indexDir.listFiles()) {
                 final int currOffset = offset.get();
-                logger.info("Recovering: table=" + tableName + INDEX_STR + indexName);
                 final TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
                 final IndexSchema indexSchema = server.getIndexSchema(dbName, tableSchema.getName(), indexName);
                 final Index index = server.getIndex(dbName, tableName, indexName);
-                logger.info("Table: table=" + tableName + ", indexName=" + indexName +
-                    ", schemaNull=" + (indexSchema == null) +
-                    ", byIdNull=" + (tableSchema.getIndexesById().get(indexSchema.getIndexId()) == null) +
-                    ", indexId=" + indexSchema.getIndexId());
+//                logger.info("Table: table=" + tableName + ", indexName=" + indexName +
+//                    ", schemaNull=" + (indexSchema == null) +
+//                    ", byIdNull=" + (tableSchema.getIndexesById().get(indexSchema.getIndexId()) == null) +
+//                    ", indexId=" + indexSchema.getIndexId());
                 futures.add(executor.submit(new Callable<Boolean>() {
                                               @Override
                                               public Boolean call() throws Exception {
@@ -248,7 +247,8 @@ public class SnapshotManagerImpl implements SnapshotManager {
                                                     }
 
                                                     if (index.put(key, address) != null) {
-                                                      throw new DatabaseException("Key already exists");
+                                                      //throw new DatabaseException("Key already exists");
+                                                      logger.error("Key already exists: key=" + DatabaseCommon.keyToString(key));
                                                     }
 
                                                     countForFile++;
@@ -261,7 +261,8 @@ public class SnapshotManagerImpl implements SnapshotManager {
                                                     }
                                                   }
                                                 }
-                                                catch (EOFException e) {
+                                                catch (Exception e) {
+                                                  logger.error("Error recovering bucket: table=" + tableName + ", index=" + indexName, e);
                                                   throw new Exception(e);
                                                 }
                                                 return true;
@@ -285,7 +286,6 @@ public class SnapshotManagerImpl implements SnapshotManager {
               logger.info("Recover progress - finished index. table=" + tableName + INDEX_STR + indexName + ": count=" + recoveredCount.get() + RATE_STR +
                   ((float) recoveredCount.get() / (float) ((System.currentTimeMillis() - indexBegin)) * 1000f) +
                   DURATION_STR + (System.currentTimeMillis() - indexBegin) / 1000f);
-
             }
           }
         }
@@ -312,6 +312,59 @@ public class SnapshotManagerImpl implements SnapshotManager {
   private String getSnapshotRootDir(String dbName) {
     return new File(getSnapshotReplicaDir(), dbName).getAbsolutePath();
   }
+
+  private String getSnapshotSchemaDir(String dbName) {
+    return new File(getSnapshotReplicaDir(), "_sonicbase_schema/" + dbName).getAbsolutePath();
+  }
+
+  public void saveIndexSchema(String dbName, int schemaVersion, TableSchema tableSchema, IndexSchema indexSchema) {
+    try {
+      File file = new File(getSnapshotSchemaDir(dbName), tableSchema.getName() + "/indices/" + indexSchema.getName() + "/schema." + schemaVersion + ".bin");
+      FileUtils.forceMkdirParent(file);
+      try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file)))) {
+        out.writeShort(DatabaseClient.SERIALIZATION_VERSION);
+        TableSchema.serializeIndexSchema(out, tableSchema, indexSchema);
+      }
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public void saveTableSchema(String dbName, int schemaVersion, String tableName, TableSchema tableSchema) {
+    try {
+      File file = new File(getSnapshotSchemaDir(dbName), tableName + "/table/schema." + schemaVersion + ".bin");
+      FileUtils.forceMkdirParent(file);
+      try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file)))) {
+        out.writeShort(DatabaseClient.SERIALIZATION_VERSION);
+        tableSchema.serialize(out);
+      }
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public void deleteTableSchema(String dbName, int schemaVersion, String tableName) {
+    File file = new File(getSnapshotSchemaDir(dbName), tableName);
+    try {
+      FileUtils.deleteDirectory(file);
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public void deleteIndexSchema(String dbName, int schemaVersion, String table, String indexName) {
+    try {
+      File file = new File(getSnapshotSchemaDir(dbName), table + "/indices/" + indexName);
+      FileUtils.deleteDirectory(file);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
 
   Thread snapshotThread = null;
   public void runSnapshotLoop() {
@@ -349,7 +402,13 @@ public class SnapshotManagerImpl implements SnapshotManager {
 //              writer.write(String.valueOf(DatabaseClient.SERIALIZATION_VERSION));
 //            }
 
-            List<String> dbNames = server.getDbNames(server.getDataDir());
+            Set<String> dbNames = new HashSet<>();
+            for (String dbName : server.getCommon().getDatabases().keySet()) {
+              dbNames.add(dbName);
+            }
+            for (String dbName : server.getDbNames(server.getDataDir())) {
+              dbNames.add(dbName);
+            }
             for (String dbName : dbNames) {
               runSnapshot(dbName);
             }

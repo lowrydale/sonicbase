@@ -1,6 +1,5 @@
 package com.sonicbase.query;
 
-import com.sonicbase.procedure.RecordEvaluator;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.impl.SelectStatementImpl;
 import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
@@ -16,8 +15,8 @@ public interface SelectStatement extends Statement {
 
   void setWhereClause(Expression expression);
 
-  Object execute(String dbName, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
-                 boolean restrictToThisServer, StoredProcedureContextImpl procedureContex) throws DatabaseException;
+  Object execute(String dbName, String sqlToUse, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
+                 boolean restrictToThisServer, StoredProcedureContextImpl procedureContex, int schemaRetryCount) throws DatabaseException;
 
   void addOrderByExpression(String tableName, String columnName, boolean ascending);
 

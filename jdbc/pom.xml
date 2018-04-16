@@ -4,14 +4,14 @@
     <groupId>com.sonicbase</groupId>
     <artifactId>sonicbase-jdbc-unobfuscated</artifactId>
     <packaging>jar</packaging>
-    <version>1.2.11</version>
+    <version>1.2.12</version>
     <name>sonicbase-jdbc</name>
     <url>http://maven.apache.org</url>
 
     <parent>
         <groupId>com.sonicbase</groupId>
         <artifactId>sonicbase-root</artifactId>
-        <version>1.2.11</version>
+        <version>1.2.12</version>
     </parent>
 
     <build>
@@ -84,14 +84,6 @@
             <groupId>log4j</groupId>
             <artifactId>log4j</artifactId>
             <version>1.2.17</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <!--Apache 2.0 - license confirmed-->
-        <dependency>
-            <groupId>com.codahale.metrics</groupId>
-            <artifactId>metrics-core</artifactId>
-            <version>3.0.2</version>
             <scope>provided</scope>
         </dependency>
 

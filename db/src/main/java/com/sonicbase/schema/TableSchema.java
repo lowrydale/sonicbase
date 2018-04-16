@@ -208,7 +208,7 @@ public class TableSchema {
     return fieldOffsets.get(id);
   }
 
-  public void addIndex(String indexName, boolean isUnique, String[] fields, Partition[] partitions, int indexId) {
+  public IndexSchema addIndex(String indexName, boolean isUnique, String[] fields, Partition[] partitions, int indexId) {
     Comparator[] comparators = getComparators(fields);
 
     boolean isPrimaryKey = false;
@@ -248,9 +248,11 @@ public class TableSchema {
       }
     }
 
-    IndexSchema indexSchema = new IndexSchema(indexName, indexId, isUnique, fields, comparators, partitions, isPrimaryKey, isPrimaryKeyGroup);
+    IndexSchema indexSchema = new IndexSchema(indexName, indexId, isUnique, fields, comparators, partitions, isPrimaryKey, isPrimaryKeyGroup, this);
     indexes.put(indexName, indexSchema);
     indexesById.put(indexId, indexSchema);
+
+    return indexSchema;
   }
 
   public Map<String, IndexSchema> getIndices() {
@@ -274,48 +276,56 @@ public class TableSchema {
     }
     out.writeInt(indexes.size());
     for (Map.Entry<String, IndexSchema> entry : indexes.entrySet()) {
-      out.writeUTF(entry.getKey());
-      out.writeInt(entry.getValue().getIndexId());
-      out.writeBoolean(entry.getValue().isUnique());
-      out.writeInt(entry.getValue().getFields().length);
-      for (int i = 0; i < entry.getValue().getFields().length; i++) {
-        out.writeUTF(entry.getValue().getFields()[i]);
-      }
-      out.writeBoolean(entry.getValue().isPrimaryKey());
-      out.writeBoolean(entry.getValue().isPrimaryKeyGroup());
-      out.writeInt(entry.getValue().getCurrPartitions().length);
-      for (int i = 0; i < entry.getValue().getCurrPartitions().length; i++) {
-        out.writeInt(entry.getValue().getCurrPartitions()[i].shardOwning);
-        out.writeBoolean(entry.getValue().getCurrPartitions()[i].unboundUpper);
-        if (entry.getValue().getCurrPartitions()[i].upperKey == null) {
-          out.writeInt(0);
-        }
-        else {
-          out.writeInt(1);
-          out.write(DatabaseCommon.serializeKey(this, entry.getKey(), entry.getValue().getCurrPartitions()[i].upperKey));
-        }
-      }
-      if (entry.getValue().getLastPartitions() == null) {
-        out.writeInt(0);
-      }
-      else {
-        out.writeInt(entry.getValue().getLastPartitions().length);
-        for (int i = 0; i < entry.getValue().getLastPartitions().length; i++) {
-          out.writeInt(entry.getValue().getLastPartitions()[i].shardOwning);
-          out.writeBoolean(entry.getValue().getLastPartitions()[i].unboundUpper);
-          if (entry.getValue().getLastPartitions()[i].upperKey == null) {
-            out.writeInt(0);
-          }
-          else {
-            out.writeInt(1);
-            out.write(DatabaseCommon.serializeKey(this, entry.getKey(), entry.getValue().getLastPartitions()[i].upperKey));
-          }
-        }
-      }
+      serializeIndexSchema(out, this, entry.getValue());
     }
     out.writeInt(primaryKey.length);
     for (int i = 0; i < primaryKey.length; i++) {
       out.writeUTF(primaryKey[i]);
+    }
+  }
+
+  public static void serializeIndexSchema(DataOutputStream out, TableSchema tableSchema, IndexSchema indexSchema) throws IOException {
+    out.writeUTF(indexSchema.getName());
+    out.writeInt(indexSchema.getIndexId());
+    if (indexSchema.getIndexId() > 10) {
+      System.out.println(">10");
+    }
+
+    out.writeBoolean(indexSchema.isUnique());
+    out.writeInt(indexSchema.getFields().length);
+    for (int i = 0; i < indexSchema.getFields().length; i++) {
+      out.writeUTF(indexSchema.getFields()[i]);
+    }
+    out.writeBoolean(indexSchema.isPrimaryKey());
+    out.writeBoolean(indexSchema.isPrimaryKeyGroup());
+    out.writeInt(indexSchema.getCurrPartitions().length);
+    for (int i = 0; i < indexSchema.getCurrPartitions().length; i++) {
+      out.writeInt(indexSchema.getCurrPartitions()[i].shardOwning);
+      out.writeBoolean(indexSchema.getCurrPartitions()[i].unboundUpper);
+      if (indexSchema.getCurrPartitions()[i].upperKey == null) {
+        out.writeInt(0);
+      }
+      else {
+        out.writeInt(1);
+        out.write(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), indexSchema.getCurrPartitions()[i].upperKey));
+      }
+    }
+    if (indexSchema.getLastPartitions() == null) {
+      out.writeInt(0);
+    }
+    else {
+      out.writeInt(indexSchema.getLastPartitions().length);
+      for (int i = 0; i < indexSchema.getLastPartitions().length; i++) {
+        out.writeInt(indexSchema.getLastPartitions()[i].shardOwning);
+        out.writeBoolean(indexSchema.getLastPartitions()[i].unboundUpper);
+        if (indexSchema.getLastPartitions()[i].upperKey == null) {
+          out.writeInt(0);
+        }
+        else {
+          out.writeInt(1);
+          out.write(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), indexSchema.getLastPartitions()[i].upperKey));
+        }
+      }
     }
   }
 
@@ -352,59 +362,68 @@ public class TableSchema {
     }
     int indexCount = in.readInt();
     for (int i = 0; i < indexCount; i++) {
-      String name = in.readUTF();
-      int indexId = in.readInt();
-      boolean isUnique = in.readBoolean();
-      int columnCount = in.readInt();
-      String[] columns = new String[columnCount];
-      for (int j = 0; j < columnCount; j++) {
-        columns[j] = in.readUTF();
-      }
-      boolean isPrimaryKey = in.readBoolean();
-      boolean isPrimaryKeyGroup = in.readBoolean();
-      IndexSchema indexSchema = new IndexSchema();
-      indexSchema.setName(name);
-      indexSchema.setIsUnique(isUnique);
-      indexSchema.setFields(columns);
-      Comparator[] comparators = getComparators(columns);
-      indexSchema.setComparators(comparators);
-      indexSchema.setIndexId(indexId);
-      indexSchema.setIsPrimaryKey(isPrimaryKey);
-      indexSchema.setIsPrimaryKeyGroup(isPrimaryKeyGroup);
-      indexes.put(name, indexSchema);
-      indexesById.put(indexId, indexSchema);
-
-      Partition[] partitions = new Partition[in.readInt()];
-      for (int j = 0; j < partitions.length; j++) {
-        partitions[j] = new Partition();
-        partitions[j].shardOwning = in.readInt();
-        partitions[j].setUnboundUpper(in.readBoolean());
-        if (in.readInt() == 1) {
-          partitions[j].upperKey = DatabaseCommon.deserializeKey(this, in);
-        }
-      }
-      indexSchema.setCurrPartitions(partitions);
-
-      partitions = new Partition[in.readInt()];
-      if (partitions.length == 0) {
-        partitions = null;
-      }
-      else {
-        for (int j = 0; j < partitions.length; j++) {
-          partitions[j] = new Partition();
-          partitions[j].shardOwning = in.readInt();
-          partitions[j].setUnboundUpper(in.readBoolean());
-          if (in.readInt() == 1) {
-            partitions[j].upperKey = DatabaseCommon.deserializeKey(this, in);
-          }
-        }
-      }
-      indexSchema.setLastPartitions(partitions);
+      deserializeIndexSchema(in, this);
     }
     int columnCount = in.readInt();
     primaryKey = new String[columnCount];
     for (int i = 0; i < columnCount; i++) {
       primaryKey[i] = in.readUTF();
     }
+  }
+
+  public static IndexSchema deserializeIndexSchema(DataInputStream in, TableSchema tableSchema) throws IOException {
+    String name = in.readUTF();
+    int indexId = in.readInt();
+    if (indexId > 10) {
+      System.out.println(">10");
+    }
+    boolean isUnique = in.readBoolean();
+    int columnCount = in.readInt();
+    String[] columns = new String[columnCount];
+    for (int j = 0; j < columnCount; j++) {
+      columns[j] = in.readUTF();
+    }
+    boolean isPrimaryKey = in.readBoolean();
+    boolean isPrimaryKeyGroup = in.readBoolean();
+    IndexSchema indexSchema = new IndexSchema();
+    indexSchema.setName(name);
+    indexSchema.setIsUnique(isUnique);
+    indexSchema.setFields(columns, tableSchema);
+    Comparator[] comparators = tableSchema.getComparators(columns);
+    indexSchema.setComparators(comparators);
+    indexSchema.setIndexId(indexId);
+    indexSchema.setIsPrimaryKey(isPrimaryKey);
+    indexSchema.setIsPrimaryKeyGroup(isPrimaryKeyGroup);
+
+    tableSchema.getIndexes().put(indexSchema.getName(), indexSchema);
+    tableSchema.getIndexesById().put(indexSchema.getIndexId(), indexSchema);
+
+    Partition[] partitions = new Partition[in.readInt()];
+    for (int j = 0; j < partitions.length; j++) {
+      partitions[j] = new Partition();
+      partitions[j].shardOwning = in.readInt();
+      partitions[j].setUnboundUpper(in.readBoolean());
+      if (in.readInt() == 1) {
+        partitions[j].upperKey = DatabaseCommon.deserializeKey(tableSchema, in);
+      }
+    }
+    indexSchema.setCurrPartitions(partitions);
+
+    partitions = new Partition[in.readInt()];
+    if (partitions.length == 0) {
+      partitions = null;
+    }
+    else {
+      for (int j = 0; j < partitions.length; j++) {
+        partitions[j] = new Partition();
+        partitions[j].shardOwning = in.readInt();
+        partitions[j].setUnboundUpper(in.readBoolean());
+        if (in.readInt() == 1) {
+          partitions[j].upperKey = DatabaseCommon.deserializeKey(tableSchema, in);
+        }
+      }
+    }
+    indexSchema.setLastPartitions(partitions);
+    return indexSchema;
   }
 }

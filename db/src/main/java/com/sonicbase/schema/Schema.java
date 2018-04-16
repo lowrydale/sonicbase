@@ -8,14 +8,15 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Responsible for
  */
 public class Schema {
 
-  private Map<String, TableSchema> tables = new HashMap<>();
-  private Map<Integer, TableSchema> tablesById = new HashMap<>();
+  private Map<String, TableSchema> tables = new ConcurrentHashMap<>();
+  private Map<Integer, TableSchema> tablesById = new ConcurrentHashMap<>();
   private final Object schemaMutex = new Object();
   private RecordIndexPartition[] lastRecordIndexPartitions;
   private RecordIndexPartition[] currRecordIndexPartitions;

@@ -201,7 +201,8 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
   }
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset, boolean b, boolean analyze) {
+  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
+                         Limit limit, Offset offset, boolean b, boolean analyze, int schemaRetryCount) {
     if (getNextShard() == -2) {
       return new NextReturn(new String[]{getTableName()}, null);
     }
@@ -256,8 +257,8 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
           tableName, indexSchema.getName(), isForceSelectOnServer(),
           BinaryExpression.Operator.equal, null,
           null, key, getParms(), this, null, key, null, getColumns(), cNode.getColumnName(), -1, getRecordCache(), usedIndex,
-          false, getViewVersion(), getCounters(), getGroupByContext(), debug, currOffset, limit,
-          offset, isProbe(), isRestrictToThisServer(), getProcedureContext());
+          false, getViewVersion(), getCounters(), getGroupByContext(), debug, currOffset, countReturned, limit,
+          offset, isProbe(), isRestrictToThisServer(), getProcedureContext(), schemaRetryCount);
       ret = aggregateResults(ret, currRet.getCurrKeys());
     }
     setNextShard(-2);
@@ -265,8 +266,8 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
   }
 
 
-  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset) {
-    return next(DatabaseClient.SELECT_PAGE_SIZE, explain, currOffset, limit, offset, false, false);
+  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
+    return next(DatabaseClient.SELECT_PAGE_SIZE, explain, currOffset, countReturned, limit, offset, false, false, schemaRetryCount);
   }
 
   @Override

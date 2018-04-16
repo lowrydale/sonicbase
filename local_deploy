@@ -8,6 +8,12 @@ mkdir -p $HOME/sonicbase/logs
 ./build-jar
 mkdir -p $HOME/sonicbase/lib
 
+rsync -rvlLt /Users/lowryda/.m2/repository/javax/servlet/javax.servlet-api/4.0.0/javax.servlet-api-4.0.0.jar $HOME/sonicbase/lib
+rsync -rvlLt /Users/lowryda/.m2/repository/org/eclipse/jetty/jetty-continuation/8.0.0.v20110901/jetty-continuation-8.0.0.v20110901.jar $HOME/sonicbase/lib
+rsync -rvlLt /Users/lowryda/.m2/repository/org/eclipse/jetty/jetty-http/8.0.0.v20110901/jetty-http-8.0.0.v20110901.jar $HOME/sonicbase/lib
+rsync -rvlLt /Users/lowryda/.m2/repository/org/eclipse/jetty/jetty-io/8.0.0.v20110901/jetty-io-8.0.0.v20110901.jar $HOME/sonicbase/lib
+rsync -rvlLt /Users/lowryda/.m2/repository/org/eclipse/jetty/jetty-util/8.0.0.v20110901/jetty-util-8.0.0.v20110901.jar $HOME/sonicbase/lib
+rsync -rvlLt /Users/lowryda/.m2/repository/org/eclipse/jetty/jetty-server/8.0.0.v20110901/jetty-server-8.0.0.v20110901.jar $HOME/sonicbase/lib
 rsync -rvlLt /Users/lowryda/.m2/repository/com/sun/jersey/jersey-json/1.19.4/jersey-json-1.19.4.jar $HOME/sonicbase/lib
 rsync -rvlLt /Users/lowryda/.m2/repository/org/apache/kafka/kafka-clients/0.11.0.1/kafka-clients-0.11.0.1.jar $HOME/sonicbase/lib
 rsync -rvlLt /Users/lowryda/.m2/repository/com/mashape/unirest/unirest-java/1.4.9/unirest-java-1.4.9.jar $HOME/sonicbase/lib
@@ -23,13 +29,13 @@ rsync -rvlLt /Users/lowryda/.m2/repository/org/anarres/lzo/lzo-hadoop/1.0.5/lzo-
 rsync -rvlLt /Users/lowryda/.m2/repository/org/anarres/lzo/lzo-core/1.0.5/lzo-core-1.0.5.jar $HOME/sonicbase/lib
 rsync -rvlLt /Users/lowryda/.m2/repository/io/netty/netty-all/4.1.13.FInal/netty-all-4.1.13.Final.jar $HOME/sonicbase/lib
 rsync -vlLt --exclude sonicbase-*shaded.jar sonicbase/target/sonicbase-*.jar $HOME/sonicbase/lib
-#rsync -vlLt repo/* $HOME/sonicbase/lib
+#rsync -vlLt repo/* $HOMdE/sonicbase/lib
 #mvn dependency:copy-dependencies -DoutputDirectory=$HOME/sonicbase/lib
 #rsync -rvlLt repo/linux64/* $HOME/sonicbase/lib/linux64
 
 rsync -rvlLt dependencies/kafka-clients-0.11.0.1.jar $HOME/sonicbase/lib
 rsync -rvlLt db/target/classes/config/config-*.json $HOME/sonicbase/config
-rsync -rvlLt $HOME/sonicbase-config/* $HOME/sonicbase/config
+rsync -rvlLt $HOME/Dropbox/sonicbase-config/* $HOME/sonicbase/config
 rsync -rvlLt get-distribution $HOME/sonicbase/bin
 rsync -rvlLt get-df $HOME/sonicbase/bin
 rsync -rvlLt win $HOME/sonicbase/lib

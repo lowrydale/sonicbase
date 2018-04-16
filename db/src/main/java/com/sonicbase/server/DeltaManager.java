@@ -41,7 +41,7 @@ public class DeltaManager implements SnapshotManager {
 
   public DeltaManager(DatabaseServer databaseServer) {
     this.server = databaseServer;
-    this.logger = new Logger(databaseServer.getDatabaseClient());
+    this.logger = new Logger(/*databaseServer.getDatabaseClient()*/null);
   }
 
   public void shutdown() {
@@ -574,6 +574,25 @@ public class DeltaManager implements SnapshotManager {
     File snapshotRootDir = new File(getSnapshotRootDir(dbName));
     return new File(snapshotRootDir, deltaName + "/deleted/" + tableName + "/" + indexName);
   }
+
+  @Override
+  public void saveIndexSchema(String dbName, int schemaVersion, TableSchema tableSchema, IndexSchema indexSchema) {
+
+  }
+
+  @Override
+  public void saveTableSchema(String dbName, int schemaVersion, String tableName, TableSchema tableSchema) {
+
+  }
+
+  public void deleteTableSchema(String dbName, int schemaVersion, String tableName) {
+
+  }
+
+  public void deleteIndexSchema(String dbName, int schemaVersion, String table, String indexName) {
+
+  }
+
 
   public void deleteDeletedDirs() {
     File snapshotRootDir = getSnapshotReplicaDir();

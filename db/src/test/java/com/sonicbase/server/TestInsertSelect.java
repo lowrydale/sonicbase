@@ -8,7 +8,7 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import org.apache.commons.io.IOUtils;
-import org.codehaus.plexus.util.FileUtils;
+import org.apache.commons.io.FileUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -36,7 +36,7 @@ public class TestInsertSelect {
   List<Long> ids = new ArrayList<>();
   DatabaseServer[] dbServers;
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void afterClass() throws SQLException {
     conn.close();
 
@@ -44,6 +44,11 @@ public class TestInsertSelect {
       server.shutdown();
     }
     Logger.queue.clear();
+    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size() + ", class=TestInsertSelect");
+    for (DatabaseClient client : DatabaseClient.allClients) {
+      System.out.println("Stack:\n" + client.getAllocatedStack());
+    }
+
   }
 
   @BeforeClass
@@ -72,7 +77,7 @@ public class TestInsertSelect {
       final int shard = i;
 
       dbServers[shard] = new DatabaseServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null, true);
+      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
       dbServers[shard].setRole(role);
       dbServers[shard].disableLogProcessor();
       dbServers[shard].setMinSizeForRepartition(0);
@@ -86,7 +91,7 @@ public class TestInsertSelect {
     }
 
     Class.forName("com.sonicbase.jdbcdriver.Driver");
-    Class.forName("com.mysql.jdbc.Driver");
+//    Class.forName("com.mysql.jdbc.Driver");
 
     boolean sonicbase = true;
     if (!sonicbase) {
@@ -140,7 +145,7 @@ public class TestInsertSelect {
     stmt.executeUpdate();
 
     try {
-      stmt = conn.prepareStatement("drop index socialSecurityNumber on persons");
+      stmt = conn.prepareStatement("drop index persons.socialSecurityNumber");
       stmt.executeUpdate();
     }
     catch (Exception e) {
@@ -160,7 +165,7 @@ public class TestInsertSelect {
     stmt.executeUpdate();
 
     try {
-      stmt = conn.prepareStatement("drop index id on nokeysecondaryindex");
+      stmt = conn.prepareStatement("drop index nokeysecondaryindex.id");
       stmt.executeUpdate();
     }
     catch (Exception e) {

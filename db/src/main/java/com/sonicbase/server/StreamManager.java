@@ -44,7 +44,7 @@ public class StreamManager {
 
   public StreamManager(final DatabaseServer server) {
     this.server = server;
-    logger = new Logger(server.getDatabaseClient(), server.getShard(), server.getReplica());
+    logger = new Logger(null/*server.getDatabaseClient()*/, server.getShard(), server.getReplica());
 
     logger.info("initializing StreamManager");
 
@@ -87,6 +87,18 @@ public class StreamManager {
 //      }
 //    });
 //    thread.start();
+  }
+
+  public void shutdown() {
+    this.shutdown = true;
+    for (Connection conn : connections.values()) {
+      try {
+        conn.close();
+      }
+      catch (SQLException e) {
+        logger.error("Error closing stream connection", e);
+      }
+    }
   }
 
   class ProcessingRequest {
@@ -561,7 +573,7 @@ public class StreamManager {
               sequence1 = after.get("_sonicbase_sequence1").asLong();
               sequence2 = (short)after.get("_sonicbase_sequence2").asInt();
             }
-            ((StatementProxy)stmt).doUpdate(sequence0, sequence1, sequence2);
+            ((StatementProxy)stmt).doUpdate(sequence0, sequence1, sequence2, false);
           }
         }
         else if (action.equals("delete")) {
@@ -604,7 +616,7 @@ public class StreamManager {
               sequence2 = (short)json.get("_sonicbase_sequence2").asInt();
             }
 
-            ((StatementProxy)stmt).doDelete(sequence0, sequence1, sequence2);
+            ((StatementProxy)stmt).doDelete(sequence0, sequence1, sequence2, false);
           }
         }
         else {

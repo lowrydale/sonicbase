@@ -1,0 +1,50 @@
+
+<!doctype html>
+<html>
+<head>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="SonicBase Query Stats Table.">
+<style>
+  table {
+    border-spacing: 0px;
+    /*border-collapse: collapse;*/
+  }
+  td {
+    padding-top: 3px;
+    padding-bottom: 3px;
+    padding-left: 3px;
+    padding-right: 3px;
+    text-align: center;
+  }
+  .grey-row {
+    background-color: #e3ebf0
+  }
+  .header {
+    background-color: #c9d0d6;
+    border:1px solid #757a80;
+  }
+  .query {
+    text-align: left;
+  }
+</style>
+</head>
+
+<body>
+
+<table width="100%" bord="0"  style="padding-top: 2px; padding-bottom: 2px;">
+  <tr width="100%" class="header">
+    <td width="75%" class="header query">Query</td><td witdh="10%" class="header">Avg</td><td witdh="10%" class="header">90%</td><td witdh="10%" class="header">99%</td><td witdh="10%" class="header">99.9%</td><td witdh="10%" class="header">max</td>
+  </tr>
+  <tr>
+    <td class="query">select * from persons where id>0</td><td>10</td><td>100</td><td>200</td><td>300</td><td>400</td>
+  </tr>
+  <tr class="grey-row">
+    <td class="query">select * from persons where ssn=529-17-5809</td><td>10</td><td>100</td><td>200</td><td>300</td><td>400</td>
+  </tr>
+  <tr>
+    <td class="query">select * from persons where gender=?</td><td>10</td><td>100</td><td>200</td><td>300</td><td>400</td>
+  </tr>
+</table>
+
+</body>

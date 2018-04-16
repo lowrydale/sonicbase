@@ -4,7 +4,6 @@ package com.sonicbase.query.impl;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.Record;
 import com.sonicbase.jdbcdriver.ParameterHandler;
-import com.sonicbase.procedure.RecordEvaluator;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.IndexSchema;
@@ -90,17 +89,47 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
   }
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset,
-                         boolean b, boolean analyze) {
+  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset,
+                         boolean b, boolean analyze, int schemaRetryCount) {
+    List<OrderByExpressionImpl> orderByExpressions = getOrderByExpressions();
+    String orderByColumn = null;
+    if (orderByExpressions != null && orderByExpressions.size() != 0) {
+      orderByColumn = orderByExpressions.get(0).getColumnName();
+    }
     TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(getFromTable());
     IndexSchema indexSchema = null;
+    IndexSchema primaryIndex = null;
     for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndexes().entrySet()) {
       if (entry.getValue().isPrimaryKey()) {
-        indexSchema = entry.getValue();
+        primaryIndex = entry.getValue();
+      }
+      if (orderByColumn == null || getGroupByContext() != null) {
+        if (entry.getValue().isPrimaryKey()) {
+          indexSchema = entry.getValue();
+          break;
+        }
+      }
+      else {
+        //todo: check for compound fields
+        if (entry.getValue().getFields()[0].equals(orderByColumn)) {
+          indexSchema = entry.getValue();
+          break;
+        }
       }
     }
+    if (indexSchema == null) {
+      indexSchema = primaryIndex;
+    }
+//    TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(getFromTable());
+//    IndexSchema indexSchema = null;
+//    for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndexes().entrySet()) {
+//      if (entry.getValue().isPrimaryKey()) {
+//        indexSchema = entry.getValue();
+//      }
+//    }
     boolean ascending = true;
-    List<OrderByExpressionImpl> orderByExpressions = getOrderByExpressions();
+//    List<OrderByExpressionImpl> orderByExpressions = getOrderByExpressions();
+
     if (orderByExpressions != null && orderByExpressions.size() != 0) {
       OrderByExpressionImpl expression = orderByExpressions.get(0);
       String columnName = expression.getColumnName();
@@ -118,8 +147,8 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
       SelectContextImpl context = lookupIds(dbName, getClient().getCommon(), getClient(), getReplica(), count, tableSchema.getName(), indexSchema.getName(), isForceSelectOnServer(),
           op, null, getOrderByExpressions(), getNextKey(), getParms(), this, null, getNextKey(), null,
           getColumns(), indexSchema.getFields()[0], getNextShard(), getRecordCache(), usedIndex, false,
-          getViewVersion(), getCounters(), getGroupByContext(), debug, currOffset, limit, offset, isProbe(), isRestrictToThisServer(),
-          getProcedureContext());
+          getViewVersion(), getCounters(), getGroupByContext(), debug, currOffset, countReturned, limit, offset, isProbe(), isRestrictToThisServer(),
+          getProcedureContext(), schemaRetryCount);
       setNextShard(context.getNextShard());
       setNextKey(context.getNextKey());
       NextReturn ret = new NextReturn();
@@ -131,8 +160,8 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
 
 
   @Override
-  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset) {
-    return next(DatabaseClient.SELECT_PAGE_SIZE, explain, currOffset, limit, offset, false, false);
+  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
+    return next(DatabaseClient.SELECT_PAGE_SIZE, explain, currOffset, countReturned, limit, offset, false, false, schemaRetryCount);
   }
 
   @Override

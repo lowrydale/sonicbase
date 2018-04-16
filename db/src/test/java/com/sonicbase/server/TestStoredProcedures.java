@@ -11,7 +11,7 @@ import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.research.socket.NettyServer;
 import com.sonicbase.streams.LocalProducer;
 import org.apache.commons.io.IOUtils;
-import org.codehaus.plexus.util.FileUtils;
+import org.apache.commons.io.FileUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -21,7 +21,10 @@ import java.io.File;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -34,7 +37,7 @@ public class TestStoredProcedures {
   private NettyServer serverA1;
   private NettyServer serverA2;
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void afterClass() throws SQLException {
     conn.close();
     for (DatabaseServer server : dbServers) {
@@ -43,6 +46,11 @@ public class TestStoredProcedures {
     Logger.queue.clear();
     serverA1.shutdown();
     serverA2.shutdown();
+
+    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size());
+    for (DatabaseClient client : DatabaseClient.allClients) {
+      System.out.println("Stack:\n" + client.getAllocatedStack());
+    }
 
     System.out.println("shutdown complete");
   }
@@ -106,7 +114,7 @@ public class TestStoredProcedures {
     }
 
     while (true) {
-      if (serverA1.isRunning() && serverA2.isRunning()) {
+      if (serverA1.isRecovered() && serverA2.isRecovered()) {
         break;
       }
       Thread.sleep(100);
@@ -200,6 +208,10 @@ public class TestStoredProcedures {
   }
 
 
+  @Test
+  public void test() {
+
+  }
 
   @Test
   public void test1() throws SQLException {

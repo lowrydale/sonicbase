@@ -28,7 +28,7 @@ public class SchemaManager {
 
   public SchemaManager(DatabaseServer databaseServer) {
     this.server = databaseServer;
-    this.logger = new Logger(databaseServer.getDatabaseClient());
+    this.logger = new Logger(null/*databaseServer.getDatabaseClient()*/);
   }
 
   public static class AutoIncrementValue {
@@ -58,7 +58,7 @@ public class SchemaManager {
   private List<String> createIndex(String dbName, String table, String indexName, boolean isUnique, String[] fields) {
     List<String> createdIndices = new ArrayList<>();
 
-    TableSchema tableSchema = server.getCommon().getTables(dbName).get(table.toLowerCase());
+    TableSchema tableSchema = server.getCommon().getTableSchema(dbName, table.toLowerCase(), server.getDataDir());
     if (tableSchema == null) {
       throw new DatabaseException("Undefined table: name=" + table);
     }
@@ -71,6 +71,9 @@ public class SchemaManager {
 
     indexName = "_" + fields.length + "_" + indexName;
 
+    if (tableSchema.getIndexes().get(indexName) != null) {
+      throw new DatabaseException("Index already exists: tableName=" + tableSchema.getName() + ", indexName=" + indexName);
+    }
     createdIndices.add(indexName);
 
     TableSchema.Partition[] partitions = new TableSchema.Partition[server.getShardCount()];
@@ -89,7 +92,10 @@ public class SchemaManager {
     }
     highIndexId++;
 
-    tableSchema.addIndex(indexName, isUnique, fields, partitions, highIndexId);
+    IndexSchema indexSchema = tableSchema.addIndex(indexName, isUnique, fields, partitions, highIndexId);
+
+    SnapshotManager snapshotManager = server.getSnapshotManager();
+    snapshotManager.saveIndexSchema(dbName, server.getCommon().getSchemaVersion() + 1, tableSchema, indexSchema);
 
     server.getCommon().updateTable(server.getClient(), dbName, server.getDataDir(), tableSchema);
 
@@ -172,22 +178,25 @@ public class SchemaManager {
       return null;
     }
 
-    logger.info("Create database: shard=" + server.getShard() + ", replica=" + server.getReplica() + ", name=" + dbName);
-    File dir = null;
-    if (DatabaseServer.USE_SNAPSHOT_MGR_OLD) {
-      dir = new File(server.getDataDir(), "snapshot/" + server.getShard() + "/" + server.getReplica() + "/" + dbName);
-    }
-    else {
-      dir = new File(server.getDataDir(), "delta/" + server.getShard() + "/" + server.getReplica() + "/" + dbName);
-    }
-    if (!dir.exists() && !dir.mkdirs()) {
-      throw new DatabaseException("Error creating database directory: dir=" + dir.getAbsolutePath());
-    }
+    synchronized (this) {
+      if (server.getCommon().getDatabases().get(dbName) == null) {
+        logger.info("Create database: shard=" + server.getShard() + ", replica=" + server.getReplica() + ", name=" + dbName);
+        File dir = null;
+        if (DatabaseServer.USE_SNAPSHOT_MGR_OLD) {
+          dir = new File(server.getDataDir(), "snapshot/" + server.getShard() + "/" + server.getReplica() + "/" + dbName);
+        }
+        else {
+          dir = new File(server.getDataDir(), "delta/" + server.getShard() + "/" + server.getReplica() + "/" + dbName);
+        }
+        if (!dir.exists() && !dir.mkdirs()) {
+          throw new DatabaseException("Error creating database directory: dir=" + dir.getAbsolutePath());
+        }
 
-    server.getIndices().put(dbName, new Indices());
-    server.getCommon().addDatabase(dbName);
-    server.getCommon().saveSchema(server.getClient(), server.getDataDir());
-
+        server.getIndices().put(dbName, new Indices());
+        server.getCommon().addDatabase(dbName);
+        server.getCommon().saveSchema(server.getClient(), server.getDataDir());
+      }
+    }
     return null;
   }
 
@@ -206,7 +215,9 @@ public class SchemaManager {
       server.getCommon().getSchemaWriteLock(dbName).lock();
       try {
         server.getCommon().dropTable(server.getClient(), dbName, tableName, server.getDataDir());
-        server.getIndices().get(dbName).getIndices().remove(tableName);
+        server.removeIndices(dbName, tableName);
+        SnapshotManager snapshotManager = server.getSnapshotManager();
+        snapshotManager.deleteTableSchema(dbName, server.getCommon().getSchemaVersion(), tableName);
       }
       finally {
         server.getCommon().getSchemaWriteLock(dbName).unlock();
@@ -246,15 +257,30 @@ public class SchemaManager {
       byte[] bytes = cobj.getByteArray(ComObject.Tag.schemaBytes);
       DatabaseCommon tmpCommon = new DatabaseCommon();
       tmpCommon.deserializeSchema(bytes);
-      if (tmpCommon.getSchemaVersion() > server.getCommon().getSchemaVersion()) {
-        server.getCommon().deserializeSchema(bytes);
-        server.getCommon().saveSchema(server.getClient(), server.getDataDir());
-      }
+
       String tableName = cobj.getString(ComObject.Tag.tableName);
-      TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
-      Map<String, IndexSchema> indices = tableSchema.getIndexes();
-      for (Map.Entry<String, IndexSchema> index : indices.entrySet()) {
-        doCreateIndex(dbName, tableSchema, index.getKey(), index.getValue().getFields());
+      TableSchema tableSchema = tmpCommon.getTableSchema(dbName, tableName, server.getDataDir());
+
+      synchronized (this) {
+        if (server.getCommon().getTableSchema(dbName, tableName, server.getDataDir()) == null) {
+          server.getCommon().getTables(dbName).put(tableName, tableSchema);
+          server.getCommon().getTablesById(dbName).put(tableSchema.getTableId(), tableSchema);
+        }
+        SnapshotManager snapshotManager = server.getSnapshotManager();
+        snapshotManager.saveTableSchema(dbName, tmpCommon.getSchemaVersion(), tableName, tableSchema);
+
+        for (IndexSchema indexSchema : tableSchema.getIndexes().values()) {
+          if (indexSchema.isPrimaryKey()) {
+            snapshotManager.saveIndexSchema(dbName, tmpCommon.getSchemaVersion(), tableSchema, indexSchema);
+          }
+        }
+
+        Map<String, IndexSchema> indices = tableSchema.getIndexes();
+        for (Map.Entry<String, IndexSchema> index : indices.entrySet()) {
+          doCreateIndex(dbName, tableSchema, index.getKey(), index.getValue().getFields());
+        }
+        server.getCommon().setSchemaVersion(tmpCommon.getSchemaVersion());
+        server.getCommon().saveSchema(server.getClient(), server.getDataDir());
       }
     }
     catch (Exception e) {
@@ -322,7 +348,7 @@ public class SchemaManager {
             schema.setFields(actualFields);
             schema.setName(tableName.toLowerCase());
             schema.setPrimaryKey(primaryKey);
-            TableSchema existingSchema = server.getCommon().getTables(dbName).get(tableName);
+            TableSchema existingSchema = server.getCommon().getTableSchema(dbName, tableName, server.getDataDir());
             if (existingSchema != null) {
               schema.setIndices(existingSchema.getIndices());
             }
@@ -336,6 +362,9 @@ public class SchemaManager {
             schema.setTableId(highTableId);
 
             server.getCommon().addTable(server.getClient(), dbName, server.getDataDir(), schema);
+
+            SnapshotManager snapshotManager = server.getSnapshotManager();
+            snapshotManager.saveTableSchema(dbName, server.getCommon().getSchemaVersion() + 1, tableName, schema);
 
             String[] primaryKeyFields = primaryKey.toArray(new String[primaryKey.size()]);
             createIndex(dbName, tableName.toLowerCase(), "_primarykey", true, primaryKeyFields);
@@ -375,7 +404,43 @@ public class SchemaManager {
     }
   }
 
-  public ComObject dropColumn(ComObject cobj) {
+
+  public ComObject dropColumnSlave(ComObject cobj, boolean replayedCommand) {
+    if (server.getShard() == 0 &&
+        server.getCommon().getServersConfig().getShards()[0].getMasterReplica() == server.getReplica()) {
+      return null;
+    }
+
+    String dbName = cobj.getString(ComObject.Tag.dbName);
+    server.getCommon().getSchemaWriteLock(dbName).lock();
+    try {
+      byte[] bytes = cobj.getByteArray(ComObject.Tag.schemaBytes);
+      DatabaseCommon tmpCommon = new DatabaseCommon();
+      tmpCommon.deserializeSchema(bytes);
+
+      String tableName = cobj.getString(ComObject.Tag.tableName);
+      TableSchema tableSchema = tmpCommon.getTableSchema(dbName, tableName, server.getDataDir());
+
+      synchronized (this) {
+        SnapshotManager snapshotManager = server.getSnapshotManager();
+        server.getCommon().getTables(dbName).put(tableName, tableSchema);
+        server.getCommon().getTablesById(dbName).put(tableSchema.getTableId(), tableSchema);
+        snapshotManager.saveTableSchema(dbName, tmpCommon.getSchemaVersion(), tableName, tableSchema);
+
+        server.getCommon().setSchemaVersion(tmpCommon.getSchemaVersion());
+        server.getCommon().saveSchema(server.getClient(), server.getDataDir());
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+    finally {
+      server.getCommon().getSchemaWriteLock(dbName).unlock();
+    }
+    return null;
+  }
+
+  public ComObject dropColumn(ComObject cobj, boolean replayedCommand) {
 
     try {
       short serializationVersionNumber = cobj.getShort(ComObject.Tag.serializationVersion);
@@ -383,19 +448,45 @@ public class SchemaManager {
       String tableName = cobj.getString(ComObject.Tag.tableName).toLowerCase();
       String columnName = cobj.getString(ComObject.Tag.columnName).toLowerCase();
 
-      TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
-      tableSchema.saveFields(server.getCommon().getSchemaVersion());
+      synchronized (this) {
+        TableSchema tableSchema = server.getCommon().getTableSchema(dbName, tableName, server.getDataDir());
+        tableSchema.saveFields(server.getCommon().getSchemaVersion());
 
-      for (FieldSchema fieldSchema : tableSchema.getFields()) {
-        if (fieldSchema.getName().equals(columnName)) {
-          tableSchema.getFields().remove(fieldSchema);
-          break;
+        for (IndexSchema indexSchema : tableSchema.getIndices().values()) {
+          for (String fieldName : indexSchema.getFields()) {
+            if (columnName.equals(fieldName)) {
+              throw new DatabaseException("Field being used by index, cannot drop: field=" + columnName + ", index=" + indexSchema.getName());
+            }
+          }
         }
+
+        for (FieldSchema fieldSchema : tableSchema.getFields()) {
+          if (fieldSchema.getName().equals(columnName)) {
+            tableSchema.getFields().remove(fieldSchema);
+            tableSchema.markChangesComplete();
+            break;
+          }
+        }
+
+        SnapshotManager snapshotManager = server.getSnapshotManager();
+        snapshotManager.saveTableSchema(dbName, server.getCommon().getSchemaVersion() + 1, tableName, tableSchema);
+
+        server.getCommon().saveSchema(server.getClient(), server.getDataDir());
       }
 
-      server.getCommon().saveSchema(server.getClient(), server.getDataDir());
+      if (!replayedCommand) {
+        Random rand = new Random(System.currentTimeMillis());
+        for (int i = 0; i < server.getShardCount(); i++) {
+          ComObject slaveObj = new ComObject();
 
-      server.pushSchema();
+          slaveObj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(DatabaseClient.SERIALIZATION_VERSION));
+          slaveObj.put(ComObject.Tag.tableName, tableName);
+          slaveObj.put(ComObject.Tag.dbName, dbName);
+          slaveObj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
+          slaveObj.put(ComObject.Tag.method, "dropColumnSlave");
+          server.getDatabaseClient().send(null, i, rand.nextLong(), slaveObj, DatabaseClient.Replica.def);
+        }
+      }
 
       ComObject retObj = new ComObject();
       retObj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(serializationVersionNumber));
@@ -407,7 +498,42 @@ public class SchemaManager {
     }
   }
 
-  public ComObject addColumn(ComObject cobj) {
+  public ComObject addColumnSlave(ComObject cobj, boolean replayedCommand) {
+    if (server.getShard() == 0 &&
+        server.getCommon().getServersConfig().getShards()[0].getMasterReplica() == server.getReplica()) {
+      return null;
+    }
+
+    String dbName = cobj.getString(ComObject.Tag.dbName);
+    server.getCommon().getSchemaWriteLock(dbName).lock();
+    try {
+      byte[] bytes = cobj.getByteArray(ComObject.Tag.schemaBytes);
+      DatabaseCommon tmpCommon = new DatabaseCommon();
+      tmpCommon.deserializeSchema(bytes);
+
+      String tableName = cobj.getString(ComObject.Tag.tableName);
+      TableSchema tableSchema = tmpCommon.getTableSchema(dbName, tableName, server.getDataDir());
+
+      synchronized (this) {
+        SnapshotManager snapshotManager = server.getSnapshotManager();
+        server.getCommon().getTables(dbName).put(tableName, tableSchema);
+        server.getCommon().getTablesById(dbName).put(tableSchema.getTableId(), tableSchema);
+        snapshotManager.saveTableSchema(dbName, tmpCommon.getSchemaVersion(), tableName, tableSchema);
+
+        server.getCommon().setSchemaVersion(tmpCommon.getSchemaVersion());
+        server.getCommon().saveSchema(server.getClient(), server.getDataDir());
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+    finally {
+      server.getCommon().getSchemaWriteLock(dbName).unlock();
+    }
+    return null;
+  }
+
+  public ComObject addColumn(ComObject cobj, boolean replayedCommand) {
 
     try {
       short serializationVersionNumber = cobj.getShort(ComObject.Tag.serializationVersion);
@@ -416,18 +542,35 @@ public class SchemaManager {
       String columnName = cobj.getString(ComObject.Tag.columnName).toLowerCase();
       String dataType = cobj.getString(ComObject.Tag.dataType);
 
-      TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
-      tableSchema.saveFields(server.getCommon().getSchemaVersion());
+      synchronized (this) {
+        TableSchema tableSchema = server.getCommon().getTableSchema(dbName, tableName, server.getDataDir());
+        tableSchema.saveFields(server.getCommon().getSchemaVersion());
 
-      FieldSchema fieldSchema = new FieldSchema();
-      fieldSchema.setType(DataType.Type.valueOf(dataType));
-      fieldSchema.setName(columnName);
-      tableSchema.addField(fieldSchema);
-      tableSchema.markChangesComplete();
+        FieldSchema fieldSchema = new FieldSchema();
+        fieldSchema.setType(DataType.Type.valueOf(dataType));
+        fieldSchema.setName(columnName);
+        tableSchema.addField(fieldSchema);
+        tableSchema.markChangesComplete();
 
-      server.getCommon().saveSchema(server.getClient(), server.getDataDir());
+        SnapshotManager snapshotManager = server.getSnapshotManager();
+        snapshotManager.saveTableSchema(dbName, server.getCommon().getSchemaVersion() + 1, tableName, tableSchema);
 
-      server.pushSchema();
+        server.getCommon().saveSchema(server.getClient(), server.getDataDir());
+      }
+
+      if (!replayedCommand) {
+        Random rand = new Random(System.currentTimeMillis());
+        for (int i = 0; i < server.getShardCount(); i++) {
+          ComObject slaveObj = new ComObject();
+
+          slaveObj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(DatabaseClient.SERIALIZATION_VERSION));
+          slaveObj.put(ComObject.Tag.tableName, tableName);
+          slaveObj.put(ComObject.Tag.dbName, dbName);
+          slaveObj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
+          slaveObj.put(ComObject.Tag.method, "addColumnSlave");
+          server.getDatabaseClient().send(null, i, rand.nextLong(), slaveObj, DatabaseClient.Replica.def);
+        }
+      }
 
       ComObject retObj = new ComObject();
       retObj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(serializationVersionNumber));
@@ -449,25 +592,36 @@ public class SchemaManager {
       return null;
     }
 
-    DatabaseCommon tmpCommon = new DatabaseCommon();
-    tmpCommon.deserializeSchema(cobj.getByteArray(ComObject.Tag.schemaBytes));
-    if (tmpCommon.getSchemaVersion() > server.getCommon().getSchemaVersion()) {
-      server.getCommon().deserializeSchema(cobj.getByteArray(ComObject.Tag.schemaBytes));
-      server.getCommon().saveSchema(server.getClient(), server.getDataDir());
-    }
+    synchronized (this) {
+      DatabaseCommon tmpCommon = new DatabaseCommon();
+      tmpCommon.deserializeSchema(cobj.getByteArray(ComObject.Tag.schemaBytes));
+//      if (tmpCommon.getSchemaVersion() > server.getCommon().getSchemaVersion()) {
+//        server.getCommon().deserializeSchema(cobj.getByteArray(ComObject.Tag.schemaBytes));
+//        server.getCommon().saveSchema(server.getClient(), server.getDataDir());
+//      }
 
-    String tableName = cobj.getString(ComObject.Tag.tableName);
-    TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
-    ComArray array = cobj.getArray(ComObject.Tag.indices);
-    for (int i = 0; i < array.getArray().size(); i++) {
-      String indexName = (String)array.getArray().get(i);
-      IndexSchema indexSchema = tableSchema.getIndexes().get(indexName);
+      String tableName = cobj.getString(ComObject.Tag.tableName);
+      TableSchema tableSchema = tmpCommon.getTableSchema(dbName, tableName, server.getDataDir());
+      ComArray array = cobj.getArray(ComObject.Tag.indices);
+      for (int i = 0; i < array.getArray().size(); i++) {
+        String indexName = (String) array.getArray().get(i);
+        IndexSchema indexSchema = tableSchema.getIndexes().get(indexName);
 
-      if (!server.getIndices(dbName).getIndices().containsKey(indexName)) {
-        doCreateIndex(dbName, tableSchema, indexName, indexSchema.getFields());
+        if (!server.getIndices(dbName).getIndices().containsKey(indexName)) {
+          doCreateIndex(dbName, tableSchema, indexName, indexSchema.getFields());
+        }
+
+        server.getCommon().getTables(dbName).get(tableName).getIndexes().put(indexName, indexSchema);
+        server.getCommon().getTables(dbName).get(tableName).getIndexesById().put(indexSchema.getIndexId(), indexSchema);
+
+        SnapshotManager snapshotManager = server.getSnapshotManager();
+        snapshotManager.saveIndexSchema(dbName, server.getCommon().getSchemaVersion(), tableSchema, indexSchema);
       }
+
+      server.getCommon().saveSchema(server.getClient(), server.getDataDir());
+
+      return null;
     }
-    return null;
   }
 
   public ComObject createIndex(ComObject cobj, boolean replayedCommand) {
@@ -493,7 +647,7 @@ public class SchemaManager {
         if (replayedCommand) {
           logger.info("replayedCommand: createIndex, table=" + table.get() + ", index=" + indexName);
           for (String field : fields) {
-            Integer offset = server.getCommon().getTables(dbName).get(table.get()).getFieldOffset(field);
+            Integer offset = server.getCommon().getTableSchema(dbName, table.get(), server.getDataDir()).getFieldOffset(field);
             if (offset == null) {
               throw new DatabaseException("Invalid field for index: indexName=" + indexName + ", field=" + field);
             }
@@ -501,22 +655,23 @@ public class SchemaManager {
 
           String fullIndexName = "_" + fields.length + "_" + indexName;
 
-          if (server.getCommon().getTables(dbName).get(table.get()).getIndexes().containsKey(fullIndexName.toLowerCase())) {
+          if (server.getCommon().getTableSchema(dbName, table.get(), server.getDataDir()).getIndexes().containsKey(fullIndexName.toLowerCase())) {
             ComObject retObj = new ComObject();
             retObj.put(ComObject.Tag.schemaBytes, server.getCommon().serializeSchema(cobj.getShort(ComObject.Tag.serializationVersion)));
             return retObj;
           }
         }
 
-        createdIndices = createIndex(dbName, table.get(), indexName, isUnique, fields);
-        server.getCommon().saveSchema(server.getClient(), server.getDataDir());
+        synchronized (this) {
+          createdIndices = createIndex(dbName, table.get(), indexName, isUnique, fields);
+          server.getCommon().saveSchema(server.getClient(), server.getDataDir());
+        }
       }
       finally {
         server.getCommon().getSchemaWriteLock(dbName).unlock();
       }
 
       if (!replayedCommand && masterSlave.equals("master")) {
-
         cobj = new ComObject();
         cobj.put(ComObject.Tag.dbName, dbName);
         cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
@@ -536,7 +691,7 @@ public class SchemaManager {
 
       if (!replayedCommand && createdIndices != null) {
         String primaryIndexName = null;
-        TableSchema tableSchema = server.getCommon().getTables(dbName).get(table.get());
+        TableSchema tableSchema = server.getCommon().getTableSchema(dbName, table.get(), server.getDataDir());
         for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndexes().entrySet()) {
           if (entry.getValue().isPrimaryKey()) {
             primaryIndexName = entry.getKey();
@@ -645,21 +800,28 @@ public class SchemaManager {
         String indexName = cobj.getString(ComObject.Tag.indexName);
 
         List<IndexSchema> toDrop = new ArrayList<>();
-        for (Map.Entry<String, IndexSchema> entry : server.getCommon().getTables(dbName).get(table).getIndices().entrySet()) {
-          String name = entry.getValue().getName();
-          int pos = name.indexOf("_", 1);
-          String outerName = name.substring(pos + 1);
-          if (outerName.equals(indexName)) {
-            toDrop.add(entry.getValue());
+        synchronized (this) {
+          for (Map.Entry<String, IndexSchema> entry : server.getCommon().getTableSchema(dbName, table, server.getDataDir()).getIndices().entrySet()) {
+            String name = entry.getValue().getName();
+            int pos = name.indexOf("_", 1);
+            String outerName = name.substring(pos + 1);
+            if (outerName.equals(indexName)) {
+              toDrop.add(entry.getValue());
+              if (entry.getValue().isPrimaryKey()) {
+                throw new DatabaseException("Cannot drop primary key index: table=" + table + ", index=" + indexName);
+              }
+            }
           }
-        }
 
-        for (IndexSchema indexSchema : toDrop) {
-          server.getIndices().get(dbName).getIndices().get(table).remove(indexSchema.getName());
-          server.getCommon().getTables(dbName).get(table).getIndices().remove(indexSchema.getName());
-        }
+          for (IndexSchema indexSchema : toDrop) {
+            server.getIndices().get(dbName).getIndices().get(table).remove(indexSchema.getName());
+            server.getCommon().getTableSchema(dbName, table, server.getDataDir()).getIndices().remove(indexSchema.getName());
+            SnapshotManager snapshotManager = server.getSnapshotManager();
+            snapshotManager.deleteIndexSchema(dbName, server.getCommon().getSchemaVersion(), table, indexSchema.getName());
+          }
 
-        server.getCommon().saveSchema(server.getClient(), server.getDataDir());
+          server.getCommon().saveSchema(server.getClient(), server.getDataDir());
+        }
 
         cobj = new ComObject();
         cobj.put(ComObject.Tag.dbName, dbName);

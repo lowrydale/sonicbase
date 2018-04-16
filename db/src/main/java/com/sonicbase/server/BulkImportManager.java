@@ -31,7 +31,7 @@ public class BulkImportManager {
 
   public BulkImportManager(final DatabaseServer server) {
     this.server = server;
-    logger = new Logger(server.getDatabaseClient(), server.getShard(), server.getReplica());
+    logger = new Logger(/*server.getDatabaseClient()*/ null, server.getShard(), server.getReplica());
 
 //    if (server.getShard() == 0) {
 //      Thread thread = new Thread(new Runnable() {

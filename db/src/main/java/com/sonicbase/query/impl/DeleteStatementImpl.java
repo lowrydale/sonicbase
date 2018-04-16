@@ -5,7 +5,6 @@ import com.sonicbase.common.ComObject;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.Record;
 import com.sonicbase.common.SchemaOutOfSyncException;
-import com.sonicbase.procedure.RecordEvaluator;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
@@ -51,8 +50,8 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
   }
 
   @Override
-  public Object execute(String dbName, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
-                        boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) throws DatabaseException {
+  public Object execute(String dbName, String sqlToUse, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
+                        boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) throws DatabaseException {
     while (true) {
       try {
         expression.setViewVersion(client.getCommon().getSchemaVersion());
@@ -75,7 +74,7 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
         Random rand = new Random(System.currentTimeMillis());
         int countDeleted = 0;
         while (true) {
-          ExpressionImpl.NextReturn ids = expression.next(explain, new AtomicLong(), null, null);
+          ExpressionImpl.NextReturn ids = expression .next(explain, new AtomicLong(), new AtomicLong(), null, null, schemaRetryCount);
           if (ids == null || ids.getIds() == null) {
             return countDeleted;
           }
@@ -99,7 +98,7 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
             if (record == null) {
               boolean forceSelectOnServer = false;
               record = expression.doReadRecord(dbName, client, forceSelectOnServer, recordCache, entry[0], tableName,
-                  null, null, null, client.getCommon().getSchemaVersion(), false, restrictToThisServer, procedureContext);
+                  null, null, null, client.getCommon().getSchemaVersion(), false, restrictToThisServer, procedureContext, schemaRetryCount);
             }
             if (record != null) {
               List<Integer> selectedShards = DatabaseClient.findOrderedPartitionForRecord(true, false, fieldOffsets, client.getCommon(), tableSchema,
@@ -111,7 +110,9 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
               ComObject cobj = new ComObject();
               cobj.put(ComObject.Tag.serializationVersion, DatabaseClient.SERIALIZATION_VERSION);
               cobj.put(ComObject.Tag.keyBytes, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), entry[0]));
-              cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+              if (schemaRetryCount < 2) {
+                cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+              }
               cobj.put(ComObject.Tag.dbName, dbName);
               cobj.put(ComObject.Tag.tableName, tableName);
               cobj.put(ComObject.Tag.indexName, indexSchema.getName());
@@ -128,7 +129,9 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
 
               cobj = new ComObject();
               cobj.put(ComObject.Tag.dbName, dbName);
-              cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+              if (schemaRetryCount < 2) {
+                cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+              }
               cobj.put(ComObject.Tag.primaryKeyBytes, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), entry[0]));
               cobj.put(ComObject.Tag.tableName, tableName);
               cobj.put(ComObject.Tag.isExcpliciteTrans, client.isExplicitTrans());

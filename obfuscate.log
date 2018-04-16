@@ -48,18 +48,18 @@ to act on classes which have been obfuscated.
 <!-- WARNING: Unresolved external dependency: org.testng.annotations.Test not found! -->
 <!-- WARNING: Unresolved external dependency: org.testng.annotations.Test not found! -->
 <!-- WARNING: Unresolved external dependency: org.testng.annotations.Test not found! -->
-<!-- WARNING: No mapping found: org.codehaus.plexus.util.FileUtils -->
+<!-- WARNING: No mapping found: org.apache.commons.io.FileUtils -->
 <!-- WARNING: No mapping found: org.testng.Assert -->
 <!-- WARNING: No mapping found: org.testng.Assert -->
 <!-- WARNING: No mapping found: org.testng.Assert -->
-<!-- WARNING: Unresolved external dependency: org.codehaus.plexus.util.FileUtils not found! -->
+<!-- WARNING: Unresolved external dependency: org.apache.commons.io.FileUtils not found! -->
 <!-- WARNING: Unresolved external dependency: org.testng.Assert not found! -->
 <!-- WARNING: Unresolved external dependency: org.testng.annotations.Test not found! -->
 <!-- WARNING: Unresolved external dependency: org.testng.annotations.Test not found! -->
-<!-- WARNING: No mapping found: org.codehaus.plexus.util.FileUtils -->
+<!-- WARNING: No mapping found: org.apache.commons.io.FileUtils -->
 <!-- WARNING: No mapping found: org.testng.Assert -->
 <!-- WARNING: No mapping found: org.testng.Assert -->
-<!-- WARNING: Unresolved external dependency: org.codehaus.plexus.util.FileUtils not found! -->
+<!-- WARNING: Unresolved external dependency: org.apache.commons.io.FileUtils not found! -->
 <!-- WARNING: Unresolved external dependency: org.testng.Assert not found! -->
 <!-- WARNING: No mapping found: org.testng.Assert -->
 <!-- WARNING: Unresolved external dependency: org.testng.Assert not found! -->
@@ -74,13 +74,13 @@ to act on classes which have been obfuscated.
 <!-- WARNING: Unresolved external dependency: org.testng.annotations.Test not found! -->
 <!-- WARNING: Unresolved external dependency: org.testng.annotations.Test not found! -->
 <!-- WARNING: Unresolved external dependency: org.testng.annotations.Test not found! -->
-<!-- WARNING: No mapping found: org.codehaus.plexus.util.FileUtils -->
+<!-- WARNING: No mapping found: org.apache.commons.io.FileUtils -->
 <!-- WARNING: No mapping found: org.testng.Assert -->
 <!-- WARNING: No mapping found: org.testng.Assert -->
 <!-- WARNING: No mapping found: org.testng.Assert -->
 <!-- WARNING: No mapping found: org.testng.Assert -->
 <!-- WARNING: No mapping found: org.testng.Assert -->
-<!-- WARNING: Unresolved external dependency: org.codehaus.plexus.util.FileUtils not found! -->
+<!-- WARNING: Unresolved external dependency: org.apache.commons.io.FileUtils not found! -->
 <!-- WARNING: Unresolved external dependency: org.testng.Assert not found! -->
 <!-- WARNING: Unresolved external dependency: net.sf.jsqlparser.statement.Statement not found! -->
 <!-- WARNING: Unresolved external dependency: net.sf.jsqlparser.statement.Statement not found! -->

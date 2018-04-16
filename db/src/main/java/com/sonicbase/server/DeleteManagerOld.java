@@ -28,10 +28,11 @@ public class DeleteManagerOld implements DeleteManager {
   private ThreadPoolExecutor executor;
   private Thread mainThread;
   private ThreadPoolExecutor freeExecutor;
+  private boolean shutdown;
 
   public DeleteManagerOld(DatabaseServer databaseServer) {
     this.databaseServer = databaseServer;
-    logger = new Logger(databaseServer.getDatabaseClient());
+    logger = new Logger(/*databaseServer.getDatabaseClient()*/ null);
     this.executor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors() * 2, "SonicBase DeleteManagerOld Thread");
     this.freeExecutor = ThreadUtil.createExecutor(4, "SonicBase DeleteManagerOld FreeExecutor Thread");
   }
@@ -64,26 +65,17 @@ public class DeleteManagerOld implements DeleteManager {
 
   private AtomicReference<LogManager.ByteCounterStream> counterStream = new AtomicReference<>();
 
-  public void doDeletes(boolean ignoreVersion) {
+  public void doDeletes(boolean ignoreVersion, File file) {
     try {
       int countDeleted = 0;
       synchronized (this) {
         File dir = getReplicaRoot();
         if (dir.exists()) {
           if (true) {
-            File[] files = dir.listFiles();
-//            if (files == null || files.length == 0) {
-//              break;
-//            }
-            if (files != null && files.length != 0) {
-              Arrays.sort(files, new Comparator<File>() {
-                @Override
-                public int compare(File o1, File o2) {
-                  return o1.getAbsolutePath().compareTo(o2.getAbsolutePath());
-                }
-              });
+            try {
+              logger.info("DeleteManager deleting file - begin: file=" + file.getAbsolutePath());
               List<Future> futures = new ArrayList<>();
-              counterStream.set(new LogManager.ByteCounterStream(new FileInputStream(files[0])));
+              counterStream.set(new LogManager.ByteCounterStream(new FileInputStream(file)));
               try (DataInputStream in = new DataInputStream(new BufferedInputStream(counterStream.get()))) {
                 short serializationVersion = (short) Varint.readSignedVarLong(in);
                 String dbName = in.readUTF();
@@ -105,7 +97,7 @@ public class DeleteManagerOld implements DeleteManager {
                 final Index index = databaseServer.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
                 List<Object[]> batch = new ArrayList<>();
                 int errorsInARow = 0;
-                while (true) {
+                while (!shutdown) {
                   Object[] key = null;
                   try {
                     key = DatabaseCommon.deserializeKey(tableSchema, in);
@@ -168,7 +160,9 @@ public class DeleteManagerOld implements DeleteManager {
                 final List<Object> toFreeBatch = new ArrayList<>();
                 for (Object[] currKey : batch) {
 
-
+                  if (shutdown) {
+                    break;
+                  }
                   //                List<Integer> selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false,
                   //                    fieldOffsets, databaseServer.getCommon(), tableSchema,
                   //                    indexName, null, BinaryExpression.Operator.equal, null, currKey, null);
@@ -189,23 +183,25 @@ public class DeleteManagerOld implements DeleteManager {
                   //                else {
                   synchronized (index.getMutex(currKey)) {
                     Object value = index.get(currKey);
-                    byte[][] content = databaseServer.fromUnsafeToRecords(value);
-                    if (content != null) {
-                      if (indexSchema.isPrimaryKey()) {
-                        if ((Record.DB_VIEW_FLAG_DELETING & Record.getDbViewFlags(content[0])) != 0) {
-                          Object toFree = index.remove(currKey);
-                          if (toFree != null) {
-                            //toFreeBatch.add(toFree);
-                            databaseServer.freeUnsafeIds(toFree);
+                    if (value != null) {
+                      byte[][] content = databaseServer.fromUnsafeToRecords(value);
+                      if (content != null) {
+                        if (indexSchema.isPrimaryKey()) {
+                          if ((Record.DB_VIEW_FLAG_DELETING & Record.getDbViewFlags(content[0])) != 0) {
+                            Object toFree = index.remove(currKey);
+                            if (toFree != null) {
+                              //toFreeBatch.add(toFree);
+                              databaseServer.freeUnsafeIds(toFree);
+                            }
                           }
                         }
-                      }
-                      else {
-                        if ((Record.DB_VIEW_FLAG_DELETING & KeyRecord.getDbViewFlags(content[0])) != 0) {
-                          Object toFree = index.remove(currKey);
-                          if (toFree != null) {
-                            //toFreeBatch.add(toFree);
-                            databaseServer.freeUnsafeIds(toFree);
+                        else {
+                          if ((Record.DB_VIEW_FLAG_DELETING & KeyRecord.getDbViewFlags(content[0])) != 0) {
+                            Object toFree = index.remove(currKey);
+                            if (toFree != null) {
+                              //toFreeBatch.add(toFree);
+                              databaseServer.freeUnsafeIds(toFree);
+                            }
                           }
                         }
                       }
@@ -224,7 +220,11 @@ public class DeleteManagerOld implements DeleteManager {
               }
               bytesRead.addAndGet(counterStream.get().getCount());
               counterStream.set(null);
-              files[0].delete();
+              file.delete();
+              logger.info("DeleteManager deleting file - end: file=" + file.getAbsolutePath());
+            }
+            catch (Exception e) {
+              logger.error("Error performing deletes", e);
             }
           }
         }
@@ -272,20 +272,36 @@ public class DeleteManagerOld implements DeleteManager {
     mainThread = new Thread(new Runnable() {
       @Override
       public void run() {
-        while (true) {
+        while (!shutdown) {
           try {
-            Thread.sleep(2_000);
-            doDeletes(false);
-          }
-          catch (InterruptedException e) {
-            break;
+            File dir = getReplicaRoot();
+            if (dir.exists()) {
+
+              try {
+                Thread.sleep(2_000);
+              }
+              catch (InterruptedException e) {
+                break;
+              }
+              File[] files = dir.listFiles();
+              if (files != null && files.length != 0) {
+                Arrays.sort(files, new Comparator<File>() {
+                  @Override
+                  public int compare(File o1, File o2) {
+                    return o1.getAbsolutePath().compareTo(o2.getAbsolutePath());
+                  }
+                });
+
+                doDeletes(false, files[0]);
+              }
+            }
           }
           catch (Exception e) {
             logger.error("Error procesing deletes file", e);
           }
         }
       }
-    });
+    }, "SonicBase Deletion Thread");
     mainThread.start();
   }
 
@@ -368,6 +384,7 @@ public class DeleteManagerOld implements DeleteManager {
 
   @Override
   public void shutdown() {
+    this.shutdown = true;
     if (mainThread != null) {
       mainThread.interrupt();
       try {
@@ -465,19 +482,39 @@ public class DeleteManagerOld implements DeleteManager {
     bytesRead.set(0);
     isForcingDeletes.set(true);
     try {
-      if (dir.exists()) {
-        File[] files = dir.listFiles();
-        for (File file : files) {
-          totalBytes += file.length();
-        }
-        while (true) {
+      ThreadPoolExecutor executor = new ThreadPoolExecutor(8, 8,
+          10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1_000), new ThreadPoolExecutor.CallerRunsPolicy());
+      try {
+        if (dir.exists()) {
+          File[] files = dir.listFiles();
+          for (File file : files) {
+            totalBytes += file.length();
+          }
           files = dir.listFiles();
           if (files == null || files.length == 0) {
             return;
           }
-          doDeletes(true);
+          List<Future> futures = new ArrayList<>();
+          for (final File file : files) {
+            futures.add(executor.submit(new Callable(){
+              @Override
+              public Object call() throws Exception {
+                doDeletes(true, file);
+                return null;
+              }
+            }));
+          }
+          for (Future future : futures) {
+            future.get();
+          }
         }
       }
+      finally {
+        executor.shutdownNow();
+      }
+    }
+    catch (Exception e) {
+      logger.error("Error deleting records", e);
     }
     finally {
       isForcingDeletes.set(false);

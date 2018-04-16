@@ -34,7 +34,7 @@ public class DeleteManagerImpl implements DeleteManager {
 
   public DeleteManagerImpl(DatabaseServer databaseServer) {
     this.databaseServer = databaseServer;
-    logger = new Logger(databaseServer.getDatabaseClient());
+    logger = new Logger(/*databaseServer.getDatabaseClient()*/null);
     this.executor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors() * 2, "SonicBase DeleteManagerImpl Thread");
     this.freeExecutor = ThreadUtil.createExecutor(4, "SonicBase DeleteManagerImpl FreeExecutor Thread");
     this.deltaLogManager = new LogManager(databaseServer, new File(getDeltaRoot(), "log"));

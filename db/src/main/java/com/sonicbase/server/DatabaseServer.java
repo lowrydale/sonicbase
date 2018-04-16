@@ -59,6 +59,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.ParseException;
 import java.util.*;
+import java.util.Calendar;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -68,6 +69,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static com.sonicbase.common.MemUtil.getMemValue;
+import static java.util.Calendar.HOUR;
+import static jdk.nashorn.internal.parser.DateParser.DAY;
 import static org.quartz.CronScheduleBuilder.cronSchedule;
 import static org.quartz.JobBuilder.newJob;
 import static org.quartz.TriggerBuilder.newTrigger;
@@ -80,6 +83,7 @@ import static org.quartz.TriggerBuilder.newTrigger;
  */
 public class DatabaseServer {
 
+  public static final String SONICBASE_SYS_DB_STR = "_sonicbase_sys";
   public static Object deathOverrideMutex = new Object();
   public static boolean[][] deathOverride;
   private Logger logger;
@@ -144,7 +148,6 @@ public class DatabaseServer {
   private boolean finishedRestoreFileCopy;
   private Connection sysConnection;
   private Thread streamsConsumerMonitorthread;
-  private Thread netMonitorThread;
   private Thread statsThread;
   private ArrayList<Thread> masterMonitorThreadsForShards;
   private Thread masterMonitorThread;
@@ -159,6 +162,11 @@ public class DatabaseServer {
   private Thread reloadServerThread;
   private Connection connectionForStoredProcedure;
   private Timer isStreamingStartedTimer;
+  private MonitorManager monitorManager;
+  private OSStatsManager osStatsManager;
+  private HttpServer httpServer;
+  private Integer httpPort;
+  private AtomicBoolean isRecovered;
 
   @SuppressWarnings("restriction")
   private static Unsafe getUnsafe() {
@@ -225,6 +233,12 @@ public class DatabaseServer {
     try {
       shutdown = true;
 
+      if (httpServer != null) {
+        httpServer.shutdown();
+      }
+      if (monitorManager != null) {
+        monitorManager.shutdown();
+      }
       if (isStreamingStartedTimer != null) {
         isStreamingStartedTimer.cancel();
       }
@@ -280,14 +294,15 @@ public class DatabaseServer {
       statsThread.interrupt();
       statsThread.join();
 
-      netMonitorThread.interrupt();
-      netMonitorThread.join();
-
       if (streamsConsumerMonitorthread != null) {
         streamsConsumerMonitorthread.interrupt();
         streamsConsumerMonitorthread.join();
       }
+      streamManager.shutdown();
 
+      if (longRunningCommands != null) {
+        longRunningCommands.shutdown();
+      }
       shutdownDeathMonitor();
       shutdownRepartitioner();
       shutdownMasterLicenseValidator();
@@ -307,11 +322,14 @@ public class DatabaseServer {
       transactionManager.shutdown();
       updateManager.shutdown();
       bulkImportManager.shutdown();
+      if (osStatsManager != null) {
+        osStatsManager.shutdown();
+      }
 
       executor.shutdownNow();
     }
     catch (Exception e) {
-      throw new DatabaseException(e);
+      throw new DatabaseException("Error shutting down DatabaseServer", e);
     }
   }
 
@@ -328,20 +346,20 @@ public class DatabaseServer {
   }
 
   public void setConfig(
-      final ObjectNode config, String cluster, String host, int port, AtomicBoolean isRunning, String gclog, String xmx,
+      final ObjectNode config, String cluster, String host, int port, AtomicBoolean isRunning, AtomicBoolean isRecovered, String gclog, String xmx,
       boolean overrideProLicense) {
-    setConfig(config, cluster, host, port, false, isRunning, false, gclog, xmx, overrideProLicense);
+    setConfig(config, cluster, host, port, false, isRunning, isRecovered, false, gclog, xmx, overrideProLicense);
   }
 
   public void setConfig(
       final ObjectNode config, String cluster, String host, int port,
-      boolean unitTest, AtomicBoolean isRunning, String gclog, boolean overrideProLicense) {
-    setConfig(config, cluster, host, port, unitTest, isRunning, false, gclog, null, overrideProLicense);
+      boolean unitTest, AtomicBoolean isRunning, AtomicBoolean isRecovered, String gclog, boolean overrideProLicense) {
+    setConfig(config, cluster, host, port, unitTest, isRunning, isRecovered, false, gclog, null, overrideProLicense);
   }
 
   public void setConfig(
       final ObjectNode config, String cluster, String host, int port,
-      boolean unitTest, AtomicBoolean isRunning, boolean skipLicense, String gclog, String xmx, boolean overrideProLicense) {
+      boolean unitTest, AtomicBoolean isRunning, AtomicBoolean isRecovered, boolean skipLicense, String gclog, String xmx, boolean overrideProLicense) {
 
 //    for (int i = 0; i < shardCount; i++) {
 //      for (int j = 0; j < replicationFactor; j++) {
@@ -352,6 +370,7 @@ public class DatabaseServer {
     this.haveProLicense = true;
     this.disableNow = false;
     this.isRunning = isRunning;
+    this.isRecovered = isRecovered;
     this.config = config;
     this.cluster = cluster;
     this.host = host;
@@ -370,6 +389,30 @@ public class DatabaseServer {
     if (replicaCount > 1) {
       usingMultipleReplicas = true;
     }
+
+    ObjectMapper mapper = new ObjectMapper();
+
+
+//    try {
+//      ObjectNode licenseConfig = (ObjectNode) mapper.readTree(json);
+//
+//      AtomicInteger licensePort = new AtomicInteger();
+//      licensePort.set(licenseConfig.get("server").get("port").asInt());
+//      final String address = licenseConfig.get("server").get("privateAddress").asText();
+//
+//      final AtomicBoolean lastHaveProLicense = new AtomicBoolean(haveProLicense);
+//      AtomicBoolean haventSet = new AtomicBoolean();
+//
+//      doValidateLicense(address, licensePort, lastHaveProLicense, haventSet, true);
+//    }
+//    catch (IOException e) {
+//      logger.error("Error initializing license validator", e);
+//      common.setHaveProLicense(false);
+//      common.saveSchema(getClient(), dataDir);
+//      DatabaseServer.this.haveProLicense = false;
+//      disableNow = true;
+//    }
+
 
     ObjectNode firstServer = (ObjectNode) shards.get(0).withArray("replicas").get(0);
     ServersConfig serversConfig = null;
@@ -423,10 +466,30 @@ public class DatabaseServer {
 
     common.setServersConfig(serversConfig);
 
-    logger = new Logger(getDatabaseClient(), shard, replica);
+    logger = new Logger(null /*getDatabaseClient()*/, shard, replica);
     logger.info("config=" + config.toString());
 
     logger.info("useUnsafe=" + useUnsafe);
+
+    String json = null;
+//    if (overrideProLicense) {
+      common.setHaveProLicense(true);
+//      common.saveSchema(getClient(), dataDir);
+      DatabaseServer.this.haveProLicense = true;
+      disableNow = false;
+//    }
+//    else {
+//      try {
+//        json = IOUtils.toString(DatabaseServer.class.getResourceAsStream("/config-license-server.json"), "utf-8");
+//      }
+//      catch (Exception e) {
+//        logger.error("Error initializing license validator", e);
+//        common.setHaveProLicense(false);
+//        common.saveSchema(getClient(), dataDir);
+//        DatabaseServer.this.haveProLicense = false;
+//        disableNow = true;
+//      }
+//    }
 
     this.awsClient = new AWSClient(client.get());
 
@@ -449,18 +512,40 @@ public class DatabaseServer {
     this.logManager = new LogManager(this, new File(dataDir, "log"));
     this.schemaManager = new SchemaManager(this);
     this.bulkImportManager = new BulkImportManager(this);
+    this.monitorManager = new MonitorManager(this);
+
+    this.methodInvoker = new MethodInvoker(this, bulkImportManager, deleteManager, deltaManager, updateManager,
+        transactionManager, readManager, logManager, schemaManager, monitorManager);
+    this.osStatsManager = new OSStatsManager(this);
+    this.osStatsManager.startStatsMonitoring();
+
+    outer:
+    for (int i = 0; i < shards.size(); i++) {
+      ArrayNode replicas = (ArrayNode) shards.get(i).withArray("replicas");
+      for (int j = 0; j < replicas.size(); j++) {
+        JsonNode replica = replicas.get(j);
+        if (replica.get("privateAddress").asText().equals(host) && replica.get("port").asInt() == port) {
+          if (replica.get("httpPort") != null) {
+            httpPort = replica.get("httpPort").asInt();
+
+            this.httpServer = new HttpServer(this);
+            this.httpServer.startMonitorServer(host, httpPort);
+            break outer;
+          }
+        }
+      }
+    }
+
+
+
     //recordsById = new IdIndex(!unitTest, (int) (long) databaseDict.getLong("subPartitionsForIdIndex"), (int) (long) databaseDict.getLong("initialIndexSize"), (int) (long) databaseDict.getLong("indexEntrySize"));
 
-    this.methodInvoker = new MethodInvoker(this, bulkImportManager, deleteManager, deltaManager, updateManager, transactionManager, readManager, logManager, schemaManager);
     this.replicationFactor = shards.get(0).withArray("replicas").size();
 //    if (replicationFactor < 2) {
 //      throw new DatabaseException("Replication Factor must be at least two");
 //    }
 
     scheduleBackup();
-
-    netMonitorThread = ThreadUtil.createThread(new NetMonitor(), "SonicBase Network Monitor Threwad");
-    netMonitorThread.start();
 
     statsThread = ThreadUtil.createThread(new StatsMonitor(), "SonicBase Stats Monitor Thread");
     statsThread.start();
@@ -518,7 +603,7 @@ public class DatabaseServer {
     //startMasterLicenseValidator();
 
     try {
-      checkLicense(new AtomicBoolean(false), new AtomicBoolean(true));
+      checkLicense(new AtomicBoolean(false), new AtomicBoolean(false), new AtomicBoolean(true));
     }
     catch (Exception e) {
       logger.error("Error checking license", e);
@@ -554,6 +639,18 @@ public class DatabaseServer {
 //    Thread logThread = new Thread(queue);
 //    logThread.start();
 
+  }
+
+  public String getHost() {
+    return host;
+  }
+
+  public int getPort() {
+    return port;
+  }
+
+  public String getGcLog() {
+    return gclog;
   }
 
   public void setBackupConfig(ObjectNode backup) {
@@ -634,7 +731,7 @@ public class DatabaseServer {
               @Override
               public void run() {
                 AtomicInteger nextMonitor = new AtomicInteger(-1);
-                while (nextMonitor.get() == -1) {
+                while (!shutdown && nextMonitor.get() == -1) {
                   try {
                     Thread.sleep(2000);
                     electNewMaster(shard, -1, monitorShards, monitorReplicas, nextMonitor);
@@ -679,6 +776,17 @@ public class DatabaseServer {
     }, "SonicBase Maste Monitor Thread");
     masterMonitorThread.start();
   }
+
+  public void removeIndices(String dbName, String tableName) {
+    if (getIndices() != null) {
+      if (getIndices().get(dbName) != null) {
+        if (getIndices().get(dbName).getIndices() != null) {
+          getIndices().get(dbName).getIndices().remove(tableName);
+        }
+      }
+    }
+  }
+
 
   private boolean electNewMaster(int shard, int oldMasterReplica, int[] monitorShards, int[] monitorReplicas, AtomicInteger nextMonitor) throws InterruptedException, IOException {
     int electedMaster = -1;
@@ -865,6 +973,8 @@ public class DatabaseServer {
         shutdownMasterLicenseValidator();
         startMasterLicenseValidator();
 
+        monitorManager.startMasterMonitor();
+
         startStreamsConsumerMonitor();
 
         shutdownDeathMonitor();
@@ -882,38 +992,46 @@ public class DatabaseServer {
     }
   }
 
+  private final Object connMutex = new Object();
   public Connection getSysConnection() {
     try {
-      synchronized (this) {
-        if (sysConnection != null) {
-          return sysConnection;
-        }
-      }
-      ArrayNode array = config.withArray("shards");
-      ObjectNode replicaDict = (ObjectNode) array.get(0);
-      ArrayNode replicasArray = replicaDict.withArray("replicas");
-      JsonNode node = config.get("clientIsPrivate");
-      final String address = node != null && node.asBoolean() ?
-          replicasArray.get(0).get("privateAddress").asText() :
-          replicasArray.get(0).get("publicAddress").asText();
-      final int port = replicasArray.get(0).get("port").asInt();
-
-      Class.forName("com.sonicbase.jdbcdriver.Driver");
-      ConnectionProxy conn = new ConnectionProxy("jdbc:sonicbase:" + address + ":" + port, this);
+      ConnectionProxy conn = null;
       try {
-        if (!((ConnectionProxy) conn).databaseExists("_sonicbase_sys")) {
-          ((ConnectionProxy) conn).createDatabase("_sonicbase_sys");
+        synchronized (connMutex) {
+          if (sysConnection != null) {
+            return sysConnection;
+          }
+          ArrayNode array = config.withArray("shards");
+          ObjectNode replicaDict = (ObjectNode) array.get(0);
+          ArrayNode replicasArray = replicaDict.withArray("replicas");
+          JsonNode node = config.get("clientIsPrivate");
+          final String address = node != null && node.asBoolean() ?
+              replicasArray.get(0).get("privateAddress").asText() :
+              replicasArray.get(0).get("publicAddress").asText();
+          final int port = replicasArray.get(0).get("port").asInt();
+
+          Class.forName("com.sonicbase.jdbcdriver.Driver");
+          conn = new ConnectionProxy("jdbc:sonicbase:" + address + ":" + port, this);
+          try {
+            if (!((ConnectionProxy) conn).databaseExists(SONICBASE_SYS_DB_STR)) {
+              ((ConnectionProxy) conn).createDatabase(SONICBASE_SYS_DB_STR);
+            }
+          }
+          catch (Exception e) {
+            if (!ExceptionUtils.getFullStackTrace(e).toLowerCase().contains("database already exists")) {
+              throw new DatabaseException(e);
+            }
+          }
+
+          sysConnection = new ConnectionProxy("jdbc:sonicbase:" + address + ":" + port + "/_sonicbase_sys", this);
         }
       }
-      catch (Exception e) {
-        if (!ExceptionUtils.getFullStackTrace(e).toLowerCase().contains("database already exists")) {
-          throw new DatabaseException(e);
+      finally {
+        if (conn != null) {
+          conn.close();
         }
       }
 
-      conn.close();
-
-      sysConnection = new ConnectionProxy("jdbc:sonicbase:" + address + ":" + port + "/_sonicbase_sys", this);
       return sysConnection;
     }
     catch (Exception e) {
@@ -1082,6 +1200,15 @@ public class DatabaseServer {
                 shutdownMasterLicenseValidator();
                 shutdownDeathMonitor();
                 shutdownRepartitioner();
+
+                monitorManager.shutdown();
+
+                if (streamsConsumerMonitorthread != null) {
+                  streamsConsumerMonitorthread.interrupt();
+                  streamsConsumerMonitorthread.join();
+                  streamsConsumerMonitorthread = null;
+                }
+
                 break;
               }
             }
@@ -1614,6 +1741,10 @@ public class DatabaseServer {
     }
   }
 
+  public SnapshotManager getSnapshotManager() {
+    return deltaManager;
+  }
+
   private static class NullX509TrustManager implements X509TrustManager {
     public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
     }
@@ -1660,10 +1791,15 @@ public class DatabaseServer {
     }
     catch (Exception e) {
       logger.error("Error initializing license validator", e);
-      common.setHaveProLicense(false);
-      common.saveSchema(getClient(), dataDir);
+//      common.setHaveProLicense(false);
+//      common.saveSchema(getClient(), dataDir);
       DatabaseServer.this.haveProLicense = false;
-      disableNow = true;
+      DatabaseServer.this.disableNow = true;
+//      this.haveProLicense = true;
+//      this.disableNow = false;
+//      this.disableDate = null;
+//      this.multipleLicenseServers = false;
+
       haventSet.set(false);
       return;
     }
@@ -1673,25 +1809,45 @@ public class DatabaseServer {
       licensePort.set(config.get("server").get("port").asInt());
       final String address = config.get("server").get("privateAddress").asText();
 
-      final AtomicBoolean lastHaveProLicense = new AtomicBoolean(haveProLicense);
+      final AtomicBoolean lastHaveProLicense = new AtomicBoolean(false);
+      final AtomicBoolean haveHadProLicense = new AtomicBoolean(false);
 
-      doValidateLicense(address, licensePort, lastHaveProLicense, haventSet);
+      doValidateLicense(address, licensePort, lastHaveProLicense, haveHadProLicense, haventSet, false);
       masterLicenseValidatorThread = ThreadUtil.createThread(new Runnable() {
       @Override
       public void run() {
         while (!shutdownMasterValidatorThread) {
           try {
-            doValidateLicense(address, licensePort, lastHaveProLicense, haventSet);
+//            DatabaseServer.this.haveProLicense = true;
+//            DatabaseServer.this.disableNow = false;
+//            DatabaseServer.this.disableDate = null;
+//            DatabaseServer.this.multipleLicenseServers = false;
+
+            doValidateLicense(address, licensePort, lastHaveProLicense, haveHadProLicense, haventSet, false);
           }
           catch (Exception e) {
             logger.error("license server not found", e);
-            if (haventSet.get() || lastHaveProLicense.get() != false) {
-              common.setHaveProLicense(false);
-              common.saveSchema(getClient(), dataDir);
+            if (haveHadProLicense.get()) {
+              DatabaseServer.this.haveProLicense = true;
+              lastHaveProLicense.set(true);
+              haventSet.set(false);
+              DatabaseServer.this.disableNow = false;
+              disableDate = DateUtils.fromDate(new Date(System.currentTimeMillis() + 7 * 24 * 60 * 60 * 1000));
+            }
+            else {
+          //  if (haventSet.get() || lastHaveProLicense.get() != false) {
+//              common.setHaveProLicense(false);
+//              common.saveSchema(getClient(), dataDir);
               DatabaseServer.this.haveProLicense = false;
               lastHaveProLicense.set(false);
               haventSet.set(false);
-              disableNow = true;
+              DatabaseServer.this.disableNow = true;
+              disableDate = DateUtils.fromDate(new Date(System.currentTimeMillis()));
+//              DatabaseServer.this.haveProLicense = true;
+//              DatabaseServer.this.disableNow = false;
+//              DatabaseServer.this.disableDate = null;
+//              DatabaseServer.this.multipleLicenseServers = false;
+
             }
             errorLogger.debug("License server not found", e);
           }
@@ -1711,16 +1867,18 @@ public class DatabaseServer {
     }
   }
 
-  private void doValidateLicense(String address, AtomicInteger licensePort, AtomicBoolean lastHaveProLicense, AtomicBoolean haventSet) throws IOException {
+  private void doValidateLicense(String address, AtomicInteger licensePort, AtomicBoolean lastHaveProLicense,
+                                 AtomicBoolean haveHadProLicense, AtomicBoolean haventSet, boolean standalone) throws IOException {
     int cores = 0;
-    synchronized (numberOfCoresPerServer) {
-      for (Map.Entry<Integer, Map<Integer, Integer>> shardEntry : numberOfCoresPerServer.entrySet()) {
-        for (Map.Entry<Integer, Integer> replicaEntry : shardEntry.getValue().entrySet()) {
-          cores += replicaEntry.getValue();
+    if (!standalone) {
+      synchronized (numberOfCoresPerServer) {
+        for (Map.Entry<Integer, Map<Integer, Integer>> shardEntry : numberOfCoresPerServer.entrySet()) {
+          for (Map.Entry<Integer, Integer> replicaEntry : shardEntry.getValue().entrySet()) {
+            cores += replicaEntry.getValue();
+          }
         }
       }
     }
-
 
     try {
       TrustManager[] trustAllCerts = new TrustManager[]{
@@ -1778,26 +1936,55 @@ public class DatabaseServer {
       this.disableNow = dict.get("disableNow").asBoolean();
       this.disableDate = dict.get("disableDate").asText();
       this.multipleLicenseServers = dict.get("multipleLicenseServers").asBoolean();
-      logger.info("licenseValidator: cores=" + cores + ", lastHaveProLicense=" + lastHaveProLicense.get() + ", haveProLicense=" + haveProLicense);
+      if (haveProLicense) {
+        haveHadProLicense.set(true);
+      }
+//      this.haveProLicense = true;
+//      this.disableNow = false;
+//      this.multipleLicenseServers = false;
+      logger.info("licenseValidator: cores=" + cores + ", lastHaveProLicense=" + lastHaveProLicense.get() +
+          ", haveProLicense=" + haveProLicense + ",  disableNow=" + disableNow);
       if (haventSet.get() || lastHaveProLicense.get() != haveProLicense) {
-        common.setHaveProLicense(haveProLicense);
-        common.saveSchema(getClient(), dataDir);
+//        common.setHaveProLicense(haveProLicense);
+//        if (!standalone) {
+//          common.saveSchema(getClient(), dataDir);
+//        }
         lastHaveProLicense.set(haveProLicense);
         haventSet.set(true);
         logger.info("Saving schema with haveProLicense=" + haveProLicense);
       }
     }
     catch (Exception e) {
-      this.haveProLicense = false;
-      this.disableNow = true;
-      this.disableDate = null;
-      this.multipleLicenseServers = false;
-      common.setHaveProLicense(haveProLicense);
-      common.saveSchema(getClient(), dataDir);
+//      this.haveProLicense = true;
+//      this.disableNow = false;
+//      this.disableDate = null;
+//      this.multipleLicenseServers = false;
+
+      if (haveHadProLicense.get()) {
+        Date date = new Date(System.currentTimeMillis());
+        Calendar cal = new GregorianCalendar();
+        cal.setTime(date);
+        cal.add(DAY, 7);
+        DatabaseServer.this.disableDate = DateUtils.fromDate(cal.getTime());
+
+        this.haveProLicense = true;
+        this.disableNow = false;
+        this.multipleLicenseServers = false;
+      }
+      else {
+        this.haveProLicense = false;
+        this.disableNow = true;
+        DatabaseServer.this.disableDate = DateUtils.fromDate(new Date(System.currentTimeMillis()));
+        this.multipleLicenseServers = false;
+      }
+//      common.setHaveProLicense(haveProLicense);
+//      if (!standalone) {
+//        common.saveSchema(getClient(), dataDir);
+//        logger.error("Error validating license", e);
+//      }
       lastHaveProLicense.set(haveProLicense);
       haventSet.set(true);
-
-      logger.error("Error validating license");
+      logger.error("MasterLicenseValidator error checking licenses", e);
     }
   }
 
@@ -1820,8 +2007,9 @@ public class DatabaseServer {
     if (overrideProLicense) {
       logger.info("Overriding pro license");
       haveProLicense = true;
-      common.setHaveProLicense(haveProLicense);
-      common.saveSchema(getClient(), dataDir);
+      disableNow = false;
+//      common.setHaveProLicense(haveProLicense);
+//      common.saveSchema(getClient(), dataDir);
       return;
     }
     haveProLicense = true;
@@ -1838,10 +2026,16 @@ public class DatabaseServer {
     }
     catch (Exception e) {
       logger.error("Error initializing license validator", e);
-      common.setHaveProLicense(false);
-      common.saveSchema(getClient(), dataDir);
+
+//      this.haveProLicense = true;
+//      this.disableNow = false;
+//      this.disableDate = null;
+//      this.multipleLicenseServers = false;
+
+//      common.setHaveProLicense(false);
+//      common.saveSchema(getClient(), dataDir);
       DatabaseServer.this.haveProLicense = false;
-      disableNow = true;
+      DatabaseServer.this.disableNow = true;
       haventSet.set(false);
       return;
     }
@@ -1852,6 +2046,7 @@ public class DatabaseServer {
       final String address = config.get("server").get("privateAddress").asText();
 
       final AtomicBoolean lastHaveProLicense = new AtomicBoolean(haveProLicense);
+      final AtomicBoolean haveHadProLicense = new AtomicBoolean();
 
       licenseValidatorThread = ThreadUtil.createThread(new Runnable() {
         @Override
@@ -1859,14 +2054,41 @@ public class DatabaseServer {
           while (!shutdown) {
             boolean hadError = false;
             try {
-              checkLicense(lastHaveProLicense, haventSet);
+              if (!(shard == 0 && common.getServersConfig().getShards()[0].getMasterReplica() == getReplica())) {
+                checkLicense(lastHaveProLicense, haveHadProLicense, haventSet);
+              }
+              else {
+                if (haveProLicense) {
+                  Date date = new Date(System.currentTimeMillis());
+                  Calendar cal = new GregorianCalendar();
+                  cal.setTime(date);
+                  cal.add(HOUR, 1);
+                  DatabaseServer.this.disableDate = DateUtils.fromDate(cal.getTime());
+
+                }
+                else {
+                  Date date = new Date(System.currentTimeMillis());
+                  DatabaseServer.this.disableDate = DateUtils.fromDate(date);
+                }
+              }
             }
             catch (Exception e) {
+              try {
+                Date date = disableDate == null ? null : DateUtils.fromString(DatabaseServer.this.disableDate);
+                if (date == null || date.getTime() < System.currentTimeMillis()) {
+                  disableNow = true;
+                  haveProLicense = false;
+                }
+              }
+              catch (ParseException e1) {
+                logger.error("Error validating license", e);
+              }
+
               hadError = true;
               logger.error("license server not found", e);
               if (haventSet.get() || lastHaveProLicense.get() != false) {
-                common.setHaveProLicense(false);
-                common.saveSchema(getClient(), dataDir);
+//                common.setHaveProLicense(false);
+                //common.saveSchema(getClient(), dataDir);
                 DatabaseServer.this.haveProLicense = false;
                 lastHaveProLicense.set(false);
                 haventSet.set(false);
@@ -1895,7 +2117,7 @@ public class DatabaseServer {
     }
   }
 
-  private void checkLicense(AtomicBoolean lastHaveProLicense, AtomicBoolean haventSet) {
+  private void checkLicense(AtomicBoolean lastHaveProLicense, AtomicBoolean haveHadProLicense, AtomicBoolean haventSet) {
     int cores = Runtime.getRuntime().availableProcessors();
 
     ComObject cobj = new ComObject();
@@ -1916,16 +2138,37 @@ public class DatabaseServer {
 
     DatabaseServer.this.haveProLicense = retObj.getBoolean(ComObject.Tag.inCompliance);
     DatabaseServer.this.disableNow = retObj.getBoolean(ComObject.Tag.disableNow);
-    DatabaseServer.this.disableDate = retObj.getString(ComObject.Tag.disableDate);
+    //DatabaseServer.this.disableDate = retObj.getString(ComObject.Tag.disableDate);
+
+    if (haveProLicense) {
+      Date date = new Date(System.currentTimeMillis());
+      Calendar cal = new GregorianCalendar();
+      cal.setTime(date);
+      cal.add(HOUR, 1);
+      DatabaseServer.this.disableDate = DateUtils.fromDate(cal.getTime());
+
+    }
+    else {
+      Date date = new Date(System.currentTimeMillis());
+      DatabaseServer.this.disableDate = DateUtils.fromDate(date);
+    }
+
+    haveHadProLicense.set(haveProLicense);
+
     DatabaseServer.this.multipleLicenseServers = retObj.getBoolean(ComObject.Tag.multipleLicenseServers);
+
+//    DatabaseServer.this.haveProLicense = true;
+//    DatabaseServer.this.disableNow = false;
+//    DatabaseServer.this.disableDate = null;
+//    DatabaseServer.this.multipleLicenseServers = false;
 
     logger.info("licenseCheckin: lastHaveProLicense=" + lastHaveProLicense.get() + ", haveProLicense=" + haveProLicense +
         ", disableNow=" + disableNow + ", disableDate=" + disableDate + ", multipleLicenseServers=" + multipleLicenseServers);
     if (haventSet.get() || lastHaveProLicense.get() != haveProLicense) {
-      common.setHaveProLicense(haveProLicense);
-      common.saveSchema(getClient(), dataDir);
+//      common.setHaveProLicense(haveProLicense);
+      //common.saveSchema(getClient(), dataDir);
       lastHaveProLicense.set(haveProLicense);
-      haventSet.set(true);
+      haventSet.set(false);
       logger.info("Saving schema with haveProLicense=" + haveProLicense);
     }
   }
@@ -1983,7 +2226,7 @@ public class DatabaseServer {
   }
 
   public long getBackupS3Size(String bucket, String prefix, String subDirectory) {
-    AWSClient client = new AWSClient(getDatabaseClient());
+    AWSClient client = new AWSClient(/*getDatabaseClient()*/ null);
     return client.getDirectorySize(bucket, prefix, subDirectory);
   }
 
@@ -3097,17 +3340,23 @@ public class DatabaseServer {
         if (indexSchema == null) {
           getClient().syncSchema();
           indexSchema = tableSchema.getIndices().get(indexName);
+          if (indexSchema != null) {
+            tableSchema.getIndexes().put(indexName, indexSchema);
+            tableSchema.getIndexesById().put(indexSchema.getIndexId(), indexSchema);
+            common.saveSchema(getClient(), getDataDir());
+          }
         }
       }
       if (indexSchema != null) {
         break;
       }
-      try {
-        Thread.sleep(1_000);
-      }
-      catch (InterruptedException e) {
-        throw new DatabaseException(e);
-      }
+      break;
+//      try {
+//        Thread.sleep(1_000);
+//      }
+//      catch (InterruptedException e) {
+//        throw new DatabaseException(e);
+//      }
     }
     return indexSchema;
   }
@@ -3130,16 +3379,21 @@ public class DatabaseServer {
           getClient().syncSchema();
           index = getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexName);
         }
+        if (index == null) {
+          schemaManager.doCreateIndex(dbName, tableSchema, indexName, tableSchema.getIndices().get(indexName).getFields());
+          index = getIndices(dbName).getIndices().get(tableSchema.getName()).get(indexName);
+        }
       }
       if (index != null) {
         break;
       }
-      try {
-        Thread.sleep(1_000);
-      }
-      catch (InterruptedException e) {
-        throw new DatabaseException(e);
-      }
+      break;
+//      try {
+//        Thread.sleep(1_000);
+//      }
+//      catch (InterruptedException e) {
+//        throw new DatabaseException(e);
+//      }
     }
     return index;
   }
@@ -3186,8 +3440,14 @@ public class DatabaseServer {
 
   public void recoverFromSnapshot() throws Exception {
     common.loadSchema(dataDir);
+    Set<String> dbNames = new HashSet<>();
+    for (String dbName : common.getDatabases().keySet()) {
+      dbNames.add(dbName);
+    }
     for (String dbName : getDbNames(dataDir)) {
-//      snapshotManager.recoverFromSnapshot(dbName);
+      dbNames.add(dbName);
+    }
+    for (String dbName : dbNames) {
       deltaManager.recoverFromSnapshot(dbName);
     }
   }
@@ -3223,68 +3483,6 @@ public class DatabaseServer {
           index.clear();
         }
       }
-    }
-  }
-
-  public double getResGigWindows() throws IOException, InterruptedException {
-    ProcessBuilder builder = new ProcessBuilder().command("tasklist", "/fi", "\"pid eq " + pid + "\"");
-    Process p = builder.start();
-    try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-      String header = in.readLine();
-      String separator = in.readLine();
-      String separator2 = in.readLine();
-      String values = in.readLine();
-      p.waitFor();
-
-      String[] parts = values.split("\\s+");
-      String kbytes = parts[4];
-      kbytes = kbytes.replaceAll(",", "");
-      return Double.valueOf(kbytes) / 1000d / 1000d;
-    }
-    finally {
-      p.destroy();
-    }
-  }
-
-  public double getCpuUtilizationWindows() throws IOException, InterruptedException {
-
-    ProcessBuilder builder = new ProcessBuilder().command("bin/get-cpu.bat", String.valueOf(pid));
-//    "wmic", "path", "Win32_PerfFormattedData_PerfProc_Process",
-//        "where", "\"IDProcess=" + pid + "\"", "get", "IDProcess,PercentProcessorTime");
-    Process p = builder.start();
-    try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-      String values = in.readLine();
-      p.waitFor();
-
-      logger.info("cpu utilization str=" + values);
-      String[] parts = values.split("\\s+");
-      String cpu = parts[1];
-      return Double.valueOf(cpu);
-    }
-    finally {
-      p.destroy();
-    }
-  }
-
-  public String getDiskAvailWindows() throws IOException, InterruptedException {
-    // disk avail:
-    //        SETLOCAL
-    //
-    //        FOR /F "usebackq tokens=1,2" %%f IN (`PowerShell -NoProfile -EncodedCommand "CgBnAHcAbQBpACAAVwBpAG4AMwAyAF8ATABvAGcAaQBjAGEAbABEAGkAcwBrACAALQBGAGkAbAB0AGUAcgAgACIAQwBhAHAAdABpAG8AbgA9ACcAQwA6ACcAIgB8ACUAewAkAGcAPQAxADAANwAzADcANAAxADgAMgA0ADsAWwBpAG4AdABdACQAZgA9ACgAJABfAC4ARgByAGUAZQBTAHAAYQBjAGUALwAkAGcAKQA7AFsAaQBuAHQAXQAkAHQAPQAoACQAXwAuAFMAaQB6AGUALwAkAGcAKQA7AFcAcgBpAHQAZQAtAEgAbwBzAHQAIAAoACQAdAAtACQAZgApACwAJABmAH0ACgA="`) DO ((SET U=%%f)&(SET F=%%g))
-    //
-    //        @ECHO Used: %U%
-    //            @ECHO Free: %F%
-
-    ProcessBuilder builder = new ProcessBuilder().command("bin/disk-avail.bat");
-    Process p = builder.start();
-    try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-      String values = in.readLine();
-      p.waitFor();
-
-      return values;
-    }
-    finally {
-      p.destroy();
     }
   }
 
@@ -3354,6 +3552,10 @@ public class DatabaseServer {
     catch (Exception e) {
       throw new DatabaseException(e);
     }
+  }
+
+  public int getPid() {
+    return pid;
   }
 
   private void startMemoryMonitor() {
@@ -3525,397 +3727,84 @@ public class DatabaseServer {
     return totalGig;
   }
 
-  private double avgTransRate = 0;
-  private double avgRecRate = 0;
+  public Double getTotalMemory() {
+    try {
+      Double totalGig = null;
+      JsonNode node = config.get("maxProcessMemoryTrigger");
+      String max = node == null ? null : node.asText();
+      //    max = null; //disable for now
+      //    if (max == null) {
+      //      logger.info("Max process memory not set in config. Not enforcing max memory");
+      //    }
 
-
-  class NetMonitor implements Runnable {
-    public void run() {
-      List<Double> transRate = new ArrayList<>();
-      List<Double> recRate = new ArrayList<>();
+      Double resGig = null;
+      String secondToLastLine = null;
+      String lastLine = null;
       try {
         if (isMac()) {
-          while (!shutdown) {
-            ProcessBuilder builder = new ProcessBuilder().command("ifstat");
-            Process p = builder.start();
-            try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-              String firstLine = null;
-              String secondLine = null;
-              Set<Integer> toSkip = new HashSet<>();
-              while (!shutdown) {
-                String line = in.readLine();
-                if (line == null) {
-                  break;
-                }
-                String[] parts = line.trim().split("\\s+");
-                if (firstLine == null) {
-                  for (int i = 0; i < parts.length; i++) {
-                    if (parts[i].toLowerCase().contains("bridge")) {
-                      toSkip.add(i);
-                    }
-                  }
-                  firstLine = line;
-                }
-                else if (secondLine == null) {
-                  secondLine = line;
-                }
-                else {
-                  try {
-                    double trans = 0;
-                    double rec = 0;
-                    for (int i = 0; i < parts.length; i++) {
-                      if (toSkip.contains(i / 2)) {
-                        continue;
-                      }
-                      if (i % 2 == 0) {
-                        rec += Double.valueOf(parts[i]);
-                      }
-                      else if (i % 2 == 1) {
-                        trans += Double.valueOf(parts[i]);
-                      }
-                    }
-                    transRate.add(trans);
-                    recRate.add(rec);
-                    if (transRate.size() > 10) {
-                      transRate.remove(0);
-                    }
-                    if (recRate.size() > 10) {
-                      recRate.remove(0);
-                    }
-                    Double total = 0d;
-                    for (Double currRec : recRate) {
-                      total += currRec;
-                    }
-                    avgRecRate = total / recRate.size();
-
-                    total = 0d;
-                    for (Double currTrans : transRate) {
-                      total += currTrans;
-                    }
-                    avgTransRate = total / transRate.size();
-                  }
-                  catch (Exception e) {
-                    logger.error("Error reading net traffic line: line=" + line, e);
-                  }
-                  break;
-                }
-              }
-              p.waitFor();
-            }
-            finally {
-              p.destroy();
-            }
-            Thread.sleep(1000);
+          ProcessBuilder builder = new ProcessBuilder().command("sysctl", "hw.memsize");
+          Process p = builder.start();
+          try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+            String line = in.readLine();
+            p.waitFor();
+            String[] parts = line.split(" ");
+            String memStr = parts[1];
+            totalGig = getMemValue(memStr);
           }
+          finally {
+            p.destroy();
+          }
+          return totalGig;
         }
         else if (isUnix()) {
-          while (!shutdown) {
-            int count = 0;
-            File file = new File(installDir, "tmp/dstat.out");
-            file.getParentFile().mkdirs();
-            file.delete();
-            ProcessBuilder builder = new ProcessBuilder().command("/usr/bin/dstat", "--output", file.getAbsolutePath());
-            Process p = builder.start();
-            try {
-              while (!file.exists()) {
-                Thread.sleep(1000);
-              }
-              outer:
-              while (!shutdown) {
-                try (BufferedReader in = new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
-                  int recvPos = 0;
-                  int sendPos = 0;
-                  boolean nextIsValid = false;
-                  while (!shutdown) {
-                    String line = in.readLine();
-                    if (line == null) {
-                      break;
-                    }
-                    try {
-                      if (count++ > 10000) {
-                        p.destroy();
-                        ;
-                        break outer;
-                      }
-
-          /*
-
-          "Dstat 0.7.0 CSV output"
-        "Author:","Dag Wieers <dag@wieers.com>",,,,"URL:","http://dag.wieers.com/home-made/dstat/"
-        "Host:","ip-10-0-0-79",,,,"User:","ec2-user"
-        "Cmdline:","dstat --output out",,,,"Date:","09 Apr 2017 02:48:19 UTC"
-
-        "total cpu usage",,,,,,"dsk/total",,"net/total",,"paging",,"system",
-        "usr","sys","idl","wai","hiq","siq","read","writ","recv","send","in","out","int","csw"
-        20.409,1.659,74.506,3.404,0.0,0.021,707495.561,82419494.859,0.0,0.0,0.0,0.0,17998.361,18691.991
-        8.794,1.131,77.010,13.065,0.0,0.0,0.0,272334848.0,54.0,818.0,0.0,0.0,1514.0,477.0
-        9.217,1.641,75.758,13.384,0.0,0.0,0.0,276201472.0,54.0,346.0,0.0,0.0,1481.0,392.0
-
-           */
-                      String[] parts = line.split(",");
-                      if (line.contains("usr") && line.contains("recv") && line.contains("send")) {
-                        for (int i = 0; i < parts.length; i++) {
-                          if (parts[i].equals("\"recv\"")) {
-                            recvPos = i;
-                          }
-                          else if (parts[i].equals("\"send\"")) {
-                            sendPos = i;
-                          }
-                        }
-                        nextIsValid = true;
-                      }
-                      else if (nextIsValid) {
-                        Double trans = Double.valueOf(parts[sendPos]);
-                        Double rec = Double.valueOf(parts[recvPos]);
-                        transRate.add(trans);
-                        recRate.add(rec);
-                        if (transRate.size() > 10) {
-                          transRate.remove(0);
-                        }
-                        if (recRate.size() > 10) {
-                          recRate.remove(0);
-                        }
-                        Double total = 0d;
-                        for (Double currRec : recRate) {
-                          total += currRec;
-                        }
-                        avgRecRate = total / recRate.size();
-
-                        total = 0d;
-                        for (Double currTrans : transRate) {
-                          total += currTrans;
-                        }
-                        avgTransRate = total / transRate.size();
-                      }
-                    }
-                    catch (Exception e) {
-                      logger.error("Error reading net traffic line: line=" + line, e);
-                      Thread.sleep(5000);
-                      break outer;
-                    }
-                  }
-                }
-                Thread.sleep(1000);
-              }
-              p.waitFor();
-            }
-            finally {
-              p.destroy();
-            }
+          ProcessBuilder builder = new ProcessBuilder().command("grep", "MemTotal", "/proc/meminfo");
+          Process p = builder.start();
+          try {
+            BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            String line = in.readLine();
+            p.waitFor();
+            line = line.substring("MemTotal:".length()).trim();
+            totalGig = getMemValue(line);
           }
+          finally {
+            p.destroy();
+          }
+          return totalGig;
         }
         else if (isWindows()) {
-          Double lastReceive = null;
-          Double lastTransmit = null;
-          long lastRecorded = 0;
-          while (!shutdown) {
-            ProcessBuilder builder = new ProcessBuilder().command("netstat", "-e");
-            Process p = builder.start();
-            try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-              while (!shutdown) {
-                String line = in.readLine();
-                if (line.startsWith("Bytes")) {
-                  String[] parts = line.split("\\s+");
-                  String receiveStr = parts[1];
-                  String transmitStr = parts[2];
-                  if (lastReceive == null) {
-                    lastReceive = Double.valueOf(receiveStr);
-                    lastTransmit = Double.valueOf(transmitStr);
-                    lastRecorded = System.currentTimeMillis();
-                  }
-                  else {
-                    Double receive = Double.valueOf(receiveStr);
-                    Double transmit = Double.valueOf(transmitStr);
-                    avgRecRate = (receive - lastReceive) / (System.currentTimeMillis() - lastRecorded) / 1000d;
-                    avgTransRate = (transmit - lastTransmit) / (System.currentTimeMillis() - lastRecorded) / 1000d;
-                    lastReceive = receive;
-                    lastTransmit = transmit;
-                    lastRecorded = System.currentTimeMillis();
-                  }
-                  break;
-                }
-                Thread.sleep(2000);
-              }
-              p.waitFor();
-            }
-            finally {
-              p.destroy();
-            }
+          ProcessBuilder builder = new ProcessBuilder().command("wmic", "ComputerSystem", "get", "TotalPhysicalMemory");
+          Process p = builder.start();
+          try {
+            BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            String line = in.readLine();
+            line = in.readLine();
+            p.waitFor();
+            totalGig = getMemValue(line);
           }
+          finally {
+            p.destroy();
+          }
+          return totalGig;
         }
+      }
+      catch (InterruptedException e) {
+        throw e;
       }
       catch (Exception e) {
-        logger.error("Error in net monitor thread", e);
-      }
-    }
-  }
-
-  private String getDiskAvailable() throws IOException, InterruptedException {
-    ProcessBuilder builder = new ProcessBuilder().command("df", "-h");
-    Process p = builder.start();
-    try {
-      Integer availPos = null;
-      Integer mountedPos = null;
-      List<String> avails = new ArrayList<>();
-      int bestLineMatching = -1;
-      int bestLineAmountMatch = 0;
-      int mountOffset = 0;
-      try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-        while (!shutdown) {
-          String line = in.readLine();
-          if (line == null) {
-            break;
-          }
-          String[] parts = line.split("\\s+");
-          if (availPos == null) {
-            for (int i = 0; i < parts.length; i++) {
-              if (parts[i].toLowerCase().trim().equals("avail")) {
-                availPos = i;
-              }
-              else if (parts[i].toLowerCase().trim().startsWith("mounted")) {
-                mountedPos = i;
-              }
-            }
-          }
-          else {
-            String mountPoint = parts[mountedPos];
-            if (dataDir.startsWith(mountPoint)) {
-              if (mountPoint.length() > bestLineAmountMatch) {
-                bestLineAmountMatch = mountPoint.length();
-                bestLineMatching = mountOffset;
-              }
-            }
-            avails.add(parts[availPos]);
-            mountOffset++;
-          }
-        }
-        p.waitFor();
-
-        if (bestLineMatching != -1) {
-          return avails.get(bestLineMatching);
-        }
-      }
-    }
-    finally {
-      p.destroy();
-    }
-    return null;
-  }
-
-
-  class OSStats {
-    double resGig;
-    double cpu;
-    double javaMemMin;
-    double javaMemMax;
-    double avgRecRate;
-    double avgTransRate;
-    String diskAvail;
-  }
-
-  public OSStats doGetOSStats() throws InterruptedException {
-    OSStats ret = new OSStats();
-    String secondToLastLine = null;
-    String lastLine = null;
-    AtomicReference<Double> javaMemMax = new AtomicReference<>();
-    AtomicReference<Double> javaMemMin = new AtomicReference<>();
-    try {
-      if (isMac()) {
-        ProcessBuilder builder = new ProcessBuilder().command("top", "-l", "1", "-pid", String.valueOf(pid));
-        Process p = builder.start();
-        try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-          while (!shutdown) {
-            String line = in.readLine();
-            if (line == null) {
-              break;
-            }
-            secondToLastLine = lastLine;
-            lastLine = line;
-          }
-          p.waitFor();
-        }
-        finally {
-          p.destroy();
-        }
-
-        secondToLastLine = secondToLastLine.trim();
-        lastLine = lastLine.trim();
-        String[] headerParts = secondToLastLine.split("\\s+");
-        String[] parts = lastLine.split("\\s+");
-        for (int i = 0; i < headerParts.length; i++) {
-          if (headerParts[i].toLowerCase().trim().equals("mem")) {
-            ret.resGig = getMemValue(parts[i]);
-          }
-          else if (headerParts[i].toLowerCase().trim().equals("%cpu")) {
-            ret.cpu = Double.valueOf(parts[i]);
-          }
-        }
-        ret.diskAvail = getDiskAvailable();
-      }
-      else if (isUnix()) {
-        ProcessBuilder builder = new ProcessBuilder().command("top", "-b", "-n", "1", "-p", String.valueOf(pid));
-        Process p = builder.start();
-        try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-          while (!shutdown) {
-            String line = in.readLine();
-            if (line == null) {
-              break;
-            }
-            if (lastLine != null || line.trim().toLowerCase().startsWith("pid")) {
-              secondToLastLine = lastLine;
-              lastLine = line;
-            }
-            if (lastLine != null && secondToLastLine != null) {
-              break;
-            }
-          }
-          p.waitFor();
-        }
-        finally {
-          p.destroy();
-        }
-
-        secondToLastLine = secondToLastLine.trim();
-        lastLine = lastLine.trim();
-        String[] headerParts = secondToLastLine.split("\\s+");
-        String[] parts = lastLine.split("\\s+");
-        for (int i = 0; i < headerParts.length; i++) {
-          if (headerParts[i].toLowerCase().trim().equals("res")) {
-            String memStr = parts[i];
-            ret.resGig = getMemValue(memStr);
-          }
-          else if (headerParts[i].toLowerCase().trim().equals("%cpu")) {
-            ret.cpu = Double.valueOf(parts[i]);
-          }
-        }
-        ret.diskAvail = getDiskAvailable();
-      }
-      else if (isWindows()) {
-        ret.resGig = getResGigWindows();
-        ret.cpu = getCpuUtilizationWindows();
-        ret.diskAvail = getDiskAvailWindows();
+        logger.error("Error checking memory: line2=" + secondToLastLine + ", line1=" + lastLine, e);
       }
 
-      getJavaMemStats(javaMemMin, javaMemMax);
-
-      ret.javaMemMin = javaMemMin.get() == null ? 0 : javaMemMin.get();
-      ret.javaMemMax = javaMemMax.get() == null ? 0 : javaMemMax.get();
-      ret.avgRecRate = avgRecRate;
-      ret.avgTransRate = avgTransRate;
-    }
-    catch (InterruptedException e) {
-      throw e;
+      return totalGig;
     }
     catch (Exception e) {
-      logger.error("Error checking memory: line2=" + secondToLastLine + ", line1=" + lastLine, e);
       throw new DatabaseException(e);
     }
-    return ret;
   }
+
 
   public ComObject getOSStats(ComObject cobj) {
     try {
-      OSStats stats = doGetOSStats();
+      OSStatsManager.OSStats stats = osStatsManager.doGetOSStats();
       ComObject retObj = new ComObject();
       retObj.put(ComObject.Tag.resGig, stats.resGig);
       retObj.put(ComObject.Tag.cpu, stats.cpu);
@@ -3931,66 +3820,6 @@ public class DatabaseServer {
     }
     catch (Exception e) {
       throw new DatabaseException(e);
-    }
-  }
-
-  private void getJavaMemStats(AtomicReference<Double> javaMemMin, AtomicReference<Double> javaMemMax) {
-    String line = null;
-    File file = new File(gclog + ".0.current");
-    try (ReversedLinesFileReader fr = new ReversedLinesFileReader(file, Charset.forName("utf-8"))) {
-      String ch;
-      do {
-        ch = fr.readLine();
-        if (ch == null) {
-          break;
-        }
-        if (ch.indexOf("[Eden") != -1) {
-          int pos = ch.indexOf("Heap:");
-          if (pos != -1) {
-            int pos2 = ch.indexOf("(", pos);
-            if (pos2 != -1) {
-              String value = ch.substring(pos + "Heap:".length(), pos2).trim().toLowerCase();
-              double maxGig = 0;
-              if (value.contains("g")) {
-                maxGig = Double.valueOf(value.substring(0, value.length() - 1));
-              }
-              else if (value.contains("m")) {
-                maxGig = Double.valueOf(value.substring(0, value.length() - 1)) / 1000d;
-              }
-              else if (value.contains("t")) {
-                maxGig = Double.valueOf(value.substring(0, value.length() - 1)) * 1000d;
-              }
-              javaMemMax.set(maxGig);
-            }
-
-            pos2 = ch.indexOf("->", pos);
-            if (pos2 != -1) {
-              int pos3 = ch.indexOf("(", pos2);
-              if (pos3 != -1) {
-                line = ch;
-                String value = ch.substring(pos2 + 2, pos3);
-                value = value.trim().toLowerCase();
-                double minGig = 0;
-                if (value.contains("g")) {
-                  minGig = Double.valueOf(value.substring(0, value.length() - 1));
-                }
-                else if (value.contains("m")) {
-                  minGig = Double.valueOf(value.substring(0, value.length() - 1)) / 1000d;
-                }
-                else if (value.contains("t")) {
-                  minGig = Double.valueOf(value.substring(0, value.length() - 1)) * 1000d;
-                }
-                javaMemMin.set(minGig);
-              }
-            }
-            break;
-          }
-        }
-      }
-      while (ch != null);
-    }
-    catch (Exception e) {
-      logger.error("Error getting java mem stats: line=" + line);
     }
   }
 
@@ -4096,20 +3925,24 @@ public class DatabaseServer {
 
   private static String OS = System.getProperty("os.name").toLowerCase();
 
-  private static boolean isWindows() {
+  public static boolean isWindows() {
     return OS.contains("win");
   }
 
-  private static boolean isMac() {
+  public static boolean isMac() {
     return OS.contains("mac");
   }
 
-  private static boolean isUnix() {
+  public static boolean isUnix() {
     return OS.contains("nux");
   }
 
   public boolean isRunning() {
     return isRunning.get();
+  }
+
+  public boolean isRecovered() {
+    return isRecovered.get();
   }
 
   public LongRunningCalls getLongRunningCommands() {
@@ -4249,27 +4082,7 @@ public class DatabaseServer {
 
 
   public List<String> getDbNames(String dataDir) {
-    File file = null;
-    if (USE_SNAPSHOT_MGR_OLD) {
-      file = new File(dataDir, "snapshot/" + shard + "/" + replica);
-    }
-    else {
-      file = new File(dataDir, "delta/" + shard + "/" + replica);
-    }
-    String[] dirs = file.list();
-    List<String> ret = new ArrayList<>();
-    if (dirs != null) {
-      for (String dir : dirs) {
-        if (dir.equals("config.bin")) {
-          continue;
-        }
-        if (dir.equals("schema.bin")) {
-          continue;
-        }
-        ret.add(dir);
-      }
-    }
-    return ret;
+    return common.getDbNames(dataDir);
   }
 
   public void startRepartitioner() {
@@ -5270,6 +5083,9 @@ public class DatabaseServer {
 
   public byte[] invokeMethod(final byte[] body, long logSequence0, long logSequence1,
                              boolean replayedCommand, boolean enableQueuing, AtomicLong timeLogging, AtomicLong handlerTime) {
+    if (methodInvoker == null) {
+      throw new DeadServerException("Server not running");
+    }
     return methodInvoker.invokeMethod(body, logSequence0, logSequence1, replayedCommand, enableQueuing, timeLogging, handlerTime);
   }
 
@@ -5345,11 +5161,11 @@ public class DatabaseServer {
         isInternal = config.get("clientIsPrivate").asBoolean();
       }
 
-      boolean optimizedForThroughput = false;
+      boolean optimizedForThroughput = true;
       if (config.has("optimizeReadsFor")) {
         String text = config.get("optimizeReadsFor").asText();
-        if (text.equalsIgnoreCase("totalThroughput")) {
-          optimizedForThroughput = true;
+        if (!text.equalsIgnoreCase("totalThroughput")) {
+          optimizedForThroughput = false;
         }
       }
 
@@ -5573,7 +5389,7 @@ public class DatabaseServer {
           for (int i = 0; i < 100; i++) {
             Thread.sleep(300);
           }
-          OSStats stats = doGetOSStats();
+          OSStatsManager.OSStats stats = osStatsManager.doGetOSStats();
           logger.info("OS Stats: CPU=" + String.format("%.2f", stats.cpu) + ", resGig=" + String.format("%.2f", stats.resGig) +
               ", javaMemMin=" + String.format("%.2f", stats.javaMemMin) + ", javaMemMax=" + String.format("%.2f", stats.javaMemMax) +
               ", NetOut=" + String.format("%.2f", stats.avgTransRate) + ", NetIn=" + String.format("%.2f", stats.avgRecRate) +

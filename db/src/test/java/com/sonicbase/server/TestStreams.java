@@ -15,7 +15,7 @@ import com.sonicbase.schema.TableSchema;
 import com.sonicbase.streams.LocalProducer;
 import com.sonicbase.research.socket.NettyServer;
 import org.apache.commons.io.IOUtils;
-import org.codehaus.plexus.util.FileUtils;
+import org.apache.commons.io.FileUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -42,8 +42,10 @@ public class TestStreams {
   private DatabaseServer[] dbServers;
   NettyServer serverA1;
   NettyServer serverA2;
+  NettyServer serverB1;
+  NettyServer serverB2;
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void afterClass() throws SQLException {
     connA.close();
     connB.close();
@@ -53,8 +55,16 @@ public class TestStreams {
     }
     serverA1.shutdown();
     serverA2.shutdown();
+    serverB1.shutdown();
+    serverB2.shutdown();
 
     Logger.queue.clear();
+
+    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size());
+    for (DatabaseClient client : DatabaseClient.allClients) {
+      System.out.println("Stack:\n" + client.getAllocatedStack());
+    }
+
   }
 
   @BeforeClass
@@ -115,7 +125,7 @@ public class TestStreams {
         Thread.sleep(100);
       }
 
-      final NettyServer serverB1 = new NettyServer(128);
+      serverB1 = new NettyServer(128);
       thread = new Thread(new Runnable(){
         @Override
         public void run() {
@@ -132,7 +142,7 @@ public class TestStreams {
         Thread.sleep(100);
       }
 
-      final NettyServer serverB2 = new NettyServer(128);
+      serverB2 = new NettyServer(128);
       thread = new Thread(new Runnable(){
         @Override
         public void run() {
@@ -142,9 +152,15 @@ public class TestStreams {
         }
       });
       thread.start();
+      while (true) {
+        if (serverB2.isRunning()) {
+          break;
+        }
+        Thread.sleep(100);
+      }
 
       while (true) {
-        if (serverA1.isRunning() && serverA2.isRunning() && serverB1.isRunning() && serverB2.isRunning()) {
+        if (serverA1.isRecovered() && serverA2.isRecovered() && serverB1.isRecovered() && serverB2.isRecovered()) {
           break;
         }
         Thread.sleep(100);

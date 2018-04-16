@@ -2,6 +2,8 @@ package com.sonicbase.research.socket;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Logger;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.server.DatabaseServer;
@@ -25,9 +27,7 @@ import org.apache.commons.lang.exception.ExceptionUtils;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.CRC32;
@@ -51,6 +51,7 @@ public class NettyServer {
   private final int threadCount;
 
   final AtomicBoolean isRunning = new AtomicBoolean(false);
+  final AtomicBoolean isRecovered = new AtomicBoolean(false);
   private int port;
   private String cluster;
   private DatabaseServer databaseServer = null;
@@ -64,9 +65,11 @@ public class NettyServer {
 
   private Thread nettyThread = null;
   private Thread serverThread = null;
+  private boolean shutdown;
 
   public void shutdown() {
     try {
+      this.shutdown = true;
       serverThread.interrupt();
       shutdownNetty();
       nettyThread.interrupt();
@@ -134,6 +137,11 @@ public class NettyServer {
   public boolean isRunning() {
     return isRunning.get();
   }
+
+  public boolean isRecovered() {
+    return isRecovered.get();
+  }
+
 
   public enum ReadState {
     size,
@@ -749,7 +757,7 @@ public class NettyServer {
 
   public void setDatabaseServer(DatabaseServer databaseServer) {
     this.databaseServer = databaseServer;
-    logger = new Logger(databaseServer.getDatabaseClient());
+    logger = new Logger(/*databaseServer.getDatabaseClient()*/null);
     Logger.setIsClient(false);
 //    File file = new File(databaseServer.getDataDir(), "queue/" + databaseServer.getShard() + "/" + databaseServer.getReplica());
 //    queue = new Queue(file.getAbsolutePath(), "request-log", 0);
@@ -869,7 +877,7 @@ public class NettyServer {
 
         final DatabaseServer databaseServer = new DatabaseServer();
 
-        databaseServer.setConfig(config, cluster, host, port, isRunning, gclog, xmx, skipLicense);
+        databaseServer.setConfig(config, cluster, host, port, isRunning, isRecovered, gclog, xmx, skipLicense);
         databaseServer.setRole(role);
 
         setDatabaseServer(databaseServer);
@@ -900,6 +908,10 @@ public class NettyServer {
           @Override
           public void run() {
             try {
+              isRunning.set(true);
+
+              waitForServersToStart();
+
               databaseServer.recoverFromSnapshot();
 
               logger.info("applying queues");
@@ -914,7 +926,7 @@ public class NettyServer {
               databaseServer.getDeltaManager().runSnapshotLoop();
 //              databaseServer.getSnapshotManager().runSnapshotLoop();
 
-              isRunning.set(true);
+              isRecovered.set(true);
             }
             catch (Exception e) {
               logger.error("Error starting server", e);
@@ -975,6 +987,71 @@ public class NettyServer {
       throw new DatabaseException(e);
     }
     logger.info("exiting netty server");
+  }
+
+  private void waitForServersToStart() {
+    int threadCount = databaseServer.getShardCount() * databaseServer.getReplicationFactor();
+    ThreadPoolExecutor executor = new ThreadPoolExecutor(threadCount, threadCount, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+    try {
+      List<Future> futures = new ArrayList<>();
+      for (int i = 0; i < databaseServer.getShardCount(); i++) {
+        for (int j = 0; j < databaseServer.getReplicationFactor(); j++) {
+          final int shard = i;
+          final int replica = j;
+          futures.add(executor.submit(new Callable() {
+            @Override
+            public Object call() throws Exception {
+              long beginTime = System.currentTimeMillis();
+              while (!shutdown) {
+                try {
+                  if (databaseServer.getShard() == shard && databaseServer.getReplica() == replica) {
+                    break;
+                  }
+                  ComObject cobj = new ComObject();
+                  cobj.put(ComObject.Tag.method, "healthCheckPriority");
+                  byte[] ret = databaseServer.getDatabaseClient().send(null, shard, replica, cobj, DatabaseClient.Replica.specified);
+                  if (ret != null) {
+                    ComObject retObj = new ComObject(ret);
+                    String status = retObj.getString(ComObject.Tag.status);
+                    if (status.equals("{\"status\" : \"ok\"}")) {
+                      break;
+                    }
+                  }
+                  Thread.sleep(1_000);
+                }
+                catch (InterruptedException e) {
+                  return null;
+                }
+                catch (Exception e) {
+                  logger.error("Error checking if server is healthy: shard=" + shard + ", replica=" + replica);
+                }
+                if (System.currentTimeMillis() - beginTime > 2 * 60 * 1000) {
+                  logger.error("Server appears to be dead, skipping: shard=" + shard + ", replica=" + replica);
+                  break;
+                }
+              }
+              return null;
+            }
+          }));
+
+        }
+      }
+      try {
+        for (Future future : futures) {
+          future.get();
+        }
+
+        if (databaseServer.getShard() == 0 && databaseServer.getReplica() == 0) {
+          databaseServer.pushSchema();
+        }
+      }
+      catch (Exception e) {
+        logger.error("Error pushing schema", e);
+      }
+    }
+    finally {
+      executor.shutdownNow();
+    }
   }
 
   public static String getHelpPage(NettyServer server) throws IOException {

@@ -161,7 +161,8 @@ public abstract class ExpressionImpl implements Expression {
 
   public static void evaluateCounter(DatabaseCommon common, DatabaseClient client, String dbName,
                                      ExpressionImpl expression, IndexSchema indexSchema, Counter counter,
-                                     SelectFunctionImpl function, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) throws IOException {
+                                     SelectFunctionImpl function, boolean restrictToThisServer,
+                                     StoredProcedureContextImpl procedureContext, int schemaRetryCount) throws IOException {
     if ((function.getName().equalsIgnoreCase("min") || function.getName().equalsIgnoreCase("max"))) {
 
       BinaryExpression.Operator op = BinaryExpression.Operator.greater;
@@ -200,7 +201,7 @@ public abstract class ExpressionImpl implements Expression {
           op, null, orderBy, null, null, expression, null, null, null,
           columnList, indexSchema.getFields()[0], -1, expression.getRecordCache(), usedIndex, false,
           client.getCommon().getSchemaVersion(), null, null, false, new AtomicLong(),
-          null, null, false, restrictToThisServer, procedureContext);
+          new AtomicLong(), null, null, false, restrictToThisServer, procedureContext, schemaRetryCount);
       NextReturn ret = new NextReturn();
       ret.setTableNames(context.getTableNames());
       ret.setIds(context.getCurrKeys());
@@ -496,10 +497,10 @@ public abstract class ExpressionImpl implements Expression {
   abstract public Object evaluateSingleRecord(
       TableSchema[] tableSchemas, Record[] records, ParameterHandler parms);
 
-  abstract public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset);
+  abstract public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount);
 
-  public abstract NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit,
-                                  Offset offset, boolean evaluateExpression, boolean analyze);
+  public abstract NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned, Limit limit,
+                                  Offset offset, boolean evaluateExpression, boolean analyze, int schemaRetryCount);
 
   abstract public boolean canUseIndex();
 
@@ -887,7 +888,7 @@ public abstract class ExpressionImpl implements Expression {
   public static HashMap<Integer, Object[][]> readRecords(
       String dbName, final DatabaseClient client, int pageSize, boolean forceSelectOnServer, final TableSchema tableSchema,
       List<IdEntry> keysToRead, String[] columns, List<ColumnImpl> selectColumns, RecordCache recordCache,
-      int viewVersion, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) {
+      int viewVersion, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) {
 
     columns = new String[selectColumns.size()];
     for (int i = 0; i < selectColumns.size(); i++) {
@@ -895,7 +896,7 @@ public abstract class ExpressionImpl implements Expression {
     }
 
     HashMap<Integer, Object[][]> ret = doReadRecords(dbName, client, pageSize, forceSelectOnServer, tableSchema,
-        keysToRead, columns, selectColumns, recordCache, viewVersion, restrictToThisServer, procedureContext);
+        keysToRead, columns, selectColumns, recordCache, viewVersion, restrictToThisServer, procedureContext, schemaRetryCount);
 
     return ret;
   }
@@ -903,7 +904,8 @@ public abstract class ExpressionImpl implements Expression {
   public static HashMap<Integer, Object[][]> doReadRecords(
       final String dbName, final DatabaseClient client, final int pageSize, final boolean forceSelectOnServer,
       final TableSchema tableSchema, List<IdEntry> keysToRead, String[] columns, final List<ColumnImpl> selectColumns,
-      final RecordCache recordCache, final int viewVersion, final boolean restrictToThisServer, final StoredProcedureContextImpl procedureContext) {
+      final RecordCache recordCache, final int viewVersion, final boolean restrictToThisServer,
+      final StoredProcedureContextImpl procedureContext, final int schemaRetryCount) {
     try {
       int[] fieldOffsets = null;
       Comparator[] comparators = null;
@@ -997,7 +999,7 @@ public abstract class ExpressionImpl implements Expression {
             Object rightRet = ExpressionImpl.batchLookupIds(dbName,
                 client.getCommon(), client, forceSelectOnServer, pageSize, tableSchema,
                 BinaryExpression.Operator.equal, indexSchema.get(), selectColumns, entry.getValue(), entry.getKey(),
-                usedIndex, recordCache, viewVersion, restrictToThisServer, procedureContext);
+                usedIndex, recordCache, viewVersion, restrictToThisServer, procedureContext, schemaRetryCount);
             return rightRet;
           }
         }));
@@ -1046,7 +1048,8 @@ public abstract class ExpressionImpl implements Expression {
   public static Record doReadRecord(
       String dbName, DatabaseClient client, boolean forceSelectOnServer, RecordCache recordCache, Object[] key,
       String tableName, List<ColumnImpl> columns, Expression expression,
-      ParameterHandler parms, int viewVersion, boolean debug, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) {
+      ParameterHandler parms, int viewVersion, boolean debug, boolean restrictToThisServer,
+      StoredProcedureContextImpl procedureContext, int schemaRetryCount) {
 //    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
 //    DataOutputStream out = new DataOutputStream(bytesOut);
 //    out.writeUTF(tableName);
@@ -1078,8 +1081,8 @@ public abstract class ExpressionImpl implements Expression {
     SelectContextImpl context = ExpressionImpl.lookupIds(dbName, client.getCommon(), client, replica, 1, tableSchema.getName(), primaryKeyIndex.getName(), forceSelectOnServer,
         BinaryExpression.Operator.equal, null, null, key, parms, expression, null, key, null,
         columns, primaryKeyIndex.getFields()[0], nextShard, recordCache, usedIndex, true, viewVersion, expression == null ? null : ((ExpressionImpl)expression).getCounters(),
-        expression == null ? null : ((ExpressionImpl)expression).groupByContext, debug, new AtomicLong(), null,
-        null, false, restrictToThisServer, procedureContext);
+        expression == null ? null : ((ExpressionImpl)expression).groupByContext, debug, new AtomicLong(), new AtomicLong(),null,
+        null, false, restrictToThisServer, procedureContext, schemaRetryCount);
 //
     Object[][][] currKeys = context.getCurrKeys();
     if (currKeys != null) {
@@ -1116,7 +1119,7 @@ public abstract class ExpressionImpl implements Expression {
   public static Record doReadRecord(
       String dbName, DatabaseClient client, boolean forceSelectOnServer, ParameterHandler parms, Expression expression,
       RecordCache recordCache, Object[] key, String tableName, List<ColumnImpl> columns, int viewVersion, boolean debug,
-      boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) {
+      boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) {
 
 
     TableSchema tableSchema = client.getCommon().getTables(dbName).get(tableName);
@@ -1135,8 +1138,8 @@ public abstract class ExpressionImpl implements Expression {
         BinaryExpression.Operator.equal, null, null, key, parms, expression, null, key, null,
         columns, primaryKeyIndex.getFields()[0], nextShard, recordCache, usedIndex, false, viewVersion,
         expression == null ? null : ((ExpressionImpl)expression).getCounters(),
-        expression == null ? null : ((ExpressionImpl)expression).groupByContext, debug, new AtomicLong(), null,
-        null, false, restrictToThisServer, procedureContext);
+        expression == null ? null : ((ExpressionImpl)expression).groupByContext, debug, new AtomicLong(), new AtomicLong(), null,
+        null, false, restrictToThisServer, procedureContext, schemaRetryCount);
 
     CachedRecord ret = recordCache.get(tableName, key);
     if (ret != null) {
@@ -1256,7 +1259,7 @@ public abstract class ExpressionImpl implements Expression {
       final BinaryExpression.Operator operator,
       final Map.Entry<String, IndexSchema> indexSchema, final List<ColumnImpl> columns, final List<IdEntry> srcValues, final int shard,
       AtomicReference<String> usedIndex, final RecordCache recordCache, final int viewVersion, final boolean restrictToThisServer, 
-      final StoredProcedureContextImpl procedureContext) {
+      final StoredProcedureContextImpl procedureContext, final int schemaRetryCount) {
 
     Timer.Context ctx = DatabaseClient.BATCH_INDEX_LOOKUP_STATS.time();
     try {
@@ -1371,7 +1374,7 @@ public abstract class ExpressionImpl implements Expression {
                       Object[] key = ids[j];
                       Record record = doReadRecord(dbName, client, forceSelectOnServer, recordCache, key,
                           tableSchema.getName(), columns, null, null, viewVersion, false, 
-                          restrictToThisServer, procedureContext);
+                          restrictToThisServer, procedureContext, schemaRetryCount);
                       records[j] = record;
                     }
                     aggregateRecords(retRecords, offset, records);
@@ -1530,8 +1533,8 @@ public abstract class ExpressionImpl implements Expression {
       Object[] originalRightValue,
       List<ColumnImpl> columns, String columnName, int shard, RecordCache recordCache,
       AtomicReference<String> usedIndex, boolean evaluateExpression, int viewVersion, Counter[] counters,
-      GroupByContext groupByContext, boolean debug, AtomicLong currOffset, Limit limit, Offset offset, boolean isProbe,
-      boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) {
+      GroupByContext groupByContext, boolean debug, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, boolean isProbe,
+      boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) {
 
     Timer.Context ctx = DatabaseClient.INDEX_LOOKUP_STATS.time();
     StringBuilder preparedKey = new StringBuilder();
@@ -1774,7 +1777,9 @@ public abstract class ExpressionImpl implements Expression {
             Random rand = new Random(System.currentTimeMillis());
             ComObject cobj = new ComObject();
             cobj.put(ComObject.Tag.dbName, dbName);
-            cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+            if (schemaRetryCount < 2) {
+              cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+            }
 
             cobj.put(ComObject.Tag.preparedId, preparedId);
             cobj.put(ComObject.Tag.isPrepared, isPrepared);
@@ -1790,6 +1795,7 @@ public abstract class ExpressionImpl implements Expression {
             cobj.put(ComObject.Tag.isProbe, isProbe);
 
             cobj.put(ComObject.Tag.currOffset, currOffset.get());
+            cobj.put(ComObject.Tag.countReturned, countReturned.get());
             if (limit != null) {
               cobj.put(ComObject.Tag.limitLong, limit.getRowCount());
             }
@@ -1910,6 +1916,10 @@ public abstract class ExpressionImpl implements Expression {
             Long retOffset = retObj.getLong(ComObject.Tag.currOffset);
             if (retOffset != null) {
               currOffset.set(retOffset);
+            }
+            Long retCountReturned = retObj.getLong(ComObject.Tag.countReturned);
+            if (retCountReturned != null) {
+              countReturned.set(retCountReturned);
             }
             if (restrictToThisServer) {
               if (nextKey == null) {
@@ -2136,7 +2146,7 @@ public abstract class ExpressionImpl implements Expression {
                     }
                   }
                   doReadRecords(dbName, client, count, forceSelectOnServer, tableSchema, keysToRead, indexColumns,
-                      columns, recordCache, viewVersion, restrictToThisServer, procedureContext);
+                      columns, recordCache, viewVersion, restrictToThisServer, procedureContext, schemaRetryCount);
                 }
               }
             }

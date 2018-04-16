@@ -4,12 +4,24 @@
   <groupId>com.sonicbase</groupId>
   <artifactId>sonicbase-root</artifactId>
   <packaging>pom</packaging>
-  <version>1.2.11</version>
+  <version>1.2.12</version>
   <name>sonicbase-root</name>
   <url>http://maven.apache.org</url>
   <build>
     <pluginManagement>
       <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-jar-plugin</artifactId>
+          <version>3.1.0</version>
+          <executions>
+            <execution>
+              <goals>
+                <goal>test-jar</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-jar-plugin</artifactId>

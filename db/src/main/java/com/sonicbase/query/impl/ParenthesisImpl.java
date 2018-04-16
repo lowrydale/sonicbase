@@ -94,13 +94,15 @@ public class ParenthesisImpl extends ExpressionImpl {
   }
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset, boolean b, boolean analyze) {
-    NextReturn ret = doNext(explain, count, currOffset, limit, offset);
+  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
+                         Limit limit, Offset offset, boolean b, boolean analyze, int schemaRetryCount) {
+    NextReturn ret = doNext(explain, count, currOffset, countReturned, limit, offset, schemaRetryCount);
     return ret;
 //    return expression.next(count, eplain, currOffset, limit, offset, b);
   }
 
-  private NextReturn doNext(SelectStatementImpl.Explain explain, int count, AtomicLong currOffset, Limit limit, Offset offset) {
+  private NextReturn doNext(SelectStatementImpl.Explain explain, int count, AtomicLong currOffset,
+                            AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
     if (isNot) {
       TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(getTableName());
       IndexSchema indexSchema = null;
@@ -123,8 +125,8 @@ public class ParenthesisImpl extends ExpressionImpl {
       SelectContextImpl context = lookupIds(dbName, getClient().getCommon(), getClient(), getReplica(), count, tableSchema.getName(), indexSchema.getName(), isForceSelectOnServer(),
           op, null, getOrderByExpressions(), getNextKey(), getParms(), this, null, getNextKey(), null,
           getColumns(), indexSchema.getFields()[0], getNextShard(), getRecordCache(), usedIndex, isNot, getViewVersion(),
-          getCounters(), getGroupByContext(), debug, currOffset, limit, offset, isProbe(), isRestrictToThisServer(),
-          getProcedureContext());
+          getCounters(), getGroupByContext(), debug, currOffset, countReturned, limit, offset, isProbe(), isRestrictToThisServer(),
+          getProcedureContext(), schemaRetryCount);
       setNextShard(context.getNextShard());
       setNextKey(context.getNextKey());
       NextReturn ret = new NextReturn();
@@ -138,8 +140,8 @@ public class ParenthesisImpl extends ExpressionImpl {
   }
 
 
-  public NextReturn next(SelectStatementImpl.Explain explainBuilder, AtomicLong currOffset, Limit limit, Offset offset) {
-    NextReturn ret = doNext(null,1000, currOffset, limit, offset);
+  public NextReturn next(SelectStatementImpl.Explain explainBuilder, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
+    NextReturn ret = doNext(null,1000, currOffset, countReturned, limit, offset, schemaRetryCount);
     return ret;
   }
 

@@ -22,9 +22,9 @@ import com.sonicbase.streams.LocalProducer;
 import com.sonicbase.streams.Message;
 import com.sun.jersey.core.util.Base64;
 import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
-import org.codehaus.plexus.util.FileUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -57,7 +57,7 @@ public class TestDatabase {
   DatabaseClient client = null;
   DatabaseServer[] dbServers;
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void afterClass() throws SQLException {
     conn.close();
 
@@ -65,7 +65,10 @@ public class TestDatabase {
       server.shutdown();
     }
     Logger.queue.clear();
-
+    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size() + ", class=TestDatabase");
+    for (DatabaseClient client : DatabaseClient.allClients) {
+      System.out.println("Stack:\n" + client.getAllocatedStack());
+    }
   }
 
   @BeforeClass
@@ -99,10 +102,27 @@ public class TestDatabase {
         //          String role = "primaryMaster";
 
         dbServers[shard] = new DatabaseServer();
-        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null, true);
+        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
         dbServers[shard].setRole(role);
         dbServers[shard].disableLogProcessor();
         dbServers[shard].setMinSizeForRepartition(0);
+
+//        if (shard == 0) {
+//          Map<Integer, Object> map = new HashMap<>();
+//          DatabaseClient.getServers2().put(0, map);
+//          map.put(0, dbServers[shard]);
+//        }
+//        if (shard == 1) {
+//          DatabaseClient.getServers2().get(0).put(1, dbServers[shard]);
+//        }
+//        if (shard == 2) {
+//          Map<Integer, Object> map = new HashMap<>();
+//          DatabaseClient.getServers2().put(1, map);
+//          map.put(0, dbServers[shard]);
+//        }
+//        if (shard == 3) {
+//          DatabaseClient.getServers2().get(1).put(1, dbServers[shard]);
+//        }
         //          return null;
         //        }
         //      }));
@@ -131,7 +151,12 @@ public class TestDatabase {
 
       conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000", "user", "password");
 
-      ((ConnectionProxy) conn).getDatabaseClient().createDatabase("_sonicbase_sys");
+      try {
+        ((ConnectionProxy) conn).getDatabaseClient().createDatabase("_sonicbase_sys");
+      }
+      catch (Exception e) {
+        e.printStackTrace();
+      }
 
       conn.close();
 
@@ -151,6 +176,8 @@ public class TestDatabase {
       stmt.setLong(3, 1);
       assertEquals(stmt.executeUpdate(), 1);
 
+
+      conn.close();
 
       conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000", "user", "password");
 
@@ -253,19 +280,19 @@ public class TestDatabase {
         assertTrue(ExceptionUtils.getStackTrace(e).contains("Unique constraint violated"));
       }
 
-      for (int i = 0; i < recordCount; i++) {
-        stmt = conn.prepareStatement("insert ignore into persons (id, socialSecurityNumber, relatives, restricted, gender, id3) VALUES (?, ?, ?, ?, ?, ?)");
-        stmt.setLong(1, i);
-        stmt.setString(2, "933-28-" + i);
-        stmt.setString(3, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
-        stmt.setBoolean(4, false);
-        stmt.setString(5, "m");
-        stmt.setLong(6, i + 1000);
-        assertEquals(stmt.executeUpdate(), 1);
-        ids.add((long) i);
-        stmt.addBatch();
-      }
-      stmt.executeBatch();
+//      for (int i = 0; i < recordCount; i++) {
+//        stmt = conn.prepareStatement("insert ignore into persons (id, socialSecurityNumber, relatives, restricted, gender, id3) VALUES (?, ?, ?, ?, ?, ?)");
+//        stmt.setLong(1, i);
+//        stmt.setString(2, "933-28-" + i);
+//        stmt.setString(3, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+//        stmt.setBoolean(4, false);
+//        stmt.setString(5, "m");
+//        stmt.setLong(6, i + 1000);
+//        assertEquals(stmt.executeUpdate(), 1);
+//        ids.add((long) i);
+//        stmt.addBatch();
+//      }
+//      stmt.executeBatch();
 
       try {
         for (int i = 0; i < recordCount; i++) {
@@ -597,7 +624,7 @@ public class TestDatabase {
 
   @Test
   public void testDebug() {
-    ((ConnectionProxy) conn).getDatabaseClient().debugRecord("test", "persons", "_1__primarykey", "[100]");
+    ((ConnectionProxy) conn).getDatabaseClient().debugRecord("test", "persons", "_1__primarykey", "[100]", 0);
   }
 
   @Test(enabled = false)
@@ -684,9 +711,9 @@ public class TestDatabase {
            null,
            columns, "socialsecuritynumber", 0, recordCache,
            usedIndex, false, client.getCommon().getSchemaVersion(), null, null,
-         false, new AtomicLong(), null, null, false, false, null);
+         false, new AtomicLong(), new AtomicLong(), null, null, false, false, null, 0);
 
-     assertEquals(ret.getCurrKeys().length, 4);
+     assertEquals(ret.getCurrKeys().length, 8);
 
   }
 
@@ -3557,7 +3584,7 @@ public class TestDatabase {
         public Object call() throws Exception {
           String role = "primaryMaster";
           dbServers[shard] = new DatabaseServer();
-          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null, true);
+          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
           dbServers[shard].setRole(role);
           dbServers[shard].disableLogProcessor();
           return null;
@@ -3657,7 +3684,7 @@ public class TestDatabase {
         public Object call() throws Exception {
           String role = "primaryMaster";
           dbServers[shard] = new DatabaseServer();
-          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null, true);
+          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
           dbServers[shard].setRole(role);
           dbServers[shard].disableLogProcessor();
           return null;
@@ -3751,7 +3778,7 @@ public class TestDatabase {
         public Object call() throws Exception {
           String role = "primaryMaster";
           dbServers[shard] = new DatabaseServer();
-          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null, true);
+          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
           dbServers[shard].setRole(role);
           dbServers[shard].disableLogProcessor();
           return null;
@@ -3942,7 +3969,7 @@ public class TestDatabase {
       }
     }
     PreparedStatement stmt2 = conn.prepareStatement("delete from ToDeleteNoPrimaryKey where id=0");
-    assertTrue(stmt2.execute());
+    assertEquals(stmt2.executeUpdate(), 1);
 
     try {
       stmt = conn.prepareStatement("select * from ToDeleteNoPrimaryKey where id = 0");

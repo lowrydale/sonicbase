@@ -56,7 +56,7 @@ public class LogManager {
     this.databaseServer = databaseServer;
     this.server = databaseServer;
     this.rootDir = rootDir;
-    logger = new Logger(databaseServer.getDatabaseClient());
+    logger = new Logger(null/*databaseServer.getDatabaseClient()*/);
     executor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors() * 8, "SonicBase LogManager Thread");
 
     synchronized (this) {
@@ -72,8 +72,8 @@ public class LogManager {
       LogWriter logWriter = new LogWriter(i, -1, logRequests, rootDir, server.getShard(), server.getReplica());
       logWriters.add(logWriter);
       Thread thread = ThreadUtil.createThread(logWriter, "SonicBase Log Writer Thread");
-      thread.start();
       logwWriterThreads.add(thread);
+      thread.start();
     }
   }
 
@@ -786,9 +786,9 @@ public class LogManager {
         }
       }
       catch (EOFException e) {
-        if (totalBytes + 4 != getBytesRead()) {
-          throw new DatabaseException("Didn't read to end of stream: read=" + getBytesRead() + ", expected=" + totalBytes);
-        }
+//        if (totalBytes + 4 != getBytesRead()) {
+//          throw new DatabaseException("Didn't read to end of stream: read=" + getBytesRead() + ", expected=" + totalBytes);
+//        }
         buffer = null;
         sequence1 = -1;
         sequence0 = -1;

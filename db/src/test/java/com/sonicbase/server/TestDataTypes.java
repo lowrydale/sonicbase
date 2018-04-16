@@ -12,7 +12,7 @@ import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.streams.LocalProducer;
 import com.sonicbase.streams.Message;
 import org.apache.commons.io.IOUtils;
-import org.codehaus.plexus.util.FileUtils;
+import org.apache.commons.io.FileUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -38,7 +38,7 @@ public class TestDataTypes {
 
   DatabaseServer[] dbServers;
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void afterClass() throws SQLException {
     conn.close();
 
@@ -46,6 +46,10 @@ public class TestDataTypes {
       server.shutdown();
     }
     Logger.queue.clear();
+    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size() + ", class=TestDataTypes");
+    for (DatabaseClient client : DatabaseClient.allClients) {
+      System.out.println("Stack:\n" + client.getAllocatedStack());
+    }
   }
 
   @BeforeClass
@@ -73,7 +77,7 @@ public class TestDataTypes {
     for (int i = 0; i < dbServers.length; i++) {
       final int shard = i;
       dbServers[shard] = new DatabaseServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null, true);
+      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true),new AtomicBoolean(true), null, true);
       dbServers[shard].setRole(role);
       dbServers[shard].disableLogProcessor();
       dbServers[shard].setMinSizeForRepartition(0);
@@ -97,8 +101,6 @@ public class TestDataTypes {
     conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/test", "user", "password");
 
     Logger.setReady(false);
-
-    DatabaseClient client = ((ConnectionProxy)conn).getDatabaseClient();
 
     executor.shutdownNow();
   }
@@ -243,6 +245,7 @@ public class TestDataTypes {
 //    assertEquals(client.getPartitionSize(2, "persons", "_1__primarykey"), 9);
 //    assertEquals(client.getPartitionSize(3, "persons", "_1__primarykey"), 8);
 
+    client.shutdown();
   }
 
   private int countRecords(List<Message> msgs) {

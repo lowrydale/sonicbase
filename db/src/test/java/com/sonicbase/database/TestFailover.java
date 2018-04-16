@@ -11,8 +11,8 @@ import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.query.impl.ColumnImpl;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.server.DatabaseServer;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.codehaus.plexus.util.FileUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -84,7 +84,7 @@ public class TestFailover {
         int replica = i % 2;
 
         dbServers[shard][replica] = new DatabaseServer();
-        dbServers[shard][replica].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), null, true);
+        dbServers[shard][replica].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
         dbServers[shard][replica].setRole(role);
         dbServers[shard][replica].disableLogProcessor();
         dbServers[shard][replica].setMinSizeForRepartition(0);

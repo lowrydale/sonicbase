@@ -49,7 +49,7 @@ public class UpdateManager {
 
   public UpdateManager(DatabaseServer databaseServer) {
     this.server = databaseServer;
-    this.logger = new Logger(databaseServer.getDatabaseClient());
+    this.logger = new Logger(/*databaseServer.getDatabaseClient()*/null);
 
     initMessageQueueProducers();
     initPublisher();
@@ -60,15 +60,17 @@ public class UpdateManager {
 
   public void shutdown() {
     this.shutdown = true;
-    for (Thread thread : publisherThreads) {
-      thread.interrupt();
-    }
-    for (Thread thread : publisherThreads) {
-      try {
-        thread.join();
+    if (publisherThreads != null) {
+      for (Thread thread : publisherThreads) {
+        thread.interrupt();
       }
-      catch (InterruptedException e) {
-        throw new DatabaseException(e);
+      for (Thread thread : publisherThreads) {
+        try {
+          thread.join();
+        }
+        catch (InterruptedException e) {
+          throw new DatabaseException(e);
+        }
       }
     }
   }
@@ -149,8 +151,8 @@ public class UpdateManager {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     String tableName = cobj.getString(ComObject.Tag.tableName);
     byte[] primaryKeyBytes = cobj.getByteArray(ComObject.Tag.primaryKeyBytes);
-    int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
-    if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
+    Integer schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
+    if (!replayedCommand && schemaVersion != null && schemaVersion < server.getSchemaVersion()) {
       throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
     }
 
@@ -165,7 +167,7 @@ public class UpdateManager {
     AtomicBoolean shouldExecute = new AtomicBoolean();
     AtomicBoolean shouldDeleteLock = new AtomicBoolean();
 
-    TableSchema tableSchema = server.getCommon().getSchema(dbName).getTables().get(tableName);
+    TableSchema tableSchema = server.getCommon().getTableSchema(dbName, tableName, server.getDataDir());
     Record record = new Record(tableSchema);
     byte[] recordBytes = cobj.getByteArray(ComObject.Tag.recordBytes);
     short serializationVersion = cobj.getShort(ComObject.Tag.serializationVersion);
@@ -218,13 +220,21 @@ public class UpdateManager {
               byte[][] newRecords = new byte[records.length - 1][];
               boolean found = false;
               int offset = 0;
+
+              int deletedOffset = -1;
               for (int i = 0; i < records.length; i++) {
                 if (Arrays.equals(KeyRecord.getPrimaryKey(records[i]), primaryKeyBytes)) {
                   found = true;
                   deletedRecords.add(records[i]);
+                  deletedOffset = i;
                 }
-                else {
-                  newRecords[offset++] = records[i];
+              }
+
+              if (deletedOffset != -1) {
+                for (int i = 0; i < records.length; i++) {
+                  if (i != deletedOffset) {
+                    newRecords[offset++] = records[i];
+                  }
                 }
               }
               if (found) {
@@ -313,7 +323,7 @@ public class UpdateManager {
     String tableName = cobj.getString(ComObject.Tag.tableName);
     String indexName = cobj.getString(ComObject.Tag.indexName);
 
-    TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
+    TableSchema tableSchema = server.getCommon().getTableSchema(dbName, tableName, server.getDataDir());
     String primaryKeyIndexName = null;
     for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
       if (entry.getValue().isPrimaryKey()) {
@@ -341,7 +351,7 @@ public class UpdateManager {
               }
 
               DatabaseClient.KeyInfo primaryKey = new DatabaseClient.KeyInfo();
-              tableSchema = server.getCommon().getTables(dbName).get(tableName);
+              tableSchema = server.getCommon().getTableSchema(dbName, tableName, server.getDataDir());
 
               long id = 0;
               if (tableSchema.getFields().get(0).getName().equals("_sonicbase_id")) {
@@ -358,6 +368,7 @@ public class UpdateManager {
               }
               for (final DatabaseClient.KeyInfo keyInfo : keys) {
                 if (keyInfo.getIndexSchema().getKey().equals(indexName)) {
+                  int schemaRetryCount = 0;
                   while (true) {
                     try {
                       String command = "DatabaseServer:ComObject:insertIndexEntryByKey:";
@@ -383,10 +394,11 @@ public class UpdateManager {
                       keyRecord.setPrimaryKey(primaryKeyBytes);
                       keyRecord.setDbViewNumber(server.getCommon().getSchemaVersion());
                       server.getDatabaseClient().insertKey(dbName, tableName, keyInfo, primaryKeyIndexName,
-                          primaryKey.getKey(), keyRecord, server.getShard(), server.getReplica(), true);
+                          primaryKey.getKey(), keyRecord, server.getShard(), server.getReplica(), true, schemaRetryCount);
                       break;
                     }
                     catch (SchemaOutOfSyncException e) {
+                      schemaRetryCount++;
                       continue;
                     }
                     catch (Exception e) {
@@ -430,8 +442,8 @@ public class UpdateManager {
                                            long sequence0, long sequence1, AtomicBoolean isExplicitTransRet, AtomicLong transactionIdRet, boolean isCommitting) {
     try {
       String dbName = cobj.getString(ComObject.Tag.dbName);
-      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
-      if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
+      Integer schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
+      if (!replayedCommand && schemaVersion != null && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
       String tableName = cobj.getString(ComObject.Tag.tableName);
@@ -445,7 +457,7 @@ public class UpdateManager {
         transactionIdRet.set(transactionId);
       }
 
-      TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
+      TableSchema tableSchema = server.getCommon().getTableSchema(dbName, tableName, server.getDataDir());
       short serializationVersion = cobj.getShort(ComObject.Tag.serializationVersion);
       byte[] keyBytes = cobj.getByteArray(ComObject.Tag.keyBytes);
       byte[] primaryKeyBytes = cobj.getByteArray(ComObject.Tag.primaryKeyBytes);
@@ -507,8 +519,8 @@ public class UpdateManager {
 
   public ComObject insertIndexEntryByKey(ComObject cobj, boolean replayedCommand) {
 
-    int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
-    if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
+    Integer schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
+    if (!replayedCommand && schemaVersion != null && schemaVersion < server.getSchemaVersion()) {
       throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
     }
 
@@ -537,8 +549,8 @@ public class UpdateManager {
       }
 
       String dbName = outerCobj.getString(ComObject.Tag.dbName);
-      int schemaVersion = outerCobj.getInt(ComObject.Tag.schemaVersion);
-      if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
+      Integer schemaVersion = outerCobj.getInt(ComObject.Tag.schemaVersion);
+      if (!replayedCommand && schemaVersion != null && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
 
@@ -564,7 +576,7 @@ public class UpdateManager {
         transactionIdRet.set(transactionId);
       }
 
-      TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
+      TableSchema tableSchema = server.getCommon().getTableSchema(dbName, tableName, server.getDataDir());
       Object[] key = DatabaseCommon.deserializeKey(tableSchema, cobj.getByteArray(ComObject.Tag.keyBytes));
       byte[] KeyRecordBytes = cobj.getByteArray(ComObject.Tag.keyRecordBytes);//cobj.getByteArray(ComObject.Tag.primaryKeyBytes);
       IndexSchema indexSchema = tableSchema.getIndexes().get(indexName);
@@ -610,9 +622,9 @@ public class UpdateManager {
         server.getTransactionManager().deleteLock(dbName, tableName, indexName, transactionId, tableSchema, primaryKey);
       }
 
-      if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
-        throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
-      }
+//      if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
+//        throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
+//      }
 
       return null;
     }
@@ -653,8 +665,8 @@ private static class InsertRequest {
   private AtomicLong lastReset = new AtomicLong(System.currentTimeMillis());
 
   public ComObject batchInsertIndexEntryByKeyWithRecord(final ComObject cobj, final boolean replayedCommand) {
-    int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
-    if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
+    Integer schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
+    if (!replayedCommand && schemaVersion != null && schemaVersion < server.getSchemaVersion()) {
       throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
     }
 
@@ -838,8 +850,8 @@ private static class InsertRequest {
 
   public ComObject insertIndexEntryByKeyWithRecord(ComObject cobj, boolean replayedCommand) {
     try {
-      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
-      if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
+      Integer schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
+      if (!replayedCommand && schemaVersion != null && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
 
@@ -877,8 +889,8 @@ private static class InsertRequest {
       }
 
       String dbName = outerCobj.getString(ComObject.Tag.dbName);
-      int schemaVersion = outerCobj.getInt(ComObject.Tag.schemaVersion);
-      if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
+      Integer schemaVersion = outerCobj.getInt(ComObject.Tag.schemaVersion);
+      if (!replayedCommand && schemaVersion != null && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
 
@@ -995,8 +1007,8 @@ private static class InsertRequest {
 
   public ComObject rollback(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
-    int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
-    if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
+    Integer schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
+    if (!replayedCommand && schemaVersion != null && schemaVersion < server.getSchemaVersion()) {
       throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
     }
     long transactionId = cobj.getLong(ComObject.Tag.transactionId);
@@ -1019,8 +1031,8 @@ private static class InsertRequest {
     long sequence1 = cobj.getLong(ComObject.Tag.sequence1);
 
     String dbName = cobj.getString(ComObject.Tag.dbName);
-    int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
-    if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
+    Integer schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
+    if (!replayedCommand && schemaVersion != null && schemaVersion < server.getSchemaVersion()) {
       throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
     }
     long transactionId = cobj.getLong(ComObject.Tag.transactionId);
@@ -1116,8 +1128,8 @@ private static class InsertRequest {
                                   AtomicBoolean isExplicitTransRet, AtomicLong transactionIdRet, boolean isCommitting) {
     try {
       String dbName = cobj.getString(ComObject.Tag.dbName);
-      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
-      if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
+      Integer schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
+      if (!replayedCommand && schemaVersion != null && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
       String tableName = cobj.getString(ComObject.Tag.tableName);
@@ -1131,7 +1143,7 @@ private static class InsertRequest {
         transactionIdRet.set(transactionId);
       }
 
-      TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
+      TableSchema tableSchema = server.getCommon().getTableSchema(dbName, tableName, server.getDataDir());
       byte[] primaryKeyBytes = cobj.getByteArray(ComObject.Tag.primaryKeyBytes);
       Object[] primaryKey = DatabaseCommon.deserializeKey(tableSchema, primaryKeyBytes);
       byte[] bytes = cobj.getByteArray(ComObject.Tag.bytes);
@@ -1344,7 +1356,7 @@ private static class InsertRequest {
         }
 
         if (indexSchema.isUnique()) {
-          throw new DatabaseException("Unique constraint violated: table=" + tableName + ", index=" + indexSchema.getName() + ", key=" + DatabaseCommon.keyToString(key));
+          throw new UniqueConstraintViolationException("Unique constraint violated: table=" + tableName + ", index=" + indexSchema.getName() + ", key=" + DatabaseCommon.keyToString(key));
         }
         if (replaced) {
           Object address = server.toUnsafeFromRecords(records);
@@ -1424,7 +1436,7 @@ private static class InsertRequest {
           if (!ignoreDuplicates && existingValue != null && !sameTrans && !sameSequence) {
             index.put(key, existingValue);
             server.freeUnsafeIds(newUnsafeRecords);
-            throw new DatabaseException("Unique constraint violated: table=" + tableName + ", index=" + indexName + ", key=" + DatabaseCommon.keyToString(key));
+            throw new UniqueConstraintViolationException("Unique constraint violated: table=" + tableName + ", index=" + indexName + ", key=" + DatabaseCommon.keyToString(key));
           }
           if ((Record.getDbViewFlags(bytes[0]) & Record.DB_VIEW_FLAG_DELETING) != 0) {
             if ((Record.getDbViewFlags(recordBytes) & Record.DB_VIEW_FLAG_DELETING) == 0) {
@@ -1439,13 +1451,15 @@ private static class InsertRequest {
       }
       if (!movingRecord) {
         if (threadLocalIsBatchRequest.get() != null && threadLocalIsBatchRequest.get()) {
-          if (!producers.isEmpty()) {
-            MessageRequest request = new MessageRequest();
-            request.dbName = dbName;
-            request.tableName = tableName;
-            request.recordBytes = recordBytes;
-            request.updateType = UpdateType.insert;
-            threadLocalMessageRequests.get().add(request);
+          if (!dbName.equals("_sonicbase_sys")) {
+            if (!producers.isEmpty()) {
+              MessageRequest request = new MessageRequest();
+              request.dbName = dbName;
+              request.tableName = tableName;
+              request.recordBytes = recordBytes;
+              request.updateType = UpdateType.insert;
+              threadLocalMessageRequests.get().add(request);
+            }
           }
         }
         else {
@@ -1480,44 +1494,48 @@ class MessageRequest {
   private ArrayBlockingQueue<MessageRequest> publishQueue = new ArrayBlockingQueue<>(30_000);
 
   public void initPublisher() {
-    if (!server.haveProLicense()) {
-      throw new InsufficientLicense("You must have a pro license to use message queue integration");
-    }
+    final ObjectNode config = server.getConfig();
+    ObjectNode queueDict = (ObjectNode) config.get("streams");
+    if (queueDict != null) {
+      if (!server.haveProLicense()) {
+        throw new InsufficientLicense("You must have a pro license to use message queue integration");
+      }
 
-    publisherThreads = new Thread[publisherThreadCount];
-    for (int i = 0; i < publisherThreads.length; i++) {
-      publisherThreads[i] = new Thread(new Runnable() {
-        @Override
-        public void run() {
-          List<MessageRequest> toProcess = new ArrayList<>();
-          long lastTimePublished = System.currentTimeMillis();
-          while (!shutdown) {
-            try {
-              for (int i = 0; i < maxPublishBatchSize * 4; i++) {
-                MessageRequest initialRequest = publishQueue.poll(100, TimeUnit.MILLISECONDS);
-                if (initialRequest == null) {
+      publisherThreads = new Thread[publisherThreadCount];
+      for (int i = 0; i < publisherThreads.length; i++) {
+        publisherThreads[i] = new Thread(new Runnable() {
+          @Override
+          public void run() {
+            List<MessageRequest> toProcess = new ArrayList<>();
+            long lastTimePublished = System.currentTimeMillis();
+            while (!shutdown) {
+              try {
+                for (int i = 0; i < maxPublishBatchSize * 4; i++) {
+                  MessageRequest initialRequest = publishQueue.poll(100, TimeUnit.MILLISECONDS);
+                  if (initialRequest == null) {
+                  }
+                  else {
+                    toProcess.add(initialRequest);
+                  }
+                  if (System.currentTimeMillis() - lastTimePublished > 2000) {
+                    break;
+                  }
                 }
-                else {
-                  toProcess.add(initialRequest);
-                }
-                if (System.currentTimeMillis() - lastTimePublished > 2000) {
-                  break;
-                }
-              }
 
-              if (toProcess.size() != 0) {
-                publishMessages(toProcess);
-                toProcess.clear();
+                if (toProcess.size() != 0) {
+                  publishMessages(toProcess);
+                  toProcess.clear();
+                }
+                lastTimePublished = System.currentTimeMillis();
               }
-              lastTimePublished = System.currentTimeMillis();
-            }
-            catch (Exception e) {
-              logger.error("error in message publisher", e);
+              catch (Exception e) {
+                logger.error("error in message publisher", e);
+              }
             }
           }
-        }
-      });
-      publisherThreads[i].start();
+        });
+        publisherThreads[i].start();
+      }
     }
   }
 
@@ -1563,7 +1581,7 @@ class MessageRequest {
         builder.append("\"_sonicbase_action\": \"").append(currRequest.updateType).append("\",");
         builder.append("\"before\" : {");
 
-        TableSchema tableSchema = server.getCommon().getTables(currRequest.dbName).get(currRequest.tableName);
+        TableSchema tableSchema = server.getCommon().getTableSchema(currRequest.dbName, currRequest.tableName, server.getDataDir());
         Record record = new Record(currRequest.dbName, server.getCommon(), currRequest.existingBytes);
         getJsonFromRecord(builder, tableSchema, record);
         builder.append("},");
@@ -1574,7 +1592,7 @@ class MessageRequest {
 
       }
       else {
-        TableSchema tableSchema = server.getCommon().getTables(currRequest.dbName).get(currRequest.tableName);
+        TableSchema tableSchema = server.getCommon().getTableSchema(currRequest.dbName, currRequest.tableName, server.getDataDir());
         Record record = new Record(currRequest.dbName, server.getCommon(), currRequest.recordBytes);
 
         builder.append("\"_sonicbase_dbname\": \"").append(currRequest.dbName).append("\",");
@@ -1608,7 +1626,9 @@ class MessageRequest {
           }
         }
         for (MessageRequest msg : toPublish) {
-          publishQueue.put(msg);
+          if (!msg.dbName.equals("_sonicbase_sys")) {
+            publishQueue.put(msg);
+          }
         }
       }
       catch (Exception e) {
@@ -1641,7 +1661,7 @@ class MessageRequest {
         builder.append("\"action\": \"" + request.updateType.name() + "\",");
         builder.append("\"records\":[");
         builder.append("{");
-        TableSchema tableSchema = server.getCommon().getTables(request.dbName).get(request.tableName);
+        TableSchema tableSchema = server.getCommon().getTableSchema(request.dbName, request.tableName, server.getDataDir());
         Record record = new Record(request.dbName, server.getCommon(), request.recordBytes);
         getJsonFromRecord(builder, tableSchema, record);
         builder.append("}");
@@ -1672,7 +1692,7 @@ class MessageRequest {
           }
           request = messages.remove(0);
           builder.append("{");
-          TableSchema tableSchema = server.getCommon().getTables(request.dbName).get(request.tableName);
+          TableSchema tableSchema = server.getCommon().getTableSchema(request.dbName, request.tableName, server.getDataDir());
           Record record = new Record(request.dbName, server.getCommon(), request.recordBytes);
           getJsonFromRecord(builder, tableSchema, record);
           builder.append("}");
@@ -1691,6 +1711,9 @@ class MessageRequest {
 
 
   private void publishInsertOrUpdate(ComObject cobj, String dbName, String tableName, byte[] recordBytes, byte[] existingBytes, UpdateType updateType) {
+    if (dbName.equals("_sonicbase_sys")) {
+      return;
+    }
     if (!producers.isEmpty()) {
       if (!server.haveProLicense()) {
         throw new InsufficientLicense("You must have a pro license to use message queue integration");
@@ -1828,8 +1851,8 @@ class MessageRequest {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     String tableName = cobj.getString(ComObject.Tag.tableName);
     String indexName = cobj.getString(ComObject.Tag.indexName);
-    int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
-    if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
+    Integer schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
+    if (!replayedCommand && schemaVersion != null && schemaVersion < server.getSchemaVersion()) {
       throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
     }
 
@@ -1844,7 +1867,7 @@ class MessageRequest {
     AtomicBoolean shouldExecute = new AtomicBoolean();
     AtomicBoolean shouldDeleteLock = new AtomicBoolean();
 
-    TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
+    TableSchema tableSchema = server.getCommon().getTableSchema(dbName, tableName, server.getDataDir());
     byte[] keyBytes = cobj.getByteArray(ComObject.Tag.keyBytes);
     Object[] key = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
 
@@ -1901,13 +1924,13 @@ class MessageRequest {
 
   public ComObject truncateTable(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
-    int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
-    if (!replayedCommand && schemaVersion < server.getSchemaVersion()) {
+    Integer schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
+    if (!replayedCommand && schemaVersion != null && schemaVersion < server.getSchemaVersion()) {
       throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
     }
     String table = cobj.getString(ComObject.Tag.tableName);
     String phase = cobj.getString(ComObject.Tag.phase);
-    TableSchema tableSchema = server.getCommon().getTables(dbName).get(table);
+    TableSchema tableSchema = server.getCommon().getTableSchema(dbName, table, server.getDataDir());
     if (tableSchema != null) {
       for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
         Index index = server.getIndex(dbName, table, entry.getKey());
@@ -2100,7 +2123,7 @@ class MessageRequest {
       String fromTable = selectStatement.getFromTable();
       List<ColumnImpl> srcColumns = selectStatement.getSelectColumns();
 
-      TableSchema fromTableSchema = server.getCommon().getTables(dbName).get(fromTable);
+      TableSchema fromTableSchema = server.getCommon().getTableSchema(dbName, fromTable, server.getDataDir());
       DataType.Type[] columnTypes = new DataType.Type[srcColumns.size()];
       for (int i = 0; i < columnTypes.length; i++) {
         ColumnImpl srcColumn = srcColumns.get(i);
@@ -2121,113 +2144,117 @@ class MessageRequest {
       //todo: make failsafe
       Class.forName("com.sonicbase.jdbcdriver.Driver");
       final Connection conn = DriverManager.getConnection("jdbc:sonicbase:" + address + ":" + port + "/" + dbName);
-
-      String destColumnsStr = "";
-      String destParmsStr = "";
-      for (int i = 0; i < columnsArray.getArray().size(); i++) {
-        if (i != 0) {
-          destColumnsStr += ",";
-          destParmsStr += ",";
-        }
-        destColumnsStr += (String)columnsArray.getArray().get(i);
-        destParmsStr += "?";
-      }
-
-      ResultSet rs = (ResultSet) selectStatement.execute(dbName, null, null, null,
-          null, false, null);
-      String sql = "insert " + (ignore ? "ignore" : "") + " into " + tableName + " (" + destColumnsStr + ") values (" + destParmsStr + ")";
-      System.out.println(sql);
-      PreparedStatement stmt = conn.prepareStatement(sql);
-
-      int totalCountInserted = 0;
-      while (true) {
-        int batchSize = 0;
-        for (int j = 0; j < 100 && rs.next(); j++) {
-          for (int i = 0; i < columnsArray.getArray().size(); i++) {
-            ColumnImpl srcColumn = srcColumns.get(i);
-            String alias = srcColumn.getAlias();
-            String columnName = srcColumn.getColumnName();
-            if (alias != null && !"__alias__".equals(alias)) {
-              columnName = alias;
-            }
-//            else if (srcColumn.getTableName() != null) {
-//              columnName = srcColumn.getTableName() + "." + columnName;
-//            }
-            switch (columnTypes[i]) {
-              case BIGINT:
-                stmt.setLong(i + 1, rs.getLong(columnName));
-                break;
-              case INTEGER:
-                stmt.setInt(i + 1, rs.getInt(columnName));
-                break;
-              case BIT:
-                stmt.setBoolean(i + 1, rs.getBoolean(columnName));
-                break;
-              case TINYINT:
-                stmt.setByte(i + 1, rs.getByte(columnName));
-                break;
-              case SMALLINT:
-                stmt.setShort(i + 1, rs.getShort(columnName));
-                break;
-              case FLOAT:
-                stmt.setDouble(i + 1, rs.getDouble(columnName));
-                break;
-              case REAL:
-                stmt.setFloat(i + 1, rs.getFloat(columnName));
-                break;
-              case DOUBLE:
-                stmt.setDouble(i + 1, rs.getDouble(columnName));
-                break;
-              case NUMERIC:
-              case DECIMAL:
-                stmt.setBigDecimal(i + 1, rs.getBigDecimal(columnName));
-                break;
-              case CHAR:
-              case VARCHAR:
-              case CLOB:
-              case NCHAR:
-              case NVARCHAR:
-              case LONGNVARCHAR:
-              case LONGVARCHAR:
-                stmt.setString(1 + 1, rs.getString(columnName));
-                break;
-              case DATE:
-                stmt.setDate(i + 1, rs.getDate(columnName));
-                break;
-              case TIME:
-                stmt.setTime(i + 1, rs.getTime(columnName));
-                break;
-              case TIMESTAMP:
-                stmt.setTimestamp(i + 1, rs.getTimestamp(columnName));
-                break;
-              case BINARY:
-              case VARBINARY:
-              case LONGVARBINARY:
-              case BLOB:
-                stmt.setBytes(i + 1, rs.getBytes(columnName));
-                break;
-              case BOOLEAN:
-                stmt.setBoolean(i + 1, rs.getBoolean(columnName));
-                break;
-              case ROWID:
-                stmt.setLong(i + 1, rs.getLong(columnName));
-                break;
-              default:
-                throw new DatabaseException("Data type not supported: " + columnTypes[i].name());
-            }
+      try {
+        String destColumnsStr = "";
+        String destParmsStr = "";
+        for (int i = 0; i < columnsArray.getArray().size(); i++) {
+          if (i != 0) {
+            destColumnsStr += ",";
+            destParmsStr += ",";
           }
-          stmt.addBatch();
-          batchSize++;
-          totalCountInserted++;
+          destColumnsStr += (String) columnsArray.getArray().get(i);
+          destParmsStr += "?";
         }
-        if (batchSize == 0) {
-          break;
+
+        ResultSet rs = (ResultSet) selectStatement.execute(dbName, null, null, null, null,
+            null, false, null, 0);
+        String sql = "insert " + (ignore ? "ignore" : "") + " into " + tableName + " (" + destColumnsStr + ") values (" + destParmsStr + ")";
+        System.out.println(sql);
+        PreparedStatement stmt = conn.prepareStatement(sql);
+
+        int totalCountInserted = 0;
+        while (true) {
+          int batchSize = 0;
+          for (int j = 0; j < 100 && rs.next(); j++) {
+            for (int i = 0; i < columnsArray.getArray().size(); i++) {
+              ColumnImpl srcColumn = srcColumns.get(i);
+              String alias = srcColumn.getAlias();
+              String columnName = srcColumn.getColumnName();
+              if (alias != null && !"__alias__".equals(alias)) {
+                columnName = alias;
+              }
+              //            else if (srcColumn.getTableName() != null) {
+              //              columnName = srcColumn.getTableName() + "." + columnName;
+              //            }
+              switch (columnTypes[i]) {
+                case BIGINT:
+                  stmt.setLong(i + 1, rs.getLong(columnName));
+                  break;
+                case INTEGER:
+                  stmt.setInt(i + 1, rs.getInt(columnName));
+                  break;
+                case BIT:
+                  stmt.setBoolean(i + 1, rs.getBoolean(columnName));
+                  break;
+                case TINYINT:
+                  stmt.setByte(i + 1, rs.getByte(columnName));
+                  break;
+                case SMALLINT:
+                  stmt.setShort(i + 1, rs.getShort(columnName));
+                  break;
+                case FLOAT:
+                  stmt.setDouble(i + 1, rs.getDouble(columnName));
+                  break;
+                case REAL:
+                  stmt.setFloat(i + 1, rs.getFloat(columnName));
+                  break;
+                case DOUBLE:
+                  stmt.setDouble(i + 1, rs.getDouble(columnName));
+                  break;
+                case NUMERIC:
+                case DECIMAL:
+                  stmt.setBigDecimal(i + 1, rs.getBigDecimal(columnName));
+                  break;
+                case CHAR:
+                case VARCHAR:
+                case CLOB:
+                case NCHAR:
+                case NVARCHAR:
+                case LONGNVARCHAR:
+                case LONGVARCHAR:
+                  stmt.setString(1 + 1, rs.getString(columnName));
+                  break;
+                case DATE:
+                  stmt.setDate(i + 1, rs.getDate(columnName));
+                  break;
+                case TIME:
+                  stmt.setTime(i + 1, rs.getTime(columnName));
+                  break;
+                case TIMESTAMP:
+                  stmt.setTimestamp(i + 1, rs.getTimestamp(columnName));
+                  break;
+                case BINARY:
+                case VARBINARY:
+                case LONGVARBINARY:
+                case BLOB:
+                  stmt.setBytes(i + 1, rs.getBytes(columnName));
+                  break;
+                case BOOLEAN:
+                  stmt.setBoolean(i + 1, rs.getBoolean(columnName));
+                  break;
+                case ROWID:
+                  stmt.setLong(i + 1, rs.getLong(columnName));
+                  break;
+                default:
+                  throw new DatabaseException("Data type not supported: " + columnTypes[i].name());
+              }
+            }
+            stmt.addBatch();
+            batchSize++;
+            totalCountInserted++;
+          }
+          if (batchSize == 0) {
+            break;
+          }
+          stmt.executeBatch();
         }
-        stmt.executeBatch();
+        ComObject retObj = new ComObject();
+        retObj.put(ComObject.Tag.count, totalCountInserted);
+        return retObj;
       }
-      ComObject retObj = new ComObject();
-      retObj.put(ComObject.Tag.count, totalCountInserted);
-      return retObj;
+      finally {
+        conn.close();
+      }
     }
     catch (Exception e) {
       throw new DatabaseException(e);

@@ -3,7 +3,6 @@ package com.sonicbase.common;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.*;
-import com.sonicbase.server.DatabaseServer;
 import org.apache.giraph.utils.Varint;
 
 import java.io.*;
@@ -11,10 +10,7 @@ import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
@@ -23,6 +19,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION;
 import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION_21;
+import static com.sonicbase.server.DatabaseServer.USE_SNAPSHOT_MGR_OLD;
 import static java.sql.Types.*;
 
 /**
@@ -91,12 +88,36 @@ public class DatabaseCommon {
     return retSchema.getTablesById();
   }
 
+  public TableSchema getTableSchema(String dbName, String tableName, String dataDir) {
+    Schema dbSchema = schema.get(dbName);
+    if (dbSchema == null) {
+      Schema prevSchema = schema.put(dbName, new Schema());
+      if (prevSchema != null) {
+        schema.put(dbName, prevSchema);
+      }
+      dbSchema = schema.get(dbName);
+    }
+    TableSchema tableSchema = dbSchema.getTables().get(tableName);
+    if (tableSchema != null) {
+      return tableSchema;
+    }
+    File file = new File(dataDir, "snapshot/" + shard + "/" + replica + "/_sonicbase_schema/" + dbName);
+    File tableDir = new File(file, tableName + "/table");
+    try {
+      loadTableSchema(dbSchema, tableDir);
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+    return dbSchema.getTables().get(tableName);
+  }
+
   public void loadSchema(String dataDir) {
     try {
       internalWriteLock.lock();
       try {
         String dataRoot = null;
-        if (DatabaseServer.USE_SNAPSHOT_MGR_OLD) {
+        if (USE_SNAPSHOT_MGR_OLD) {
           dataRoot = new File(dataDir, "snapshot/" + shard + "/" + replica).getAbsolutePath();
         }
         else {
@@ -112,6 +133,22 @@ public class DatabaseCommon {
         else {
           logger.info("No schema file found");
         }
+        //schema.clear();
+        List<String> dbNames = getDbNames(dataDir);
+        for (String dbName : dbNames) {
+          Schema dbSchema = schema.get(dbName);
+          if (dbSchema == null) {
+            dbSchema = new Schema();
+            schema.put(dbName, dbSchema);
+          }
+          File file = new File(dataDir, "snapshot/" + shard + "/" + replica + "/_sonicbase_schema/" + dbName);
+          File[] tableNames = file.listFiles();
+          if (tableNames != null) {
+            for (File tableFile : tableNames) {
+              loadTableSchema(dbSchema, tableFile);
+            }
+          }
+        }
       }
       finally {
         internalWriteLock.unlock();
@@ -123,6 +160,78 @@ public class DatabaseCommon {
     catch (IOException e) {
       throw new DatabaseException(e);
     }
+  }
+
+  private void loadTableSchema(Schema dbSchema, File tableFile) throws IOException {
+    String tableName = tableFile.getName();
+    TableSchema previousTableSchema = dbSchema.getTables().get(tableName);
+    File tableDir = new File(tableFile + "/table");
+    File[] tableSchemas = tableDir.listFiles();
+    if (tableSchemas != null) {
+      sortSchemaFiles(tableSchemas);
+      File tableSchemaFile = tableSchemas[tableSchemas.length - 1];
+      TableSchema tableSchema = new TableSchema();
+      try (DataInputStream in = new DataInputStream(new FileInputStream(tableSchemaFile))) {
+        short serializationVersion = in.readShort();
+        try {
+          tableSchema.deserialize(in, serializationVersion);
+          TableSchema existingSchema = dbSchema.getTables().get(tableSchema.getName());
+          if (existingSchema != null) {
+            for (IndexSchema indexSchema : existingSchema.getIndexes().values()) {
+              tableSchema.getIndexes().put(indexSchema.getName(), indexSchema);
+              tableSchema.getIndexesById().put(indexSchema.getIndexId(), indexSchema);
+            }
+          }
+          dbSchema.getTables().put(tableSchema.getName(), tableSchema);
+          dbSchema.getTablesById().put(tableSchema.getTableId(), tableSchema);
+          File indicesDir = new File(tableFile, "/indices");
+          if (indicesDir.exists()) {
+            File[] indices = indicesDir.listFiles();
+            if (indices != null) {
+              for (File indexDir : indices) {
+                String indexName = indexDir.getName();
+                IndexSchema previousIndexSchema = previousTableSchema == null ? null : previousTableSchema.getIndices().get(indexName);
+                File[] indexSchemas = indexDir.listFiles();
+                if (indexSchemas != null) {
+                  sortSchemaFiles(indexSchemas);
+                  File indexSchemaFile = indexSchemas[indexSchemas.length - 1];
+                  try (DataInputStream indexIn = new DataInputStream(new FileInputStream(indexSchemaFile))) {
+                    serializationVersion = indexIn.readShort();
+                    TableSchema.deserializeIndexSchema(indexIn, tableSchema);
+                  }
+                }
+                IndexSchema currIndexSchema = tableSchema.getIndices().get(indexName);
+                if (previousIndexSchema != null) {
+                  currIndexSchema.setCurrPartitions(previousIndexSchema.getCurrPartitions());
+                  currIndexSchema.setLastPartitions(previousIndexSchema.getLastPartitions());
+                }
+              }
+            }
+          }
+        }
+        catch (Exception e) {
+          throw new DatabaseException("Error deserializing tableSchema: file=" + tableSchemaFile.getAbsolutePath());
+        }
+      }
+    }
+  }
+
+  private void sortSchemaFiles(File[] schemas) {
+    Arrays.sort(schemas, new Comparator<File>() {
+      @Override
+      public int compare(File o1, File o2) {
+        int o1SchemaVersion = getSchemaVersion(o1);
+        int o2SchemaVersion = getSchemaVersion(o2);
+        return Integer.compare(o1SchemaVersion, o2SchemaVersion);
+      }
+
+      public int getSchemaVersion(File file) {
+        String filename = file.getName();
+        int pos1 = filename.indexOf('.');
+        int pos2 = filename.indexOf('.', pos1 + 1);
+        return Integer.valueOf(filename.substring(pos1 + 1, pos2));
+      }
+    });
   }
 
   private void createSchemaLocks(String dbName) {
@@ -138,7 +247,7 @@ public class DatabaseCommon {
     try {
       internalWriteLock.lock();
       String dataRoot = null;
-      if (DatabaseServer.USE_SNAPSHOT_MGR_OLD) {
+      if (USE_SNAPSHOT_MGR_OLD) {
         dataRoot = new File(dataDir, "snapshot/" + shard + "/" + replica).getAbsolutePath();
       }
       else {
@@ -175,7 +284,7 @@ public class DatabaseCommon {
     try {
       internalWriteLock.lock();
       String dataRoot = null;
-      if (DatabaseServer.USE_SNAPSHOT_MGR_OLD) {
+      if (USE_SNAPSHOT_MGR_OLD) {
         dataRoot = new File(dataDir, "snapshot/" + shard + "/" + replica).getAbsolutePath();
       }
       else {
@@ -267,24 +376,28 @@ public class DatabaseCommon {
   }
 
   public void updateTable(DatabaseClient client, String dbName, String dataDir, TableSchema tableSchema) {
-    schema.get(dbName).updateTable(tableSchema);
-    saveSchema(client, dataDir);
+    synchronized (this) {
+      schema.get(dbName).updateTable(tableSchema);
+    }
   }
 
 
   public void addTable(DatabaseClient client, String dbName, String dataDir, TableSchema schema) {
-    Schema retSchema = ensureSchemaExists(dbName);
-    retSchema.addTable(schema);
-    saveSchema(client, dataDir);
+    synchronized (this) {
+      Schema retSchema = ensureSchemaExists(dbName);
+      retSchema.addTable(schema);
+    }
   }
 
   private Schema ensureSchemaExists(String dbName) {
-    Schema retSchema = this.schema.get(dbName);
-    if (retSchema == null) {
-      retSchema = new Schema();
-      this.schema.put(dbName, retSchema);
+    synchronized (this) {
+      Schema retSchema = this.schema.get(dbName);
+      if (retSchema == null) {
+        retSchema = new Schema();
+        this.schema.put(dbName, retSchema);
+      }
+      return retSchema;
     }
-    return retSchema;
   }
 
   public void serializeSchema(String dbName, DataOutputStream out) {
@@ -364,106 +477,103 @@ public class DatabaseCommon {
       indexId = (int) Varint.readSignedVarLong(in);
       //logger.info("tableId=" + tableId + " indexId=" + indexId + ", indexCount=" + tableSchema.getIndices().size());
       IndexSchema indexSchema = tableSchema.getIndexesById().get(indexId);
-      String[] columns = indexSchema.getFields();
+      int[] columns = indexSchema.getFieldOffsets();
       int keyLength = (int) Varint.readSignedVarLong(in);
       Object[] fields = new Object[keyLength];
       for (int i = 0; i < keyLength; i++) {
-        String column = columns[i];
-        if (column != null) {
-          if (in.readBoolean()) {
-            if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.BIGINT) {
-              fields[i] = Varint.readSignedVarLong(in);
-            }
-            else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.INTEGER) {
-              fields[i] = (int) Varint.readSignedVarLong(in);
-            }
-            else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.SMALLINT) {
-              fields[i] = (short) Varint.readSignedVarLong(in);
-            }
-            else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.TINYINT) {
-              fields[i] = in.readByte();
-            }
-            else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.CHAR) {
-              int len = (int) Varint.readSignedVarLong(in);
-              byte[] bytes = new byte[len];
-              in.read(bytes);
-              fields[i] = bytes;
-            }
-            else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.NCHAR) {
-              int len = (int) Varint.readSignedVarLong(in);
-              byte[] bytes = new byte[len];
-              in.read(bytes);
-              fields[i] = bytes;
-            }
-            else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.FLOAT) {
-              fields[i] = in.readDouble();
-            }
-            else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.REAL) {
-              fields[i] = in.readFloat();
-            }
-            else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.DOUBLE) {
-              fields[i] = in.readDouble();
-            }
-            else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.BOOLEAN) {
-              fields[i] = in.readBoolean();
-            }
-            else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.BIT) {
-              fields[i] = in.readBoolean();
-            }
-            else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.VARCHAR ||
-                tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.LONGVARCHAR ||
-                tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.LONGNVARCHAR ||
-                tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.CLOB ||
-                tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.NCLOB ||
-                tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.NVARCHAR) {
-              int len = (int) Varint.readSignedVarLong(in);
-              byte[] bytes = new byte[len];
-              in.read(bytes);
-              fields[i] = bytes;
-            }
-            else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.LONGVARBINARY ||
-                tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.VARBINARY ||
-                tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.BLOB) {
-              int len = (int) Varint.readSignedVarLong(in);
-              byte[] data = new byte[len];
-              in.readFully(data);
-              fields[i] = data;
-            }
-            else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.NUMERIC) {
-              int len = (int) Varint.readSignedVarLong(in);
-              byte[] buffer = new byte[len];
-              in.readFully(buffer);
-              String str = new String(buffer, "utf-8");
-              fields[i] = new BigDecimal(str);
-            }
-            else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.DECIMAL) {
-              int len = (int) Varint.readSignedVarLong(in);
-              byte[] buffer = new byte[len];
-              in.readFully(buffer);
-              String str = new String(buffer, "utf-8");
-              fields[i] = new BigDecimal(str);
-            }
-            else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.DATE) {
-              int len = (int) Varint.readSignedVarLong(in);
-              byte[] buffer = new byte[len];
-              in.readFully(buffer);
-              String str = new String(buffer, "utf-8");
-              fields[i] = Date.valueOf(str);
-            }
-            else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.TIME) {
-              int len = (int) Varint.readSignedVarLong(in);
-              byte[] buffer = new byte[len];
-              in.readFully(buffer);
-              String str = new String(buffer, "utf-8");
-              fields[i] = Time.valueOf(str);
-            }
-            else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.TIMESTAMP) {
-              int len = (int) Varint.readSignedVarLong(in);
-              byte[] buffer = new byte[len];
-              in.readFully(buffer);
-              String str = new String(buffer, "utf-8");
-              fields[i] = Timestamp.valueOf(str);
-            }
+        if (in.readBoolean()) {
+          if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.BIGINT) {
+            fields[i] = Varint.readSignedVarLong(in);
+          }
+          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.INTEGER) {
+            fields[i] = (int) Varint.readSignedVarLong(in);
+          }
+          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.SMALLINT) {
+            fields[i] = (short) Varint.readSignedVarLong(in);
+          }
+          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.TINYINT) {
+            fields[i] = in.readByte();
+          }
+          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.CHAR) {
+            int len = (int) Varint.readSignedVarLong(in);
+            byte[] bytes = new byte[len];
+            in.read(bytes);
+            fields[i] = bytes;
+          }
+          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.NCHAR) {
+            int len = (int) Varint.readSignedVarLong(in);
+            byte[] bytes = new byte[len];
+            in.read(bytes);
+            fields[i] = bytes;
+          }
+          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.FLOAT) {
+            fields[i] = in.readDouble();
+          }
+          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.REAL) {
+            fields[i] = in.readFloat();
+          }
+          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.DOUBLE) {
+            fields[i] = in.readDouble();
+          }
+          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.BOOLEAN) {
+            fields[i] = in.readBoolean();
+          }
+          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.BIT) {
+            fields[i] = in.readBoolean();
+          }
+          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.VARCHAR ||
+              tableSchema.getFields().get(columns[i]).getType() == DataType.Type.LONGVARCHAR ||
+              tableSchema.getFields().get(columns[i]).getType() == DataType.Type.LONGNVARCHAR ||
+              tableSchema.getFields().get(columns[i]).getType() == DataType.Type.CLOB ||
+              tableSchema.getFields().get(columns[i]).getType() == DataType.Type.NCLOB ||
+              tableSchema.getFields().get(columns[i]).getType() == DataType.Type.NVARCHAR) {
+            int len = (int) Varint.readSignedVarLong(in);
+            byte[] bytes = new byte[len];
+            in.read(bytes);
+            fields[i] = bytes;
+          }
+          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.LONGVARBINARY ||
+              tableSchema.getFields().get(columns[i]).getType() == DataType.Type.VARBINARY ||
+              tableSchema.getFields().get(columns[i]).getType() == DataType.Type.BLOB) {
+            int len = (int) Varint.readSignedVarLong(in);
+            byte[] data = new byte[len];
+            in.readFully(data);
+            fields[i] = data;
+          }
+          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.NUMERIC) {
+            int len = (int) Varint.readSignedVarLong(in);
+            byte[] buffer = new byte[len];
+            in.readFully(buffer);
+            String str = new String(buffer, "utf-8");
+            fields[i] = new BigDecimal(str);
+          }
+          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.DECIMAL) {
+            int len = (int) Varint.readSignedVarLong(in);
+            byte[] buffer = new byte[len];
+            in.readFully(buffer);
+            String str = new String(buffer, "utf-8");
+            fields[i] = new BigDecimal(str);
+          }
+          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.DATE) {
+            int len = (int) Varint.readSignedVarLong(in);
+            byte[] buffer = new byte[len];
+            in.readFully(buffer);
+            String str = new String(buffer, "utf-8");
+            fields[i] = Date.valueOf(str);
+          }
+          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.TIME) {
+            int len = (int) Varint.readSignedVarLong(in);
+            byte[] buffer = new byte[len];
+            in.readFully(buffer);
+            String str = new String(buffer, "utf-8");
+            fields[i] = Time.valueOf(str);
+          }
+          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.TIMESTAMP) {
+            int len = (int) Varint.readSignedVarLong(in);
+            byte[] buffer = new byte[len];
+            in.readFully(buffer);
+            String str = new String(buffer, "utf-8");
+            fields[i] = Timestamp.valueOf(str);
           }
         }
       }
@@ -476,7 +586,7 @@ public class DatabaseCommon {
       throw new DatabaseException(e);
     }
     catch (Exception e) {
-      throw new DatabaseException(e);
+      throw new DatabaseException("Error deserializing key: indexId=" + indexId, e);
     }
   }
 
@@ -1244,11 +1354,13 @@ public class DatabaseCommon {
   }
 
   public void addDatabase(String dbName) {
-    if (schema.get(dbName) != null) {
-      return;
+    synchronized (this) {
+      if (schema.get(dbName) != null) {
+        return;
+      }
+      schema.put(dbName, new Schema());
+      createSchemaLocks(dbName);
     }
-    schema.put(dbName, new Schema());
-    createSchemaLocks(dbName);
   }
 
   public byte[] serializeConfig(short serializationVersionNumber) throws IOException {
@@ -1273,7 +1385,7 @@ public class DatabaseCommon {
     try {
       internalWriteLock.lock();
       String dataRoot = null;
-      if (DatabaseServer.USE_SNAPSHOT_MGR_OLD) {
+      if (USE_SNAPSHOT_MGR_OLD) {
         dataRoot = new File(dataDir, "snapshot/" + shard + "/" + replica).getAbsolutePath();
       }
       else {
@@ -1299,8 +1411,9 @@ public class DatabaseCommon {
   }
 
   public void dropTable(DatabaseClient client, String dbName, String tableName, String dataDir) {
-    schema.get(dbName).getTables().remove(tableName);
-    saveSchema(client, dataDir);
+    synchronized (this) {
+      schema.get(dbName).getTables().remove(tableName);
+    }
   }
 
   public static String keyToString(Object[] key) {
@@ -1335,14 +1448,45 @@ public class DatabaseCommon {
   }
 
   public boolean haveProLicense() {
-    return haveProLicense;
+
+    return true;
+    //return haveProLicense;
   }
 
   public void setSchemaVersion(int schemaVersion) {
     this.schemaVersion = schemaVersion;
   }
 
-  public void clearSchema() {
-    schema = new ConcurrentHashMap<>();
+  public List<String> getDbNames(String dataDir) {
+    File file = null;
+    if (USE_SNAPSHOT_MGR_OLD) {
+      file = new File(dataDir, "snapshot/" + shard + "/" + replica);
+    }
+    else {
+      file = new File(dataDir, "delta/" + shard + "/" + replica);
+    }
+    Set<String> dbs = new HashSet<>();
+    String[] dirs = file.list();
+    List<String> ret = new ArrayList<>();
+    if (dirs != null) {
+      for (String dir : dirs) {
+        if (dir.equals("config.bin")) {
+          continue;
+        }
+        if (dir.equals("schema.bin")) {
+          continue;
+        }
+        if (dir.equals("_sonicbase_schema")) {
+          continue;
+        }
+        dbs.add(dir);
+      }
+    }
+//    for (String db : common.getDatabases().keySet()) {
+//      dbs.add(db);
+//    }
+    return new ArrayList<>(dbs);
+
   }
+
 }

@@ -167,7 +167,7 @@ public class DatabaseCommon {
     TableSchema previousTableSchema = dbSchema.getTables().get(tableName);
     File tableDir = new File(tableFile + "/table");
     File[] tableSchemas = tableDir.listFiles();
-    if (tableSchemas != null) {
+    if (tableSchemas != null && tableSchemas.length > 0) {
       sortSchemaFiles(tableSchemas);
       File tableSchemaFile = tableSchemas[tableSchemas.length - 1];
       TableSchema tableSchema = new TableSchema();
@@ -192,7 +192,7 @@ public class DatabaseCommon {
                 String indexName = indexDir.getName();
                 IndexSchema previousIndexSchema = previousTableSchema == null ? null : previousTableSchema.getIndices().get(indexName);
                 File[] indexSchemas = indexDir.listFiles();
-                if (indexSchemas != null) {
+                if (indexSchemas != null && indexSchemas.length > 0) {
                   sortSchemaFiles(indexSchemas);
                   File indexSchemaFile = indexSchemas[indexSchemas.length - 1];
                   try (DataInputStream indexIn = new DataInputStream(new FileInputStream(indexSchemaFile))) {
@@ -216,7 +216,7 @@ public class DatabaseCommon {
     }
   }
 
-  private void sortSchemaFiles(File[] schemas) {
+  public static void sortSchemaFiles(File[] schemas) {
     Arrays.sort(schemas, new Comparator<File>() {
       @Override
       public int compare(File o1, File o2) {
@@ -229,6 +229,9 @@ public class DatabaseCommon {
         String filename = file.getName();
         int pos1 = filename.indexOf('.');
         int pos2 = filename.indexOf('.', pos1 + 1);
+        if (pos1 == -1 || pos2 == -1) {
+          return -1;
+        }
         return Integer.valueOf(filename.substring(pos1 + 1, pos2));
       }
     });

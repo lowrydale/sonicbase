@@ -615,7 +615,7 @@ public class SchemaManager {
         server.getCommon().getTables(dbName).get(tableName).getIndexesById().put(indexSchema.getIndexId(), indexSchema);
 
         SnapshotManager snapshotManager = server.getSnapshotManager();
-        snapshotManager.saveIndexSchema(dbName, server.getCommon().getSchemaVersion(), tableSchema, indexSchema);
+        snapshotManager.saveIndexSchema(dbName, tmpCommon.getSchemaVersion(), tableSchema, indexSchema);
       }
 
       server.getCommon().saveSchema(server.getClient(), server.getDataDir());
@@ -628,7 +628,7 @@ public class SchemaManager {
     try {
       int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
       String dbName = cobj.getString(ComObject.Tag.dbName);
-      if (schemaVersion < server.getSchemaVersion()) {
+      if (schemaVersion < server.getSchemaVersion() && !replayedCommand) {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
       }
       AtomicReference<String> table = new AtomicReference<>();
@@ -781,7 +781,7 @@ public class SchemaManager {
      return null;
    }
 
-  public ComObject dropIndex(ComObject cobj) {
+  public ComObject dropIndex(ComObject cobj, boolean replayedCommand) {
       try {
         String masterSlave = cobj.getString(ComObject.Tag.masterSlave);
         if (server.getShard() == 0 &&
@@ -793,7 +793,7 @@ public class SchemaManager {
         short serializationVersionNumber = cobj.getShort(ComObject.Tag.serializationVersion);
         int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
         String dbName = cobj.getString(ComObject.Tag.dbName);
-        if (schemaVersion < server.getSchemaVersion()) {
+        if (schemaVersion < server.getSchemaVersion() && !replayedCommand) {
           throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
         }
         String table = cobj.getString(ComObject.Tag.tableName);

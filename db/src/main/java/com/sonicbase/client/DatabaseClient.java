@@ -60,6 +60,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.sonicbase.server.UpdateManager.BATCH_STATUS_FAILED;
+import static com.sonicbase.server.UpdateManager.BATCH_STATUS_SUCCCESS;
+import static com.sonicbase.server.UpdateManager.BATCH_STATUS_UNIQUE_CONSTRAINT_VIOLATION;
+
 /**
  * User: lowryda
  * Date: 1/3/14
@@ -74,7 +78,7 @@ public class DatabaseClient {
   private Object databaseServer;
   private Server[][] servers;
   private AtomicBoolean isShutdown = new AtomicBoolean();
-  public  static AtomicInteger clientRefCount = new AtomicInteger();
+  public static AtomicInteger clientRefCount = new AtomicInteger();
   public static ConcurrentHashMap<String, DatabaseClient> sharedClients = new ConcurrentHashMap<>();
   public static ConcurrentLinkedQueue<DatabaseClient> allClients = new ConcurrentLinkedQueue<>();
 
@@ -288,6 +292,18 @@ public class DatabaseClient {
 
   }
 
+  public static AtomicInteger getClientRefCount() {
+    return clientRefCount;
+  }
+
+  public static ConcurrentHashMap<String, DatabaseClient> getSharedClients() {
+    return sharedClients;
+  }
+
+  public static ConcurrentLinkedQueue<DatabaseClient> getAllClients() {
+    return allClients;
+  }
+
   public Set<String> getWrite_verbs() {
     return write_verbs;
   }
@@ -409,13 +425,13 @@ public class DatabaseClient {
       op.statement.execute(dbName, explain);
     }
     */
-     int schemaRetryCount = 0;
-     while (true) {
-       if (isShutdown.get()) {
-         throw new DatabaseException("Shutting down");
-       }
+    int schemaRetryCount = 0;
+    while (true) {
+      if (isShutdown.get()) {
+        throw new DatabaseException("Shutting down");
+      }
 
-       try {
+      try {
         ComObject cobj = new ComObject();
         cobj.put(ComObject.Tag.dbName, dbName);
         if (schemaRetryCount < 2) {
@@ -440,8 +456,7 @@ public class DatabaseClient {
         }
         throw new DatabaseException(e);
       }
-     }
-
+    }
 
 
   }
@@ -529,7 +544,7 @@ public class DatabaseClient {
                 null, null, keyObj, parms,
                 null, null, keyObj, null, columns, columnName, shard, recordCache,
                 usedIndex, false, common.getSchemaVersion(), null, null,
-                false, new AtomicLong(), new AtomicLong(),null, null, false,
+                false, new AtomicLong(), new AtomicLong(), null, null, false,
                 false, null, schemaRetryCount);
             Object[][][] keys = context.getCurrKeys();
             if (keys != null && keys.length > 0 && keys[0].length > 0 && keys[0][0].length > 0) {
@@ -603,6 +618,7 @@ public class DatabaseClient {
     try {
       final Object mutex = new Object();
       final List<PreparedInsert> withRecordPrepared = new ArrayList<>();
+      final Map<Integer, PreparedInsert> withRecordPreparedMap = new HashMap<>();
       final List<PreparedInsert> preparedKeys = new ArrayList<>();
       long nonTransId = 0;
       while (true) {
@@ -625,14 +641,16 @@ public class DatabaseClient {
         }
       }
 
+      AtomicInteger originalOffset = new AtomicInteger();
       for (InsertRequest request : batch.get()) {
-        List<PreparedInsert> inserts = prepareInsert(request, new ArrayList<KeyInfo>(), new AtomicLong(-1L), nonTransId);
+        List<PreparedInsert> inserts = prepareInsert(request, new ArrayList<KeyInfo>(), new AtomicLong(-1L), nonTransId, originalOffset);
         for (PreparedInsert insert : inserts) {
-          if (insert.ignore) {
-            throw new DatabaseException("'ignore' is not supported for batch operations");
+          if (isExplicitTrans.get() && insert.ignore) {
+            throw new DatabaseException("'ignore' is not supported for batch operations in an explicit transaction");
           }
           if (insert.keyInfo.indexSchema.getValue().isPrimaryKey()) {
             withRecordPrepared.add(insert);
+            withRecordPreparedMap.put(insert.originalOffset, insert);
           }
           else {
             preparedKeys.add(insert);
@@ -701,41 +719,42 @@ public class DatabaseClient {
           }
           synchronized (mutex) {
             for (PreparedInsert insert : withRecordPrepared) {
-              ComObject obj = serializeInsertKeyWithRecord(insert.dbName, insert.tableId, insert.indexId, insert.tableName, insert.keyInfo, insert.record, insert.ignore);
+              ComObject obj = serializeInsertKeyWithRecord(insert.dbName, insert.originalOffset, insert.tableId, insert.indexId, insert.tableName, insert.keyInfo, insert.record, insert.ignore);
               cobjs1.get(insert.keyInfo.shard).getArray(ComObject.Tag.insertObjects).getArray().add(obj);
               withRecordProcessed.get(insert.keyInfo.shard).add(insert);
             }
             for (PreparedInsert insert : preparedKeys) {
-              ComObject obj = serializeInsertKey(getCommon(), insert.dbName, insert.tableId, insert.indexId, insert.tableName, insert.keyInfo,
+              ComObject obj = serializeInsertKey(getCommon(), insert.dbName, insert.originalOffset, insert.tableId, insert.indexId, insert.tableName, insert.keyInfo,
                   insert.primaryKeyIndexName, insert.primaryKey, insert.keyRecord, insert.ignore);
               cobjs2.get(insert.keyInfo.shard).getArray(ComObject.Tag.insertObjects).getArray().add(obj);
               processed.get(insert.keyInfo.shard).add(insert);
             }
           }
 
-          List<Future> futures = new ArrayList<>();
+          List<Future<ComObject>> futures = new ArrayList<>();
           for (int i = 0; i < bytesOut.size(); i++) {
             final int offset = i;
-            futures.add(executor.submit(new Callable() {
+            futures.add(executor.submit(new Callable<ComObject>() {
               @Override
-              public Object call() throws Exception {
+              public ComObject call() throws Exception {
 //                ByteArrayOutputStream currBytes = withRecordBytesOut.get(offset);
 //                byte[] bytes = currBytes.toByteArray();
 //                if (bytes == null || bytes.length == 0) {
 //                  return null;
 //                }
                 if (cobjs1.get(offset).getArray(ComObject.Tag.insertObjects).getArray().size() == 0) {
-                  return null;
+                  ComObject retObj = new ComObject();
+                  return retObj;
                 }
                 byte[] ret = send(null, offset, 0, cobjs1.get(offset), DatabaseClient.Replica.def);
                 if (ret == null) {
                   throw new FailedToInsertException("No response for key insert");
                 }
-                for (PreparedInsert insert : withRecordProcessed.get(offset)) {
-                  synchronized (mutex) {
-                    withRecordPrepared.remove(insert);
-                  }
-                }
+//                for (PreparedInsert insert : withRecordProcessed.get(offset)) {
+//                  synchronized (mutex) {
+//                    withRecordPrepared.remove(insert);
+//                  }
+//                }
                 ComObject retObj = new ComObject(ret);
                 if (retObj.getInt(ComObject.Tag.count) == null) {
                   throw new DatabaseException("count not returned: obj=" + retObj.toString());
@@ -745,12 +764,60 @@ public class DatabaseClient {
                 //if (retVal != 1) {
                 //  throw new FailedToInsertException("Incorrect response from server: value=" + retVal);
                 //}
-                return null;
+                return retObj;
               }
             }));
           }
-          for (Future future : futures) {
-            future.get();
+          List<ComObject> responses = new ArrayList<>();
+          for (Future<ComObject> future : futures) {
+            responses.add(future.get());
+          }
+
+          List<ComObject> allResponses = new ArrayList<>();
+          for (ComObject response : responses) {
+            ComArray array = response.getArray(ComObject.Tag.batchResponses);
+            if (array != null) {
+              for (Object obj : array.getArray()) {
+                allResponses.add((ComObject) obj);
+              }
+            }
+          }
+
+          for (ComObject currRet : allResponses) {
+            int currOriginalOffset = currRet.getInt(ComObject.Tag.originalOffset);
+            int currStatus = currRet.getInt(ComObject.Tag.intStatus);
+            PreparedInsert insert = withRecordPreparedMap.get(currOriginalOffset);
+            if (insert.originalOffset == currOriginalOffset) {
+              if (currStatus == BATCH_STATUS_UNIQUE_CONSTRAINT_VIOLATION) {
+                if (insert.ignore) {
+                  try {
+                    convertInsertToUpdate(dbName, insert.originalStatement);
+                    currRet.put(ComObject.Tag.intStatus, BATCH_STATUS_SUCCCESS);
+                  }
+                  catch (Exception e) {
+                    logger.error("Error updating record", e);
+                    currRet.put(ComObject.Tag.intStatus, BATCH_STATUS_FAILED);
+                  }
+                }
+                else {
+                  currRet.put(ComObject.Tag.intStatus, BATCH_STATUS_FAILED);
+                }
+                removeInsertKey(cobjs2, insert.originalOffset, insert.primaryKey);
+              }
+              else if (currStatus == BATCH_STATUS_FAILED) {
+                removeInsertKey(cobjs2, insert.originalOffset, insert.primaryKey);
+              }
+              break;
+            }
+          }
+
+          for (int i = 0; i < bytesOut.size(); i++) {
+            final int offset = i;
+            for (PreparedInsert insert : withRecordProcessed.get(offset)) {
+              synchronized (mutex) {
+                withRecordPrepared.remove(insert);
+              }
+            }
           }
 
           futures = new ArrayList<>();
@@ -790,9 +857,15 @@ public class DatabaseClient {
             throw firstException;
           }
 
-          int[] ret = new int[totalCount.get()];
-          for (int i = 0; i < ret.length; i++) {
-            ret[i] = 1;
+          int maxOffset = 0;
+          for (ComObject currRet : allResponses) {
+            int currOriginalOffset = currRet.getInt(ComObject.Tag.originalOffset);
+            maxOffset = Math.max(maxOffset, currOriginalOffset);
+          }
+          int[] ret = new int[maxOffset + 1];
+          for (ComObject currRet : allResponses) {
+            int currOriginalOffset = currRet.getInt(ComObject.Tag.originalOffset);
+            ret[currOriginalOffset] = currRet.getInt(ComObject.Tag.intStatus);
           }
           return ret;
         }
@@ -827,13 +900,27 @@ public class DatabaseClient {
       }
     }
     catch (Exception e) {
-      if (!(e instanceof  SchemaOutOfSyncException)) {
+      if (!(e instanceof SchemaOutOfSyncException)) {
         logger.sendErrorToServer("Error processing batch request", e);
       }
       throw new DatabaseException(e);
     }
     finally {
       batch.set(null);
+    }
+  }
+
+  private void removeInsertKey(List<ComObject> cobjs, int originalOffset, Object[] primaryKey) {
+    for (ComObject cobj : cobjs) {
+      ComArray array = cobj.getArray(ComObject.Tag.insertObjects);
+      ComArray newArray = new ComArray(ComObject.Type.objectType);
+      for (int i = 0; i < array.getArray().size(); i++) {
+        ComObject innerObj = (ComObject) array.getArray().get(i);
+        if (innerObj.getInt(ComObject.Tag.originalOffset) != originalOffset) {
+          newArray.add(innerObj);
+        }
+      }
+      cobj.putArray(ComObject.Tag.insertObject, newArray);
     }
   }
 
@@ -928,6 +1015,7 @@ public class DatabaseClient {
     public byte[] do_send(String batchKey, ComObject body) {
       return socketClient.do_send(batchKey, body.serialize(), hostPort);
     }
+
     public byte[] do_send(String batchKey, byte[] body) {
       return socketClient.do_send(batchKey, body, hostPort);
     }
@@ -1334,7 +1422,7 @@ public class DatabaseClient {
             }
           }
           else if (replica == Replica.master) {
-            int masterReplica = - 1;
+            int masterReplica = -1;
             while (true) {
               if (isShutdown.get()) {
                 throw new DatabaseException("Shutting down");
@@ -1391,14 +1479,14 @@ public class DatabaseClient {
           }
           else if (replica == Replica.specified) {
             boolean skip = false;
-            if (!ignoreDeath && replicas[(int)auth_user].dead) {
+            if (!ignoreDeath && replicas[(int) auth_user].dead) {
               if (writeVerbs.contains(method)) {
                 ComObject header = new ComObject();
                 header.put(ComObject.Tag.method, body.getString(ComObject.Tag.method));
 //                if (body.containsTag(ComObject.Tag.replica)) {
 //                  header.put(ComObject.Tag.replica, body.getInt(ComObject.Tag.replica));
 //                }
-                header.put(ComObject.Tag.replica, (int)auth_user);
+                header.put(ComObject.Tag.replica, (int) auth_user);
                 body.put(ComObject.Tag.header, header);
 
                 body.put(ComObject.Tag.method, "queueForOtherServer");
@@ -1537,7 +1625,7 @@ public class DatabaseClient {
 //                            if (body.containsTag(ComObject.Tag.replica)) {
 //                              header.put(ComObject.Tag.replica, body.getInt(ComObject.Tag.replica));
 //                            }
-                            header.put(ComObject.Tag.replica, (int)auth_user);
+                            header.put(ComObject.Tag.replica, (int) auth_user);
                             body.put(ComObject.Tag.header, header);
 
                             body.put(ComObject.Tag.method, "queueForOtherServer");
@@ -1723,7 +1811,7 @@ public class DatabaseClient {
 
   private byte[] invokeOnServer(Object dbServer, byte[] body, boolean replayedCommand, boolean enableQueuing) {
     try {
-      return ((DatabaseServer)dbServer).invokeMethod(body, replayedCommand, enableQueuing);
+      return ((DatabaseServer) dbServer).invokeMethod(body, replayedCommand, enableQueuing);
 //      Method method = Class.forName("com.sonicbase.server.DatabaseServer").getMethod("invokeMethod", byte[].class, boolean.class, boolean.class);
 //      return (byte[]) method.invoke(dbServer, body, replayedCommand, enableQueuing);
     }
@@ -2161,6 +2249,7 @@ public class DatabaseClient {
       }
     }
   }
+
   private class QueryStats {
     private long begin;
     private long duration;
@@ -2246,7 +2335,7 @@ public class DatabaseClient {
       ResultSetImpl rs = new ResultSetImpl(this, retObj.getArray(ComObject.Tag.records));
       return rs;
     }
-    return new ResultSetImpl(this, (ComArray)null);
+    return new ResultSetImpl(this, (ComArray) null);
   }
 
   private Object doExplain(String dbName, String sql, ParameterHandler parms, int schemaRetryCount) {
@@ -2382,15 +2471,17 @@ public class DatabaseClient {
 
   public static ResultSet describeLicenses() {
     try {
-      TrustManager[] trustAllCerts = new TrustManager[] {
+      TrustManager[] trustAllCerts = new TrustManager[]{
           new X509TrustManager() {
             public java.security.cert.X509Certificate[] getAcceptedIssuers() {
               return null;
             }
 
-            public void checkClientTrusted(X509Certificate[] certs, String authType) {  }
+            public void checkClientTrusted(X509Certificate[] certs, String authType) {
+            }
 
-            public void checkServerTrusted(X509Certificate[] certs, String authType) {  }
+            public void checkServerTrusted(X509Certificate[] certs, String authType) {
+            }
 
           }
       };
@@ -2547,7 +2638,7 @@ public class DatabaseClient {
             if (dead) {
               continue;
             }
-            futures.add(executor.submit(new Callable<Map<String, String>>(){
+            futures.add(executor.submit(new Callable<Map<String, String>>() {
               @Override
               public Map<String, String> call() throws Exception {
                 boolean dead = common.getServersConfig().getShards()[shard].getReplicas()[replica].isDead();
@@ -2630,6 +2721,7 @@ public class DatabaseClient {
     private String getKey() {
       return table + ":" + index + ":" + shard;
     }
+
     private String table;
     private String index;
     private int shard;
@@ -2851,9 +2943,9 @@ public class DatabaseClient {
       ComArray array = retObj.getArray(ComObject.Tag.shards);
       for (int i = 0; i < array.getArray().size(); i++) {
         ShardState shardState = new ShardState();
-        shardState.shard = ((ComObject)array.getArray().get(i)).getInt(ComObject.Tag.shard);
-        shardState.count = ((ComObject)array.getArray().get(i)).getLong(ComObject.Tag.countLong);
-        shardState.exception = ((ComObject)array.getArray().get(i)).getString(ComObject.Tag.exception);
+        shardState.shard = ((ComObject) array.getArray().get(i)).getInt(ComObject.Tag.shard);
+        shardState.count = ((ComObject) array.getArray().get(i)).getLong(ComObject.Tag.countLong);
+        shardState.exception = ((ComObject) array.getArray().get(i)).getString(ComObject.Tag.exception);
 
         shards.add(shardState);
       }
@@ -3210,7 +3302,7 @@ public class DatabaseClient {
     try {
       int tableId = common.getTables(dbName).get(tableName).getTableId();
       int indexId = common.getTables(dbName).get(tableName).getIndexes().get(keyInfo.indexSchema.getKey()).getIndexId();
-      ComObject cobj = serializeInsertKey(getCommon(), dbName, tableId, indexId, tableName, keyInfo, primaryKeyIndexName,
+      ComObject cobj = serializeInsertKey(getCommon(), dbName, 0, tableId, indexId, tableName, keyInfo, primaryKeyIndexName,
           primaryKey, keyRecord, ignore);
 
       byte[] keyRecordBytes = keyRecord.serialize(SERIALIZATION_VERSION);
@@ -3232,7 +3324,7 @@ public class DatabaseClient {
 //        }
 //      }
 //      else {
-        send("DatabaseServer:insertIndexEntryByKey", keyInfo.shard, rand.nextLong(), cobj, DatabaseClient.Replica.def);
+      send("DatabaseServer:insertIndexEntryByKey", keyInfo.shard, rand.nextLong(), cobj, DatabaseClient.Replica.def);
 //      }
     }
     catch (IOException e) {
@@ -3240,7 +3332,7 @@ public class DatabaseClient {
     }
   }
 
-  public static ComObject serializeInsertKey(DatabaseCommon common, String dbName, int tableId, int indexId,
+  public static ComObject serializeInsertKey(DatabaseCommon common, String dbName, int originalOffset, int tableId, int indexId,
                                              String tableName, KeyInfo keyInfo,
                                              String primaryKeyIndexName, Object[] primaryKey, KeyRecord keyRecord, boolean ignore) throws IOException {
     ComObject cobj = new ComObject();
@@ -3250,6 +3342,7 @@ public class DatabaseClient {
     cobj.put(ComObject.Tag.tableId, tableId);
     cobj.put(ComObject.Tag.indexId, indexId);
     cobj.put(ComObject.Tag.ignore, ignore);
+    cobj.put(ComObject.Tag.originalOffset, originalOffset);
 //    cobj.put(ComObject.Tag.tableName, tableName);
 //    cobj.put(ComObject.Tag.indexName, keyInfo.indexSchema.getKey());
 //    cobj.put(ComObject.Tag.isExcpliciteTrans, isExplicitTrans());
@@ -3276,7 +3369,7 @@ public class DatabaseClient {
     try {
       int tableId = common.getTables(dbName).get(tableName).getTableId();
       int indexId = common.getTables(dbName).get(tableName).getIndexes().get(keyInfo.indexSchema.getKey()).getIndexId();
-      ComObject cobj = serializeInsertKeyWithRecord(dbName, tableId, indexId, tableName, keyInfo, record, ignore);
+      ComObject cobj = serializeInsertKeyWithRecord(dbName, 0, tableId, indexId, tableName, keyInfo, record, ignore);
       cobj.put(ComObject.Tag.dbName, dbName);
       if (schemaRetryCount < 2) {
         cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
@@ -3318,15 +3411,17 @@ public class DatabaseClient {
     }
   }
 
-  private ComObject serializeInsertKeyWithRecord(String dbName, int tableId, int indexId, String tableName,
+  private ComObject serializeInsertKeyWithRecord(String dbName, int originalOffset, int tableId, int indexId, String tableName,
                                                  KeyInfo keyInfo, Record record, boolean ignore) throws IOException {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.serializationVersion, SERIALIZATION_VERSION);
 //    cobj.put(ComObject.Tag.dbName, dbName);
 //    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+    cobj.put(ComObject.Tag.originalOffset, originalOffset);
     cobj.put(ComObject.Tag.indexId, indexId);
     cobj.put(ComObject.Tag.tableId, tableId);
-    cobj.put(ComObject.Tag.ignore, ignore);
+    cobj.put(ComObject.Tag.originalIgnore, ignore);
+    //cobj.put(ComObject.Tag.ignore, ignore);
 //    cobj.put(ComObject.Tag.tableName, tableName);
 //    cobj.put(ComObject.Tag.indexName, keyInfo.indexSchema.getKey());
 //    cobj.put(ComObject.Tag.isExcpliciteTrans, isExplicitTrans());
@@ -3533,10 +3628,12 @@ public class DatabaseClient {
     public String indexName;
     public KeyRecord keyRecord;
     public boolean ignore;
+    public int originalOffset;
+    public InsertStatementImpl originalStatement;
   }
 
   public List<PreparedInsert> prepareInsert(InsertRequest request,
-                                            List<KeyInfo> completed, AtomicLong recordId, long nonTransId) throws UnsupportedEncodingException, SQLException {
+                                            List<KeyInfo> completed, AtomicLong recordId, long nonTransId, AtomicInteger originalOffset) throws UnsupportedEncodingException, SQLException {
     List<PreparedInsert> ret = new ArrayList<>();
 
     String dbName = request.dbName;
@@ -3620,20 +3717,10 @@ public class DatabaseClient {
           }
         }
 
-//        if (keyInfo.indexSchema.getValue().isPrimaryKey()) {
-//          if (!keyInfo.currAndLastMatch) {
-//            if (keyInfo.isCurrPartition()) {
-//              record.setDbViewNumber(common.getSchemaVersion());
-//              record.setDbViewFlags(Record.DB_VIEW_FLAG_ADDING);
-//            }
-//            else {
-//              record.setDbViewFlags(Record.DB_VIEW_FLAG_ADDING);
-//              record.setDbViewNumber(common.getSchemaVersion() - 1);
-//            }
-//          }
-//        }
         PreparedInsert insert = new PreparedInsert();
         insert.dbName = dbName;
+        insert.originalOffset = originalOffset.getAndIncrement();
+        insert.originalStatement = request.insertStatement;
         insert.keyInfo = keyInfo;
         insert.record = record;
         insert.tableId = tableId;
@@ -3670,6 +3757,7 @@ public class DatabaseClient {
     request.dbName = dbName;
     request.insertStatement = insertStatement;
     request.parms = parms;
+    request.ignore = insertStatement.isIgnore();
     boolean origIgnore = insertStatement.isIgnore();
     insertStatement.setIgnore(false);
     int insertCountCompleted = 0;
@@ -3687,10 +3775,10 @@ public class DatabaseClient {
         else {
           long nonTransId = 0;
           if (!isExplicitTrans.get()) {
-             nonTransId = allocateId(dbName);
+            nonTransId = allocateId(dbName);
           }
 
-          List<PreparedInsert> inserts = prepareInsert(request, completed, recordId, nonTransId);
+          List<PreparedInsert> inserts = prepareInsert(request, completed, recordId, nonTransId, new AtomicInteger());
           List<PreparedInsert> insertsWithRecords = new ArrayList<>();
           List<PreparedInsert> insertsWithKey = new ArrayList<>();
           for (PreparedInsert insert : inserts) {
@@ -3728,62 +3816,7 @@ public class DatabaseClient {
           if (!origIgnore) {
             throw new DatabaseException(e);
           }
-          List<String> columns = insertStatement.getColumns();
-          String sql = "update " + insertStatement.getTableName() + " set ";
-          boolean first = true;
-          for (String column : columns) {
-            if (!first) {
-              sql += ", ";
-            }
-            first = false;
-            sql += column + "=? ";
-          }
-          TableSchema tableSchema = common.getTables(dbName).get(insertStatement.getTableName());
-          IndexSchema primaryKey = null;
-          for (IndexSchema indexSchema : tableSchema.getIndices().values()) {
-            if (indexSchema.isPrimaryKey()) {
-              primaryKey = indexSchema;
-            }
-          }
-          sql += " where ";
-          first = true;
-          for (String field : primaryKey.getFields()) {
-            if (!first) {
-              sql += " and ";
-            }
-            first = false;
-            sql += field + "=? ";
-          }
-
-          int parmIndex = 1;
-          ParameterHandler newParms = new ParameterHandler();
-          for (int i = 0; i < insertStatement.getColumns().size(); i++) {
-            String column = insertStatement.getColumns().get(i);
-            Object obj = insertStatement.getValues().get(i);
-            for (FieldSchema field : tableSchema.getFields()) {
-              if (field.getName().equals(column)) {
-                setFieldInParms(field, obj, parmIndex, newParms);
-                parmIndex++;
-                break;
-              }
-            }
-          }
-          for (String field : primaryKey.getFields()) {
-            for (FieldSchema fieldSchema : tableSchema.getFields()) {
-              if (field.equals(fieldSchema.getName())) {
-                for (int i = 0; i < insertStatement.getColumns().size(); i++) {
-                  if (field.equals(insertStatement.getColumns().get(i))) {
-                    setFieldInParms(fieldSchema, insertStatement.getValues().get(i), parmIndex, newParms);
-                    parmIndex++;
-                    break;
-                  }
-                }
-                break;
-              }
-            }
-          }
-          return (int)executeQuery(dbName, QueryType.update1, sql, newParms, false,
-          null, null, null, false, null, true);
+          return convertInsertToUpdate(dbName, insertStatement);
         }
 
         int index = ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class);
@@ -3794,6 +3827,65 @@ public class DatabaseClient {
       }
     }
     return 1;
+  }
+
+  private int convertInsertToUpdate(String dbName, InsertStatementImpl insertStatement) throws SQLException {
+    List<String> columns = insertStatement.getColumns();
+    String sql = "update " + insertStatement.getTableName() + " set ";
+    boolean first = true;
+    for (String column : columns) {
+      if (!first) {
+        sql += ", ";
+      }
+      first = false;
+      sql += column + "=? ";
+    }
+    TableSchema tableSchema = common.getTables(dbName).get(insertStatement.getTableName());
+    IndexSchema primaryKey = null;
+    for (IndexSchema indexSchema : tableSchema.getIndices().values()) {
+      if (indexSchema.isPrimaryKey()) {
+        primaryKey = indexSchema;
+      }
+    }
+    sql += " where ";
+    first = true;
+    for (String field : primaryKey.getFields()) {
+      if (!first) {
+        sql += " and ";
+      }
+      first = false;
+      sql += field + "=? ";
+    }
+
+    int parmIndex = 1;
+    ParameterHandler newParms = new ParameterHandler();
+    for (int i = 0; i < insertStatement.getColumns().size(); i++) {
+      String column = insertStatement.getColumns().get(i);
+      Object obj = insertStatement.getValues().get(i);
+      for (FieldSchema field : tableSchema.getFields()) {
+        if (field.getName().equals(column)) {
+          setFieldInParms(field, obj, parmIndex, newParms);
+          parmIndex++;
+          break;
+        }
+      }
+    }
+    for (String field : primaryKey.getFields()) {
+      for (FieldSchema fieldSchema : tableSchema.getFields()) {
+        if (field.equals(fieldSchema.getName())) {
+          for (int i = 0; i < insertStatement.getColumns().size(); i++) {
+            if (field.equals(insertStatement.getColumns().get(i))) {
+              setFieldInParms(fieldSchema, insertStatement.getValues().get(i), parmIndex, newParms);
+              parmIndex++;
+              break;
+            }
+          }
+          break;
+        }
+      }
+    }
+    return (int) executeQuery(dbName, QueryType.update1, sql, newParms, false,
+        null, null, null, false, null, true);
   }
 
   public void setFieldInParms(FieldSchema field, Object obj, int parmIndex, ParameterHandler newParms) throws SQLException {
@@ -3811,7 +3903,7 @@ public class DatabaseClient {
       case CHAR:
       case LONGVARCHAR:
         try {
-          newParms.setString(parmIndex, new String((byte[])field.getType().getConverter().convert(obj), "utf-8"));
+          newParms.setString(parmIndex, new String((byte[]) field.getType().getConverter().convert(obj), "utf-8"));
         }
         catch (UnsupportedEncodingException e) {
           throw new DatabaseException(e);
@@ -4428,7 +4520,7 @@ public class DatabaseClient {
               ret.add(new KeyInfo(shard, key, indexSchema, false));
             }
           }
-         }
+        }
       }
     }
     return ret;
@@ -4445,7 +4537,7 @@ public class DatabaseClient {
       SelectStatementImpl selectStatement = parseSelectStatement(parms, debug, (PlainSelect) selectBody, currParmNum);
       return selectStatement.execute(dbName, sqlToUse, explain, null, null, null, restrictToThisServer, procedureContext, schemaRetryCount);
     }
-    else if (selectBody instanceof SetOperationList){
+    else if (selectBody instanceof SetOperationList) {
       SetOperationList opList = (SetOperationList) selectBody;
       String[] tableNames = new String[opList.getSelects().size()];
       SelectStatementImpl[] statements = new SelectStatementImpl[opList.getSelects().size()];
@@ -4557,7 +4649,7 @@ public class DatabaseClient {
 
     ComObject retObj = null;
     if (restrictToThisServer) {
-      retObj = ((DatabaseServer)getDatabaseServer()).getMethodInvoker().getReadManager().serverSetSelect(cobj, restrictToThisServer, procedureContext);
+      retObj = ((DatabaseServer) getDatabaseServer()).getMethodInvoker().getReadManager().serverSetSelect(cobj, restrictToThisServer, procedureContext);
     }
     else {
       byte[] recordRet = null;
@@ -4600,9 +4692,9 @@ public class DatabaseClient {
       currRetRecords[k] = new Record[tableNames.length];
       retRecords[k] = new ExpressionImpl.CachedRecord[tableNames.length];
       retKeys[k] = new Object[tableNames.length][];
-      ComArray records = (ComArray)tableRecords.getArray().get(k);
+      ComArray records = (ComArray) tableRecords.getArray().get(k);
       for (int j = 0; j < tableNames.length; j++) {
-        byte [] recordBytes = (byte[])records.getArray().get(j);
+        byte[] recordBytes = (byte[]) records.getArray().get(j);
         if (recordBytes != null && recordBytes.length > 0) {
           Record record = new Record(tableSchemas[j]);
           record.deserialize(dbName, getCommon(), recordBytes, null, true);
@@ -4867,7 +4959,7 @@ public class DatabaseClient {
     }
     else if (whereExpression instanceof Parenthesis) {
       retExpression = getExpression(currParmNum, ((Parenthesis) whereExpression).getExpression(), tableName, parms);
-      if (((Parenthesis)whereExpression).isNot()) {
+      if (((Parenthesis) whereExpression).isNot()) {
         ParenthesisImpl parens = new ParenthesisImpl();
         parens.setExpression(retExpression);
         parens.setNot(true);
@@ -5012,7 +5104,7 @@ public class DatabaseClient {
       retExpression = parameter;
     }
     else if (whereExpression instanceof Function) {
-      Function sourceFunc = (Function)whereExpression;
+      Function sourceFunc = (Function) whereExpression;
       ExpressionList sourceParms = sourceFunc.getParameters();
       List<ExpressionImpl> expressions = new ArrayList<>();
       if (sourceParms != null) {
@@ -5026,7 +5118,7 @@ public class DatabaseClient {
       retExpression = func;
     }
     else if (whereExpression instanceof SignedExpression) {
-      SignedExpression expression = (SignedExpression)whereExpression;
+      SignedExpression expression = (SignedExpression) whereExpression;
       Expression innerExpression = expression.getExpression();
       ExpressionImpl inner = getExpression(currParmNum, innerExpression, tableName, parms);
       if (inner instanceof ConstantImpl) {

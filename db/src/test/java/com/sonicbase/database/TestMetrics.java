@@ -7,6 +7,8 @@ import com.codahale.metrics.Snapshot;
 import com.sonicbase.server.MonitorManager;
 import org.testng.annotations.Test;
 
+import java.util.concurrent.atomic.AtomicLong;
+
 import static com.codahale.metrics.MetricRegistry.name;
 
 public class TestMetrics {
@@ -119,10 +121,10 @@ public class TestMetrics {
 //
 //
 
-    MonitorManager.updateStats(histogramAggregate, null, count1, snapshot1.getMean(), snapshot1.get75thPercentile(),
+    MonitorManager.updateStats(new AtomicLong(), histogramAggregate, null, count1, snapshot1.getMean(), snapshot1.get75thPercentile(),
         snapshot1.get95thPercentile(), snapshot1.get99thPercentile(), snapshot1.get999thPercentile(),
         snapshot1.getMax());
-    MonitorManager.updateStats(histogramAggregate, histogram1, count2, snapshot2.getMean(), snapshot2.get75thPercentile(),
+    MonitorManager.updateStats(new AtomicLong(), histogramAggregate, histogram1, count2, snapshot2.getMean(), snapshot2.get75thPercentile(),
         snapshot2.get95thPercentile(), snapshot2.get99thPercentile(), snapshot2.get999thPercentile(),
         snapshot2.getMax());
 
@@ -163,10 +165,10 @@ public class TestMetrics {
     Snapshot snapshot1 = histogram1.getSnapshot();
     int totalCount = 0;
 
-    MonitorManager.updateStats(histogramAggregate, null, count1, snapshot1.getMean(), snapshot1.get75thPercentile(),
+    MonitorManager.updateStats(new AtomicLong(), histogramAggregate, null, count1, snapshot1.getMean(), snapshot1.get75thPercentile(),
         snapshot1.get95thPercentile(), snapshot1.get99thPercentile(), snapshot1.get999thPercentile(),
         snapshot1.getMax());
-    MonitorManager.updateStats(histogramAggregate, histogram1, count2, snapshot2.getMean(), snapshot2.get75thPercentile(),
+    MonitorManager.updateStats(new AtomicLong(), histogramAggregate, histogram1, count2, snapshot2.getMean(), snapshot2.get75thPercentile(),
         snapshot2.get95thPercentile(), snapshot2.get99thPercentile(), snapshot2.get999thPercentile(),
         snapshot2.getMax());
 

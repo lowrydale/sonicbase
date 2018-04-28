@@ -64,9 +64,9 @@ public class TestDatabase {
     for (DatabaseServer server : dbServers) {
       server.shutdown();
     }
-    Logger.queue.clear();
-    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size() + ", class=TestDatabase");
-    for (DatabaseClient client : DatabaseClient.allClients) {
+    Logger.getQueue().clear();
+    System.out.println("client refCount=" + DatabaseClient.getClientRefCount().get() + ", sharedClients=" + DatabaseClient.getSharedClients().size() + ", class=TestDatabase");
+    for (DatabaseClient client : DatabaseClient.getAllClients()) {
       System.out.println("Stack:\n" + client.getAllocatedStack());
     }
   }
@@ -132,10 +132,10 @@ public class TestDatabase {
       }
 
       DatabaseServer.initDeathOverride(2, 2);
-      DatabaseServer.deathOverride[0][0] = false;
-      DatabaseServer.deathOverride[0][1] = false;
-      DatabaseServer.deathOverride[1][0] = false;
-      DatabaseServer.deathOverride[1][1] = false;
+      DatabaseServer.getDeathOverride()[0][0] = false;
+      DatabaseServer.getDeathOverride()[0][1] = false;
+      DatabaseServer.getDeathOverride()[1][0] = false;
+      DatabaseServer.getDeathOverride()[1][1] = false;
 
       dbServers[0].enableSnapshot(false);
       dbServers[1].enableSnapshot(false);
@@ -216,7 +216,7 @@ public class TestDatabase {
 
       //test insertWithRecord
 
-      LocalProducer.queue.clear();
+      LocalProducer.getQueue().clear();
 
       stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");
       stmt.setLong(1, 1000);
@@ -280,30 +280,36 @@ public class TestDatabase {
         assertTrue(ExceptionUtils.getStackTrace(e).contains("Unique constraint violated"));
       }
 
-//      for (int i = 0; i < recordCount; i++) {
-//        stmt = conn.prepareStatement("insert ignore into persons (id, socialSecurityNumber, relatives, restricted, gender, id3) VALUES (?, ?, ?, ?, ?, ?)");
-//        stmt.setLong(1, i);
-//        stmt.setString(2, "933-28-" + i);
-//        stmt.setString(3, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
-//        stmt.setBoolean(4, false);
-//        stmt.setString(5, "m");
-//        stmt.setLong(6, i + 1000);
-//        assertEquals(stmt.executeUpdate(), 1);
-//        ids.add((long) i);
-//        stmt.addBatch();
-//      }
-//      stmt.executeBatch();
+      stmt = conn.prepareStatement("insert ignore into persons (id, socialSecurityNumber, relatives, restricted, gender, id3) VALUES (?, ?, ?, ?, ?, ?)");
+      for (int i = 0; i < recordCount; i++) {
+        stmt.setLong(1, i);
+        stmt.setString(2, "933-28-" + i);
+        stmt.setString(3, "updated value");
+        stmt.setBoolean(4, false);
+        stmt.setString(5, "m");
+        stmt.setLong(6, i + 1000);
+        ids.add((long) i);
+        stmt.addBatch();
+      }
+      int[] batchRet = stmt.executeBatch();
+      for (int i = 0; i < recordCount; i++) {
+        assertEquals(batchRet[i], UpdateManager.BATCH_STATUS_SUCCCESS);
+      }
+
+      stmt = conn.prepareStatement("select * from persons where id=0");
+      ResultSet rs = stmt.executeQuery();
+      rs.next();
+      assertEquals(rs.getString("relatives"), "updated value");
 
       try {
+        stmt = conn.prepareStatement("insert into persons (id, socialSecurityNumber, relatives, restricted, gender, id3) VALUES (?, ?, ?, ?, ?, ?)");
         for (int i = 0; i < recordCount; i++) {
-          stmt = conn.prepareStatement("insert into persons (id, socialSecurityNumber, relatives, restricted, gender, id3) VALUES (?, ?, ?, ?, ?, ?)");
           stmt.setLong(1, i);
           stmt.setString(2, "933-28-" + i);
           stmt.setString(3, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
           stmt.setBoolean(4, false);
           stmt.setString(5, "m");
           stmt.setLong(6, i + 1000);
-          assertEquals(stmt.executeUpdate(), 1);
           ids.add((long) i);
           stmt.addBatch();
         }
@@ -560,7 +566,7 @@ public class TestDatabase {
       cobj.put(ComObject.Tag.method, "forceDeletes");
       client.sendToAllShards(null, 0, cobj, DatabaseClient.Replica.all);
 
-     // Thread.sleep(10000);
+        // Thread.sleep(10000);
       executor.shutdownNow();
     }
     catch (Exception e) {
@@ -3504,6 +3510,28 @@ public class TestDatabase {
       }
       stmt.executeBatch();
       conn.commit();
+
+      try {
+        stmt = conn.prepareStatement("update persons set id=1 where id=1");
+        for (int i = 0; i < 10; i++) {
+          stmt.addBatch();
+        }
+        stmt.executeBatch();
+      }
+      catch (Exception e) {
+        System.out.println("pass");
+      }
+
+      try {
+        stmt = conn.prepareStatement("delete from persons where id=1");
+        for (int i = 0; i < 10; i++) {
+          stmt.addBatch();
+        }
+        stmt.executeBatch();
+      }
+      catch (Exception e) {
+        System.out.println("pass");
+      }
 
       Thread.sleep(5000);
 

@@ -910,7 +910,11 @@ public class NettyServer {
             try {
               isRunning.set(true);
 
+              databaseServer.setWaitingForServersToStart(true);
               waitForServersToStart();
+              databaseServer.setWaitingForServersToStart(false);
+
+              databaseServer.reconcileSchema();
 
               databaseServer.recoverFromSnapshot();
 

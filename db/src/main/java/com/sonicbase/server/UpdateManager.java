@@ -3,25 +3,27 @@ package com.sonicbase.server;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
-
+import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
 import com.sonicbase.index.Repartitioner;
-
-import com.sonicbase.common.*;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.ResultSet;
 import com.sonicbase.query.impl.ColumnImpl;
 import com.sonicbase.query.impl.SelectStatementImpl;
-import com.sonicbase.streams.StreamsProducer;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.streams.StreamsProducer;
 import com.sonicbase.util.DateUtils;
 import com.sun.jersey.json.impl.writer.JsonEncoder;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import sun.misc.BASE64Encoder;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
+import java.io.EOFException;
+import java.io.IOException;
 import java.sql.*;
 import java.util.*;
 import java.util.Date;
@@ -31,11 +33,17 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static com.sonicbase.server.TransactionManager.*;
 import static com.sonicbase.server.TransactionManager.OperationType.*;
+import static java.sql.Statement.EXECUTE_FAILED;
+import static java.sql.Statement.SUCCESS_NO_INFO;
 
 /**
  * Responsible for
  */
 public class UpdateManager {
+
+  public static final int BATCH_STATUS_SUCCCESS = SUCCESS_NO_INFO;
+  public static final int BATCH_STATUS_FAILED = EXECUTE_FAILED;
+  public static final int BATCH_STATUS_UNIQUE_CONSTRAINT_VIOLATION = -100;
 
   private Logger logger;
 
@@ -684,6 +692,8 @@ private static class InsertRequest {
     final long transactionId = cobj.getLong(ComObject.Tag.transactionId);
     int count = 0;
 
+    final ComObject retObj = new ComObject();
+
     //boolean hasRepartitioned = hasRepartitioned(dbName, cobj);
 //    if (hasRepartitioned) {
 //      //server.getThrottleReadLock().lock();
@@ -691,13 +701,6 @@ private static class InsertRequest {
     try {
       List<Future> futures = new ArrayList<>();
       final ComArray array = cobj.getArray(ComObject.Tag.insertObjects);
-
-      if (false) {
-        ComObject retObj = new ComObject();
-        retObj.put(ComObject.Tag.count, array.getArray().size());
-        return retObj;
-      }
-
 
       batchEntryCount.addAndGet(array.getArray().size());
       if (batchCount.incrementAndGet() % 1000 == 0) {
@@ -714,7 +717,8 @@ private static class InsertRequest {
         }
       }
 
-      long begin = System.nanoTime();
+      final ComArray batchResponses = retObj.putArray(ComObject.Tag.batchResponses, ComObject.Type.objectType);
+      final long begin = System.nanoTime();
       List<InsertRequest> requests = new ArrayList<>();
       for (int i = 0; i < array.getArray().size(); i++) {
         final int offset = i;
@@ -733,7 +737,7 @@ private static class InsertRequest {
               public Object call() throws Exception {
                 for (InsertRequest request : currRequests) {
                   doInsertIndexEntryByKeyWithRecord(cobj, request.innerObj, request.sequence0, request.sequence1, request.sequence2,
-                      request.replayedCommand, transactionId, isExplicitTrans, request.isCommitting);
+                      request.replayedCommand, transactionId, isExplicitTrans, request.isCommitting, batchResponses);
                 }
                 return null;
               }
@@ -747,11 +751,17 @@ private static class InsertRequest {
           //server.getThrottleWriteLock().lock();
           try {
             doInsertIndexEntryByKeyWithRecord(cobj, innerObj, sequence0, sequence1, sequence2, replayedCommand,
-                transactionId, isExplicitTrans, false);
+                transactionId, isExplicitTrans, false, batchResponses);
           }
-          finally {
-            //server.getThrottleWriteLock().unlock();
+          catch (Exception e) {
+            if (-1 != ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class)) {
+              throw new DatabaseException(e);
+            }
+            else {
+              logger.error("Error inserting record", e);
+            }
           }
+
         }
         count++;
         //if (insertCount.incrementAndGet() % 5000 == 0) {
@@ -764,12 +774,32 @@ private static class InsertRequest {
       }
 
       for (InsertRequest request : requests) {
-        doInsertIndexEntryByKeyWithRecord(cobj, request.innerObj, request.sequence0, request.sequence1, request.sequence2,
-            request.replayedCommand, transactionId, isExplicitTrans, request.isCommitting);
+        try {
+          doInsertIndexEntryByKeyWithRecord(cobj, request.innerObj, request.sequence0, request.sequence1, request.sequence2,
+              request.replayedCommand, transactionId, isExplicitTrans, request.isCommitting, batchResponses);
+        }
+        catch (Exception e) {
+          if (-1 != ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class)) {
+            throw new DatabaseException(e);
+          }
+          else {
+            logger.error("Error inserting record", e);
+          }
+        }
       }
 
       for (Future future : futures) {
-        future.get();
+        try {
+          future.get();
+        }
+        catch (Exception e) {
+          if (-1 != ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class)) {
+            throw new DatabaseException(e);
+          }
+          else {
+            logger.error("Error inserting record", e);
+          }
+        }
       }
       if (isExplicitTrans) {
         Transaction trans = server.getTransactionManager().getTransaction(transactionId);
@@ -797,7 +827,6 @@ private static class InsertRequest {
 //      //  server.getThrottleReadLock().unlock();
 //      }
     }
-    ComObject retObj = new ComObject();
     retObj.put(ComObject.Tag.count, count);
     return retObj;
   }
@@ -862,7 +891,7 @@ private static class InsertRequest {
       final long transactionId = cobj.getLong(ComObject.Tag.transactionId);
 
       ComObject ret = doInsertIndexEntryByKeyWithRecord(cobj, cobj, sequence0, sequence1, sequence2, replayedCommand,
-          transactionId, isExplicitTrans, false);
+          transactionId, isExplicitTrans, false, null);
       if (isExplicitTrans) {
         Transaction trans = server.getTransactionManager().getTransaction(transactionId);
         String command = "DatabaseServer:ComObject:insertIndexEntryByKeyWithRecord:";
@@ -882,7 +911,9 @@ private static class InsertRequest {
 
   public ComObject doInsertIndexEntryByKeyWithRecord(ComObject outerCobj, ComObject cobj,
                                                      long sequence0, long sequence1, short sequence2, boolean replayedCommand, long transactionId,
-                                                     boolean isExpliciteTrans, boolean isCommitting) throws EOFException {
+                                                     boolean isExpliciteTrans, boolean isCommitting, ComArray batchResponses) throws EOFException {
+    int originalOffset = cobj.getInt(ComObject.Tag.originalOffset);
+
     try {
       if (server.getAboveMemoryThreshold().get()) {
         throw new DatabaseException("Above max memory threshold. Further inserts are not allowed");
@@ -912,7 +943,10 @@ private static class InsertRequest {
       byte[] keyBytes = cobj.getByteArray(ComObject.Tag.keyBytes);
       Object[] primaryKey = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
 
-      boolean ignore = cobj.getBoolean(ComObject.Tag.ignore);
+      Boolean ignore = cobj.getBoolean(ComObject.Tag.ignore);
+      if (ignore == null) {
+        ignore = false;
+      }
 
       AtomicBoolean shouldExecute = new AtomicBoolean();
       AtomicBoolean shouldDeleteLock = new AtomicBoolean();
@@ -993,14 +1027,40 @@ private static class InsertRequest {
 //        throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
 //      }
 
+      if (batchResponses != null) {
+        synchronized (batchResponses) {
+          ComObject obj = new ComObject();
+          obj.put(ComObject.Tag.originalOffset, originalOffset);
+          obj.put(ComObject.Tag.intStatus, BATCH_STATUS_SUCCCESS);
+          batchResponses.add(obj);
+        }
+      }
       ComObject retObj = new ComObject();
       retObj.put(ComObject.Tag.count, 1);
       return retObj;
     }
-    catch (EOFException e) {
-      throw e;
-    }
-    catch (IOException e) {
+    catch (Exception e) {
+      if (-1 != ExceptionUtils.indexOfThrowable(e, UniqueConstraintViolationException.class)) {
+        if (batchResponses != null) {
+          synchronized (batchResponses) {
+            ComObject obj = new ComObject();
+            obj.put(ComObject.Tag.originalOffset, originalOffset);
+            obj.put(ComObject.Tag.intStatus, BATCH_STATUS_UNIQUE_CONSTRAINT_VIOLATION);
+            batchResponses.add(obj);
+          }
+        }
+      }
+      else {
+        if (batchResponses != null) {
+          synchronized (batchResponses) {
+            ComObject obj = new ComObject();
+            obj.put(ComObject.Tag.originalOffset, originalOffset);
+            obj.put(ComObject.Tag.intStatus, BATCH_STATUS_FAILED);
+            batchResponses.add(obj);
+          }
+        }
+      }
+
       throw new DatabaseException(e);
     }
   }
@@ -1060,7 +1120,8 @@ private static class InsertRequest {
               }
               break;
             case insertWithRecord:
-              doInsertIndexEntryByKeyWithRecord(cobj, new ComObject(opBody), sequence0, sequence1, (short) 0, op.getReplayed(), transactionId, isExplicitTrans, true);
+              doInsertIndexEntryByKeyWithRecord(cobj, new ComObject(opBody), sequence0, sequence1, (short) 0,
+                  op.getReplayed(), transactionId, isExplicitTrans, true, null);
               break;
             case batchInsertWithRecord:
               threadLocalIsBatchRequest.set(true);
@@ -1074,7 +1135,7 @@ private static class InsertRequest {
                 for (int i = 0; i < array.getArray().size(); i++) {
                   ComObject innerObj = (ComObject) array.getArray().get(i);
                   doInsertIndexEntryByKeyWithRecord(cobj, innerObj, sequence0, sequence1, (short) i, op.getReplayed(),
-                      transactionId, isExplicitTrans, true);
+                      transactionId, isExplicitTrans, true, null);
                 }
                 publishBatch(cobj);
               }

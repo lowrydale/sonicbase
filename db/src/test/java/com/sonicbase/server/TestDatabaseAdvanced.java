@@ -247,6 +247,44 @@ public class TestDatabaseAdvanced {
       Thread.sleep(1000);
     }
 
+    for (DatabaseServer server : dbServers) {
+      server.shutdownRepartitioner();
+    }
+
+    File tableDir = dbServers[2].getSnapshotManager().getTableSchemaDir("test", "persons");
+
+    File[] tableFiles = tableDir.listFiles();
+    DatabaseCommon.sortSchemaFiles(tableFiles);
+    File tableFile = tableFiles[tableFiles.length - 1];
+    int tableVersion = getVersionFromFile(tableFile.getName());
+    tableFile.delete();
+
+
+    File indexDir = dbServers[2].getSnapshotManager().getIndexSchemaDir("test", "persons", "_1__primarykey");
+
+    File[] indexFiles = indexDir.listFiles();
+    DatabaseCommon.sortSchemaFiles(indexFiles);
+    File indexFile = indexFiles[indexFiles.length - 1];
+    int indexVersion = getVersionFromFile(indexFile.getName());
+    indexFile.delete();
+
+    long begin = System.currentTimeMillis();
+    dbServers[0].reconcileSchema();
+    System.out.println("reconcile duration=" + (System.currentTimeMillis() - begin));
+
+    File[] files = tableDir.listFiles();
+    DatabaseCommon.sortSchemaFiles(files);
+
+    String filename = files[files.length - 1].getName();
+    assertTrue(getVersionFromFile(filename) >= tableVersion);
+
+    files = indexDir.listFiles();
+    DatabaseCommon.sortSchemaFiles(files);
+
+    filename = files[files.length - 1].getName();
+    assertTrue(getVersionFromFile(filename) >= indexVersion);
+
+
 //    Thread.sleep(30000);
 
 //    assertEquals(client.getPartitionSize("test", 0, "persons", "_1__primarykey"), 9);
@@ -258,6 +296,12 @@ public class TestDatabaseAdvanced {
     Thread.sleep(10000);
 
     executor.shutdownNow();
+  }
+
+  private Integer getVersionFromFile(String filename) {
+    int pos = filename.indexOf(".");
+    int pos2 = filename.indexOf(".", pos + 1);
+    return Integer.valueOf(filename.substring(pos + 1, pos2));
   }
 
   @Test

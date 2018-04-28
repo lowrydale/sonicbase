@@ -34,6 +34,22 @@
 -keep public class com.sonicbase.util.DateUtils
 -keep public class com.sonicbase.common.SchemaOutOfSyncException
 -keep public class com.sonicbase.server.LogManager$ByteCounterStream
+-keep public class com.sonicbase.common.Logger
+-keep public class com.sonicbase.server.HttpServer
+-keep public class com.sonicbase.server.MonitorHandler
+
+
+-keepclassmembers  class com.sonicbase.server.MonitorHandler {
+    !private <methods>;
+}
+
+-keepclassmembers  class com.sonicbase.server.HttpServer {
+    !private <methods>;
+}
+
+-keepclassmembers  class com.sonicbase.common.Logger {
+    !private <methods>;
+}
 
 -keepclassmembers  class com.sonicbase.bench.TestPerformance {
     !private <methods>;
@@ -163,6 +179,11 @@
 -keep public class com.sonicbase.website.Tutorial
 -keep public class com.sonicbase.misc.TestMissing
 
+
+-keepclassmembers  class com.sonicbase.streams.LocalProducer {
+    !private <methods>;
+    !public <methods>;
+}
 
 -keepclassmembers  class com.sonicbase.misc.TestMissing {
       public static void main(java.lang.String[]);

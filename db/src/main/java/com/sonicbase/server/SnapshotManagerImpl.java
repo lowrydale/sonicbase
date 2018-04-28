@@ -102,7 +102,7 @@ public class SnapshotManagerImpl implements SnapshotManager {
 
   public void getPercentRecoverComplete(ComObject retObj) {
     if (totalBytes == 0) {
-      retObj.put(ComObject.Tag.percentComplete, 0);
+      retObj.put(ComObject.Tag.percentComplete, 0d);
     }
     else {
       retObj.put(ComObject.Tag.percentComplete, (double) finishedBytes.get() / (double) totalBytes);
@@ -315,6 +315,14 @@ public class SnapshotManagerImpl implements SnapshotManager {
 
   private String getSnapshotSchemaDir(String dbName) {
     return new File(getSnapshotReplicaDir(), "_sonicbase_schema/" + dbName).getAbsolutePath();
+  }
+
+  public File getIndexSchemaDir(String dbName, String tableName, String indexName) {
+    return new File(getSnapshotSchemaDir(dbName), tableName + "/indices/" + indexName);
+  }
+
+  public File getTableSchemaDir(String dbName, String tableName) {
+    return new File(getSnapshotSchemaDir(dbName), tableName + "/table");
   }
 
   public void saveIndexSchema(String dbName, int schemaVersion, TableSchema tableSchema, IndexSchema indexSchema) {

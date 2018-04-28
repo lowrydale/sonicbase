@@ -442,7 +442,7 @@ public class MethodInvoker {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaWriteLock(dbName).lock();
     try {
-      return schemaManager.dropIndex(cobj);
+      return schemaManager.dropIndex(cobj, replayedCommand);
     }
     finally {
       common.getSchemaWriteLock(dbName).unlock();
@@ -1011,6 +1011,43 @@ public class MethodInvoker {
     }
   }
 
+  public ComObject updateIndexSchema(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
+    common.getSchemaWriteLock(dbName).lock();
+    try {
+      return server.updateIndexSchema(cobj, replayedCommand);
+    }
+    finally {
+      common.getSchemaWriteLock(dbName).unlock();
+    }
+  }
+
+  public ComObject updateTableSchema(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
+    common.getSchemaWriteLock(dbName).lock();
+    try {
+      return server.updateTableSchema(cobj, replayedCommand);
+    }
+    finally {
+      common.getSchemaWriteLock(dbName).unlock();
+    }
+  }
+
+  public ComObject getSchemaVersions(ComObject cobj, boolean replayedCommand) {
+    return server.getSchemaVersions(cobj, replayedCommand);
+  }
+
+  public ComObject getTableSchema(ComObject cobj, boolean replayedCommand) {
+    String dbName = cobj.getString(ComObject.Tag.dbName);
+    common.getSchemaReadLock(dbName).lock();
+    try {
+      return server.getTableSchema(cobj, replayedCommand);
+    }
+    finally {
+      common.getSchemaReadLock(dbName).unlock();
+    }
+  }
+
   public ComObject abortTransaction(String command, byte[] body, boolean replayedCommand) {
     String[] parts = command.split(":");
     String dbName = parts[5];
@@ -1188,6 +1225,10 @@ public class MethodInvoker {
     finally {
       common.getSchemaReadLock(dbName).unlock();
     }
+  }
+
+  public ComObject getIndexSchema(ComObject cobj, boolean replayedCommand) {
+    return server.getIndexSchema(cobj, replayedCommand);
   }
 
   public ComObject getIndexCounts(ComObject cobj, boolean replayedCommand) {

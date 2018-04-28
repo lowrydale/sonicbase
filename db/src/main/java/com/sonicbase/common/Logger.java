@@ -93,6 +93,10 @@ public class Logger {
     ready = true;
   }
 
+  public static ArrayBlockingQueue<Error> getQueue() {
+    return queue;
+  }
+
   public void errorLocalOnly(String msg, Throwable throwable) {
     logger.error(msg, throwable);
   }

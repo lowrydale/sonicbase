@@ -53,6 +53,10 @@ public interface SnapshotManager {
 
   File getDeletedDeltaDir(String dbName, String s, String key, String key1);
 
+  File getIndexSchemaDir(String dbName, String tableName, String indexName);
+
+  File getTableSchemaDir(String dbName, String tableName);
+
   void saveIndexSchema(String dbName, int schemaVersion, TableSchema tableSchema, IndexSchema indexSchema);
 
   void saveTableSchema(String dbName, int schemaVersion, String tableName, TableSchema tableSchema);

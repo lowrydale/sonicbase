@@ -1,10 +1,10 @@
 /* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
-import com.codahale.metrics.ExponentiallyDecayingReservoir;
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Snapshot;
+import com.codahale.metrics.UniformReservoir;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.sonicbase.common.*;
@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.TimeZone;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static com.sonicbase.server.DatabaseServer.SONICBASE_SYS_DB_STR;
 
@@ -268,6 +269,7 @@ public class MonitorManager {
     private String dbName;
     private Histogram histogram;
     private long lastCount;
+    private AtomicLong totalCount = new AtomicLong();
 
     public HistogramEntry(String dbName, Histogram histogram) {
       this.dbName = dbName;
@@ -337,16 +339,32 @@ public class MonitorManager {
               }
 
               Histogram histogram = entry.getValue().histogram;
+              AtomicLong totalCount = entry.getValue().totalCount;
               Snapshot snapshot = histogram.getSnapshot();
 
               long id = entry.getKey();
-              long count = histogram.getCount();
+              long count = totalCount.get();
               double lat_mean = snapshot.getMean();
               double lat_75 = snapshot.get75thPercentile();
+              if (lat_75 < lat_mean) {
+                lat_75 = lat_mean;
+              }
               double lat_95 = snapshot.get95thPercentile();
+              if (lat_95 < lat_75) {
+                lat_95 = lat_75;
+              }
               double lat_99 = snapshot.get99thPercentile();
+              if (lat_99 < lat_95) {
+                lat_99 = lat_95;
+              }
               double lat_999 = snapshot.get999thPercentile();
+              if (lat_999 < lat_99) {
+                lat_999 = lat_99;
+              }
               double lat_max = snapshot.getMax();
+              if (lat_max < lat_999) {
+                lat_max = lat_999;
+              }
 
               Date date = new Date(System.currentTimeMillis());
               SimpleDateFormat df = new SimpleDateFormat(DAY_FORMAT_STR);
@@ -485,6 +503,7 @@ public class MonitorManager {
 
         Histogram histogram = null;
 
+        AtomicLong totalCount;
         HistogramEntry histogramEntry = cache.getIfPresent(id);
         if (histogramEntry == null) {
           histogramEntry = new HistogramEntry();
@@ -493,7 +512,8 @@ public class MonitorManager {
           date = new Date(System.currentTimeMillis());
           String dateStr = new SimpleDateFormat(DAY_FORMAT_STR).format(date);
 
-          histogram = histogramEntry.histogram = new Histogram(new ExponentiallyDecayingReservoir());
+          histogram = histogramEntry.histogram = new Histogram(new UniformReservoir());
+          totalCount = histogramEntry.totalCount;
 
           try (PreparedStatement stmt = conn.prepareStatement("select * from query_stats where id=? and date_val=?")) {
             stmt.setLong(1, id);
@@ -508,7 +528,7 @@ public class MonitorManager {
                 double lat_999 = rs.getDouble("lat_999");
                 double lat_max = rs.getDouble("lat_max");
 
-                updateStats(histogram, null, count, lat_avg, lat_75, lat_95, lat_99, lat_999, lat_max);
+                updateStats(totalCount, histogram, null, count, lat_avg, lat_75, lat_95, lat_99, lat_999, lat_max);
               }
             }
           }
@@ -519,6 +539,7 @@ public class MonitorManager {
         }
         else {
           histogram = histogramEntry.histogram;
+          totalCount = histogramEntry.totalCount;
         }
 
         byte[] latenciesBytes = snapshotObj.getByteArray(ComObject.Tag.latenciesBytes);
@@ -528,6 +549,7 @@ public class MonitorManager {
             while (true) {
               long latency = Varint.readUnsignedVarLong(in);
               histogram.update(latency);
+              totalCount.incrementAndGet();
             }
           }
           catch (EOFException e) {
@@ -535,7 +557,7 @@ public class MonitorManager {
           }
         }
         else {
-          updateStats(histogram, null,
+          updateStats(totalCount, histogram, null,
               snapshotObj.getInt(ComObject.Tag.count),
               snapshotObj.getDouble(ComObject.Tag.lat_avg),
               snapshotObj.getDouble(ComObject.Tag.lat_75),
@@ -552,10 +574,16 @@ public class MonitorManager {
     }
   }
 
-  public static void updateStats(Histogram histogram, Histogram histogram2, double countRegistered,
+  public static void updateStats(AtomicLong totalCountRet, Histogram histogram, Histogram histogram2, double countRegistered,
                                  double lat_avg, double lat_75, double lat_95, double lat_99, double lat_999, double lat_max) {
     int totalCount = 0;
     int count = 0;
+
+    totalCountRet.addAndGet((long)countRegistered);
+
+    if (countRegistered >= 1000) {
+      countRegistered /= 100;
+    }
 
     double updateCount = countRegistered;//count * ((count + countRegistered) / countRegistered);
     count += (int) (((0.5)) * updateCount);// * count2 / (count1 + count2));

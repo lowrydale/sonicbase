@@ -575,6 +575,19 @@ public class DeltaManager implements SnapshotManager {
     return new File(snapshotRootDir, deltaName + "/deleted/" + tableName + "/" + indexName);
   }
 
+  public File getIndexSchemaDir(String dbName, String tableName, String indexName) {
+    return null;
+  }
+
+  @Override
+  public File getTableSchemaDir(String dbName, String tableName) {
+    return null;
+  }
+
+  public File getTableSchemaDir(String dbName, String tableName, String indexName) {
+    return null;
+  }
+
   @Override
   public void saveIndexSchema(String dbName, int schemaVersion, TableSchema tableSchema, IndexSchema indexSchema) {
 

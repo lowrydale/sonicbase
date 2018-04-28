@@ -49,13 +49,13 @@ public class TestBulkImport {
     for (DatabaseServer server : dbServers) {
       server.shutdown();
     }
-    Logger.queue.clear();
+    Logger.getQueue().clear();
     serverA1.shutdown();
     serverA2.shutdown();
     serverB1.shutdown();
     serverB2.shutdown();
 
-    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size());
+    System.out.println("client refCount=" + DatabaseClient.getClientRefCount().get() + ", sharedClients=" + DatabaseClient.getSharedClients().size());
 
     System.out.println("finished");
   }
@@ -202,7 +202,7 @@ public class TestBulkImport {
         server.shutdownRepartitioner();
       }
 
-      LocalProducer.queue.clear();
+      LocalProducer.getQueue().clear();
 
 
       for (int i = 0; i < 10_000; i++) {

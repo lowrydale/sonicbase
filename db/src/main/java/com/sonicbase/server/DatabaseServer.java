@@ -141,7 +141,7 @@ public class DatabaseServer {
   private Boolean multipleLicenseServers;
   private BulkImportManager bulkImportManager;
   private StreamManager streamManager;
-  private boolean waitingForServersToStart = true;
+  private boolean waitingForServersToStart = false;
 
   static {
     addressMap = new AddressMap();

@@ -1002,7 +1002,7 @@ public class DeleteManagerImpl implements DeleteManager {
               }
             });
             List<Future> futures = new ArrayList<>();
-            counterStream.set(new LogManager.ByteCounterStream(new FileInputStream(files[0])));
+            counterStream.set(new LogManager.ByteCounterStream(new FileInputStream(files[0]), new AtomicLong()));
             try (DataInputStream in = new DataInputStream(new BufferedInputStream(counterStream.get()))) {
               short serializationVersion = (short)Varint.readSignedVarLong(in);
               String dbName = in.readUTF();

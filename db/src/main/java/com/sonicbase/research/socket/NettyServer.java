@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Logger;
+import com.sonicbase.common.ThreadUtil;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.socket.DatabaseSocketClient;
@@ -910,11 +911,18 @@ public class NettyServer {
             try {
               isRunning.set(true);
 
-              databaseServer.setWaitingForServersToStart(true);
-              waitForServersToStart();
-              databaseServer.setWaitingForServersToStart(false);
+              Thread thread = ThreadUtil.createThread(new Runnable(){
+                @Override
+                public void run() {
+                  //databaseServer.setWaitingForServersToStart(true);
+                  waitForServersToStart();
+                  //databaseServer.setWaitingForServersToStart(false);
 
-              databaseServer.reconcileSchema();
+                  databaseServer.reconcileSchema();
+
+                }
+              }, "SonicBase Reconcile Thread");
+              thread.start();
 
               databaseServer.recoverFromSnapshot();
 

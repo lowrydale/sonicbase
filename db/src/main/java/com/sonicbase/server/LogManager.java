@@ -51,6 +51,7 @@ public class LogManager {
   private boolean didSlice = false;
   private boolean shutdown;
   final AtomicInteger countReplayed = new AtomicInteger();
+  private AtomicLong countRead = new AtomicLong();
 
   public LogManager(DatabaseServer databaseServer, File rootDir) {
     this.databaseServer = databaseServer;
@@ -480,10 +481,9 @@ public class LogManager {
 
   public double getPercentApplyQueuesComplete() {
     long totalBytes = 0;
-    long readBytes = 0;
+    long readBytes = countRead.get();
     for (LogSource source : allCurrentSources) {
       totalBytes += source.getTotalBytes();
-      readBytes += source.getBytesRead();
     }
     if (totalBytes == 0) {
       return 0;
@@ -717,21 +717,22 @@ public class LogManager {
   }
 
   public static class ByteCounterStream extends InputStream {
-    long count;
+    private final AtomicLong countRead;
     private final InputStream in;
 
-    public ByteCounterStream(InputStream in) {
+    public ByteCounterStream(InputStream in, AtomicLong countRead) {
       this.in = in;
+      this.countRead = countRead;
     }
 
     @Override
     public int read() throws IOException {
-      count++;
+      countRead.incrementAndGet();
       return in.read();
     }
 
     public long getCount() {
-      return count;
+      return countRead.get();
     }
   }
 
@@ -746,7 +747,7 @@ public class LogManager {
     List<NettyServer.Request> requests;
     private String methodStr;
 
-    public LogSource(File file, DatabaseServer server, Logger logger) throws IOException {
+    public LogSource(File file, DatabaseServer server, Logger logger, AtomicLong countRead) throws IOException {
       InputStream inputStream = null;
       if (file.getName().contains(".gz")) {
         inputStream = new GZIPInputStream(new BufferedInputStream(new FileInputStream(file)));
@@ -754,7 +755,7 @@ public class LogManager {
       else {
         inputStream = new BufferedInputStream(new FileInputStream(file));
       }
-      counterStream = new ByteCounterStream(inputStream);
+      counterStream = new ByteCounterStream(inputStream, countRead);
       in = new DataInputStream(counterStream);
       filename = file.getAbsolutePath();
       totalBytes = file.length();
@@ -763,10 +764,6 @@ public class LogManager {
 
     public long getTotalBytes() {
       return this.totalBytes;
-    }
-
-    public long getBytesRead() {
-      return counterStream.count;
     }
 
     public boolean take(DatabaseServer server, Logger logger) {
@@ -974,14 +971,14 @@ public class LogManager {
               }
             }
             if (slicePoint == null) {
-              LogSource src = new LogSource(file, server, logger);
+              LogSource src = new LogSource(file, server, logger, countRead);
               sources.add(src);
               allCurrentSources.add(src);
               continue;
             }
             if (beforeSlice) {
               if (sliceFiles.contains(file.getAbsolutePath())) {
-                LogSource src = new LogSource(file, server, logger);
+                LogSource src = new LogSource(file, server, logger, countRead);
                 sources.add(src);
                 allCurrentSources.add(src);
               }
@@ -989,7 +986,7 @@ public class LogManager {
 
             if (!beforeSlice) {
               if (!sliceFiles.contains(file.getAbsolutePath())) {
-                LogSource src = new LogSource(file, server, logger);
+                LogSource src = new LogSource(file, server, logger, countRead);
                 sources.add(src);
                 allCurrentSources.add(src);
               }

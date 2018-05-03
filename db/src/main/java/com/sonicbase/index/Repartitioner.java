@@ -1536,16 +1536,16 @@ public class Repartitioner extends Thread {
       if (replayedCommand) {
         List<Future> futures = new ArrayList<>();
         for (final DeleteManagerImpl.DeleteRequest request : keysToDelete) {
-          futures.add(databaseServer.getExecutor().submit(new Callable(){
-            @Override
-            public Object call() throws Exception {
+//          futures.add(databaseServer.getExecutor().submit(new Callable(){
+//            @Override
+//            public Object call() throws Exception {
               doDeleteMovedEntry(keysToDeleteExpanded, indexSchema, index, request);
               if (count.incrementAndGet() % 100000 == 0) {
                 logger.info("deleteMovedRecords progress: count=" + count.get());
               }
-              return null;
-            }
-          }));
+//              return null;
+//            }
+//          }));
         }
         for (Future future : futures) {
           future.get();

@@ -155,7 +155,6 @@ public class DatabaseClient {
       "insertIndexEntryByKey",
       "insertIndexEntryByKeyWithRecord",
       "removeRecord",
-      "deleteMovedRecords",
       //"beginRebalance",
       "updateServersConfig",
       "deleteRecord",
@@ -202,6 +201,7 @@ public class DatabaseClient {
       "batchInsertIndexEntryByKey",
       "moveIndexEntries",
       "moveRecord",
+      "deleteMovedRecords",
       "registerStats",
   };
 
@@ -807,7 +807,6 @@ public class DatabaseClient {
               else if (currStatus == BATCH_STATUS_FAILED) {
                 removeInsertKey(cobjs2, insert.originalOffset, insert.primaryKey);
               }
-              break;
             }
           }
 

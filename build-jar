@@ -14,7 +14,7 @@ java -jar /Users/lowryda/tools/proguard5.3.3/lib/proguard.jar @myconfig-parent.p
 
 #mvn install:install-file -Dfile=/Users/lowryda/Dropbox/git/sonicbase/db/target/sonicbase-core-1.2.12.jar -DgroupId=com.sonicbase -DartifactId=sonicbase-core -Dversion=1.2.12 -Dpackaging=jar
 #mvn install:install-file -Dfile=/Users/lowryda/Dropbox/git/sonicbase/jdbc/target/sonicbase-jdbc-1.2.12.jar -DgroupId=com.sonicbase -DartifactId=sonicbase-jdbc -Dversion=1.2.12 -Dpackaging=jar
-mvn install:install-file -Dfile=/Users/lowryda/Dropbox/git/sonicbase/db/target/sonicbase-core-unobfuscated-1.2.12.jar -DgroupId=com.sonicbase -DartifactId=sonicbase-core -Dversion=1.2.12 -Dpackaging=jar
+mvn install:install-file -Dfile=/Users/lowryda/Dropbox/git/sonicbase/db/target/sonicbase-core-1.2.12.jar -DgroupId=com.sonicbase -DartifactId=sonicbase-core -Dversion=1.2.12 -Dpackaging=jar
 
 cd sonicbase
 mvn clean package shade:shade -DskipTests

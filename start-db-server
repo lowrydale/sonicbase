@@ -5,7 +5,7 @@ mkdir $4/logs
 
 if [ $5 == "4-dale" ]
 then
-  export MODE=debug
+  export MODE=yprof
 fi
 if [ $5 == "4-dale-2" ]
 then

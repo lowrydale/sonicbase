@@ -728,21 +728,21 @@ private static class InsertRequest {
         short sequence2 = (short) offset;
         if (replayedCommand) {
           InsertRequest request = new InsertRequest(innerObj, sequence0, sequence1, sequence2, replayedCommand, false);
-          requests.add(request);
-          if (requests.size() >= 100) {
-            final List<InsertRequest> currRequests = requests;
-            requests = new ArrayList<>();
-            futures.add(server.getExecutor().submit(new Callable() {
-              @Override
-              public Object call() throws Exception {
-                for (InsertRequest request : currRequests) {
+//          requests.add(request);
+//          if (requests.size() >= 100) {
+//            final List<InsertRequest> currRequests = requests;
+//            requests = new ArrayList<>();
+//            futures.add(server.getExecutor().submit(new Callable() {
+//              @Override
+//              public Object call() throws Exception {
+//                for (InsertRequest request : currRequests) {
                   doInsertIndexEntryByKeyWithRecord(cobj, request.innerObj, request.sequence0, request.sequence1, request.sequence2,
                       request.replayedCommand, transactionId, isExplicitTrans, request.isCommitting, batchResponses);
-                }
-                return null;
-              }
-            }));
-          }
+//                }
+//                return null;
+//              }
+//            }));
+//          }
         }
         else {
 

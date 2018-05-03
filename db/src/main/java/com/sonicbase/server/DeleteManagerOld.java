@@ -29,12 +29,45 @@ public class DeleteManagerOld implements DeleteManager {
   private Thread mainThread;
   private ThreadPoolExecutor freeExecutor;
   private boolean shutdown;
+  private LinkedBlockingQueue<Object> toFree = new LinkedBlockingQueue<>();
+  private Thread freeThread;
+  private AtomicLong countRead = new AtomicLong();
 
-  public DeleteManagerOld(DatabaseServer databaseServer) {
+  public DeleteManagerOld(final DatabaseServer databaseServer) {
     this.databaseServer = databaseServer;
     logger = new Logger(/*databaseServer.getDatabaseClient()*/ null);
     this.executor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors() * 2, "SonicBase DeleteManagerOld Thread");
     this.freeExecutor = ThreadUtil.createExecutor(4, "SonicBase DeleteManagerOld FreeExecutor Thread");
+    freeThread = ThreadUtil.createThread(new Runnable(){
+      @Override
+      public void run() {
+        while (!shutdown) {
+          try {
+            final Object obj = toFree.poll(10_000, TimeUnit.MILLISECONDS);
+            if (obj == null) {
+              continue;
+            }
+            final List<Object> batch = new ArrayList<>();
+            toFree.drainTo(batch, 1000);
+            freeExecutor.submit(new Runnable(){
+              @Override
+              public void run() {
+                for (Object currObj : batch) {
+                  databaseServer.freeUnsafeIds(currObj);
+                }
+              }
+            });
+          }
+          catch (InterruptedException e) {
+            break;
+          }
+          catch (Exception e) {
+            logger.error("Error in free thread", e);
+          }
+        }
+      }
+    }, "SonicBase Free Thread");
+    freeThread.start();
   }
 
   public void saveDeletes(String dbName, String tableName, String indexName, ConcurrentLinkedQueue<DeleteManagerImpl.DeleteRequest> deleteRequests) {
@@ -63,20 +96,18 @@ public class DeleteManagerOld implements DeleteManager {
     }
   }
 
-  private AtomicReference<LogManager.ByteCounterStream> counterStream = new AtomicReference<>();
-
   public void doDeletes(boolean ignoreVersion, File file) {
     try {
       int countDeleted = 0;
-      synchronized (this) {
+      //synchronized (this) {
         File dir = getReplicaRoot();
         if (dir.exists()) {
           if (true) {
             try {
               logger.info("DeleteManager deleting file - begin: file=" + file.getAbsolutePath());
               List<Future> futures = new ArrayList<>();
-              counterStream.set(new LogManager.ByteCounterStream(new FileInputStream(file)));
-              try (DataInputStream in = new DataInputStream(new BufferedInputStream(counterStream.get()))) {
+              InputStream countIn = new LogManager.ByteCounterStream(new FileInputStream(file), countRead);
+              try (DataInputStream in = new DataInputStream(new BufferedInputStream(countIn))) {
                 short serializationVersion = (short) Varint.readSignedVarLong(in);
                 String dbName = in.readUTF();
                 String tableName = in.readUTF();
@@ -116,7 +147,7 @@ public class DeleteManagerOld implements DeleteManager {
                   }
                   countDeleted++;
                   batch.add(key);
-                  if (batch.size() > 100_000) {
+                  if (batch.size() > 1_000) {
                     final List<Object[]> currBatch = batch;
                     batch = new ArrayList<>();
                     futures.add(executor.submit(new Callable() {
@@ -133,8 +164,9 @@ public class DeleteManagerOld implements DeleteManager {
                                   if ((Record.DB_VIEW_FLAG_DELETING & Record.getDbViewFlags(content[0])) != 0) {
                                     Object toFree = index.remove(currKey);
                                     if (toFree != null) {
+                                      DeleteManagerOld.this.toFree.put(toFree);
                                       //  toFreeBatch.add(toFree);
-                                      databaseServer.freeUnsafeIds(toFree);
+                                      //databaseServer.freeUnsafeIds(toFree);
                                     }
                                   }
                                 }
@@ -142,8 +174,9 @@ public class DeleteManagerOld implements DeleteManager {
                                   if ((Record.DB_VIEW_FLAG_DELETING & KeyRecord.getDbViewFlags(content[0])) != 0) {
                                     Object toFree = index.remove(currKey);
                                     if (toFree != null) {
+                                      DeleteManagerOld.this.toFree.put(toFree);
                                       //  toFreeBatch.add(toFree);
-                                      databaseServer.freeUnsafeIds(toFree);
+                                      //databaseServer.freeUnsafeIds(toFree);
                                     }
                                   }
                                 }
@@ -191,7 +224,8 @@ public class DeleteManagerOld implements DeleteManager {
                             Object toFree = index.remove(currKey);
                             if (toFree != null) {
                               //toFreeBatch.add(toFree);
-                              databaseServer.freeUnsafeIds(toFree);
+                              DeleteManagerOld.this.toFree.put(toFree);
+//                              databaseServer.freeUnsafeIds(toFree);
                             }
                           }
                         }
@@ -200,7 +234,8 @@ public class DeleteManagerOld implements DeleteManager {
                             Object toFree = index.remove(currKey);
                             if (toFree != null) {
                               //toFreeBatch.add(toFree);
-                              databaseServer.freeUnsafeIds(toFree);
+                              DeleteManagerOld.this.toFree.put(toFree);
+//                              databaseServer.freeUnsafeIds(toFree);
                             }
                           }
                         }
@@ -218,8 +253,6 @@ public class DeleteManagerOld implements DeleteManager {
               for (Future future : futures) {
                 future.get();
               }
-              bytesRead.addAndGet(counterStream.get().getCount());
-              counterStream.set(null);
               file.delete();
               logger.info("DeleteManager deleting file - end: file=" + file.getAbsolutePath());
             }
@@ -228,7 +261,7 @@ public class DeleteManagerOld implements DeleteManager {
             }
           }
         }
-      }
+      //}
       //System.out.println("deletes - finished: count=" + countDeleted + ", shard=" + databaseServer.getShard() + ", replica=" + databaseServer.getReplica());
     }
     catch (Exception e) {
@@ -397,20 +430,17 @@ public class DeleteManagerOld implements DeleteManager {
   }
 
   private long totalBytes = 0;
-  private AtomicLong bytesRead = new AtomicLong();
 
   public double getPercentDeleteComplete() {
 
     if (totalBytes == 0) {
       return 0;
     }
-    LogManager.ByteCounterStream stream = counterStream.get();
-    long readBytes = bytesRead.get();
-    if (stream != null) {
-      readBytes += stream.getCount();
+    if (countRead == null) {
+      return 0;
     }
 
-    return (double)readBytes / (double)totalBytes;
+    return (double)countRead.get() / (double)totalBytes;
   }
 
   @Override
@@ -479,7 +509,7 @@ public class DeleteManagerOld implements DeleteManager {
   public void forceDeletes() {
     File dir = getReplicaRoot();
     totalBytes = 0;
-    bytesRead.set(0);
+
     isForcingDeletes.set(true);
     try {
       ThreadPoolExecutor executor = new ThreadPoolExecutor(8, 8,
@@ -490,6 +520,7 @@ public class DeleteManagerOld implements DeleteManager {
           for (File file : files) {
             totalBytes += file.length();
           }
+          countRead.set(0);
           files = dir.listFiles();
           if (files == null || files.length == 0) {
             return;

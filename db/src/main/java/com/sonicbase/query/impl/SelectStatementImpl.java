@@ -23,9 +23,7 @@ import org.apache.giraph.utils.Varint;
 import java.io.*;
 import java.math.BigDecimal;
 import java.util.*;
-import java.util.concurrent.Callable;
-import java.util.concurrent.Future;
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -1210,58 +1208,118 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
   }
 
 
-  class KeyEntry {
-    private Object[][] key;
-    Comparator[][] comparators;
+//  class KeyEntry {
+//    private Object[][] key;
+//    Comparator[][] comparators;
+//
+//    @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
+//    @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
+//    public KeyEntry(Object[][] id, Comparator[][] comparators) {
+//      this.key = id;
+//      this.comparators = comparators;
+//    }
+//
+//    public boolean equals(Object otherObj) {
+//      KeyEntry other = (KeyEntry) otherObj;
+//      for (int i = 0; i < key.length; i++) {
+//        if (key[i] != null && other.key[i] == null) {
+//          return false;
+//        }
+//        if (key[i] == null && other.key[i] != null) {
+//          return false;
+//        }
+//        if (key[0] != null && other.key[0] != null) {
+//          for (int j = 0; j < comparators.length; j++) {
+//            if (comparators[i][j].compare(key[i][j], other.key[i][j]) != 0) {
+//              return false;
+//            }
+//          }
+//        }
+//      }
+//      return true;
+//    }
+//
+//    public int hashCode() {
+//      int ret = 0;
+//      for (int i = 0; i < key.length; i++) {
+//        if (key[i] != null) {
+//          for (int j = 0; j < key[i].length; j++) {
+//            //if (key[i][j] != null) {
+//            ret = ret >> 13 ^ key[i][j].hashCode();
+//            //}
+//          }
+//        }
+//      }
+//      return ret;
+//    }
+//  }
+//
+//
+//  private void dedupIds(String dbName, String[] tableNames, ExpressionImpl.NextReturn ids) {
+//    if (ids.getIds() == null) {
+//      return;
+//    }
+//    if (ids.getIds().length == 1) {
+//      return;
+//    }
+//    Comparator[][] comparators = new Comparator[tableNames.length][];
+//    for (int i = 0; i < tableNames.length; i++) {
+//      TableSchema schema = client.getCommon().getTables(dbName).get(tableNames[i]);
+//      for (Map.Entry<String, IndexSchema> indexSchema : schema.getIndices().entrySet()) {
+//        if (indexSchema.getValue().isPrimaryKey()) {
+//          comparators[i] = indexSchema.getValue().getComparators();
+//          break;
+//        }
+//      }
+//    }
+//
+//    Set<KeyEntry> set = new HashSet<>();
+//    for (int i = 0; i < ids.getIds().length; i++) {
+//      KeyEntry entry = new KeyEntry(ids.getIds()[i], comparators);
+//      set.add(entry);
+//    }
+//
+//    Object[][][] retIds = new Object[set.size()][][];
+//    int offset = 0;
+//    for (int i = 0; i < ids.getIds().length; i++) {
+//      if (set.contains(new KeyEntry(ids.getIds()[i], comparators))) {
+//        retIds[offset] = ids.getIds()[i];
+//        set.remove(new KeyEntry(ids.getIds()[i], comparators));
+//        offset++;
+//      }
+//    }
+//    ids.setIds(retIds);
+//  }
 
-    @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
-    @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
-    public KeyEntry(Object[][] id, Comparator[][] comparators) {
-      this.key = id;
+  class DedupComparator implements Comparator<Object[][]> {
+    private Comparator[][] comparators;
+
+    public DedupComparator(Comparator[][] comparators) {
       this.comparators = comparators;
     }
 
-    public boolean equals(Object otherObj) {
-      KeyEntry other = (KeyEntry) otherObj;
-      boolean equals = true;
-      outer:
-      for (int i = 0; i < key.length; i++) {
-        if (key[i] != null && other.key[i] == null) {
-          equals = false;
-          break;
+    @Override
+    public int compare(Object[][] o1, Object[][] o2) {
+      for (int j = 0; j < Math.min(o1.length, o2.length); j++) {
+        if (o1[j] == null || o2[j] == null) {
+          continue;
         }
-        if (key[i] == null && other.key[i] != null) {
-          equals = false;
-          break;
-        }
-        if (key[0] != null && other.key[0] != null) {
-          if (equals) {
-            for (int j = 0; j < comparators.length; j++) {
-              if (comparators[i][j].compare(key[i][j], other.key[i][j]) != 0) {
-                equals = false;
-                break outer;
-              }
-            }
+        for (int i = 0; i < Math.min(o1[j].length, o2[j].length); i++) {
+          if (o1[j][i] == null || o2[j][i] == null) {
+            continue;
+          }
+          int value = comparators[j][i].compare(o1[j][i], o2[j][i]);
+          if (value < 0) {
+            return -1;
+          }
+          if (value > 0) {
+            return 1;
           }
         }
       }
-      return equals;
+      return 0;
     }
-
-    public int hashCode() {
-      int ret = 0;
-      for (int i = 0; i < key.length; i++) {
-        if (key[i] != null) {
-          for (int j = 0; j < key[i].length; j++) {
-            //if (key[i][j] != null) {
-              ret += key[i][j].hashCode();
-            //}
-          }
-        }
-      }
-      return ret;
-    }
-  }
+  };
 
 
   private void dedupIds(String dbName, String[] tableNames, ExpressionImpl.NextReturn ids) {
@@ -1271,7 +1329,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     if (ids.getIds().length == 1) {
       return;
     }
-    Comparator[][] comparators = new Comparator[tableNames.length][];
+    final Comparator[][] comparators = new Comparator[tableNames.length][];
     for (int i = 0; i < tableNames.length; i++) {
       TableSchema schema = client.getCommon().getTables(dbName).get(tableNames[i]);
       for (Map.Entry<String, IndexSchema> indexSchema : schema.getIndices().entrySet()) {
@@ -1282,18 +1340,20 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       }
     }
 
-    Set<KeyEntry> set = new HashSet<>();
-    for (int i = 0; i < ids.getIds().length; i++) {
-      KeyEntry entry = new KeyEntry(ids.getIds()[i], comparators);
-      set.add(entry);
+    DedupComparator comparator = new DedupComparator(comparators);
+
+    Object[][][] actualIds = ids.getIds();
+    ConcurrentSkipListSet<Object[][]> map = new ConcurrentSkipListSet<>(comparator);
+    for (int i = 0; i < actualIds.length; i++) {
+      map.add(actualIds[i]);
     }
 
-    Object[][][] retIds = new Object[set.size()][][];
+    Object[][][] retIds = new Object[map.size()][][];
     int offset = 0;
-    for (int i = 0; i < ids.getIds().length; i++) {
-      if (set.contains(new KeyEntry(ids.getIds()[i], comparators))) {
-        retIds[offset] = ids.getIds()[i];
-        set.remove(new KeyEntry(ids.getIds()[i], comparators));
+    for (int i = 0; i < actualIds.length; i++) {
+      if (map.contains(actualIds[i])) {
+        retIds[offset] = actualIds[i];
+        map.remove(actualIds[i]);
         offset++;
       }
     }

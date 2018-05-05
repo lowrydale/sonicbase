@@ -1,6 +1,6 @@
 package com.sonicbase.bench;
 
-import com.sonicbase.research.socket.NettyServer;
+import com.sonicbase.server.NettyServer;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -1,6 +1,8 @@
 package com.sonicbase.query.impl;
 
+import com.sonicbase.client.ClientStatsHandler;
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.client.SelectStatementHandler;
 import com.sonicbase.common.*;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.procedure.RecordImpl;
@@ -19,6 +21,7 @@ import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
 import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.statement.select.Limit;
 import net.sf.jsqlparser.statement.select.Offset;
+import net.sf.jsqlparser.statement.select.Select;
 import org.apache.commons.lang.exception.ExceptionUtils;
 
 import java.io.*;
@@ -51,7 +54,7 @@ public class ResultSetImpl implements ResultSet {
   private Map<String, ColumnImpl> aliases;
   private String[] tableNames;
   private Object[][][] retKeys;
-  private DatabaseClient.SetOperation setOperation;
+  private SelectStatementHandler.SetOperation setOperation;
   private List<Map<String, String>> mapResults;
   private String[] describeStrs;
   private String dbName;
@@ -88,7 +91,7 @@ public class ResultSetImpl implements ResultSet {
     this.mapResults = mapResults;
   }
 
-  public ResultSetImpl(String dbName, DatabaseClient client, String[] tableNames, DatabaseClient.SetOperation setOperation,
+  public ResultSetImpl(String dbName, DatabaseClient client, String[] tableNames, SelectStatementHandler.SetOperation setOperation,
                        Map<String, ColumnImpl> aliases, Map<String, SelectFunctionImpl> functionAliases,
                        boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) {
 //    this.readRecords = readRecords(new ExpressionImpl.NextReturn(selectContext.getTableNames(), selectContext.getCurrKeys()));
@@ -2254,9 +2257,9 @@ public class ResultSetImpl implements ResultSet {
   public void getMoreResults(final int schemaRetryCount) {
 
 
-    DatabaseClient.HistogramEntry histogramEntry = null;
+    ClientStatsHandler.HistogramEntry histogramEntry = null;
     if (sqlToUse != null) {
-      histogramEntry = databaseClient.registerQueryForStats(databaseClient.getCluster(), dbName, "(next page) " + sqlToUse);
+      histogramEntry = databaseClient.getClientStatsHandler().registerQueryForStats(databaseClient.getCluster(), dbName, "(next page) " + sqlToUse);
     }
     long beginNanos = System.nanoTime();
     long beginMillis = System.currentTimeMillis();
@@ -2939,7 +2942,7 @@ public class ResultSetImpl implements ResultSet {
     }
     finally {
       if (histogramEntry != null) {
-        databaseClient.registerCompletedQueryForStats(dbName, histogramEntry, beginMillis, beginNanos);
+        databaseClient.getClientStatsHandler().registerCompletedQueryForStats(dbName, histogramEntry, beginMillis, beginNanos);
       }
     }
 
@@ -3348,7 +3351,8 @@ public class ResultSetImpl implements ResultSet {
       try {
         lastReadRecords = readRecords;
 
-        databaseClient.doServerSetSelect(dbName, tableNames, setOperation, this, restrictToThisServer, procedureContext);
+        SelectStatementHandler handler = (SelectStatementHandler) databaseClient.getStatementHandlerFactory().getHandler(new Select());
+        handler.doServerSetSelect(dbName, tableNames, setOperation, this, restrictToThisServer, procedureContext);
 
 //        readRecords = null;
 //        synchronized (recordCache.getRecordsForTable()) {

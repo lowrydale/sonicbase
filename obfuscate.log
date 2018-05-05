@@ -1078,8 +1078,8 @@ to act on classes which have been obfuscated.
 <!-- WARNING: No mapping found: org.apache.commons.io.IOUtils -->
 <!-- WARNING: Unresolved external dependency: org.apache.commons.io.IOUtils not found! -->
 <expose>
-  <class name="com.sonicbase.research.socket.NettyServer"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="void main(java.lang.String[])"/>
+  <class name="com.sonicbase.server.NettyServer"/>
+  <method class="com.sonicbase.server.NettyServer" name="void main(java.lang.String[])"/>
   <class name="ReconfigureResults"/>
   <method class="ReconfigureResults" name="boolean isHandedOffToMaster()"/>
   <method class="ReconfigureResults" name="int getShardCount()"/>
@@ -2015,94 +2015,94 @@ to act on classes which have been obfuscated.
   <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testToDate()" map="L"/>
   <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testUnion()" map="M"/>
   <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testChangeFieldDataType()" map="N"/>
-  <class name="com.sonicbase.research.socket.NettyServer$3" map="3"/>
-  <field class="com.sonicbase.research.socket.NettyServer$3" name="this$0" map="A"/>
-  <field class="com.sonicbase.research.socket.NettyServer$3" name="val$isRunning" map="B"/>
-  <field class="com.sonicbase.research.socket.NettyServer$3" name="val$databaseServer" map="C"/>
-  <method class="com.sonicbase.research.socket.NettyServer$3" name="void run()" map="run"/>
-  <class name="com.sonicbase.research.socket.NettyServer$2" map="2"/>
-  <field class="com.sonicbase.research.socket.NettyServer$2" name="this$0" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer$2" name="void run()" map="run"/>
-  <class name="com.sonicbase.research.socket.NettyServer$Request" map="_A"/>
-  <field class="com.sonicbase.research.socket.NettyServer$Request" name="sequence0" map="A"/>
-  <field class="com.sonicbase.research.socket.NettyServer$Request" name="body" map="B"/>
-  <field class="com.sonicbase.research.socket.NettyServer$Request" name="response" map="C"/>
-  <field class="com.sonicbase.research.socket.NettyServer$Request" name="latch" map="D"/>
-  <field class="com.sonicbase.research.socket.NettyServer$Request" name="command" map="E"/>
-  <field class="com.sonicbase.research.socket.NettyServer$Request" name="sequence1" map="F"/>
-  <method class="com.sonicbase.research.socket.NettyServer$Request" name="byte[] getBody()" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer$Request" name="void setBody(byte[])" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer$Request" name="java.lang.String access$000(com.sonicbase.research.socket.NettyServer$Request)" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer$Request" name="byte[] access$102(com.sonicbase.research.socket.NettyServer$Request, byte[])" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer$Request" name="long getSequence1()" map="B"/>
-  <method class="com.sonicbase.research.socket.NettyServer$Request" name="java.lang.String access$002(com.sonicbase.research.socket.NettyServer$Request, java.lang.String)" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer$Request" name="void setCommand(java.lang.String)" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer$Request" name="byte[] access$100(com.sonicbase.research.socket.NettyServer$Request)" map="B"/>
-  <method class="com.sonicbase.research.socket.NettyServer$Request" name="long getSequence0()" map="C"/>
-  <method class="com.sonicbase.research.socket.NettyServer$Request" name="java.lang.String getCommand()" map="D"/>
-  <class name="com.sonicbase.research.socket.NettyServer$1" map="1"/>
-  <field class="com.sonicbase.research.socket.NettyServer$1" name="this$0" map="this$0"/>
-  <method class="com.sonicbase.research.socket.NettyServer$1" name="void initChannel(io.netty.channel.Channel)" map="initChannel"/>
-  <method class="com.sonicbase.research.socket.NettyServer$1" name="void initChannel(io.netty.channel.socket.SocketChannel)" map="initChannel"/>
-  <class name="com.sonicbase.research.socket.NettyServer$RequestHandler" map="_B"/>
-  <method class="com.sonicbase.research.socket.NettyServer$RequestHandler" name="java.lang.String handleCommandOld(java.lang.String, java.lang.String)" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer$RequestHandler" name="java.lang.String handleCommand(java.lang.String, java.lang.String)" map="B"/>
-  <class name="com.sonicbase.research.socket.NettyServer$ReadState" map="_C"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ReadState" name="bytes" map="A"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ReadState" name="$VALUES" map="B"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ReadState" name="size" map="C"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ReadState" name="dlqSize" map="D"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ReadState" name="dlqBytes" map="E"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ReadState" name="com.sonicbase.research.socket.NettyServer$ReadState valueOf(java.lang.String)" map="valueOf"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ReadState" name="com.sonicbase.research.socket.NettyServer$ReadState[] values()" map="values"/>
-  <class name="com.sonicbase.research.socket.NettyServer$ServerHandler" map="_D"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="respBuffer" map="A"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="command" map="B"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="readState" map="C"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="destBuff" map="D"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="this$0" map="this$0"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="len" map="E"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="bodyLen" map="F"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="intBuff" map="G"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="alloc" map="H"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="void channelRead(io.netty.channel.ChannelHandlerContext, java.lang.Object)" map="channelRead"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="void channelReadComplete(io.netty.channel.ChannelHandlerContext)" map="channelReadComplete"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="void handlerAdded(io.netty.channel.ChannelHandlerContext)" map="handlerAdded"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="java.util.List doProcessRequests(java.util.List)" map="doProcessRequests"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="byte[] doProcessRequest(com.sonicbase.research.socket.NettyServer$Request)" map="doProcessRequest"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="java.util.List processRequests(java.util.List)" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="byte[] processRequest(java.lang.String, byte[])" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="byte[] returnException(java.lang.String, java.lang.Throwable)" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="void exceptionCaught(io.netty.channel.ChannelHandlerContext, java.lang.Throwable)" map="exceptionCaught"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="void handlerRemoved(io.netty.channel.ChannelHandlerContext)" map="handlerRemoved"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="void processError(java.lang.String, java.util.List, java.lang.Throwable)" map="A"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="databaseServer" map="A"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="port" map="B"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="ENABLE_COMPRESSION" map="C"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="UTF8_STR" map="D"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="f" map="E"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="HOST_STR" map="F"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="dlqServer" map="G"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="bossGroup" map="H"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="PORT_STR" map="I"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="cluster" map="J"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="logger" map="K"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="workerGroup" map="L"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="isRunning" map="M"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="java.lang.String getHelpPage(com.sonicbase.research.socket.NettyServer)" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="void setDlqServer(com.sonicbase.research.socket.NettyServer$RequestHandler)" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="Logger access$300()" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="void startServer(java.lang.String[], java.lang.String, boolean)" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="boolean access$200(com.sonicbase.research.socket.NettyServer)" map="B"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="boolean isRunning()" map="B"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="byte[] sendResponse(byte[], java.io.OutputStream, byte[], int, java.util.ArrayList, java.io.ByteArrayOutputStream)" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="byte[] compress(byte[])" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="com.sonicbase.research.socket.NettyServer$Request deserializeRequest(java.io.InputStream, byte[])" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="com.sonicbase.server.DatabaseServer getDatabaseServer()" map="C"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="byte[] uncompress(byte[])" map="B"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="void run()" map="D"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="com.sonicbase.research.socket.NettyServer$RequestHandler getDlqServer()" map="E"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="void setDatabaseServer(com.sonicbase.server.DatabaseServer)" map="A"/>
+  <class name="com.sonicbase.server.NettyServer$3" map="3"/>
+  <field class="com.sonicbase.server.NettyServer$3" name="this$0" map="A"/>
+  <field class="com.sonicbase.server.NettyServer$3" name="val$isRunning" map="B"/>
+  <field class="com.sonicbase.server.NettyServer$3" name="val$databaseServer" map="C"/>
+  <method class="com.sonicbase.server.NettyServer$3" name="void run()" map="run"/>
+  <class name="com.sonicbase.server.NettyServer$2" map="2"/>
+  <field class="com.sonicbase.server.NettyServer$2" name="this$0" map="A"/>
+  <method class="com.sonicbase.server.NettyServer$2" name="void run()" map="run"/>
+  <class name="com.sonicbase.server.NettyServer$Request" map="_A"/>
+  <field class="com.sonicbase.server.NettyServer$Request" name="sequence0" map="A"/>
+  <field class="com.sonicbase.server.NettyServer$Request" name="body" map="B"/>
+  <field class="com.sonicbase.server.NettyServer$Request" name="response" map="C"/>
+  <field class="com.sonicbase.server.NettyServer$Request" name="latch" map="D"/>
+  <field class="com.sonicbase.server.NettyServer$Request" name="command" map="E"/>
+  <field class="com.sonicbase.server.NettyServer$Request" name="sequence1" map="F"/>
+  <method class="com.sonicbase.server.NettyServer$Request" name="byte[] getBody()" map="A"/>
+  <method class="com.sonicbase.server.NettyServer$Request" name="void setBody(byte[])" map="A"/>
+  <method class="com.sonicbase.server.NettyServer$Request" name="java.lang.String access$000(com.sonicbase.server.NettyServer$Request)" map="A"/>
+  <method class="com.sonicbase.server.NettyServer$Request" name="byte[] access$102(com.sonicbase.server.NettyServer$Request, byte[])" map="A"/>
+  <method class="com.sonicbase.server.NettyServer$Request" name="long getSequence1()" map="B"/>
+  <method class="com.sonicbase.server.NettyServer$Request" name="java.lang.String access$002(com.sonicbase.server.NettyServer$Request, java.lang.String)" map="A"/>
+  <method class="com.sonicbase.server.NettyServer$Request" name="void setCommand(java.lang.String)" map="A"/>
+  <method class="com.sonicbase.server.NettyServer$Request" name="byte[] access$100(com.sonicbase.server.NettyServer$Request)" map="B"/>
+  <method class="com.sonicbase.server.NettyServer$Request" name="long getSequence0()" map="C"/>
+  <method class="com.sonicbase.server.NettyServer$Request" name="java.lang.String getCommand()" map="D"/>
+  <class name="com.sonicbase.server.NettyServer$1" map="1"/>
+  <field class="com.sonicbase.server.NettyServer$1" name="this$0" map="this$0"/>
+  <method class="com.sonicbase.server.NettyServer$1" name="void initChannel(io.netty.channel.Channel)" map="initChannel"/>
+  <method class="com.sonicbase.server.NettyServer$1" name="void initChannel(io.netty.channel.socket.SocketChannel)" map="initChannel"/>
+  <class name="com.sonicbase.server.NettyServer$RequestHandler" map="_B"/>
+  <method class="com.sonicbase.server.NettyServer$RequestHandler" name="java.lang.String handleCommandOld(java.lang.String, java.lang.String)" map="A"/>
+  <method class="com.sonicbase.server.NettyServer$RequestHandler" name="java.lang.String handleCommand(java.lang.String, java.lang.String)" map="B"/>
+  <class name="com.sonicbase.server.NettyServer$ReadState" map="_C"/>
+  <field class="com.sonicbase.server.NettyServer$ReadState" name="bytes" map="A"/>
+  <field class="com.sonicbase.server.NettyServer$ReadState" name="$VALUES" map="B"/>
+  <field class="com.sonicbase.server.NettyServer$ReadState" name="size" map="C"/>
+  <field class="com.sonicbase.server.NettyServer$ReadState" name="dlqSize" map="D"/>
+  <field class="com.sonicbase.server.NettyServer$ReadState" name="dlqBytes" map="E"/>
+  <method class="com.sonicbase.server.NettyServer$ReadState" name="com.sonicbase.server.NettyServer$ReadState valueOf(java.lang.String)" map="valueOf"/>
+  <method class="com.sonicbase.server.NettyServer$ReadState" name="com.sonicbase.server.NettyServer$ReadState[] values()" map="values"/>
+  <class name="com.sonicbase.server.NettyServer$ServerHandler" map="_D"/>
+  <field class="com.sonicbase.server.NettyServer$ServerHandler" name="respBuffer" map="A"/>
+  <field class="com.sonicbase.server.NettyServer$ServerHandler" name="command" map="B"/>
+  <field class="com.sonicbase.server.NettyServer$ServerHandler" name="readState" map="C"/>
+  <field class="com.sonicbase.server.NettyServer$ServerHandler" name="destBuff" map="D"/>
+  <field class="com.sonicbase.server.NettyServer$ServerHandler" name="this$0" map="this$0"/>
+  <field class="com.sonicbase.server.NettyServer$ServerHandler" name="len" map="E"/>
+  <field class="com.sonicbase.server.NettyServer$ServerHandler" name="bodyLen" map="F"/>
+  <field class="com.sonicbase.server.NettyServer$ServerHandler" name="intBuff" map="G"/>
+  <field class="com.sonicbase.server.NettyServer$ServerHandler" name="alloc" map="H"/>
+  <method class="com.sonicbase.server.NettyServer$ServerHandler" name="void channelRead(io.netty.channel.ChannelHandlerContext, java.lang.Object)" map="channelRead"/>
+  <method class="com.sonicbase.server.NettyServer$ServerHandler" name="void channelReadComplete(io.netty.channel.ChannelHandlerContext)" map="channelReadComplete"/>
+  <method class="com.sonicbase.server.NettyServer$ServerHandler" name="void handlerAdded(io.netty.channel.ChannelHandlerContext)" map="handlerAdded"/>
+  <method class="com.sonicbase.server.NettyServer$ServerHandler" name="java.util.List doProcessRequests(java.util.List)" map="doProcessRequests"/>
+  <method class="com.sonicbase.server.NettyServer$ServerHandler" name="byte[] doProcessRequest(com.sonicbase.server.NettyServer$Request)" map="doProcessRequest"/>
+  <method class="com.sonicbase.server.NettyServer$ServerHandler" name="java.util.List processRequests(java.util.List)" map="A"/>
+  <method class="com.sonicbase.server.NettyServer$ServerHandler" name="byte[] processRequest(java.lang.String, byte[])" map="A"/>
+  <method class="com.sonicbase.server.NettyServer$ServerHandler" name="byte[] returnException(java.lang.String, java.lang.Throwable)" map="A"/>
+  <method class="com.sonicbase.server.NettyServer$ServerHandler" name="void exceptionCaught(io.netty.channel.ChannelHandlerContext, java.lang.Throwable)" map="exceptionCaught"/>
+  <method class="com.sonicbase.server.NettyServer$ServerHandler" name="void handlerRemoved(io.netty.channel.ChannelHandlerContext)" map="handlerRemoved"/>
+  <method class="com.sonicbase.server.NettyServer$ServerHandler" name="void processError(java.lang.String, java.util.List, java.lang.Throwable)" map="A"/>
+  <field class="com.sonicbase.server.NettyServer" name="databaseServer" map="A"/>
+  <field class="com.sonicbase.server.NettyServer" name="port" map="B"/>
+  <field class="com.sonicbase.server.NettyServer" name="ENABLE_COMPRESSION" map="C"/>
+  <field class="com.sonicbase.server.NettyServer" name="UTF8_STR" map="D"/>
+  <field class="com.sonicbase.server.NettyServer" name="f" map="E"/>
+  <field class="com.sonicbase.server.NettyServer" name="HOST_STR" map="F"/>
+  <field class="com.sonicbase.server.NettyServer" name="dlqServer" map="G"/>
+  <field class="com.sonicbase.server.NettyServer" name="bossGroup" map="H"/>
+  <field class="com.sonicbase.server.NettyServer" name="PORT_STR" map="I"/>
+  <field class="com.sonicbase.server.NettyServer" name="cluster" map="J"/>
+  <field class="com.sonicbase.server.NettyServer" name="logger" map="K"/>
+  <field class="com.sonicbase.server.NettyServer" name="workerGroup" map="L"/>
+  <field class="com.sonicbase.server.NettyServer" name="isRunning" map="M"/>
+  <method class="com.sonicbase.server.NettyServer" name="java.lang.String getHelpPage(com.sonicbase.server.NettyServer)" map="A"/>
+  <method class="com.sonicbase.server.NettyServer" name="void setDlqServer(com.sonicbase.server.NettyServer$RequestHandler)" map="A"/>
+  <method class="com.sonicbase.server.NettyServer" name="Logger access$300()" map="A"/>
+  <method class="com.sonicbase.server.NettyServer" name="void startServer(java.lang.String[], java.lang.String, boolean)" map="A"/>
+  <method class="com.sonicbase.server.NettyServer" name="boolean access$200(com.sonicbase.server.NettyServer)" map="B"/>
+  <method class="com.sonicbase.server.NettyServer" name="boolean isRunning()" map="B"/>
+  <method class="com.sonicbase.server.NettyServer" name="byte[] sendResponse(byte[], java.io.OutputStream, byte[], int, java.util.ArrayList, java.io.ByteArrayOutputStream)" map="A"/>
+  <method class="com.sonicbase.server.NettyServer" name="byte[] compress(byte[])" map="A"/>
+  <method class="com.sonicbase.server.NettyServer" name="com.sonicbase.server.NettyServer$Request deserializeRequest(java.io.InputStream, byte[])" map="A"/>
+  <method class="com.sonicbase.server.NettyServer" name="com.sonicbase.server.DatabaseServer getDatabaseServer()" map="C"/>
+  <method class="com.sonicbase.server.NettyServer" name="byte[] uncompress(byte[])" map="B"/>
+  <method class="com.sonicbase.server.NettyServer" name="void run()" map="D"/>
+  <method class="com.sonicbase.server.NettyServer" name="com.sonicbase.server.NettyServer$RequestHandler getDlqServer()" map="E"/>
+  <method class="com.sonicbase.server.NettyServer" name="void setDatabaseServer(com.sonicbase.server.DatabaseServer)" map="A"/>
   <class name="com.sonicbase.research.socket.ChangeRequest" map="A"/>
   <field class="com.sonicbase.research.socket.ChangeRequest" name="socket" map="A"/>
   <field class="com.sonicbase.research.socket.ChangeRequest" name="CHANGEOPS" map="B"/>
@@ -3058,7 +3058,7 @@ to act on classes which have been obfuscated.
   <field class="com.sonicbase.server.LogManager$LogSource" name="sequence1" map="J"/>
   <field class="com.sonicbase.server.LogManager$LogSource" name="sequence0" map="K"/>
   <field class="com.sonicbase.server.LogManager$LogSource" name="in" map="L"/>
-  <method class="com.sonicbase.server.LogManager$LogSource" name="com.sonicbase.research.socket.NettyServer$Request readRequest()" map="A"/>
+  <method class="com.sonicbase.server.LogManager$LogSource" name="com.sonicbase.server.NettyServer$Request readRequest()" map="A"/>
   <method class="com.sonicbase.server.LogManager$LogSource" name="long getTotalBytes()" map="B"/>
   <method class="com.sonicbase.server.LogManager$LogSource" name="void readNext()" map="C"/>
   <method class="com.sonicbase.server.LogManager$LogSource" name="long getBytesRead()" map="D"/>

@@ -253,12 +253,23 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
 
       Object[] key = new Object[]{value};
       AtomicReference<String> usedIndex = new AtomicReference<>();
-      SelectContextImpl currRet = lookupIds(dbName, getClient().getCommon(), getClient(), getReplica(), count,
-          tableName, indexSchema.getName(), isForceSelectOnServer(),
-          BinaryExpression.Operator.equal, null,
-          null, key, getParms(), this, null, key, null, getColumns(), cNode.getColumnName(), -1, getRecordCache(), usedIndex,
-          false, getViewVersion(), getCounters(), getGroupByContext(), debug, currOffset, countReturned, limit,
-          offset, isProbe(), isRestrictToThisServer(), getProcedureContext(), schemaRetryCount);
+
+      IndexLookup indexLookup = new IndexLookup();
+      indexLookup.setCount(count);
+      indexLookup.setIndexName(indexSchema.getName());
+      indexLookup.setLeftOp(BinaryExpression.Operator.equal);
+      indexLookup.setLeftKey(key);
+      indexLookup.setLeftOriginalKey(key);
+      indexLookup.setColumnName(cNode.getColumnName());
+      indexLookup.setCurrOffset(currOffset);
+      indexLookup.setCountReturned(countReturned);
+      indexLookup.setLimit(limit);
+      indexLookup.setOffset(offset);
+      indexLookup.setSchemaRetryCount(schemaRetryCount);
+      indexLookup.setUsedIndex(usedIndex);
+      indexLookup.setEvaluateExpression(false);
+
+      SelectContextImpl currRet = indexLookup.lookup(this, getTopLevelExpression());
       ret = aggregateResults(ret, currRet.getCurrKeys());
     }
     setNextShard(-2);

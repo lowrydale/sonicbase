@@ -1397,12 +1397,12 @@
 	<field name="shardCount" class="com.sonicbase.server.DatabaseServer" />
 	<field name="batchWriteLock" class="com.sonicbase.server.DatabaseServer" />
 	<class name="com.sonicbase.bench.TestServers$1" />
-	<method signature="void &lt;init&gt;(com.sonicbase.research.socket.NettyServer[])" class="com.sonicbase.bench.TestServers$1" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.NettyServer[])" class="com.sonicbase.bench.TestServers$1" />
 	<method signature="java.lang.Object call()" class="com.sonicbase.bench.TestServers$1" />
 	<field name="val$dbServers" class="com.sonicbase.bench.TestServers$1" />
 	<class name="com.sonicbase.bench.TestServers$2" />
 	<method signature="java.lang.Object call()" class="com.sonicbase.bench.TestServers$2" />
-	<method signature="void &lt;init&gt;(int,com.sonicbase.research.socket.NettyServer[])" class="com.sonicbase.bench.TestServers$2" />
+	<method signature="void &lt;init&gt;(int,com.sonicbase.server.NettyServer[])" class="com.sonicbase.bench.TestServers$2" />
 	<field name="val$dbServers" class="com.sonicbase.bench.TestServers$2" />
 	<field name="val$shard" class="com.sonicbase.bench.TestServers$2" />
 	<class name="DataType$TimeConverter" />
@@ -2197,29 +2197,29 @@
 	<field name="fieldOffset" class="GroupByContext$FieldContext" />
 	<field name="dataType" class="GroupByContext$FieldContext" />
 	<field name="tableSchema" class="GroupByContext$FieldContext" />
-	<class name="com.sonicbase.research.socket.NettyServer$ServerHandler" />
-	<method signature="byte[] processRequest(java.lang.String,byte[])" class="com.sonicbase.research.socket.NettyServer$ServerHandler" />
-	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.research.socket.NettyServer$ServerHandler" />
-	<method signature="void channelReadComplete(io.netty.channel.ChannelHandlerContext)" class="com.sonicbase.research.socket.NettyServer$ServerHandler" />
-	<method signature="byte[] returnException(java.lang.String,java.lang.Throwable)" class="com.sonicbase.research.socket.NettyServer$ServerHandler" />
-	<method signature="void handlerRemoved(io.netty.channel.ChannelHandlerContext)" class="com.sonicbase.research.socket.NettyServer$ServerHandler" />
-	<method signature="void channelRead(io.netty.channel.ChannelHandlerContext,java.lang.Object)" class="com.sonicbase.research.socket.NettyServer$ServerHandler" />
-	<method signature="void &lt;init&gt;(com.sonicbase.research.socket.NettyServer)" class="com.sonicbase.research.socket.NettyServer$ServerHandler" />
-	<method signature="byte[] doProcessRequest(com.sonicbase.research.socket.NettyServer$Request)" class="com.sonicbase.research.socket.NettyServer$ServerHandler" />
-	<method signature="void handlerAdded(io.netty.channel.ChannelHandlerContext)" class="com.sonicbase.research.socket.NettyServer$ServerHandler" />
-	<method signature="void exceptionCaught(io.netty.channel.ChannelHandlerContext,java.lang.Throwable)" class="com.sonicbase.research.socket.NettyServer$ServerHandler" />
-	<method signature="void processError(java.lang.String,java.util.List,java.lang.Throwable)" class="com.sonicbase.research.socket.NettyServer$ServerHandler" />
-	<method signature="java.util.List doProcessRequests(java.util.List)" class="com.sonicbase.research.socket.NettyServer$ServerHandler" />
-	<method signature="java.util.List processRequests(java.util.List)" class="com.sonicbase.research.socket.NettyServer$ServerHandler" />
-	<field name="readState" class="com.sonicbase.research.socket.NettyServer$ServerHandler" />
-	<field name="len" class="com.sonicbase.research.socket.NettyServer$ServerHandler" />
-	<field name="respBuffer" class="com.sonicbase.research.socket.NettyServer$ServerHandler" />
-	<field name="bodyLen" class="com.sonicbase.research.socket.NettyServer$ServerHandler" />
-	<field name="intBuff" class="com.sonicbase.research.socket.NettyServer$ServerHandler" />
-	<field name="this$0" class="com.sonicbase.research.socket.NettyServer$ServerHandler" />
-	<field name="alloc" class="com.sonicbase.research.socket.NettyServer$ServerHandler" />
-	<field name="command" class="com.sonicbase.research.socket.NettyServer$ServerHandler" />
-	<field name="destBuff" class="com.sonicbase.research.socket.NettyServer$ServerHandler" />
+	<class name="com.sonicbase.server.NettyServer$ServerHandler" />
+	<method signature="byte[] processRequest(java.lang.String,byte[])" class="com.sonicbase.server.NettyServer$ServerHandler" />
+	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.server.NettyServer$ServerHandler" />
+	<method signature="void channelReadComplete(io.netty.channel.ChannelHandlerContext)" class="com.sonicbase.server.NettyServer$ServerHandler" />
+	<method signature="byte[] returnException(java.lang.String,java.lang.Throwable)" class="com.sonicbase.server.NettyServer$ServerHandler" />
+	<method signature="void handlerRemoved(io.netty.channel.ChannelHandlerContext)" class="com.sonicbase.server.NettyServer$ServerHandler" />
+	<method signature="void channelRead(io.netty.channel.ChannelHandlerContext,java.lang.Object)" class="com.sonicbase.server.NettyServer$ServerHandler" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.NettyServer)" class="com.sonicbase.server.NettyServer$ServerHandler" />
+	<method signature="byte[] doProcessRequest(com.sonicbase.server.NettyServer$Request)" class="com.sonicbase.server.NettyServer$ServerHandler" />
+	<method signature="void handlerAdded(io.netty.channel.ChannelHandlerContext)" class="com.sonicbase.server.NettyServer$ServerHandler" />
+	<method signature="void exceptionCaught(io.netty.channel.ChannelHandlerContext,java.lang.Throwable)" class="com.sonicbase.server.NettyServer$ServerHandler" />
+	<method signature="void processError(java.lang.String,java.util.List,java.lang.Throwable)" class="com.sonicbase.server.NettyServer$ServerHandler" />
+	<method signature="java.util.List doProcessRequests(java.util.List)" class="com.sonicbase.server.NettyServer$ServerHandler" />
+	<method signature="java.util.List processRequests(java.util.List)" class="com.sonicbase.server.NettyServer$ServerHandler" />
+	<field name="readState" class="com.sonicbase.server.NettyServer$ServerHandler" />
+	<field name="len" class="com.sonicbase.server.NettyServer$ServerHandler" />
+	<field name="respBuffer" class="com.sonicbase.server.NettyServer$ServerHandler" />
+	<field name="bodyLen" class="com.sonicbase.server.NettyServer$ServerHandler" />
+	<field name="intBuff" class="com.sonicbase.server.NettyServer$ServerHandler" />
+	<field name="this$0" class="com.sonicbase.server.NettyServer$ServerHandler" />
+	<field name="alloc" class="com.sonicbase.server.NettyServer$ServerHandler" />
+	<field name="command" class="com.sonicbase.server.NettyServer$ServerHandler" />
+	<field name="destBuff" class="com.sonicbase.server.NettyServer$ServerHandler" />
 	<class name="Logger$1" />
 	<method signature="void run()" class="Logger$1" />
 	<method signature="void &lt;init&gt;()" class="Logger$1" />
@@ -2353,21 +2353,21 @@
 	<field name="LONGVARBINARY" class="ResultSetProxy$FieldType" />
 	<field name="STRUCT" class="ResultSetProxy$FieldType" />
 	<field name="ROWID" class="ResultSetProxy$FieldType" />
-	<class name="com.sonicbase.research.socket.NettyServer$3" />
-	<method signature="void run()" class="com.sonicbase.research.socket.NettyServer$3" />
-	<method signature="void &lt;init&gt;(com.sonicbase.research.socket.NettyServer,com.sonicbase.server.DatabaseServer,java.util.concurrent.atomic.AtomicBoolean)" class="com.sonicbase.research.socket.NettyServer$3" />
-	<field name="val$isRunning" class="com.sonicbase.research.socket.NettyServer$3" />
-	<field name="this$0" class="com.sonicbase.research.socket.NettyServer$3" />
-	<field name="val$databaseServer" class="com.sonicbase.research.socket.NettyServer$3" />
-	<class name="com.sonicbase.research.socket.NettyServer$2" />
-	<method signature="void run()" class="com.sonicbase.research.socket.NettyServer$2" />
-	<method signature="void &lt;init&gt;(com.sonicbase.research.socket.NettyServer)" class="com.sonicbase.research.socket.NettyServer$2" />
-	<field name="this$0" class="com.sonicbase.research.socket.NettyServer$2" />
-	<class name="com.sonicbase.research.socket.NettyServer$1" />
-	<method signature="void initChannel(io.netty.channel.socket.SocketChannel)" class="com.sonicbase.research.socket.NettyServer$1" />
-	<method signature="void initChannel(io.netty.channel.Channel)" class="com.sonicbase.research.socket.NettyServer$1" />
-	<method signature="void &lt;init&gt;(com.sonicbase.research.socket.NettyServer)" class="com.sonicbase.research.socket.NettyServer$1" />
-	<field name="this$0" class="com.sonicbase.research.socket.NettyServer$1" />
+	<class name="com.sonicbase.server.NettyServer$3" />
+	<method signature="void run()" class="com.sonicbase.server.NettyServer$3" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.NettyServer,com.sonicbase.server.DatabaseServer,java.util.concurrent.atomic.AtomicBoolean)" class="com.sonicbase.server.NettyServer$3" />
+	<field name="val$isRunning" class="com.sonicbase.server.NettyServer$3" />
+	<field name="this$0" class="com.sonicbase.server.NettyServer$3" />
+	<field name="val$databaseServer" class="com.sonicbase.server.NettyServer$3" />
+	<class name="com.sonicbase.server.NettyServer$2" />
+	<method signature="void run()" class="com.sonicbase.server.NettyServer$2" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.NettyServer)" class="com.sonicbase.server.NettyServer$2" />
+	<field name="this$0" class="com.sonicbase.server.NettyServer$2" />
+	<class name="com.sonicbase.server.NettyServer$1" />
+	<method signature="void initChannel(io.netty.channel.socket.SocketChannel)" class="com.sonicbase.server.NettyServer$1" />
+	<method signature="void initChannel(io.netty.channel.Channel)" class="com.sonicbase.server.NettyServer$1" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.NettyServer)" class="com.sonicbase.server.NettyServer$1" />
+	<field name="this$0" class="com.sonicbase.server.NettyServer$1" />
 	<class name="Logger$Error" />
 	<method signature="void &lt;init&gt;(Logger,DatabaseClient,java.lang.String,java.lang.Throwable)" class="Logger$Error" />
 	<method signature="void &lt;clinit&gt;()" class="Logger$Error" />
@@ -2990,10 +2990,10 @@
 	<method signature="void &lt;init&gt;()" class="DataType$Utf8Comparator" />
 	<method signature="int compare(java.lang.Object,java.lang.Object)" class="DataType$Utf8Comparator" />
 	<method signature="void &lt;init&gt;(DataType$1)" class="DataType$Utf8Comparator" />
-	<class name="com.sonicbase.research.socket.NettyServer$RequestHandler" />
-	<method signature="java.lang.String handleCommandOld(java.lang.String,java.lang.String)" class="com.sonicbase.research.socket.NettyServer$RequestHandler" />
-	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.research.socket.NettyServer$RequestHandler" />
-	<method signature="java.lang.String handleCommand(java.lang.String,java.lang.String)" class="com.sonicbase.research.socket.NettyServer$RequestHandler" />
+	<class name="com.sonicbase.server.NettyServer$RequestHandler" />
+	<method signature="java.lang.String handleCommandOld(java.lang.String,java.lang.String)" class="com.sonicbase.server.NettyServer$RequestHandler" />
+	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.server.NettyServer$RequestHandler" />
+	<method signature="java.lang.String handleCommand(java.lang.String,java.lang.String)" class="com.sonicbase.server.NettyServer$RequestHandler" />
 	<class name="com.sonicbase.common.WindowsTerminal" />
 	<method signature="void enableAnsi()" class="com.sonicbase.common.WindowsTerminal" />
 	<method signature="java.lang.String getConsoleSize()" class="com.sonicbase.common.WindowsTerminal" />
@@ -3647,25 +3647,25 @@
 	<field name="highestIndex" class="ResultSetProxy$ResultSetInfo" />
 	<field name="currRow" class="ResultSetProxy$ResultSetInfo" />
 	<field name="resultSet" class="ResultSetProxy$ResultSetInfo" />
-	<class name="com.sonicbase.research.socket.NettyServer$Request" />
-	<method signature="byte[] access$100(com.sonicbase.research.socket.NettyServer$Request)" class="com.sonicbase.research.socket.NettyServer$Request" />
-	<method signature="java.lang.String getCommand()" class="com.sonicbase.research.socket.NettyServer$Request" />
-	<method signature="long getSequence1()" class="com.sonicbase.research.socket.NettyServer$Request" />
-	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.research.socket.NettyServer$Request" />
-	<method signature="void &lt;init&gt;()" class="com.sonicbase.research.socket.NettyServer$Request" />
-	<method signature="long getSequence0()" class="com.sonicbase.research.socket.NettyServer$Request" />
-	<method signature="byte[] getBody()" class="com.sonicbase.research.socket.NettyServer$Request" />
-	<method signature="byte[] access$102(com.sonicbase.research.socket.NettyServer$Request,byte[])" class="com.sonicbase.research.socket.NettyServer$Request" />
-	<method signature="void setCommand(java.lang.String)" class="com.sonicbase.research.socket.NettyServer$Request" />
-	<method signature="void setBody(byte[])" class="com.sonicbase.research.socket.NettyServer$Request" />
-	<method signature="java.lang.String access$002(com.sonicbase.research.socket.NettyServer$Request,java.lang.String)" class="com.sonicbase.research.socket.NettyServer$Request" />
-	<method signature="java.lang.String access$000(com.sonicbase.research.socket.NettyServer$Request)" class="com.sonicbase.research.socket.NettyServer$Request" />
-	<field name="sequence0" class="com.sonicbase.research.socket.NettyServer$Request" />
-	<field name="response" class="com.sonicbase.research.socket.NettyServer$Request" />
-	<field name="latch" class="com.sonicbase.research.socket.NettyServer$Request" />
-	<field name="body" class="com.sonicbase.research.socket.NettyServer$Request" />
-	<field name="command" class="com.sonicbase.research.socket.NettyServer$Request" />
-	<field name="sequence1" class="com.sonicbase.research.socket.NettyServer$Request" />
+	<class name="com.sonicbase.server.NettyServer$Request" />
+	<method signature="byte[] access$100(com.sonicbase.server.NettyServer$Request)" class="com.sonicbase.server.NettyServer$Request" />
+	<method signature="java.lang.String getCommand()" class="com.sonicbase.server.NettyServer$Request" />
+	<method signature="long getSequence1()" class="com.sonicbase.server.NettyServer$Request" />
+	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.server.NettyServer$Request" />
+	<method signature="void &lt;init&gt;()" class="com.sonicbase.server.NettyServer$Request" />
+	<method signature="long getSequence0()" class="com.sonicbase.server.NettyServer$Request" />
+	<method signature="byte[] getBody()" class="com.sonicbase.server.NettyServer$Request" />
+	<method signature="byte[] access$102(com.sonicbase.server.NettyServer$Request,byte[])" class="com.sonicbase.server.NettyServer$Request" />
+	<method signature="void setCommand(java.lang.String)" class="com.sonicbase.server.NettyServer$Request" />
+	<method signature="void setBody(byte[])" class="com.sonicbase.server.NettyServer$Request" />
+	<method signature="java.lang.String access$002(com.sonicbase.server.NettyServer$Request,java.lang.String)" class="com.sonicbase.server.NettyServer$Request" />
+	<method signature="java.lang.String access$000(com.sonicbase.server.NettyServer$Request)" class="com.sonicbase.server.NettyServer$Request" />
+	<field name="sequence0" class="com.sonicbase.server.NettyServer$Request" />
+	<field name="response" class="com.sonicbase.server.NettyServer$Request" />
+	<field name="latch" class="com.sonicbase.server.NettyServer$Request" />
+	<field name="body" class="com.sonicbase.server.NettyServer$Request" />
+	<field name="command" class="com.sonicbase.server.NettyServer$Request" />
+	<field name="sequence1" class="com.sonicbase.server.NettyServer$Request" />
 	<class name="SelectContextImpl" />
 	<method signature="java.lang.String[] getTableNames()" class="SelectContextImpl" />
 	<method signature="void &lt;clinit&gt;()" class="SelectContextImpl" />
@@ -4227,7 +4227,7 @@
 	<field name="val$sequence1" class="com.sonicbase.server.LogManager$2" />
 	<class name="com.sonicbase.server.LogManager$1" />
 	<method signature="void run()" class="com.sonicbase.server.LogManager$1" />
-	<method signature="void &lt;init&gt;(com.sonicbase.server.LogManager,com.sonicbase.research.socket.NettyServer$Request,java.util.concurrent.atomic.AtomicInteger,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong,long,com.sonicbase.server.LogManager$LogSource,java.util.concurrent.atomic.AtomicLong)" class="com.sonicbase.server.LogManager$1" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.LogManager,com.sonicbase.server.NettyServer$Request,java.util.concurrent.atomic.AtomicInteger,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong,long,com.sonicbase.server.LogManager$LogSource,java.util.concurrent.atomic.AtomicLong)" class="com.sonicbase.server.LogManager$1" />
 	<field name="val$countProcessed" class="com.sonicbase.server.LogManager$1" />
 	<field name="val$lastLogged" class="com.sonicbase.server.LogManager$1" />
 	<field name="val$countBatched" class="com.sonicbase.server.LogManager$1" />
@@ -4246,16 +4246,16 @@
 	<method signature="void &lt;init&gt;(Parameter$ParameterBase)" class="Parameter$Date" />
 	<method signature="void &lt;init&gt;(java.sql.Date,java.util.Calendar)" class="Parameter$Date" />
 	<field name="cal" class="Parameter$Date" />
-	<class name="com.sonicbase.research.socket.NettyServer$ReadState" />
-	<method signature="com.sonicbase.research.socket.NettyServer$ReadState valueOf(java.lang.String)" class="com.sonicbase.research.socket.NettyServer$ReadState" />
-	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.research.socket.NettyServer$ReadState" />
-	<method signature="com.sonicbase.research.socket.NettyServer$ReadState[] values()" class="com.sonicbase.research.socket.NettyServer$ReadState" />
-	<method signature="void &lt;init&gt;(java.lang.String,int)" class="com.sonicbase.research.socket.NettyServer$ReadState" />
-	<field name="dlqSize" class="com.sonicbase.research.socket.NettyServer$ReadState" />
-	<field name="size" class="com.sonicbase.research.socket.NettyServer$ReadState" />
-	<field name="bytes" class="com.sonicbase.research.socket.NettyServer$ReadState" />
-	<field name="dlqBytes" class="com.sonicbase.research.socket.NettyServer$ReadState" />
-	<field name="$VALUES" class="com.sonicbase.research.socket.NettyServer$ReadState" />
+	<class name="com.sonicbase.server.NettyServer$ReadState" />
+	<method signature="com.sonicbase.server.NettyServer$ReadState valueOf(java.lang.String)" class="com.sonicbase.server.NettyServer$ReadState" />
+	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.server.NettyServer$ReadState" />
+	<method signature="com.sonicbase.server.NettyServer$ReadState[] values()" class="com.sonicbase.server.NettyServer$ReadState" />
+	<method signature="void &lt;init&gt;(java.lang.String,int)" class="com.sonicbase.server.NettyServer$ReadState" />
+	<field name="dlqSize" class="com.sonicbase.server.NettyServer$ReadState" />
+	<field name="size" class="com.sonicbase.server.NettyServer$ReadState" />
+	<field name="bytes" class="com.sonicbase.server.NettyServer$ReadState" />
+	<field name="dlqBytes" class="com.sonicbase.server.NettyServer$ReadState" />
+	<field name="$VALUES" class="com.sonicbase.server.NettyServer$ReadState" />
 	<class name="com.sonicbase.server.LogManager$QueueEntry" />
 	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.server.LogManager$QueueEntry" />
 	<method signature="void &lt;init&gt;(java.lang.String,byte[])" class="com.sonicbase.server.LogManager$QueueEntry" />
@@ -4471,37 +4471,37 @@
 	<field name="expression" class="SelectStatementImpl$Join" />
 	<field name="rightFrom" class="SelectStatementImpl$Join" />
 	<field name="type" class="SelectStatementImpl$Join" />
-	<class name="com.sonicbase.research.socket.NettyServer" />
-	<method signature="byte[] compress(byte[])" class="com.sonicbase.research.socket.NettyServer" />
-	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.research.socket.NettyServer" />
-	<method signature="boolean isRunning()" class="com.sonicbase.research.socket.NettyServer" />
-	<method signature="void setDatabaseServer(com.sonicbase.server.DatabaseServer)" class="com.sonicbase.research.socket.NettyServer" />
-	<method signature="void setDlqServer(com.sonicbase.research.socket.NettyServer$RequestHandler)" class="com.sonicbase.research.socket.NettyServer" />
-	<method signature="com.sonicbase.server.DatabaseServer getDatabaseServer()" class="com.sonicbase.research.socket.NettyServer" />
-	<method signature="boolean access$200(com.sonicbase.research.socket.NettyServer)" class="com.sonicbase.research.socket.NettyServer" />
-	<method signature="void run()" class="com.sonicbase.research.socket.NettyServer" />
-	<method signature="Logger access$300()" class="com.sonicbase.research.socket.NettyServer" />
-	<method signature="void &lt;init&gt;()" class="com.sonicbase.research.socket.NettyServer" />
-	<method signature="com.sonicbase.research.socket.NettyServer$RequestHandler getDlqServer()" class="com.sonicbase.research.socket.NettyServer" />
-	<method signature="void main(java.lang.String[])" class="com.sonicbase.research.socket.NettyServer" />
-	<method signature="byte[] sendResponse(byte[],java.io.OutputStream,byte[],int,java.util.ArrayList,java.io.ByteArrayOutputStream)" class="com.sonicbase.research.socket.NettyServer" />
-	<method signature="byte[] uncompress(byte[])" class="com.sonicbase.research.socket.NettyServer" />
-	<method signature="java.lang.String getHelpPage(com.sonicbase.research.socket.NettyServer)" class="com.sonicbase.research.socket.NettyServer" />
-	<method signature="com.sonicbase.research.socket.NettyServer$Request deserializeRequest(java.io.InputStream,byte[])" class="com.sonicbase.research.socket.NettyServer" />
-	<method signature="void startServer(java.lang.String[],java.lang.String,boolean)" class="com.sonicbase.research.socket.NettyServer" />
-	<field name="cluster" class="com.sonicbase.research.socket.NettyServer" />
-	<field name="databaseServer" class="com.sonicbase.research.socket.NettyServer" />
-	<field name="f" class="com.sonicbase.research.socket.NettyServer" />
-	<field name="logger" class="com.sonicbase.research.socket.NettyServer" />
-	<field name="UTF8_STR" class="com.sonicbase.research.socket.NettyServer" />
-	<field name="dlqServer" class="com.sonicbase.research.socket.NettyServer" />
-	<field name="bossGroup" class="com.sonicbase.research.socket.NettyServer" />
-	<field name="PORT_STR" class="com.sonicbase.research.socket.NettyServer" />
-	<field name="HOST_STR" class="com.sonicbase.research.socket.NettyServer" />
-	<field name="isRunning" class="com.sonicbase.research.socket.NettyServer" />
-	<field name="port" class="com.sonicbase.research.socket.NettyServer" />
-	<field name="ENABLE_COMPRESSION" class="com.sonicbase.research.socket.NettyServer" />
-	<field name="workerGroup" class="com.sonicbase.research.socket.NettyServer" />
+	<class name="com.sonicbase.server.NettyServer" />
+	<method signature="byte[] compress(byte[])" class="com.sonicbase.server.NettyServer" />
+	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.server.NettyServer" />
+	<method signature="boolean isRunning()" class="com.sonicbase.server.NettyServer" />
+	<method signature="void setDatabaseServer(com.sonicbase.server.DatabaseServer)" class="com.sonicbase.server.NettyServer" />
+	<method signature="void setDlqServer(com.sonicbase.server.NettyServer$RequestHandler)" class="com.sonicbase.server.NettyServer" />
+	<method signature="com.sonicbase.server.DatabaseServer getDatabaseServer()" class="com.sonicbase.server.NettyServer" />
+	<method signature="boolean access$200(com.sonicbase.server.NettyServer)" class="com.sonicbase.server.NettyServer" />
+	<method signature="void run()" class="com.sonicbase.server.NettyServer" />
+	<method signature="Logger access$300()" class="com.sonicbase.server.NettyServer" />
+	<method signature="void &lt;init&gt;()" class="com.sonicbase.server.NettyServer" />
+	<method signature="com.sonicbase.server.NettyServer$RequestHandler getDlqServer()" class="com.sonicbase.server.NettyServer" />
+	<method signature="void main(java.lang.String[])" class="com.sonicbase.server.NettyServer" />
+	<method signature="byte[] sendResponse(byte[],java.io.OutputStream,byte[],int,java.util.ArrayList,java.io.ByteArrayOutputStream)" class="com.sonicbase.server.NettyServer" />
+	<method signature="byte[] uncompress(byte[])" class="com.sonicbase.server.NettyServer" />
+	<method signature="java.lang.String getHelpPage(com.sonicbase.server.NettyServer)" class="com.sonicbase.server.NettyServer" />
+	<method signature="com.sonicbase.server.NettyServer$Request deserializeRequest(java.io.InputStream,byte[])" class="com.sonicbase.server.NettyServer" />
+	<method signature="void startServer(java.lang.String[],java.lang.String,boolean)" class="com.sonicbase.server.NettyServer" />
+	<field name="cluster" class="com.sonicbase.server.NettyServer" />
+	<field name="databaseServer" class="com.sonicbase.server.NettyServer" />
+	<field name="f" class="com.sonicbase.server.NettyServer" />
+	<field name="logger" class="com.sonicbase.server.NettyServer" />
+	<field name="UTF8_STR" class="com.sonicbase.server.NettyServer" />
+	<field name="dlqServer" class="com.sonicbase.server.NettyServer" />
+	<field name="bossGroup" class="com.sonicbase.server.NettyServer" />
+	<field name="PORT_STR" class="com.sonicbase.server.NettyServer" />
+	<field name="HOST_STR" class="com.sonicbase.server.NettyServer" />
+	<field name="isRunning" class="com.sonicbase.server.NettyServer" />
+	<field name="port" class="com.sonicbase.server.NettyServer" />
+	<field name="ENABLE_COMPRESSION" class="com.sonicbase.server.NettyServer" />
+	<field name="workerGroup" class="com.sonicbase.server.NettyServer" />
 	<class name="SelectStatementImpl$Explain" />
 	<method signature="void outdent()" class="SelectStatementImpl$Explain" />
 	<method signature="void appendSpaces()" class="SelectStatementImpl$Explain" />
@@ -5066,7 +5066,7 @@
 	<field name="val$indexSchema" class="ExpressionImpl$1" />
 	<field name="val$recordCache" class="ExpressionImpl$1" />
 	<class name="com.sonicbase.server.LogManager$LogSource" />
-	<method signature="com.sonicbase.research.socket.NettyServer$Request readRequest()" class="com.sonicbase.server.LogManager$LogSource" />
+	<method signature="com.sonicbase.server.NettyServer$Request readRequest()" class="com.sonicbase.server.LogManager$LogSource" />
 	<method signature="void readNext()" class="com.sonicbase.server.LogManager$LogSource" />
 	<method signature="void &lt;init&gt;(com.sonicbase.server.LogManager,java.io.File)" class="com.sonicbase.server.LogManager$LogSource" />
 	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.server.LogManager$LogSource" />

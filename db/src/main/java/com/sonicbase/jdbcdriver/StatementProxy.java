@@ -1,9 +1,11 @@
 package com.sonicbase.jdbcdriver;
 
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.client.InsertStatementHandler;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.ResultSetImpl;
+import net.sf.jsqlparser.statement.insert.Insert;
 
 import java.io.InputStream;
 import java.io.Reader;
@@ -42,7 +44,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
     this.sql = sql;
     this.dbName = connectionProxy.getDbName();
 
-    DatabaseClient.batch.set(null);
+    InsertStatementHandler.batch.set(null);
   }
 
   public void close() throws SQLException {
@@ -153,8 +155,8 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
 
   public void addBatch() throws SQLException {
     try {
-      if (DatabaseClient.batch.get() == null) {
-        DatabaseClient.batch.set(new ArrayList<DatabaseClient.InsertRequest>());
+      if (InsertStatementHandler.batch.get() == null) {
+        InsertStatementHandler.batch.set(new ArrayList<InsertStatementHandler.InsertRequest>());
       }
       String normalizedSQL = sql.trim().toLowerCase();
       if (!normalizedSQL.startsWith("insert")) {
@@ -170,12 +172,13 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
   }
 
   public void clearBatch() throws SQLException {
-    DatabaseClient.batch.set(null);
+    InsertStatementHandler.batch.set(null);
   }
 
   public int[] executeBatch() throws SQLException {
     try {
-      return databaseClient.executeBatch();
+      InsertStatementHandler handler = (InsertStatementHandler) databaseClient.getStatementHandlerFactory().getHandler(new Insert());
+      return handler.executeBatch();
     }
     catch (Exception e) {
       throw new SQLException(e);

@@ -1,7 +1,7 @@
 package com.sonicbase.misc;
 
 import com.sonicbase.common.ComObject;
-import com.sonicbase.research.socket.NettyServer;
+import com.sonicbase.server.NettyServer;
 import com.sonicbase.socket.DatabaseSocketClient;
 
 import java.util.ArrayList;

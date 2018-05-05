@@ -3,6 +3,7 @@ package com.sonicbase.server;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.client.InsertStatementHandler;
 import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
 import com.sonicbase.index.Repartitioner;
@@ -358,23 +359,23 @@ public class UpdateManager {
                 columnNames.add(tableSchema.getFields().get(j).getName());
               }
 
-              DatabaseClient.KeyInfo primaryKey = new DatabaseClient.KeyInfo();
+              InsertStatementHandler.KeyInfo primaryKey = new InsertStatementHandler.KeyInfo();
               tableSchema = server.getCommon().getTableSchema(dbName, tableName, server.getDataDir());
 
               long id = 0;
               if (tableSchema.getFields().get(0).getName().equals("_sonicbase_id")) {
                 id = (long) record.getFields()[0];
               }
-              List<DatabaseClient.KeyInfo> keys = server.getDatabaseClient().getKeys(server.getCommon(), tableSchema, columnNames, values, id);
+              List<InsertStatementHandler.KeyInfo> keys = InsertStatementHandler.getKeys(server.getCommon(), tableSchema, columnNames, values, id);
 
-              for (final DatabaseClient.KeyInfo keyInfo : keys) {
+              for (final InsertStatementHandler.KeyInfo keyInfo : keys) {
                 if (keyInfo.getIndexSchema().getValue().isPrimaryKey()) {
                   primaryKey.setKey(keyInfo.getKey());
                   primaryKey.setIndexSchema(keyInfo.getIndexSchema());
                   break;
                 }
               }
-              for (final DatabaseClient.KeyInfo keyInfo : keys) {
+              for (final InsertStatementHandler.KeyInfo keyInfo : keys) {
                 if (keyInfo.getIndexSchema().getKey().equals(indexName)) {
                   int schemaRetryCount = 0;
                   while (true) {
@@ -401,7 +402,7 @@ public class UpdateManager {
                           primaryKeyIndexName, primaryKey.getKey());
                       keyRecord.setPrimaryKey(primaryKeyBytes);
                       keyRecord.setDbViewNumber(server.getCommon().getSchemaVersion());
-                      server.getDatabaseClient().insertKey(dbName, tableName, keyInfo, primaryKeyIndexName,
+                      InsertStatementHandler.insertKey(server.getClient(), dbName, tableName, keyInfo, primaryKeyIndexName,
                           primaryKey.getKey(), keyRecord, server.getShard(), server.getReplica(), true, schemaRetryCount);
                       break;
                     }

@@ -142,13 +142,27 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
     }
     else {
 
+      setTableName(getFromTable());
+
       BinaryExpression.Operator op = ascending ? BinaryExpression.Operator.greater : BinaryExpression.Operator.less;
       AtomicReference<String> usedIndex = new AtomicReference<>();
-      SelectContextImpl context = lookupIds(dbName, getClient().getCommon(), getClient(), getReplica(), count, tableSchema.getName(), indexSchema.getName(), isForceSelectOnServer(),
-          op, null, getOrderByExpressions(), getNextKey(), getParms(), this, null, getNextKey(), null,
-          getColumns(), indexSchema.getFields()[0], getNextShard(), getRecordCache(), usedIndex, false,
-          getViewVersion(), getCounters(), getGroupByContext(), debug, currOffset, countReturned, limit, offset, isProbe(), isRestrictToThisServer(),
-          getProcedureContext(), schemaRetryCount);
+
+      IndexLookup indexLookup = new IndexLookup();
+      indexLookup.setCount(count);
+      indexLookup.setIndexName(indexSchema.getName());
+      indexLookup.setLeftOp(op);
+      indexLookup.setLeftKey(getNextKey());
+      indexLookup.setLeftOriginalKey(getNextKey());
+      indexLookup.setColumnName(indexSchema.getFields()[0]);
+      indexLookup.setCurrOffset(currOffset);
+      indexLookup.setCountReturned(countReturned);
+      indexLookup.setLimit(limit);
+      indexLookup.setOffset(offset);
+      indexLookup.setSchemaRetryCount(schemaRetryCount);
+      indexLookup.setUsedIndex(usedIndex);
+      indexLookup.setEvaluateExpression(false);
+
+      SelectContextImpl context = indexLookup.lookup(this, getTopLevelExpression());
       setNextShard(context.getNextShard());
       setNextKey(context.getNextKey());
       NextReturn ret = new NextReturn();

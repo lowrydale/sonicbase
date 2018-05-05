@@ -25,8 +25,10 @@ public abstract class StatementImpl implements Statement {
     return parms;
   }
 
-  public abstract Object execute(String dbName, String sqlToUse, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1,
-                                 Short sequence2, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) throws DatabaseException;
+  public Object execute(String dbName, String sqlToUse, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1,
+                                 Short sequence2, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) throws DatabaseException {
+    throw new DatabaseException("Not supported");
+  }
 
   @Override
   public BinaryExpression createBinaryExpression(String id, BinaryExpression.Operator op, long value) {

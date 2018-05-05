@@ -17,7 +17,7 @@
                   </class>
               </keep>
           </shrink>
-          <rename mainclass="com.sonicbase.research.socket.NettyServer" logfile="obfuscate.log" annotationClass="ExcludeRename">
+          <rename mainclass="com.sonicbase.server.NettyServer" logfile="obfuscate.log" annotationClass="ExcludeRename">
           <keep>
               <linenumbertable>
                   <patternset id="CompanyPatternSet">

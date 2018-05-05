@@ -13,7 +13,6 @@ import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.streams.LocalProducer;
-import com.sonicbase.research.socket.NettyServer;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.FileUtils;
 import org.testng.annotations.AfterClass;

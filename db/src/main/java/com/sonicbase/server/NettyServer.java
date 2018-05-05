@@ -1,4 +1,4 @@
-package com.sonicbase.research.socket;
+package com.sonicbase.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -7,7 +7,6 @@ import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Logger;
 import com.sonicbase.common.ThreadUtil;
 import com.sonicbase.query.DatabaseException;
-import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.socket.DatabaseSocketClient;
 import com.sonicbase.socket.Util;
 import io.netty.bootstrap.ServerBootstrap;

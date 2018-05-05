@@ -1,8 +1,9 @@
 package com.sonicbase.query.impl;
 
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.client.InsertStatementHandler;
 import com.sonicbase.common.*;
-
+import com.sonicbase.index.Repartitioner;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
@@ -12,12 +13,13 @@ import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 
-
 import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
+
+import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION;
 
 public class UpdateStatementImpl extends StatementImpl implements UpdateStatement {
   private final DatabaseClient client;
@@ -119,7 +121,8 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
               if (tableFields.get(0).getName().equals("_sonicbase_id")) {
                 id = (long)record.getFields()[0];
               }
-              List<DatabaseClient.KeyInfo> previousKeys = client.getKeys(client.getCommon(), tableSchema, columnNames, values, id);
+              List<InsertStatementHandler.KeyInfo> previousKeys = InsertStatementHandler.getKeys(client.getCommon(),
+                  tableSchema, columnNames, values, id);
 
               List<ColumnImpl> qColumns = getColumns();
               List<ExpressionImpl> setExpressions = getSetExpressions();
@@ -186,7 +189,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
               }
 
               //update record
-              List<Integer> selectedShards = DatabaseClient.findOrderedPartitionForRecord(true, false, fieldOffsets, client.getCommon(), tableSchema,
+              List<Integer> selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false, fieldOffsets, client.getCommon(), tableSchema,
                   indexSchema.getName(), null, BinaryExpression.Operator.equal, null, newPrimaryKey, null);
               if (selectedShards.size() == 0) {
                 throw new Exception("No shards selected for query");
@@ -216,44 +219,44 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
 
               //update keys
 
-              List<DatabaseClient.KeyInfo> newKeys = client.getKeys(client.getCommon(), tableSchema, columnNames, values, id);
+              List<InsertStatementHandler.KeyInfo> newKeys = InsertStatementHandler.getKeys(client.getCommon(), tableSchema, columnNames, values, id);
 
-              Map<String, ConcurrentSkipListMap<Object[], DatabaseClient.KeyInfo>> orderedKeyInfosPrevious = new HashMap<>();
-              Map<String, ConcurrentSkipListMap<Object[], DatabaseClient.KeyInfo>> orderedKeyInfosNew = new HashMap<>();
+              Map<String, ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo>> orderedKeyInfosPrevious = new HashMap<>();
+              Map<String, ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo>> orderedKeyInfosNew = new HashMap<>();
 
               client.populateOrderedKeyInfo(orderedKeyInfosPrevious, previousKeys);
               client.populateOrderedKeyInfo(orderedKeyInfosNew, newKeys);
 
-              for (Map.Entry<String, ConcurrentSkipListMap<Object[], DatabaseClient.KeyInfo>> previousEntry : orderedKeyInfosPrevious.entrySet()) {
-                ConcurrentSkipListMap<Object[], DatabaseClient.KeyInfo> newMap = orderedKeyInfosNew.get(previousEntry.getKey());
+              for (Map.Entry<String, ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo>> previousEntry : orderedKeyInfosPrevious.entrySet()) {
+                ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo> newMap = orderedKeyInfosNew.get(previousEntry.getKey());
                 if (newMap == null) {
-                  for (Map.Entry<Object[], DatabaseClient.KeyInfo> prevEntry : previousEntry.getValue().entrySet()) {
-                    client.deleteKey(dbName, tableSchema.getName(), prevEntry.getValue(), indexSchema.getName(), entry[0], schemaRetryCount);
+                  for (Map.Entry<Object[], InsertStatementHandler.KeyInfo> prevEntry : previousEntry.getValue().entrySet()) {
+                    deleteKey(dbName, tableSchema.getName(), prevEntry.getValue(), indexSchema.getName(), entry[0], schemaRetryCount);
                   }
                 }
                 else {
-                  for (Map.Entry<Object[], DatabaseClient.KeyInfo> prevEntry : previousEntry.getValue().entrySet()) {
+                  for (Map.Entry<Object[], InsertStatementHandler.KeyInfo> prevEntry : previousEntry.getValue().entrySet()) {
                     if (!newMap.containsKey(prevEntry.getKey())) {
-                      client.deleteKey(dbName, tableSchema.getName(), prevEntry.getValue(), indexSchema.getName(), entry[0], schemaRetryCount);
+                      deleteKey(dbName, tableSchema.getName(), prevEntry.getValue(), indexSchema.getName(), entry[0], schemaRetryCount);
                     }
                   }
                 }
               }
 
-              for (Map.Entry<String, ConcurrentSkipListMap<Object[], DatabaseClient.KeyInfo>> newEntry : orderedKeyInfosNew.entrySet()) {
-                ConcurrentSkipListMap<Object[], DatabaseClient.KeyInfo> prevMap = orderedKeyInfosPrevious.get(newEntry.getKey());
+              for (Map.Entry<String, ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo>> newEntry : orderedKeyInfosNew.entrySet()) {
+                ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo> prevMap = orderedKeyInfosPrevious.get(newEntry.getKey());
                 if (prevMap == null) {
-                  for (Map.Entry<Object[], DatabaseClient.KeyInfo> innerNewEntry : newEntry.getValue().entrySet()) {
+                  for (Map.Entry<Object[], InsertStatementHandler.KeyInfo> innerNewEntry : newEntry.getValue().entrySet()) {
                     KeyRecord keyRecord = new KeyRecord();
                     byte[] primaryKeyBytes = client.getCommon().serializeKey(tableSchema, innerNewEntry.getValue().getIndexSchema().getKey(), newPrimaryKey);
                     keyRecord.setPrimaryKey(primaryKeyBytes);
                     keyRecord.setDbViewNumber(client.getCommon().getSchemaVersion());
-                    client.insertKey(dbName, tableSchema.getName(), innerNewEntry.getValue(), indexSchema.getName(),
+                    InsertStatementHandler.insertKey(client, dbName, tableSchema.getName(), innerNewEntry.getValue(), indexSchema.getName(),
                         newPrimaryKey, keyRecord, -1, -1, false, schemaRetryCount);
                   }
                 }
                 else {
-                  for (Map.Entry<Object[], DatabaseClient.KeyInfo> innerNewEntry : newEntry.getValue().entrySet()) {
+                  for (Map.Entry<Object[], InsertStatementHandler.KeyInfo> innerNewEntry : newEntry.getValue().entrySet()) {
                     if (!prevMap.containsKey(innerNewEntry.getKey())) {
                       if (innerNewEntry.getValue().getIndexSchema().getKey().equals(indexSchema.getName())) {
                         continue;
@@ -263,7 +266,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
                           indexSchema.getName(), newPrimaryKey);
                       keyRecord.setPrimaryKey(primaryKeyBytes);
                       keyRecord.setDbViewNumber(client.getCommon().getSchemaVersion());
-                      client.insertKey(dbName, tableSchema.getName(), innerNewEntry.getValue(), indexSchema.getName(),
+                      InsertStatementHandler.insertKey(client, dbName, tableSchema.getName(), innerNewEntry.getValue(), indexSchema.getName(),
                           newPrimaryKey, keyRecord, -1, -1, false, schemaRetryCount);
                     }
                   }
@@ -287,6 +290,28 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
       }
     }
 
+  }
+
+  public void deleteKey(String dbName, String tableName, InsertStatementHandler.KeyInfo keyInfo, String primaryKeyIndexName,
+                        Object[] primaryKey, int schemaRetryCount) {
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.dbName, dbName);
+    if (schemaRetryCount < 2) {
+      cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+    }
+    cobj.put(ComObject.Tag.method, "deleteIndexEntryByKey");
+    cobj.put(ComObject.Tag.tableName, tableName);
+    cobj.put(ComObject.Tag.indexName, keyInfo.getIndexSchema().getKey());
+    cobj.put(ComObject.Tag.primaryKeyIndexName, primaryKeyIndexName);
+    cobj.put(ComObject.Tag.isExcpliciteTrans, client.isExplicitTrans());
+    cobj.put(ComObject.Tag.isCommitting, client.isCommitting());
+    cobj.put(ComObject.Tag.transactionId, client.getTransactionId());
+
+    cobj.put(ComObject.Tag.serializationVersion, SERIALIZATION_VERSION);
+    cobj.put(ComObject.Tag.keyBytes, DatabaseCommon.serializeKey(client.getCommon().getTables(dbName).get(tableName), keyInfo.getIndexSchema().getKey(), keyInfo.getKey()));
+    cobj.put(ComObject.Tag.primaryKeyBytes, DatabaseCommon.serializeKey(client.getCommon().getTables(dbName).get(tableName), primaryKeyIndexName, primaryKey));
+
+    client.send("DatabaseServer:deleteIndexEntryByKey", keyInfo.getShard(), 0, cobj, DatabaseClient.Replica.def);
   }
 
   public String getTableName() {

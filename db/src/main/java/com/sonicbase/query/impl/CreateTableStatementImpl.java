@@ -52,15 +52,6 @@ public class CreateTableStatementImpl implements CreateTableStatement {
     fields.add(schema);
   }
 
-  public int execute(String dbName) throws DatabaseException {
-    try {
-      return client.doCreateTable(dbName, this);
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-  }
-
   public void setPrimaryKey(List<String> primaryKey) {
     this.primaryKey = primaryKey;
     for (int i = 0; i < primaryKey.size(); i++) {

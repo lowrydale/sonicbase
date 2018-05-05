@@ -1880,7 +1880,8 @@ public class DatabaseServer {
         String currTableName = table.getString(ComObject.Tag.tableName);
         byte[] tableSchema = getHighestTableSchema(currDbName, currTableName, table.getInt(ComObject.Tag.shard),
             table.getInt(ComObject.Tag.replica));
-        if (table.getBoolean(ComObject.Tag.hasDiscrepancy)) {
+        Boolean hasDiscrepency = table.getBoolean(ComObject.Tag.hasDiscrepancy);
+        if (hasDiscrepency != null && hasDiscrepency) {
           logger.info("Table schema has discrepancy, will push schema: db=" + currDbName + ", table=" + currTableName);
           pushTableSchema(currDbName, currTableName, tableSchema, table.getInt(ComObject.Tag.schemaVersion));
         }
@@ -1888,7 +1889,8 @@ public class DatabaseServer {
         for (int k = 0; k < indices.getArray().size(); k++) {
           ComObject index = (ComObject) indices.getArray().get(k);
           String currIndexName = index.getString(ComObject.Tag.indexName);
-          if (index.getBoolean(ComObject.Tag.hasDiscrepancy)) {
+          hasDiscrepency = index.getBoolean(ComObject.Tag.hasDiscrepancy);
+          if (hasDiscrepency != null && hasDiscrepency) {
             byte[] indexSchema = getHighestIndexSchema(currDbName, currTableName, currIndexName, index.getInt(ComObject.Tag.shard),
                 index.getInt(ComObject.Tag.replica));
             logger.info("Index schema has discrepancy, will push schema: db=" + currDbName + ", table=" + currTableName + ", index=" + currIndexName);
@@ -5018,48 +5020,6 @@ public class DatabaseServer {
 
   private boolean shutdown = false;
 
-
-//  public static class AddressMap {
-//    private ConcurrentHashMap<Long, Long>  map = new ConcurrentHashMap<>();
-//    private AtomicLong currOuterAddress = new AtomicLong();
-//    Object[] mutex = new Object[10000];
-//
-//    public AddressMap() {
-//      for (int i = 0; i < mutex.length; i++) {
-//        mutex[i] = new Object();
-//      }
-//    }
-//
-//    public Object getMutex(long outerAddress) {
-//      return mutex[(int)(outerAddress % mutex.length)];
-//    }
-//
-//    public long addAddress(long innerAddress) {
-//      long outerAddress = currOuterAddress.incrementAndGet();
-//      if (innerAddress == 0 || innerAddress == -1L) {
-//        throw new DatabaseException("Adding invalid address");
-//      }
-//      synchronized (getMutex(outerAddress)) {
-//        map.put(outerAddress, innerAddress);
-//      }
-//      return outerAddress;
-//    }
-//
-//    public Long getAddress(long outerAddress) {
-//      synchronized (getMutex(outerAddress)) {
-//        Long ret = map.get(outerAddress);
-//        return ret;
-//      }
-//    }
-//
-//    public Long removeAddress(long outerAddress) {
-//      synchronized (getMutex(outerAddress)) {
-//        Long ret = map.remove(outerAddress);
-//        return ret;
-//      }
-//    }
-//  }
-
   class IndexValue {
     long updateTime;
     byte[][] records;
@@ -5443,8 +5403,6 @@ public class DatabaseServer {
         }
 
         in = new DataInputStream(new ByteArrayInputStream(bytes));
-        //in.readInt(); //byte count
-        //in.readInt(); //orig len
         byte[][] ret = new byte[(int) Varint.readSignedVarLong(in)][];
         for (int i = 0; i < ret.length; i++) {
           int len = (int) Varint.readSignedVarLong(in);
@@ -5463,95 +5421,6 @@ public class DatabaseServer {
 
   public byte[][] fromUnsafeToKeys(Object obj) {
     return fromUnsafeToRecords(obj);
-//    try {
-//      if (obj instanceof byte[]) {
-//        DataInputStream in = new DataInputStream(new ByteArrayInputStream((byte[])obj));
-//        long seconds = Varint.readUnsignedVarLong(in);
-//        long outerAddress = Varint.readUnsignedVarLong(in);
-//
-//        synchronized (addressMap.getMutex(outerAddress)) {
-//          Long address = addressMap.getAddress(outerAddress);
-//          if (address == null) {
-//            return null;
-//          }
-//
-//          byte[] lenBuffer = new byte[8];
-//          lenBuffer[0] = unsafe.getByte(address + 0);
-//          lenBuffer[1] = unsafe.getByte(address + 1);
-//          lenBuffer[2] = unsafe.getByte(address + 2);
-//          lenBuffer[3] = unsafe.getByte(address + 3);
-//          lenBuffer[4] = unsafe.getByte(address + 4);
-//          lenBuffer[5] = unsafe.getByte(address + 5);
-//          lenBuffer[6] = unsafe.getByte(address + 6);
-//          lenBuffer[7] = unsafe.getByte(address + 7);
-//          ByteArrayInputStream bytesIn = new ByteArrayInputStream(lenBuffer);
-//          in = new DataInputStream(bytesIn);
-//          int count = in.readInt();
-//          int origLen = in.readInt();
-//          byte[] bytes = new byte[count];
-//          for (int i = 0; i < count; i++) {
-//            bytes[i] = unsafe.getByte(address + i + 8);
-//          }
-//
-//          if (origLen != -1) {
-//            LZ4Factory factory = LZ4Factory.fastestInstance();
-//
-//            LZ4FastDecompressor decompressor = factory.fastDecompressor();
-//            byte[] restored = new byte[origLen];
-//            decompressor.decompress(bytes, 0, restored, 0, origLen);
-//            bytes = restored;
-//          }
-//
-//          in = new DataInputStream(new ByteArrayInputStream(bytes));
-//          //in.readInt(); //byte count
-//          //in.readInt(); //orig len
-//          byte[][] ret = new byte[(int) Varint.readSignedVarLong(in)][];
-//          for (int i = 0; i < ret.length; i++) {
-//            int len = (int) Varint.readSignedVarLong(in);
-//            byte[] record = new byte[len];
-//            in.readFully(record);
-//            ret[i] = record;
-//          }
-//          return ret;
-//        }
-//      }
-//      else {
-//        if (!compressRecords) {
-//          return ((IndexValue)obj).records;
-//        }
-//        byte[] bytes = ((IndexValue)obj).bytes;
-//        byte[] lenBuffer = new byte[8];
-//        System.arraycopy(bytes, 0, lenBuffer, 0, lenBuffer.length);
-//        ByteArrayInputStream bytesIn = new ByteArrayInputStream(lenBuffer);
-//        DataInputStream in = new DataInputStream(bytesIn);
-//        int count = in.readInt();
-//        int origLen = in.readInt();
-//
-//        if (origLen != -1) {
-//          LZ4Factory factory = LZ4Factory.fastestInstance();
-//
-//          LZ4FastDecompressor decompressor = factory.fastDecompressor();
-//          byte[] restored = new byte[origLen];
-//          decompressor.decompress(bytes, lenBuffer.length, restored, 0, origLen);
-//          bytes = restored;
-//        }
-//
-//        in = new DataInputStream(new ByteArrayInputStream(bytes));
-//        //in.readInt(); //byte count
-//        //in.readInt(); //orig len
-//        byte[][] ret = new byte[(int) Varint.readSignedVarLong(in)][];
-//        for (int i = 0; i < ret.length; i++) {
-//          int len = (int) Varint.readSignedVarLong(in);
-//          byte[] record = new byte[len];
-//          in.readFully(record);
-//          ret[i] = record;
-//        }
-//        return ret;
-//      }
-//    }
-//    catch (IOException e) {
-//      throw new DatabaseException(e);
-//    }
   }
 
   public void freeUnsafeIds(Object obj) {

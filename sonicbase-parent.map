@@ -123,16 +123,16 @@ com.sonicbase.bench.TestPerformance -> com.sonicbase.bench.TestPerformance:
     26:26:java.sql.Connection access$300(com.sonicbase.bench.TestPerformance) -> access$300
     26:26:java.lang.String access$400(com.sonicbase.bench.TestPerformance,int) -> access$400
 com.sonicbase.bench.TestPerformance$1 -> com.sonicbase.bench.TestPerformance$1:
-    com.sonicbase.research.socket.NettyServer val$server0_0 -> a
+    com.sonicbase.server.NettyServer val$server0_0 -> a
     java.util.concurrent.CountDownLatch val$latch -> b
     com.sonicbase.bench.TestPerformance this$0 -> c
-    223:223:void <init>(com.sonicbase.bench.TestPerformance,com.sonicbase.research.socket.NettyServer,java.util.concurrent.CountDownLatch) -> <init>
+    223:223:void <init>(com.sonicbase.bench.TestPerformance,com.sonicbase.server.NettyServer,java.util.concurrent.CountDownLatch) -> <init>
     226:229:void run() -> run
 com.sonicbase.bench.TestPerformance$2 -> com.sonicbase.bench.TestPerformance$2:
-    com.sonicbase.research.socket.NettyServer val$server0_1 -> a
+    com.sonicbase.server.NettyServer val$server0_1 -> a
     java.util.concurrent.CountDownLatch val$latch -> b
     com.sonicbase.bench.TestPerformance this$0 -> c
-    242:242:void <init>(com.sonicbase.bench.TestPerformance,com.sonicbase.research.socket.NettyServer,java.util.concurrent.CountDownLatch) -> <init>
+    242:242:void <init>(com.sonicbase.bench.TestPerformance,com.sonicbase.server.NettyServer,java.util.concurrent.CountDownLatch) -> <init>
     245:248:void run() -> run
 com.sonicbase.bench.TestPerformance$3 -> com.sonicbase.bench.TestPerformance$3:
     int val$currOffset -> a
@@ -170,13 +170,13 @@ com.sonicbase.bench.TestServers -> com.sonicbase.bench.e:
     12:12:void <init>() -> <init>
     17:81:void main(java.lang.String[]) -> a
 com.sonicbase.bench.TestServers$1 -> com.sonicbase.bench.e$1:
-    com.sonicbase.research.socket.NettyServer[] val$dbServers -> a
-    25:25:void <init>(com.sonicbase.research.socket.NettyServer[]) -> <init>
+    com.sonicbase.server.NettyServer[] val$dbServers -> a
+    25:25:void <init>(com.sonicbase.server.NettyServer[]) -> <init>
     29:36:java.lang.Object call() -> call
 com.sonicbase.bench.TestServers$2 -> com.sonicbase.bench.e$2:
     int val$shard -> a
-    com.sonicbase.research.socket.NettyServer[] val$dbServers -> b
-    47:47:void <init>(int,com.sonicbase.research.socket.NettyServer[]) -> <init>
+    com.sonicbase.server.NettyServer[] val$dbServers -> b
+    47:47:void <init>(int,com.sonicbase.server.NettyServer[]) -> <init>
     50:67:java.lang.Object call() -> call
 com.sonicbase.bench.TestTransactions -> com.sonicbase.bench.f:
     java.sql.Connection conn -> a
@@ -4625,7 +4625,7 @@ com.sonicbase.research.socket.ChangeRequest -> com.sonicbase.research.socket.a:
     32:33:void setType(int) -> a
     36:36:int getOps() -> c
     40:41:void setOps(int) -> b
-com.sonicbase.research.socket.NettyServer -> com.sonicbase.research.socket.NettyServer:
+com.sonicbase.server.NettyServer -> com.sonicbase.server.NettyServer:
     com.sonicbase.common.Logger logger -> d
     boolean ENABLE_COMPRESSION -> a
     java.lang.String UTF8_STR -> e
@@ -4662,7 +4662,7 @@ com.sonicbase.research.socket.NettyServer -> com.sonicbase.research.socket.Netty
     139:139:boolean isRunning() -> isRunning
     143:143:boolean isRecovered() -> isRecovered
     157:207:byte[] writeResponse(byte[],java.io.OutputStream,byte[],int,java.util.ArrayList,java.io.ByteArrayOutputStream) -> writeResponse
-    212:231:com.sonicbase.research.socket.NettyServer$Request deserializeRequest(java.io.InputStream,byte[]) -> deserializeRequest
+    212:231:com.sonicbase.server.NettyServer$Request deserializeRequest(java.io.InputStream,byte[]) -> deserializeRequest
     743:748:byte[] compress(byte[]) -> compress
     752:756:byte[] uncompress(byte[]) -> uncompress
     760:777:void setDatabaseServer(com.sonicbase.server.DatabaseServer) -> setDatabaseServer
@@ -4671,57 +4671,57 @@ com.sonicbase.research.socket.NettyServer -> com.sonicbase.research.socket.Netty
     823:826:void main(java.lang.String[]) -> main
     829:1002:void startServer(java.lang.String[],java.lang.String,boolean) -> startServer
     1005:1067:void waitForServersToStart() -> waitForServersToStart
-    1070:1071:java.lang.String getHelpPage(com.sonicbase.research.socket.NettyServer) -> getHelpPage
-    44:44:java.util.concurrent.atomic.AtomicLong access$100(com.sonicbase.research.socket.NettyServer) -> access$100
-    44:44:java.util.concurrent.atomic.AtomicLong access$200(com.sonicbase.research.socket.NettyServer) -> access$200
-    44:44:java.util.concurrent.atomic.AtomicLong access$300(com.sonicbase.research.socket.NettyServer) -> access$300
-    44:44:java.util.concurrent.atomic.AtomicLong access$400(com.sonicbase.research.socket.NettyServer) -> access$400
-    44:44:java.util.concurrent.atomic.AtomicLong access$500(com.sonicbase.research.socket.NettyServer) -> access$500
-    44:44:java.util.concurrent.atomic.AtomicLong access$600(com.sonicbase.research.socket.NettyServer) -> access$600
+    1070:1071:java.lang.String getHelpPage(com.sonicbase.server.NettyServer) -> getHelpPage
+    44:44:java.util.concurrent.atomic.AtomicLong access$100(com.sonicbase.server.NettyServer) -> access$100
+    44:44:java.util.concurrent.atomic.AtomicLong access$200(com.sonicbase.server.NettyServer) -> access$200
+    44:44:java.util.concurrent.atomic.AtomicLong access$300(com.sonicbase.server.NettyServer) -> access$300
+    44:44:java.util.concurrent.atomic.AtomicLong access$400(com.sonicbase.server.NettyServer) -> access$400
+    44:44:java.util.concurrent.atomic.AtomicLong access$500(com.sonicbase.server.NettyServer) -> access$500
+    44:44:java.util.concurrent.atomic.AtomicLong access$600(com.sonicbase.server.NettyServer) -> access$600
     44:44:com.sonicbase.common.Logger access$700() -> access$700
-    44:44:java.util.concurrent.atomic.AtomicLong access$800(com.sonicbase.research.socket.NettyServer) -> access$800
-    44:44:java.util.concurrent.atomic.AtomicLong access$900(com.sonicbase.research.socket.NettyServer) -> access$900
-    44:44:java.util.concurrent.atomic.AtomicLong access$1000(com.sonicbase.research.socket.NettyServer) -> access$1000
-    44:44:java.util.concurrent.atomic.AtomicLong access$1100(com.sonicbase.research.socket.NettyServer) -> access$1100
-    44:44:java.util.concurrent.atomic.AtomicLong access$1200(com.sonicbase.research.socket.NettyServer) -> access$1200
-    44:44:void access$1300(com.sonicbase.research.socket.NettyServer) -> access$1300
-    44:44:boolean access$1400(com.sonicbase.research.socket.NettyServer) -> access$1400
-    44:44:com.sonicbase.server.DatabaseServer access$1500(com.sonicbase.research.socket.NettyServer) -> access$1500
-com.sonicbase.research.socket.NettyServer$1 -> com.sonicbase.research.socket.NettyServer$1:
-    com.sonicbase.research.socket.NettyServer this$0 -> a
-    886:886:void <init>(com.sonicbase.research.socket.NettyServer) -> <init>
+    44:44:java.util.concurrent.atomic.AtomicLong access$800(com.sonicbase.server.NettyServer) -> access$800
+    44:44:java.util.concurrent.atomic.AtomicLong access$900(com.sonicbase.server.NettyServer) -> access$900
+    44:44:java.util.concurrent.atomic.AtomicLong access$1000(com.sonicbase.server.NettyServer) -> access$1000
+    44:44:java.util.concurrent.atomic.AtomicLong access$1100(com.sonicbase.server.NettyServer) -> access$1100
+    44:44:java.util.concurrent.atomic.AtomicLong access$1200(com.sonicbase.server.NettyServer) -> access$1200
+    44:44:void access$1300(com.sonicbase.server.NettyServer) -> access$1300
+    44:44:boolean access$1400(com.sonicbase.server.NettyServer) -> access$1400
+    44:44:com.sonicbase.server.DatabaseServer access$1500(com.sonicbase.server.NettyServer) -> access$1500
+com.sonicbase.server.NettyServer$1 -> com.sonicbase.server.NettyServer$1:
+    com.sonicbase.server.NettyServer this$0 -> a
+    886:886:void <init>(com.sonicbase.server.NettyServer) -> <init>
     890:904:void run() -> run
-com.sonicbase.research.socket.NettyServer$2 -> com.sonicbase.research.socket.NettyServer$2:
+com.sonicbase.server.NettyServer$2 -> com.sonicbase.server.NettyServer$2:
     com.sonicbase.server.DatabaseServer val$databaseServer -> a
-    com.sonicbase.research.socket.NettyServer this$0 -> b
-    908:908:void <init>(com.sonicbase.research.socket.NettyServer,com.sonicbase.server.DatabaseServer) -> <init>
+    com.sonicbase.server.NettyServer this$0 -> b
+    908:908:void <init>(com.sonicbase.server.NettyServer,com.sonicbase.server.DatabaseServer) -> <init>
     912:954:void run() -> run
-com.sonicbase.research.socket.NettyServer$2$1 -> com.sonicbase.research.socket.NettyServer$2$1:
-    com.sonicbase.research.socket.NettyServer$2 this$1 -> a
-    914:914:void <init>(com.sonicbase.research.socket.NettyServer$2) -> <init>
+com.sonicbase.server.NettyServer$2$1 -> com.sonicbase.server.NettyServer$2$1:
+    com.sonicbase.server.NettyServer$2 this$1 -> a
+    914:914:void <init>(com.sonicbase.server.NettyServer$2) -> <init>
     918:923:void run() -> run
-com.sonicbase.research.socket.NettyServer$3 -> com.sonicbase.research.socket.NettyServer$3:
+com.sonicbase.server.NettyServer$3 -> com.sonicbase.server.NettyServer$3:
     int val$shard -> a
     int val$replica -> b
-    com.sonicbase.research.socket.NettyServer this$0 -> c
-    1013:1013:void <init>(com.sonicbase.research.socket.NettyServer,int,int) -> <init>
+    com.sonicbase.server.NettyServer this$0 -> c
+    1013:1013:void <init>(com.sonicbase.server.NettyServer,int,int) -> <init>
     1016:1045:java.lang.Object call() -> call
-com.sonicbase.research.socket.NettyServer$MyChannelInitializer -> com.sonicbase.research.socket.NettyServer$a:
-    com.sonicbase.research.socket.NettyServer this$0 -> a
-    783:783:void <init>(com.sonicbase.research.socket.NettyServer) -> <init>
+com.sonicbase.server.NettyServer$MyChannelInitializer -> com.sonicbase.server.NettyServer$a:
+    com.sonicbase.server.NettyServer this$0 -> a
+    783:783:void <init>(com.sonicbase.server.NettyServer) -> <init>
     787:788:void initChannel(io.netty.channel.socket.SocketChannel) -> initChannel
     783:783:void initChannel(io.netty.channel.Channel) -> initChannel
-com.sonicbase.research.socket.NettyServer$ReadState -> com.sonicbase.research.socket.NettyServer$b:
-    com.sonicbase.research.socket.NettyServer$ReadState size -> a
-    com.sonicbase.research.socket.NettyServer$ReadState bytes -> b
-    com.sonicbase.research.socket.NettyServer$ReadState dlqSize -> c
-    com.sonicbase.research.socket.NettyServer$ReadState dlqBytes -> d
-    com.sonicbase.research.socket.NettyServer$ReadState[] $VALUES -> e
-    147:147:com.sonicbase.research.socket.NettyServer$ReadState[] values() -> a
-    147:147:com.sonicbase.research.socket.NettyServer$ReadState valueOf(java.lang.String) -> a
+com.sonicbase.server.NettyServer$ReadState -> com.sonicbase.server.NettyServer$b:
+    com.sonicbase.server.NettyServer$ReadState size -> a
+    com.sonicbase.server.NettyServer$ReadState bytes -> b
+    com.sonicbase.server.NettyServer$ReadState dlqSize -> c
+    com.sonicbase.server.NettyServer$ReadState dlqBytes -> d
+    com.sonicbase.server.NettyServer$ReadState[] $VALUES -> e
+    147:147:com.sonicbase.server.NettyServer$ReadState[] values() -> a
+    147:147:com.sonicbase.server.NettyServer$ReadState valueOf(java.lang.String) -> a
     147:147:void <init>(java.lang.String,int) -> <init>
     147:151:void <clinit>() -> <clinit>
-com.sonicbase.research.socket.NettyServer$Request -> com.sonicbase.research.socket.NettyServer$c:
+com.sonicbase.server.NettyServer$Request -> com.sonicbase.server.NettyServer$c:
     byte[] body -> b
     java.util.concurrent.CountDownLatch latch -> a
     byte[] response -> c
@@ -4734,26 +4734,26 @@ com.sonicbase.research.socket.NettyServer$Request -> com.sonicbase.research.sock
     118:118:long getSequence1() -> c
     122:123:void setSequence0(long) -> a
     126:127:void setSequence1(long) -> b
-    98:98:byte[] access$002(com.sonicbase.research.socket.NettyServer$Request,byte[]) -> a
-    98:98:byte[] access$000(com.sonicbase.research.socket.NettyServer$Request) -> a
-com.sonicbase.research.socket.NettyServer$ServerHandler -> com.sonicbase.research.socket.NettyServer$d:
+    98:98:byte[] access$002(com.sonicbase.server.NettyServer$Request,byte[]) -> a
+    98:98:byte[] access$000(com.sonicbase.server.NettyServer$Request) -> a
+com.sonicbase.server.NettyServer$ServerHandler -> com.sonicbase.server.NettyServer$d:
     io.netty.buffer.ByteBufAllocator alloc -> c
     int len -> d
     int bodyLen -> e
-    com.sonicbase.research.socket.NettyServer$ReadState readState -> f
+    com.sonicbase.server.NettyServer$ReadState readState -> f
     io.netty.buffer.ByteBuf destBuff -> g
     io.netty.buffer.ByteBuf respBuffer -> h
     byte[] intBuff -> i
     java.util.List buffers -> j
     boolean oldWay -> a
-    com.sonicbase.research.socket.NettyServer this$0 -> b
-    245:282:void <init>(com.sonicbase.research.socket.NettyServer) -> <init>
+    com.sonicbase.server.NettyServer this$0 -> b
+    245:282:void <init>(com.sonicbase.server.NettyServer) -> <init>
     260:269:void handlerAdded(io.netty.channel.ChannelHandlerContext) -> handlerAdded
     272:276:void handlerRemoved(io.netty.channel.ChannelHandlerContext) -> handlerRemoved
     285:430:byte[] readRequest(io.netty.buffer.ByteBuf) -> readRequest
     435:590:void channelRead(io.netty.channel.ChannelHandlerContext,java.lang.Object) -> channelRead
     593:616:void processError(java.lang.String,java.util.List,java.lang.Throwable) -> processError
-    620:640:byte[] doProcessRequest(com.sonicbase.research.socket.NettyServer$Request) -> doProcessRequest
+    620:640:byte[] doProcessRequest(com.sonicbase.server.NettyServer$Request) -> doProcessRequest
     645:677:java.util.List doProcessRequests(java.util.List,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong) -> doProcessRequests
     681:690:java.util.List processRequests(java.util.List,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong) -> processRequests
     694:694:byte[] processRequest(byte[]) -> processRequest
@@ -6499,11 +6499,11 @@ com.sonicbase.server.LogManager -> com.sonicbase.server.LogManager:
     27:27:com.sonicbase.server.DatabaseServer access$800(com.sonicbase.server.LogManager) -> e
     30:30:void <clinit>() -> <clinit>
 com.sonicbase.server.LogManager$1 -> com.sonicbase.server.LogManager$1:
-    com.sonicbase.research.socket.NettyServer$Request val$currRequest -> a
+    com.sonicbase.server.NettyServer$Request val$currRequest -> a
     java.util.concurrent.atomic.AtomicLong val$lastLogged -> b
     long val$begin -> c
     com.sonicbase.server.LogManager this$0 -> d
-    1078:1078:void <init>(com.sonicbase.server.LogManager,com.sonicbase.research.socket.NettyServer$Request,java.util.concurrent.atomic.AtomicLong,long) -> <init>
+    1078:1078:void <init>(com.sonicbase.server.LogManager,com.sonicbase.server.NettyServer$Request,java.util.concurrent.atomic.AtomicLong,long) -> <init>
     1082:1093:java.lang.Object call() -> call
 com.sonicbase.server.LogManager$ByteCounterStream -> com.sonicbase.server.LogManager$ByteCounterStream:
     java.util.concurrent.atomic.AtomicLong countRead -> a

@@ -259,11 +259,11 @@ public class TestRepartitionerConsistencySecondaryIndex {
             boolean isCurrPartitions = ((ResultSetProxy)rs).isCurrPartitions();
 
             boolean currPartitions = false;
-            List<Integer> selectedShards = DatabaseClient.findOrderedPartitionForRecord(false, true, fieldOffsets, dbServers[0].getCommon(), tableSchema,
+            List<Integer> selectedShards = Repartitioner.findOrderedPartitionForRecord(false, true, fieldOffsets, dbServers[0].getCommon(), tableSchema,
                 "_1__primarykey", null, BinaryExpression.Operator.equal, null, new Object[]{i},
                 null);
             if (selectedShards.size() == 0) {
-              selectedShards = DatabaseClient.findOrderedPartitionForRecord(true, false, fieldOffsets, dbServers[0].getCommon(), tableSchema,
+              selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false, fieldOffsets, dbServers[0].getCommon(), tableSchema,
                   indexSchema.getName(), null, BinaryExpression.Operator.equal, null, new Object[]{i}, null);
               currPartitions = true;
             }

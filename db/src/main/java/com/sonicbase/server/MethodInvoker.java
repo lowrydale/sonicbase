@@ -1387,7 +1387,6 @@ public class MethodInvoker {
 
   public ComObject expirePreparedStatement(ComObject cobj, boolean replayedCommand) {
     long preparedId = cobj.getLong(ComObject.Tag.preparedId);
-    readManager.expirePreparedStatement(preparedId);
     return null;
   }
 }

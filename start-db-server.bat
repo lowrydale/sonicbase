@@ -17,6 +17,6 @@ SET _LOG4J_FILENAME_=%SEARCH_HOME%/logs/%2.log
 SET _GC_LOG_FILENAME_=%SEARCH_HOME%/logs/gc-%2.log
 SET LOG4J_FILE="log4j.xml"
 
-%SEARCH_HOME%/bin/runclass.bat com.sonicbase.research.socket.NettyServer -host %1 -port %2 -cluster %5 -gclog %_GC_LOG_FILENAME_% -xmx %_XMX_% > %SEARCH_HOME%/logs/%2-sysout.log
+%SEARCH_HOME%/bin/runclass.bat com.sonicbase.server.NettyServer -host %1 -port %2 -cluster %5 -gclog %_GC_LOG_FILENAME_% -xmx %_XMX_% > %SEARCH_HOME%/logs/%2-sysout.log
 
 popd

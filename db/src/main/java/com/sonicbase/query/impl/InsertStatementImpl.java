@@ -1,12 +1,10 @@
 package com.sonicbase.query.impl;
 
 
+import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComArray;
 import com.sonicbase.common.ComObject;
-import com.sonicbase.procedure.StoredProcedureContextImpl;
-import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.InsertStatement;
-import com.sonicbase.client.DatabaseClient;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,17 +27,6 @@ public class InsertStatementImpl extends StatementImpl implements InsertStatemen
 
   public void setTableName(String tableName) {
     this.tableName = tableName.toLowerCase();
-  }
-
-  @Override
-  public Object execute(String dbName, String sqlToUse, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
-                        boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) throws DatabaseException {
-    try {
-      return client.doInsert(dbName, this, getParms(), schemaRetryCount);
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
   }
 
   public List<Object> getValues() {

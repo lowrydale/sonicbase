@@ -4,6 +4,7 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
+import com.sonicbase.index.Repartitioner;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.BinaryExpression;
@@ -13,10 +14,8 @@ import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
-import com.sonicbase.server.ReadManager;
 import net.sf.jsqlparser.statement.select.Limit;
 import net.sf.jsqlparser.statement.select.Offset;
-import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.giraph.utils.Varint;
 
 import java.io.*;
@@ -26,9 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static java.util.Collections.singletonList;
-
-public abstract class ExpressionImpl implements Expression {
+public class ExpressionImpl implements Expression {
 
   private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
 
@@ -196,12 +193,34 @@ public abstract class ExpressionImpl implements Expression {
       }
       List<ColumnImpl> columnList = new ArrayList<>();
       columnList.addAll(columns);
-      SelectContextImpl context = lookupIds(dbName, client.getCommon(), client, replica, 1, counter.getTableName(),
-          indexSchema.getName(), false,
-          op, null, orderBy, null, null, expression, null, null, null,
-          columnList, indexSchema.getFields()[0], -1, expression.getRecordCache(), usedIndex, false,
-          client.getCommon().getSchemaVersion(), null, null, false, new AtomicLong(),
-          new AtomicLong(), null, null, false, restrictToThisServer, procedureContext, schemaRetryCount);
+
+      ExpressionImpl expressionImpl = new ExpressionImpl();
+      expressionImpl.setDbName(dbName);
+      expressionImpl.setTableName(counter.getTableName());
+      expressionImpl.setClient(client);
+      expressionImpl.setReplica(replica);
+      expressionImpl.setForceSelectOnServer(false);
+      expressionImpl.setColumns(columnList);
+      expressionImpl.setNextShard(-1);
+      expressionImpl.setRecordCache(expression.getRecordCache());
+      expressionImpl.setViewVersion(client.getCommon().getSchemaVersion());
+      expressionImpl.setCounters(expression == null ? null : ((ExpressionImpl) expression).getCounters());
+      expressionImpl.setGroupByContext(expression == null ? null : ((ExpressionImpl) expression).groupByContext);
+      expressionImpl.setIsProbe(false);
+      expressionImpl.setOrderByExpressions(orderBy);
+      expressionImpl.setRestrictToThisServer(restrictToThisServer);
+      expressionImpl.setProcedureContext(procedureContext);
+
+      IndexLookup indexLookup = new IndexLookup();
+      indexLookup.setCount(1);
+      indexLookup.setIndexName(indexSchema.getName());
+      indexLookup.setLeftOp(op);
+      indexLookup.setColumnName(indexSchema.getFields()[0]);
+      indexLookup.setSchemaRetryCount(schemaRetryCount);
+      indexLookup.setUsedIndex(usedIndex);
+      indexLookup.setEvaluateExpression(false);
+
+      SelectContextImpl context = indexLookup.lookup(expressionImpl, expression);
       NextReturn ret = new NextReturn();
       ret.setTableNames(context.getTableNames());
       ret.setIds(context.getCurrKeys());
@@ -351,7 +370,7 @@ public abstract class ExpressionImpl implements Expression {
     for (int i = 0; i < indexFields.length; i++) {
       fieldOffsets[i] = tableSchema.getFieldOffset(indexFields[i]);
     }
-    List<Integer> selectedShards = DatabaseClient.findOrderedPartitionForRecord(true, false, fieldOffsets, client.getCommon(), tableSchema,
+    List<Integer> selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false, fieldOffsets, client.getCommon(), tableSchema,
         indexName, null, BinaryExpression.Operator.equal, null, key, null);
 
     byte[] ret = client.send(batchKey, selectedShards.get(0), 0, cobj, DatabaseClient.Replica.def);
@@ -397,6 +416,14 @@ public abstract class ExpressionImpl implements Expression {
     this.procedureContext = procedureContext;
   }
 
+  public void setForceSelectOnServer(boolean forceSelectOnServer) {
+    this.forceSelectOnServer = forceSelectOnServer;
+  }
+
+  public void setIsProbe(boolean isProbe) {
+    this.probe = isProbe;
+  }
+
   public static enum Type {
     column(0),
     constant(1),
@@ -406,7 +433,8 @@ public abstract class ExpressionImpl implements Expression {
     inExpression(5),
     allExpression(6),
     function(7),
-    signedExpression(8);
+    signedExpression(8),
+    baseExpression(9);
 
     private final int id;
 
@@ -429,7 +457,8 @@ public abstract class ExpressionImpl implements Expression {
     this.orderByExpressions = orderByExpressions;
   }
 
-  public abstract void getColumns(Set<ColumnImpl> columns);
+  public void getColumns(Set<ColumnImpl> columns) {
+  }
 
   public void setTableName(String tableName) {
     this.tableName = tableName;
@@ -472,7 +501,9 @@ public abstract class ExpressionImpl implements Expression {
     }
   }
 
-  abstract public Type getType();
+  public Type getType() {
+    return Type.baseExpression;
+  }
 
   /**
    * ###############################
@@ -494,21 +525,36 @@ public abstract class ExpressionImpl implements Expression {
     }
   }
 
-  abstract public Object evaluateSingleRecord(
-      TableSchema[] tableSchemas, Record[] records, ParameterHandler parms);
+  public Object evaluateSingleRecord(
+      TableSchema[] tableSchemas, Record[] records, ParameterHandler parms) {
+    return false;
+  }
 
-  abstract public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount);
 
-  public abstract NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned, Limit limit,
-                                  Offset offset, boolean evaluateExpression, boolean analyze, int schemaRetryCount);
+  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
+    return null;
+  }
 
-  abstract public boolean canUseIndex();
+  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned, Limit limit,
+                                  Offset offset, boolean evaluateExpression, boolean analyze, int schemaRetryCount) {
+    return null;
+  }
 
-  public abstract boolean canSortWithIndex();
+  public boolean canUseIndex() {
+    return false;
+  }
 
-  public abstract void queryRewrite();
+  public boolean canSortWithIndex() {
+    return false;
+  }
 
-  public abstract ColumnImpl getPrimaryColumn();
+  public void queryRewrite() {
+
+  }
+
+  public ColumnImpl getPrimaryColumn() {
+    return null;
+  }
 
   public static byte[] serializeExpression(ExpressionImpl expression) {
     try {
@@ -971,7 +1017,7 @@ public abstract class ExpressionImpl implements Expression {
 
       boolean synced = false;
       for (int i = 0; i < keysToRead.size(); i++) {
-        List<Integer> selectedShards = DatabaseClient.findOrderedPartitionForRecord(true, false, fieldOffsets, client.getCommon(), tableSchema,
+        List<Integer> selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false, fieldOffsets, client.getCommon(), tableSchema,
             indexSchema.get().getKey(), null, BinaryExpression.Operator.equal, null, keysToRead.get(i).getValue(), null);
         if (selectedShards.size() == 0) {
           throw new DatabaseException("No shards selected for query");
@@ -1066,7 +1112,6 @@ public abstract class ExpressionImpl implements Expression {
       return ret.getRecord();
     }
 
-    TableSchema tableSchema = client.getCommon().getTables(dbName).get(tableName);
     IndexSchema primaryKeyIndex = null;
     for (Map.Entry<String, IndexSchema> entry : client.getCommon().getTables(dbName).get(tableName).getIndices().entrySet()) {
       if (entry.getValue().isPrimaryKey()) {
@@ -1078,11 +1123,37 @@ public abstract class ExpressionImpl implements Expression {
     int replicaCount = client.getCommon().getServersConfig().getShards()[0].getReplicas().length;
     int replica = ThreadLocalRandom.current().nextInt(0, replicaCount);
     AtomicReference<String> usedIndex = new AtomicReference<>();
-    SelectContextImpl context = ExpressionImpl.lookupIds(dbName, client.getCommon(), client, replica, 1, tableSchema.getName(), primaryKeyIndex.getName(), forceSelectOnServer,
-        BinaryExpression.Operator.equal, null, null, key, parms, expression, null, key, null,
-        columns, primaryKeyIndex.getFields()[0], nextShard, recordCache, usedIndex, true, viewVersion, expression == null ? null : ((ExpressionImpl)expression).getCounters(),
-        expression == null ? null : ((ExpressionImpl)expression).groupByContext, debug, new AtomicLong(), new AtomicLong(),null,
-        null, false, restrictToThisServer, procedureContext, schemaRetryCount);
+
+    ExpressionImpl expressionImpl = new ExpressionImpl();
+    expressionImpl.setDbName(dbName);
+    expressionImpl.setTableName(tableName);
+    expressionImpl.setClient(client);
+    expressionImpl.setReplica(replica);
+    expressionImpl.setForceSelectOnServer(forceSelectOnServer);
+    expressionImpl.setParms(parms);
+    expressionImpl.setColumns(columns);
+    expressionImpl.setNextShard(nextShard);
+    expressionImpl.setRecordCache(recordCache);
+    expressionImpl.setViewVersion(viewVersion);
+    expressionImpl.setCounters(expression == null ? null : ((ExpressionImpl) expression).getCounters());
+    expressionImpl.setGroupByContext(expression == null ? null : ((ExpressionImpl) expression).groupByContext);
+    expressionImpl.setIsProbe(false);
+    expressionImpl.setOrderByExpressions(null);
+    expressionImpl.setRestrictToThisServer(restrictToThisServer);
+    expressionImpl.setProcedureContext(procedureContext);
+
+    IndexLookup indexLookup = new IndexLookup();
+    indexLookup.setCount(1);
+    indexLookup.setIndexName(primaryKeyIndex.getName());
+    indexLookup.setLeftOp(BinaryExpression.Operator.equal);
+    indexLookup.setLeftKey(key);
+    indexLookup.setLeftOriginalKey(key);
+    indexLookup.setColumnName(primaryKeyIndex.getFields()[0]);
+    indexLookup.setSchemaRetryCount(schemaRetryCount);
+    indexLookup.setUsedIndex(usedIndex);
+    indexLookup.setEvaluateExpression(false);
+
+    SelectContextImpl context = indexLookup.lookup(expressionImpl, expression);
 //
     Object[][][] currKeys = context.getCurrKeys();
     if (currKeys != null) {
@@ -1121,8 +1192,6 @@ public abstract class ExpressionImpl implements Expression {
       RecordCache recordCache, Object[] key, String tableName, List<ColumnImpl> columns, int viewVersion, boolean debug,
       boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) {
 
-
-    TableSchema tableSchema = client.getCommon().getTables(dbName).get(tableName);
     IndexSchema primaryKeyIndex = null;
     for (Map.Entry<String, IndexSchema> entry : client.getCommon().getTables(dbName).get(tableName).getIndices().entrySet()) {
       if (entry.getValue().isPrimaryKey()) {
@@ -1134,12 +1203,37 @@ public abstract class ExpressionImpl implements Expression {
     int replicaCount = client.getCommon().getServersConfig().getShards()[0].getReplicas().length;
     int replica = ThreadLocalRandom.current().nextInt(0, replicaCount);
     AtomicReference<String> usedIndex = new AtomicReference<>();
-    ExpressionImpl.lookupIds(dbName, client.getCommon(), client, replica, 1, tableSchema.getName(), primaryKeyIndex.getName(), forceSelectOnServer,
-        BinaryExpression.Operator.equal, null, null, key, parms, expression, null, key, null,
-        columns, primaryKeyIndex.getFields()[0], nextShard, recordCache, usedIndex, false, viewVersion,
-        expression == null ? null : ((ExpressionImpl)expression).getCounters(),
-        expression == null ? null : ((ExpressionImpl)expression).groupByContext, debug, new AtomicLong(), new AtomicLong(), null,
-        null, false, restrictToThisServer, procedureContext, schemaRetryCount);
+
+    ExpressionImpl expressionImpl = new ExpressionImpl();
+    expressionImpl.setDbName(dbName);
+    expressionImpl.setTableName(tableName);
+    expressionImpl.setClient(client);
+    expressionImpl.setReplica(replica);
+    expressionImpl.setForceSelectOnServer(forceSelectOnServer);
+    expressionImpl.setParms(parms);
+    expressionImpl.setColumns(columns);
+    expressionImpl.setNextShard(nextShard);
+    expressionImpl.setRecordCache(recordCache);
+    expressionImpl.setViewVersion(viewVersion);
+    expressionImpl.setCounters(expression == null ? null : ((ExpressionImpl) expression).getCounters());
+    expressionImpl.setGroupByContext(expression == null ? null : ((ExpressionImpl) expression).groupByContext);
+    expressionImpl.setIsProbe(false);
+    expressionImpl.setOrderByExpressions(null);
+    expressionImpl.setRestrictToThisServer(restrictToThisServer);
+    expressionImpl.setProcedureContext(procedureContext);
+
+    IndexLookup indexLookup = new IndexLookup();
+    indexLookup.setCount(1);
+    indexLookup.setIndexName(primaryKeyIndex.getName());
+    indexLookup.setLeftOp(BinaryExpression.Operator.equal);
+    indexLookup.setLeftKey(key);
+    indexLookup.setLeftOriginalKey(key);
+    indexLookup.setColumnName(primaryKeyIndex.getFields()[0]);
+    indexLookup.setSchemaRetryCount(schemaRetryCount);
+    indexLookup.setUsedIndex(usedIndex);
+    indexLookup.setEvaluateExpression(false);
+
+    indexLookup.lookup(expressionImpl, expression);
 
     CachedRecord ret = recordCache.get(tableName, key);
     if (ret != null) {
@@ -1466,766 +1560,6 @@ public abstract class ExpressionImpl implements Expression {
 
   private static final MetricRegistry METRICS = new MetricRegistry();
 
-  static class PreparedIndexLookup {
-    private long preparedId;
-    private long lastTimeUsed;
-    private boolean[][] serversPrepared;
-  }
-
-  private static Thread preparedReaper;
-
-  public static void stopPreparedReaper() {
-    synchronized (ExpressionImpl.class) {
-      if (preparedReaper != null) {
-        preparedReaper.interrupt();
-        preparedReaper = null;
-      }
-    }
-  }
-
-
-  public static void startPreparedReaper(final DatabaseClient client) {
-    synchronized (ExpressionImpl.class) {
-      if (preparedReaper == null) {
-        preparedReaper = ThreadUtil.createThread(new Runnable() {
-          @Override
-          public void run() {
-            while (true) {
-              try {
-                for (Map.Entry<String, PreparedIndexLookup> prepared : preparedIndexLookups.entrySet()) {
-                  if (prepared.getValue().lastTimeUsed != 0 &&
-                      prepared.getValue().lastTimeUsed < System.currentTimeMillis() - 15 * 60 * 1000) {
-                    preparedIndexLookups.remove(prepared.getKey());
-
-                    ComObject cobj = new ComObject();
-                    cobj.put(ComObject.Tag.dbName, "__none__");
-                    cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-                    cobj.put(ComObject.Tag.method, "expirePreparedStatement");
-                    cobj.put(ComObject.Tag.preparedId, prepared.getValue().preparedId);
-                    client.sendToAllShards(null, 0, cobj, DatabaseClient.Replica.def);
-                  }
-                }
-                Thread.sleep(10 * 1000);
-              }
-              catch (InterruptedException e) {
-                break;
-              }
-              catch (Exception e) {
-                logger.error("Error in prepared reaper thread", e);
-              }
-            }
-          }
-        }, "SonicBase Prepared Stamement Reaper");
-        preparedReaper.start();
-      }
-    }
-  }
-
-  private static ConcurrentHashMap<String, PreparedIndexLookup> preparedIndexLookups = new ConcurrentHashMap<>();
-
-  public static SelectContextImpl lookupIds(
-      String dbName, DatabaseCommon common, DatabaseClient client, int replica,
-      int count, String tableName, String indexName, boolean forceSelectOnServer, BinaryExpression.Operator leftOperator,
-      BinaryExpression.Operator rightOperator,
-      List<OrderByExpressionImpl> orderByExpressions,
-      Object[] leftValue, ParameterHandler parms, Expression expression, Object[] rightValue,
-      Object[] originalLeftValue,
-      Object[] originalRightValue,
-      List<ColumnImpl> columns, String columnName, int shard, RecordCache recordCache,
-      AtomicReference<String> usedIndex, boolean evaluateExpression, int viewVersion, Counter[] counters,
-      GroupByContext groupByContext, boolean debug, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, boolean isProbe,
-      boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) {
-
-    Timer.Context ctx = DatabaseClient.INDEX_LOOKUP_STATS.time();
-    StringBuilder preparedKey = new StringBuilder();
-    while (true) {
-      try {
-        //todo: do we really want to change the view version?
-        if (viewVersion == 0) {
-          //throw new DatabaseException("view version not set");
-          viewVersion = common.getSchemaVersion();
-        }
-
-        TableSchema tableSchema = common.getTables(dbName).get(tableName);
-        IndexSchema indexSchema = tableSchema.getIndexes().get(indexName);
-        int originalShard = shard;
-        int lastShard = -1;
-        boolean currPartitions = false;
-        List<Integer> selectedShards = null;
-        int currShardOffset = 0;
-        int previousSchemaVersion = common.getSchemaVersion();
-        KeyRecord[][] retKeyRecords = null;
-        Object[][][] retKeys;
-        Record[] recordRet = null;
-        Object[] nextKey = null;
-        int nextShard = shard;
-        int localShard = shard;
-        Object[] localLeftValue = leftValue;
-
-        List<Object> leftValues = new ArrayList<>();
-        leftValues.add(localLeftValue);
-
-        List<Object> rightValues = new ArrayList<>();
-        rightValues.add(rightValue);
-
-        String[] fields = indexSchema.getFields();
-        boolean shouldIndex = true;
-        if (fields.length == 1 && !fields[0].equals(columnName)) {
-          shouldIndex = false;
-        }
-
-        //int replica = ThreadLocalRandom.current().nextInt(0,2);
-        if (shouldIndex) {
-
-          retKeys = null;
-          retKeyRecords = null;
-
-          String[] indexFields = indexSchema.getFields();
-          int[] fieldOffsets = new int[indexFields.length];
-          for (int k = 0; k < indexFields.length; k++) {
-            fieldOffsets[k] = tableSchema.getFieldOffset(indexFields[k]);
-          }
-          Comparator[] comparators = indexSchema.getComparators();
-
-          if (originalLeftValue != null && leftValue != null) {
-            if (0 != DatabaseCommon.compareKey(comparators, originalLeftValue, leftValue)) {
-//              if (leftOperator == BinaryExpression.Operator.less) {
-//                leftOperator = BinaryExpression.Operator.lessEqual;
-//              }
-//              else if (leftOperator == BinaryExpression.Operator.greater) {
-//                leftOperator = BinaryExpression.Operator.greaterEqual;
-//              }
-            }
-          }
-          //
-          //        if (originalLeftValue != null && leftValue != null) {
-          //          if (0 != DatabaseCommon.compareKey(comparators, originalLeftValue, leftValue)) {
-          //            if (leftOperator == BinaryExpression.Operator.lessEqual) {
-          //              leftOperator = BinaryExpression.Operator.less;
-          //            }
-          //            else if (leftOperator == BinaryExpression.Operator.greaterEqual) {
-          //              leftOperator = BinaryExpression.Operator.greater;
-          //            }
-          //          }
-          //        }
-
-          //todo: do we want this?
-//          if (originalRightValue != null && leftValue != null) {
-//            if (0 != DatabaseCommon.compareKey(comparators, originalRightValue, leftValue)) {
-//              if (rightOperator == BinaryExpression.Operator.less) {
-//                rightOperator = BinaryExpression.Operator.lessEqual;
-//              }
-//              else if (rightOperator == BinaryExpression.Operator.greater) {
-//                rightOperator = BinaryExpression.Operator.greaterEqual;
-//              }
-//            }
-//          }
-
-          //
-          //        if (originalRightValue != null && leftValue != null) {
-          //          if (0 != DatabaseCommon.compareKey(comparators, originalRightValue, leftValue)) {
-          //            if (rightOperator == BinaryExpression.Operator.lessEqual) {
-          //              rightOperator = BinaryExpression.Operator.less;
-          //            }
-          //            else if (rightOperator == BinaryExpression.Operator.greaterEqual) {
-          //              rightOperator = BinaryExpression.Operator.greater;
-          //            }
-          //          }
-          //        }
-          //
-          if (nextShard == -2) {
-            return new SelectContextImpl();
-          }
-
-          if (debug) {
-            selectedShards = new ArrayList<>();
-            for (int i = 0; i < client.getShardCount(); i++) {
-              selectedShards.add(i);
-            }
-            localLeftValue = originalLeftValue;
-          }
-          else {
-
-            currPartitions = false;
-            selectedShards = new ArrayList<>();
-            selectedShards = DatabaseClient.findOrderedPartitionForRecord(false, true, fieldOffsets, common, tableSchema,
-                indexSchema.getName(), orderByExpressions, leftOperator, rightOperator, originalLeftValue, originalRightValue);
-            if (selectedShards.size() == 0) {
-              currPartitions = true;
-              selectedShards = DatabaseClient.findOrderedPartitionForRecord(true, false, fieldOffsets, common, tableSchema,
-                  indexSchema.getName(), orderByExpressions, leftOperator, rightOperator, originalLeftValue, originalRightValue);
-              //              for (Integer curr : currSelectedShards) {
-              //                boolean found = false;
-              //                for (Integer last : selectedShards) {
-              //                  if (last.equals(curr)) {
-              //                    found = true;
-              //                  }
-              //                }
-              //                if (!found) {
-              //                  selectedShards.add(curr);
-              //                }
-              //              }
-            }
-            //              if (selectedShards.size() == 0) {
-            //                throw new DatabaseException("No shards selected for query");
-            //              }
-            //            ''}
-          }
-
-          if (localShard == -1) {
-            localShard = nextShard = selectedShards.get(currShardOffset);
-            lastShard = localShard;
-
-          }
-
-          boolean found = false;
-          for (int i = 0; i < selectedShards.size(); i++) {
-            if (localShard == selectedShards.get(i)) {
-              found = true;
-            }
-          }
-          if (!found) {
-            localShard = nextShard = selectedShards.get(currShardOffset);
-            lastShard = localShard;
-          }
-          usedIndex.set(indexSchema.getName());
-
-          preparedKey.append(dbName).append(":").append(count);
-          preparedKey.append(":").append(tableSchema.getName()).append(":").append(indexSchema.getName());
-          preparedKey.append(":").append(forceSelectOnServer);
-          if (orderByExpressions != null) {
-            //todo: this is printing an object
-            for (OrderByExpressionImpl orderByExp : orderByExpressions) {
-              preparedKey.append(":").append(orderByExp.toString());
-            }
-          }
-          preparedKey.append(":").append(expression);
-          if (columns != null) {
-            for (ColumnImpl column : columns) {
-              preparedKey.append(":").append(column.toString());
-            }
-          }
-          preparedKey.append(":").append(columnName);
-          preparedKey.append(":").append(evaluateExpression);
-
-          String preparedKeyStr = preparedKey.toString();
-          PreparedIndexLookup prepared = null;
-          synchronized (preparedIndexLookups) {
-            if (leftOperator == BinaryExpression.Operator.equal && rightValue == null) {
-              //prepared = preparedIndexLookups.get(preparedKeyStr);
-            }
-            if (prepared == null) {
-              prepared = new PreparedIndexLookup();
-              //prepared.preparedId = client.allocateId(dbName);
-              prepared.serversPrepared = new boolean[client.getShardCount()][];
-              for (int i = 0; i < prepared.serversPrepared.length; i++) {
-                prepared.serversPrepared[i] = new boolean[client.getReplicaCount()];
-              }
-              //preparedIndexLookups.put(preparedKeyStr, prepared);
-            }
-            prepared.lastTimeUsed = System.currentTimeMillis();
-          }
-
-          String[] cfields = tableSchema.getPrimaryKey();
-          int[] keyOffsets = new int[cfields.length];
-          for (int i = 0; i < keyOffsets.length; i++) {
-            keyOffsets[i] = tableSchema.getFieldOffset(cfields[i]);
-          }
-
-          boolean keyContainsColumns = true;
-          if (true || columns == null || columns.size() == 0 || counters != null) {
-            keyContainsColumns = false;
-          }
-          else {
-            List<Integer> array = new ArrayList<>();
-            for (ColumnImpl column : columns) {
-              if (column.getTableName() == null || column.getTableName().equals(tableSchema.getName())) {
-                Integer o = tableSchema.getFieldOffset(column.getColumnName());
-                if (o == null) {
-                  continue;
-                }
-                array.add(o);
-              }
-            }
-            for (Integer columnOffset : array) {
-              boolean cfound = false;
-              for (int i = 0; i < keyOffsets.length; i++) {
-                if (columnOffset == keyOffsets[i]) {
-                  cfound = true;
-                }
-              }
-              if (!cfound) {
-                keyContainsColumns = false;
-                break;
-              }
-            }
-          }
-
-
-          Object[] lastKey = null;
-          boolean justSwitched = false;
-          int attempt = 0;
-          while (true) {
-            lastKey = nextKey;
-            lastShard = nextShard;
-            boolean switchedShards = false;
-
-            boolean isPrepared = prepared.serversPrepared[localShard][replica];
-            long preparedId = prepared.preparedId;
-
-            //TableSchema.Partition[] partitions = indexSchema.getValue().getCurrPartitions();
-            Random rand = new Random(System.currentTimeMillis());
-            ComObject cobj = new ComObject();
-            cobj.put(ComObject.Tag.dbName, dbName);
-            if (schemaRetryCount < 2) {
-              cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-            }
-
-            cobj.put(ComObject.Tag.preparedId, preparedId);
-            cobj.put(ComObject.Tag.isPrepared, isPrepared);
-
-            if (!isPrepared) {
-              cobj.put(ComObject.Tag.count, count);
-            }
-            cobj.put(ComObject.Tag.isExcpliciteTrans, client.isExplicitTrans());
-            cobj.put(ComObject.Tag.isCommitting, client.isCommitting());
-            cobj.put(ComObject.Tag.transactionId, client.getTransactionId());
-            cobj.put(ComObject.Tag.viewVersion, (long)viewVersion);
-
-            cobj.put(ComObject.Tag.isProbe, isProbe);
-
-            cobj.put(ComObject.Tag.currOffset, currOffset.get());
-            cobj.put(ComObject.Tag.countReturned, countReturned.get());
-            if (limit != null) {
-              cobj.put(ComObject.Tag.limitLong, limit.getRowCount());
-            }
-            if (offset != null) {
-              cobj.put(ComObject.Tag.offsetLong, offset.getOffset());
-            }
-
-            if (!isPrepared) {
-              cobj.put(ComObject.Tag.tableId, tableSchema.getTableId());
-              cobj.put(ComObject.Tag.indexId, indexSchema.getIndexId());
-              cobj.put(ComObject.Tag.forceSelectOnServer, forceSelectOnServer);
-            }
-            if (parms != null) {
-              byte[] bytes = parms.serialize();
-              cobj.put(ComObject.Tag.parms, bytes);
-            }
-            if (!isPrepared) {
-              cobj.put(ComObject.Tag.evaluateExpression, evaluateExpression);
-              if (expression != null) {
-                byte[] bytes = ExpressionImpl.serializeExpression((ExpressionImpl) expression);
-                cobj.put(ComObject.Tag.legacyExpression, bytes);
-              }
-              if (orderByExpressions != null) {
-                ComArray array = cobj.putArray(ComObject.Tag.orderByExpressions, ComObject.Type.byteArrayType);
-                for (int j = 0; j < orderByExpressions.size(); j++) {
-                  OrderByExpressionImpl orderByExpression = orderByExpressions.get(j);
-                  byte[] bytes = orderByExpression.serialize();
-                  array.add(bytes);
-                }
-              }
-            }
-
-            if (localLeftValue != null) {
-              cobj.put(ComObject.Tag.leftKey, DatabaseCommon.serializeTypedKey(localLeftValue));
-            }
-            if (originalLeftValue != null) {
-              cobj.put(ComObject.Tag.originalLeftKey, DatabaseCommon.serializeTypedKey(originalLeftValue));
-            }
-            cobj.put(ComObject.Tag.leftOperator, leftOperator.getId());
-
-            if (rightOperator != null) {
-              if (rightValue != null) {
-                cobj.put(ComObject.Tag.rightKey, DatabaseCommon.serializeTypedKey(rightValue));
-              }
-
-              if (originalRightValue != null) {
-                cobj.put(ComObject.Tag.originalRightKey, DatabaseCommon.serializeTypedKey(originalRightValue));
-              }
-
-              //out.writeInt(rightOperator.getId());
-              cobj.put(ComObject.Tag.rightOperator, rightOperator.getId());
-            }
-
-            if (!isPrepared) {
-              ComArray columnArray = cobj.putArray(ComObject.Tag.columnOffsets, ComObject.Type.intType);
-              writeColumns(tableSchema, columns, columnArray);
-            }
-
-            if (counters != null) {
-              ComArray array = cobj.putArray(ComObject.Tag.counters, ComObject.Type.byteArrayType);
-              for (int i = 0; i < counters.length; i++) {
-                array.add(counters[i].serialize());
-              }
-            }
-
-            if (groupByContext != null) {
-              cobj.put(ComObject.Tag.legacyGroupContext, groupByContext.serialize(client.getCommon()));
-            }
-
-            List<Integer> replicas = singletonList(replica);
-            if (debug) {
-              replicas = new ArrayList<>();
-              replicas.add(0);
-              replicas.add(1);
-            }
-
-//            TableSchema.Partition[] lastPartitions = indexSchema.getLastPartitions();
-//            if (lastPartitions != null && lastPartitions[0].getUpperKey() != null) {
-//              if (leftValue != null && nextShard == 0) {
-//                if ((long)lastPartitions[0].getUpperKey()[0] - (long)leftValue[0] < 800) {
-//                  System.out.println("almost");
-//                }
-//              }
-//            }
-
-
-            cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-            cobj.put(ComObject.Tag.dbName, dbName);
-            cobj.put(ComObject.Tag.method, "indexLookup");
-
-            ComObject retObj = null;
-            if (restrictToThisServer) {
-              DatabaseServer server = (DatabaseServer) client.getDatabaseServer();
-              ReadManager readManager = server.getMethodInvoker().getReadManager();
-              retObj = readManager.indexLookup(cobj, procedureContext);
-            }
-            else {
-              //Timer.Context ctx = INDEX_LOOKUP_SEND_STATS.time();
-              byte[] lookupRet = client.send(null, localShard, 0, cobj, DatabaseClient.Replica.def);
-              //ctx.stop();
-              retObj = new ComObject(lookupRet);
-            }
-            //prepared.serversPrepared[localShard][replica] = true;
-
-
-            int calledShard = localShard;
-//            if (previousSchemaVersion < common.getSchemaVersion()) {
-//              throw new SchemaOutOfSyncException();
-//            }
-            byte[] keyBytes = retObj.getByteArray(ComObject.Tag.keyBytes);
-            if (keyBytes != null) {
-              Object[] retKey = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
-              nextKey = retKey;
-            }
-            else {
-              nextKey = null;
-            }
-            Long retOffset = retObj.getLong(ComObject.Tag.currOffset);
-            if (retOffset != null) {
-              currOffset.set(retOffset);
-            }
-            Long retCountReturned = retObj.getLong(ComObject.Tag.countReturned);
-            if (retCountReturned != null) {
-              countReturned.set(retCountReturned);
-            }
-            if (restrictToThisServer) {
-              if (nextKey == null) {
-                localShard = nextShard = -2;
-              }
-            }
-            else {
-              for (int i = 0; i < selectedShards.size(); i++) {
-                if (localShard == selectedShards.get(i)) {
-                  if (nextKey == null && i >= selectedShards.size() - 1) {
-                    localShard = nextShard = -2;
-                    //System.out.println("nextKey == null && > shards");
-                    break;
-                  }
-                  else {
-                    if (nextKey == null) {
-                      localShard = nextShard = selectedShards.get(i + 1);
-                      //                    nextKey = indexSchema.getCurrPartitions()[localShard - 1].getUpperKey();
-
-                      switchedShards = true;
-                      //System.out.println("nextKey == null, nextShard=" + localShard);
-                    }
-                    break;
-                  }
-                }
-              }
-            }
-            //              if (retCount != 0 || nextKey != null) {
-            //                localLeftValue = nextKey;
-            //              }
-            //              else {
-            //                nextKey = localLeftValue;
-            //              }
-            if (debug && localLeftValue == null) {
-              localLeftValue = originalLeftValue;
-            }
-
-            Object[][][] currRetKeys = null;
-            ComArray keys = retObj.getArray(ComObject.Tag.keys);
-            if (keys != null && keys.getArray().size() != 0) {
-              currRetKeys = new Object[keys.getArray().size()][][];
-              DataType.Type[] types = DatabaseCommon.deserializeKeyPrep(tableSchema, (byte[])keys.getArray().get(0));
-
-              for (int k = 0; k < keys.getArray().size(); k++) {
-                keyBytes = (byte[])keys.getArray().get(k);
-               //Object[] key = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
-                Object[] key = DatabaseCommon.deserializeKey(tableSchema, types,  new DataInputStream(new ByteArrayInputStream(keyBytes)));
-                currRetKeys[k] = new Object[][]{key};
-                if (debug) {
-                  System.out.println("hit key: shard=" + calledShard + ", replica=" + replica);
-                }
-              }
-              if (/*nextKey == null && */currRetKeys.length != 0) {
-                nextKey = currRetKeys[currRetKeys.length - 1][0];
-              }
-            }
-
-            KeyRecord[][] currRetKeyRecords = null;
-            ComArray keyRecords = retObj.getArray(ComObject.Tag.keyRecords);
-            if (keyRecords != null && keyRecords.getArray().size() != 0) {
-              currRetKeyRecords = new KeyRecord[keyRecords.getArray().size()][];
-              currRetKeys = new Object[keyRecords.getArray().size()][][];
-
-              for (int k = 0; k < keyRecords.getArray().size(); k++) {
-                keyBytes = (byte[])keyRecords.getArray().get(k);
-                KeyRecord keyRecord = new KeyRecord(keyBytes);
-                currRetKeyRecords[k] = new KeyRecord[]{keyRecord};
-
-                Object[] key = DatabaseCommon.deserializeKey(tableSchema, keyRecord.getPrimaryKey());
-                currRetKeys[k] = new Object[][]{key};
-              }
-            }
-
-            ComArray records = retObj.getArray(ComObject.Tag.records);
-            Record[] currRetRecords = new Record[records == null ? 0 : records.getArray().size()];
-            if (currRetRecords.length > 0) {
-              String[] primaryKeyFields = null;
-              int[] primaryKeyOffsets = null;
-              for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
-                if (entry.getValue().isPrimaryKey()) {
-                  primaryKeyFields = entry.getValue().getFields();
-                  primaryKeyOffsets = new int[primaryKeyFields.length];
-                  for (int i = 0; i < primaryKeyFields.length; i++) {
-                    primaryKeyOffsets[i] = tableSchema.getFieldOffset(primaryKeyFields[i]);
-                  }
-                  break;
-                }
-              }
-
-              for (int k = 0; k < currRetRecords.length; k++) {
-                byte[] recordBytes = (byte[])records.getArray().get(k);
-                try {
-                  currRetRecords[k] = new Record(dbName, client.getCommon(), recordBytes, null, false);
-
-                  if (debug) {
-                    System.out.println("hit record: shard=" + calledShard + ", replica=" + replica);
-                  }
-                }
-                catch (Exception e) {
-                  throw e;
-                }
-              }
-              if (/*nextKey == null &&*/ currRetRecords.length != 0) {
-                Object[] key = new Object[primaryKeyFields.length];
-                for (int j = 0; j < primaryKeyFields.length; j++) {
-                  key[j] = currRetRecords[currRetRecords.length - 1].getFields()[primaryKeyOffsets[j]];
-                }
-                nextKey = key;
-              }
-            }
-
-            recordRet = aggregateResults(recordRet, currRetRecords);
-            retKeys = aggregateResults(retKeys, currRetKeys);
-            retKeyRecords = aggregateResults(retKeyRecords, currRetKeyRecords);
-
-            if (recordRet == null && retKeys == null && retKeyRecords == null) {
-              nextKey = localLeftValue;
-            }
-
-            if (switchedShards && logger.isDebugEnabled()) {
-              //long id = (Long) currRetRecords[currRetRecords.length - 1].getFields()[tableSchema.getFieldOffset("id")];
-              logger.debug("Switched shards: id=" + (nextKey == null ? "null" : (long)nextKey[0]) +
-                  ", retLen=" + (recordRet == null ? 0 : recordRet.length) + ", count=" + count + ", nextShard=" + nextShard);
-            }
-
-            Counter[] retCounters = null;
-            ComArray countersArray = retObj.getArray(ComObject.Tag.counters);
-            if (countersArray != null) {
-              retCounters = new Counter[countersArray.getArray().size()];
-              for (int i = 0; i < retCounters.length; i++) {
-                retCounters[i] = new Counter();
-                retCounters[i].deserialize((byte[])countersArray.getArray().get(i));
-              }
-              System.arraycopy(retCounters, 0, counters, 0, Math.min(counters.length, retCounters.length));
-            }
-
-            byte[] groupBytes = retObj.getByteArray(ComObject.Tag.legacyGroupContext);
-            if (groupBytes != null) {
-              groupByContext.deserialize(groupBytes, client.getCommon(), dbName);
-            }
-
-//            if (attempt >= 5) {
-//              attempt = 0;
-//            }
-//            else {
-//              if (justSwitched) {
-//                justSwitched = false;
-//                if (groupBytes == null && countersArray == null && (currRetKeys == null || currRetKeys.length == 0) && (currRetRecords == null || currRetRecords.length == 0)) {
-//                  //System.out.println("just switched, found nothing");
-//                  if (true || lastKey != null) {
-//                    nextShard = lastShard;
-//                    nextKey = lastKey;
-//                    replica = (replica + 1) % client.getReplicaCount();
-//                    attempt++;
-//                  }
-//                }
-//                else {
-//                  attempt = 0;
-//                }
-//              }
-//            }
-
-            if (switchedShards) {
-              justSwitched = true;
-            }
-
-            if (switchedShards && logger.isDebugEnabled()) {
-              long id = currRetRecords.length == 0 ? -1 : (Long) currRetRecords[currRetRecords.length - 1].getFields()[tableSchema.getFieldOffset("id")];
-              logger.debug("Switched shards: id=" + id +
-                  ", retLen=" + (recordRet == null ? 0 : recordRet.length) + ", count=" + count + ", nextShard=" + nextShard);
-            }
-
-            if (limit != null) {
-              long tmpOffset = 1;
-              if (offset != null) {
-                tmpOffset = offset.getOffset();
-              }
-              if (currOffset.get() >= tmpOffset + limit.getRowCount() - 1) {
-                nextShard = -2;
-                nextKey = null;
-                break;
-              }
-            }
-
-            localLeftValue = nextKey;
-
-            if (/*originalShard != -1 ||*/localShard == -1 || localShard == -2 || (retKeys != null && retKeys.length >= count) || (recordRet != null && recordRet.length >= count)) {
-              break;
-            }
-          }
-          if (recordRet == null) {
-            String[] indexColumns = null;
-            for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
-              if (entry.getValue().isPrimaryKey()) {
-                indexColumns = entry.getValue().getFields();
-                break;
-              }
-            }
-            if (retKeys != null || retKeyRecords != null) {
-              if (keyContainsColumns) {
-                if (retKeys != null) {
-                  for (int i = 0; i < retKeys.length; i++) {
-                    Object[][] key = retKeys[i];
-                    Record keyRecord = new Record(tableSchema);
-                    Object[] rfields = new Object[tableSchema.getFields().size()];
-                    keyRecord.setFields(rfields);
-                    for (int j = 0; j < keyOffsets.length; j++) {
-                      keyRecord.getFields()[keyOffsets[j]] = key[0][j];
-                    }
-
-                    recordCache.put(tableSchema.getName(), key[0], new CachedRecord(keyRecord, null));
-                  }
-                }
-              }
-              else {
-                if (retKeyRecords != null) {
-                  List<IdEntry> keysToRead = new ArrayList<>();
-                  for (int i = 0; i < retKeyRecords.length; i++) {
-                    KeyRecord[] id = retKeyRecords[i];
-
-                    Object[] key = DatabaseCommon.deserializeKey(tableSchema, id[0].getPrimaryKey());
-                    if (!recordCache.containsKey(tableSchema.getName(), key)) {
-                      keysToRead.add(new ExpressionImpl.IdEntry(i, key));
-                    }
-                  }
-                  doReadRecords(dbName, client, count, forceSelectOnServer, tableSchema, keysToRead, indexColumns,
-                      columns, recordCache, viewVersion, restrictToThisServer, procedureContext, schemaRetryCount);
-                }
-              }
-            }
-          }
-          else {
-            String[] primaryKeyFields = null;
-            for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
-              if (entry.getValue().isPrimaryKey()) {
-                primaryKeyFields = entry.getValue().getFields();
-                break;
-              }
-            }
-            retKeys = new Object[recordRet.length][][];
-            for (int i = 0; i < recordRet.length; i++) {
-              Record record = recordRet[i];
-
-              Object[] key = new Object[primaryKeyFields.length];
-              for (int j = 0; j < primaryKeyFields.length; j++) {
-                key[j] = record.getFields()[tableSchema.getFieldOffset(primaryKeyFields[j])];
-              }
-
-              if (retKeys[i] == null) {
-                retKeys[i] = new Object[][]{key};
-              }
-
-              //nextKey = key;
-
-              recordCache.put(tableSchema.getName(), key, new CachedRecord(record, null));
-            }
-          }
-//          if (previousSchemaVersion < common.getSchemaVersion()) {
-//            throw new SchemaOutOfSyncException();
-//          }
-
-          return new SelectContextImpl(tableSchema.getName(), indexSchema.getName(), leftOperator, nextShard, nextKey,
-              retKeys, recordCache, lastShard, currPartitions);
-        }
-        return new SelectContextImpl();
-      }
-      catch (Exception e) {
-         if (handlePreparedNotFound(e)) {
-          preparedIndexLookups.remove(preparedKey.toString());
-          preparedKey = new StringBuilder();
-          continue;
-        }
-        int index = ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class);
-        if (-1 != index) {
-          continue;
-        }
-        throw new DatabaseException(e);
-      }
-      finally {
-        ctx.stop();
-      }
-    }
-  }
-
-  private static boolean handlePreparedNotFound(Throwable e) {
-    int index = ExceptionUtils.indexOfThrowable(e, PreparedIndexLookupNotFoundException.class);
-    if (-1 != index) {
-      return true;
-    }
-    while (true) {
-//      if (e.getMessage() == null) {
-//        break;
-//      }
-      if (e.getMessage() != null && e.getMessage().contains("PreparedIndexLookupNotFoundException")) {
-        return true;
-      }
-      e = e.getCause();
-      if (e == null) {
-        break;
-      }
-    }
-    return false;
-  }
-
-
-
   private static void writeColumns(
       TableSchema tableSchema, List<ColumnImpl> columns, DataOutputStream out) throws IOException {
     if (columns == null) {
@@ -2254,7 +1588,7 @@ public abstract class ExpressionImpl implements Expression {
     }
   }
 
-  private static void writeColumns(
+  public static void writeColumns(
       TableSchema tableSchema, List<ColumnImpl> columns, ComArray array) throws IOException {
     if (columns != null) {
       for (ColumnImpl column : columns) {
@@ -2589,7 +1923,7 @@ public abstract class ExpressionImpl implements Expression {
     return key;
   }
 
-  static Object[][][] aggregateResults(Object[][][] records1, Object[][][] records2) {
+  public static Object[][][] aggregateResults(Object[][][] records1, Object[][][] records2) {
     if (records1 == null || records1.length == 0) {
       if (records2 == null || records2.length == 0) {
         return null;

@@ -8,7 +8,7 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.query.DatabaseException;
-import com.sonicbase.research.socket.NettyServer;
+import com.sonicbase.server.NettyServer;
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;

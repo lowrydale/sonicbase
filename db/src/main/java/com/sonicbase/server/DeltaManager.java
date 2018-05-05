@@ -5,6 +5,7 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
 import com.sonicbase.index.Indices;
+import com.sonicbase.index.Repartitioner;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.IndexSchema;
@@ -17,7 +18,10 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -181,7 +185,7 @@ public class DeltaManager implements SnapshotManager {
 
   public void deleteRecord(String dbName, String tableName, TableSchema tableSchema, IndexSchema indexSchema, Object[] key, byte[] record, int[] fieldOffsets) {
 
-    List<Integer> selectedShards = DatabaseClient.findOrderedPartitionForRecord(true, false,
+    List<Integer> selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false,
         fieldOffsets, server.getClient().getCommon(), tableSchema,
         indexSchema.getName(), null, BinaryExpression.Operator.equal, null, key, null);
     if (selectedShards.size() == 0) {

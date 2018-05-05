@@ -14,6 +14,7 @@ import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.ColumnImpl;
 import com.sonicbase.query.impl.ExpressionImpl;
+import com.sonicbase.query.impl.IndexLookup;
 import com.sonicbase.query.impl.SelectContextImpl;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
@@ -43,7 +44,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.testng.Assert.*;
@@ -628,11 +628,6 @@ public class TestDatabase {
 
   }
 
-  @Test
-  public void testDebug() {
-    ((ConnectionProxy) conn).getDatabaseClient().debugRecord("test", "persons", "_1__primarykey", "[100]", 0);
-  }
-
   @Test(enabled = false)
   public void testMulti() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("create table Persons2 (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
@@ -707,19 +702,39 @@ public class TestDatabase {
      AtomicReference<String> usedIndex = new AtomicReference<String>();
      ExpressionImpl.RecordCache recordCache = new ExpressionImpl.RecordCache();
      ParameterHandler parms = new ParameterHandler();
-     SelectContextImpl ret = ExpressionImpl.lookupIds(
-           "test", client.getCommon(), client, 0,
-           1000, "persons", indexSchema.getName(), false, BinaryExpression.Operator.equal,
-           null,
-           null,
-           new Object[]{"933-28-0".getBytes()}, parms, null, null,
-       new Object[]{"933-28-0".getBytes()},
-           null,
-           columns, "socialsecuritynumber", 0, recordCache,
-           usedIndex, false, client.getCommon().getSchemaVersion(), null, null,
-         false, new AtomicLong(), new AtomicLong(), null, null, false, false, null, 0);
 
-     assertEquals(ret.getCurrKeys().length, 8);
+    ExpressionImpl expressionImpl = new ExpressionImpl();
+    expressionImpl.setDbName("test");
+    expressionImpl.setTableName("persons");
+    expressionImpl.setClient(client);
+    expressionImpl.setReplica(0);
+    expressionImpl.setForceSelectOnServer(false);
+    expressionImpl.setParms(parms);
+    expressionImpl.setColumns(columns);
+    expressionImpl.setNextShard(-1);
+    expressionImpl.setRecordCache(recordCache);
+    expressionImpl.setViewVersion(client.getCommon().getSchemaVersion());
+    expressionImpl.setCounters(null);
+    expressionImpl.setGroupByContext(null);
+    expressionImpl.setIsProbe(false);
+    expressionImpl.setRestrictToThisServer(false);
+    expressionImpl.setProcedureContext(null);
+
+
+    IndexLookup indexLookup = new IndexLookup();
+    indexLookup.setCount(1000);
+    indexLookup.setIndexName(indexSchema.getName());
+    indexLookup.setLeftOp(BinaryExpression.Operator.equal);
+    indexLookup.setLeftKey(new Object[]{"933-28-0".getBytes()});
+    indexLookup.setLeftOriginalKey(new Object[]{"933-28-0".getBytes()});
+    indexLookup.setColumnName("socialsecuritynumber");
+    indexLookup.setSchemaRetryCount(0);
+    indexLookup.setUsedIndex(usedIndex);
+    indexLookup.setEvaluateExpression(false);
+
+    SelectContextImpl ret = indexLookup.lookup(expressionImpl, expressionImpl);
+
+    assertEquals(ret.getCurrKeys().length, 8);
 
   }
 

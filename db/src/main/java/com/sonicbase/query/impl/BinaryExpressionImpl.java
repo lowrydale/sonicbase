@@ -372,13 +372,24 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
               int fieldCount = indexSchema.getFields().length;
               Object[] leftOriginalKey = new Object[fieldCount];
               leftOriginalKey[0] = originalLeftValue;
-              SelectContextImpl context = lookupIds(dbName, getClient().getCommon(), getClient(), getReplica(), count,
-                  getTableName(),
-                  indexName, isForceSelectOnServer(),
-                  operator, null, getOrderByExpressions(), leftKey, getParms(), getTopLevelExpression(), null,
-                  leftOriginalKey, null, getColumns(), columnName,
-                  getNextShard(), getRecordCache(), usedIndex, evaluateExpression, getViewVersion(), getCounters(), getGroupByContext(),
-                  debug, currOffset, countReturned, limit, offset, isProbe(), isRestrictToThisServer(), getProcedureContext(), schemaRetryCount);
+
+              IndexLookup indexLookup = new IndexLookup();
+              indexLookup.setCount(count);
+              indexLookup.setIndexName(indexName);
+              indexLookup.setLeftOp(operator);
+              indexLookup.setLeftKey(leftKey);
+              indexLookup.setLeftOriginalKey(leftOriginalKey);
+              indexLookup.setColumnName(columnName);
+              indexLookup.setCurrOffset(currOffset);
+              indexLookup.setCountReturned(countReturned);
+              indexLookup.setLimit(limit);
+              indexLookup.setOffset(offset);
+              indexLookup.setSchemaRetryCount(schemaRetryCount);
+              indexLookup.setUsedIndex(usedIndex);
+              indexLookup.setEvaluateExpression(evaluateExpression);
+
+
+              SelectContextImpl context = indexLookup.lookup(this, getTopLevelExpression());
               setNextShard(context.getNextShard());
               setNextKey(context.getNextKey());
               if (getNextShard() == -1 || getNextShard() == -2) {
@@ -712,13 +723,22 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
           return null;
         }
         else {
-          SelectContextImpl context = lookupIds(dbName, getClient().getCommon(), getClient(), getReplica(), count,
-              getTableName(),
-              indexName, isForceSelectOnServer(),
-              leftOp, null, getOrderByExpressions(), singleKey, getParms(), getTopLevelExpression(), null,
-              originalSingleKey, null, getColumns(), leftColumn, getNextShard(),
-              getRecordCache(), usedIndex, false, getViewVersion(), getCounters(), getGroupByContext(),
-              debug, currOffset, countReturned, limit, offset, isProbe(), isRestrictToThisServer(), getProcedureContext(), schemaRetryCount);
+          IndexLookup indexLookup = new IndexLookup();
+          indexLookup.setCount(count);
+          indexLookup.setIndexName(indexName);
+          indexLookup.setLeftOp(leftOp);
+          indexLookup.setLeftKey(singleKey);
+          indexLookup.setLeftOriginalKey(originalSingleKey);
+          indexLookup.setColumnName(leftColumn);
+          indexLookup.setCurrOffset(currOffset);
+          indexLookup.setCountReturned(countReturned);
+          indexLookup.setLimit(limit);
+          indexLookup.setOffset(offset);
+          indexLookup.setSchemaRetryCount(schemaRetryCount);
+          indexLookup.setUsedIndex(usedIndex);
+          indexLookup.setEvaluateExpression(evaluateExpression);
+
+          SelectContextImpl context = indexLookup.lookup(this, getTopLevelExpression());
           if (context != null) {
             setLastShard(context.getLastShard());
             setIsCurrPartitions(context.isCurrPartitions());
@@ -835,13 +855,26 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
               Object[] rightOriginalKey = new Object[fieldCount];
               rightOriginalKey[0] = originalRightValue;
 
-              SelectContextImpl context = lookupIds(dbName, getClient().getCommon(), getClient(), getReplica(), count,
-                  getTableName(),
-                  indexName, isForceSelectOnServer(),
-                  leftOp, rightOp, getOrderByExpressions(), leftKey, getParms(), getTopLevelExpression(), rightKey,
-                  leftOriginalKey, rightOriginalKey, getColumns(), leftColumn, getNextShard(),
-                  getRecordCache(), usedIndex, evaluateExpression, getViewVersion(), getCounters(), getGroupByContext(),
-                  debug, currOffset, countReturned, limit, offset, isProbe(), isRestrictToThisServer(), getProcedureContext(), schemaRetryCount);
+              IndexLookup indexLookup = new IndexLookup();
+              indexLookup.setCount(count);
+              indexLookup.setIndexName(indexName);
+              indexLookup.setLeftOp(leftOp);
+              indexLookup.setRightOp(rightOp);
+              indexLookup.setLeftKey(leftKey);
+              indexLookup.setRightKey(rightKey);
+              indexLookup.setLeftOriginalKey(leftOriginalKey);
+              indexLookup.setRightOriginalKey(rightOriginalKey);
+              indexLookup.setColumnName(leftColumn);
+              indexLookup.setCurrOffset(currOffset);
+              indexLookup.setCountReturned(countReturned);
+              indexLookup.setLimit(limit);
+              indexLookup.setOffset(offset);
+              indexLookup.setSchemaRetryCount(schemaRetryCount);
+              indexLookup.setUsedIndex(usedIndex);
+              indexLookup.setEvaluateExpression(evaluateExpression);
+
+
+              SelectContextImpl context = indexLookup.lookup(this, getTopLevelExpression());
               if (context != null) {
                 setNextShard(context.getNextShard());
                 setNextKey(context.getNextKey());

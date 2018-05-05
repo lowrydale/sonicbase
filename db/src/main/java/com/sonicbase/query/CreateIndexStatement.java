@@ -10,6 +10,4 @@ public interface CreateIndexStatement {
   void setTableName(String tableName);
 
   void setColumns(List<String> columnNames);
-
-  int execute(String dbName) throws DatabaseException;
 }

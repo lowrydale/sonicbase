@@ -132,7 +132,7 @@
 -keep public class com.sonicbase.bench.TestPerformance {
       public static void main(java.lang.String[]);
 }
--keep public class com.sonicbase.research.socket.NettyServer {
+-keep public class com.sonicbase.server.NettyServer {
       public static void main(java.lang.String[]);
 }
 -keep public class com.sonicbase.misc.FindIdInSnapshot {
@@ -159,8 +159,8 @@
 -keep public class com.sonicbase.streams.KafkaConsumer
 -keep public class com.sonicbase.streams.StreamsConsumer
 -keep public class com.sonicbase.streams.Message
--keep public class com.sonicbase.research.socket.NettyServer$MyChannelInitializer
--keep public class com.sonicbase.research.socket.NettyServer$ServerHandler
+-keep public class com.sonicbase.server.NettyServer$MyChannelInitializer
+-keep public class com.sonicbase.server.NettyServer$ServerHandler
 -keep public class com.sonicbase.server.MethodInvoker
 -keep public class com.sonicbase.procedure.MyStoredProcedure1
 -keep public class com.sonicbase.procedure.MyStoredProcedure2
@@ -267,7 +267,7 @@
 -keepclassmembers  class com.sonicbase.server.LogManager$ByteCounterStream {
     !private <methods>;
 }
--keepclassmembers class com.sonicbase.research.socket.NettyServer {
+-keepclassmembers class com.sonicbase.server.NettyServer {
     !private <methods>;
     private <methods>;
 }
@@ -283,11 +283,11 @@
     !private <methods>;
     private <methods>;
 }
--keepclassmembers class com.sonicbase.research.socket.NettyServer$ServerHandler {
+-keepclassmembers class com.sonicbase.server.NettyServer$ServerHandler {
     !private <methods>;
     private <methods>;
 }
--keepclassmembers class com.sonicbase.research.socket.NettyServer$MyChannelInitializer {
+-keepclassmembers class com.sonicbase.server.NettyServer$MyChannelInitializer {
     !private <methods>;
     private <methods>;
 }

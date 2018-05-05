@@ -24,7 +24,6 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -41,7 +40,6 @@ public class ReadManager {
   private Logger logger;
 
   private final DatabaseServer server;
-  private Thread preparedReaper;
   private Thread diskReaper;
   private boolean shutdown;
 
@@ -49,8 +47,6 @@ public class ReadManager {
 
     this.server = databaseServer;
     this.logger = new Logger(null/*databaseServer.getDatabaseClient()*/);
-
-    startPreparedReaper();
 
     startDiskResultsReaper();
   }
@@ -322,36 +318,6 @@ public class ReadManager {
   public static final com.codahale.metrics.Timer INDEX_LOOKUP_STATS = METRICS.timer("indexLookup");
   public static final com.codahale.metrics.Timer BATCH_INDEX_LOOKUP_STATS = METRICS.timer("batchIndexLookup");
 
-  public void expirePreparedStatement(long preparedId) {
-    preparedIndexLookups.remove(preparedId);
-  }
-
-  public void startPreparedReaper() {
-    preparedReaper = ThreadUtil.createThread(new Runnable(){
-      @Override
-      public void run() {
-        while (!shutdown) {
-          try {
-            for (Map.Entry<Long, PreparedIndexLookup> prepared : preparedIndexLookups.entrySet()) {
-              if (prepared.getValue().lastTimeUsed != 0 &&
-                      prepared.getValue().lastTimeUsed < System.currentTimeMillis() - 30 * 60 * 1000) {
-                preparedIndexLookups.remove(prepared.getKey());
-              }
-            }
-            Thread.sleep(10 * 1000);
-          }
-          catch (InterruptedException e) {
-            break;
-          }
-          catch (Exception e) {
-            logger.error("Error in prepared reaper thread", e);
-          }
-        }
-      }
-    }, "SonicBase Prepared Statement Reaper Thread");
-    preparedReaper.start();
-  }
-
   public void shutdown() {
     try {
       shutdown = true;
@@ -359,28 +325,11 @@ public class ReadManager {
         diskReaper.interrupt();
         diskReaper.join();
       }
-      preparedReaper.interrupt();
-      preparedReaper.join();
     }
     catch (InterruptedException e) {
       throw new DatabaseException(e);
     }
   }
-
-  class PreparedIndexLookup {
-
-    public long lastTimeUsed;
-    public int count;
-    public int tableId;
-    public int indexId;
-    public boolean forceSelectOnServer;
-    public boolean evaluateExpression;
-    public Expression expression;
-    public List<OrderByExpressionImpl> orderByExpressions;
-    public Set<Integer> columnOffsets;
-  }
-
-  private ConcurrentHashMap<Long, PreparedIndexLookup> preparedIndexLookups = new ConcurrentHashMap<>();
 
   private AtomicInteger lookupCount = new AtomicInteger();
 
@@ -419,28 +368,8 @@ public class ReadManager {
 
       short serializationVersion = cobj.getShort(ComObject.Tag.serializationVersion);
       AtomicInteger AtomicInteger = new AtomicInteger();
-      long preparedId = cobj.getLong(ComObject.Tag.preparedId);
-      boolean isPrepared = cobj.getBoolean(ComObject.Tag.isPrepared);
 
-      PreparedIndexLookup prepared = null;
-      if (isPrepared) {
-        prepared = preparedIndexLookups.get(preparedId);
-        if (prepared == null) {
-          throw new PreparedIndexLookupNotFoundException();
-        }
-      }
-      else {
-        prepared = new PreparedIndexLookup();
-        //preparedIndexLookups.put(preparedId, prepared);
-      }
-      prepared.lastTimeUsed = System.currentTimeMillis();
-      int count = 0;
-      if (isPrepared) {
-        count = prepared.count;
-      }
-      else {
-        prepared.count = count = cobj.getInt(ComObject.Tag.count);
-      }
+      int count = cobj.getInt(ComObject.Tag.count);
       boolean isExplicitTrans = cobj.getBoolean(ComObject.Tag.isExcpliciteTrans);
       boolean isCommitting = cobj.getBoolean(ComObject.Tag.isCommitting);
       long transactionId = cobj.getLong(ComObject.Tag.transactionId);
@@ -453,16 +382,11 @@ public class ReadManager {
       int tableId = 0;
       int indexId = 0;
       boolean forceSelectOnServer = false;
-      if (isPrepared) {
-        tableId = prepared.tableId;
-        indexId = prepared.indexId;
-        forceSelectOnServer = prepared.forceSelectOnServer;
-      }
-      else {
-        prepared.tableId = tableId = cobj.getInt(ComObject.Tag.tableId);
-        prepared.indexId = indexId = cobj.getInt(ComObject.Tag.indexId);
-        prepared.forceSelectOnServer = forceSelectOnServer = cobj.getBoolean(ComObject.Tag.forceSelectOnServer);
-      }
+
+      tableId = cobj.getInt(ComObject.Tag.tableId);
+      indexId = cobj.getInt(ComObject.Tag.indexId);
+      forceSelectOnServer = cobj.getBoolean(ComObject.Tag.forceSelectOnServer);
+
       ParameterHandler parms = null;
       byte[] parmBytes = cobj.getByteArray(ComObject.Tag.parms);
       if (parmBytes != null) {
@@ -470,21 +394,13 @@ public class ReadManager {
         parms.deserialize(parmBytes);
       }
       boolean evaluateExpression;
-      if (isPrepared) {
-        evaluateExpression = prepared.evaluateExpression;
-      }
-      else {
-        prepared.evaluateExpression = evaluateExpression = cobj.getBoolean(ComObject.Tag.evaluateExpression);
-      }
+      evaluateExpression = cobj.getBoolean(ComObject.Tag.evaluateExpression);
+
       Expression expression = null;
-      if (isPrepared) {
-        expression = prepared.expression;
-      }
-      else {
-        byte[] expressionBytes = cobj.getByteArray(ComObject.Tag.legacyExpression);
-        if (expressionBytes != null) {
-          prepared.expression = expression = ExpressionImpl.deserializeExpression(expressionBytes);
-        }
+
+      byte[] expressionBytes = cobj.getByteArray(ComObject.Tag.legacyExpression);
+      if (expressionBytes != null) {
+        expression = ExpressionImpl.deserializeExpression(expressionBytes);
       }
       String dbName = cobj.getString(ComObject.Tag.dbName);
       String tableName = null;
@@ -512,20 +428,16 @@ public class ReadManager {
         throw e;
       }
       List<OrderByExpressionImpl> orderByExpressions = null;
-      if (isPrepared) {
-        orderByExpressions = prepared.orderByExpressions;
-      }
-      else {
-        prepared.orderByExpressions = orderByExpressions = new ArrayList<>();
-        ComArray array = cobj.getArray(ComObject.Tag.orderByExpressions);
-        if (array != null) {
-          for (Object entry : array.getArray()) {
-            OrderByExpressionImpl orderByExpression = new OrderByExpressionImpl();
-            orderByExpression.deserialize((byte[]) entry);
-            orderByExpressions.add(orderByExpression);
-          }
+      orderByExpressions = new ArrayList<>();
+      ComArray oarray = cobj.getArray(ComObject.Tag.orderByExpressions);
+      if (oarray != null) {
+        for (Object entry : oarray.getArray()) {
+          OrderByExpressionImpl orderByExpression = new OrderByExpressionImpl();
+          orderByExpression.deserialize((byte[]) entry);
+          orderByExpressions.add(orderByExpression);
         }
       }
+
       byte[] leftBytes = cobj.getByteArray(ComObject.Tag.leftKey);
       Object[] leftKey = null;
       if (leftBytes != null) {
@@ -556,15 +468,10 @@ public class ReadManager {
       }
 
       Set<Integer> columnOffsets = null;
-      if (isPrepared) {
-        columnOffsets = prepared.columnOffsets;
-      }
-      else {
-        ComArray cOffsets = cobj.getArray(ComObject.Tag.columnOffsets);
-        prepared.columnOffsets = columnOffsets = new HashSet<>();
-        for (Object obj : cOffsets.getArray()) {
-          columnOffsets.add((Integer)obj);
-        }
+      ComArray cOffsets = cobj.getArray(ComObject.Tag.columnOffsets);
+      columnOffsets = new HashSet<>();
+      for (Object obj : cOffsets.getArray()) {
+        columnOffsets.add((Integer)obj);
       }
 
       Counter[] counters = null;

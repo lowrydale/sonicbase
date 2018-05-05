@@ -162,18 +162,18 @@
 	<field name="currValue" class="com.sonicbase.server.SchemaManager$AutoIncrementValue" />
 	<field name="dataType" class="com.sonicbase.server.SchemaManager$AutoIncrementValue" />
 	<field name="mutex" class="com.sonicbase.server.SchemaManager$AutoIncrementValue" />
-	<class name="com.sonicbase.index.Repartitioner$MoveRequest" />
-	<method signature="byte[][] getContent()" class="com.sonicbase.index.Repartitioner$MoveRequest" />
-	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.index.Repartitioner$MoveRequest" />
-	<method signature="void setContent(byte[][])" class="com.sonicbase.index.Repartitioner$MoveRequest" />
-	<method signature="boolean access$1400(com.sonicbase.index.Repartitioner$MoveRequest)" class="com.sonicbase.index.Repartitioner$MoveRequest" />
-	<method signature="java.lang.Object[] getKey()" class="com.sonicbase.index.Repartitioner$MoveRequest" />
-	<method signature="void setKey(java.lang.Object[])" class="com.sonicbase.index.Repartitioner$MoveRequest" />
-	<method signature="java.lang.Object[] access$1500(com.sonicbase.index.Repartitioner$MoveRequest)" class="com.sonicbase.index.Repartitioner$MoveRequest" />
-	<method signature="void &lt;init&gt;(java.lang.Object[],byte[][],boolean)" class="com.sonicbase.index.Repartitioner$MoveRequest" />
-	<field name="key" class="com.sonicbase.index.Repartitioner$MoveRequest" />
-	<field name="content" class="com.sonicbase.index.Repartitioner$MoveRequest" />
-	<field name="shouldDeleteNow" class="com.sonicbase.index.Repartitioner$MoveRequest" />
+	<class name="com.sonicbase.server.PartitionManager$MoveRequest" />
+	<method signature="byte[][] getContent()" class="com.sonicbase.server.PartitionManager$MoveRequest" />
+	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.server.PartitionManager$MoveRequest" />
+	<method signature="void setContent(byte[][])" class="com.sonicbase.server.PartitionManager$MoveRequest" />
+	<method signature="boolean access$1400(com.sonicbase.server.PartitionManager$MoveRequest)" class="com.sonicbase.server.PartitionManager$MoveRequest" />
+	<method signature="java.lang.Object[] getKey()" class="com.sonicbase.server.PartitionManager$MoveRequest" />
+	<method signature="void setKey(java.lang.Object[])" class="com.sonicbase.server.PartitionManager$MoveRequest" />
+	<method signature="java.lang.Object[] access$1500(com.sonicbase.server.PartitionManager$MoveRequest)" class="com.sonicbase.server.PartitionManager$MoveRequest" />
+	<method signature="void &lt;init&gt;(java.lang.Object[],byte[][],boolean)" class="com.sonicbase.server.PartitionManager$MoveRequest" />
+	<field name="key" class="com.sonicbase.server.PartitionManager$MoveRequest" />
+	<field name="content" class="com.sonicbase.server.PartitionManager$MoveRequest" />
+	<field name="shouldDeleteNow" class="com.sonicbase.server.PartitionManager$MoveRequest" />
 	<class name="Parameter$CharacterStream" />
 	<method signature="int getSqlType()" class="Parameter$CharacterStream" />
 	<method signature="void &lt;clinit&gt;()" class="Parameter$CharacterStream" />
@@ -375,11 +375,11 @@
 	<method signature="void serialize(java.io.DataOutputStream,boolean)" class="Parameter$NClob" />
 	<method signature="void &lt;init&gt;(java.sql.NClob)" class="Parameter$NClob" />
 	<method signature="void &lt;init&gt;(Parameter$ParameterBase)" class="Parameter$NClob" />
-	<class name="com.sonicbase.index.Repartitioner$7$1" />
-	<method signature="void run()" class="com.sonicbase.index.Repartitioner$7$1" />
-	<method signature="void &lt;init&gt;(com.sonicbase.index.Repartitioner$7,java.util.List)" class="com.sonicbase.index.Repartitioner$7$1" />
-	<field name="this$1" class="com.sonicbase.index.Repartitioner$7$1" />
-	<field name="val$toProcess" class="com.sonicbase.index.Repartitioner$7$1" />
+	<class name="com.sonicbase.server.PartitionManager$7$1" />
+	<method signature="void run()" class="com.sonicbase.server.PartitionManager$7$1" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.PartitionManager$7,java.util.List)" class="com.sonicbase.server.PartitionManager$7$1" />
+	<field name="this$1" class="com.sonicbase.server.PartitionManager$7$1" />
+	<field name="val$toProcess" class="com.sonicbase.server.PartitionManager$7$1" />
 	<class name="DatabaseClient$TransactionOperation" />
 	<method signature="void &lt;clinit&gt;()" class="DatabaseClient$TransactionOperation" />
 	<method signature="void &lt;init&gt;(StatementImpl,ParameterHandler)" class="DatabaseClient$TransactionOperation" />
@@ -727,7 +727,7 @@
 	<method signature="ComObject deletePeerLogs(ComObject,boolean)" class="com.sonicbase.server.MethodInvoker" />
 	<method signature="ComObject notifyRepartitioningComplete(ComObject,boolean)" class="com.sonicbase.server.MethodInvoker" />
 	<method signature="int getTestWriteCallCount()" class="com.sonicbase.server.MethodInvoker" />
-	<method signature="void setRepartitioner(com.sonicbase.index.Repartitioner)" class="com.sonicbase.server.MethodInvoker" />
+	<method signature="void setRepartitioner(com.sonicbase.server.PartitionManager)" class="com.sonicbase.server.MethodInvoker" />
 	<method signature="ComObject isRepartitioningComplete(ComObject,boolean)" class="com.sonicbase.server.MethodInvoker" />
 	<method signature="ComObject setMaxSequenceNum(ComObject,boolean)" class="com.sonicbase.server.MethodInvoker" />
 	<method signature="ComObject testWrite(ComObject,boolean)" class="com.sonicbase.server.MethodInvoker" />
@@ -821,13 +821,13 @@
 	<field name="channel" class="DatabaseSocketClient$ClientNioHandler" />
 	<field name="latch" class="DatabaseSocketClient$ClientNioHandler" />
 	<field name="body" class="DatabaseSocketClient$ClientNioHandler" />
-	<class name="com.sonicbase.index.Repartitioner$10" />
-	<method signature="void &lt;init&gt;(java.lang.String,DatabaseClient,int,com.sonicbase.index.Repartitioner$GlobalIndexCounts)" class="com.sonicbase.index.Repartitioner$10" />
-	<method signature="java.lang.Object call()" class="com.sonicbase.index.Repartitioner$10" />
-	<field name="val$client" class="com.sonicbase.index.Repartitioner$10" />
-	<field name="val$ret" class="com.sonicbase.index.Repartitioner$10" />
-	<field name="val$dbName" class="com.sonicbase.index.Repartitioner$10" />
-	<field name="val$shard" class="com.sonicbase.index.Repartitioner$10" />
+	<class name="com.sonicbase.server.PartitionManager$10" />
+	<method signature="void &lt;init&gt;(java.lang.String,DatabaseClient,int,com.sonicbase.server.PartitionManager$GlobalIndexCounts)" class="com.sonicbase.server.PartitionManager$10" />
+	<method signature="java.lang.Object call()" class="com.sonicbase.server.PartitionManager$10" />
+	<field name="val$client" class="com.sonicbase.server.PartitionManager$10" />
+	<field name="val$ret" class="com.sonicbase.server.PartitionManager$10" />
+	<field name="val$dbName" class="com.sonicbase.server.PartitionManager$10" />
+	<field name="val$shard" class="com.sonicbase.server.PartitionManager$10" />
 	<class name="com.sonicbase.server.DeleteManagerImpl" />
 	<method signature="java.io.File getReplicaRoot()" class="com.sonicbase.server.DeleteManagerImpl" />
 	<method signature="void getFiles(java.util.List)" class="com.sonicbase.server.DeleteManagerImpl" />
@@ -1054,12 +1054,12 @@
 	<method signature="void run()" class="com.sonicbase.server.ReadManager$1" />
 	<method signature="void &lt;init&gt;(com.sonicbase.server.ReadManager)" class="com.sonicbase.server.ReadManager$1" />
 	<field name="this$0" class="com.sonicbase.server.ReadManager$1" />
-	<class name="com.sonicbase.index.Repartitioner$IndexCounts" />
-	<method signature="java.util.concurrent.ConcurrentHashMap access$2400(com.sonicbase.index.Repartitioner$IndexCounts)" class="com.sonicbase.index.Repartitioner$IndexCounts" />
-	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.index.Repartitioner$IndexCounts" />
-	<method signature="void &lt;init&gt;()" class="com.sonicbase.index.Repartitioner$IndexCounts" />
-	<method signature="java.util.concurrent.ConcurrentHashMap getCounts()" class="com.sonicbase.index.Repartitioner$IndexCounts" />
-	<field name="counts" class="com.sonicbase.index.Repartitioner$IndexCounts" />
+	<class name="com.sonicbase.server.PartitionManager$IndexCounts" />
+	<method signature="java.util.concurrent.ConcurrentHashMap access$2400(com.sonicbase.server.PartitionManager$IndexCounts)" class="com.sonicbase.server.PartitionManager$IndexCounts" />
+	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.server.PartitionManager$IndexCounts" />
+	<method signature="void &lt;init&gt;()" class="com.sonicbase.server.PartitionManager$IndexCounts" />
+	<method signature="java.util.concurrent.ConcurrentHashMap getCounts()" class="com.sonicbase.server.PartitionManager$IndexCounts" />
+	<field name="counts" class="com.sonicbase.server.PartitionManager$IndexCounts" />
 	<class name="com.sonicbase.server.ReadManager$3" />
 	<method signature="void run()" class="com.sonicbase.server.ReadManager$3" />
 	<method signature="void &lt;init&gt;(com.sonicbase.server.ReadManager)" class="com.sonicbase.server.ReadManager$3" />
@@ -1131,7 +1131,7 @@
 	<method signature="boolean access$500(com.sonicbase.server.DatabaseServer,int,int,int[],int[])" class="com.sonicbase.server.DatabaseServer" />
 	<method signature="byte[] handleCommand(java.lang.String,byte[],long,long,boolean,boolean)" class="com.sonicbase.server.DatabaseServer" />
 	<method signature="java.lang.String access$1400(com.sonicbase.server.DatabaseServer)" class="com.sonicbase.server.DatabaseServer" />
-	<method signature="com.sonicbase.index.Repartitioner getRepartitioner()" class="com.sonicbase.server.DatabaseServer" />
+	<method signature="com.sonicbase.server.PartitionManager getRepartitioner()" class="com.sonicbase.server.DatabaseServer" />
 	<method signature="void freeUnsafeIds(java.lang.Object)" class="com.sonicbase.server.DatabaseServer" />
 	<method signature="java.lang.String fixReplica(java.lang.String,java.lang.String)" class="com.sonicbase.server.DatabaseServer" />
 	<method signature="int getReplica()" class="com.sonicbase.server.DatabaseServer" />
@@ -1816,13 +1816,13 @@
 	<field name="errorRecovering" class="com.sonicbase.server.SnapshotManagerImpl" />
 	<field name="snapshotThread" class="com.sonicbase.server.SnapshotManagerImpl" />
 	<field name="enableSnapshot" class="com.sonicbase.server.SnapshotManagerImpl" />
-	<class name="com.sonicbase.index.Repartitioner$OffsetEntry" />
-	<method signature="int getPartitionOffset()" class="com.sonicbase.index.Repartitioner$OffsetEntry" />
-	<method signature="long getOffset()" class="com.sonicbase.index.Repartitioner$OffsetEntry" />
-	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.index.Repartitioner$OffsetEntry" />
-	<method signature="void &lt;init&gt;(long,int)" class="com.sonicbase.index.Repartitioner$OffsetEntry" />
-	<field name="offset" class="com.sonicbase.index.Repartitioner$OffsetEntry" />
-	<field name="partitionOffset" class="com.sonicbase.index.Repartitioner$OffsetEntry" />
+	<class name="com.sonicbase.server.PartitionManager$OffsetEntry" />
+	<method signature="int getPartitionOffset()" class="com.sonicbase.server.PartitionManager$OffsetEntry" />
+	<method signature="long getOffset()" class="com.sonicbase.server.PartitionManager$OffsetEntry" />
+	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.server.PartitionManager$OffsetEntry" />
+	<method signature="void &lt;init&gt;(long,int)" class="com.sonicbase.server.PartitionManager$OffsetEntry" />
+	<field name="offset" class="com.sonicbase.server.PartitionManager$OffsetEntry" />
+	<field name="partitionOffset" class="com.sonicbase.server.PartitionManager$OffsetEntry" />
 	<class name="com.sonicbase.util.JsonDict" />
 	<method signature="com.sonicbase.util.JsonDict getDict(java.lang.String)" class="com.sonicbase.util.JsonDict" />
 	<method signature="int size()" class="com.sonicbase.util.JsonDict" />
@@ -2536,12 +2536,12 @@
 	<method signature="java.util.Map getRecordsForTable()" class="ExpressionImpl$RecordCache" />
 	<method signature="boolean containsKey(java.lang.String,java.lang.Object[])" class="ExpressionImpl$RecordCache" />
 	<field name="recordsForTable" class="ExpressionImpl$RecordCache" />
-	<class name="com.sonicbase.index.Repartitioner$9" />
-	<method signature="void &lt;init&gt;(com.sonicbase.index.Repartitioner,int,ComObject)" class="com.sonicbase.index.Repartitioner$9" />
-	<method signature="java.lang.Object call()" class="com.sonicbase.index.Repartitioner$9" />
-	<field name="val$replica" class="com.sonicbase.index.Repartitioner$9" />
-	<field name="this$0" class="com.sonicbase.index.Repartitioner$9" />
-	<field name="val$cobj" class="com.sonicbase.index.Repartitioner$9" />
+	<class name="com.sonicbase.server.PartitionManager$9" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.PartitionManager,int,ComObject)" class="com.sonicbase.server.PartitionManager$9" />
+	<method signature="java.lang.Object call()" class="com.sonicbase.server.PartitionManager$9" />
+	<field name="val$replica" class="com.sonicbase.server.PartitionManager$9" />
+	<field name="this$0" class="com.sonicbase.server.PartitionManager$9" />
+	<field name="val$cobj" class="com.sonicbase.server.PartitionManager$9" />
 	<class name="ExpressionImpl$CachedRecord" />
 	<method signature="void setSerializedRecord(byte[])" class="ExpressionImpl$CachedRecord" />
 	<method signature="void setRecord(Record)" class="ExpressionImpl$CachedRecord" />
@@ -2551,23 +2551,23 @@
 	<method signature="void &lt;init&gt;(Record,byte[])" class="ExpressionImpl$CachedRecord" />
 	<field name="serializedRecord" class="ExpressionImpl$CachedRecord" />
 	<field name="record" class="ExpressionImpl$CachedRecord" />
-	<class name="com.sonicbase.index.Repartitioner$7" />
-	<method signature="void &lt;init&gt;(com.sonicbase.index.Repartitioner,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicInteger,java.util.concurrent.ThreadPoolExecutor,java.lang.String,java.lang.String,com.sonicbase.index.Index,IndexSchema,java.lang.String,int[],TableSchema,ComObject,java.util.concurrent.atomic.AtomicInteger)" class="com.sonicbase.index.Repartitioner$7" />
-	<method signature="boolean visit(java.lang.Object[],java.lang.Object)" class="com.sonicbase.index.Repartitioner$7" />
-	<field name="val$countSubmitted" class="com.sonicbase.index.Repartitioner$7" />
-	<field name="val$indexName" class="com.sonicbase.index.Repartitioner$7" />
-	<field name="val$fieldOffsets" class="com.sonicbase.index.Repartitioner$7" />
-	<field name="val$index" class="com.sonicbase.index.Repartitioner$7" />
-	<field name="val$cobj" class="com.sonicbase.index.Repartitioner$7" />
-	<field name="val$tableName" class="com.sonicbase.index.Repartitioner$7" />
-	<field name="val$countFinished" class="com.sonicbase.index.Repartitioner$7" />
-	<field name="val$currEntries" class="com.sonicbase.index.Repartitioner$7" />
-	<field name="this$0" class="com.sonicbase.index.Repartitioner$7" />
-	<field name="val$dbName" class="com.sonicbase.index.Repartitioner$7" />
-	<field name="val$countVisited" class="com.sonicbase.index.Repartitioner$7" />
-	<field name="val$tableSchema" class="com.sonicbase.index.Repartitioner$7" />
-	<field name="val$executor" class="com.sonicbase.index.Repartitioner$7" />
-	<field name="val$indexSchema" class="com.sonicbase.index.Repartitioner$7" />
+	<class name="com.sonicbase.server.PartitionManager$7" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.PartitionManager,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicInteger,java.util.concurrent.ThreadPoolExecutor,java.lang.String,java.lang.String,com.sonicbase.index.Index,IndexSchema,java.lang.String,int[],TableSchema,ComObject,java.util.concurrent.atomic.AtomicInteger)" class="com.sonicbase.server.PartitionManager$7" />
+	<method signature="boolean visit(java.lang.Object[],java.lang.Object)" class="com.sonicbase.server.PartitionManager$7" />
+	<field name="val$countSubmitted" class="com.sonicbase.server.PartitionManager$7" />
+	<field name="val$indexName" class="com.sonicbase.server.PartitionManager$7" />
+	<field name="val$fieldOffsets" class="com.sonicbase.server.PartitionManager$7" />
+	<field name="val$index" class="com.sonicbase.server.PartitionManager$7" />
+	<field name="val$cobj" class="com.sonicbase.server.PartitionManager$7" />
+	<field name="val$tableName" class="com.sonicbase.server.PartitionManager$7" />
+	<field name="val$countFinished" class="com.sonicbase.server.PartitionManager$7" />
+	<field name="val$currEntries" class="com.sonicbase.server.PartitionManager$7" />
+	<field name="this$0" class="com.sonicbase.server.PartitionManager$7" />
+	<field name="val$dbName" class="com.sonicbase.server.PartitionManager$7" />
+	<field name="val$countVisited" class="com.sonicbase.server.PartitionManager$7" />
+	<field name="val$tableSchema" class="com.sonicbase.server.PartitionManager$7" />
+	<field name="val$executor" class="com.sonicbase.server.PartitionManager$7" />
+	<field name="val$indexSchema" class="com.sonicbase.server.PartitionManager$7" />
 	<class name="DatabaseClient$1" />
 	<method signature="java.lang.Object call()" class="DatabaseClient$1" />
 	<method signature="void &lt;init&gt;(DatabaseClient,java.util.List,int,java.util.List,java.lang.Object,java.util.List,java.util.concurrent.atomic.AtomicInteger)" class="DatabaseClient$1" />
@@ -2578,27 +2578,27 @@
 	<field name="val$withRecordProcessed" class="DatabaseClient$1" />
 	<field name="val$totalCount" class="DatabaseClient$1" />
 	<field name="val$mutex" class="DatabaseClient$1" />
-	<class name="com.sonicbase.index.Repartitioner$8" />
-	<method signature="void &lt;init&gt;(com.sonicbase.index.Repartitioner,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicInteger,java.util.concurrent.ThreadPoolExecutor,java.lang.String,java.lang.String,com.sonicbase.index.Index,IndexSchema,java.lang.String,int[],TableSchema,ComObject,java.util.concurrent.atomic.AtomicInteger)" class="com.sonicbase.index.Repartitioner$8" />
-	<method signature="boolean visit(java.lang.Object[],java.lang.Object)" class="com.sonicbase.index.Repartitioner$8" />
-	<field name="val$countSubmitted" class="com.sonicbase.index.Repartitioner$8" />
-	<field name="val$indexName" class="com.sonicbase.index.Repartitioner$8" />
-	<field name="val$fieldOffsets" class="com.sonicbase.index.Repartitioner$8" />
-	<field name="val$index" class="com.sonicbase.index.Repartitioner$8" />
-	<field name="val$cobj" class="com.sonicbase.index.Repartitioner$8" />
-	<field name="val$tableName" class="com.sonicbase.index.Repartitioner$8" />
-	<field name="val$countFinished" class="com.sonicbase.index.Repartitioner$8" />
-	<field name="val$currEntries" class="com.sonicbase.index.Repartitioner$8" />
-	<field name="this$0" class="com.sonicbase.index.Repartitioner$8" />
-	<field name="val$dbName" class="com.sonicbase.index.Repartitioner$8" />
-	<field name="val$countVisited" class="com.sonicbase.index.Repartitioner$8" />
-	<field name="val$tableSchema" class="com.sonicbase.index.Repartitioner$8" />
-	<field name="val$executor" class="com.sonicbase.index.Repartitioner$8" />
-	<field name="val$indexSchema" class="com.sonicbase.index.Repartitioner$8" />
-	<class name="com.sonicbase.index.Repartitioner$5" />
-	<method signature="void &lt;init&gt;()" class="com.sonicbase.index.Repartitioner$5" />
-	<method signature="int compare(com.sonicbase.index.Repartitioner$OffsetEntry,com.sonicbase.index.Repartitioner$OffsetEntry)" class="com.sonicbase.index.Repartitioner$5" />
-	<method signature="int compare(java.lang.Object,java.lang.Object)" class="com.sonicbase.index.Repartitioner$5" />
+	<class name="com.sonicbase.server.PartitionManager$8" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.PartitionManager,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicInteger,java.util.concurrent.ThreadPoolExecutor,java.lang.String,java.lang.String,com.sonicbase.index.Index,IndexSchema,java.lang.String,int[],TableSchema,ComObject,java.util.concurrent.atomic.AtomicInteger)" class="com.sonicbase.server.PartitionManager$8" />
+	<method signature="boolean visit(java.lang.Object[],java.lang.Object)" class="com.sonicbase.server.PartitionManager$8" />
+	<field name="val$countSubmitted" class="com.sonicbase.server.PartitionManager$8" />
+	<field name="val$indexName" class="com.sonicbase.server.PartitionManager$8" />
+	<field name="val$fieldOffsets" class="com.sonicbase.server.PartitionManager$8" />
+	<field name="val$index" class="com.sonicbase.server.PartitionManager$8" />
+	<field name="val$cobj" class="com.sonicbase.server.PartitionManager$8" />
+	<field name="val$tableName" class="com.sonicbase.server.PartitionManager$8" />
+	<field name="val$countFinished" class="com.sonicbase.server.PartitionManager$8" />
+	<field name="val$currEntries" class="com.sonicbase.server.PartitionManager$8" />
+	<field name="this$0" class="com.sonicbase.server.PartitionManager$8" />
+	<field name="val$dbName" class="com.sonicbase.server.PartitionManager$8" />
+	<field name="val$countVisited" class="com.sonicbase.server.PartitionManager$8" />
+	<field name="val$tableSchema" class="com.sonicbase.server.PartitionManager$8" />
+	<field name="val$executor" class="com.sonicbase.server.PartitionManager$8" />
+	<field name="val$indexSchema" class="com.sonicbase.server.PartitionManager$8" />
+	<class name="com.sonicbase.server.PartitionManager$5" />
+	<method signature="void &lt;init&gt;()" class="com.sonicbase.server.PartitionManager$5" />
+	<method signature="int compare(com.sonicbase.server.PartitionManager$OffsetEntry,com.sonicbase.server.PartitionManager$OffsetEntry)" class="com.sonicbase.server.PartitionManager$5" />
+	<method signature="int compare(java.lang.Object,java.lang.Object)" class="com.sonicbase.server.PartitionManager$5" />
 	<class name="ExpressionImpl" />
 	<method signature="void reset()" class="ExpressionImpl" />
 	<method signature="boolean isForceSelectOnServer()" class="ExpressionImpl" />
@@ -2713,15 +2713,15 @@
 	<field name="compound" class="com.sonicbase.server.LongRunningCommands$Type" />
 	<field name="value" class="com.sonicbase.server.LongRunningCommands$Type" />
 	<field name="$VALUES" class="com.sonicbase.server.LongRunningCommands$Type" />
-	<class name="com.sonicbase.index.Repartitioner$6" />
-	<method signature="void &lt;init&gt;(com.sonicbase.index.Repartitioner$GetKeyAtOffset,java.lang.String,java.util.Map$Entry,java.lang.String,java.lang.String,java.util.List)" class="com.sonicbase.index.Repartitioner$6" />
-	<method signature="java.lang.Object call()" class="com.sonicbase.index.Repartitioner$6" />
-	<field name="val$entry" class="com.sonicbase.index.Repartitioner$6" />
-	<field name="val$getKey" class="com.sonicbase.index.Repartitioner$6" />
-	<field name="val$indexName" class="com.sonicbase.index.Repartitioner$6" />
-	<field name="val$newPartitions" class="com.sonicbase.index.Repartitioner$6" />
-	<field name="val$dbName" class="com.sonicbase.index.Repartitioner$6" />
-	<field name="val$tableName" class="com.sonicbase.index.Repartitioner$6" />
+	<class name="com.sonicbase.server.PartitionManager$6" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.PartitionManager$GetKeyAtOffset,java.lang.String,java.util.Map$Entry,java.lang.String,java.lang.String,java.util.List)" class="com.sonicbase.server.PartitionManager$6" />
+	<method signature="java.lang.Object call()" class="com.sonicbase.server.PartitionManager$6" />
+	<field name="val$entry" class="com.sonicbase.server.PartitionManager$6" />
+	<field name="val$getKey" class="com.sonicbase.server.PartitionManager$6" />
+	<field name="val$indexName" class="com.sonicbase.server.PartitionManager$6" />
+	<field name="val$newPartitions" class="com.sonicbase.server.PartitionManager$6" />
+	<field name="val$dbName" class="com.sonicbase.server.PartitionManager$6" />
+	<field name="val$tableName" class="com.sonicbase.server.PartitionManager$6" />
 	<class name="ParenthesisImpl" />
 	<method signature="void setNot(boolean)" class="ParenthesisImpl" />
 	<method signature="void &lt;clinit&gt;()" class="ParenthesisImpl" />
@@ -2749,27 +2749,27 @@
 	<field name="val$replica" class="DatabaseClient$4" />
 	<field name="this$0" class="DatabaseClient$4" />
 	<field name="val$shard" class="DatabaseClient$4" />
-	<class name="com.sonicbase.index.Repartitioner$3" />
-	<method signature="void &lt;init&gt;(com.sonicbase.index.Repartitioner,java.util.Comparator[])" class="com.sonicbase.index.Repartitioner$3" />
-	<method signature="int compare(TableSchema$Partition,TableSchema$Partition)" class="com.sonicbase.index.Repartitioner$3" />
-	<method signature="int compare(java.lang.Object,java.lang.Object)" class="com.sonicbase.index.Repartitioner$3" />
-	<field name="this$0" class="com.sonicbase.index.Repartitioner$3" />
-	<field name="val$comparators" class="com.sonicbase.index.Repartitioner$3" />
+	<class name="com.sonicbase.server.PartitionManager$3" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.PartitionManager,java.util.Comparator[])" class="com.sonicbase.server.PartitionManager$3" />
+	<method signature="int compare(TableSchema$Partition,TableSchema$Partition)" class="com.sonicbase.server.PartitionManager$3" />
+	<method signature="int compare(java.lang.Object,java.lang.Object)" class="com.sonicbase.server.PartitionManager$3" />
+	<field name="this$0" class="com.sonicbase.server.PartitionManager$3" />
+	<field name="val$comparators" class="com.sonicbase.server.PartitionManager$3" />
 	<class name="DatabaseClient$5" />
 	<method signature="void &lt;init&gt;(DatabaseClient,DatabaseClient$KeyInfo)" class="DatabaseClient$5" />
 	<method signature="int compare(java.lang.Object[],java.lang.Object[])" class="DatabaseClient$5" />
 	<method signature="int compare(java.lang.Object,java.lang.Object)" class="DatabaseClient$5" />
 	<field name="this$0" class="DatabaseClient$5" />
 	<field name="val$keyInfo" class="DatabaseClient$5" />
-	<class name="com.sonicbase.index.Repartitioner$4" />
-	<method signature="java.lang.Object call()" class="com.sonicbase.index.Repartitioner$4" />
-	<method signature="void &lt;init&gt;(com.sonicbase.index.Repartitioner,java.lang.String,java.lang.String,java.lang.String,int,int[])" class="com.sonicbase.index.Repartitioner$4" />
-	<field name="val$masters" class="com.sonicbase.index.Repartitioner$4" />
-	<field name="val$indexName" class="com.sonicbase.index.Repartitioner$4" />
-	<field name="this$0" class="com.sonicbase.index.Repartitioner$4" />
-	<field name="val$dbName" class="com.sonicbase.index.Repartitioner$4" />
-	<field name="val$shard" class="com.sonicbase.index.Repartitioner$4" />
-	<field name="val$finalTableName" class="com.sonicbase.index.Repartitioner$4" />
+	<class name="com.sonicbase.server.PartitionManager$4" />
+	<method signature="java.lang.Object call()" class="com.sonicbase.server.PartitionManager$4" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.PartitionManager,java.lang.String,java.lang.String,java.lang.String,int,int[])" class="com.sonicbase.server.PartitionManager$4" />
+	<field name="val$masters" class="com.sonicbase.server.PartitionManager$4" />
+	<field name="val$indexName" class="com.sonicbase.server.PartitionManager$4" />
+	<field name="this$0" class="com.sonicbase.server.PartitionManager$4" />
+	<field name="val$dbName" class="com.sonicbase.server.PartitionManager$4" />
+	<field name="val$shard" class="com.sonicbase.server.PartitionManager$4" />
+	<field name="val$finalTableName" class="com.sonicbase.server.PartitionManager$4" />
 	<class name="com.sonicbase.server.DatabaseServer$NullHostnameVerifier" />
 	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.server.DatabaseServer$NullHostnameVerifier" />
 	<method signature="void &lt;init&gt;()" class="com.sonicbase.server.DatabaseServer$NullHostnameVerifier" />
@@ -2783,15 +2783,15 @@
 	<field name="this$0" class="DatabaseClient$2" />
 	<field name="val$offset" class="DatabaseClient$2" />
 	<field name="val$processed" class="DatabaseClient$2" />
-	<class name="com.sonicbase.index.Repartitioner$1" />
-	<method signature="java.lang.Object call()" class="com.sonicbase.index.Repartitioner$1" />
-	<method signature="void &lt;init&gt;(com.sonicbase.index.Repartitioner,long[],int,java.lang.String,java.lang.String,java.lang.String)" class="com.sonicbase.index.Repartitioner$1" />
-	<field name="val$indexName" class="com.sonicbase.index.Repartitioner$1" />
-	<field name="val$currTableName" class="com.sonicbase.index.Repartitioner$1" />
-	<field name="this$0" class="com.sonicbase.index.Repartitioner$1" />
-	<field name="val$offset" class="com.sonicbase.index.Repartitioner$1" />
-	<field name="val$dbName" class="com.sonicbase.index.Repartitioner$1" />
-	<field name="val$currPartitionSizes" class="com.sonicbase.index.Repartitioner$1" />
+	<class name="com.sonicbase.server.PartitionManager$1" />
+	<method signature="java.lang.Object call()" class="com.sonicbase.server.PartitionManager$1" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.PartitionManager,long[],int,java.lang.String,java.lang.String,java.lang.String)" class="com.sonicbase.server.PartitionManager$1" />
+	<field name="val$indexName" class="com.sonicbase.server.PartitionManager$1" />
+	<field name="val$currTableName" class="com.sonicbase.server.PartitionManager$1" />
+	<field name="this$0" class="com.sonicbase.server.PartitionManager$1" />
+	<field name="val$offset" class="com.sonicbase.server.PartitionManager$1" />
+	<field name="val$dbName" class="com.sonicbase.server.PartitionManager$1" />
+	<field name="val$currPartitionSizes" class="com.sonicbase.server.PartitionManager$1" />
 	<class name="DatabaseClient$3" />
 	<method signature="java.lang.Object call()" class="DatabaseClient$3" />
 	<method signature="byte[] call()" class="DatabaseClient$3" />
@@ -2804,10 +2804,10 @@
 	<field name="this$0" class="DatabaseClient$3" />
 	<field name="val$body" class="DatabaseClient$3" />
 	<field name="val$shard" class="DatabaseClient$3" />
-	<class name="com.sonicbase.index.Repartitioner$2" />
-	<method signature="void &lt;init&gt;(com.sonicbase.index.Repartitioner)" class="com.sonicbase.index.Repartitioner$2" />
-	<method signature="java.util.List getKeyAtOffset(java.lang.String,int,java.lang.String,java.lang.String,java.util.List)" class="com.sonicbase.index.Repartitioner$2" />
-	<field name="this$0" class="com.sonicbase.index.Repartitioner$2" />
+	<class name="com.sonicbase.server.PartitionManager$2" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.PartitionManager)" class="com.sonicbase.server.PartitionManager$2" />
+	<method signature="java.util.List getKeyAtOffset(java.lang.String,int,java.lang.String,java.lang.String,java.util.List)" class="com.sonicbase.server.PartitionManager$2" />
+	<field name="this$0" class="com.sonicbase.server.PartitionManager$2" />
 	<class name="DatabaseClient$6" />
 	<method signature="void &lt;clinit&gt;()" class="DatabaseClient$6" />
 	<field name="$SwitchMap$com$sonicbase$schema$DataType$Type" class="DatabaseClient$6" />
@@ -2838,76 +2838,76 @@
 	<method signature="int compare(java.lang.Object,java.lang.Object)" class="com.sonicbase.index.Index$2" />
 	<field name="this$0" class="com.sonicbase.index.Index$2" />
 	<field name="val$comparators" class="com.sonicbase.index.Index$2" />
-	<class name="com.sonicbase.index.Repartitioner" />
-	<method signature="boolean undeleteIndexEntry(java.lang.String,java.lang.String,java.lang.String,java.lang.Object[],byte[])" class="com.sonicbase.index.Repartitioner" />
-	<method signature="void doProcessEntries(com.sonicbase.index.Repartitioner$MoveProcessor[],java.lang.String,java.lang.String,java.util.List,com.sonicbase.index.Index,IndexSchema,java.lang.String,int[],TableSchema,ComObject)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="void deleteRecordsOnOtherReplicas(java.lang.String,java.lang.String,java.lang.String,java.util.concurrent.ConcurrentLinkedQueue)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="void &lt;init&gt;(com.sonicbase.server.DatabaseServer,DatabaseCommon)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="ComObject deleteMovedRecords(ComObject)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="void shutdown()" class="com.sonicbase.index.Repartitioner" />
-	<method signature="com.sonicbase.server.DatabaseServer access$300(com.sonicbase.index.Repartitioner)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.index.Repartitioner" />
-	<method signature="void setMinSizeForRepartition(int)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="ComObject isShardRepartitioningComplete(ComObject,boolean)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="com.sonicbase.index.Repartitioner$GlobalIndexCounts getIndexCounts(java.lang.String,DatabaseClient)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="void calculatePartitions(java.lang.String,int,java.util.List,java.lang.String,java.lang.String,long[],long,com.sonicbase.index.Repartitioner$GetKeyAtOffset)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="void access$2100(com.sonicbase.index.Repartitioner,com.sonicbase.index.Repartitioner$MoveProcessor[],java.lang.String,java.lang.String,java.util.List,com.sonicbase.index.Index,IndexSchema,java.lang.String,int[],TableSchema,ComObject)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="void logCurrPartitions(java.lang.String,java.lang.String,java.lang.String,TableSchema$Partition[])" class="com.sonicbase.index.Repartitioner" />
-	<method signature="java.util.List access$100(com.sonicbase.index.Repartitioner,java.lang.String,int,java.lang.String,java.lang.String,java.util.List)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="ComObject rebalanceOrderedIndex(ComObject)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="Logger access$400()" class="com.sonicbase.index.Repartitioner" />
-	<method signature="void stopShardsFromRepartitioning()" class="com.sonicbase.index.Repartitioner" />
-	<method signature="long getPartitionSize(java.lang.String,int,java.lang.String,java.lang.String)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="ComObject moveIndexEntries(ComObject)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="void resetDeletingComplete()" class="com.sonicbase.index.Repartitioner" />
-	<method signature="void logPartitionsToApply(java.lang.String,java.lang.String,java.lang.String,java.util.List)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="ComObject stopRepartitioning(ComObject)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="ComObject doRebalanceOrderedIndex(ComObject)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="int getCompareValue(java.util.Comparator[],java.lang.Object[],java.lang.Object[])" class="com.sonicbase.index.Repartitioner" />
-	<method signature="void access$1300(com.sonicbase.index.Repartitioner,java.lang.String,java.lang.String,java.lang.String,boolean,int,java.util.List)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="ComObject getKeyAtOffset(ComObject)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="byte[] finishRebalance(java.lang.String,byte[])" class="com.sonicbase.index.Repartitioner" />
-	<method signature="ComObject isRepartitioningComplete(ComObject)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="byte[] beginRebalance(java.lang.String,java.util.List)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="void deleteIndexEntry(java.lang.String,java.lang.String,java.lang.Object[])" class="com.sonicbase.index.Repartitioner" />
-	<method signature="ComObject notifyRepartitioningComplete(ComObject)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="com.sonicbase.index.Repartitioner$MoveProcessor[] access$2000(com.sonicbase.index.Repartitioner)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="void run()" class="com.sonicbase.index.Repartitioner" />
-	<method signature="ComObject beginRebalance(ComObject)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="java.util.List findOrderedPartitionForRecord(boolean,boolean,int[],DatabaseCommon,TableSchema,java.lang.String,java.util.List,BinaryExpression$Operator,BinaryExpression$Operator,java.lang.Object[],java.lang.Object[])" class="com.sonicbase.index.Repartitioner" />
-	<method signature="long access$000(com.sonicbase.index.Repartitioner,java.lang.String,int,java.lang.String,java.lang.String)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="void resetRepartitioningComplete()" class="com.sonicbase.index.Repartitioner" />
-	<method signature="boolean isRepartitioningComplete()" class="com.sonicbase.index.Repartitioner" />
-	<method signature="void doSelectPartitions(TableSchema$Partition[],TableSchema,java.lang.String,BinaryExpression$Operator,java.util.Comparator[],java.lang.Object[],boolean,java.util.List)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="ComObject getPartitionSize(ComObject)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="boolean addToRebalance(java.util.List,java.util.Map$Entry,java.lang.String,com.sonicbase.index.Repartitioner$IndexCounts,boolean)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="DatabaseCommon access$200(com.sonicbase.index.Repartitioner)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="java.util.List getKeyAtOffset(java.lang.String,int,java.lang.String,java.lang.String,java.util.List)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="java.util.concurrent.ConcurrentHashMap getIndicesToDeleteFrom(java.lang.String,java.lang.String)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="void moveIndexEntriesToShard(java.lang.String,java.lang.String,java.lang.String,boolean,int,java.util.List)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="ComObject getIndexCounts(ComObject)" class="com.sonicbase.index.Repartitioner" />
-	<method signature="void doSelectPartitions(TableSchema$Partition[],TableSchema,java.lang.String,BinaryExpression$Operator,java.util.Comparator[],java.lang.Object[],java.lang.Object[],boolean,java.util.List)" class="com.sonicbase.index.Repartitioner" />
-	<field name="tableToDeleteEntriesFrom" class="com.sonicbase.index.Repartitioner" />
-	<field name="databaseServer" class="com.sonicbase.index.Repartitioner" />
-	<field name="moveProcessors" class="com.sonicbase.index.Repartitioner" />
-	<field name="logger" class="com.sonicbase.index.Repartitioner" />
-	<field name="minSizeForRepartition" class="com.sonicbase.index.Repartitioner" />
-	<field name="entriesToDelete" class="com.sonicbase.index.Repartitioner" />
-	<field name="INDEX_STR" class="com.sonicbase.index.Repartitioner" />
-	<field name="currTableRepartitioning" class="com.sonicbase.index.Repartitioner" />
-	<field name="isShardRepartitioningComplete" class="com.sonicbase.index.Repartitioner" />
-	<field name="deletingComplete" class="com.sonicbase.index.Repartitioner" />
-	<field name="indices" class="com.sonicbase.index.Repartitioner" />
-	<field name="isRebalancing" class="com.sonicbase.index.Repartitioner" />
-	<field name="NAME_STR" class="com.sonicbase.index.Repartitioner" />
-	<field name="common" class="com.sonicbase.index.Repartitioner" />
-	<field name="currIndexRepartitioning" class="com.sonicbase.index.Repartitioner" />
-	<field name="repartitioningRecordsByIdComplete" class="com.sonicbase.index.Repartitioner" />
-	<field name="repartitioningComplete" class="com.sonicbase.index.Repartitioner" />
-	<field name="beginRepartitioningThread" class="com.sonicbase.index.Repartitioner" />
-	<field name="isRepartitioningIndex" class="com.sonicbase.index.Repartitioner" />
-	<field name="shutdown" class="com.sonicbase.index.Repartitioner" />
-	<field name="isComplete" class="com.sonicbase.index.Repartitioner" />
+	<class name="com.sonicbase.server.PartitionManager" />
+	<method signature="boolean undeleteIndexEntry(java.lang.String,java.lang.String,java.lang.String,java.lang.Object[],byte[])" class="com.sonicbase.server.PartitionManager" />
+	<method signature="void doProcessEntries(com.sonicbase.server.PartitionManager$MoveProcessor[],java.lang.String,java.lang.String,java.util.List,com.sonicbase.index.Index,IndexSchema,java.lang.String,int[],TableSchema,ComObject)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="void deleteRecordsOnOtherReplicas(java.lang.String,java.lang.String,java.lang.String,java.util.concurrent.ConcurrentLinkedQueue)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.DatabaseServer,DatabaseCommon)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="ComObject deleteMovedRecords(ComObject)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="void shutdown()" class="com.sonicbase.server.PartitionManager" />
+	<method signature="com.sonicbase.server.DatabaseServer access$300(com.sonicbase.server.PartitionManager)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.server.PartitionManager" />
+	<method signature="void setMinSizeForRepartition(int)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="ComObject isShardRepartitioningComplete(ComObject,boolean)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="com.sonicbase.server.PartitionManager$GlobalIndexCounts getIndexCounts(java.lang.String,DatabaseClient)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="void calculatePartitions(java.lang.String,int,java.util.List,java.lang.String,java.lang.String,long[],long,com.sonicbase.server.PartitionManager$GetKeyAtOffset)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="void access$2100(com.sonicbase.server.PartitionManager,com.sonicbase.server.PartitionManager$MoveProcessor[],java.lang.String,java.lang.String,java.util.List,com.sonicbase.index.Index,IndexSchema,java.lang.String,int[],TableSchema,ComObject)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="void logCurrPartitions(java.lang.String,java.lang.String,java.lang.String,TableSchema$Partition[])" class="com.sonicbase.server.PartitionManager" />
+	<method signature="java.util.List access$100(com.sonicbase.server.PartitionManager,java.lang.String,int,java.lang.String,java.lang.String,java.util.List)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="ComObject rebalanceOrderedIndex(ComObject)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="Logger access$400()" class="com.sonicbase.server.PartitionManager" />
+	<method signature="void stopShardsFromRepartitioning()" class="com.sonicbase.server.PartitionManager" />
+	<method signature="long getPartitionSize(java.lang.String,int,java.lang.String,java.lang.String)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="ComObject moveIndexEntries(ComObject)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="void resetDeletingComplete()" class="com.sonicbase.server.PartitionManager" />
+	<method signature="void logPartitionsToApply(java.lang.String,java.lang.String,java.lang.String,java.util.List)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="ComObject stopRepartitioning(ComObject)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="ComObject doRebalanceOrderedIndex(ComObject)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="int getCompareValue(java.util.Comparator[],java.lang.Object[],java.lang.Object[])" class="com.sonicbase.server.PartitionManager" />
+	<method signature="void access$1300(com.sonicbase.server.PartitionManager,java.lang.String,java.lang.String,java.lang.String,boolean,int,java.util.List)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="ComObject getKeyAtOffset(ComObject)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="byte[] finishRebalance(java.lang.String,byte[])" class="com.sonicbase.server.PartitionManager" />
+	<method signature="ComObject isRepartitioningComplete(ComObject)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="byte[] beginRebalance(java.lang.String,java.util.List)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="void deleteIndexEntry(java.lang.String,java.lang.String,java.lang.Object[])" class="com.sonicbase.server.PartitionManager" />
+	<method signature="ComObject notifyRepartitioningComplete(ComObject)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="com.sonicbase.server.PartitionManager$MoveProcessor[] access$2000(com.sonicbase.server.PartitionManager)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="void run()" class="com.sonicbase.server.PartitionManager" />
+	<method signature="ComObject beginRebalance(ComObject)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="java.util.List findOrderedPartitionForRecord(boolean,boolean,int[],DatabaseCommon,TableSchema,java.lang.String,java.util.List,BinaryExpression$Operator,BinaryExpression$Operator,java.lang.Object[],java.lang.Object[])" class="com.sonicbase.server.PartitionManager" />
+	<method signature="long access$000(com.sonicbase.server.PartitionManager,java.lang.String,int,java.lang.String,java.lang.String)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="void resetRepartitioningComplete()" class="com.sonicbase.server.PartitionManager" />
+	<method signature="boolean isRepartitioningComplete()" class="com.sonicbase.server.PartitionManager" />
+	<method signature="void doSelectPartitions(TableSchema$Partition[],TableSchema,java.lang.String,BinaryExpression$Operator,java.util.Comparator[],java.lang.Object[],boolean,java.util.List)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="ComObject getPartitionSize(ComObject)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="boolean addToRebalance(java.util.List,java.util.Map$Entry,java.lang.String,com.sonicbase.server.PartitionManager$IndexCounts,boolean)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="DatabaseCommon access$200(com.sonicbase.server.PartitionManager)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="java.util.List getKeyAtOffset(java.lang.String,int,java.lang.String,java.lang.String,java.util.List)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="java.util.concurrent.ConcurrentHashMap getIndicesToDeleteFrom(java.lang.String,java.lang.String)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="void moveIndexEntriesToShard(java.lang.String,java.lang.String,java.lang.String,boolean,int,java.util.List)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="ComObject getIndexCounts(ComObject)" class="com.sonicbase.server.PartitionManager" />
+	<method signature="void doSelectPartitions(TableSchema$Partition[],TableSchema,java.lang.String,BinaryExpression$Operator,java.util.Comparator[],java.lang.Object[],java.lang.Object[],boolean,java.util.List)" class="com.sonicbase.server.PartitionManager" />
+	<field name="tableToDeleteEntriesFrom" class="com.sonicbase.server.PartitionManager" />
+	<field name="databaseServer" class="com.sonicbase.server.PartitionManager" />
+	<field name="moveProcessors" class="com.sonicbase.server.PartitionManager" />
+	<field name="logger" class="com.sonicbase.server.PartitionManager" />
+	<field name="minSizeForRepartition" class="com.sonicbase.server.PartitionManager" />
+	<field name="entriesToDelete" class="com.sonicbase.server.PartitionManager" />
+	<field name="INDEX_STR" class="com.sonicbase.server.PartitionManager" />
+	<field name="currTableRepartitioning" class="com.sonicbase.server.PartitionManager" />
+	<field name="isShardRepartitioningComplete" class="com.sonicbase.server.PartitionManager" />
+	<field name="deletingComplete" class="com.sonicbase.server.PartitionManager" />
+	<field name="indices" class="com.sonicbase.server.PartitionManager" />
+	<field name="isRebalancing" class="com.sonicbase.server.PartitionManager" />
+	<field name="NAME_STR" class="com.sonicbase.server.PartitionManager" />
+	<field name="common" class="com.sonicbase.server.PartitionManager" />
+	<field name="currIndexRepartitioning" class="com.sonicbase.server.PartitionManager" />
+	<field name="repartitioningRecordsByIdComplete" class="com.sonicbase.server.PartitionManager" />
+	<field name="repartitioningComplete" class="com.sonicbase.server.PartitionManager" />
+	<field name="beginRepartitioningThread" class="com.sonicbase.server.PartitionManager" />
+	<field name="isRepartitioningIndex" class="com.sonicbase.server.PartitionManager" />
+	<field name="shutdown" class="com.sonicbase.server.PartitionManager" />
+	<field name="isComplete" class="com.sonicbase.server.PartitionManager" />
 	<class name="com.sonicbase.index.Index$3" />
 	<method signature="void &lt;init&gt;(com.sonicbase.index.Index)" class="com.sonicbase.index.Index$3" />
 	<method signature="int compare(java.lang.Long,java.lang.Long)" class="com.sonicbase.index.Index$3" />
@@ -3547,11 +3547,11 @@
 	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.server.DatabaseServer$BackupJob" />
 	<method signature="void &lt;init&gt;()" class="com.sonicbase.server.DatabaseServer$BackupJob" />
 	<method signature="void execute(org.quartz.JobExecutionContext)" class="com.sonicbase.server.DatabaseServer$BackupJob" />
-	<class name="com.sonicbase.index.Repartitioner$MoveProcessor$1$1" />
-	<method signature="void run()" class="com.sonicbase.index.Repartitioner$MoveProcessor$1$1" />
-	<method signature="void &lt;init&gt;(com.sonicbase.index.Repartitioner$MoveProcessor$1,java.util.List)" class="com.sonicbase.index.Repartitioner$MoveProcessor$1$1" />
-	<field name="val$list" class="com.sonicbase.index.Repartitioner$MoveProcessor$1$1" />
-	<field name="this$2" class="com.sonicbase.index.Repartitioner$MoveProcessor$1$1" />
+	<class name="com.sonicbase.server.PartitionManager$MoveProcessor$1$1" />
+	<method signature="void run()" class="com.sonicbase.server.PartitionManager$MoveProcessor$1$1" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.PartitionManager$MoveProcessor$1,java.util.List)" class="com.sonicbase.server.PartitionManager$MoveProcessor$1$1" />
+	<field name="val$list" class="com.sonicbase.server.PartitionManager$MoveProcessor$1$1" />
+	<field name="this$2" class="com.sonicbase.server.PartitionManager$MoveProcessor$1$1" />
 	<class name="DiskBasedResultSet" />
 	<method signature="void &lt;clinit&gt;()" class="DiskBasedResultSet" />
 	<method signature="void getKeepers(java.lang.String,com.sonicbase.server.DatabaseServer,java.lang.String[],java.util.Map,boolean[][],java.lang.String,java.lang.String)" class="DiskBasedResultSet" />
@@ -3892,10 +3892,10 @@
 	<method signature="ComObject$DynamicType access$000(ComObject$DynamicTag)" class="ComObject$DynamicTag" />
 	<field name="tag" class="ComObject$DynamicTag" />
 	<field name="type" class="ComObject$DynamicTag" />
-	<class name="com.sonicbase.index.Repartitioner$MoveProcessor$1" />
-	<method signature="void run()" class="com.sonicbase.index.Repartitioner$MoveProcessor$1" />
-	<method signature="void &lt;init&gt;(com.sonicbase.index.Repartitioner$MoveProcessor)" class="com.sonicbase.index.Repartitioner$MoveProcessor$1" />
-	<field name="this$1" class="com.sonicbase.index.Repartitioner$MoveProcessor$1" />
+	<class name="com.sonicbase.server.PartitionManager$MoveProcessor$1" />
+	<method signature="void run()" class="com.sonicbase.server.PartitionManager$MoveProcessor$1" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.PartitionManager$MoveProcessor)" class="com.sonicbase.server.PartitionManager$MoveProcessor$1" />
+	<field name="this$1" class="com.sonicbase.server.PartitionManager$MoveProcessor$1" />
 	<class name="DatabaseClient$InsertRequest" />
 	<method signature="void &lt;init&gt;(DatabaseClient)" class="DatabaseClient$InsertRequest" />
 	<method signature="InsertStatementImpl access$1400(DatabaseClient$InsertRequest)" class="DatabaseClient$InsertRequest" />
@@ -4168,9 +4168,9 @@
 	<field name="this$0" class="com.sonicbase.server.DeleteManagerImpl$1" />
 	<class name="Expression" />
 	<method signature="void &lt;clinit&gt;()" class="Expression" />
-	<class name="com.sonicbase.index.Repartitioner$GetKeyAtOffset" />
-	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.index.Repartitioner$GetKeyAtOffset" />
-	<method signature="java.util.List getKeyAtOffset(java.lang.String,int,java.lang.String,java.lang.String,java.util.List)" class="com.sonicbase.index.Repartitioner$GetKeyAtOffset" />
+	<class name="com.sonicbase.server.PartitionManager$GetKeyAtOffset" />
+	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.server.PartitionManager$GetKeyAtOffset" />
+	<method signature="java.util.List getKeyAtOffset(java.lang.String,int,java.lang.String,java.lang.String,java.util.List)" class="com.sonicbase.server.PartitionManager$GetKeyAtOffset" />
 	<class name="Parameter$RowId" />
 	<method signature="int getSqlType()" class="Parameter$RowId" />
 	<method signature="void &lt;clinit&gt;()" class="Parameter$RowId" />
@@ -4261,38 +4261,38 @@
 	<method signature="void &lt;init&gt;(java.lang.String,byte[])" class="com.sonicbase.server.LogManager$QueueEntry" />
 	<field name="body" class="com.sonicbase.server.LogManager$QueueEntry" />
 	<field name="command" class="com.sonicbase.server.LogManager$QueueEntry" />
-	<class name="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<method signature="java.lang.String access$1000(com.sonicbase.index.Repartitioner$MoveProcessor)" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<method signature="void await()" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<method signature="void shutdown()" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<method signature="java.lang.String access$900(com.sonicbase.index.Repartitioner$MoveProcessor)" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<method signature="java.lang.String access$800(com.sonicbase.index.Repartitioner$MoveProcessor)" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<method signature="java.util.concurrent.atomic.AtomicInteger access$1800(com.sonicbase.index.Repartitioner$MoveProcessor)" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<method signature="boolean access$500(com.sonicbase.index.Repartitioner$MoveProcessor)" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<method signature="int access$1200(com.sonicbase.index.Repartitioner$MoveProcessor)" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<method signature="java.util.concurrent.ConcurrentLinkedQueue access$1700(com.sonicbase.index.Repartitioner$MoveProcessor)" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<method signature="boolean access$1100(com.sonicbase.index.Repartitioner$MoveProcessor)" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<method signature="void start()" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<method signature="void &lt;init&gt;(com.sonicbase.index.Repartitioner,java.lang.String,java.lang.String,java.lang.String,boolean,com.sonicbase.index.Index,java.util.concurrent.ConcurrentLinkedQueue,int)" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<method signature="java.util.concurrent.ArrayBlockingQueue access$600(com.sonicbase.index.Repartitioner$MoveProcessor)" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<method signature="java.util.concurrent.ThreadPoolExecutor access$1900(com.sonicbase.index.Repartitioner$MoveProcessor)" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<method signature="java.util.concurrent.atomic.AtomicInteger access$700(com.sonicbase.index.Repartitioner$MoveProcessor)" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<method signature="com.sonicbase.index.Index access$1600(com.sonicbase.index.Repartitioner$MoveProcessor)" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<field name="indexName" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<field name="dbName" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<field name="index" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<field name="isPrimaryKey" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<field name="keysToDelete" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<field name="thread" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<field name="tableName" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<field name="countStarted" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<field name="executor" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<field name="this$0" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<field name="countFinished" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<field name="shard" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<field name="queue" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
-	<field name="shutdown" class="com.sonicbase.index.Repartitioner$MoveProcessor" />
+	<class name="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<method signature="java.lang.String access$1000(com.sonicbase.server.PartitionManager$MoveProcessor)" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<method signature="void await()" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<method signature="void shutdown()" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<method signature="java.lang.String access$900(com.sonicbase.server.PartitionManager$MoveProcessor)" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<method signature="java.lang.String access$800(com.sonicbase.server.PartitionManager$MoveProcessor)" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<method signature="java.util.concurrent.atomic.AtomicInteger access$1800(com.sonicbase.server.PartitionManager$MoveProcessor)" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<method signature="boolean access$500(com.sonicbase.server.PartitionManager$MoveProcessor)" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<method signature="int access$1200(com.sonicbase.server.PartitionManager$MoveProcessor)" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<method signature="java.util.concurrent.ConcurrentLinkedQueue access$1700(com.sonicbase.server.PartitionManager$MoveProcessor)" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<method signature="boolean access$1100(com.sonicbase.server.PartitionManager$MoveProcessor)" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<method signature="void start()" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.PartitionManager,java.lang.String,java.lang.String,java.lang.String,boolean,com.sonicbase.index.Index,java.util.concurrent.ConcurrentLinkedQueue,int)" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<method signature="java.util.concurrent.ArrayBlockingQueue access$600(com.sonicbase.server.PartitionManager$MoveProcessor)" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<method signature="java.util.concurrent.ThreadPoolExecutor access$1900(com.sonicbase.server.PartitionManager$MoveProcessor)" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<method signature="java.util.concurrent.atomic.AtomicInteger access$700(com.sonicbase.server.PartitionManager$MoveProcessor)" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<method signature="com.sonicbase.index.Index access$1600(com.sonicbase.server.PartitionManager$MoveProcessor)" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<field name="indexName" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<field name="dbName" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<field name="index" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<field name="isPrimaryKey" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<field name="keysToDelete" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<field name="thread" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<field name="tableName" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<field name="countStarted" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<field name="executor" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<field name="this$0" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<field name="countFinished" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<field name="shard" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<field name="queue" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
+	<field name="shutdown" class="com.sonicbase.server.PartitionManager$MoveProcessor" />
 	<class name="Parameter$Short" />
 	<method signature="int getSqlType()" class="Parameter$Short" />
 	<method signature="Parameter$ParameterBase deserialize(java.io.DataInputStream)" class="Parameter$Short" />
@@ -4350,11 +4350,11 @@
 	<field name="cpu" class="com.sonicbase.server.DatabaseServer$OSStats" />
 	<field name="javaMemMin" class="com.sonicbase.server.DatabaseServer$OSStats" />
 	<field name="avgTransRate" class="com.sonicbase.server.DatabaseServer$OSStats" />
-	<class name="com.sonicbase.index.Repartitioner$MapEntry" />
-	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.index.Repartitioner$MapEntry" />
-	<method signature="void &lt;init&gt;(java.lang.Object[],java.lang.Object)" class="com.sonicbase.index.Repartitioner$MapEntry" />
-	<field name="value" class="com.sonicbase.index.Repartitioner$MapEntry" />
-	<field name="key" class="com.sonicbase.index.Repartitioner$MapEntry" />
+	<class name="com.sonicbase.server.PartitionManager$MapEntry" />
+	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.server.PartitionManager$MapEntry" />
+	<method signature="void &lt;init&gt;(java.lang.Object[],java.lang.Object)" class="com.sonicbase.server.PartitionManager$MapEntry" />
+	<field name="value" class="com.sonicbase.server.PartitionManager$MapEntry" />
+	<field name="key" class="com.sonicbase.server.PartitionManager$MapEntry" />
 	<class name="ConstantImpl" />
 	<method signature="void setSqlType(int)" class="ConstantImpl" />
 	<method signature="int getSqlType()" class="ConstantImpl" />
@@ -4389,12 +4389,12 @@
 	<field name="longRunningCommands" class="com.sonicbase.server.LongRunningCommands$SingleCommand" />
 	<field name="body" class="com.sonicbase.server.LongRunningCommands$SingleCommand" />
 	<field name="command" class="com.sonicbase.server.LongRunningCommands$SingleCommand" />
-	<class name="com.sonicbase.server.RecordLockedException" />
-	<method signature="void &lt;init&gt;(java.lang.Exception)" class="com.sonicbase.server.RecordLockedException" />
-	<method signature="void &lt;init&gt;(java.lang.String,java.lang.Exception)" class="com.sonicbase.server.RecordLockedException" />
-	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.server.RecordLockedException" />
-	<method signature="void &lt;init&gt;()" class="com.sonicbase.server.RecordLockedException" />
-	<method signature="void &lt;init&gt;(java.lang.String)" class="com.sonicbase.server.RecordLockedException" />
+	<class name="com.sonicbase.common.RecordLockedException" />
+	<method signature="void &lt;init&gt;(java.lang.Exception)" class="com.sonicbase.common.RecordLockedException" />
+	<method signature="void &lt;init&gt;(java.lang.String,java.lang.Exception)" class="com.sonicbase.common.RecordLockedException" />
+	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.common.RecordLockedException" />
+	<method signature="void &lt;init&gt;()" class="com.sonicbase.common.RecordLockedException" />
+	<method signature="void &lt;init&gt;(java.lang.String)" class="com.sonicbase.common.RecordLockedException" />
 	<class name="DatabaseSocketClient" />
 	<method signature="DatabaseSocketClient$Connection borrow_connection(java.lang.String,int)" class="DatabaseSocketClient" />
 	<method signature="byte[] do_send(java.lang.String,java.lang.String,byte[],java.lang.String)" class="DatabaseSocketClient" />
@@ -4963,11 +4963,11 @@
 	<method signature="void &lt;clinit&gt;()" class="QueryPlan" />
 	<method signature="void &lt;init&gt;()" class="QueryPlan" />
 	<field name="expression" class="QueryPlan" />
-	<class name="com.sonicbase.index.Repartitioner$8$1" />
-	<method signature="void run()" class="com.sonicbase.index.Repartitioner$8$1" />
-	<method signature="void &lt;init&gt;(com.sonicbase.index.Repartitioner$8,java.util.List)" class="com.sonicbase.index.Repartitioner$8$1" />
-	<field name="this$1" class="com.sonicbase.index.Repartitioner$8$1" />
-	<field name="val$toProcess" class="com.sonicbase.index.Repartitioner$8$1" />
+	<class name="com.sonicbase.server.PartitionManager$8$1" />
+	<method signature="void run()" class="com.sonicbase.server.PartitionManager$8$1" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.PartitionManager$8,java.util.List)" class="com.sonicbase.server.PartitionManager$8$1" />
+	<field name="this$1" class="com.sonicbase.server.PartitionManager$8$1" />
+	<field name="val$toProcess" class="com.sonicbase.server.PartitionManager$8$1" />
 	<class name="DeleteStatementImpl" />
 	<method signature="void &lt;init&gt;(DatabaseClient)" class="DeleteStatementImpl" />
 	<method signature="java.lang.String getTableName()" class="DeleteStatementImpl" />
@@ -5017,12 +5017,12 @@
 	<method signature="void &lt;init&gt;(java.lang.String,int)" class="DatabaseSocketClient$Connection" />
 	<field name="sock" class="DatabaseSocketClient$Connection" />
 	<field name="count_called" class="DatabaseSocketClient$Connection" />
-	<class name="com.sonicbase.index.Repartitioner$GlobalIndexCounts" />
-	<method signature="java.util.concurrent.ConcurrentHashMap access$2200(com.sonicbase.index.Repartitioner$GlobalIndexCounts)" class="com.sonicbase.index.Repartitioner$GlobalIndexCounts" />
-	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.index.Repartitioner$GlobalIndexCounts" />
-	<method signature="void &lt;init&gt;()" class="com.sonicbase.index.Repartitioner$GlobalIndexCounts" />
-	<method signature="java.util.concurrent.ConcurrentHashMap getTables()" class="com.sonicbase.index.Repartitioner$GlobalIndexCounts" />
-	<field name="tables" class="com.sonicbase.index.Repartitioner$GlobalIndexCounts" />
+	<class name="com.sonicbase.server.PartitionManager$GlobalIndexCounts" />
+	<method signature="java.util.concurrent.ConcurrentHashMap access$2200(com.sonicbase.server.PartitionManager$GlobalIndexCounts)" class="com.sonicbase.server.PartitionManager$GlobalIndexCounts" />
+	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.server.PartitionManager$GlobalIndexCounts" />
+	<method signature="void &lt;init&gt;()" class="com.sonicbase.server.PartitionManager$GlobalIndexCounts" />
+	<method signature="java.util.concurrent.ConcurrentHashMap getTables()" class="com.sonicbase.server.PartitionManager$GlobalIndexCounts" />
+	<field name="tables" class="com.sonicbase.server.PartitionManager$GlobalIndexCounts" />
 	<class name="DiskBasedResultSet$1" />
 	<method signature="void &lt;init&gt;(DiskBasedResultSet,int[],int[],boolean[],java.util.Comparator[])" class="DiskBasedResultSet$1" />
 	<method signature="int compare(java.lang.Object,java.lang.Object)" class="DiskBasedResultSet$1" />
@@ -5040,12 +5040,12 @@
 	<method signature="void serialize(java.io.DataOutputStream,boolean)" class="Parameter$Clob" />
 	<method signature="void &lt;init&gt;(Parameter$ParameterBase)" class="Parameter$Clob" />
 	<method signature="void &lt;init&gt;(byte[])" class="Parameter$Clob" />
-	<class name="com.sonicbase.index.Repartitioner$TableIndexCounts" />
-	<method signature="java.util.concurrent.ConcurrentHashMap access$2300(com.sonicbase.index.Repartitioner$TableIndexCounts)" class="com.sonicbase.index.Repartitioner$TableIndexCounts" />
-	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.index.Repartitioner$TableIndexCounts" />
-	<method signature="void &lt;init&gt;()" class="com.sonicbase.index.Repartitioner$TableIndexCounts" />
-	<method signature="java.util.concurrent.ConcurrentHashMap getIndices()" class="com.sonicbase.index.Repartitioner$TableIndexCounts" />
-	<field name="indices" class="com.sonicbase.index.Repartitioner$TableIndexCounts" />
+	<class name="com.sonicbase.server.PartitionManager$TableIndexCounts" />
+	<method signature="java.util.concurrent.ConcurrentHashMap access$2300(com.sonicbase.server.PartitionManager$TableIndexCounts)" class="com.sonicbase.server.PartitionManager$TableIndexCounts" />
+	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.server.PartitionManager$TableIndexCounts" />
+	<method signature="void &lt;init&gt;()" class="com.sonicbase.server.PartitionManager$TableIndexCounts" />
+	<method signature="java.util.concurrent.ConcurrentHashMap getIndices()" class="com.sonicbase.server.PartitionManager$TableIndexCounts" />
+	<field name="indices" class="com.sonicbase.server.PartitionManager$TableIndexCounts" />
 	<class name="DeadServerException" />
 	<method signature="void &lt;clinit&gt;()" class="DeadServerException" />
 	<method signature="void &lt;init&gt;()" class="DeadServerException" />

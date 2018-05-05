@@ -5,7 +5,7 @@ import com.sonicbase.common.ComObject;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.Record;
 import com.sonicbase.common.SchemaOutOfSyncException;
-import com.sonicbase.index.Repartitioner;
+import com.sonicbase.server.PartitionManager;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
@@ -102,7 +102,7 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
                   null, null, null, client.getCommon().getSchemaVersion(), false, restrictToThisServer, procedureContext, schemaRetryCount);
             }
             if (record != null) {
-              List<Integer> selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false, fieldOffsets, client.getCommon(), tableSchema,
+              List<Integer> selectedShards = PartitionManager.findOrderedPartitionForRecord(true, false, fieldOffsets, client.getCommon(), tableSchema,
                   indexSchema.getName(), null, BinaryExpression.Operator.equal, null, entry[0], null);
               if (selectedShards.size() == 0) {
                 throw new Exception("No shards selected for query");

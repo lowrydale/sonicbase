@@ -351,7 +351,7 @@ public class TestStreams {
     TableSchema tableSchema = clientA.getCommon().getTables("test").get("persons");
     Index index = dbServers[0].getIndices().get("test").getIndices().get("persons").get("_1__primarykey");
     Map.Entry<Object[], Object> entry = index.lastEntry();
-    byte[][] bytes = dbServers[0].fromUnsafeToRecords(entry.getValue());
+    byte[][] bytes = dbServers[0].getAddressMap().fromUnsafeToRecords(entry.getValue());
     Record record = new Record("test", clientA.getCommon(), bytes[0]);
 
     builder.append("{");

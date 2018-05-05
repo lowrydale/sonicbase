@@ -1,8 +1,10 @@
-package com.sonicbase.index;
+package com.sonicbase.server;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
+import com.sonicbase.index.Index;
+import com.sonicbase.index.Indices;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.OrderByExpressionImpl;
@@ -10,8 +12,6 @@ import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.Schema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.server.DatabaseServer;
-import com.sonicbase.server.DeleteManagerImpl;
 import com.sonicbase.socket.DeadServerException;
 import org.apache.commons.lang.exception.ExceptionUtils;
 
@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicReference;
 /**
  * Responsible for
  */
-public class Repartitioner extends Thread {
+public class PartitionManager extends Thread {
 
   private static final String INDEX_STR = ", index=";
   private static final String NAME_STR = "name";
@@ -73,8 +73,8 @@ public class Repartitioner extends Thread {
   private int minSizeForRepartition = 0;//10000;
   private boolean shutdown;
 
-  public Repartitioner(DatabaseServer databaseServer, DatabaseCommon common) {
-    super("Repartitioner Thread");
+  public PartitionManager(DatabaseServer databaseServer, DatabaseCommon common) {
+    super("PartitionManager Thread");
     logger = new Logger(null /*databaseServer.getDatabaseClient()*/);
     this.databaseServer = databaseServer;
     this.common = common;
@@ -204,7 +204,7 @@ public class Repartitioner extends Thread {
               tableSchema.getName(), currPartitionSizes, newPartitionSize, new GetKeyAtOffset() {
                 @Override
                 public List<Object[]> getKeyAtOffset(String dbName, int shard, String tableName, String indexName, List<OffsetEntry> offsets) throws IOException {
-                  return Repartitioner.this.getKeyAtOffset(dbName, shard, tableName, indexName, offsets);
+                  return PartitionManager.this.getKeyAtOffset(dbName, shard, tableName, indexName, offsets);
                 }
               });
           logger.info("master - calculating partitions - finished: table=" + tableName + ", index=" + indexName +
@@ -1039,13 +1039,21 @@ public class Repartitioner extends Thread {
     return retObj;
   }
 
-  static class MapEntry {
+  public static class MapEntry {
     Object[] key;
     Object value;
 
     public MapEntry(Object[] key, Object value) {
       this.key = key;
       this.value = value;
+    }
+
+    public Object[] getKey() {
+      return key;
+    }
+
+    public Object getValue() {
+      return value;
     }
   }
 
@@ -1105,7 +1113,7 @@ public class Repartitioner extends Thread {
                       if (request.shouldDeleteNow) {
                         synchronized (index.getMutex(request.key)) {
                           if (isPrimaryKey) {
-                            byte[][] content = databaseServer.fromUnsafeToRecords(index.get(request.key));
+                            byte[][] content = databaseServer.getAddressMap().fromUnsafeToRecords(index.get(request.key));
                             if (content != null) {
                               for (byte[] bytes : content) {
                                 if (Record.DB_VIEW_FLAG_DELETING != Record.getDbViewFlags(bytes)) {
@@ -1115,7 +1123,7 @@ public class Repartitioner extends Thread {
                             }
                           }
                           else {
-                            byte[][] content = databaseServer.fromUnsafeToKeys(index.get(request.key));
+                            byte[][] content = databaseServer.getAddressMap().fromUnsafeToKeys(index.get(request.key));
                             if (content != null) {
                               for (byte[] bytes : content) {
                                 if (Record.DB_VIEW_FLAG_DELETING != KeyRecord.getDbViewFlags(bytes)) {
@@ -1127,7 +1135,7 @@ public class Repartitioner extends Thread {
                           Object value = index.remove(request.key);
                           if (value != null) {
                             //toFree.add(value);
-                            databaseServer.freeUnsafeIds(value);
+                            databaseServer.getAddressMap().freeUnsafeIds(value);
                           }
                         }
                       }
@@ -1146,7 +1154,7 @@ public class Repartitioner extends Thread {
 //                      @Override
 //                      public void run() {
                     for (Object obj : toFree) {
-                      databaseServer.freeUnsafeIds(obj);
+                      databaseServer.getAddressMap().freeUnsafeIds(obj);
                     }
 //                      }
 //                    }, 30 * 1000);
@@ -1565,7 +1573,7 @@ public class Repartitioner extends Thread {
 //        @Override
 //        public void run() {
       for (Object obj : toFree) {
-        databaseServer.freeUnsafeIds(obj);
+        databaseServer.getAddressMap().freeUnsafeIds(obj);
       }
 
       if (indexSchema.isPrimaryKey()) {
@@ -1596,10 +1604,10 @@ public class Repartitioner extends Thread {
       byte[][] content = null;
       if (value != null) {
         if (indexSchema.isPrimaryKey()) {
-          content = databaseServer.fromUnsafeToRecords(value);
+          content = databaseServer.getAddressMap().fromUnsafeToRecords(value);
         }
         else {
-          content = databaseServer.fromUnsafeToKeys(value);
+          content = databaseServer.getAddressMap().fromUnsafeToKeys(value);
         }
       }
       if (content != null) {
@@ -1616,9 +1624,9 @@ public class Repartitioner extends Thread {
             newContent[i] = content[i];
           }
           //toFree.add(value);
-          Object newValue = databaseServer.toUnsafeFromRecords(newContent);
+          Object newValue = databaseServer.getAddressMap().toUnsafeFromRecords(newContent);
           index.put(request.getKey(), newValue);
-          databaseServer.freeUnsafeIds(value);
+          databaseServer.getAddressMap().freeUnsafeIds(value);
         }
         else {
           byte[][] newContent = new byte[content.length][];
@@ -1633,9 +1641,9 @@ public class Repartitioner extends Thread {
             keysToDeleteExpanded.add(new DeleteManagerImpl. DeleteRequestForKeyRecord(request.getKey(), KeyRecord.getPrimaryKey(content[i])));
           }
           //toFree.add(value);
-          Object newValue = databaseServer.toUnsafeFromRecords(newContent);
+          Object newValue = databaseServer.getAddressMap().toUnsafeFromRecords(newContent);
           index.put(request.getKey(), newValue);
-          databaseServer.freeUnsafeIds(value);
+          databaseServer.getAddressMap().freeUnsafeIds(value);
         }
       }
     }
@@ -1677,7 +1685,7 @@ public class Repartitioner extends Thread {
           }
           byte[][] content = null;
           int shard = 0;
-          List<Integer> selectedShards = Repartitioner.findOrderedPartitionForRecord(true,
+          List<Integer> selectedShards = PartitionManager.findOrderedPartitionForRecord(true,
               false, fieldOffsets, common, tableSchema, indexName,
               null, BinaryExpression.Operator.equal, null,
               entry.key, null);
@@ -1685,10 +1693,10 @@ public class Repartitioner extends Thread {
             entry.value = index.get(entry.key);
             if (entry.value != null) {
               if (indexSchema.isPrimaryKey()) {
-                content = databaseServer.fromUnsafeToRecords(entry.value);
+                content = databaseServer.getAddressMap().fromUnsafeToRecords(entry.value);
               }
               else {
-                content = databaseServer.fromUnsafeToKeys(entry.value);
+                content = databaseServer.getAddressMap().fromUnsafeToKeys(entry.value);
               }
             }
             if (content != null) {
@@ -1707,9 +1715,9 @@ public class Repartitioner extends Thread {
                     Record.setDbViewNumber(newBytes, common.getSchemaVersion());
                     newContent[i] = newBytes;
                   }
-                  Object newValue = databaseServer.toUnsafeFromRecords(newContent);
+                  Object newValue = databaseServer.getAddressMap().toUnsafeFromRecords(newContent);
                   index.put(entry.key, newValue);
-                  databaseServer.freeUnsafeIds(entry.value);
+                  databaseServer.getAddressMap().freeUnsafeIds(entry.value);
                 }
                 else {
                   byte[][] newContent = new byte[content.length][];
@@ -1725,9 +1733,9 @@ public class Repartitioner extends Thread {
                     newContent[i] = newBytes;
                   }
                   //toFree.add(entry.value);
-                  Object newValue = databaseServer.toUnsafeFromRecords(newContent);
+                  Object newValue = databaseServer.getAddressMap().toUnsafeFromRecords(newContent);
                   index.put(entry.key, newValue);
-                  databaseServer.freeUnsafeIds(entry.value);
+                  databaseServer.getAddressMap().freeUnsafeIds(entry.value);
                 }
               }
               else {
@@ -1737,9 +1745,9 @@ public class Repartitioner extends Thread {
                     Record.setDbViewNumber(content[i], 0);// common.getSchemaVersion() - 2);
                   }
                   //toFree.add(entry.value);
-                  Object newValue = databaseServer.toUnsafeFromRecords(content);
+                  Object newValue = databaseServer.getAddressMap().toUnsafeFromRecords(content);
                   index.put(entry.key, newValue);
-                  databaseServer.freeUnsafeIds(entry.value);
+                  databaseServer.getAddressMap().freeUnsafeIds(entry.value);
 
                 }
                 else {
@@ -1748,9 +1756,9 @@ public class Repartitioner extends Thread {
                     KeyRecord.setDbViewNumber(content[i], 0);// common.getSchemaVersion() - 2);
                   }
                   //toFree.add(entry.value);
-                  Object newValue = databaseServer.toUnsafeFromRecords(content);
+                  Object newValue = databaseServer.getAddressMap().toUnsafeFromRecords(content);
                   index.put(entry.key, newValue);
-                  databaseServer.freeUnsafeIds(entry.value);
+                  databaseServer.getAddressMap().freeUnsafeIds(entry.value);
                 }
                 content = null;
               }
@@ -2167,7 +2175,7 @@ public class Repartitioner extends Thread {
             Thread.sleep(2 * 1000);
           }
           catch (InterruptedException e) {
-            logger.info("Repartitioner interrupted");
+            logger.info("PartitionManager interrupted");
             return;
           }
         }
@@ -2337,7 +2345,7 @@ public class Repartitioner extends Thread {
         common.setServersConfig(newConfig);
       }
       common.saveServersConfig(databaseServer.getDataDir());
-      logger.info("Repartitioner: shardCount=" + newShards.length);
+      logger.info("PartitionManager: shardCount=" + newShards.length);
       databaseServer.setShardCount(newShards.length);
       databaseServer.getDatabaseClient().configureServers();
       databaseServer.pushServersConfig();

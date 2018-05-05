@@ -4,7 +4,7 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
-import com.sonicbase.index.Repartitioner;
+import com.sonicbase.server.PartitionManager;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.BinaryExpression;
@@ -370,7 +370,7 @@ public class ExpressionImpl implements Expression {
     for (int i = 0; i < indexFields.length; i++) {
       fieldOffsets[i] = tableSchema.getFieldOffset(indexFields[i]);
     }
-    List<Integer> selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false, fieldOffsets, client.getCommon(), tableSchema,
+    List<Integer> selectedShards = PartitionManager.findOrderedPartitionForRecord(true, false, fieldOffsets, client.getCommon(), tableSchema,
         indexName, null, BinaryExpression.Operator.equal, null, key, null);
 
     byte[] ret = client.send(batchKey, selectedShards.get(0), 0, cobj, DatabaseClient.Replica.def);
@@ -672,7 +672,7 @@ public class ExpressionImpl implements Expression {
 //          continue;
 //        }
 //
-//        selectedShards = Repartitioner.findOrderedPartitionForRecord(false, fieldOffsets, client.getCommon(), tableSchema,
+//        selectedShards = PartitionManager.findOrderedPartitionForRecord(false, fieldOffsets, client.getCommon(), tableSchema,
 //              indexSchema.getKey(), orderByExpressions, leftOperator, rightOperator, comparators, originalLeftValue, originalRightValue);
 //
 //        RecordIndexPartition recordPartition = recordPartitions[(int) (currId % recordPartitions.length)];
@@ -1017,7 +1017,7 @@ public class ExpressionImpl implements Expression {
 
       boolean synced = false;
       for (int i = 0; i < keysToRead.size(); i++) {
-        List<Integer> selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false, fieldOffsets, client.getCommon(), tableSchema,
+        List<Integer> selectedShards = PartitionManager.findOrderedPartitionForRecord(true, false, fieldOffsets, client.getCommon(), tableSchema,
             indexSchema.get().getKey(), null, BinaryExpression.Operator.equal, null, keysToRead.get(i).getValue(), null);
         if (selectedShards.size() == 0) {
           throw new DatabaseException("No shards selected for query");

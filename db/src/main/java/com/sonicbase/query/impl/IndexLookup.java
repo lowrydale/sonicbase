@@ -4,7 +4,7 @@ package com.sonicbase.query.impl;
 import com.codahale.metrics.Timer;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
-import com.sonicbase.index.Repartitioner;
+import com.sonicbase.server.PartitionManager;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
@@ -596,11 +596,11 @@ public class IndexLookup {
 
     public SelectShard invoke() {
       int lastShard;
-      selectedShards = Repartitioner.findOrderedPartitionForRecord(false, true, fieldOffsets, common, tableSchema,
+      selectedShards = PartitionManager.findOrderedPartitionForRecord(false, true, fieldOffsets, common, tableSchema,
           indexSchema.getName(), orderByExpressions, leftOp, rightOp, leftOriginalKey, rightOriginalKey);
       if (selectedShards.size() == 0) {
         currPartitions = true;
-        selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false, fieldOffsets, common, tableSchema,
+        selectedShards = PartitionManager.findOrderedPartitionForRecord(true, false, fieldOffsets, common, tableSchema,
             indexSchema.getName(), orderByExpressions, leftOp, rightOp, leftOriginalKey, rightOriginalKey);
       }
 

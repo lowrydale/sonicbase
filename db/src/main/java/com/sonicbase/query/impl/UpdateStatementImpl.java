@@ -3,7 +3,7 @@ package com.sonicbase.query.impl;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.client.InsertStatementHandler;
 import com.sonicbase.common.*;
-import com.sonicbase.index.Repartitioner;
+import com.sonicbase.server.PartitionManager;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
@@ -189,7 +189,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
               }
 
               //update record
-              List<Integer> selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false, fieldOffsets, client.getCommon(), tableSchema,
+              List<Integer> selectedShards = PartitionManager.findOrderedPartitionForRecord(true, false, fieldOffsets, client.getCommon(), tableSchema,
                   indexSchema.getName(), null, BinaryExpression.Operator.equal, null, newPrimaryKey, null);
               if (selectedShards.size() == 0) {
                 throw new Exception("No shards selected for query");

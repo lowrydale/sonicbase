@@ -6,7 +6,6 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.client.InsertStatementHandler;
 import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
-import com.sonicbase.index.Repartitioner;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.ResultSet;
 import com.sonicbase.query.impl.ColumnImpl;
@@ -223,7 +222,7 @@ public class UpdateManager {
           synchronized (index.getMutex(key)) {
             Object value = index.get(key);
             if (value != null) {
-              records = server.fromUnsafeToKeys(value);
+              records = server.getAddressMap().fromUnsafeToKeys(value);
             }
             if (records != null) {
               byte[][] newRecords = new byte[records.length - 1][];
@@ -250,14 +249,14 @@ public class UpdateManager {
                 if (newRecords.length == 0) {
                   Object obj = index.remove(key);
                   if (obj != null) {
-                    server.freeUnsafeIds(obj);
+                    server.getAddressMap().freeUnsafeIds(obj);
                     index.addAndGetCount(-1);
                   }
                 }
                 else {
-                  index.put(key, server.toUnsafeFromKeys(newRecords));
+                  index.put(key, server.getAddressMap().toUnsafeFromKeys(newRecords));
                   if (value != null) {
-                    server.freeUnsafeIds(value);
+                    server.getAddressMap().freeUnsafeIds(value);
                   }
                 }
               }
@@ -348,7 +347,7 @@ public class UpdateManager {
         synchronized (primaryKeyIndex.getMutex(entry.getKey())) {
           Object value = primaryKeyIndex.get(entry.getKey());
           if (!value.equals(0L)) {
-            byte[][] records = server.fromUnsafeToRecords(value);
+            byte[][] records = server.getAddressMap().fromUnsafeToRecords(value);
             for (int i = 0; i < records.length; i++) {
               Record record = new Record(dbName, server.getCommon(), records[i]);
               Object[] fields = record.getFields();
@@ -553,7 +552,7 @@ public class UpdateManager {
                                            AtomicBoolean isExplicitTransRet, AtomicLong transactionIdRet,
                                            boolean isCommitting) throws EOFException {
     try {
-      if (server.getAboveMemoryThreshold().get()) {
+      if (server.getOSStatsManager().getAboveMemoryThreshold().get()) {
         throw new DatabaseException("Above max memory threshold. Further inserts are not allowed");
       }
 
@@ -916,7 +915,7 @@ private static class InsertRequest {
     int originalOffset = cobj.getInt(ComObject.Tag.originalOffset);
 
     try {
-      if (server.getAboveMemoryThreshold().get()) {
+      if (server.getOSStatsManager().getAboveMemoryThreshold().get()) {
         throw new DatabaseException("Above max memory threshold. Further inserts are not allowed");
       }
 
@@ -963,7 +962,7 @@ private static class InsertRequest {
         for (int i = 0; i < indexFields.length; i++) {
           fieldOffsets[i] = tableSchema.getFieldOffset(indexFields[i]);
         }
-//        selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false, fieldOffsets, server.getCommon(), tableSchema,
+//        selectedShards = PartitionManager.findOrderedPartitionForRecord(true, false, fieldOffsets, server.getCommon(), tableSchema,
 //            indexName, null, BinaryExpression.Operator.equal, null, primaryKey, null);
 
 //        if (null != index.get(primaryKey)) {
@@ -973,7 +972,7 @@ private static class InsertRequest {
 
 //        int selectedShard = selectedShards.get(0);
 //        if (indexSchema.getCurrPartitions()[selectedShard].getShardOwning() != server.getShard()) {
-//          server.getRepartitioner().deleteIndexEntry(tableName, indexName, primaryKey);
+//          server.getPartitionManager().deleteIndexEntry(tableName, indexName, primaryKey);
 //        }
       }
       else {
@@ -1020,7 +1019,7 @@ private static class InsertRequest {
 ////          }
 //
 //          if (indexSchema.getCurrPartitions()[selectedShards.get(0)].getShardOwning() != server.getShard()) {
-//            if (server.getRepartitioner().undeleteIndexEntry(dbName, tableName, indexName, primaryKey, recordBytes)) {
+//            if (server.getPartitionManager().undeleteIndexEntry(dbName, tableName, indexName, primaryKey, recordBytes)) {
 //              doInsertKey(dbName, recordBytes, primaryKey, index, tableSchema.getName(), indexName, replayedCommand);
 //            }
 //          }
@@ -1245,12 +1244,12 @@ private static class InsertRequest {
       if (shouldExecute.get()) {
         //because this is the primary key index we won't have more than one index entry for the key
         Index index = server.getIndex(dbName, tableName, indexName);
-        Object newValue = server.toUnsafeFromRecords(new byte[][]{bytes});
+        Object newValue = server.getAddressMap().toUnsafeFromRecords(new byte[][]{bytes});
         byte[] existingBytes = null;
         synchronized (index.getMutex(primaryKey)) {
           Object value = index.get(primaryKey);
           if (value != null) {
-            byte[][] content = server.fromUnsafeToRecords(value);
+            byte[][] content = server.getAddressMap().fromUnsafeToRecords(value);
             existingBytes = content[0];
             if ((Record.getDbViewFlags(content[0]) & Record.DB_VIEW_FLAG_DELETING) != 0) {
               if ((Record.getDbViewFlags(bytes) & Record.DB_VIEW_FLAG_DELETING) == 0) {
@@ -1265,7 +1264,7 @@ private static class InsertRequest {
           }
           index.put(primaryKey, newValue);
           if (value != null) {
-            server.freeUnsafeIds(value);
+            server.getAddressMap().freeUnsafeIds(value);
           }
         }
         publishInsertOrUpdate(cobj, dbName, tableName, bytes, existingBytes, UpdateType.update);
@@ -1310,7 +1309,7 @@ private static class InsertRequest {
     //    currEntry.latch.await();
   }
 
-  public void doInsertKeys(final ComObject cobj, final String dbName, List<Repartitioner.MoveRequest> moveRequests, final Index index,
+  public void doInsertKeys(final ComObject cobj, final String dbName, List<PartitionManager.MoveRequest> moveRequests, final Index index,
                            final String tableName, final IndexSchema indexSchema, boolean replayedCommand,
                            final boolean movingRecord) {
     //    ArrayBlockingQueue<Entry> existing = insertQueue.computeIfAbsent(index, k -> new ArrayBlockingQueue<>(1000));
@@ -1319,7 +1318,7 @@ private static class InsertRequest {
       if (indexSchema.isPrimaryKey()) {
         if (replayedCommand) {
           List<Future> futures = new ArrayList<>();
-          for (final Repartitioner.MoveRequest moveRequest : moveRequests) {
+          for (final PartitionManager.MoveRequest moveRequest : moveRequests) {
             futures.add(server.getExecutor().submit(new Callable() {
               @Override
               public Object call() throws Exception {
@@ -1337,7 +1336,7 @@ private static class InsertRequest {
           }
         }
         else {
-          for (Repartitioner.MoveRequest moveRequest : moveRequests) {
+          for (PartitionManager.MoveRequest moveRequest : moveRequests) {
             byte[][] content = moveRequest.getContent();
             for (int i = 0; i < content.length; i++) {
               doActualInsertKeyWithRecord(cobj, dbName, content[i], moveRequest.getKey(), index, tableName,
@@ -1349,7 +1348,7 @@ private static class InsertRequest {
       else {
         if (replayedCommand) {
           List<Future> futures = new ArrayList<>();
-          for (final Repartitioner.MoveRequest moveRequest : moveRequests) {
+          for (final PartitionManager.MoveRequest moveRequest : moveRequests) {
             futures.add(server.getExecutor().submit(new Callable(){
               @Override
               public Object call() throws Exception {
@@ -1366,7 +1365,7 @@ private static class InsertRequest {
           }
         }
         else {
-          for (Repartitioner.MoveRequest moveRequest : moveRequests) {
+          for (PartitionManager.MoveRequest moveRequest : moveRequests) {
             byte[][] content = moveRequest.getContent();
             for (int i = 0; i < content.length; i++) {
               doActualInsertKey(moveRequest.getKey(), content[i], tableName, index, indexSchema);
@@ -1399,7 +1398,7 @@ private static class InsertRequest {
     synchronized (index.getMutex(key)) {
       existingValue = index.get(key);
       if (existingValue != null) {
-        byte[][] records = server.fromUnsafeToRecords(existingValue);
+        byte[][] records = server.getAddressMap().fromUnsafeToRecords(existingValue);
         boolean replaced = false;
         for (int i = 0; i < records.length; i++) {
           if (Arrays.equals(KeyRecord.getPrimaryKey(records[i]), KeyRecord.getPrimaryKey(keyRecordBytes))) {
@@ -1421,23 +1420,23 @@ private static class InsertRequest {
           throw new UniqueConstraintViolationException("Unique constraint violated: table=" + tableName + ", index=" + indexSchema.getName() + ", key=" + DatabaseCommon.keyToString(key));
         }
         if (replaced) {
-          Object address = server.toUnsafeFromRecords(records);
+          Object address = server.getAddressMap().toUnsafeFromRecords(records);
           index.put(key, address);
           //todo: increment if previous record was deleting
-          server.freeUnsafeIds(existingValue);
+          server.getAddressMap().freeUnsafeIds(existingValue);
         }
         else {
           byte[][] newRecords = new byte[records.length + 1][];
           System.arraycopy(records, 0, newRecords, 0, records.length);
           newRecords[newRecords.length - 1] = keyRecordBytes;
-          Object address = server.toUnsafeFromRecords(newRecords);
+          Object address = server.getAddressMap().toUnsafeFromRecords(newRecords);
           index.put(key, address);
           index.addAndGetCount(1);
-          server.freeUnsafeIds(existingValue);
+          server.getAddressMap().freeUnsafeIds(existingValue);
         }
       }
       if (existingValue == null) {
-        index.put(key, server.toUnsafeFromKeys(new byte[][]{keyRecordBytes}));
+        index.put(key, server.getAddressMap().toUnsafeFromKeys(new byte[][]{keyRecordBytes}));
       }
     }
   }
@@ -1462,10 +1461,10 @@ private static class InsertRequest {
       throw new DatabaseException("Invalid record, null");
     }
 
-    //server.getRepartitioner().notifyAdded(key, tableName, indexName);
+    //server.getPartitionManager().notifyAdded(key, tableName, indexName);
 
     try {
-      Object newUnsafeRecords = server.toUnsafeFromRecords(new byte[][]{recordBytes});
+      Object newUnsafeRecords = server.getAddressMap().toUnsafeFromRecords(new byte[][]{recordBytes});
       synchronized (index.getMutex(key)) {
         Object existingValue = index.put(key, newUnsafeRecords);
         if (existingValue == null) {
@@ -1474,7 +1473,7 @@ private static class InsertRequest {
         else {
           //synchronized (index) {
           boolean sameTrans = false;
-          byte[][] bytes = server.fromUnsafeToRecords(existingValue);
+          byte[][] bytes = server.getAddressMap().fromUnsafeToRecords(existingValue);
           long transId = Record.getTransId(recordBytes);
           boolean sameSequence = false;
           for (byte[] innerBytes : bytes) {
@@ -1497,7 +1496,7 @@ private static class InsertRequest {
           }
           if (!ignoreDuplicates && existingValue != null && !sameTrans && !sameSequence) {
             index.put(key, existingValue);
-            server.freeUnsafeIds(newUnsafeRecords);
+            server.getAddressMap().freeUnsafeIds(newUnsafeRecords);
             throw new UniqueConstraintViolationException("Unique constraint violated: table=" + tableName + ", index=" + indexName + ", key=" + DatabaseCommon.keyToString(key));
           }
           if ((Record.getDbViewFlags(bytes[0]) & Record.DB_VIEW_FLAG_DELETING) != 0) {
@@ -1508,7 +1507,7 @@ private static class InsertRequest {
           else if ((Record.getDbViewFlags(recordBytes) & Record.DB_VIEW_FLAG_DELETING) != 0) {
             index.addAndGetCount(-1);
           }
-          server.freeUnsafeIds(existingValue);
+          server.getAddressMap().freeUnsafeIds(existingValue);
         }
       }
       if (!movingRecord) {
@@ -1943,8 +1942,8 @@ class MessageRequest {
       synchronized (index.getMutex(key)) {
         Object value = index.remove(key);
         if (value != null) {
-          bytes = server.fromUnsafeToRecords(value);
-          server.freeUnsafeIds(value);
+          bytes = server.getAddressMap().fromUnsafeToRecords(value);
+          server.getAddressMap().freeUnsafeIds(value);
           index.addAndGetCount(-1);
         }
       }
@@ -2006,7 +2005,7 @@ class MessageRequest {
               synchronized (indexEntry.getKey()) {
                 Object value = index.remove(indexEntry.getKey());
                 if (value != null) {
-                  server.freeUnsafeIds(value);
+                  server.getAddressMap().freeUnsafeIds(value);
                 }
               }
               indexEntry = index.higherEntry(indexEntry.getKey());
@@ -2023,7 +2022,7 @@ class MessageRequest {
             synchronized (indexEntry.getKey()) {
               Object value = index.remove(indexEntry.getKey());
               if (value != null) {
-                server.freeUnsafeIds(value);
+                server.getAddressMap().freeUnsafeIds(value);
               }
             }
             indexEntry = index.higherEntry(indexEntry.getKey());
@@ -2071,7 +2070,7 @@ class MessageRequest {
         return;
       }
       else {
-        byte[][] ids = server.fromUnsafeToKeys(value);
+        byte[][] ids = server.getAddressMap().fromUnsafeToKeys(value);
         if (ids.length == 1) {
           boolean mismatch = false;
           if (!indexName.equals(primaryKeyIndexName)) {
@@ -2102,7 +2101,7 @@ class MessageRequest {
             }
             value = index.remove(key);
             if (value != null) {
-              server.freeUnsafeIds(value);
+              server.getAddressMap().freeUnsafeIds(value);
             }
           }
         }
@@ -2146,10 +2145,10 @@ class MessageRequest {
                 index.addAndGetCount(-1);
               }
             }
-            Object newValue = server.toUnsafeFromKeys(newValues);
+            Object newValue = server.getAddressMap().toUnsafeFromKeys(newValues);
             index.put(key, newValue);
             if (value != null) {
-              server.freeUnsafeIds(value);
+              server.getAddressMap().freeUnsafeIds(value);
             }
           }
         }

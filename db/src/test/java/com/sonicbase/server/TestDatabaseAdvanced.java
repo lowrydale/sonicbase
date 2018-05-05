@@ -269,7 +269,7 @@ public class TestDatabaseAdvanced {
     indexFile.delete();
 
     long begin = System.currentTimeMillis();
-    dbServers[0].reconcileSchema();
+    dbServers[0].getSchemaManager().reconcileSchema();
     System.out.println("reconcile duration=" + (System.currentTimeMillis() - begin));
 
     File[] files = tableDir.listFiles();
@@ -1837,7 +1837,7 @@ public class TestDatabaseAdvanced {
 
     Index index = ((DatabaseServer)DatabaseClient.getServers().get(0).get(0)).getIndices().get("test").getIndices().get("secondary_delete").get("_2_make_model");
     Object value = index.get(new Object[]{"make-0".getBytes("utf-8")});
-    byte[][] keys = ((DatabaseServer)DatabaseClient.getServers().get(0).get(0)).fromUnsafeToKeys(value);
+    byte[][] keys = ((DatabaseServer)DatabaseClient.getServers().get(0).get(0)).getAddressMap().fromUnsafeToKeys(value);
 
     index = ((DatabaseServer)DatabaseClient.getServers().get(0).get(0)).getIndices().get("test").getIndices().get("secondary_delete").get("_1__primarykey");
     TableSchema tableSchema = ((DatabaseServer)DatabaseClient.getServers().get(0).get(0)).getCommon().getTables("test").get("secondary_delete");

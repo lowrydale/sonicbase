@@ -5,6 +5,7 @@ import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.server.PartitionManager;
 import it.unimi.dsi.fastutil.longs.Long2ObjectAVLTreeMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectSortedMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectAVLTreeMap;
@@ -1464,7 +1465,7 @@ public class Index {
         boolean shouldSkip = false;
         while (true) {
           int count = 0;
-          List<Repartitioner.MapEntry> list = new ArrayList<>();
+          List<PartitionManager.MapEntry> list = new ArrayList<>();
           synchronized (this) {
             Long2ObjectSortedMap<Object> map = longIndex.tailMap((long) key[0]);
             if (map.isEmpty()) {
@@ -1476,7 +1477,7 @@ public class Index {
                 continue;
               }
               key = new Object[]{entry.getKey()};
-              list.add(new Repartitioner.MapEntry(key, entry.getValue()));
+              list.add(new PartitionManager.MapEntry(key, entry.getValue()));
               if (count++ > 100) {
                 break;
               }
@@ -1487,8 +1488,8 @@ public class Index {
           if (list.isEmpty()) {
             return false;
           }
-          for (Repartitioner.MapEntry entry : list) {
-            if (!visitor.visit(entry.key, entry.value)) {
+          for (PartitionManager.MapEntry entry : list) {
+            if (!visitor.visit(entry.getKey(), entry.getValue())) {
               return false;
             }
           }
@@ -1498,7 +1499,7 @@ public class Index {
         boolean shouldSkip = false;
         while (true) {
           int count = 0;
-          List<Repartitioner.MapEntry> list = new ArrayList<>();
+          List<PartitionManager.MapEntry> list = new ArrayList<>();
           synchronized (this) {
             Object2ObjectSortedMap<byte[], Object> map = stringIndex.tailMap((byte[]) key[0]);
             if (map.isEmpty()) {
@@ -1510,7 +1511,7 @@ public class Index {
                 continue;
               }
               key = new Object[]{entry.getKey()};
-              list.add(new Repartitioner.MapEntry(key, entry.getValue()));
+              list.add(new PartitionManager.MapEntry(key, entry.getValue()));
               if (count++ > 100) {
                 break;
               }
@@ -1521,8 +1522,8 @@ public class Index {
           if (list.isEmpty()) {
             return false;
           }
-          for (Repartitioner.MapEntry entry : list) {
-            if (!visitor.visit(entry.key, entry.value)) {
+          for (PartitionManager.MapEntry entry : list) {
+            if (!visitor.visit(entry.getKey(), entry.getValue())) {
               return false;
             }
           }
@@ -1532,7 +1533,7 @@ public class Index {
         boolean shouldSkip = false;
         while (true) {
           int count = 0;
-          List<Repartitioner.MapEntry> list = new ArrayList<>();
+          List<PartitionManager.MapEntry> list = new ArrayList<>();
           synchronized (this) {
             Object2ObjectSortedMap<Object[], Object> map = objectIndex.tailMap(key);
             if (map.isEmpty()) {
@@ -1544,7 +1545,7 @@ public class Index {
                 continue;
               }
               key = entry.getKey();
-              list.add(new Repartitioner.MapEntry(key, entry.getValue()));
+              list.add(new PartitionManager.MapEntry(key, entry.getValue()));
               if (count++ > 100) {
                 break;
               }
@@ -1555,8 +1556,8 @@ public class Index {
           if (list.isEmpty()) {
             return false;
           }
-          for (Repartitioner.MapEntry entry : list) {
-            if (!visitor.visit(entry.key, entry.value)) {
+          for (PartitionManager.MapEntry entry : list) {
+            if (!visitor.visit(entry.getKey(), entry.getValue())) {
               return false;
             }
           }
@@ -1617,7 +1618,7 @@ public class Index {
 /*
         while (true) {
           int count = 0;
-          List<Repartitioner.MapEntry> list = new ArrayList<>();
+          List<PartitionManager.MapEntry> list = new ArrayList<>();
           synchronized (this) {
             Long2ObjectSortedMap<Object> map = longIndex.headMap((long) key[0]);
             if (map.isEmpty()) {
@@ -1625,7 +1626,7 @@ public class Index {
             }
             for (Map.Entry<Long, Object> entry : map.entrySet()) {
               key = new Object[]{entry.getKey()};
-              list.add(new Repartitioner.MapEntry(key, entry.getValue()));
+              list.add(new PartitionManager.MapEntry(key, entry.getValue()));
               if (count++ > 100) {
                 break;
               }
@@ -1635,7 +1636,7 @@ public class Index {
           if (list.isEmpty()) {
             return true;
           }
-          for (Repartitioner.MapEntry entry : list) {
+          for (PartitionManager.MapEntry entry : list) {
             if (!visitor.visit(entry.key, entry.value)) {
               return false;
             }

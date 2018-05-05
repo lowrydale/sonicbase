@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.common.*;
-import com.sonicbase.index.Repartitioner;
+import com.sonicbase.server.PartitionManager;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.ResultSet;
 import com.sonicbase.query.impl.ResultSetImpl;
@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-import static com.sonicbase.index.Repartitioner.getIndexCounts;
+import static com.sonicbase.server.PartitionManager.getIndexCounts;
 
 public class DescribeStatementHandler {
   private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
@@ -440,9 +440,9 @@ public class DescribeStatementHandler {
         StringBuilder ret = new StringBuilder();
 
         Map<String, Entry> entries = new HashMap<>();
-        Repartitioner.GlobalIndexCounts counts = getIndexCounts(dbName, client);
-        for (Map.Entry<String, Repartitioner.TableIndexCounts> tableEntry : counts.getTables().entrySet()) {
-          for (Map.Entry<String, Repartitioner.IndexCounts> indexEntry : tableEntry.getValue().getIndices().entrySet()) {
+        PartitionManager.GlobalIndexCounts counts = getIndexCounts(dbName, client);
+        for (Map.Entry<String, PartitionManager.TableIndexCounts> tableEntry : counts.getTables().entrySet()) {
+          for (Map.Entry<String, PartitionManager.IndexCounts> indexEntry : tableEntry.getValue().getIndices().entrySet()) {
             ConcurrentHashMap<Integer, Long> currCounts = indexEntry.getValue().getCounts();
             for (Map.Entry<Integer, Long> countEntry : currCounts.entrySet()) {
               Entry entry = new Entry(tableEntry.getKey(), indexEntry.getKey(), countEntry.getKey(), "Table=" +

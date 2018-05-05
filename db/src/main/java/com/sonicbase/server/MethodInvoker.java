@@ -37,13 +37,17 @@ public class MethodInvoker {
   private final DatabaseServer server;
   private final DatabaseCommon common;
   private final MonitorManager monitorManager;
+  private final BackupManager backupManager;
+  private final OSStatsManager osStatsManager;
+  private final MasterManager masterManager;
   private boolean shutdown;
   private AtomicInteger testWriteCallCount = new AtomicInteger();
   private ConcurrentHashMap<String, Method> methodMap = new ConcurrentHashMap<>();
 
   public MethodInvoker(DatabaseServer server, BulkImportManager bulkImportManager, DeleteManager deleteManagerImpl,
                        SnapshotManager deltaManager, UpdateManager updateManager, TransactionManager transactionManager,
-                       ReadManager readManager, LogManager logManager, SchemaManager schemaManager, MonitorManager monitorManager) {
+                       ReadManager readManager, LogManager logManager, SchemaManager schemaManager, MonitorManager monitorManager,
+                       BackupManager backupManager, OSStatsManager osStatsManager, MasterManager masterManager) {
     this.server = server;
     this.common = server.getCommon();
     this.bulkImportManager = bulkImportManager;
@@ -55,6 +59,9 @@ public class MethodInvoker {
     this.logManager = logManager;
     this.schemaManager = schemaManager;
     this.monitorManager = monitorManager;
+    this.backupManager = backupManager;
+    this.osStatsManager = osStatsManager;
+    this.masterManager = masterManager;
 
     Method[] methods = MethodInvoker.class.getMethods();
     for (Method method : methods) {
@@ -346,7 +353,7 @@ public class MethodInvoker {
   }
 
   public ComObject licenseCheckin(ComObject cobj, boolean replayedCommand) {
-    return server.licenseCheckin(cobj);
+    return server.getLicenseManager().licenseCheckin(cobj);
   }
 
   public ComObject areAllLongRunningCommandsComplete(ComObject cobj, boolean replayedCommand) {
@@ -461,15 +468,15 @@ public class MethodInvoker {
   }
 
   public ComObject promoteEntireReplicaToMaster(ComObject cobj, boolean replayedCommand) {
-    return server.promoteEntireReplicaToMaster(cobj);
+    return masterManager.promoteEntireReplicaToMaster(cobj);
   }
 
   public ComObject electNewMaster(ComObject cobj, boolean replayedCommand) throws InterruptedException, IOException {
-    return server.electNewMaster(cobj);
+    return masterManager.electNewMaster(cobj);
   }
 
   public ComObject promoteToMaster(ComObject cobj, boolean replayedCommand) {
-    return server.promoteToMaster(cobj);
+    return masterManager.promoteToMaster(cobj);
   }
 
   public ComObject markReplicaDead(ComObject cobj, boolean replayedCommand) {
@@ -510,88 +517,88 @@ public class MethodInvoker {
   }
 
   public ComObject getRepartitionerState(ComObject cobj, boolean replayedCommand) {
-    return server.getRepartitioner().getRepartitionerState(cobj);
+    return server.getPartitionManager().getRepartitionerState(cobj);
   }
 
   public ComObject isShardRepartitioningComplete(ComObject cobj, boolean replayedCommand) {
-    return server.getRepartitioner().isShardRepartitioningComplete(cobj, replayedCommand);
+    return server.getPartitionManager().isShardRepartitioningComplete(cobj, replayedCommand);
   }
 
   public ComObject prepareForBackup(ComObject cobj, boolean replayedCommand) {
-    return server.prepareForBackup(cobj);
+    return backupManager.prepareForBackup(cobj);
   }
 
   public ComObject doBackupFileSystem(final ComObject cobj, boolean replayedCommand) {
-    return server.doBackupFileSystem(cobj);
+    return backupManager.doBackupFileSystem(cobj);
   }
 
 
   public ComObject doGetBackupSizes(final ComObject obj, boolean replayedCommand) {
-    return server.doGetBackupSizes(obj);
+    return backupManager.doGetBackupSizes(obj);
   }
 
   public ComObject doGetRestoreSizes(final ComObject obj, boolean replayedCommand) {
-    return server.doGetRestoreSizes(obj);
+    return backupManager.doGetRestoreSizes(obj);
   }
 
   public ComObject getBackupStatus(final ComObject obj, boolean replayedCommand) {
-    return server.getBackupStatus(obj);
+    return backupManager.getBackupStatus(obj);
   }
 
   public ComObject getRestoreStatus(final ComObject obj, boolean replayedCommand) {
-    return server.getRestoreStatus(obj);
+    return backupManager.getRestoreStatus(obj);
   }
 
   public ComObject doBackupAWS(final ComObject cobj, boolean replayedCommand) {
-    return server.doBackupAWS(cobj);
+    return backupManager.doBackupAWS(cobj);
   }
 
   public ComObject isBackupComplete(ComObject cobj, boolean replayedCommand) {
-    return server.isBackupComplete(cobj);
+    return backupManager.isBackupComplete(cobj);
   }
 
   public ComObject finishBackup(ComObject cobj, boolean replayedCommand) {
-    return server.finishBackup(cobj);
+    return backupManager.finishBackup(cobj);
   }
 
   public ComObject isEntireBackupComplete(ComObject cobj, boolean replayedCommand) {
-    return server.isEntireBackupComplete(cobj);
+    return backupManager.isEntireBackupComplete(cobj);
   }
 
   public byte[] startBackup(ComObject cobj, boolean replayedCommand) {
-    return server.startBackup(cobj);
+    return backupManager.startBackup(cobj);
   }
 
   public ComObject getLastBackupDir(ComObject cobj, boolean replayedCommand) {
-    return server.getLastBackupDir(cobj);
+    return backupManager.getLastBackupDir(cobj);
   }
 
   public ComObject prepareForRestore(ComObject cobj, boolean replayedCommand) {
-    return server.prepareForRestore(cobj);
+    return backupManager.prepareForRestore(cobj);
   }
 
   public ComObject doRestoreFileSystem(final ComObject cobj, boolean replayedCommand) {
-    return server.doRestoreFileSystem(cobj);
+    return backupManager.doRestoreFileSystem(cobj);
   }
 
   public ComObject doRestoreAWS(final ComObject cobj, boolean replayedCommand) {
-    return server.doRestoreAWS(cobj);
+    return backupManager.doRestoreAWS(cobj);
   }
 
   public ComObject isRestoreComplete(ComObject cobj, boolean replayedCommand) {
-    return server.isRestoreComplete(cobj);
+    return backupManager.isRestoreComplete(cobj);
   }
 
   public ComObject finishRestore(ComObject cobj, boolean replayedCommand) {
-    return server.finishRestore(cobj);
+    return backupManager.finishRestore(cobj);
   }
 
   public ComObject isEntireRestoreComplete(ComObject cobj, boolean replayedCommand) {
-    return server.isEntireRestoreComplete(cobj);
+    return backupManager.isEntireRestoreComplete(cobj);
   }
 
   public ComObject startRestore(final ComObject cobj, boolean replayedCommand) {
-    return server.startRestore(cobj);
+    return backupManager.startRestore(cobj);
   }
 
   public ComObject getFile(ComObject cobj, boolean replayedCommand) {
@@ -641,9 +648,8 @@ public class MethodInvoker {
   }
 
   public ComObject getOSStats(ComObject cobj, boolean replayedCommand) {
-    return server.getOSStats(cobj);
+    return osStatsManager.getOSStats(cobj);
   }
-
 
   public ComObject getDbNames(ComObject cobj, boolean replayedCommand) {
 
@@ -683,7 +689,7 @@ public class MethodInvoker {
   }
 
   public ComObject prepareSourceForServerReload(ComObject cobj, boolean replayedCommand) {
-    return server.prepareSourceForServerReload(cobj);
+    return backupManager.prepareSourceForServerReload(cobj);
   }
 
   public ComObject finishServerReloadForSource(ComObject cobj, boolean replayedCommand) {
@@ -694,11 +700,11 @@ public class MethodInvoker {
   }
 
   public ComObject isServerReloadFinished(ComObject cobj, boolean replayedCommand) {
-    return server.isServerReloadFinished(cobj);
+    return backupManager.isServerReloadFinished(cobj);
   }
 
   public ComObject reloadServer(ComObject cobj, boolean replayedCommand) {
-    return server.reloadServer(cobj);
+    return backupManager.reloadServer(cobj);
   }
 
   public ComObject getDatabaseFile(ComObject cobj, boolean replayedCommand) {
@@ -1015,7 +1021,7 @@ public class MethodInvoker {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaWriteLock(dbName).lock();
     try {
-      return server.updateIndexSchema(cobj, replayedCommand);
+      return schemaManager.updateIndexSchema(cobj, replayedCommand);
     }
     finally {
       common.getSchemaWriteLock(dbName).unlock();
@@ -1026,7 +1032,7 @@ public class MethodInvoker {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaWriteLock(dbName).lock();
     try {
-      return server.updateTableSchema(cobj, replayedCommand);
+      return schemaManager.updateTableSchema(cobj, replayedCommand);
     }
     finally {
       common.getSchemaWriteLock(dbName).unlock();
@@ -1034,14 +1040,14 @@ public class MethodInvoker {
   }
 
   public ComObject getSchemaVersions(ComObject cobj, boolean replayedCommand) {
-    return server.getSchemaVersions(cobj, replayedCommand);
+    return schemaManager.getSchemaVersions(cobj, replayedCommand);
   }
 
   public ComObject getTableSchema(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return server.getTableSchema(cobj, replayedCommand);
+      return schemaManager.getTableSchema(cobj, replayedCommand);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
@@ -1228,14 +1234,14 @@ public class MethodInvoker {
   }
 
   public ComObject getIndexSchema(ComObject cobj, boolean replayedCommand) {
-    return server.getIndexSchema(cobj, replayedCommand);
+    return schemaManager.getIndexSchema(cobj, replayedCommand);
   }
 
   public ComObject getIndexCounts(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return server.getRepartitioner().getIndexCounts(cobj);
+      return server.getPartitionManager().getIndexCounts(cobj);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
@@ -1252,7 +1258,7 @@ public class MethodInvoker {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return server.getRepartitioner().deleteMovedRecords(cobj, replayedCommand);
+      return server.getPartitionManager().deleteMovedRecords(cobj, replayedCommand);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
@@ -1275,7 +1281,7 @@ public class MethodInvoker {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return server.getRepartitioner().isRepartitioningComplete(cobj);
+      return server.getPartitionManager().isRepartitioningComplete(cobj);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
@@ -1285,14 +1291,14 @@ public class MethodInvoker {
   public ComObject beginRebalance(ComObject cobj, boolean replayedCommand) {
 
     //schema lock below
-    return server.getRepartitioner().beginRebalance(cobj);
+    return server.getPartitionManager().beginRebalance(cobj);
   }
 
   public ComObject getKeyAtOffset(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return server.getRepartitioner().getKeyAtOffset(cobj);
+      return server.getPartitionManager().getKeyAtOffset(cobj);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
@@ -1303,7 +1309,7 @@ public class MethodInvoker {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return server.getRepartitioner().getPartitionSize(cobj);
+      return server.getPartitionManager().getPartitionSize(cobj);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();
@@ -1311,11 +1317,11 @@ public class MethodInvoker {
   }
 
   public ComObject stopRepartitioning(ComObject cobj, boolean replayedCommand) {
-    return server.getRepartitioner().stopRepartitioning(cobj);
+    return server.getPartitionManager().stopRepartitioning(cobj);
   }
 
   public ComObject doRebalanceOrderedIndex(ComObject cobj, boolean replayedCommand) {
-    return server.getRepartitioner().doRebalanceOrderedIndex(cobj);
+    return server.getPartitionManager().doRebalanceOrderedIndex(cobj);
   }
 
   public ComObject rebalanceOrderedIndex(ComObject cobj, boolean replayedCommand) {
@@ -1323,14 +1329,14 @@ public class MethodInvoker {
     if (replayedCommand) {
       return null;
     }
-    return server.getRepartitioner().rebalanceOrderedIndex(cobj);
+    return server.getPartitionManager().rebalanceOrderedIndex(cobj);
   }
 
   public ComObject moveIndexEntries(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
-      return server.getRepartitioner().moveIndexEntries(cobj, replayedCommand);
+      return server.getPartitionManager().moveIndexEntries(cobj, replayedCommand);
     }
     finally {
       common.getSchemaReadLock(dbName).unlock();

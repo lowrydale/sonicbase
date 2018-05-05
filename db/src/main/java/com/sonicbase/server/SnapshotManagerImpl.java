@@ -5,7 +5,6 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
 import com.sonicbase.index.Indices;
-import com.sonicbase.index.Repartitioner;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.IndexSchema;
@@ -233,7 +232,7 @@ public class SnapshotManagerImpl implements SnapshotManager {
 
                                                     Object address;
                                                     if (isPrimaryKey) {
-                                                      address = server.toUnsafeFromRecords(updateTime, records);
+                                                      address = server.getAddressMap().toUnsafeFromRecords(updateTime, records);
                                                       for (byte[] record : records) {
                                                         if ((Record.getDbViewFlags(record) & Record.DB_VIEW_FLAG_DELETING) == 0) {
                                                           index.addAndGetCount(1);
@@ -241,7 +240,7 @@ public class SnapshotManagerImpl implements SnapshotManager {
                                                       }
                                                     }
                                                     else {
-                                                      address = server.toUnsafeFromKeys(updateTime, records);
+                                                      address = server.getAddressMap().toUnsafeFromKeys(updateTime, records);
                                                       for (byte[] record : records) {
                                                         if ((Record.getDbViewFlags(record) & Record.DB_VIEW_FLAG_DELETING) == 0) {
                                                           index.addAndGetCount(1);
@@ -439,7 +438,7 @@ public class SnapshotManagerImpl implements SnapshotManager {
 
   public void deleteRecord(String dbName, String tableName, TableSchema tableSchema, IndexSchema indexSchema, Object[] key, byte[] record, int[] fieldOffsets) {
 
-    List<Integer> selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false,
+    List<Integer> selectedShards = PartitionManager.findOrderedPartitionForRecord(true, false,
         fieldOffsets, server.getClient().getCommon(), tableSchema,
         indexSchema.getName(), null, BinaryExpression.Operator.equal, null, key, null);
     if (selectedShards.size() == 0) {
@@ -549,10 +548,10 @@ public class SnapshotManagerImpl implements SnapshotManager {
                   }
                   else {
                     if (isPrimaryKey) {
-                      records = server.fromUnsafeToRecords(currValue);
+                      records = server.getAddressMap().fromUnsafeToRecords(currValue);
                     }
                     else {
-                      records = server.fromUnsafeToKeys(currValue);
+                      records = server.getAddressMap().fromUnsafeToKeys(currValue);
                     }
                     updateTime = server.getUpdateTime(currValue);
                   }

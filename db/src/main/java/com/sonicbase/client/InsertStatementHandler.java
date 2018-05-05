@@ -35,7 +35,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static com.sonicbase.client.DatabaseClient.*;
-import static com.sonicbase.index.Repartitioner.findOrderedPartitionForRecord;
+import static com.sonicbase.server.PartitionManager.findOrderedPartitionForRecord;
 import static com.sonicbase.server.UpdateManager.*;
 
 public class InsertStatementHandler extends StatementHandler {

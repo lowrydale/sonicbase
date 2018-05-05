@@ -1,4 +1,4 @@
-package com.sonicbase.server;
+package com.sonicbase.common;
 
 /**
  * Responsible for

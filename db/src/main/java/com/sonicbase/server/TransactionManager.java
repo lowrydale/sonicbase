@@ -2,6 +2,7 @@ package com.sonicbase.server;
 
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Record;
+import com.sonicbase.common.RecordLockedException;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 

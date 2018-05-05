@@ -9,7 +9,7 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.Record;
 import com.sonicbase.index.Index;
-import com.sonicbase.index.Repartitioner;
+import com.sonicbase.server.PartitionManager;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.jdbcdriver.ResultSetProxy;
 import com.sonicbase.query.BinaryExpression;
@@ -39,7 +39,7 @@ import static org.testng.Assert.assertEquals;
 /**
  * Created by lowryda on 8/28/17.
  */
-public class TestRepartitionerConsistencySecondaryIndex {
+public class TestPartitionManagerConsistencySecondaryIndex {
 
   private Connection conn;
 
@@ -73,7 +73,7 @@ public class TestRepartitionerConsistencySecondaryIndex {
         dbServers[shard].setMinSizeForRepartition(0);
       }
 
-      dbServers[0].promoteToMaster(null);
+      dbServers[0].getMasterManager().promoteToMaster(null);
 
       DatabaseServer.initDeathOverride(2, 2);
       DatabaseServer.deathOverride[0][0] = false;
@@ -229,12 +229,12 @@ public class TestRepartitionerConsistencySecondaryIndex {
             for (int j = 0; j < partitions.length; j++) {
               appendUpperKey(j, partitions, curr);
             }
-            synchronized (Repartitioner.previousPartitions) {
-              List<Repartitioner.PartitionEntry> list = Repartitioner.previousPartitions.get("persons:_1__primarykey");
+            synchronized (PartitionManager.previousPartitions) {
+              List<PartitionManager.PartitionEntry> list = PartitionManager.previousPartitions.get("persons:_1__primarykey");
               if (list != null) {
                 for (int j = Math.min(4, list.size() - 1); j >= 0; j--) {
                   last.append("last(" + j + ")");
-                  Repartitioner.PartitionEntry entry = list.get(j);
+                  PartitionManager.PartitionEntry entry = list.get(j);
                   if (entry == null || entry.partitions == null) {
                     last.append("null");
                   }
@@ -259,11 +259,11 @@ public class TestRepartitionerConsistencySecondaryIndex {
             boolean isCurrPartitions = ((ResultSetProxy)rs).isCurrPartitions();
 
             boolean currPartitions = false;
-            List<Integer> selectedShards = Repartitioner.findOrderedPartitionForRecord(false, true, fieldOffsets, dbServers[0].getCommon(), tableSchema,
+            List<Integer> selectedShards = PartitionManager.findOrderedPartitionForRecord(false, true, fieldOffsets, dbServers[0].getCommon(), tableSchema,
                 "_1__primarykey", null, BinaryExpression.Operator.equal, null, new Object[]{i},
                 null);
             if (selectedShards.size() == 0) {
-              selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false, fieldOffsets, dbServers[0].getCommon(), tableSchema,
+              selectedShards = PartitionManager.findOrderedPartitionForRecord(true, false, fieldOffsets, dbServers[0].getCommon(), tableSchema,
                   indexSchema.getName(), null, BinaryExpression.Operator.equal, null, new Object[]{i}, null);
               currPartitions = true;
             }
@@ -314,7 +314,7 @@ public class TestRepartitionerConsistencySecondaryIndex {
       Object value = index1.get(key);
       if (value != null && !value.equals(0L)) {
         debug = "recordFound=" + i;
-        byte[][] bytes = dbServer.fromUnsafeToRecords(value);
+        byte[][] bytes = dbServer.getAddressMap().fromUnsafeToRecords(value);
         if (bytes == null) {
 //          while (bytes == null) {
 //            System.out.println("nullRecord value=" + value);

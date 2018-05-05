@@ -1361,7 +1361,7 @@ com.sonicbase.index.Indices -> com.sonicbase.a.b:
     8:9:void <init>() -> <init>
     12:12:java.util.concurrent.ConcurrentHashMap getIndices() -> a
     16:23:void addIndex(com.sonicbase.schema.TableSchema,java.lang.String,java.util.Comparator[]) -> a
-com.sonicbase.index.Repartitioner -> com.sonicbase.a.c:
+com.sonicbase.server.PartitionManager -> com.sonicbase.a.c:
     java.lang.String INDEX_STR -> c
     java.lang.String NAME_STR -> d
     com.sonicbase.common.Logger logger -> e
@@ -1371,7 +1371,7 @@ com.sonicbase.index.Repartitioner -> com.sonicbase.a.c:
     java.util.Map stateIsShardRepartitioningComplete -> i
     java.lang.String stateTable -> j
     java.lang.String stateIndex -> k
-    com.sonicbase.index.Repartitioner$RepartitionerState state -> l
+    com.sonicbase.server.PartitionManager$RepartitionerState state -> l
     java.lang.Exception shardRepartitionException -> m
     java.util.concurrent.atomic.AtomicBoolean isRepartitioningIndex -> n
     java.lang.String currIndexRepartitioning -> o
@@ -1385,7 +1385,7 @@ com.sonicbase.index.Repartitioner -> com.sonicbase.a.c:
     long countProcessed -> v
     java.util.concurrent.ConcurrentHashMap entriesToDelete -> w
     java.lang.String tableToDeleteEntriesFrom -> x
-    com.sonicbase.index.Repartitioner$MoveProcessor[] moveProcessors -> y
+    com.sonicbase.server.PartitionManager$MoveProcessor[] moveProcessors -> y
     java.util.concurrent.atomic.AtomicLong countMoved -> z
     boolean isRunning -> A
     java.util.concurrent.atomic.AtomicBoolean isRebalancing -> b
@@ -1396,7 +1396,7 @@ com.sonicbase.index.Repartitioner -> com.sonicbase.a.c:
     468:475:com.sonicbase.common.ComObject isShardRepartitioningComplete(com.sonicbase.common.ComObject,boolean) -> a
     479:515:void stopShardsFromRepartitioning() -> a
     518:521:void shutdown() -> b
-    531:671:void calculatePartitions(java.lang.String,int,java.util.List,java.lang.String,java.lang.String,long[],long,com.sonicbase.index.Repartitioner$GetKeyAtOffset) -> a
+    531:671:void calculatePartitions(java.lang.String,int,java.util.List,java.lang.String,java.lang.String,long[],long,com.sonicbase.server.PartitionManager$GetKeyAtOffset) -> a
     692:712:void logPartitionsToApply(java.lang.String,java.lang.String,java.lang.String,java.util.List) -> a
     741:743:com.sonicbase.common.ComObject isRepartitioningComplete(com.sonicbase.common.ComObject) -> b
     762:794:java.util.List getKeyAtOffset(java.lang.String,int,java.lang.String,java.lang.String,java.util.List) -> a
@@ -1413,7 +1413,7 @@ com.sonicbase.index.Repartitioner -> com.sonicbase.a.c:
     1486:1508:void sendDeletes(java.util.concurrent.ThreadPoolExecutor,com.sonicbase.common.ComObject,java.util.List) -> a
     1512:1583:com.sonicbase.common.ComObject deleteMovedRecords(com.sonicbase.common.ComObject,boolean) -> b
     1588:1641:void doDeleteMovedEntry(java.util.concurrent.ConcurrentLinkedQueue,com.sonicbase.schema.IndexSchema,com.sonicbase.index.Index,com.sonicbase.server.DeleteManagerImpl$DeleteRequest) -> a
-    1655:1830:void doProcessEntries(com.sonicbase.index.Repartitioner$MoveProcessor[],int,java.lang.String,java.lang.String,java.util.List,com.sonicbase.index.Index,com.sonicbase.schema.IndexSchema,java.lang.String,int[],com.sonicbase.schema.TableSchema,com.sonicbase.common.ComObject) -> a
+    1655:1830:void doProcessEntries(com.sonicbase.server.PartitionManager$MoveProcessor[],int,java.lang.String,java.lang.String,java.util.List,com.sonicbase.index.Index,com.sonicbase.schema.IndexSchema,java.lang.String,int[],com.sonicbase.schema.TableSchema,com.sonicbase.common.ComObject) -> a
     1833:1840:java.util.concurrent.ConcurrentHashMap getIndicesToDeleteFrom(java.lang.String,java.lang.String) -> a
     1953:2003:void moveIndexEntriesToShard(java.lang.String,java.lang.String,java.lang.String,boolean,int,java.util.List) -> a
     2007:2055:com.sonicbase.common.ComObject moveIndexEntries(com.sonicbase.common.ComObject,boolean) -> c
@@ -1423,29 +1423,29 @@ com.sonicbase.index.Repartitioner -> com.sonicbase.a.c:
     2181:2201:void logCurrPartitions(java.lang.String,java.lang.String,java.lang.String,com.sonicbase.schema.TableSchema$Partition[]) -> a
     2206:2327:com.sonicbase.common.ComObject beginRebalance(com.sonicbase.common.ComObject) -> i
     2334:2359:boolean addToRebalance(java.util.List,java.util.Map$Entry,java.lang.String,com.sonicbase.client.DatabaseClient$IndexCounts,boolean) -> a
-    28:28:long access$300(com.sonicbase.index.Repartitioner,java.lang.String,int,java.lang.String,java.lang.String) -> a
-    28:28:java.util.List access$400(com.sonicbase.index.Repartitioner,java.lang.String,int,java.lang.String,java.lang.String,java.util.List) -> a
-    28:28:com.sonicbase.common.DatabaseCommon access$500(com.sonicbase.index.Repartitioner) -> a
-    28:28:com.sonicbase.server.DatabaseServer access$600(com.sonicbase.index.Repartitioner) -> b
+    28:28:long access$300(com.sonicbase.server.PartitionManager,java.lang.String,int,java.lang.String,java.lang.String) -> a
+    28:28:java.util.List access$400(com.sonicbase.server.PartitionManager,java.lang.String,int,java.lang.String,java.lang.String,java.util.List) -> a
+    28:28:com.sonicbase.common.DatabaseCommon access$500(com.sonicbase.server.PartitionManager) -> a
+    28:28:com.sonicbase.server.DatabaseServer access$600(com.sonicbase.server.PartitionManager) -> b
     28:28:com.sonicbase.common.Logger access$700() -> d
-    28:28:void access$1600(com.sonicbase.index.Repartitioner,java.lang.String,java.lang.String,java.lang.String,boolean,int,java.util.List) -> a
-    28:28:java.lang.Exception access$2102(com.sonicbase.index.Repartitioner,java.lang.Exception) -> a
-    28:28:java.lang.Exception access$2100(com.sonicbase.index.Repartitioner) -> c
-    28:28:void access$2400(com.sonicbase.index.Repartitioner,java.lang.Object[],java.lang.Object,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicInteger,java.util.concurrent.ThreadPoolExecutor,java.lang.String,java.lang.String,com.sonicbase.index.Index,com.sonicbase.schema.IndexSchema,java.lang.String,int[],com.sonicbase.schema.TableSchema,com.sonicbase.common.ComObject,java.util.concurrent.atomic.AtomicInteger) -> a
-    28:28:long access$2502(com.sonicbase.index.Repartitioner,long) -> a
-    28:28:com.sonicbase.index.Repartitioner$MoveProcessor[] access$2600(com.sonicbase.index.Repartitioner) -> d
-    28:28:void access$2700(com.sonicbase.index.Repartitioner,com.sonicbase.index.Repartitioner$MoveProcessor[],int,java.lang.String,java.lang.String,java.util.List,com.sonicbase.index.Index,com.sonicbase.schema.IndexSchema,java.lang.String,int[],com.sonicbase.schema.TableSchema,com.sonicbase.common.ComObject) -> a
+    28:28:void access$1600(com.sonicbase.server.PartitionManager,java.lang.String,java.lang.String,java.lang.String,boolean,int,java.util.List) -> a
+    28:28:java.lang.Exception access$2102(com.sonicbase.server.PartitionManager,java.lang.Exception) -> a
+    28:28:java.lang.Exception access$2100(com.sonicbase.server.PartitionManager) -> c
+    28:28:void access$2400(com.sonicbase.server.PartitionManager,java.lang.Object[],java.lang.Object,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicInteger,java.util.concurrent.ThreadPoolExecutor,java.lang.String,java.lang.String,com.sonicbase.index.Index,com.sonicbase.schema.IndexSchema,java.lang.String,int[],com.sonicbase.schema.TableSchema,com.sonicbase.common.ComObject,java.util.concurrent.atomic.AtomicInteger) -> a
+    28:28:long access$2502(com.sonicbase.server.PartitionManager,long) -> a
+    28:28:com.sonicbase.server.PartitionManager$MoveProcessor[] access$2600(com.sonicbase.server.PartitionManager) -> d
+    28:28:void access$2700(com.sonicbase.server.PartitionManager,com.sonicbase.server.PartitionManager$MoveProcessor[],int,java.lang.String,java.lang.String,java.util.List,com.sonicbase.index.Index,com.sonicbase.schema.IndexSchema,java.lang.String,int[],com.sonicbase.schema.TableSchema,com.sonicbase.common.ComObject) -> a
     462:462:void <clinit>() -> <clinit>
-com.sonicbase.index.Repartitioner$1 -> com.sonicbase.a.c$1:
+com.sonicbase.server.PartitionManager$1 -> com.sonicbase.a.c$1:
     long[] val$currPartitionSizes -> a
     int val$offset -> b
     java.lang.String val$dbName -> c
     java.lang.String val$currTableName -> d
     java.lang.String val$indexName -> e
-    com.sonicbase.index.Repartitioner this$0 -> f
-    152:152:void <init>(com.sonicbase.index.Repartitioner,long[],int,java.lang.String,java.lang.String,java.lang.String) -> <init>
+    com.sonicbase.server.PartitionManager this$0 -> f
+    152:152:void <init>(com.sonicbase.server.PartitionManager,long[],int,java.lang.String,java.lang.String,java.lang.String) -> <init>
     155:156:java.lang.Object call() -> call
-com.sonicbase.index.Repartitioner$10 -> com.sonicbase.a.c$2:
+com.sonicbase.server.PartitionManager$10 -> com.sonicbase.a.c$2:
     java.lang.String val$tableName -> a
     java.lang.String val$indexName -> b
     java.util.List val$toProcess -> c
@@ -1456,55 +1456,55 @@ com.sonicbase.index.Repartitioner$10 -> com.sonicbase.a.c$2:
     com.sonicbase.schema.TableSchema val$tableSchema -> h
     com.sonicbase.common.ComObject val$cobj -> i
     java.util.concurrent.atomic.AtomicInteger val$countFinished -> j
-    com.sonicbase.index.Repartitioner this$0 -> k
-    1403:1403:void <init>(com.sonicbase.index.Repartitioner,java.lang.String,java.lang.String,java.util.List,com.sonicbase.index.Index,com.sonicbase.schema.IndexSchema,java.lang.String,int[],com.sonicbase.schema.TableSchema,com.sonicbase.common.ComObject,java.util.concurrent.atomic.AtomicInteger) -> <init>
+    com.sonicbase.server.PartitionManager this$0 -> k
+    1403:1403:void <init>(com.sonicbase.server.PartitionManager,java.lang.String,java.lang.String,java.util.List,com.sonicbase.index.Index,com.sonicbase.schema.IndexSchema,java.lang.String,int[],com.sonicbase.schema.TableSchema,com.sonicbase.common.ComObject,java.util.concurrent.atomic.AtomicInteger) -> <init>
     1406:1420:void run() -> run
-com.sonicbase.index.Repartitioner$11 -> com.sonicbase.a.c$3:
+com.sonicbase.server.PartitionManager$11 -> com.sonicbase.a.c$3:
     int val$replica -> a
     com.sonicbase.common.ComObject val$currObj -> b
-    com.sonicbase.index.Repartitioner this$0 -> c
-    1492:1492:void <init>(com.sonicbase.index.Repartitioner,int,com.sonicbase.common.ComObject) -> <init>
+    com.sonicbase.server.PartitionManager this$0 -> c
+    1492:1492:void <init>(com.sonicbase.server.PartitionManager,int,com.sonicbase.common.ComObject) -> <init>
     1501:1503:java.lang.Object call() -> call
-com.sonicbase.index.Repartitioner$2 -> com.sonicbase.a.c$4:
-    com.sonicbase.index.Repartitioner this$0 -> a
-    203:203:void <init>(com.sonicbase.index.Repartitioner) -> <init>
+com.sonicbase.server.PartitionManager$2 -> com.sonicbase.a.c$4:
+    com.sonicbase.server.PartitionManager this$0 -> a
+    203:203:void <init>(com.sonicbase.server.PartitionManager) -> <init>
     206:206:java.util.List getKeyAtOffset(java.lang.String,int,java.lang.String,java.lang.String,java.util.List) -> a
-com.sonicbase.index.Repartitioner$3 -> com.sonicbase.a.c$5:
+com.sonicbase.server.PartitionManager$3 -> com.sonicbase.a.c$5:
     java.util.Comparator[] val$comparators -> a
-    com.sonicbase.index.Repartitioner this$0 -> b
-    214:214:void <init>(com.sonicbase.index.Repartitioner,java.util.Comparator[]) -> <init>
+    com.sonicbase.server.PartitionManager this$0 -> b
+    214:214:void <init>(com.sonicbase.server.PartitionManager,java.util.Comparator[]) -> <init>
     217:227:int compare(com.sonicbase.schema.TableSchema$Partition,com.sonicbase.schema.TableSchema$Partition) -> a
     214:214:int compare(java.lang.Object,java.lang.Object) -> compare
-com.sonicbase.index.Repartitioner$4 -> com.sonicbase.a.c$6:
+com.sonicbase.server.PartitionManager$4 -> com.sonicbase.a.c$6:
     java.lang.String val$dbName -> a
     java.lang.String val$finalTableName -> b
     java.lang.String val$indexName -> c
     int val$shard -> d
     int[] val$masters -> e
-    com.sonicbase.index.Repartitioner this$0 -> f
-    344:344:void <init>(com.sonicbase.index.Repartitioner,java.lang.String,java.lang.String,java.lang.String,int,int[]) -> <init>
+    com.sonicbase.server.PartitionManager this$0 -> f
+    344:344:void <init>(com.sonicbase.server.PartitionManager,java.lang.String,java.lang.String,java.lang.String,int,int[]) -> <init>
     347:363:java.lang.Object call() -> call
-com.sonicbase.index.Repartitioner$5 -> com.sonicbase.a.c$7:
+com.sonicbase.server.PartitionManager$5 -> com.sonicbase.a.c$7:
     int val$localShard -> a
     int val$localReplica -> b
     com.sonicbase.common.ComObject val$cobj -> c
-    com.sonicbase.index.Repartitioner this$0 -> d
-    489:489:void <init>(com.sonicbase.index.Repartitioner,int,int,com.sonicbase.common.ComObject) -> <init>
+    com.sonicbase.server.PartitionManager this$0 -> d
+    489:489:void <init>(com.sonicbase.server.PartitionManager,int,int,com.sonicbase.common.ComObject) -> <init>
     493:498:java.lang.Object call() -> call
-com.sonicbase.index.Repartitioner$6 -> com.sonicbase.a.c$8:
+com.sonicbase.server.PartitionManager$6 -> com.sonicbase.a.c$8:
     637:637:void <init>() -> <init>
-    640:640:int compare(com.sonicbase.index.Repartitioner$OffsetEntry,com.sonicbase.index.Repartitioner$OffsetEntry) -> a
+    640:640:int compare(com.sonicbase.server.PartitionManager$OffsetEntry,com.sonicbase.server.PartitionManager$OffsetEntry) -> a
     637:637:int compare(java.lang.Object,java.lang.Object) -> compare
-com.sonicbase.index.Repartitioner$7 -> com.sonicbase.a.c$9:
-    com.sonicbase.index.Repartitioner$GetKeyAtOffset val$getKey -> a
+com.sonicbase.server.PartitionManager$7 -> com.sonicbase.a.c$9:
+    com.sonicbase.server.PartitionManager$GetKeyAtOffset val$getKey -> a
     java.lang.String val$dbName -> b
     java.util.Map$Entry val$entry -> c
     java.lang.String val$tableName -> d
     java.lang.String val$indexName -> e
     java.util.List val$newPartitions -> f
-    646:646:void <init>(com.sonicbase.index.Repartitioner$GetKeyAtOffset,java.lang.String,java.util.Map$Entry,java.lang.String,java.lang.String,java.util.List) -> <init>
+    646:646:void <init>(com.sonicbase.server.PartitionManager$GetKeyAtOffset,java.lang.String,java.util.Map$Entry,java.lang.String,java.lang.String,java.util.List) -> <init>
     649:655:java.lang.Object call() -> call
-com.sonicbase.index.Repartitioner$8 -> com.sonicbase.a.c$10:
+com.sonicbase.server.PartitionManager$8 -> com.sonicbase.a.c$10:
     java.util.concurrent.atomic.AtomicLong val$countVisited -> a
     java.util.concurrent.atomic.AtomicReference val$currEntries -> b
     java.util.concurrent.atomic.AtomicInteger val$countSubmitted -> c
@@ -1518,10 +1518,10 @@ com.sonicbase.index.Repartitioner$8 -> com.sonicbase.a.c$10:
     com.sonicbase.schema.TableSchema val$tableSchema -> k
     com.sonicbase.common.ComObject val$cobj -> l
     java.util.concurrent.atomic.AtomicInteger val$countFinished -> m
-    com.sonicbase.index.Repartitioner this$0 -> n
-    1267:1267:void <init>(com.sonicbase.index.Repartitioner,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicInteger,java.util.concurrent.ThreadPoolExecutor,java.lang.String,java.lang.String,com.sonicbase.index.Index,com.sonicbase.schema.IndexSchema,java.lang.String,int[],com.sonicbase.schema.TableSchema,com.sonicbase.common.ComObject,java.util.concurrent.atomic.AtomicInteger) -> <init>
+    com.sonicbase.server.PartitionManager this$0 -> n
+    1267:1267:void <init>(com.sonicbase.server.PartitionManager,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicInteger,java.util.concurrent.ThreadPoolExecutor,java.lang.String,java.lang.String,com.sonicbase.index.Index,com.sonicbase.schema.IndexSchema,java.lang.String,int[],com.sonicbase.schema.TableSchema,com.sonicbase.common.ComObject,java.util.concurrent.atomic.AtomicInteger) -> <init>
     1270:1271:boolean visit(java.lang.Object[],java.lang.Object) -> a
-com.sonicbase.index.Repartitioner$9 -> com.sonicbase.a.c$11:
+com.sonicbase.server.PartitionManager$9 -> com.sonicbase.a.c$11:
     java.util.concurrent.atomic.AtomicLong val$countVisited -> a
     java.util.concurrent.atomic.AtomicReference val$currEntries -> b
     java.util.concurrent.atomic.AtomicInteger val$countSubmitted -> c
@@ -1535,21 +1535,21 @@ com.sonicbase.index.Repartitioner$9 -> com.sonicbase.a.c$11:
     com.sonicbase.schema.TableSchema val$tableSchema -> k
     com.sonicbase.common.ComObject val$cobj -> l
     java.util.concurrent.atomic.AtomicInteger val$countFinished -> m
-    com.sonicbase.index.Repartitioner this$0 -> n
-    1296:1296:void <init>(com.sonicbase.index.Repartitioner,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicInteger,java.util.concurrent.ThreadPoolExecutor,java.lang.String,java.lang.String,com.sonicbase.index.Index,com.sonicbase.schema.IndexSchema,java.lang.String,int[],com.sonicbase.schema.TableSchema,com.sonicbase.common.ComObject,java.util.concurrent.atomic.AtomicInteger) -> <init>
+    com.sonicbase.server.PartitionManager this$0 -> n
+    1296:1296:void <init>(com.sonicbase.server.PartitionManager,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicReference,java.util.concurrent.atomic.AtomicInteger,java.util.concurrent.ThreadPoolExecutor,java.lang.String,java.lang.String,com.sonicbase.index.Index,com.sonicbase.schema.IndexSchema,java.lang.String,int[],com.sonicbase.schema.TableSchema,com.sonicbase.common.ComObject,java.util.concurrent.atomic.AtomicInteger) -> <init>
     1299:1329:boolean visit(java.lang.Object[],java.lang.Object) -> a
-com.sonicbase.index.Repartitioner$9$1 -> com.sonicbase.a.c$11$1:
+com.sonicbase.server.PartitionManager$9$1 -> com.sonicbase.a.c$11$1:
     java.util.List val$toProcess -> a
-    com.sonicbase.index.Repartitioner$9 this$1 -> b
-    1309:1309:void <init>(com.sonicbase.index.Repartitioner$9,java.util.List) -> <init>
+    com.sonicbase.server.PartitionManager$9 this$1 -> b
+    1309:1309:void <init>(com.sonicbase.server.PartitionManager$9,java.util.List) -> <init>
     1312:1326:void run() -> run
-com.sonicbase.index.Repartitioner$GetKeyAtOffset -> com.sonicbase.a.c$a:
+com.sonicbase.server.PartitionManager$GetKeyAtOffset -> com.sonicbase.a.c$a:
     java.util.List getKeyAtOffset(java.lang.String,int,java.lang.String,java.lang.String,java.util.List) -> a
-com.sonicbase.index.Repartitioner$MapEntry -> com.sonicbase.a.c$b:
+com.sonicbase.server.PartitionManager$MapEntry -> com.sonicbase.a.c$b:
     java.lang.Object[] key -> a
     java.lang.Object value -> b
     1045:1048:void <init>(java.lang.Object[],java.lang.Object) -> <init>
-com.sonicbase.index.Repartitioner$MoveProcessor -> com.sonicbase.a.c$c:
+com.sonicbase.server.PartitionManager$MoveProcessor -> com.sonicbase.a.c$c:
     java.lang.String dbName -> b
     java.lang.String tableName -> c
     java.lang.String indexName -> d
@@ -1563,33 +1563,33 @@ com.sonicbase.index.Repartitioner$MoveProcessor -> com.sonicbase.a.c$c:
     java.lang.Thread thread -> l
     java.util.concurrent.atomic.AtomicInteger countStarted -> m
     java.util.concurrent.atomic.AtomicInteger countFinished -> n
-    com.sonicbase.index.Repartitioner this$0 -> a
-    1061:1077:void <init>(com.sonicbase.index.Repartitioner,java.lang.String,java.lang.String,java.lang.String,boolean,com.sonicbase.index.Index,java.util.concurrent.ConcurrentLinkedQueue,int) -> <init>
+    com.sonicbase.server.PartitionManager this$0 -> a
+    1061:1077:void <init>(com.sonicbase.server.PartitionManager,java.lang.String,java.lang.String,java.lang.String,boolean,com.sonicbase.index.Index,java.util.concurrent.ConcurrentLinkedQueue,int) -> <init>
     1080:1083:void shutdown() -> a
     1086:1181:void start() -> b
     1184:1195:void await() -> c
-    1051:1051:boolean access$800(com.sonicbase.index.Repartitioner$MoveProcessor) -> a
-    1051:1051:java.util.concurrent.ArrayBlockingQueue access$900(com.sonicbase.index.Repartitioner$MoveProcessor) -> b
-    1051:1051:java.util.concurrent.atomic.AtomicInteger access$1000(com.sonicbase.index.Repartitioner$MoveProcessor) -> c
-    1051:1051:java.lang.String access$1100(com.sonicbase.index.Repartitioner$MoveProcessor) -> d
-    1051:1051:java.lang.String access$1200(com.sonicbase.index.Repartitioner$MoveProcessor) -> e
-    1051:1051:java.lang.String access$1300(com.sonicbase.index.Repartitioner$MoveProcessor) -> f
-    1051:1051:boolean access$1400(com.sonicbase.index.Repartitioner$MoveProcessor) -> g
-    1051:1051:int access$1500(com.sonicbase.index.Repartitioner$MoveProcessor) -> h
-    1051:1051:com.sonicbase.index.Index access$1900(com.sonicbase.index.Repartitioner$MoveProcessor) -> i
-    1051:1051:java.util.concurrent.ConcurrentLinkedQueue access$2000(com.sonicbase.index.Repartitioner$MoveProcessor) -> j
-    1051:1051:java.util.concurrent.atomic.AtomicInteger access$2200(com.sonicbase.index.Repartitioner$MoveProcessor) -> k
-    1051:1051:java.util.concurrent.ThreadPoolExecutor access$2300(com.sonicbase.index.Repartitioner$MoveProcessor) -> l
-com.sonicbase.index.Repartitioner$MoveProcessor$1 -> com.sonicbase.a.c$c$1:
-    com.sonicbase.index.Repartitioner$MoveProcessor this$1 -> a
-    1086:1086:void <init>(com.sonicbase.index.Repartitioner$MoveProcessor) -> <init>
+    1051:1051:boolean access$800(com.sonicbase.server.PartitionManager$MoveProcessor) -> a
+    1051:1051:java.util.concurrent.ArrayBlockingQueue access$900(com.sonicbase.server.PartitionManager$MoveProcessor) -> b
+    1051:1051:java.util.concurrent.atomic.AtomicInteger access$1000(com.sonicbase.server.PartitionManager$MoveProcessor) -> c
+    1051:1051:java.lang.String access$1100(com.sonicbase.server.PartitionManager$MoveProcessor) -> d
+    1051:1051:java.lang.String access$1200(com.sonicbase.server.PartitionManager$MoveProcessor) -> e
+    1051:1051:java.lang.String access$1300(com.sonicbase.server.PartitionManager$MoveProcessor) -> f
+    1051:1051:boolean access$1400(com.sonicbase.server.PartitionManager$MoveProcessor) -> g
+    1051:1051:int access$1500(com.sonicbase.server.PartitionManager$MoveProcessor) -> h
+    1051:1051:com.sonicbase.index.Index access$1900(com.sonicbase.server.PartitionManager$MoveProcessor) -> i
+    1051:1051:java.util.concurrent.ConcurrentLinkedQueue access$2000(com.sonicbase.server.PartitionManager$MoveProcessor) -> j
+    1051:1051:java.util.concurrent.atomic.AtomicInteger access$2200(com.sonicbase.server.PartitionManager$MoveProcessor) -> k
+    1051:1051:java.util.concurrent.ThreadPoolExecutor access$2300(com.sonicbase.server.PartitionManager$MoveProcessor) -> l
+com.sonicbase.server.PartitionManager$MoveProcessor$1 -> com.sonicbase.a.c$c$1:
+    com.sonicbase.server.PartitionManager$MoveProcessor this$1 -> a
+    1086:1086:void <init>(com.sonicbase.server.PartitionManager$MoveProcessor) -> <init>
     1089:1178:void run() -> run
-com.sonicbase.index.Repartitioner$MoveProcessor$1$1 -> com.sonicbase.a.c$c$1$1:
-    com.sonicbase.index.Repartitioner$MoveRequestList val$list -> a
-    com.sonicbase.index.Repartitioner$MoveProcessor$1 this$2 -> b
-    1096:1096:void <init>(com.sonicbase.index.Repartitioner$MoveProcessor$1,com.sonicbase.index.Repartitioner$MoveRequestList) -> <init>
+com.sonicbase.server.PartitionManager$MoveProcessor$1$1 -> com.sonicbase.a.c$c$1$1:
+    com.sonicbase.server.PartitionManager$MoveRequestList val$list -> a
+    com.sonicbase.server.PartitionManager$MoveProcessor$1 this$2 -> b
+    1096:1096:void <init>(com.sonicbase.server.PartitionManager$MoveProcessor$1,com.sonicbase.server.PartitionManager$MoveRequestList) -> <init>
     1100:1164:void run() -> run
-com.sonicbase.index.Repartitioner$MoveRequest -> com.sonicbase.a.c$d:
+com.sonicbase.server.PartitionManager$MoveRequest -> com.sonicbase.a.c$d:
     boolean shouldDeleteNow -> a
     java.lang.Object[] key -> b
     byte[][] content -> c
@@ -1598,43 +1598,43 @@ com.sonicbase.index.Repartitioner$MoveRequest -> com.sonicbase.a.c$d:
     997:998:void setKey(java.lang.Object[]) -> a
     1002:1002:byte[][] getContent() -> b
     1008:1009:void setContent(byte[][]) -> a
-    976:976:boolean access$1700(com.sonicbase.index.Repartitioner$MoveRequest) -> a
-    976:976:java.lang.Object[] access$1800(com.sonicbase.index.Repartitioner$MoveRequest) -> b
-com.sonicbase.index.Repartitioner$MoveRequestList -> com.sonicbase.a.c$e:
+    976:976:boolean access$1700(com.sonicbase.server.PartitionManager$MoveRequest) -> a
+    976:976:java.lang.Object[] access$1800(com.sonicbase.server.PartitionManager$MoveRequest) -> b
+com.sonicbase.server.PartitionManager$MoveRequestList -> com.sonicbase.a.c$e:
     java.util.List moveRequests -> a
     java.util.concurrent.CountDownLatch latch -> b
-    com.sonicbase.index.Repartitioner this$0 -> c
-    1645:1649:void <init>(com.sonicbase.index.Repartitioner,java.util.List) -> <init>
-com.sonicbase.index.Repartitioner$OffsetEntry -> com.sonicbase.a.c$f:
+    com.sonicbase.server.PartitionManager this$0 -> c
+    1645:1649:void <init>(com.sonicbase.server.PartitionManager,java.util.List) -> <init>
+com.sonicbase.server.PartitionManager$OffsetEntry -> com.sonicbase.a.c$f:
     long offset -> a
     int partitionOffset -> b
     677:680:void <init>(long,int) -> <init>
     683:683:long getOffset() -> a
     687:687:int getPartitionOffset() -> b
-com.sonicbase.index.Repartitioner$PartitionEntry -> com.sonicbase.a.c$g:
+com.sonicbase.server.PartitionManager$PartitionEntry -> com.sonicbase.a.c$g:
     int version -> a
     com.sonicbase.schema.TableSchema$Partition[] partitions -> b
     457:457:void <init>() -> <init>
-com.sonicbase.index.Repartitioner$RepartitionerState -> com.sonicbase.a.c$h:
-    com.sonicbase.index.Repartitioner$RepartitionerState idle -> a
-    com.sonicbase.index.Repartitioner$RepartitionerState prep -> b
-    com.sonicbase.index.Repartitioner$RepartitionerState rebalancing -> c
-    com.sonicbase.index.Repartitioner$RepartitionerState complete -> d
-    com.sonicbase.index.Repartitioner$RepartitionerState[] $VALUES -> e
-    44:44:com.sonicbase.index.Repartitioner$RepartitionerState[] values() -> a
-    44:44:com.sonicbase.index.Repartitioner$RepartitionerState valueOf(java.lang.String) -> a
+com.sonicbase.server.PartitionManager$RepartitionerState -> com.sonicbase.a.c$h:
+    com.sonicbase.server.PartitionManager$RepartitionerState idle -> a
+    com.sonicbase.server.PartitionManager$RepartitionerState prep -> b
+    com.sonicbase.server.PartitionManager$RepartitionerState rebalancing -> c
+    com.sonicbase.server.PartitionManager$RepartitionerState complete -> d
+    com.sonicbase.server.PartitionManager$RepartitionerState[] $VALUES -> e
+    44:44:com.sonicbase.server.PartitionManager$RepartitionerState[] values() -> a
+    44:44:com.sonicbase.server.PartitionManager$RepartitionerState valueOf(java.lang.String) -> a
     44:44:void <init>(java.lang.String,int) -> <init>
     44:48:void <clinit>() -> <clinit>
-com.sonicbase.index.Repartitioner$ShardState -> com.sonicbase.a.c$i:
+com.sonicbase.server.PartitionManager$ShardState -> com.sonicbase.a.c$i:
     int shard -> a
     long count -> b
     java.lang.String exception -> c
     boolean finished -> d
     57:61:void <init>(long,java.lang.String,boolean) -> <init>
     63:65:void <init>() -> <init>
-    51:51:long access$000(com.sonicbase.index.Repartitioner$ShardState) -> a
-    51:51:boolean access$100(com.sonicbase.index.Repartitioner$ShardState) -> b
-    51:51:java.lang.String access$200(com.sonicbase.index.Repartitioner$ShardState) -> c
+    51:51:long access$000(com.sonicbase.server.PartitionManager$ShardState) -> a
+    51:51:boolean access$100(com.sonicbase.server.PartitionManager$ShardState) -> b
+    51:51:java.lang.String access$200(com.sonicbase.server.PartitionManager$ShardState) -> c
 com.sonicbase.jdbcdriver.ConnectionProxy -> com.sonicbase.jdbcdriver.ConnectionProxy:
     java.lang.Object clientMutex -> a
     java.util.Map clients -> b
@@ -5176,7 +5176,7 @@ com.sonicbase.schema.TableSchema$PreviousFields -> com.sonicbase.schema.TableSch
     java.util.List fields -> b
     com.sonicbase.schema.TableSchema this$0 -> c
     130:132:void <init>(com.sonicbase.schema.TableSchema) -> <init>
-com.sonicbase.server.AddressMap -> com.sonicbase.server.a:
+com.sonicbase.index.AddressMap -> com.sonicbase.server.a:
     org.apache.log4j.Logger logger -> b
     it.unimi.dsi.fastutil.longs.LongList[] map -> c
     java.util.concurrent.atomic.AtomicLong currOuterAddress -> d
@@ -5379,7 +5379,7 @@ com.sonicbase.server.DatabaseServer -> com.sonicbase.server.c:
     boolean dead -> W
     boolean applyingQueuesAndInteractive -> X
     com.sonicbase.server.MethodInvoker methodInvoker -> Y
-    com.sonicbase.server.AddressMap addressMap -> Z
+    com.sonicbase.index.AddressMap addressMap -> Z
     boolean shutdownMasterValidatorThread -> aa
     java.lang.Thread masterLicenseValidatorThread -> ab
     java.lang.String disableDate -> ac
@@ -5413,7 +5413,7 @@ com.sonicbase.server.DatabaseServer -> com.sonicbase.server.c:
     com.sonicbase.common.DatabaseCommon common -> aE
     java.util.concurrent.atomic.AtomicReference client -> aF
     sun.misc.Unsafe unsafe -> aG
-    com.sonicbase.index.Repartitioner repartitioner -> aH
+    com.sonicbase.server.PartitionManager repartitioner -> aH
     java.util.concurrent.atomic.AtomicLong nextRecordId -> aI
     int recordsByIdPartitionCount -> aJ
     com.fasterxml.jackson.databind.node.ObjectNode config -> aK
@@ -5577,7 +5577,7 @@ com.sonicbase.server.DatabaseServer -> com.sonicbase.server.c:
     3991:3991:com.sonicbase.server.UpdateManager getUpdateManager() -> N
     3995:3995:com.sonicbase.server.LogManager getLogManager() -> O
     3999:3999:com.sonicbase.server.SchemaManager getSchemaManager() -> P
-    4003:4003:com.sonicbase.index.Repartitioner getRepartitioner() -> Q
+    4003:4003:com.sonicbase.server.PartitionManager getRepartitioner() -> Q
     4007:4008:void enableSnapshot(boolean) -> b
     4011:4016:void runSnapshot() -> R
     4019:4030:void recoverFromSnapshot() -> S
@@ -5654,7 +5654,7 @@ com.sonicbase.server.DatabaseServer -> com.sonicbase.server.c:
     5340:5461:byte[][] fromUnsafeToRecords(java.lang.Object) -> b
     5465:5465:byte[][] fromUnsafeToKeys(java.lang.Object) -> c
     5559:5566:void freeUnsafeIds(java.lang.Object) -> d
-    5569:5569:com.sonicbase.server.AddressMap getAddressMap() -> aC
+    5569:5569:com.sonicbase.index.AddressMap getAddressMap() -> aC
     5658:5658:byte[] invokeMethod(byte[],boolean,boolean) -> a
     5663:5666:byte[] invokeMethod(byte[],long,long,boolean,boolean,java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong) -> a
     5671:5678:void purge(java.lang.String) -> e
@@ -6375,7 +6375,7 @@ com.sonicbase.server.DeltaManager$OutContext -> com.sonicbase.server.g$c:
     478:478:long access$504(com.sonicbase.server.DeltaManager$OutContext) -> b
     478:478:java.io.DataOutputStream access$400(com.sonicbase.server.DeltaManager$OutContext) -> c
     478:478:int access$704(com.sonicbase.server.DeltaManager$OutContext) -> d
-com.sonicbase.server.Histogram -> com.sonicbase.server.h:
+com.sonicbase.common.Histogram -> com.sonicbase.server.h:
     double pinMinimum -> b
     double pinMaximum -> c
     double bucketRatio -> d
@@ -7067,7 +7067,7 @@ com.sonicbase.server.ReadManager$ProcessKeyContainsColumns -> com.sonicbase.serv
     3519:3519:byte[][] getRecords() -> d
     3524:3585:com.sonicbase.server.ReadManager$ProcessKeyContainsColumns invoke() -> e
     3589:3589:java.lang.Object[][] getCurrKeys() -> f
-com.sonicbase.server.RecordLockedException -> com.sonicbase.server.m:
+com.sonicbase.common.RecordLockedException -> com.sonicbase.server.m:
     7:8:void <init>() -> <init>
     11:12:void <init>(java.lang.String) -> <init>
     15:16:void <init>(java.lang.String,java.lang.Exception) -> <init>
@@ -7451,7 +7451,7 @@ com.sonicbase.server.UpdateManager -> com.sonicbase.server.s:
     42:42:void access$1500(com.sonicbase.server.UpdateManager,java.util.List) -> a
     42:42:com.sonicbase.common.Logger access$1600(com.sonicbase.server.UpdateManager) -> d
 com.sonicbase.server.UpdateManager$1 -> com.sonicbase.server.s$1:
-    com.sonicbase.index.Repartitioner$MoveRequest val$moveRequest -> a
+    com.sonicbase.server.PartitionManager$MoveRequest val$moveRequest -> a
     com.sonicbase.common.ComObject val$cobj -> b
     java.lang.String val$dbName -> c
     com.sonicbase.index.Index val$index -> d
@@ -7459,15 +7459,15 @@ com.sonicbase.server.UpdateManager$1 -> com.sonicbase.server.s$1:
     com.sonicbase.schema.IndexSchema val$indexSchema -> f
     boolean val$movingRecord -> g
     com.sonicbase.server.UpdateManager this$0 -> h
-    1322:1322:void <init>(com.sonicbase.server.UpdateManager,com.sonicbase.index.Repartitioner$MoveRequest,com.sonicbase.common.ComObject,java.lang.String,com.sonicbase.index.Index,java.lang.String,com.sonicbase.schema.IndexSchema,boolean) -> <init>
+    1322:1322:void <init>(com.sonicbase.server.UpdateManager,com.sonicbase.server.PartitionManager$MoveRequest,com.sonicbase.common.ComObject,java.lang.String,com.sonicbase.index.Index,java.lang.String,com.sonicbase.schema.IndexSchema,boolean) -> <init>
     1325:1330:java.lang.Object call() -> call
 com.sonicbase.server.UpdateManager$2 -> com.sonicbase.server.s$2:
-    com.sonicbase.index.Repartitioner$MoveRequest val$moveRequest -> a
+    com.sonicbase.server.PartitionManager$MoveRequest val$moveRequest -> a
     java.lang.String val$tableName -> b
     com.sonicbase.index.Index val$index -> c
     com.sonicbase.schema.IndexSchema val$indexSchema -> d
     com.sonicbase.server.UpdateManager this$0 -> e
-    1352:1352:void <init>(com.sonicbase.server.UpdateManager,com.sonicbase.index.Repartitioner$MoveRequest,java.lang.String,com.sonicbase.index.Index,com.sonicbase.schema.IndexSchema) -> <init>
+    1352:1352:void <init>(com.sonicbase.server.UpdateManager,com.sonicbase.server.PartitionManager$MoveRequest,java.lang.String,com.sonicbase.index.Index,com.sonicbase.schema.IndexSchema) -> <init>
     1355:1359:java.lang.Object call() -> call
 com.sonicbase.server.UpdateManager$3 -> com.sonicbase.server.s$3:
     com.sonicbase.server.UpdateManager this$0 -> a

@@ -917,7 +917,7 @@ public class NettyServer {
                   waitForServersToStart();
                   //databaseServer.setWaitingForServersToStart(false);
 
-                  databaseServer.reconcileSchema();
+                  databaseServer.getSchemaManager().reconcileSchema();
 
                 }
               }, "SonicBase Reconcile Thread");
@@ -931,7 +931,7 @@ public class NettyServer {
               databaseServer.getDeleteManager().forceDeletes();
               databaseServer.getDeleteManager().start();
 
-              databaseServer.startMasterMonitor();
+              databaseServer.getMasterManager().startMasterMonitor();
 
               logger.info("running snapshot loop");
               databaseServer.getDeltaManager().runSnapshotLoop();

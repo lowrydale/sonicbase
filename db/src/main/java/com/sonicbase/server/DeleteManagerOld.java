@@ -53,7 +53,7 @@ public class DeleteManagerOld implements DeleteManager {
               @Override
               public void run() {
                 for (Object currObj : batch) {
-                  databaseServer.freeUnsafeIds(currObj);
+                  databaseServer.getAddressMap().freeUnsafeIds(currObj);
                 }
               }
             });
@@ -158,7 +158,7 @@ public class DeleteManagerOld implements DeleteManager {
                           synchronized (index.getMutex(currKey)) {
                             Object value = index.get(currKey);
                             if (value != null) {
-                              byte[][] content = databaseServer.fromUnsafeToRecords(value);
+                              byte[][] content = databaseServer.getAddressMap().fromUnsafeToRecords(value);
                               if (content != null) {
                                 if (indexSchema.isPrimaryKey()) {
                                   if ((Record.DB_VIEW_FLAG_DELETING & Record.getDbViewFlags(content[0])) != 0) {
@@ -196,7 +196,7 @@ public class DeleteManagerOld implements DeleteManager {
                   if (shutdown) {
                     break;
                   }
-                  //                List<Integer> selectedShards = Repartitioner.findOrderedPartitionForRecord(true, false,
+                  //                List<Integer> selectedShards = PartitionManager.findOrderedPartitionForRecord(true, false,
                   //                    fieldOffsets, databaseServer.getCommon(), tableSchema,
                   //                    indexName, null, BinaryExpression.Operator.equal, null, currKey, null);
                   //                if (selectedShards.get(0) == databaseServer.getShard()) {
@@ -217,7 +217,7 @@ public class DeleteManagerOld implements DeleteManager {
                   synchronized (index.getMutex(currKey)) {
                     Object value = index.get(currKey);
                     if (value != null) {
-                      byte[][] content = databaseServer.fromUnsafeToRecords(value);
+                      byte[][] content = databaseServer.getAddressMap().fromUnsafeToRecords(value);
                       if (content != null) {
                         if (indexSchema.isPrimaryKey()) {
                           if ((Record.DB_VIEW_FLAG_DELETING & Record.getDbViewFlags(content[0])) != 0) {
@@ -279,7 +279,7 @@ public class DeleteManagerOld implements DeleteManager {
 //          @Override
 //          public Object call() throws Exception {
     for (Object obj : toFreeBatch) {
-      databaseServer.freeUnsafeIds(obj);
+      databaseServer.getAddressMap().freeUnsafeIds(obj);
     }
 //            return null;
 //          }

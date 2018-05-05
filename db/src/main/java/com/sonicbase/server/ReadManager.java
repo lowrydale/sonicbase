@@ -143,7 +143,7 @@ public class ReadManager {
             //entry.setValue(index.get(entry.getKey()));
           //}
           if (entry.getValue() != null && !entry.getValue().equals(0L)) {
-            records = server.fromUnsafeToRecords(entry.getValue());
+            records = server.getAddressMap().fromUnsafeToRecords(entry.getValue());
           }
         //}
         for (byte[] bytes : records) {
@@ -1317,7 +1317,7 @@ public class ReadManager {
         // entry.setValue(index.get(entry.getKey()));
         //}
         if (entry.getValue() != null && !entry.getValue().equals(0L)) {
-          records = server.fromUnsafeToRecords(entry.getValue());
+          records = server.getAddressMap().fromUnsafeToRecords(entry.getValue());
         }
         //}
         if (parms != null && expression != null && records != null) {
@@ -1648,10 +1648,10 @@ public class ReadManager {
             //}
             if (entry.getValue() != null && !entry.getValue().equals(0L)) {
               if (keys) {
-                currKeyRecords = server.fromUnsafeToKeys(entry.getValue());
+                currKeyRecords = server.getAddressMap().fromUnsafeToKeys(entry.getValue());
               }
               else {
-                records = server.fromUnsafeToRecords(entry.getValue());
+                records = server.getAddressMap().fromUnsafeToRecords(entry.getValue());
               }
             }
             //}
@@ -1670,7 +1670,7 @@ public class ReadManager {
               }
               else {
                 Object unsafeAddress = entry.getValue();
-                currKeyRecords = server.fromUnsafeToKeys(unsafeAddress);
+                currKeyRecords = server.getAddressMap().fromUnsafeToKeys(unsafeAddress);
               }
             }
             else {
@@ -2369,7 +2369,7 @@ public class ReadManager {
             if (value != null && !value.equals(0L)) {
               if (keys) {
                 if (keyContainsColumns) {
-                  records = server.fromUnsafeToRecords(value);
+                  records = server.getAddressMap().fromUnsafeToRecords(value);
 
                   MapEntry<Object[], Object> currEntry = new MapEntry<>();
                   currEntry.setKey(originalKey);
@@ -2383,11 +2383,11 @@ public class ReadManager {
                   records = processKeyContainsColumns.getRecords();
                 }
                 else {
-                  currKeyRecords = server.fromUnsafeToKeys(value);
+                  currKeyRecords = server.getAddressMap().fromUnsafeToKeys(value);
                 }
               }
               else {
-                records = server.fromUnsafeToRecords(value);
+                records = server.getAddressMap().fromUnsafeToRecords(value);
               }
             }
           //}
@@ -2460,7 +2460,7 @@ public class ReadManager {
                 if (value != null && !value.equals(0L)) {
                   if (keys) {
                     if (keyContainsColumns) {
-                      records = server.fromUnsafeToRecords(value);
+                      records = server.getAddressMap().fromUnsafeToRecords(value);
 
                       ProcessKeyContainsColumns processKeyContainsColumns = new ProcessKeyContainsColumns(serializationVersion, dbName, tableSchema,
                           indexSchema, parms, evaluateExpresion, expression, columnOffsets, forceSelectOnServer, index,
@@ -2474,11 +2474,11 @@ public class ReadManager {
                       //entry = processKeyContainsColumns.getEntry();
                     }
                     else {
-                      currKeyRecords = server.fromUnsafeToKeys(value);
+                      currKeyRecords = server.getAddressMap().fromUnsafeToKeys(value);
                     }
                   }
                   else {
-                    records = server.fromUnsafeToRecords(value);
+                    records = server.getAddressMap().fromUnsafeToRecords(value);
                   }
                 }
               //}
@@ -2752,7 +2752,7 @@ public class ReadManager {
                 Object unsafeAddress = currEntry.getValue();//index.get(entry.getKey());
                 if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
                   if (keyContainsColumns) {
-                    records = server.fromUnsafeToRecords(currEntry.getValue());
+                    records = server.getAddressMap().fromUnsafeToRecords(currEntry.getValue());
                     ProcessKeyContainsColumns processKeyContainsColumns = new ProcessKeyContainsColumns(serializationVersion, dbName, tableSchema,
                         indexSchema, parms, evaluateExpresion, expression, columnOffsets, forceSelectOnServer, index,
                         viewVersion, counters, groupContext, keyOffsets, keyContainsColumns, entry, currEntry, currKeyRecords,
@@ -2765,14 +2765,14 @@ public class ReadManager {
                     entry = processKeyContainsColumns.getEntry();
                   }
                   else {
-                    currKeyRecords = server.fromUnsafeToKeys(unsafeAddress);
+                    currKeyRecords = server.getAddressMap().fromUnsafeToKeys(unsafeAddress);
                   }
                 }
               }
               else {
                 Object unsafeAddress = currEntry.getValue();//index.get(entry.getKey());
                 if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
-                  records = server.fromUnsafeToRecords(unsafeAddress);
+                  records = server.getAddressMap().fromUnsafeToRecords(unsafeAddress);
 //                  while (records == null) {
 //                    try {
 //                      Thread.sleep(100);
@@ -3240,7 +3240,7 @@ public class ReadManager {
            // unsafeAddress = index.get(entry.getKey());
           //}
           if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
-            records = server.fromUnsafeToRecords(unsafeAddress);
+            records = server.getAddressMap().fromUnsafeToRecords(unsafeAddress);
           }
         //}
         if (records != null) {
@@ -3263,7 +3263,7 @@ public class ReadManager {
            // unsafeAddress = index.get(entry.getKey());
           //}
           if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
-            records = server.fromUnsafeToRecords(unsafeAddress);
+            records = server.getAddressMap().fromUnsafeToRecords(unsafeAddress);
           }
         //}
         if (records != null) {
@@ -3327,7 +3327,7 @@ public class ReadManager {
         if (unsafeAddress != null) {
           byte[][] records = null;
           if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
-            records = server.fromUnsafeToRecords(unsafeAddress);
+            records = server.getAddressMap().fromUnsafeToRecords(unsafeAddress);
           }
           if (records != null) {
             Record record = new Record(dbName, server.getCommon(), records[0]);
@@ -3435,7 +3435,7 @@ public class ReadManager {
 
       unsafeAddress = currEntry.getValue();
       if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
-        records = server.fromUnsafeToRecords(unsafeAddress);
+        records = server.getAddressMap().fromUnsafeToRecords(unsafeAddress);
       }
 
       boolean shouldInclude = true;

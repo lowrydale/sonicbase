@@ -197,7 +197,7 @@ public class TestAWSBackup {
 
       while (true) {
         ComObject cobj = new ComObject();
-        cobj.put(ComObject.Tag.method, "areAllLongRunningCommandsComplete");
+        cobj.put(ComObject.Tag.method, "DatabaseServer:areAllLongRunningCommandsComplete");
 
         byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().sendToMaster(cobj);
         if (new String(bytes).equals("true")) {
@@ -281,7 +281,7 @@ public class TestAWSBackup {
 
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "__none__");
-      cobj.put(ComObject.Tag.method, "getLastBackupDir");
+      cobj.put(ComObject.Tag.method, "BackupManager:getLastBackupDir");
       cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
       byte[] ret = client.send(null, 0, 0, cobj, DatabaseClient.Replica.master);
       ComObject retObj = new ComObject(ret);
@@ -311,7 +311,7 @@ public class TestAWSBackup {
       cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "test");
       cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "forceDeletes");
+      cobj.put(ComObject.Tag.method, "DeleteManager:forceDeletes");
       client.sendToAllShards(null, 0, cobj, DatabaseClient.Replica.all);
 
       executor.shutdownNow();

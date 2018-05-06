@@ -245,7 +245,7 @@ public class ExpressionImpl implements Expression {
       cobj.put(ComObject.Tag.legacyCounter, counter.serialize());
       cobj.put(ComObject.Tag.dbName, dbName);
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "evaluateCounterGetKeys");
+      cobj.put(ComObject.Tag.method, "ReadManager:evaluateCounterGetKeys");
 
       String batchKey = "DatabaseServer:evaluateCounterGetKeys";
 
@@ -350,7 +350,7 @@ public class ExpressionImpl implements Expression {
     }
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-    cobj.put(ComObject.Tag.method, "evaluateCounterWithRecord");
+    cobj.put(ComObject.Tag.method, "ReadManager:evaluateCounterWithRecord");
 
     String batchKey = "DatabaseServer:evaluateCounterWithRecord";
 
@@ -1422,7 +1422,7 @@ public class ExpressionImpl implements Expression {
               cobj.put(ComObject.Tag.dbName, dbName);
               cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
               cobj.put(ComObject.Tag.count, count);
-              cobj.put(ComObject.Tag.method, "batchIndexLookup");
+              cobj.put(ComObject.Tag.method, "ReadManager:batchIndexLookup");
               byte[] lookupRet = client.send(null, shard, -1, cobj, DatabaseClient.Replica.def);
 //              if (previousSchemaVersion < common.getSchemaVersion()) {
 //                throw new SchemaOutOfSyncException();
@@ -1726,7 +1726,7 @@ public class ExpressionImpl implements Expression {
           cobj.put(ComObject.Tag.count, count);
           cobj.put(ComObject.Tag.dbName, dbName);
           cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-          cobj.put(ComObject.Tag.method, "indexLookupExpression");
+          cobj.put(ComObject.Tag.method, "ReadManager:indexLookupExpression");
 
           ComObject retObj = null;
           if (restrictToThisServer) {

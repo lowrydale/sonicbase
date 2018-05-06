@@ -124,7 +124,7 @@ public class OSStatsManager {
           int healthyShards = 0;
           for (int i = 0; i < server.getShardCount(); i++) {
             ComObject cobj = new ComObject();
-            cobj.put(ComObject.Tag.method, "healthCheck");
+            cobj.put(ComObject.Tag.method, "DatabaseServer:healthCheck");
             server.getClient().send(null, i, 0, cobj, DatabaseClient.Replica.def);
             healthyShards++;
           }
@@ -1217,7 +1217,7 @@ public class OSStatsManager {
   }
 
 
-  public ComObject getOSStats(ComObject cobj) {
+  public ComObject getOSStats(ComObject cobj, boolean replayedCommand) {
     try {
       OSStatsManager.OSStats stats = doGetOSStats();
       ComObject retObj = new ComObject();

@@ -748,7 +748,7 @@ public class ResultSetImpl implements ResultSet {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, dbName);
       cobj.put(ComObject.Tag.schemaVersion, databaseClient.getCommon().getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "serverSelectDelete");
+      cobj.put(ComObject.Tag.method, "ReadManager:serverSelectDelete");
       cobj.put(ComObject.Tag.id, selectStatement.getServerSelectResultSetId());
 
       byte[] recordRet = databaseClient.send(null, selectStatement.getServerSelectShardNumber(),
@@ -3382,7 +3382,7 @@ public class ResultSetImpl implements ResultSet {
         cobj.put(ComObject.Tag.schemaVersion, databaseClient.getCommon().getSchemaVersion());
         cobj.put(ComObject.Tag.dbName, dbName);
         cobj.put(ComObject.Tag.count, DatabaseClient.SELECT_PAGE_SIZE);
-        cobj.put(ComObject.Tag.method, "serverSelect");
+        cobj.put(ComObject.Tag.method, "ReadManager:serverSelect");
         cobj.put(ComObject.Tag.currOffset, currOffset.get());
         cobj.put(ComObject.Tag.countReturned, countReturned.get());
 

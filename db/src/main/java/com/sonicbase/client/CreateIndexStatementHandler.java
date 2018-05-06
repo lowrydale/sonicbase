@@ -52,7 +52,7 @@ public class CreateIndexStatementHandler extends StatementHandler {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-    cobj.put(ComObject.Tag.method, "createIndex");
+    cobj.put(ComObject.Tag.method, "SchemaManager:createIndex");
     cobj.put(ComObject.Tag.masterSlave, "master");
     cobj.put(ComObject.Tag.tableName, statement.getTableName());
     cobj.put(ComObject.Tag.indexName, statement.getName());

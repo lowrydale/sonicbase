@@ -204,7 +204,7 @@ public class TestJoins {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, "test");
     cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-    cobj.put(ComObject.Tag.method, "forceDeletes");
+    cobj.put(ComObject.Tag.method, "DeleteManager:forceDeletes");
     String command = "DatabaseServer:ComObject:forceDeletes:";
     //client.sendToAllShards(null, 0, command, cobj, DatabaseClient.Replica.all);
 

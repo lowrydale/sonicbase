@@ -281,7 +281,7 @@ public class DescribeStatementHandler {
           ComObject cobj = new ComObject();
           cobj.put(ComObject.Tag.dbName, "__none__");
           cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-          cobj.put(ComObject.Tag.method, "getSchema");
+          cobj.put(ComObject.Tag.method, "DatabaseServer:getSchema");
           byte[] ret = null;
           try {
             ret = client.send(null, j, i, cobj, DatabaseClient.Replica.specified);
@@ -347,7 +347,7 @@ public class DescribeStatementHandler {
                 ComObject cobj = new ComObject();
                 cobj.put(ComObject.Tag.dbName, "__none__");
                 cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-                cobj.put(ComObject.Tag.method, "getOSStats");
+                cobj.put(ComObject.Tag.method, "OSStatsManager:getOSStats");
 
                 byte[] ret = client.send(null, shard, replica, cobj, DatabaseClient.Replica.specified);
                 ComObject retObj = new ComObject(ret);
@@ -501,7 +501,7 @@ public class DescribeStatementHandler {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-    cobj.put(ComObject.Tag.method, "getRepartitionerState");
+    cobj.put(ComObject.Tag.method, "PartitionManager:getRepartitionerState");
     byte[] ret = client.sendToMaster(cobj);
     ComObject retObj = new ComObject(ret);
 

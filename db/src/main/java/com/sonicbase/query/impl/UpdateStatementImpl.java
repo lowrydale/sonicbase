@@ -200,7 +200,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
               if (schemaRetryCount < 2) {
                 cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
               }
-              cobj.put(ComObject.Tag.method, "updateRecord");
+              cobj.put(ComObject.Tag.method, "UpdateManager:updateRecord");
               cobj.put(ComObject.Tag.tableName, tableName);
               cobj.put(ComObject.Tag.indexName, indexSchema.getName());
               cobj.put(ComObject.Tag.isExcpliciteTrans, client.isExplicitTrans());
@@ -299,7 +299,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
     if (schemaRetryCount < 2) {
       cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
     }
-    cobj.put(ComObject.Tag.method, "deleteIndexEntryByKey");
+    cobj.put(ComObject.Tag.method, "UpdateManager:deleteIndexEntryByKey");
     cobj.put(ComObject.Tag.tableName, tableName);
     cobj.put(ComObject.Tag.indexName, keyInfo.getIndexSchema().getKey());
     cobj.put(ComObject.Tag.primaryKeyIndexName, primaryKeyIndexName);

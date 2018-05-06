@@ -138,11 +138,11 @@ public class LogManager {
           writer.write(String.valueOf(maxAllocatedLogSequenceNumber.get()));
         }
       }
-      pushMaxSequenceNum();
+      pushMaxSequenceNum(null, false);
     }
   }
 
-  public ComObject setMaxSequenceNum(ComObject cobj) {
+  public ComObject setMaxSequenceNum(ComObject cobj, boolean replayedCommand) {
     try {
       long sequenceNum = cobj.getLong(ComObject.Tag.sequenceNumber);
 
@@ -163,14 +163,14 @@ public class LogManager {
     return System.nanoTime();
   }
 
-  void pushMaxSequenceNum() {
+  void pushMaxSequenceNum(ComObject cobj, boolean replayedCommand) {
     for (int replica = 0; replica < server.getReplicationFactor(); replica++) {
       if (replica != server.getReplica()) {
         try {
-          ComObject cobj = new ComObject();
+          cobj = new ComObject();
           cobj.put(ComObject.Tag.dbName, "__none__");
           cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-          cobj.put(ComObject.Tag.method, "setMaxSequenceNum");
+          cobj.put(ComObject.Tag.method, "LogManager:setMaxSequenceNum");
           cobj.put(ComObject.Tag.sequenceNumber, maxAllocatedLogSequenceNumber.get());
           server.getClient().send(null, server.getShard(), replica, cobj, DatabaseClient.Replica.specified, true);
         }
@@ -375,7 +375,7 @@ public class LogManager {
     }
   }
 
-  public ComObject getLogFile(ComObject cobj) {
+  public ComObject getLogFile(ComObject cobj, boolean replayedCommand) {
     try {
       int replica = cobj.getInt(ComObject.Tag.replica);
       String filename = cobj.getString(ComObject.Tag.filename);
@@ -395,12 +395,14 @@ public class LogManager {
     }
   }
 
-  public ComObject deletePeerLogs(ComObject cobj) {
+  public ComObject deletePeerLogs(ComObject cobj, boolean replayedCommand) {
     deletePeerLogs(cobj.getInt(ComObject.Tag.replica));
     return null;
   }
 
-  public ComObject sendLogsToPeer(int replicaNum) {
+  public ComObject sendLogsToPeer(ComObject cobj, boolean replayedCommand) {
+    int replicaNum = cobj.getInt(ComObject.Tag.replica);
+
     try {
       ComObject retObj = new ComObject();
       File[] files = new File(getLogRoot() + "/peer-" + replicaNum).listFiles();
@@ -455,7 +457,14 @@ public class LogManager {
     }
   }
 
-  public void receiveExternalLog(int peerReplica, String filename, byte[] bytes) {
+  public ComObject sendQueueFile(ComObject cobj, boolean replayedCommand) {
+    int peerReplica = cobj.getInt(ComObject.Tag.replica);
+    String filename = cobj.getString(ComObject.Tag.filename);
+    byte[] bytes = cobj.getByteArray(ComObject.Tag.binaryFileContent);
+    return sendQueueFile(peerReplica, filename, bytes);
+  }
+
+  public ComObject sendQueueFile(int peerReplica, String filename, byte[] bytes) {
     try {
       String directory = getLogRoot();
       File dataRootDir = new File(directory);
@@ -464,6 +473,7 @@ public class LogManager {
       try (BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(file))) {
         out.write(bytes);
       }
+      return null;
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -670,7 +680,7 @@ public class LogManager {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, "__none__");
     cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-    cobj.put(ComObject.Tag.method, "sendLogsToPeer");
+    cobj.put(ComObject.Tag.method, "LogManager:sendLogsToPeer");
     cobj.put(ComObject.Tag.replica, server.getReplica());
     AtomicBoolean isHealthy = new AtomicBoolean();
     try {
@@ -689,7 +699,7 @@ public class LogManager {
           cobj = new ComObject();
           cobj.put(ComObject.Tag.dbName, "__none__");
           cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-          cobj.put(ComObject.Tag.method, "getLogFile");
+          cobj.put(ComObject.Tag.method, "LogManager:getLogFile");
           cobj.put(ComObject.Tag.replica, server.getReplica());
           cobj.put(ComObject.Tag.filename, filename);
 
@@ -697,13 +707,13 @@ public class LogManager {
           retObj = new ComObject(ret);
           byte[] bytes = retObj.getByteArray(ComObject.Tag.binaryFileContent);
 
-          receiveExternalLog(replica, filename, bytes);
+          sendQueueFile(replica, filename, bytes);
           logger.info("Received log file: filename=" + filename + ", replica=" + replica);
         }
         cobj = new ComObject();
         cobj.put(ComObject.Tag.dbName, "__none__");
         cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-        cobj.put(ComObject.Tag.method, "deletePeerLogs");
+        cobj.put(ComObject.Tag.method, "LogManager:deletePeerLogs");
         cobj.put(ComObject.Tag.replica, server.getReplica());
         ret = server.getClient().send(null, server.getShard(), replica, cobj, DatabaseClient.Replica.specified);
 

@@ -68,7 +68,7 @@ public class ClientStatsHandler {
           }
 
           ComObject cobj = new ComObject();
-          cobj.put(ComObject.Tag.method, "registerStats");
+          cobj.put(ComObject.Tag.method, "MonitorManager:registerStats");
           ComArray array = cobj.putArray(ComObject.Tag.histogramSnapshot, ComObject.Type.objectType);
 
           if (registeredQueries.get(cluster) == null) {
@@ -161,7 +161,7 @@ public class ClientStatsHandler {
       }
 
       ComObject cobj = new ComObject();
-      cobj.put(ComObject.Tag.method, "registerQueryForStats");
+      cobj.put(ComObject.Tag.method, "MonitorManager:registerQueryForStats");
       cobj.put(ComObject.Tag.dbName, dbName);
       cobj.put(ComObject.Tag.sql, sql);
 

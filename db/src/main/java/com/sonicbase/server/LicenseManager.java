@@ -428,13 +428,13 @@ public class LicenseManager {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, "__none__");
     cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-    cobj.put(ComObject.Tag.method, "licenseCheckin");
+    cobj.put(ComObject.Tag.method, "LicenseManager:licenseCheckin");
     cobj.put(ComObject.Tag.shard, server.getShard());
     cobj.put(ComObject.Tag.replica, server.getReplica());
     cobj.put(ComObject.Tag.coreCount, cores);
     byte[] ret = null;
     if (0 == server.getShard() && server.getCommon().getServersConfig().getShards()[0].getMasterReplica() == server.getReplica()) {
-      ret = licenseCheckin(cobj).serialize();
+      ret = licenseCheckin(cobj, false).serialize();
     }
     else {
       ret = server.getClient().sendToMaster(cobj);
@@ -477,7 +477,7 @@ public class LicenseManager {
     }
   }
 
-  public ComObject licenseCheckin(ComObject cobj) {
+  public ComObject licenseCheckin(ComObject cobj, boolean replayedCommand) {
     int shard = cobj.getInt(ComObject.Tag.shard);
     int replica = cobj.getInt(ComObject.Tag.replica);
     int cores = cobj.getInt(ComObject.Tag.coreCount);

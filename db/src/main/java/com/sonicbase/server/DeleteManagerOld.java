@@ -506,7 +506,7 @@ public class DeleteManagerOld implements DeleteManager {
     return isForcingDeletes.get();
   }
 
-  public void forceDeletes() {
+  public ComObject forceDeletes(ComObject cobj, boolean replayedCommand) {
     File dir = getReplicaRoot();
     totalBytes = 0;
 
@@ -523,7 +523,7 @@ public class DeleteManagerOld implements DeleteManager {
           countRead.set(0);
           files = dir.listFiles();
           if (files == null || files.length == 0) {
-            return;
+            return null;
           }
           List<Future> futures = new ArrayList<>();
           for (final File file : files) {
@@ -550,5 +550,6 @@ public class DeleteManagerOld implements DeleteManager {
     finally {
       isForcingDeletes.set(false);
     }
+    return null;
   }
 }

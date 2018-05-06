@@ -15,6 +15,8 @@ public interface SnapshotManager {
 
   boolean isRecovering();
 
+  ComObject finishServerReloadForSource(ComObject cobj, boolean replayedCommand);
+
   void getPercentRecoverComplete(ComObject retObj);
 
   Exception getErrorRecovering();

@@ -102,6 +102,13 @@ public class SnapshotManagerImpl implements SnapshotManager {
   private int finishedFileCount = 0;
   private Exception errorRecovering = null;
 
+  public ComObject finishServerReloadForSource(ComObject cobj, boolean replayedCommand) {
+
+    enableSnapshot(true);
+
+    return null;
+  }
+
   public void getPercentRecoverComplete(ComObject retObj) {
     if (totalBytes == 0) {
       retObj.put(ComObject.Tag.percentComplete, 0d);
@@ -452,14 +459,14 @@ public class SnapshotManagerImpl implements SnapshotManager {
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.tableName, tableName);
     cobj.put(ComObject.Tag.indexName, indexSchema.getName());
-    cobj.put(ComObject.Tag.method, "deleteRecord");
+    cobj.put(ComObject.Tag.method, "UpdateManager:deleteRecord");
     server.getClient().send("DatabaseServer:deleteRecord", selectedShards.get(0), 0, cobj, DatabaseClient.Replica.def);
 
     cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
     cobj.put(ComObject.Tag.tableName, tableName);
-    cobj.put(ComObject.Tag.method, "deleteIndexEntry");
+    cobj.put(ComObject.Tag.method, "UpdateManager:deleteIndexEntry");
     cobj.put(ComObject.Tag.recordBytes, record);
 
     server.getClient().sendToAllShards(null, 0, cobj, DatabaseClient.Replica.def);

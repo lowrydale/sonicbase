@@ -38,7 +38,7 @@ public class Logger {
               ComObject cobj = new ComObject();
               cobj.put(ComObject.Tag.dbName, "__none__");
               cobj.put(ComObject.Tag.schemaVersion, error.client.getCommon().getSchemaVersion());
-              cobj.put(ComObject.Tag.method, "logError");
+              cobj.put(ComObject.Tag.method, "DatabaseServer.logError");
               cobj.put(ComObject.Tag.isClient, isClient);
               cobj.put(ComObject.Tag.host, hostName);
               cobj.put(ComObject.Tag.message, error.msg);

@@ -431,7 +431,7 @@ public class IndexLookup {
 
     cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
     cobj.put(ComObject.Tag.dbName, expression.dbName);
-    cobj.put(ComObject.Tag.method, "indexLookup");
+    cobj.put(ComObject.Tag.method, "ReadManager:indexLookup");
     return cobj;
   }
 

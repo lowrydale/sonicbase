@@ -75,7 +75,8 @@ public class ReadManager {
   }
 
 
-  public ComObject countRecords(ComObject cobj) {
+  @SchemaReadLock
+  public ComObject countRecords(ComObject cobj, boolean replayedCommand) {
     if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
       try {
         Thread.sleep(10);
@@ -180,7 +181,8 @@ public class ReadManager {
     return retObj;
   }
 
-  public ComObject batchIndexLookup(ComObject cobj) {
+  @SchemaReadLock
+  public ComObject batchIndexLookup(ComObject cobj, boolean replayedCommand) {
     try {
       if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
         try {
@@ -333,7 +335,8 @@ public class ReadManager {
 
   private AtomicInteger lookupCount = new AtomicInteger();
 
-  public ComObject indexLookup(ComObject cobj) {
+  @SchemaReadLock
+  public ComObject indexLookup(ComObject cobj, boolean replayedCommand) {
     return indexLookup(cobj, null);
   }
 
@@ -679,6 +682,7 @@ public class ReadManager {
     return columnOffsets;
   }
 
+  @SchemaReadLock
   public ComObject closeResultSet(ComObject cobj, boolean replayedCommand) {
     long resultSetId = cobj.getLong(ComObject.Tag.resultSetId);
 
@@ -688,6 +692,7 @@ public class ReadManager {
     return null;
   }
 
+  @SchemaReadLock
   public ComObject serverSelectDelete(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     long id = cobj.getLong(ComObject.Tag.id);
@@ -697,7 +702,8 @@ public class ReadManager {
     return null;
   }
 
-  public ComObject serverSelect(ComObject cobj) {
+  @SchemaReadLock
+  public ComObject serverSelect(ComObject cobj, boolean replayedCommand) {
     return serverSelect(cobj, false,null);
   }
 
@@ -850,7 +856,8 @@ public class ReadManager {
     }
   }
 
-  public ComObject serverSetSelect(ComObject cobj) {
+  @SchemaReadLock
+  public ComObject serverSetSelect(ComObject cobj, boolean replayedCommand) {
     return serverSetSelect(cobj, false, null);
   }
 
@@ -1069,7 +1076,8 @@ public class ReadManager {
     return (DiskBasedResultSet) ret;
   }
 
-  public ComObject indexLookupExpression(ComObject cobj) {
+  @SchemaReadLock
+  public ComObject indexLookupExpression(ComObject cobj, boolean replayedCommand) {
     return indexLookupExpression(cobj, null);
   }
 
@@ -3206,7 +3214,8 @@ public class ReadManager {
     }
   }
 
-  public ComObject evaluateCounterGetKeys(ComObject cobj) {
+  @SchemaReadLock
+  public ComObject evaluateCounterGetKeys(ComObject cobj, boolean replayedCommand) {
 
     String dbName = cobj.getString(ComObject.Tag.dbName);
 
@@ -3295,7 +3304,8 @@ public class ReadManager {
   }
 
 
-  public ComObject evaluateCounterWithRecord(ComObject cobj) {
+  @SchemaReadLock
+  public ComObject evaluateCounterWithRecord(ComObject cobj, boolean replayedCommand) {
 
     String dbName = cobj.getString(ComObject.Tag.dbName);
 

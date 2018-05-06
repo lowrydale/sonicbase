@@ -32,7 +32,7 @@ public class ExecuteStatementHandler extends StatementHandler {
     }
 
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.method, "executeProcedurePrimary");
+    cobj.put(ComObject.Tag.method, "DatabaseServer:executeProcedurePrimary");
     cobj.put(ComObject.Tag.sql, sqlToUse);
     cobj.put(ComObject.Tag.dbName, dbName);
 

@@ -43,7 +43,7 @@ public class AlterStatementHandler extends StatementHandler {
     cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
     cobj.put(ComObject.Tag.tableName, tableName);
     cobj.put(ComObject.Tag.columnName, columnName);
-    cobj.put(ComObject.Tag.method, "dropColumn");
+    cobj.put(ComObject.Tag.method, "SchemaManager:dropColumn");
     cobj.put(ComObject.Tag.masterSlave, "master");
     byte[] ret = client.sendToMaster(cobj);
     ComObject retObj = new ComObject(ret);
@@ -55,7 +55,7 @@ public class AlterStatementHandler extends StatementHandler {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-    cobj.put(ComObject.Tag.method, "addColumn");
+    cobj.put(ComObject.Tag.method, "SchemaManager:addColumn");
     cobj.put(ComObject.Tag.tableName, tableName);
     cobj.put(ComObject.Tag.columnName, columnName);
     cobj.put(ComObject.Tag.dataType, type.getDataType());

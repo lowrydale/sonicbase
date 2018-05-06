@@ -90,79 +90,72 @@ public class DatabaseClient {
 
   private Set<String> write_verbs = new HashSet<String>();
   private static String[] write_verbs_array = new String[]{
-      "insert",
-      "dropTable",
-      "dropIndex",
-      "dropColumn",
-      "dropColumnSlave",
-      "addColumn",
-      "addColumnSlave",
-      "dropIndexSlave",
-      "doCreateIndex",
-      "createIndex",
-      "createIndexSlave",
-      "createTable",
-      "createTableSlave",
-      "createDatabase",
-      "createDatabaseSlave",
+      "SchemaManager:dropTable",
+      "SchemaManager:dropIndex",
+      "SchemaManager:dropColumn",
+      "SchemaManager:dropColumnSlave",
+      "SchemaManager:addColumn",
+      "SchemaManager:addColumnSlave",
+      "SchemaManager:dropIndexSlave",
+      "SchemaManager:createIndex",
+      "SchemaManager:createIndexSlave",
+      "SchemaManager:createTable",
+      "SchemaManager:createTableSlave",
+      "SchemaManager:createDatabase",
+      "SchemaManager:createDatabaseSlave",
       "echoWrite",
-      "delete",
-      "deleteRecord",
-      "deleteIndexEntryByKey",
-      "deleteIndexEntry",
-      "updateRecord",
-      "populateIndex",
-      "insertIndexEntryByKey",
-      "insertIndexEntryByKeyWithRecord",
+      "UpdateManager:deleteRecord",
+      "UpdateManager:deleteIndexEntryByKey",
+      "UpdateManager:deleteIndexEntry",
+      "UpdateManager:updateRecord",
+      "UpdateManager:populateIndex",
+      "UpdateManager:insertIndexEntryByKey",
+      "UpdateManager:insertIndexEntryByKeyWithRecord",
       "removeRecord",
-      //"beginRebalance",
-      "updateServersConfig",
-      "deleteRecord",
-      "allocateRecordIds",
-      "setMaxRecordId",
+      "Databaseserver:updateServersConfig",
+      "UpdateManager:deleteRecord",
+      "DatabaseServer:allocateRecordIds",
+      "DatabaseServer:setMaxRecordId",
       "reserveNextId",
-      "updateSchema",
+      "DatabaseServer:updateSchema",
       "expirePreparedStatement",
-      "rebalanceOrderedIndex",
+      "PartitionManager:rebalanceOrderedIndex",
       "beginRebalanceOrderedIndex",
-      "moveIndexEntries",
+      "PartitionManager:moveIndexEntries",
       "notifyDeletingComplete",
       "notifyRepartitioningComplete",
       "notifyRepartitioningRecordsByIdComplete",
-      "batchInsertIndexEntryByKeyWithRecord",
-      "batchInsertIndexEntryByKey",
+      "UpdateManager:batchInsertIndexEntryByKeyWithRecord",
+      "UpdateManager:batchInsertIndexEntryByKey",
       "moveHashPartition",
-      "moveIndexEntries",
-      "moveRecord",
+      "PartitionManager:moveIndexEntries",
       "notifyRepartitioningComplete",
-      "truncateTable",
+      "UpdateManager:truncateTable",
       "purge",
-      "reserveNextIdFromReplica",
+      "DatabaseServer:reserveNextIdFromReplica",
       "reserveNextId",
-      "allocateRecordIds",
-      "abortTransaction",
-      "serverSelectDelete",
-      "commit",
-      "rollback",
+      "DatabaseServer:allocateRecordIds",
+      "TransactionManager:abortTransaction",
+      "ReadManager:serverSelectDelete",
+      "UpdateManager:commit",
+      "UpdateManager:rollback",
       "testWrite",
       "saveSchema",
-      "registerStats"
+      "MonitorManager:registerStats"
   };
 
   private static Set<String> writeVerbs = new HashSet<String>();
 
   private Set<String> parallel_verbs = new HashSet<String>();
   private static String[] parallel_verbs_array = new String[]{
-      "insert",
-      "insertIndexEntryByKey",
-      "insertIndexEntryByKeyWithRecord",
-      "moveIndexEntries",
-      "batchInsertIndexEntryByKeyWithRecord",
-      "batchInsertIndexEntryByKey",
-      "moveIndexEntries",
-      "moveRecord",
-      "deleteMovedRecords",
-      "registerStats",
+      "UpdateManager:insertIndexEntryByKey",
+      "UpdateManager:insertIndexEntryByKeyWithRecord",
+      "PartitionManager:moveIndexEntries",
+      "UpdateManager:batchInsertIndexEntryByKeyWithRecord",
+      "UpdateManager:batchInsertIndexEntryByKey",
+      "PartitionManager:moveIndexEntries",
+      "PartitionManager:deleteMovedRecords",
+      "MonitorManager:registerStats",
   };
 
   private static Set<String> parallelVerbs = new HashSet<String>();
@@ -380,7 +373,7 @@ public class DatabaseClient {
         if (schemaRetryCount < 2) {
           cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
         }
-        cobj.put(ComObject.Tag.method, "commit");
+        cobj.put(ComObject.Tag.method, "UpdateManager:commit");
         cobj.put(ComObject.Tag.transactionId, transactionId.get());
         sendToAllShards(null, 0, cobj, DatabaseClient.Replica.def);
 
@@ -412,7 +405,7 @@ public class DatabaseClient {
     if (schemaRetryCount < 2) {
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
     }
-    cobj.put(ComObject.Tag.method, "rollback");
+    cobj.put(ComObject.Tag.method, "UpdateManager:rollback");
     cobj.put(ComObject.Tag.transactionId, transactionId.get());
     sendToAllShards(null, 0, cobj, DatabaseClient.Replica.def);
 
@@ -437,7 +430,7 @@ public class DatabaseClient {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-    cobj.put(ComObject.Tag.method, "createDatabase");
+    cobj.put(ComObject.Tag.method, "SchemaManager:createDatabase");
     cobj.put(ComObject.Tag.masterSlave, "master");
 
     sendToMaster(cobj);
@@ -502,7 +495,7 @@ public class DatabaseClient {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "healthCheck");
+      cobj.put(ComObject.Tag.method, "DatabaseServer:healthCheck");
 
       try {
         byte[] bytes = sendToMaster(cobj);
@@ -511,7 +504,7 @@ public class DatabaseClient {
           ComObject rcobj = new ComObject();
           rcobj.put(ComObject.Tag.dbName, "__none__");
           rcobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-          rcobj.put(ComObject.Tag.method, "reconfigureCluster");
+          rcobj.put(ComObject.Tag.method, "DatabaseServer:reconfigureCluster");
           bytes = sendToMaster(null);
           retObj = new ComObject(bytes);
           int count = retObj.getInt(ComObject.Tag.count);
@@ -637,7 +630,7 @@ public class DatabaseClient {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "getConfig");
+      cobj.put(ComObject.Tag.method, "DatabaseServer:getConfig");
       try {
         byte[] ret = null;
         int receivedReplica = -1;
@@ -808,7 +801,7 @@ public class DatabaseClient {
           ComObject cobj = new ComObject();
           cobj.put(ComObject.Tag.dbName, "__none__");
           cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-          cobj.put(ComObject.Tag.method, "getSchema");
+          cobj.put(ComObject.Tag.method, "DatabaseServer:getSchema");
           try {
 
             byte[] ret = send(null, 0, i, cobj, Replica.specified);
@@ -1382,7 +1375,7 @@ public class DatabaseClient {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "isEntireBackupComplete");
+      cobj.put(ComObject.Tag.method, "BackupManager:isEntireBackupComplete");
       byte[] ret = send(null, 0, 0, cobj, DatabaseClient.Replica.master);
       ComObject retObj = new ComObject(ret);
       return retObj.getBoolean(ComObject.Tag.isComplete);
@@ -1397,7 +1390,7 @@ public class DatabaseClient {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "isEntireRestoreComplete");
+      cobj.put(ComObject.Tag.method, "BackupManager:isEntireRestoreComplete");
       byte[] ret = send(null, 0, 0, cobj, DatabaseClient.Replica.master);
       ComObject retObj = new ComObject(ret);
       return retObj.getBoolean(ComObject.Tag.isComplete);
@@ -1412,7 +1405,7 @@ public class DatabaseClient {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "startRestore");
+      cobj.put(ComObject.Tag.method, "BackupManager:startRestore");
       cobj.put(ComObject.Tag.directory, subDir);
       byte[] ret = send(null, 0, 0, cobj, DatabaseClient.Replica.master);
     }
@@ -1425,7 +1418,7 @@ public class DatabaseClient {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, "__none__");
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-    cobj.put(ComObject.Tag.method, "startBackup");
+    cobj.put(ComObject.Tag.method, "BackupManager:startBackup");
     byte[] ret = send(null, 0, 0, cobj, DatabaseClient.Replica.master);
   }
 
@@ -1685,7 +1678,7 @@ public class DatabaseClient {
         ComObject cobj = new ComObject();
         cobj.put(ComObject.Tag.dbName, dbName);
         cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-        cobj.put(ComObject.Tag.method, "allocateRecordIds");
+        cobj.put(ComObject.Tag.method, "DatabaseServer:allocateRecordIds");
         byte[] ret = sendToMaster(cobj);
         ComObject retObj = new ComObject(ret);
         nextId.set(retObj.getLong(ComObject.Tag.nextId));
@@ -1708,7 +1701,7 @@ public class DatabaseClient {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-    cobj.put(ComObject.Tag.method, "isRepartitioningComplete");
+    cobj.put(ComObject.Tag.method, "PartitionManager:isRepartitioningComplete");
     byte[] bytes = sendToMaster(cobj);
     ComObject retObj = new ComObject(bytes);
     return retObj.getBoolean(ComObject.Tag.finished);
@@ -1724,7 +1717,7 @@ public class DatabaseClient {
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
     cobj.put(ComObject.Tag.tableName, tableName);
     cobj.put(ComObject.Tag.indexName, indexName);
-    cobj.put(ComObject.Tag.method, "getPartitionSize");
+    cobj.put(ComObject.Tag.method, "PartitionManager:getPartitionSize");
     byte[] bytes = send(null, shard, replica, cobj, DatabaseClient.Replica.specified);
     ComObject retObj = new ComObject(bytes);
     return retObj.getLong(ComObject.Tag.size);
@@ -1753,7 +1746,7 @@ public class DatabaseClient {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "getSchema");
+      cobj.put(ComObject.Tag.method, "DatabaseServer:getSchema");
       try {
 
         byte[] ret = null;
@@ -1821,7 +1814,7 @@ public class DatabaseClient {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "getConfig");
+      cobj.put(ComObject.Tag.method, "DatabaseServer:getConfig");
 
       byte[] ret = send(null, selectShard(0), auth_user, cobj, DatabaseClient.Replica.def);
       ComObject retObj = new ComObject(ret);
@@ -1836,7 +1829,7 @@ public class DatabaseClient {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-    cobj.put(ComObject.Tag.method, "beginRebalance");
+    cobj.put(ComObject.Tag.method, "PartitionManager:beginRebalance");
     cobj.put(ComObject.Tag.force, false);
     sendToMaster(cobj);
   }

@@ -881,7 +881,7 @@ public class DeleteManagerImpl implements DeleteManager {
       Varint.writeSignedVarLong(sequence0, out);
       Varint.writeSignedVarLong(sequence1, out);
       byte[] body = bytesOut.toByteArray();
-      deltaLogManager.logRequest(body, true, "deleteRecord", sequence0, sequence1, new AtomicLong());
+      deltaLogManager.logRequest(body, true, "UpdateManager:deleteRecord", sequence0, sequence1, new AtomicLong());
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -904,7 +904,7 @@ public class DeleteManagerImpl implements DeleteManager {
       Varint.writeSignedVarInt(request.primaryKeyBytes.length, out);
       out.write(request.primaryKeyBytes);
       byte[] body = bytesOut.toByteArray();
-      deltaLogManager.logRequest(body, true, "deleteRecord", sequence0, sequence1, new AtomicLong());
+      deltaLogManager.logRequest(body, true, "UpdateManager:deleteRecord", sequence0, sequence1, new AtomicLong());
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -1321,7 +1321,7 @@ public class DeleteManagerImpl implements DeleteManager {
     return isForcingDeletes.get();
   }
 
-  public void forceDeletes() {
+  public ComObject forceDeletes(ComObject cobj, boolean replayedCommand) {
     File dir = getStandardRoot();
     totalBytes = 0;
     bytesRead.set(0);
@@ -1335,7 +1335,7 @@ public class DeleteManagerImpl implements DeleteManager {
         while (true) {
           files = dir.listFiles();
           if (files == null || files.length == 0) {
-            return;
+            return null;
           }
           doDeletes(true);
         }
@@ -1344,5 +1344,6 @@ public class DeleteManagerImpl implements DeleteManager {
     finally {
       isForcingDeletes.set(false);
     }
+    return null;
   }
 }

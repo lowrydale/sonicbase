@@ -928,7 +928,7 @@ public class NettyServer {
               logger.info("applying queues");
               databaseServer.getLogManager().applyLogs();
 
-              databaseServer.getDeleteManager().forceDeletes();
+              databaseServer.getDeleteManager().forceDeletes(null,  false);
               databaseServer.getDeleteManager().start();
 
               databaseServer.getMasterManager().startMasterMonitor();
@@ -1019,7 +1019,7 @@ public class NettyServer {
                     break;
                   }
                   ComObject cobj = new ComObject();
-                  cobj.put(ComObject.Tag.method, "healthCheckPriority");
+                  cobj.put(ComObject.Tag.method, "DatabaseServer:healthCheckPriority");
                   byte[] ret = databaseServer.getDatabaseClient().send(null, shard, replica, cobj, DatabaseClient.Replica.specified);
                   if (ret != null) {
                     ComObject retObj = new ComObject(ret);

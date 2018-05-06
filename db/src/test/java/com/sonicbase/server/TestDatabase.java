@@ -381,7 +381,7 @@ public class TestDatabase {
 
       while (true) {
         ComObject cobj = new ComObject();
-        cobj.put(ComObject.Tag.method, "areAllLongRunningCommandsComplete");
+        cobj.put(ComObject.Tag.method, "DatabaseServer:areAllLongRunningCommandsComplete");
         byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().sendToMaster(cobj);
         ComObject retObj = new ComObject(bytes);
         if (retObj.getBoolean(ComObject.Tag.isComplete)) {
@@ -563,7 +563,7 @@ public class TestDatabase {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "test");
       cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "forceDeletes");
+      cobj.put(ComObject.Tag.method, "DeleteManager:forceDeletes");
       client.sendToAllShards(null, 0, cobj, DatabaseClient.Replica.all);
 
         // Thread.sleep(10000);

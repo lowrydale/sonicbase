@@ -165,8 +165,8 @@ public class TestStreams {
         Thread.sleep(100);
       }
 
-      serverB1.getDatabaseServer().getStreamManager().startStreaming(null);
-      serverB2.getDatabaseServer().getStreamManager().startStreaming(null);
+      serverB1.getDatabaseServer().getStreamManager().startStreaming(null, false);
+      serverB2.getDatabaseServer().getStreamManager().startStreaming(null, false);
 
       dbServers[0] = serverA1.getDatabaseServer();
       dbServers[1] = serverA2.getDatabaseServer();

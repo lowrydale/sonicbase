@@ -1,6 +1,8 @@
 /* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
+import com.sonicbase.common.ComObject;
+
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
@@ -41,7 +43,7 @@ public interface DeleteManager {
 
   void applyDeletesToSnapshot(String dbName, int currDeltaDirNum, AtomicLong finishedBytes);
 
-  void forceDeletes();
+  ComObject forceDeletes(ComObject cobj, boolean replayedCommand);
 
   void start();
 }

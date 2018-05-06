@@ -28,7 +28,7 @@ public class DropStatementHandler extends StatementHandler {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, dbName);
       cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "dropTable");
+      cobj.put(ComObject.Tag.method, "SchemaManager:dropTable");
       cobj.put(ComObject.Tag.masterSlave, "master");
       cobj.put(ComObject.Tag.tableName, table);
       byte[] ret = client.sendToMaster(cobj);
@@ -43,7 +43,7 @@ public class DropStatementHandler extends StatementHandler {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, dbName);
       cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "dropIndex");
+      cobj.put(ComObject.Tag.method, "SchemaManager:dropIndex");
       cobj.put(ComObject.Tag.tableName, tableName);
       cobj.put(ComObject.Tag.indexName, indexName);
       cobj.put(ComObject.Tag.masterSlave, "master");

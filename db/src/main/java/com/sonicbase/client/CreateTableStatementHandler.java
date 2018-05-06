@@ -94,7 +94,7 @@ public class CreateTableStatementHandler extends StatementHandler {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, dbName);
       cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "createTable");
+      cobj.put(ComObject.Tag.method, "SchemaManager:createTable");
       cobj.put(ComObject.Tag.masterSlave, "master");
       cobj.put(ComObject.Tag.createTableStatement, createTableStatement.serialize());
 

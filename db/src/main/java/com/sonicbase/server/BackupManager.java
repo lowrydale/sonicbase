@@ -88,7 +88,7 @@ public class BackupManager {
     }
   }
 
-  public ComObject prepareForBackup(ComObject cobj) {
+  public ComObject prepareForBackup(ComObject cobj, boolean replayedCommand) {
 
     server.getDeltaManager().enableSnapshot(false);
 
@@ -133,7 +133,7 @@ public class BackupManager {
             ComObject cobj = new ComObject();
             cobj.put(ComObject.Tag.dbName, "__none__");
             cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-            cobj.put(ComObject.Tag.method, "doGetBackupSizes");
+            cobj.put(ComObject.Tag.method, "BackupManager:doGetBackupSizes");
 
             ComObject ret = new ComObject(server.getDatabaseClient().send(null, finalI, finalJ, cobj, DatabaseClient.Replica.specified));
             return ret;
@@ -218,7 +218,7 @@ public class BackupManager {
   public ComObject getRestoreStatus(final ComObject obj) {
 
     if (finishedRestoreFileCopy) {
-      return server.getRecoverProgress();
+      return server.getRecoverProgress(null, false);
     }
     else {
       List<Future> futures = new ArrayList<>();
@@ -235,7 +235,7 @@ public class BackupManager {
               ComObject cobj = new ComObject();
               cobj.put(ComObject.Tag.dbName, "__none__");
               cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-              cobj.put(ComObject.Tag.method, "doGetRestoreSizes");
+              cobj.put(ComObject.Tag.method, "BackupManager:doGetRestoreSizes");
 
               ComObject ret = new ComObject(server.getDatabaseClient().send(null, finalI, finalJ, cobj, DatabaseClient.Replica.specified));
               return ret;
@@ -311,7 +311,7 @@ public class BackupManager {
     return retObj;
   }
 
-  public ComObject doBackupFileSystem(final ComObject cobj) {
+  public ComObject doBackupFileSystem(final ComObject cobj, boolean replayedCommand) {
     backupFileSystemThread = ThreadUtil.createThread(new Runnable() {
 
       @Override
@@ -371,7 +371,7 @@ public class BackupManager {
     }
   }
 
-  public ComObject doBackupAWS(final ComObject cobj) {
+  public ComObject doBackupAWS(final ComObject cobj, boolean replayedCommand) {
     backupAWSThread = ThreadUtil.createThread(new Runnable() {
       @Override
       public void run() {
@@ -423,7 +423,7 @@ public class BackupManager {
     }
   }
 
-  public ComObject isBackupComplete(ComObject cobj) {
+  public ComObject isBackupComplete(ComObject cobj, boolean replayedCommand) {
     try {
       ComObject retObj = new ComObject();
       retObj.put(ComObject.Tag.isComplete, isBackupComplete);
@@ -434,7 +434,7 @@ public class BackupManager {
     }
   }
 
-  public ComObject finishBackup(ComObject cobj) {
+  public ComObject finishBackup(ComObject cobj, boolean replayedCommand) {
     try {
       boolean shared = cobj.getBoolean(ComObject.Tag.shared);
       String directory = cobj.getString(ComObject.Tag.directory);
@@ -478,7 +478,7 @@ public class BackupManager {
     }
   }
 
-  public ComObject isEntireBackupComplete(ComObject cobj) {
+  public ComObject isEntireBackupComplete(ComObject cobj, boolean replayedCommand) {
     try {
       if (finalBackupException != null) {
         throw new DatabaseException("Error performing backup", finalBackupException);
@@ -493,7 +493,7 @@ public class BackupManager {
     }
   }
 
-  public byte[] startBackup(ComObject cobj) {
+  public byte[] startBackup(ComObject cobj, boolean replayedCommand) {
 
     if (!server.getCommon().haveProLicense()) {
       throw new InsufficientLicense("You must have a pro license to start a backup");
@@ -526,7 +526,7 @@ public class BackupManager {
     this.backupConfig = backupConfig;
   }
 
-  public ComObject prepareSourceForServerReload(ComObject cobj) {
+  public ComObject prepareSourceForServerReload(ComObject cobj, boolean replayedCommand) {
     try {
       List<String> files = new ArrayList<>();
 
@@ -568,7 +568,7 @@ public class BackupManager {
     }
   }
 
-  public ComObject isServerReloadFinished(ComObject cobj) {
+  public ComObject isServerReloadFinished(ComObject cobj, boolean replayedCommand) {
     ComObject retObj = new ComObject();
     retObj.put(ComObject.Tag.isComplete, !isServerRoloadRunning);
 
@@ -577,7 +577,7 @@ public class BackupManager {
 
   private boolean isServerRoloadRunning = false;
 
-  public ComObject reloadServer(ComObject cobj) {
+  public ComObject reloadServer(ComObject cobj, boolean replayedCommand) {
     reloadServerThread = ThreadUtil.createThread(new Runnable() {
       @Override
       public void run() {
@@ -617,7 +617,7 @@ public class BackupManager {
           ComObject rcobj = new ComObject();
           rcobj.put(ComObject.Tag.dbName, "__none__");
           rcobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-          rcobj.put(ComObject.Tag.method, "finishServerReloadForSource");
+          rcobj.put(ComObject.Tag.method, "SnapshotManager:finishServerReloadForSource");
           byte[] bytes = server.getClient().send(null, server.getShard(), 0, rcobj, DatabaseClient.Replica.master);
 
           isServerRoloadRunning = false;
@@ -637,7 +637,7 @@ public class BackupManager {
         ComObject cobj = new ComObject();
         cobj.put(ComObject.Tag.dbName, "__none__");
         cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-        cobj.put(ComObject.Tag.method, "getDatabaseFile");
+        cobj.put(ComObject.Tag.method, "DatabaesServer:getDatabaseFile");
         cobj.put(ComObject.Tag.filename, filename);
         byte[] bytes = server.getClient().send(null, server.getShard(), 0, cobj, DatabaseClient.Replica.master);
         ComObject retObj = new ComObject(bytes);
@@ -732,7 +732,7 @@ public class BackupManager {
   private String backupFileSystemDir;
 
 
-  public ComObject getLastBackupDir(ComObject cobj) {
+  public ComObject getLastBackupDir(ComObject cobj, boolean replayedCommand) {
     ComObject retObj = new ComObject();
     if (lastBackupDir != null) {
       retObj.put(ComObject.Tag.directory, lastBackupDir);
@@ -753,7 +753,7 @@ public class BackupManager {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "prepareForBackup");
+      cobj.put(ComObject.Tag.method, "BackupManager:prepareForBackup");
       byte[][] ret = server.getDatabaseClient().sendToAllShards(null, 0, cobj, DatabaseClient.Replica.master);
       int[] masters = new int[server.getShardCount()];
       for (int i = 0; i < ret.length; i++) {
@@ -781,7 +781,7 @@ public class BackupManager {
         ComObject docobj = new ComObject();
         docobj.put(ComObject.Tag.dbName, "__none__");
         docobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-        docobj.put(ComObject.Tag.method, "doBackupAWS");
+        docobj.put(ComObject.Tag.method, "BackupManager:doBackupAWS");
         docobj.put(ComObject.Tag.subDirectory, subDirectory);
         docobj.put(ComObject.Tag.bucket, bucket);
         docobj.put(ComObject.Tag.prefix, prefix);
@@ -802,7 +802,7 @@ public class BackupManager {
         ComObject docobj = new ComObject();
         docobj.put(ComObject.Tag.dbName, "__none__");
         docobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-        docobj.put(ComObject.Tag.method, "doBackupFileSystem");
+        docobj.put(ComObject.Tag.method, "BackupManager:doBackupFileSystem");
         docobj.put(ComObject.Tag.directory, directory);
         docobj.put(ComObject.Tag.subDirectory, subDirectory);
         for (int i = 0; i < server.getShardCount(); i++) {
@@ -816,7 +816,7 @@ public class BackupManager {
         ComObject iscobj = new ComObject();
         iscobj.put(ComObject.Tag.dbName, "__none__");
         iscobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-        iscobj.put(ComObject.Tag.method, "isBackupComplete");
+        iscobj.put(ComObject.Tag.method, "BackupManager:isBackupComplete");
 
         boolean finished = false;
         outer:
@@ -882,7 +882,7 @@ public class BackupManager {
       ComObject fcobj = new ComObject();
       fcobj.put(ComObject.Tag.dbName, "__none__");
       fcobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-      fcobj.put(ComObject.Tag.method, "finishBackup");
+      fcobj.put(ComObject.Tag.method, "BackupManager:finishBackup");
       fcobj.put(ComObject.Tag.shared, shared);
       if (directory != null) {
         fcobj.put(ComObject.Tag.directory, directory);
@@ -927,7 +927,7 @@ public class BackupManager {
     }
   }
 
-  public ComObject prepareForRestore(ComObject cobj) {
+  public ComObject prepareForRestore(ComObject cobj, boolean replayedCommand) {
     try {
       isRestoreComplete = false;
 
@@ -956,7 +956,7 @@ public class BackupManager {
     }
   }
 
-  public ComObject doRestoreFileSystem(final ComObject cobj) {
+  public ComObject doRestoreFileSystem(final ComObject cobj, boolean replayedCommand) {
 
     restoreFileSystemThread = ThreadUtil.createThread(new Runnable() {
       @Override
@@ -1038,7 +1038,7 @@ public class BackupManager {
 
   }
 
-  public ComObject doRestoreAWS(final ComObject cobj) {
+  public ComObject doRestoreAWS(final ComObject cobj, boolean replayedCommand) {
     restoreAWSThread = ThreadUtil.createThread(new Runnable() {
       @Override
       public void run() {
@@ -1093,7 +1093,7 @@ public class BackupManager {
     }
   }
 
-  public ComObject isRestoreComplete(ComObject cobj) {
+  public ComObject isRestoreComplete(ComObject cobj, boolean replayedCommand) {
     try {
 //      if (restoreException != null) {
 //        throw new DatabaseException(restoreException);
@@ -1108,7 +1108,7 @@ public class BackupManager {
   }
 
 
-  public ComObject finishRestore(ComObject cobj) {
+  public ComObject finishRestore(ComObject cobj, boolean replayedCommand) {
     try {
       server.getDeltaManager().enableSnapshot(true);
       //isRunning.set(true);
@@ -1128,7 +1128,7 @@ public class BackupManager {
     server.getLogManager().applyLogs();
   }
 
-  public ComObject isEntireRestoreComplete(ComObject cobj) {
+  public ComObject isEntireRestoreComplete(ComObject cobj, boolean replayedCommand) {
     try {
       if (finalRestoreException != null) {
         throw new DatabaseException("Error restoring backup", finalRestoreException);
@@ -1143,7 +1143,7 @@ public class BackupManager {
     }
   }
 
-  public ComObject startRestore(final ComObject cobj) {
+  public ComObject startRestore(final ComObject cobj, boolean replayedCommand) {
     if (!server.getCommon().haveProLicense()) {
       throw new InsufficientLicense("You must have a pro license to start a restore");
     }
@@ -1227,7 +1227,7 @@ public class BackupManager {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "prepareForRestore");
+      cobj.put(ComObject.Tag.method, "BackupManager:prepareForRestore");
       byte[][] ret = server.getDatabaseClient().sendToAllShards(null, 0, cobj, DatabaseClient.Replica.all, true);
 
 
@@ -1241,7 +1241,7 @@ public class BackupManager {
         cobj = new ComObject();
         cobj.put(ComObject.Tag.dbName, "__none__");
         cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-        cobj.put(ComObject.Tag.method, "doRestoreAWS");
+        cobj.put(ComObject.Tag.method, "BackupManager:doRestoreAWS");
         cobj.put(ComObject.Tag.bucket, bucket);
         cobj.put(ComObject.Tag.prefix, prefix);
         cobj.put(ComObject.Tag.subDirectory, subDirectory);
@@ -1254,7 +1254,7 @@ public class BackupManager {
         cobj = new ComObject();
         cobj.put(ComObject.Tag.dbName, "__none__");
         cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-        cobj.put(ComObject.Tag.method, "doRestoreFileSystem");
+        cobj.put(ComObject.Tag.method, "BackupManager:doRestoreFileSystem");
         cobj.put(ComObject.Tag.directory, directory);
         cobj.put(ComObject.Tag.subDirectory, subDirectory);
         ret = server.getDatabaseClient().sendToAllShards(null, 0, cobj, DatabaseClient.Replica.all, true);
@@ -1264,7 +1264,7 @@ public class BackupManager {
         cobj = new ComObject();
         cobj.put(ComObject.Tag.dbName, "__none__");
         cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-        cobj.put(ComObject.Tag.method, "isRestoreComplete");
+        cobj.put(ComObject.Tag.method, "BackupManager:isRestoreComplete");
 
         boolean finished = false;
         outer:
@@ -1303,7 +1303,7 @@ public class BackupManager {
       cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "finishRestore");
+      cobj.put(ComObject.Tag.method, "BackupManager:finishRestore");
 
       ret = server.getDatabaseClient().sendToAllShards(null, 0, cobj, DatabaseClient.Replica.all, true);
 
@@ -1320,7 +1320,7 @@ public class BackupManager {
       cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "test");
       cobj.put(ComObject.Tag.schemaVersion, server.getClient().getCommon().getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "forceDeletes");
+      cobj.put(ComObject.Tag.method, "DeleteManager:forceDeletes");
       server.getClient().sendToAllShards(null, 0, cobj, DatabaseClient.Replica.all);
 
     }

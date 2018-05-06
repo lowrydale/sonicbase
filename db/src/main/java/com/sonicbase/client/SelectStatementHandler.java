@@ -159,7 +159,7 @@ public class SelectStatementHandler extends StatementHandler {
     }
     cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
     cobj.put(ComObject.Tag.count, DatabaseClient.SELECT_PAGE_SIZE);
-    cobj.put(ComObject.Tag.method, "serverSetSelect");
+    cobj.put(ComObject.Tag.method, "ReadManager:serverSetSelect");
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.serverSelectPageNumber, setOperation.serverSelectPageNumber);
     cobj.put(ComObject.Tag.resultSetId, setOperation.resultSetId);

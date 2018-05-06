@@ -887,7 +887,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
         cobj.put(ComObject.Tag.legacySelectStatement, serialize());
         cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
         cobj.put(ComObject.Tag.count, pageSize);
-        cobj.put(ComObject.Tag.method, "serverSelect");
+        cobj.put(ComObject.Tag.method, "ReadManager:serverSelect");
         cobj.put(ComObject.Tag.dbName, dbName);
         cobj.put(ComObject.Tag.currOffset, currOffset.get());
         cobj.put(ComObject.Tag.countReturned, countReturned.get());
@@ -1095,7 +1095,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
 
                 cobj.put(ComObject.Tag.dbName, dbName);
                 cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-                cobj.put(ComObject.Tag.method, "countRecords");
+                cobj.put(ComObject.Tag.method, "ReadManager:countRecords");
                 cobj.put(ComObject.Tag.tableName, fromTable);
 
                 byte[] lookupRet = client.send(null, shard, 0, cobj, DatabaseClient.Replica.master);

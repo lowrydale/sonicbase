@@ -382,7 +382,7 @@ public class TestBulkImport {
 
   public String bulkImportStatus(ConnectionProxy conn) throws Exception {
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.method, "getBulkImportProgress");
+    cobj.put(ComObject.Tag.method, "BulkImportManager:getBulkImportProgress");
     cobj.put(ComObject.Tag.dbName, "test");
     byte[] bytes = conn.sendToMaster(cobj);
     ComObject retObj = new ComObject(bytes);
@@ -454,7 +454,7 @@ public class TestBulkImport {
       cobj.put(ComObject.Tag.whereClause, whereClause);
     }
 
-    cobj.put(ComObject.Tag.method, "startBulkImport");
+    cobj.put(ComObject.Tag.method, "BulkImportManager:startBulkImport");
 
     conn.sendToMaster(cobj);
 

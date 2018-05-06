@@ -413,8 +413,27 @@ public class DatabaseServer {
     this.osStatsManager = new OSStatsManager(this);
     this.masterManager = new MasterManager(this);
     this.osStatsManager.startStatsMonitoring();
+    this.partitionManager = new PartitionManager(this, common);
+    this.streamManager = new StreamManager(this);
+
     this.methodInvoker = new MethodInvoker(this, bulkImportManager, deleteManager, deltaManager, updateManager,
         transactionManager, readManager, logManager, schemaManager, monitorManager, backupManager, osStatsManager, masterManager);
+    this.methodInvoker.registerMethodProvider("BackupManager", backupManager);
+    this.methodInvoker.registerMethodProvider("BulkImportManager", bulkImportManager);
+    this.methodInvoker.registerMethodProvider("DeleteManager", deleteManager);
+    this.methodInvoker.registerMethodProvider("LicenseManager", licenseManager);
+    this.methodInvoker.registerMethodProvider("LogManager", logManager);
+    this.methodInvoker.registerMethodProvider("MasterManager", masterManager);
+    this.methodInvoker.registerMethodProvider("MonitorManager", monitorManager);
+    this.methodInvoker.registerMethodProvider("OSStatsManager", osStatsManager);
+    this.methodInvoker.registerMethodProvider("PartitionManager", partitionManager);
+    this.methodInvoker.registerMethodProvider("ReadManager", readManager);
+    this.methodInvoker.registerMethodProvider("SchemaManager", schemaManager);
+    this.methodInvoker.registerMethodProvider("SnapshotManager", deltaManager);
+    this.methodInvoker.registerMethodProvider("StreamManager", streamManager);
+    this.methodInvoker.registerMethodProvider("TransactionManager", transactionManager);
+    this.methodInvoker.registerMethodProvider("UpdateManager", updateManager);
+    this.methodInvoker.registerMethodProvider("DatabaseServer", this);
 
     outer:
     for (int i = 0; i < shards.size(); i++) {
@@ -480,8 +499,6 @@ public class DatabaseServer {
 
     common.setServersConfig(serversConfig);
 
-    partitionManager = new PartitionManager(this, common);
-
     //common.getSchema().initRecordsById(shardCount, (int) (long) databaseDict.getLong("partitionCountForRecordIndex"));
 
     //logger.info("RecordsById: partitionCount=" + common.getSchema().getRecordIndexPartitions().length);
@@ -494,8 +511,6 @@ public class DatabaseServer {
     disable();
     licenseManager.startLicenseValidator();
 
-    this.streamManager = new StreamManager(this);
-
     //startMasterMonitor();
 
     logger.info("Started server");
@@ -506,11 +521,11 @@ public class DatabaseServer {
       @Override
       public void run() {
         ComObject cobj = new ComObject();
-        cobj.put(ComObject.Tag.method, "isStreamingStarted");
+        cobj.put(ComObject.Tag.method, "StreamManager:isStreamingStarted");
 
         ComObject retObj = new ComObject(getDatabaseClient().sendToMaster(cobj));
         if (retObj.getBoolean(ComObject.Tag.isStarted)) {
-          streamManager.startStreaming(null);
+          streamManager.startStreaming(null, false);
         }
       }
     }, 20_000);
@@ -834,7 +849,7 @@ public class DatabaseServer {
                     ComObject cobj = new ComObject();
                     cobj.put(ComObject.Tag.dbName, "__none__");
                     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-                    cobj.put(ComObject.Tag.method, "prepareToComeAlive");
+                    cobj.put(ComObject.Tag.method, "DatabaessServer:prepareToComeAlive");
 
                     getDatabaseClient().send(null, shard, replica, cobj, DatabaseClient.Replica.specified, true);
                   }
@@ -908,7 +923,7 @@ public class DatabaseServer {
             ComObject cobj = new ComObject();
             cobj.put(ComObject.Tag.dbName, "__none__");
             cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-            cobj.put(ComObject.Tag.method, "healthCheck");
+            cobj.put(ComObject.Tag.method, "DatabaseServer:healthCheck");
             byte[] bytes = getDatabaseClient().send(null, shard, replica, cobj, DatabaseClient.Replica.specified, true);
             ComObject retObj = new ComObject(bytes);
             if (retObj.getString(ComObject.Tag.status).equals("{\"status\" : \"ok\"}")) {
@@ -1006,7 +1021,7 @@ public class DatabaseServer {
     return deltaManager;
   }
 
-  public ComObject getRecoverProgress() {
+  public ComObject getRecoverProgress(ComObject cobj, boolean replayedCommand) {
     ComObject retObj = new ComObject();
     if (waitingForServersToStart) {
       retObj.put(ComObject.Tag.percentComplete, 0d);
@@ -1086,7 +1101,7 @@ public class DatabaseServer {
     }
   }
 
-  public ComObject executeProcedure(final ComObject cobj) {
+  public ComObject executeProcedure(final ComObject cobj, boolean replayedCommand) {
     ConnectionProxy conn = null;
     try {
       if (!common.haveProLicense()) {
@@ -1131,7 +1146,7 @@ public class DatabaseServer {
     }
   }
 
-  public ComObject executeProcedurePrimary(final ComObject cobj) {
+  public ComObject executeProcedurePrimary(final ComObject cobj, boolean replayedCommand) {
     ThreadPoolExecutor executor = null;
     try {
       if (!common.haveProLicense()) {
@@ -1164,7 +1179,7 @@ public class DatabaseServer {
       context.setParameters(parms);
       procedure.init(context);
 
-      cobj.put(ComObject.Tag.method, "executeProcedure");
+      cobj.put(ComObject.Tag.method, "DatabaseServer:executeProcedure");
       cobj.put(ComObject.Tag.id, storedProcedureId);
 
       executor = ThreadUtil.createExecutor(shardCount, "SonicBase executeProcedurePrimary Thread");
@@ -1530,7 +1545,7 @@ public class DatabaseServer {
     return longRunningCommands;
   }
 
-  public ComObject areAllLongRunningCommandsComplete(ComObject cobj) {
+  public ComObject areAllLongRunningCommandsComplete(ComObject cobj, boolean replayedCommand) {
     ComObject retObj = new ComObject();
     if (longRunningCommands.getCommandCount() == 0) {
       retObj.put(ComObject.Tag.isComplete, true);
@@ -1638,12 +1653,137 @@ public class DatabaseServer {
     return decrypted;
   }
 
+
+  public ComObject getDbNames(ComObject cobj, boolean replayedCommand) {
+
+    try {
+      ComObject retObj = new ComObject();
+      List<String> dbNames = getDbNames(getDataDir());
+      ComArray array = retObj.putArray(ComObject.Tag.dbNames, ComObject.Type.stringType);
+      for (String dbName : dbNames) {
+        array.add(dbName);
+      }
+      return retObj;
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public ComObject updateSchema(ComObject cobj, boolean replayedCommand) throws IOException {
+    if (replayedCommand) {
+      return null;
+    }
+    DatabaseCommon tempCommon = new DatabaseCommon();
+    tempCommon.deserializeSchema(cobj.getByteArray(ComObject.Tag.schemaBytes));
+
+//    if (getShard() == 0 &&
+//        tempCommon.getServersConfig().getShards()[0].getMasterReplica() == getReplica()) {
+//      return null;
+//    }
+
+    synchronized (common) {
+      if (tempCommon.getSchemaVersion() > common.getSchemaVersion()) {
+        common.deserializeSchema(cobj.getByteArray(ComObject.Tag.schemaBytes));
+        common.saveSchema(getClient(), getDataDir());
+      }
+    }
+    return null;
+  }
+
+
+
+  public ComObject logError(ComObject cobj, boolean replayedCommand) {
+    try {
+      boolean isClient = cobj.getBoolean(ComObject.Tag.isClient);
+      String hostName = cobj.getString(ComObject.Tag.host);
+      String msg = cobj.getString(ComObject.Tag.message);
+      String exception = cobj.getString(ComObject.Tag.exception);
+
+      StringBuilder actualMsg = new StringBuilder();
+      actualMsg.append("host=").append(hostName).append("\n");
+      actualMsg.append("msg=").append(msg).append("\n");
+      if (exception != null) {
+        actualMsg.append("exception=").append(exception);
+      }
+
+      if (isClient) {
+        getClientErrorLogger().error(actualMsg.toString());
+      }
+      else {
+        getErrorLogger().error(actualMsg.toString());
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+    return null;
+  }
+
+  public ComObject getFile(ComObject cobj, boolean replayedCommand) {
+    try {
+      String filename = cobj.getString(ComObject.Tag.filename);
+      File file = new File(getInstallDir(), filename);
+      if (!file.exists()) {
+        return null;
+      }
+      try (FileInputStream fileIn = new FileInputStream(file)) {
+        String ret = IOUtils.toString(fileIn, "utf-8");
+        ComObject retObj = new ComObject();
+        retObj.put(ComObject.Tag.fileContent, ret);
+        return retObj;
+      }
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public ComObject promoteToMasterAndPushSchema(ComObject cobj, boolean replayedCommand) {
+    int shard = cobj.getInt(ComObject.Tag.shard);
+    int replica = cobj.getInt(ComObject.Tag.replica);
+
+    logger.info("promoting to master: shard=" + shard + ", replica=" + replica);
+    common.getServersConfig().getShards()[shard].setMasterReplica(replica);
+    common.saveSchema(getClient(), getDataDir());
+    pushSchema();
+    return null;
+  }
+
+  public ComObject markReplicaAlive(ComObject cobj, boolean replayedCommand) {
+    int replicaToMarkAlive = cobj.getInt(ComObject.Tag.replica);
+    logger.info("Marking replica alive: replica=" + replicaToMarkAlive);
+    for (int shard = 0; shard < getShardCount(); shard++) {
+      common.getServersConfig().getShards()[shard].getReplicas()[replicaToMarkAlive].setDead(false);
+    }
+    common.saveSchema(getClient(), getDataDir());
+    pushSchema();
+
+    setReplicaDeadForRestart(-1);
+    return null;
+  }
+
+
+  public ComObject markReplicaDead(ComObject cobj, boolean replayedCommand) {
+    int replicaToKill = cobj.getInt(ComObject.Tag.replica);
+    logger.info("Marking replica dead: replica=" + replicaToKill);
+    for (int shard = 0; shard < getShardCount(); shard++) {
+      common.getServersConfig().getShards()[shard].getReplicas()[replicaToKill].setDead(true);
+    }
+    common.saveSchema(getClient(), getDataDir());
+    pushSchema();
+
+    setReplicaDeadForRestart(replicaToKill);
+    return null;
+  }
+
+
   private void syncDbNames() {
     logger.info("Syncing database names: shard=" + shard + ", replica=" + replica);
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, "__none__");
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-    cobj.put(ComObject.Tag.method, "getDbNames");
+    cobj.put(ComObject.Tag.method, "DatabaseServer:getDbNames");
     byte[] ret = getDatabaseClient().send(null, 0, 0, cobj, DatabaseClient.Replica.master, true);
     ComObject retObj = new ComObject(ret);
     ComArray array = retObj.getArray(ComObject.Tag.dbNames);
@@ -1766,7 +1906,7 @@ public class DatabaseServer {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "updateSchema");
+      cobj.put(ComObject.Tag.method, "DatabaseServer:updateSchema");
       cobj.put(ComObject.Tag.schemaBytes, common.serializeSchema(DatabaseClient.SERIALIZATION_VERSION));
 
       for (int i = 0; i < shardCount; i++) {
@@ -1790,7 +1930,7 @@ public class DatabaseServer {
     }
   }
 
-  public ComObject getDatabaseFile(ComObject cobj) {
+  public ComObject getDatabaseFile(ComObject cobj, boolean replayedCommand) {
     try {
       String filename = cobj.getString(ComObject.Tag.filename);
       File file = new File(filename);
@@ -1809,7 +1949,21 @@ public class DatabaseServer {
     }
   }
 
-  public ComObject updateServersConfig(ComObject cobj) {
+  public ComObject healthCheck(ComObject cobj, boolean replayedCommand) {
+    ComObject retObj = new ComObject();
+    retObj.put(ComObject.Tag.status, "{\"status\" : \"ok\"}");
+    retObj.put(ComObject.Tag.haveProLicense, haveProLicense());
+    return retObj;
+  }
+
+  public ComObject healthCheckPriority(ComObject cobj, boolean replayedCommand) {
+    ComObject retObj = new ComObject();
+    retObj.put(ComObject.Tag.status, "{\"status\" : \"ok\"}");
+    retObj.put(ComObject.Tag.haveProLicense, haveProLicense());
+    return retObj;
+  }
+
+  public ComObject updateServersConfig(ComObject cobj, boolean replayedCommand) {
     try {
       short serializationVersion = cobj.getShort(ComObject.Tag.serializationVersion);
       ServersConfig serversConfig = new ServersConfig(cobj.getByteArray(ComObject.Tag.serversConfig), serializationVersion);
@@ -1835,7 +1989,7 @@ public class DatabaseServer {
           ComObject cobj = new ComObject();
           cobj.put(ComObject.Tag.dbName, "__none__");
           cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-          cobj.put(ComObject.Tag.method, "updateServersConfig");
+          cobj.put(ComObject.Tag.method, "DatabaseServer:updateServersConfig");
           cobj.put(ComObject.Tag.serversConfig, common.getServersConfig().serialize(DatabaseClient.SERIALIZATION_VERSION));
           getDatabaseClient().send(null, i, j, cobj, DatabaseClient.Replica.specified);
         }
@@ -2031,13 +2185,13 @@ public class DatabaseServer {
     }
   }
 
-  public ComObject prepareToComeAlive(ComObject cobj) {
+  public ComObject prepareToComeAlive(ComObject cobj, boolean replayedCommand) {
     String slicePoint = null;
     try {
       ComObject pcobj = new ComObject();
       pcobj.put(ComObject.Tag.dbName, "__none__");
       pcobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-      pcobj.put(ComObject.Tag.method, "pushMaxSequenceNum");
+      pcobj.put(ComObject.Tag.method, "LogManager:pushMaxSequenceNum");
       getClient().send(null, shard, 0, pcobj, DatabaseClient.Replica.master,
           true);
 
@@ -2045,7 +2199,7 @@ public class DatabaseServer {
         pcobj = new ComObject();
         pcobj.put(ComObject.Tag.dbName, "__none__");
         pcobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-        pcobj.put(ComObject.Tag.method, "pushMaxRecordId");
+        pcobj.put(ComObject.Tag.method, "DatabaseServer:pushMaxRecordId");
         getClient().send(null, shard, 0, pcobj, DatabaseClient.Replica.master,
             true);
       }
@@ -2073,7 +2227,94 @@ public class DatabaseServer {
     return null;
   }
 
-  public ComObject reconfigureCluster(ComObject cobj) {
+  public ComObject getSchema(ComObject cobj, boolean replayedCommand) {
+    short serializationVersionNumber = cobj.getShort(ComObject.Tag.serializationVersion);
+    try {
+
+      if (cobj.getBoolean(ComObject.Tag.force) != null && cobj.getBoolean(ComObject.Tag.force)) {
+        final ComObject cobj2 = new ComObject();
+        cobj2.put(ComObject.Tag.dbName, "__none__");
+        cobj2.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+        cobj2.put(ComObject.Tag.method, "DatabaseServer:getSchema");
+
+        int threadCount = getShardCount() * getReplicationFactor();
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(threadCount, threadCount, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+        try {
+          logger.info("forcing schema sync: version=" + common.getSchemaVersion());
+          List<Future> futures = new ArrayList<>();
+          for (int i = 0; i < getShardCount(); i++) {
+            for (int j = 0; j < getReplicationFactor(); j++) {
+              try {
+                if (common.getServersConfig().getShards()[i].getReplicas()[j].isDead()) {
+                  continue;
+                }
+                if (i == getShard() && j == getReplica()) {
+                  continue;
+                }
+
+                final int shard = i;
+                final int replica = j;
+
+                futures.add(executor.submit(new Callable(){
+                  @Override
+                  public Object call() throws Exception {
+                    byte[] bytes = getClient().send(null, shard, replica, cobj2, DatabaseClient.Replica.specified);
+                    ComObject retObj = new ComObject(bytes);
+                    DatabaseCommon tmpCommon = new DatabaseCommon();
+                    tmpCommon.deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
+                    synchronized (common) {
+                      if (tmpCommon.getSchemaVersion() > common.getSchemaVersion()) {
+                        logger.info("Found schema with higher version: version=" + tmpCommon.getSchemaVersion() +
+                            ", currVersion=" + common.getSchemaVersion() + ", shard=" + shard + ", replica=" + replica);
+                        common.deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
+                      }
+                    }
+                    return null;
+                  }
+                }));
+              }
+              catch (Exception e) {
+                logger.error("Error getting schema: shard=" + i + ", replica=" + j, e);
+              }
+            }
+          }
+          for (Future future : futures) {
+            future.get();
+          }
+          pushSchema();
+        }
+        catch (Exception e) {
+          logger.error("Error pushing schema", e);
+        }
+        finally {
+          executor.shutdownNow();
+        }
+      }
+      ComObject retObj = new ComObject();
+      retObj.put(ComObject.Tag.schemaBytes, common.serializeSchema(serializationVersionNumber));
+      return retObj;
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+
+
+  public ComObject getConfig(ComObject cobj, boolean replayedCommand) {
+    short serializationVersionNumber = cobj.getShort(ComObject.Tag.serializationVersion);
+    try {
+      byte[] bytes = common.serializeConfig(serializationVersionNumber);
+      ComObject retObj = new ComObject();
+      retObj.put(ComObject.Tag.configBytes, bytes);
+      return retObj;
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public ComObject reconfigureCluster(ComObject cobj, boolean replayedCommand) {
     ServersConfig oldConfig = common.getServersConfig();
     try {
       File file = new File(System.getProperty("user.dir"), "config/config-" + getCluster() + ".json");
@@ -2124,7 +2365,7 @@ public class DatabaseServer {
   }
 
 
-  public ComObject reserveNextIdFromReplica(ComObject cobj) {
+  public ComObject reserveNextIdFromReplica(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
@@ -2151,7 +2392,7 @@ public class DatabaseServer {
 
   private final Object nextIdLock = new Object();
 
-  public ComObject allocateRecordIds(ComObject cobj) {
+  public ComObject allocateRecordIds(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     common.getSchemaReadLock(dbName).lock();
     try {
@@ -2199,7 +2440,7 @@ public class DatabaseServer {
     }
   }
 
-  public ComObject pushMaxRecordId(ComObject cobj) {
+  public ComObject pushMaxRecordId(ComObject cobj, boolean replayedCommand) {
     try {
       synchronized (nextIdLock) {
         File file = new File(dataDir, "nextRecordId/" + getShard() + "/" + getReplica() + "/nextRecorId.txt");
@@ -2222,7 +2463,7 @@ public class DatabaseServer {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-    cobj.put(ComObject.Tag.method, "setMaxRecordId");
+    cobj.put(ComObject.Tag.method, "DatabaseServer:setMaxRecordId");
     cobj.put(ComObject.Tag.maxId, maxId);
 
     for (int replica = 0; replica < replicationFactor; replica++) {
@@ -2238,7 +2479,7 @@ public class DatabaseServer {
     }
   }
 
-  public ComObject setMaxRecordId(ComObject cobj) {
+  public ComObject setMaxRecordId(ComObject cobj, boolean replayedCommand) {
     if (shard == 0 && replica == common.getServersConfig().getShards()[0].getMasterReplica()) {
       return null;
     }

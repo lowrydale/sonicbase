@@ -198,14 +198,14 @@ public class DeltaManager implements SnapshotManager {
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.tableName, tableName);
     cobj.put(ComObject.Tag.indexName, indexSchema.getName());
-    cobj.put(ComObject.Tag.method, "deleteRecord");
+    cobj.put(ComObject.Tag.method, "UpdateManager:deleteRecord");
     server.getClient().send("DatabaseServer:deleteRecord", selectedShards.get(0), 0, cobj, DatabaseClient.Replica.def);
 
     cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
     cobj.put(ComObject.Tag.tableName, tableName);
-    cobj.put(ComObject.Tag.method, "deleteIndexEntry");
+    cobj.put(ComObject.Tag.method, "UpdateManager:deleteIndexEntry");
     cobj.put(ComObject.Tag.recordBytes, record);
 
     server.getClient().sendToAllShards(null, 0, cobj, DatabaseClient.Replica.def);
@@ -1108,6 +1108,13 @@ public class DeltaManager implements SnapshotManager {
         }
       }
     }
+  }
+
+  public ComObject finishServerReloadForSource(ComObject cobj, boolean replayedCommand) {
+
+    enableSnapshot(true);
+
+    return null;
   }
 
   public boolean isRecovering() {

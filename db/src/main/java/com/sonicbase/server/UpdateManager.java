@@ -134,6 +134,7 @@ public class UpdateManager {
     }
   }
 
+  @SchemaReadLock
   public ComObject deleteIndexEntry(ComObject cobj, boolean replayedCommand) {
 
     AtomicBoolean isExplicitTrans = new AtomicBoolean();
@@ -316,17 +317,17 @@ public class UpdateManager {
 
   public ComObject populateIndex(ComObject cobj, boolean replayedCommand) {
     if (false && replayedCommand) {
-      doPopulateIndex(cobj);
+      doPopulateIndex(cobj, false);
     }
     else {
-      cobj.put(ComObject.Tag.method, "doPopulateIndex");
+      cobj.put(ComObject.Tag.method, "UpdateManager:doPopulateIndex");
       server.getLongRunningCommands().addCommand(
           server.getLongRunningCommands().createSingleCommand(cobj.serialize()));
     }
     return null;
   }
 
-  public ComObject doPopulateIndex(ComObject cobj) {
+  public ComObject doPopulateIndex(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     String tableName = cobj.getString(ComObject.Tag.tableName);
     String indexName = cobj.getString(ComObject.Tag.indexName);
@@ -431,6 +432,7 @@ public class UpdateManager {
     return null;
   }
 
+  @SchemaReadLock
   public ComObject deleteIndexEntryByKey(ComObject cobj, boolean replayedCommand) {
     AtomicBoolean isExplicitTrans = new AtomicBoolean();
     AtomicLong transactionId = new AtomicLong();
@@ -491,6 +493,7 @@ public class UpdateManager {
     }
   }
 
+  @SchemaReadLock
   public ComObject batchInsertIndexEntryByKey(ComObject cobj, boolean replayedCommand) {
     AtomicBoolean isExplicitTrans = new AtomicBoolean();
     AtomicLong transactionId = new AtomicLong();
@@ -525,6 +528,7 @@ public class UpdateManager {
     return retObj;
   }
 
+  @SchemaReadLock
   public ComObject insertIndexEntryByKey(ComObject cobj, boolean replayedCommand) {
 
     Integer schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
@@ -672,6 +676,7 @@ private static class InsertRequest {
   private AtomicLong insertCount = new AtomicLong();
   private AtomicLong lastReset = new AtomicLong(System.currentTimeMillis());
 
+  @SchemaReadLock
   public ComObject batchInsertIndexEntryByKeyWithRecord(final ComObject cobj, final boolean replayedCommand) {
     Integer schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
     if (!replayedCommand && schemaVersion != null && schemaVersion < server.getSchemaVersion()) {
@@ -877,6 +882,7 @@ private static class InsertRequest {
 //    return hasRepartitioned;
 //  }
 
+  @SchemaReadLock
   public ComObject insertIndexEntryByKeyWithRecord(ComObject cobj, boolean replayedCommand) {
     try {
       Integer schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
@@ -1065,6 +1071,7 @@ private static class InsertRequest {
     }
   }
 
+  @SchemaReadLock
   public ComObject rollback(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     Integer schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
@@ -1086,6 +1093,7 @@ private static class InsertRequest {
     return null;
   }
 
+  @SchemaReadLock
   public ComObject commit(ComObject cobj, boolean replayedCommand) {
     long sequence0 = cobj.getLong(ComObject.Tag.sequence0);
     long sequence1 = cobj.getLong(ComObject.Tag.sequence1);
@@ -1172,6 +1180,7 @@ private static class InsertRequest {
     return null;
   }
 
+  @SchemaReadLock
   public ComObject updateRecord(ComObject cobj, boolean replayedCommand) {
 
     AtomicBoolean isExplicitTrans = new AtomicBoolean();
@@ -1885,6 +1894,7 @@ class MessageRequest {
     }
   }
 
+  @SchemaReadLock
   public ComObject deleteRecord(ComObject cobj, boolean replayedCommand) {
     try {
       AtomicBoolean isExplicitTrans = new AtomicBoolean();
@@ -1983,6 +1993,7 @@ class MessageRequest {
     }
   }
 
+  @SchemaReadLock
   public ComObject truncateTable(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     Integer schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
@@ -2167,6 +2178,7 @@ class MessageRequest {
   }
 
 
+  @SchemaReadLock
   public ComObject insertWithSelect(ComObject cobj, boolean replayedCommand) {
 
     try {

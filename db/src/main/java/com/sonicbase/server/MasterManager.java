@@ -74,7 +74,7 @@ public class MasterManager {
         public void run() {
           while (!server.getShutdown()) {
             try {
-              promoteToMaster(null);
+              promoteToMaster(null, false);
               break;
             }
             catch (Exception e) {
@@ -228,7 +228,7 @@ public class MasterManager {
               ComObject cobj = new ComObject();
               cobj.put(ComObject.Tag.dbName, "__non__");
               cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-              cobj.put(ComObject.Tag.method, "electNewMaster");
+              cobj.put(ComObject.Tag.method, "MasterManager:electNewMaster");
               cobj.put(ComObject.Tag.requestedMasterShard, shard);
               cobj.put(ComObject.Tag.requestedMasterReplica, j);
               byte[] bytes = server.getDatabaseClient().send(null, monitorShards[nextMonitor.get()], monitorReplicas[nextMonitor.get()],
@@ -259,7 +259,7 @@ public class MasterManager {
             ComObject cobj = new ComObject();
             cobj.put(ComObject.Tag.dbName, "__none__");
             cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-            cobj.put(ComObject.Tag.method, "promoteToMasterAndPushSchema");
+            cobj.put(ComObject.Tag.method, "DatabaseServer:promoteToMasterAndPushSchema");
             cobj.put(ComObject.Tag.shard, shard);
             cobj.put(ComObject.Tag.replica, electedMaster);
             server.getCommon().getServersConfig().getShards()[shard].setMasterReplica(electedMaster);
@@ -270,7 +270,7 @@ public class MasterManager {
             cobj = new ComObject();
             cobj.put(ComObject.Tag.dbName, "__none__");
             cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-            cobj.put(ComObject.Tag.method, "promoteToMaster");
+            cobj.put(ComObject.Tag.method, "MasterManager:promoteToMaster");
             cobj.put(ComObject.Tag.shard, shard);
             cobj.put(ComObject.Tag.electedMaster, electedMaster);
 
@@ -287,7 +287,7 @@ public class MasterManager {
     return false;
   }
 
-  public ComObject promoteEntireReplicaToMaster(ComObject cobj) {
+  public ComObject promoteEntireReplicaToMaster(ComObject cobj, boolean replayedCommand) {
     final int newReplica = cobj.getInt(ComObject.Tag.replica);
     for (int shard = 0; shard < server.getShardCount(); shard++) {
       logger.info("promoting to master: shard=" + shard + ", replica=" + newReplica);
@@ -306,7 +306,7 @@ public class MasterManager {
           ComObject cobj = new ComObject();
           cobj.put(ComObject.Tag.dbName, "__none__");
           cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-          cobj.put(ComObject.Tag.method, "promoteToMaster");
+          cobj.put(ComObject.Tag.method, "MasterManager:promoteToMaster");
           cobj.put(ComObject.Tag.shard, localShard);
           cobj.put(ComObject.Tag.electedMaster, newReplica);
 
@@ -328,7 +328,7 @@ public class MasterManager {
     return null;
   }
 
-  public ComObject electNewMaster(ComObject cobj) throws InterruptedException, IOException {
+  public ComObject electNewMaster(ComObject cobj, boolean replayedCommand) throws InterruptedException, IOException {
     int requestedMasterShard = cobj.getInt(ComObject.Tag.requestedMasterShard);
     int requestedMasterReplica = cobj.getInt(ComObject.Tag.requestedMasterReplica);
 
@@ -369,7 +369,7 @@ public class MasterManager {
           ComObject cobj = new ComObject();
           cobj.put(ComObject.Tag.dbName, "__none__");
           cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-          cobj.put(ComObject.Tag.method, "getSchema");
+          cobj.put(ComObject.Tag.method, "DatabaseServer:getSchema");
 
           byte[] ret = server.getClient().send(null, monitorShards[i], monitorReplicas[i], cobj, DatabaseClient.Replica.specified, true);
           DatabaseCommon tempCommon = new DatabaseCommon();
@@ -399,7 +399,7 @@ public class MasterManager {
     return false;
   }
 
-  public ComObject promoteToMaster(ComObject cobj) {
+  public ComObject promoteToMaster(ComObject cobj, boolean replayedCommand) {
     try {
       logger.info("Promoting to master: shard=" + server.getShard() + ", replica=" + server.getReplica());
       server.getLogManager().skipToMaxSequenceNumber();

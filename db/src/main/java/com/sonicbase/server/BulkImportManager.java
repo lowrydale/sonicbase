@@ -794,7 +794,7 @@ public class BulkImportManager {
     importCountExpected.put(dbName + ":" + tableName, cobj.getLong(ComObject.Tag.expectedCount));
     cancelBulkImport.put(dbName + ":" + tableName, new AtomicBoolean(false));
     try {
-      cobj.put(ComObject.Tag.method, "startBulkImportOnServer");
+      cobj.put(ComObject.Tag.method, "BulkImportManager:startBulkImportOnServer");
       cobj.put(ComObject.Tag.tableName, tableName);
       for (int shard = 0; shard < server.getShardCount(); shard++) {
         for (int replica = 0; replica < server.getReplicationFactor(); replica++) {
@@ -996,7 +996,7 @@ public class BulkImportManager {
     cobj.put(ComObject.Tag.expectedCount, countPer);
     logger.info("bulkImport got keys");
 
-    cobj.put(ComObject.Tag.method, "startBulkImportOnServer");
+    cobj.put(ComObject.Tag.method, "BulkImportManager:startBulkImportOnServer");
     cobj.put(ComObject.Tag.shouldProcess, true);
 
     List<ComObject> requests = new ArrayList<>();
@@ -1427,7 +1427,7 @@ public class BulkImportManager {
 
     try {
       ComObject cobj = new ComObject();
-      cobj.put(ComObject.Tag.method, "getBulkImportProgressOnServer");
+      cobj.put(ComObject.Tag.method, "BulkImportManager:getBulkImportProgressOnServer");
       for (final String tableName : server.getCommon().getTables(dbName).keySet()) {
         ConcurrentHashMap<String, BulkImportStatus> tableStatus = null;
         tableStatus = bulkImportStatus.get(dbName + ":" + tableName);
@@ -1564,7 +1564,7 @@ public class BulkImportManager {
                   for (int replica = 0; replica < server.getReplicationFactor(); replica++) {
                     //  if (offset == coordinatesCalled.get()) {
                     ComObject cobj = new ComObject(cobjBytes);
-                    cobj.put(ComObject.Tag.method, "coordinateBulkImportForTable");
+                    cobj.put(ComObject.Tag.method, "BulkImportManager:coordinateBulkImportForTable");
                     cobj.put(ComObject.Tag.tableName, tableName);
                     if (hasAccepted) {
                       logger.info("bulkImport setting shouldProcess=false");

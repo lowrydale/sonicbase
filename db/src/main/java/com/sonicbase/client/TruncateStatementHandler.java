@@ -37,7 +37,7 @@ public class TruncateStatementHandler extends StatementHandler {
     if (schemaRetryCount < 2) {
       cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
     }
-    cobj.put(ComObject.Tag.method, "truncateTable");
+    cobj.put(ComObject.Tag.method, "UpdateManager:truncateTable");
     cobj.put(ComObject.Tag.tableName, table);
     cobj.put(ComObject.Tag.phase, "secondary");
 

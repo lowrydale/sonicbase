@@ -180,7 +180,7 @@ public class TestFailover {
 
       while (true) {
         ComObject cobj = new ComObject();
-        cobj.put(ComObject.Tag.method, "areAllLongRunningCommandsComplete");
+        cobj.put(ComObject.Tag.method, "DatabaseServer:areAllLongRunningCommandsComplete");
         byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().sendToMaster(cobj);
         ComObject retObj = new ComObject(bytes);
         if (retObj.getBoolean(ComObject.Tag.isComplete)) {

@@ -535,7 +535,7 @@ public class InsertStatementHandler extends StatementHandler {
 
       cobj.put(ComObject.Tag.dbName, dbName);
       cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "insertIndexEntryByKey");
+      cobj.put(ComObject.Tag.method, "UpdateManager:insertIndexEntryByKey");
       if (schemaRetryCount < 2) {
         cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
       }
@@ -585,7 +585,7 @@ public class InsertStatementHandler extends StatementHandler {
       if (schemaRetryCount < 2) {
         cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
       }
-      cobj.put(ComObject.Tag.method, "insertIndexEntryByKeyWithRecord");
+      cobj.put(ComObject.Tag.method, "UpdateManager:insertIndexEntryByKeyWithRecord");
       cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
       cobj.put(ComObject.Tag.isExcpliciteTrans, client.isExplicitTrans());
       cobj.put(ComObject.Tag.isCommitting, client.isCommitting());
@@ -764,7 +764,7 @@ public class InsertStatementHandler extends StatementHandler {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-    cobj.put(ComObject.Tag.method, "insertWithSelect");
+    cobj.put(ComObject.Tag.method, "UpdateManager:insertWithSelect");
 
 
     SelectStatementImpl select = insertStatement.getSelect();
@@ -877,7 +877,7 @@ public class InsertStatementHandler extends StatementHandler {
             if (schemaRetryCount < 2) {
               cobj1.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
             }
-            cobj1.put(ComObject.Tag.method, "batchInsertIndexEntryByKeyWithRecord");
+            cobj1.put(ComObject.Tag.method, "UpdateManager:batchInsertIndexEntryByKeyWithRecord");
             cobj1.put(ComObject.Tag.isExcpliciteTrans, client.isExplicitTrans());
             cobj1.put(ComObject.Tag.isCommitting, client.isCommitting());
             cobj1.put(ComObject.Tag.transactionId, client.getTransactionId());
@@ -891,7 +891,7 @@ public class InsertStatementHandler extends StatementHandler {
             if (schemaRetryCount < 2) {
               cobj2.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
             }
-            cobj2.put(ComObject.Tag.method, "batchInsertIndexEntryByKey");
+            cobj2.put(ComObject.Tag.method, "UpdateManager:batchInsertIndexEntryByKey");
             cobj2.put(ComObject.Tag.isExcpliciteTrans, client.isExplicitTrans());
             cobj2.put(ComObject.Tag.isCommitting, client.isCommitting());
             cobj2.put(ComObject.Tag.transactionId, client.getTransactionId());

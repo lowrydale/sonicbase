@@ -84,7 +84,7 @@ public class PartitionManager extends Thread {
   private Thread beginRepartitioningThread = null;
   private AtomicBoolean isComplete = new AtomicBoolean(true);
 
-  public ComObject getRepartitionerState(ComObject cobj) {
+  public ComObject getRepartitionerState(ComObject cobj, boolean replayedCommand) {
     logger.info("getRepartitionerState - begin: state=" + state.name() + ", table=" + stateTable + ", index=" + stateIndex);
     ComObject retObj = new ComObject();
     retObj.put(ComObject.Tag.state, state.name());
@@ -350,7 +350,7 @@ public class PartitionManager extends Thread {
                   cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
                   cobj.put(ComObject.Tag.tableName, finalTableName);
                   cobj.put(ComObject.Tag.indexName, indexName);
-                  cobj.put(ComObject.Tag.method, "rebalanceOrderedIndex");
+                  cobj.put(ComObject.Tag.method, "PartitionManager:rebalanceOrderedIndex");
                   Random rand = new Random(System.currentTimeMillis());
                   try {
                     byte[] ret = databaseServer.getDatabaseClient().send(null, shard, rand.nextLong(),
@@ -379,7 +379,7 @@ public class PartitionManager extends Thread {
                   ComObject cobj = new ComObject();
                   cobj.put(ComObject.Tag.dbName, "__none__");
                   cobj.put(ComObject.Tag.schemaVersion, databaseServer.getCommon().getSchemaVersion());
-                  cobj.put(ComObject.Tag.method, "isShardRepartitioningComplete");
+                  cobj.put(ComObject.Tag.method, "PartitionManager:isShardRepartitioningComplete");
                   byte[] bytes = databaseServer.getClient().send(null, shard, masters[shard], cobj, DatabaseClient.Replica.specified);
                   ComObject retObj = new ComObject(bytes);
                   long count = retObj.getLong(ComObject.Tag.countLong);
@@ -480,7 +480,7 @@ public class PartitionManager extends Thread {
     logger.info("stopShardsFromRepartitioning - begin");
     final ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, "__none__");
-    cobj.put(ComObject.Tag.method, "stopRepartitioning");
+    cobj.put(ComObject.Tag.method, "PartitionManager:stopRepartitioning");
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
     List<Future> futures = new ArrayList<>();
     for (int shard = 0; shard < databaseServer.getShardCount(); shard++) {
@@ -738,7 +738,8 @@ public class PartitionManager extends Thread {
 //    return finished;
 //  }
 
-  public ComObject isRepartitioningComplete(ComObject cobj) {
+  @SchemaReadLock
+  public ComObject isRepartitioningComplete(ComObject cobj, boolean replayedCommand) {
     ComObject retObj = new ComObject();
     retObj.put(ComObject.Tag.finished, !isRebalancing.get());
     return retObj;
@@ -768,7 +769,7 @@ public class PartitionManager extends Thread {
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
     cobj.put(ComObject.Tag.tableName, tableName);
     cobj.put(ComObject.Tag.indexName, indexName);
-    cobj.put(ComObject.Tag.method, "getKeyAtOffset");
+    cobj.put(ComObject.Tag.method, "PartitionManager:getKeyAtOffset");
     ComArray array = cobj.putArray(ComObject.Tag.offsets, ComObject.Type.longType);
     for (OffsetEntry offset : offsets) {
       array.add(offset.offset);
@@ -795,7 +796,8 @@ public class PartitionManager extends Thread {
     return keys;
   }
 
-  public ComObject getKeyAtOffset(ComObject cobj) {
+  @SchemaReadLock
+  public ComObject getKeyAtOffset(ComObject cobj, boolean replayedCommand) {
     try {
       String dbName = cobj.getString(ComObject.Tag.dbName);
       String tableName = cobj.getString(ComObject.Tag.tableName);
@@ -886,7 +888,7 @@ public class PartitionManager extends Thread {
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
     cobj.put(ComObject.Tag.tableName, tableName);
     cobj.put(ComObject.Tag.indexName, indexName);
-    cobj.put(ComObject.Tag.method, "getPartitionSize");
+    cobj.put(ComObject.Tag.method, "PartitionManager:getPartitionSize");
     Random rand = new Random(System.currentTimeMillis());
     byte[] ret = databaseServer.getDatabaseClient().send(null, shard, rand.nextLong(),
         cobj, DatabaseClient.Replica.master);
@@ -898,7 +900,8 @@ public class PartitionManager extends Thread {
     return size;
   }
 
-  public ComObject getPartitionSize(ComObject cobj) {
+  @SchemaReadLock
+  public ComObject getPartitionSize(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     String tableName = cobj.getString(ComObject.Tag.tableName);
     String indexName = cobj.getString(ComObject.Tag.indexName);
@@ -1028,10 +1031,13 @@ public class PartitionManager extends Thread {
 //    }
 //  }
 
-  public ComObject rebalanceOrderedIndex(ComObject cobj) {
+  public ComObject rebalanceOrderedIndex(ComObject cobj, boolean replayedCommand) {
+    if (replayedCommand) {
+      return null;
+    }
     isShardRepartitioningComplete = false;
 
-    cobj.put(ComObject.Tag.method, "doRebalanceOrderedIndex");
+    cobj.put(ComObject.Tag.method, "PartitionManager:doRebalanceOrderedIndex");
     databaseServer.getLongRunningCommands().addCommand(
         databaseServer.getLongRunningCommands().createSingleCommand(cobj.serialize()));
     ComObject retObj = new ComObject();
@@ -1204,7 +1210,7 @@ public class PartitionManager extends Thread {
     }
   }
 
-  public ComObject stopRepartitioning(final ComObject cobj) {
+  public ComObject stopRepartitioning(final ComObject cobj, boolean replayedCommand) {
     logger.info("stopRepartitioning: shard=" + databaseServer.getShard() + ", replica=" + databaseServer.getReplica());
     if (moveProcessors != null) {
       for (MoveProcessor processor : moveProcessors) {
@@ -1216,7 +1222,7 @@ public class PartitionManager extends Thread {
 
   private MoveProcessor[] moveProcessors = null;
 
-  public ComObject doRebalanceOrderedIndex(final ComObject cobj) {
+  public ComObject doRebalanceOrderedIndex(final ComObject cobj, boolean replayedCommand) {
     isShardRepartitioningComplete = false;
     countMoved.set(0);
     shardRepartitionException = null;
@@ -1448,7 +1454,7 @@ public class PartitionManager extends Thread {
           count += keys.getArray().size();
 
           cobj.put(ComObject.Tag.dbName, dbName);
-          cobj.put(ComObject.Tag.method, "deleteMovedRecords");
+          cobj.put(ComObject.Tag.method, "PartitionManager:deleteMovedRecords");
           cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
           cobj.put(ComObject.Tag.tableName, tableName);
           cobj.put(ComObject.Tag.indexName, indexName);
@@ -1463,7 +1469,7 @@ public class PartitionManager extends Thread {
       }
       if (keys.getArray().size() > 0) {
         cobj.put(ComObject.Tag.dbName, dbName);
-        cobj.put(ComObject.Tag.method, "deleteMovedRecords");
+        cobj.put(ComObject.Tag.method, "PartitionManager:deleteMovedRecords");
         cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
         cobj.put(ComObject.Tag.tableName, tableName);
         cobj.put(ComObject.Tag.indexName, indexName);
@@ -1516,6 +1522,7 @@ public class PartitionManager extends Thread {
     }
   }
 
+  @SchemaReadLock
   public ComObject deleteMovedRecords(ComObject cobj, boolean replayedCommand) {
     try {
       ConcurrentLinkedQueue<DeleteManagerImpl.DeleteRequest> keysToDelete = new ConcurrentLinkedQueue<>();
@@ -1964,7 +1971,7 @@ public class PartitionManager extends Thread {
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.tableName, tableName);
     cobj.put(ComObject.Tag.indexName, indexName);
-    cobj.put(ComObject.Tag.method, "moveIndexEntries");
+    cobj.put(ComObject.Tag.method, "PartitionManager:moveIndexEntries");
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
     ComArray keys = cobj.putArray(ComObject.Tag.keys, ComObject.Type.objectType);
     int consecutiveErrors = 0;
@@ -2011,6 +2018,7 @@ public class PartitionManager extends Thread {
     countMoved.addAndGet(count);
   }
 
+  @SchemaReadLock
   public ComObject moveIndexEntries(ComObject cobj, boolean replayedCommand) {
     try {
       databaseServer.getBatchRepartCount().incrementAndGet();
@@ -2065,7 +2073,8 @@ public class PartitionManager extends Thread {
     }
   }
 
-  public ComObject getIndexCounts(ComObject cobj) {
+  @SchemaReadLock
+  public ComObject getIndexCounts(ComObject cobj, boolean replayedCommand) {
     try {
       String dbName = cobj.getString(ComObject.Tag.dbName);
 
@@ -2156,10 +2165,10 @@ public class PartitionManager extends Thread {
             ComObject cobj = new ComObject();
             cobj.put(ComObject.Tag.dbName, dbName);
             cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-            cobj.put(ComObject.Tag.method, "beginRebalance");
+            cobj.put(ComObject.Tag.method, "PartitionManager:beginRebalance");
             cobj.put(ComObject.Tag.force, false);
             String command = "DatabaseServer:ComObject:beginRebalance:";
-            beginRebalance(cobj);
+            beginRebalance(cobj, false);
           }
           Thread.sleep(2000);
         }
@@ -2248,7 +2257,7 @@ public class PartitionManager extends Thread {
             ComObject cobj = new ComObject();
             cobj.put(ComObject.Tag.dbName, dbName);
             cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-            cobj.put(ComObject.Tag.method, "getIndexCounts");
+            cobj.put(ComObject.Tag.method, "PartitionManager:getIndexCounts");
             byte[] response = client.send(null, shard, 0, cobj, DatabaseClient.Replica.master);
             synchronized (ret) {
               ComObject retObj = new ComObject(response);
@@ -2306,7 +2315,7 @@ public class PartitionManager extends Thread {
     }
   }
 
-  public ComObject beginRebalance(ComObject cobj) {
+  public ComObject beginRebalance(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     boolean force = cobj.getBoolean(ComObject.Tag.force);
     try {

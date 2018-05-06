@@ -139,6 +139,13 @@ public class StreamManager {
 
   private boolean streamingHasBeenStarted = false;
 
+  public ComObject isStreamingStarted(ComObject cobj, boolean replayedCommand) {
+    boolean started = server.getStreamManager().isStreamingStarted();
+    ComObject retObj = new ComObject();
+    retObj.put(ComObject.Tag.isStarted, started);
+    return retObj;
+  }
+
   public boolean isStreamingStarted() {
     return streamingHasBeenStarted;
   }
@@ -150,9 +157,9 @@ public class StreamManager {
 
   private ConcurrentLinkedQueue<ConsumerContext> consumers = new ConcurrentLinkedQueue<>();
 
-  public ComObject startStreaming(ComObject cobj) {
+  public ComObject startStreaming(ComObject cobj, boolean replayedCommand) {
 
-    stopStreaming(cobj);
+    stopStreaming(cobj, false);
 
     if (!server.haveProLicense()) {
       throw new InsufficientLicense("You must have a pro license to use streams integration");
@@ -391,7 +398,7 @@ public class StreamManager {
       return;
     }
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.method, "processMessages");
+    cobj.put(ComObject.Tag.method, "StreamManager:processMessages");
     ComArray array = cobj.putArray(ComObject.Tag.messages, ComObject.Type.stringType);
     for (Message msg : messages) {
       array.add(msg.getBody());
@@ -431,7 +438,7 @@ public class StreamManager {
     }
   }
 
-  public ComObject processMessages(ComObject cobj) {
+  public ComObject processMessages(ComObject cobj, boolean replayedCommand) {
     Map<String, List<JsonNode>> groupedMessages = new HashMap<>();
     ComArray messages = cobj.getArray(ComObject.Tag.messages);
     for (int i = 0; i < messages.getArray().size(); i++) {
@@ -630,7 +637,7 @@ public class StreamManager {
     return null;
   }
 
-  public ComObject stopStreaming(ComObject cobj) {
+  public ComObject stopStreaming(ComObject cobj, boolean replayedCommand) {
     shutdown = true;
     streamingHasBeenStarted = false;
     try {

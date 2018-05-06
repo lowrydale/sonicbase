@@ -73,7 +73,7 @@ public class TestPartitionManagerConsistencySecondaryIndex {
         dbServers[shard].setMinSizeForRepartition(0);
       }
 
-      dbServers[0].getMasterManager().promoteToMaster(null);
+      dbServers[0].getMasterManager().promoteToMaster(null, false);
 
       DatabaseServer.initDeathOverride(2, 2);
       DatabaseServer.deathOverride[0][0] = false;

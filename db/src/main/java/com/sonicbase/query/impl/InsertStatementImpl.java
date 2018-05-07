@@ -41,32 +41,6 @@ public class InsertStatementImpl extends StatementImpl implements InsertStatemen
     return columnNames;
   }
 
-//  List srcColumns = stmt.getColumns();
-//    ExpressionList items = (ExpressionList) stmt.getItemsList();
-//    List srcExpressions = items.getExpressions();
-//    for (int i = 0; i < srcColumns.size(); i++) {
-//      Column column = (Column) srcColumns.get(i);
-//      columnNames.add(column.getColumnName().toLowerCase());
-//      Expression expression = (Expression) srcExpressions.get(i);
-//      //todo: this doesn't handle out of order fields
-//      if (expression instanceof JdbcParameter) {
-//        values.add(new ParameterNode());
-//      }
-//      else if (expression instanceof StringValue) {
-//        values.add(((StringValue) expression).getValue());
-//      }
-//      else if (expression instanceof LongValue) {
-//        values.add(((LongValue) expression).getValue());
-//      }
-//      else if (expression instanceof DoubleValue) {
-//        values.add(((DoubleValue) expression).getValue());
-//      }
-//      else {
-//        throw new Exception("Unexpected column type: " + expression.getClass().getName());
-//      }
-
-
-
   @Override
   public void addValue(String columnName, Object value) {
     columnNames.add(client.toLower(columnName));
@@ -94,7 +68,6 @@ public class InsertStatementImpl extends StatementImpl implements InsertStatemen
     cobj.put(ComObject.Tag.tableName, tableName);
 
     //todo: add support for values when needed
-    //cobj.putArray(ComObject.Tag.insearverValues, ComObject.Type.objectType);
 
     ComArray columnsArray = cobj.putArray(ComObject.Tag.columns, ComObject.Type.stringType);
     for (String column : columnNames) {

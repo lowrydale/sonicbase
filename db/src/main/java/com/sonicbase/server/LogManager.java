@@ -586,10 +586,6 @@ public class LogManager {
         if (writer != null) {
           writer.close();
         }
-//        if (!wroteData && currFilename != null) {
-//          File currFile = new File(currFilename);
-//          currFile.delete();
-//        }
         sliceFilename = currFilename.get();
         String directory = getLogRoot();
         currQueueTime = System.currentTimeMillis();
@@ -792,9 +788,6 @@ public class LogManager {
         }
       }
       catch (EOFException e) {
-//        if (totalBytes + 4 != getBytesRead()) {
-//          throw new DatabaseException("Didn't read to end of stream: read=" + getBytesRead() + ", expected=" + totalBytes);
-//        }
         buffer = null;
         sequence1 = -1;
         sequence0 = -1;
@@ -1150,12 +1143,6 @@ public class LogManager {
         request.setBegin(System.nanoTime());
         request.setTimeLogging(timeLogging);
 
-//        logWriters.get(0).logRequests(Collections.singletonList(request));
-//        if (request.getTimeLogging() != null) {
-//          request.getTimeLogging().addAndGet(System.nanoTime() - request.getBegin());
-//        }
-//        request.getLatch().countDown();
-
         logRequests.put(request);
       }
       return request;
@@ -1180,19 +1167,6 @@ public class LogManager {
                 }
               }
 
-//              int pos = 0;
-//              if (name.startsWith("peer-")) {
-//                pos = name.indexOf('-', "peer-".length());  //skip 'peer'
-//                pos = name.indexOf('-', pos + 1); //skip replica
-//              }
-//              else {
-//                pos = name.indexOf('-');
-//              }
-//
-//              int pos2 = name.indexOf('-');
-//              String dateStr = name.substring(pos + 1, pos2);
-//              Date fileDate = DateUtils.fromString(dateStr);
-//              long fileTime = fileDate.getTime();
               long fileTime = file.lastModified();
               if (exactDate) {
                 if (fileTime < lastSnapshot && file.exists() && !file.delete()) {

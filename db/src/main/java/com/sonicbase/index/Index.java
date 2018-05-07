@@ -556,46 +556,6 @@ public class Index {
         Object[] firstKey = tail.firstKey();
         Object value = objectIndex.get(firstKey);
         return new MyEntry<>(firstKey, value);
-
-        //        if (objectIndex.isEmpty()) {
-        //          return null;
-        //        }
-        //        boolean haveKey = false;
-        //        Object[] lastKey = key;
-        //        while (true) {
-        //          Object2LongSortedMap<Object[]> head = objectIndex.tailMap(lastKey);
-        //          if (head.isEmpty()) {
-        //            break;
-        //          }
-        //          Object[] curr = head.firstKey();
-        //          if (objectIndex.comparator().compare(curr, key) != 0) {
-        //            break;
-        //          }
-        //          lastKey = curr;
-        //          haveKey = true;
-        //        }
-        //
-        //        if (!haveKey) {
-        //          Map.Entry<Object[], Long> entry = lowerEntry(lastKey);
-        //          if (entry != null) {
-        //            lastKey = entry.getKey();
-        //            while (true) {
-        //              Object2LongSortedMap<Object[]> head = objectIndex.tailMap(lastKey);
-        //              if (head.isEmpty()) {
-        //                break;
-        //              }
-        //              Object[] curr = head.firstKey();
-        //              if (objectIndex.comparator().compare(curr, key) == 0) {
-        //                lastKey = curr;
-        //              }
-        //              else {
-        //                break;
-        //              }
-        //            }
-        //          }
-        //        }
-        //        Long value = objectIndex.get(lastKey);
-        //        return new MyEntry<>(lastKey, value);
       }
     }
 
@@ -839,18 +799,6 @@ public class Index {
         }
         boolean haveKey = false;
         Object[] lastKey = key;
-        //        while (true) {
-        //          Object2LongSortedMap<Object[]> head = objectIndex.headMap(lastKey);
-        //          if (head.isEmpty()) {
-        //            break;
-        //          }
-        //          Object[] curr = head.lastKey();
-        //          if (objectIndex.comparator().compare(curr, key) != 0) {
-        //            break;
-        //          }
-        //          lastKey = curr;
-        //          haveKey = true;
-        //        }
 
         if (!haveKey) {
           Map.Entry<Object[], Object> entry = objectIndex.tailMap(lastKey).entrySet().first();//higherEntry(lastKey);
@@ -1105,7 +1053,6 @@ public class Index {
           try {
             int offset = 0;
             byte[] lastKey = (byte[]) head.firstKey();
-            //if (lastKey.equals(key[0])) {
             lastKey = null;
             byte[] currKey = null;
             for (Map.Entry<byte[], Object> entry : entries) {
@@ -1120,7 +1067,6 @@ public class Index {
                 }
               }
             }
-            //}
             return ret;
           }
           catch (NoSuchElementException e) {
@@ -1138,7 +1084,6 @@ public class Index {
           try {
             int offset = 0;
             Object[] lastKey = (Object[]) head.firstKey();
-            //if (lastKey.equals(key[0])) {
             lastKey = null;
             Object[] currKey = null;
             for (Map.Entry<Object[], Object> entry : entries) {
@@ -1153,7 +1098,6 @@ public class Index {
                 }
               }
             }
-            //}
             return ret;
           }
           catch (NoSuchElementException e) {
@@ -1615,34 +1559,6 @@ public class Index {
             }
           }
         }
-/*
-        while (true) {
-          int count = 0;
-          List<PartitionManager.MapEntry> list = new ArrayList<>();
-          synchronized (this) {
-            Long2ObjectSortedMap<Object> map = longIndex.headMap((long) key[0]);
-            if (map.isEmpty()) {
-              return true;
-            }
-            for (Map.Entry<Long, Object> entry : map.entrySet()) {
-              key = new Object[]{entry.getKey()};
-              list.add(new PartitionManager.MapEntry(key, entry.getValue()));
-              if (count++ > 100) {
-                break;
-              }
-            }
-          }
-
-          if (list.isEmpty()) {
-            return true;
-          }
-          for (PartitionManager.MapEntry entry : list) {
-            if (!visitor.visit(entry.key, entry.value)) {
-              return false;
-            }
-          }
-        }
-  */
       }
       else if (stringIndex != null) {
         while (true) {

@@ -258,25 +258,15 @@ public class NettyServer {
 
       destBuff.clear();
       destBuff.retain();
-
-//      ByteBufAllocator alloc = PooledByteBufAllocator.DEFAULT;
-//      destBuff = alloc.directBuffer(1024);
-//      //destBuff = ctx.alloc().buffer(100, 1000000); // (1)
-//      //respBuffer = ctx.alloc().buffer(100, 1000000);
-//      respBuffer = alloc.directBuffer(1024);
       readState = ReadState.size;
     }
 
     public void handlerRemoved(ChannelHandlerContext ctx) {
-      destBuff.release(); // (1)
+      destBuff.release();
       destBuff = null;
-      respBuffer.release(); // (1)
+      respBuffer.release();
       respBuffer = null;
     }
-
-    //public void channelReadCompleted(ChannelHandlerContext ctx) { // (2)
-    //  ctx.flush();
-    //}
 
     boolean oldWay = false;
 
@@ -287,7 +277,6 @@ public class NettyServer {
       else {
         buffers.add(m);
       }
-      //m.resetReaderIndex();
       int readable = 0;
       if (oldWay) {
         readable = destBuff.readableBytes();
@@ -296,7 +285,6 @@ public class NettyServer {
         readable = m.readableBytes();
       }
       if (readState == ReadState.size) {
-        //logger.info("Reading size");
         if (readable >= 4) {
           readState = ReadState.bytes;
 
@@ -311,38 +299,17 @@ public class NettyServer {
           }
           else {
             byte[] intBuff = new byte[4];
-            m.resetReaderIndex(); //destBuff.resetReaderIndex();
-            m.readBytes(intBuff);//destBuff.readBytes(intBuff);
+            m.resetReaderIndex();
+            m.readBytes(intBuff);
             bodyLen = (((int) intBuff[0] & 0xff)) |
                 (((int) intBuff[1] & 0xff) << 8) |
                 (((int) intBuff[2] & 0xff) << 16) |
                 (((int) intBuff[3] & 0xff) << 24);
-
-            //            if (len > 100000) {
-            //              byte[] other = new byte[readable - 4];
-            //              destBuff.getBytes(4, other);
-            //              logger.error("Invalid length: len=" + len + ", Other bytes=" + new String(other));
-            //              returnException(ctx, "Error", new Throwable("Invalid len=" + len));
-            //              readState = ReadState.size;
-            //              destBuff.clear();
-            //              return;
-            //  //            int index = destBuff.readerIndex();
-            //  //            destBuff.readerIndex(index - 4);
-            //            }
-            //destBuff = ctx.alloc().buffer(len);
-            //logger.info("Read size: len=" + len);
           }
         }
       }
 
       if (readState == ReadState.bytes) {
-        //logger.info("Reading bytes");
-//          if (len > 1024 * 1024 * 1024) {
-//            returnException(ctx, "Payload too big: len=" + len, new Throwable("Payload too big: len=" + len));
-//            readState = ReadState.size;
-//            destBuff.clear();
-//          }
-//          else {
         if (oldWay) {
           readable = destBuff.readableBytes();
         }
@@ -354,10 +321,6 @@ public class NettyServer {
           }
         }
         if (readable >= len + bodyLen) {
-          //            logger.error("readable less than len+bodyLen: readable=" + readable +
-          //              ", len+bodyLen=" + (len+bodyLen));
-          //          }
-          //          else {
           readState = ReadState.size;
 
           byte[] body = new byte[bodyLen];
@@ -385,29 +348,13 @@ public class NettyServer {
 
           long sentChecksum = Util.readRawLittleEndian64(body, offset);
           offset += 8;
-
-//              byte[] newBody = null;
           offset = 0;
           if (DatabaseSocketClient.COMPRESS) {
-            //newBody = new byte[bodyLen - 12];
             offset = 12;
           }
           else {
-            //newBody = new byte[bodyLen - 8];
             offset = 8;
           }
-//              System.arraycopy(body, offset, newBody, 0, newBody.length);
-//              body = newBody;
-
-//              CRC32 checksum = new CRC32();
-//              checksum.update(body, 0, body.length);
-          long checksumValue = 0;//checksum.getValue();
-          //checksumValue = Arrays.hashCode(body);
-
-//              if (sentChecksum != checksumValue) {
-//                throw new Exception("Checksum mismatch");
-//              }
-          //System.out.println("origBodyLen=" + origBodyLen + ", len=" + bodyLen);
           if (DatabaseSocketClient.COMPRESS) {
             if (DatabaseSocketClient.LZO_COMPRESSION) {
               LZ4Factory factory = LZ4Factory.fastestInstance();
@@ -441,9 +388,6 @@ public class NettyServer {
       ByteBuf m = null;
       String respStr = "";
       try {
-//        if (!NettyServer.this.isRunning.get()) {
-//          return;
-//        }
         m = (ByteBuf) msg;
 
         long requestBegin = System.nanoTime();
@@ -598,17 +542,10 @@ public class NettyServer {
       t.printStackTrace(writer);
       writer.close();
       errorResponse.append(sWriter.toString());
-      //    for (StackTraceElement elem : t.getStackTrace()) {
-      //      errorResponse.append(elem.toString()).append("\n");
-      //    }
       byte[] retBytes = errorResponse.toString().getBytes(UTF8_STR);
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       bytesOut.write(0);
-
-      //                  respBuffer.writeBoolean(false);
       Util.writeRawLittleEndian32(retBytes.length, intBuff);
-      //                  respBuffer.writeBytes(intBuff);
-      //                  respBuffer.writeBytes(retBytes);
       bytesOut.write(intBuff);
       bytesOut.write(retBytes);
       buffers.add(bytesOut.toByteArray());
@@ -634,8 +571,6 @@ public class NettyServer {
         return bytesOut.toByteArray();
       }
       catch (Exception t) {
-        //  System.out.println("Error processing request: error=" + t.getMessage());
-        //  t.printStackTrace();
         return returnException("exception: " + t.getMessage(), t);
       }
     }
@@ -697,15 +632,11 @@ public class NettyServer {
       try {
         StringBuilder errorResponse = new StringBuilder();
         errorResponse.append("Response: ").append(respStr).append("\n");
-        //t.fillInStackTrace();
         StringWriter sWriter = new StringWriter();
         PrintWriter writer = new PrintWriter(sWriter);
         t.printStackTrace(writer);
         writer.close();
         errorResponse.append(sWriter.toString());
-        //    for (StackTraceElement elem : t.getStackTrace()) {
-        //      errorResponse.append(elem.toString()).append("\n");
-        //    }
         byte[] retBytes = errorResponse.toString().getBytes(UTF8_STR);
         ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
         bytesOut.write(0);
@@ -722,7 +653,6 @@ public class NettyServer {
     }
 
     public void channelReadComplete(ChannelHandlerContext ctx) {
-      //ctx.flush();
     }
 
     @Override
@@ -759,20 +689,6 @@ public class NettyServer {
     this.databaseServer = databaseServer;
     logger = new Logger(/*databaseServer.getDatabaseClient()*/null);
     Logger.setIsClient(false);
-//    File file = new File(databaseServer.getDataDir(), "queue/" + databaseServer.getShard() + "/" + databaseServer.getReplica());
-//    queue = new Queue(file.getAbsolutePath(), "request-log", 0);
-//    Thread logThread = new Thread(queue);
-//    logThread.start();
-//
-//    for (int i = 0; i < logRequests.length; i++) {
-//      logRequests[i] = new ArrayBlockingQueue<>(2000);
-//      Thread thread = new Thread(new LogWriter(i, logRequests[i], databaseServer.getDataDir(), databaseServer.getShard(), databaseServer.getReplica()));
-//      thread.start();
-//    }
-//        File file = new File(databaseServer.getDataDir(), "queue/" + databaseServer.getShard()+ "/" + databaseServer.getReplica());
-//        queue = new Queue(file.getAbsolutePath(), "request-log", 0);
-//        Thread logThread = new Thread(queue);
-//        logThread.start();
   }
 
   public DatabaseServer getDatabaseServer() {
@@ -934,7 +850,7 @@ public class NettyServer {
               databaseServer.getMasterManager().startMasterMonitor();
 
               logger.info("running snapshot loop");
-              databaseServer.getDeltaManager().runSnapshotLoop();
+              databaseServer.getSnapshotManager().runSnapshotLoop();
 //              databaseServer.getSnapshotManager().runSnapshotLoop();
 
               isRecovered.set(true);
@@ -1063,10 +979,5 @@ public class NettyServer {
     finally {
       executor.shutdownNow();
     }
-  }
-
-  public static String getHelpPage(NettyServer server) throws IOException {
-    InputStream in = server.getClass().getResourceAsStream("rest-help.html");
-    return IOUtils.toString(in, "utf-8");
   }
 }

@@ -6140,7 +6140,7 @@ com.sonicbase.server.DeleteManagerImpl$OutputState -> com.sonicbase.server.e$h:
     113:113:int access$908(com.sonicbase.server.DeleteManagerImpl$OutputState) -> c
     113:113:java.io.DataOutputStream access$1100(com.sonicbase.server.DeleteManagerImpl$OutputState) -> d
     113:113:int access$804(com.sonicbase.server.DeleteManagerImpl$OutputState) -> e
-com.sonicbase.server.DeleteManagerOld -> com.sonicbase.server.f:
+com.sonicbase.server.DeleteManager -> com.sonicbase.server.f:
     com.sonicbase.common.Logger logger -> a
     com.sonicbase.server.DatabaseServer databaseServer -> b
     java.util.concurrent.ThreadPoolExecutor executor -> c
@@ -6176,43 +6176,43 @@ com.sonicbase.server.DeleteManagerOld -> com.sonicbase.server.f:
     501:501:void applyDeletesToSnapshot(java.lang.String,int,java.util.concurrent.atomic.AtomicLong) -> a
     506:506:boolean isForcingDeletes() -> d
     510:553:void forceDeletes() -> f
-    23:23:boolean access$000(com.sonicbase.server.DeleteManagerOld) -> a
-    23:23:java.util.concurrent.LinkedBlockingQueue access$100(com.sonicbase.server.DeleteManagerOld) -> b
-    23:23:java.util.concurrent.ThreadPoolExecutor access$200(com.sonicbase.server.DeleteManagerOld) -> c
-    23:23:com.sonicbase.common.Logger access$300(com.sonicbase.server.DeleteManagerOld) -> d
-    23:23:com.sonicbase.server.DatabaseServer access$400(com.sonicbase.server.DeleteManagerOld) -> e
-    23:23:void access$500(com.sonicbase.server.DeleteManagerOld,java.util.List) -> a
-    23:23:java.io.File access$600(com.sonicbase.server.DeleteManagerOld) -> f
-com.sonicbase.server.DeleteManagerOld$1 -> com.sonicbase.server.f$1:
+    23:23:boolean access$000(com.sonicbase.server.DeleteManager) -> a
+    23:23:java.util.concurrent.LinkedBlockingQueue access$100(com.sonicbase.server.DeleteManager) -> b
+    23:23:java.util.concurrent.ThreadPoolExecutor access$200(com.sonicbase.server.DeleteManager) -> c
+    23:23:com.sonicbase.common.Logger access$300(com.sonicbase.server.DeleteManager) -> d
+    23:23:com.sonicbase.server.DatabaseServer access$400(com.sonicbase.server.DeleteManager) -> e
+    23:23:void access$500(com.sonicbase.server.DeleteManager,java.util.List) -> a
+    23:23:java.io.File access$600(com.sonicbase.server.DeleteManager) -> f
+com.sonicbase.server.DeleteManager$1 -> com.sonicbase.server.f$1:
     com.sonicbase.server.DatabaseServer val$databaseServer -> a
-    com.sonicbase.server.DeleteManagerOld this$0 -> b
-    41:41:void <init>(com.sonicbase.server.DeleteManagerOld,com.sonicbase.server.DatabaseServer) -> <init>
+    com.sonicbase.server.DeleteManager this$0 -> b
+    41:41:void <init>(com.sonicbase.server.DeleteManager,com.sonicbase.server.DatabaseServer) -> <init>
     44:68:void run() -> run
-com.sonicbase.server.DeleteManagerOld$1$1 -> com.sonicbase.server.f$1$1:
+com.sonicbase.server.DeleteManager$1$1 -> com.sonicbase.server.f$1$1:
     java.util.List val$batch -> a
-    com.sonicbase.server.DeleteManagerOld$1 this$1 -> b
-    52:52:void <init>(com.sonicbase.server.DeleteManagerOld$1,java.util.List) -> <init>
+    com.sonicbase.server.DeleteManager$1 this$1 -> b
+    52:52:void <init>(com.sonicbase.server.DeleteManager$1,java.util.List) -> <init>
     55:58:void run() -> run
-com.sonicbase.server.DeleteManagerOld$2 -> com.sonicbase.server.f$2:
+com.sonicbase.server.DeleteManager$2 -> com.sonicbase.server.f$2:
     java.util.List val$currBatch -> a
     com.sonicbase.index.Index val$index -> b
     com.sonicbase.schema.IndexSchema val$indexSchema -> c
-    com.sonicbase.server.DeleteManagerOld this$0 -> d
-    153:153:void <init>(com.sonicbase.server.DeleteManagerOld,java.util.List,com.sonicbase.index.Index,com.sonicbase.schema.IndexSchema) -> <init>
+    com.sonicbase.server.DeleteManager this$0 -> d
+    153:153:void <init>(com.sonicbase.server.DeleteManager,java.util.List,com.sonicbase.index.Index,com.sonicbase.schema.IndexSchema) -> <init>
     156:188:java.lang.Object call() -> call
-com.sonicbase.server.DeleteManagerOld$3 -> com.sonicbase.server.f$3:
-    com.sonicbase.server.DeleteManagerOld this$0 -> a
-    305:305:void <init>(com.sonicbase.server.DeleteManagerOld) -> <init>
+com.sonicbase.server.DeleteManager$3 -> com.sonicbase.server.f$3:
+    com.sonicbase.server.DeleteManager this$0 -> a
+    305:305:void <init>(com.sonicbase.server.DeleteManager) -> <init>
     308:336:void run() -> run
-com.sonicbase.server.DeleteManagerOld$3$1 -> com.sonicbase.server.f$3$1:
-    com.sonicbase.server.DeleteManagerOld$3 this$1 -> a
-    321:321:void <init>(com.sonicbase.server.DeleteManagerOld$3) -> <init>
+com.sonicbase.server.DeleteManager$3$1 -> com.sonicbase.server.f$3$1:
+    com.sonicbase.server.DeleteManager$3 this$1 -> a
+    321:321:void <init>(com.sonicbase.server.DeleteManager$3) -> <init>
     324:324:int compare(java.io.File,java.io.File) -> a
     321:321:int compare(java.lang.Object,java.lang.Object) -> compare
-com.sonicbase.server.DeleteManagerOld$4 -> com.sonicbase.server.f$4:
+com.sonicbase.server.DeleteManager$4 -> com.sonicbase.server.f$4:
     java.io.File val$file -> a
-    com.sonicbase.server.DeleteManagerOld this$0 -> b
-    530:530:void <init>(com.sonicbase.server.DeleteManagerOld,java.io.File) -> <init>
+    com.sonicbase.server.DeleteManager this$0 -> b
+    530:530:void <init>(com.sonicbase.server.DeleteManager,java.io.File) -> <init>
     533:534:java.lang.Object call() -> call
 com.sonicbase.server.DeltaManager -> com.sonicbase.server.g:
     int SNAPSHOT_PARTITION_COUNT -> a
@@ -7128,7 +7128,7 @@ com.sonicbase.server.SnapshotManager -> com.sonicbase.server.o:
     void saveTableSchema(java.lang.String,int,java.lang.String,com.sonicbase.schema.TableSchema) -> a
     void deleteTableSchema(java.lang.String,int,java.lang.String) -> a
     void deleteIndexSchema(java.lang.String,int,java.lang.String,java.lang.String) -> a
-com.sonicbase.server.SnapshotManagerImpl -> com.sonicbase.server.p:
+com.sonicbase.server.SnapshotManager -> com.sonicbase.server.p:
     int SNAPSHOT_PARTITION_COUNT -> a
     java.lang.String SNAPSHOT_STR -> d
     java.lang.String INDEX_STR -> e
@@ -7183,11 +7183,11 @@ com.sonicbase.server.SnapshotManagerImpl -> com.sonicbase.server.p:
     828:828:void deleteDeletedDirs() -> d
     831:844:void doDeleteTempDirs(java.io.File) -> b
     847:847:boolean isRecovering() -> h
-    23:23:java.util.concurrent.atomic.AtomicLong access$000(com.sonicbase.server.SnapshotManagerImpl) -> a
-    23:23:com.sonicbase.server.DatabaseServer access$100(com.sonicbase.server.SnapshotManagerImpl) -> b
-    23:23:long access$200(com.sonicbase.server.SnapshotManagerImpl) -> c
-    23:23:boolean access$300(com.sonicbase.server.SnapshotManagerImpl) -> d
-com.sonicbase.server.SnapshotManagerImpl$1 -> com.sonicbase.server.p$1:
+    23:23:java.util.concurrent.atomic.AtomicLong access$000(com.sonicbase.server.SnapshotManager) -> a
+    23:23:com.sonicbase.server.DatabaseServer access$100(com.sonicbase.server.SnapshotManager) -> b
+    23:23:long access$200(com.sonicbase.server.SnapshotManager) -> c
+    23:23:boolean access$300(com.sonicbase.server.SnapshotManager) -> d
+com.sonicbase.server.SnapshotManager$1 -> com.sonicbase.server.p$1:
     java.io.File val$indexFile -> a
     com.sonicbase.schema.IndexSchema val$indexSchema -> b
     com.sonicbase.schema.TableSchema val$tableSchema -> c
@@ -7198,15 +7198,15 @@ com.sonicbase.server.SnapshotManagerImpl$1 -> com.sonicbase.server.p$1:
     java.lang.String val$tableName -> h
     java.lang.String val$indexName -> i
     long val$indexBegin -> j
-    com.sonicbase.server.SnapshotManagerImpl this$0 -> k
-    206:206:void <init>(com.sonicbase.server.SnapshotManagerImpl,java.io.File,com.sonicbase.schema.IndexSchema,com.sonicbase.schema.TableSchema,com.sonicbase.index.Index,java.util.concurrent.atomic.AtomicLong,int,java.util.concurrent.atomic.AtomicLong,java.lang.String,java.lang.String,long) -> <init>
+    com.sonicbase.server.SnapshotManager this$0 -> k
+    206:206:void <init>(com.sonicbase.server.SnapshotManager,java.io.File,com.sonicbase.schema.IndexSchema,com.sonicbase.schema.TableSchema,com.sonicbase.index.Index,java.util.concurrent.atomic.AtomicLong,int,java.util.concurrent.atomic.AtomicLong,java.lang.String,java.lang.String,long) -> <init>
     209:268:java.lang.Boolean call() -> a
     206:206:java.lang.Object call() -> call
-com.sonicbase.server.SnapshotManagerImpl$2 -> com.sonicbase.server.p$2:
-    com.sonicbase.server.SnapshotManagerImpl this$0 -> a
-    388:388:void <init>(com.sonicbase.server.SnapshotManagerImpl) -> <init>
+com.sonicbase.server.SnapshotManager$2 -> com.sonicbase.server.p$2:
+    com.sonicbase.server.SnapshotManager this$0 -> a
+    388:388:void <init>(com.sonicbase.server.SnapshotManager) -> <init>
     391:432:void run() -> run
-com.sonicbase.server.SnapshotManagerImpl$3 -> com.sonicbase.server.p$3:
+com.sonicbase.server.SnapshotManager$3 -> com.sonicbase.server.p$3:
     java.util.concurrent.atomic.AtomicLong val$countSaved -> a
     com.sonicbase.index.Index val$index -> b
     boolean val$isPrimaryKey -> c
@@ -7219,14 +7219,14 @@ com.sonicbase.server.SnapshotManagerImpl$3 -> com.sonicbase.server.p$3:
     java.util.concurrent.atomic.AtomicLong val$savedCount -> j
     java.util.concurrent.atomic.AtomicLong val$lastLogged -> k
     long val$subBegin -> l
-    com.sonicbase.server.SnapshotManagerImpl this$0 -> m
-    531:531:void <init>(com.sonicbase.server.SnapshotManagerImpl,java.util.concurrent.atomic.AtomicLong,com.sonicbase.index.Index,boolean,java.io.DataOutputStream[],java.util.Map$Entry,java.util.Map$Entry,java.lang.Long,java.lang.String,int[],java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong,long) -> <init>
+    com.sonicbase.server.SnapshotManager this$0 -> m
+    531:531:void <init>(com.sonicbase.server.SnapshotManager,java.util.concurrent.atomic.AtomicLong,com.sonicbase.index.Index,boolean,java.io.DataOutputStream[],java.util.Map$Entry,java.util.Map$Entry,java.lang.Long,java.lang.String,int[],java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong,long) -> <init>
     534:588:boolean visit(java.lang.Object[],java.lang.Object) -> a
-com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream -> com.sonicbase.server.p$a:
+com.sonicbase.server.SnapshotManager$ByteCounterStream -> com.sonicbase.server.p$a:
     java.io.FileInputStream stream -> b
     java.util.concurrent.atomic.AtomicLong finishedBytes -> c
-    com.sonicbase.server.SnapshotManagerImpl this$0 -> a
-    854:857:void <init>(com.sonicbase.server.SnapshotManagerImpl,java.util.concurrent.atomic.AtomicLong,java.io.FileInputStream) -> <init>
+    com.sonicbase.server.SnapshotManager this$0 -> a
+    854:857:void <init>(com.sonicbase.server.SnapshotManager,java.util.concurrent.atomic.AtomicLong,java.io.FileInputStream) -> <init>
     860:861:void reset() -> reset
     864:864:boolean markSupported() -> markSupported
     868:869:void mark(int) -> mark
@@ -7626,7 +7626,7 @@ com.sonicbase.socket.DatabaseSocketClient$Request -> com.sonicbase.b.a$d:
     350:350:java.lang.Exception access$1202(com.sonicbase.socket.DatabaseSocketClient$Request,java.lang.Exception) -> a
     350:350:java.lang.Exception access$1200(com.sonicbase.socket.DatabaseSocketClient$Request) -> d
     350:350:boolean access$800(com.sonicbase.socket.DatabaseSocketClient$Request) -> e
-com.sonicbase.socket.DeadServerException -> com.sonicbase.b.b:
+com.sonicbase.common.DeadServerException -> com.sonicbase.b.b:
     8:10:void <init>() -> <init>
     13:14:void <init>(java.lang.String) -> <init>
     17:18:void <init>(java.lang.Throwable) -> <init>

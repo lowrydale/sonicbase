@@ -315,16 +315,6 @@ public class ExpressionImpl implements Expression {
           else {
             minCounter.setMinDouble(lastMinDouble);
           }
-          //        Long count = retCounter.getCount();
-          //        Long lastCount = lastCounter.getCount();
-          //        if (count != null) {
-          //          if (lastCount != null) {
-          //            retCounter.setCount(count + lastCount);
-          //          }
-          //        }
-          //        else {
-          //          retCounter.setCount(lastCount);
-          //        }
           minCounter.setMaxLong(maxCounter.getMaxLong());
           minCounter.setMaxDouble(maxCounter.getMaxDouble());
         }
@@ -514,11 +504,6 @@ public class ExpressionImpl implements Expression {
     try {
       this.serializationVersion = serializationVersion;
       nextShard = in.readInt();
-//      if (serializationVersion >= DatabaseClient.SERIALIZATION_VERSION_24) {
-//        if (1 == in.readByte()) {
-//          tableName = in.readUTF();
-//        }
-//      }
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -648,139 +633,6 @@ public class ExpressionImpl implements Expression {
       this.id = id;
     }
   }
-
-//  private static ThreadPoolExecutor readExecutor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
-//  public static Record[][] doReadRecords(
-//      final DatabaseClient client, Object[][][] keys, String[] tableNames, final List<String> columns) throws Exception {
-//
-//    final int previousSchemaVersion = client.getCommon().getSchemaVersion();
-//
-//    final List<List<RecordToRead>> partitionedIds = new ArrayList<>();
-//    for (int i = 0; i < client.getShardCount(); i++) {
-//      partitionedIds.add(new ArrayList<RecordToRead>());
-//    }
-//    int[] tableIds = new int[tableNames.length];
-//    for (int i = 0; i < tableNames.length; i++) {
-//      tableIds[i] = client.getCommon().getTables().get(tableNames[i]).getTableId();
-//    }
-//
-//    RecordIndexPartition[] recordPartitions = client.getCommon().getSchema().getRecordIndexPartitions();
-//    for (Object[][] id : keys) {
-//      for (int i = 0; i < id.length; i++) {
-//        Object[] currId = id[i];
-//        if (currId == null) {
-//          continue;
-//        }
-//
-//        selectedShards = PartitionManager.findOrderedPartitionForRecord(false, fieldOffsets, client.getCommon(), tableSchema,
-//              indexSchema.getKey(), orderByExpressions, leftOperator, rightOperator, comparators, originalLeftValue, originalRightValue);
-//
-//        RecordIndexPartition recordPartition = recordPartitions[(int) (currId % recordPartitions.length)];
-//        partitionedIds.get(recordPartition.getShardOwning()).add(new RecordToRead(tableIds[i], currId));
-//      }
-//    }
-//
-//    final ConcurrentHashMap<Long, Record> recordsRead = new ConcurrentHashMap<>();
-//
-//    List<Future> outerFutures = new ArrayList<>();
-//    for (int i = 0; i < partitionedIds.size(); i++) {
-//      final int partitionOffset = i;
-//      final List<RecordToRead> records = partitionedIds.get(partitionOffset);
-//      if (records.size() == 0) {
-//        continue;
-//      }
-//      outerFutures.add(readExecutor.submit(new Callable() {
-//        @Override
-//        public Object call() throws Exception {
-//          int threadCount = 128;
-//          final ByteArrayOutputStream[] bytesOut = new ByteArrayOutputStream[threadCount];
-//          DataOutputStream[] out = new DataOutputStream[threadCount];
-//          List<Future> futures = new ArrayList<>();
-//          AtomicInteger resultLength = new AtomicInteger();
-//          int l = 0;
-//          for (int j = 0; j < threadCount; j++) {
-//            int count = (j == (threadCount - 1) ? records.size() - l : records.size() / threadCount);
-//            if (count == 0) {
-//              continue;
-//            }
-//            bytesOut[j] = new ByteArrayOutputStream();
-//            out[j] = new DataOutputStream(bytesOut[j]);
-//            final int threadOffset = j;
-//           // List<RecordToRead> records = partitionedIds.get(partitionOffset);
-//            out[j].writeInt(columns.size());
-//            for (String column : columns) {
-//              out[j].writeUTF(column);
-//            }
-//            out[j].writeInt(count);
-//            int k = l;
-//            for (; k < l + count; k++) {
-//              RecordToRead record = records.get(k);
-//              Varint.writeSignedVarLong(out[j], record.tableId, resultLength);
-//              Varint.writeSignedVarLong(out[j], record.id, resultLength);
-//            }
-//            out[j].close();
-//            l = k;
-//
-//            futures.add(client.getExecutor().submit(new Callable() {
-//              @Override
-//              public Object call() throws Exception {
-//                String command = "DatabaseServer:readRecordsWithColumns:1:" + client.getCommon().getSchemaVersion();
-//
-//                AtomicReference<String> selectedHost = new AtomicReference<>();
-//
-//                byte[] recordRet = client.send(partitionOffset, ThreadLocalRandom.current().nextLong(), command, bytesOut[threadOffset].toByteArray(), DatabaseClient.Replica.def, 30000, selectedHost);
-//                if (previousSchemaVersion < client.getCommon().getSchemaVersion()) {
-//                  throw new SchemaOutOfSyncException();
-//                }
-//
-//                Map<Long, Record> recordsRead = new HashMap<>();
-//
-//                if (recordRet != null) {
-//                  DataInputStream in = new DataInputStream(new ByteArrayInputStream(recordRet));
-//                  int count = in.readInt();
-//                  for (int j = 0; j < count; j++) {
-//                    if (in.readBoolean()) {
-//                      int tableId = in.readInt();
-//                      Record record = new Record(client.getCommon().getTablesById().get(tableId));
-//                      byte[] bytes = new byte[in.readInt()];
-//                      in.readFully(bytes);
-//                      record.deserialize(client.getCommon(), bytes);
-//                      recordsRead.put(record.getId(), record);
-//                    }
-//                  }
-//                }
-//                return recordsRead;
-//              }
-//              }));
-//          }
-//          for (Future future : futures) {
-//            Map<Long, Record> currRead = (Map<Long, Record>) future.get();
-//            recordsRead.putAll(currRead);
-//          }
-//          return null;
-//        }
-//      }));
-//
-//    }
-//
-//    for (Future future : outerFutures) {
-//      future.get();
-//    }
-//
-//    Record[][] retRecords = new Record[keys.length][];
-//    for (int j = 0; j < keys.length; j++) {
-//      retRecords[j] = new Record[tableNames.length];
-//      for (int k = 0; k < keys[j].length; k++) {
-//        if (keys[j][k] == -1) {
-//          continue;
-//        }
-//        retRecords[j][k] = recordsRead.get(keys[j][k]);
-//      }
-//    }
-//    return retRecords;
-//  }
-//
-
 
   public static class CachedRecord {
     private Record record;
@@ -1022,13 +874,6 @@ public class ExpressionImpl implements Expression {
         if (selectedShards.size() == 0) {
           throw new DatabaseException("No shards selected for query");
         }
-//        if (selectedShards.size() > 1) {
-//          if (!synced) {
-//            client.syncSchema();
-//            synced = true;
-//          }
-//          throw new DatabaseException("Invalid state. Multiple shards");
-//        }
         for (int selectedShard : selectedShards) {
           partitionedValues.get(selectedShard).add(new IdEntry(keysToRead.get(i).getOffset(), keysToRead.get(i).getValue()));
         }
@@ -1096,16 +941,6 @@ public class ExpressionImpl implements Expression {
       String tableName, List<ColumnImpl> columns, Expression expression,
       ParameterHandler parms, int viewVersion, boolean debug, boolean restrictToThisServer,
       StoredProcedureContextImpl procedureContext, int schemaRetryCount) {
-//    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-//    DataOutputStream out = new DataOutputStream(bytesOut);
-//    out.writeUTF(tableName);
-//    out.writeInt(selectColumns.size());
-//    for (String column : selectColumns) {
-//      out.writeUTF(column);
-//    }
-//    ExpressionImpl.serializeExpression((ExpressionImpl) expression, out);
-//    parms.serialize(out);
-//    out.close();
 
     CachedRecord ret = recordCache.get(tableName, key);
     if (ret != null) {
@@ -1166,25 +1001,6 @@ public class ExpressionImpl implements Expression {
       }
     }
     return null;
-
-//    String command = "DatabaseServer:selectRecord:1:" + client.getCommon().getSchemaVersion() + ":" + id;
-//
-//    RecordIndexPartition[] recordPartitions = client.getCommon().getSchema().getRecordIndexPartitions();
-//    RecordIndexPartition recordPartition = recordPartitions[(int) (id % recordPartitions.length)];
-//
-//    AtomicReference<String> selectedHost = new AtomicReference<>();
-//
-//    Record currRecord = null;
-//    byte[] recordRet = client.send(recordPartition.getShardOwning(), ThreadLocalRandom.current().nextLong(), command, bytesOut.toByteArray(), DatabaseClient.Replica.def, 30000, selectedHost);
-//    if (recordRet != null) {
-//      Record record = new Record(client.getCommon().getTables().get(tableName));
-//      record.deserialize(client.getCommon(), recordRet);
-//      currRecord = record;
-//    }
-//    if (currRecord != null) {
-//      return currRecord;
-//    }
-//    return null;
   }
 
   public static Record doReadRecord(
@@ -1240,34 +1056,6 @@ public class ExpressionImpl implements Expression {
       return ret.getRecord();
     }
     return null;
-
-//    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-//    DataOutputStream out = new DataOutputStream(bytesOut);
-//    out.writeUTF(tableName);
-//    out.writeInt(selectColumns.size());
-//    for (String column : selectColumns) {
-//      out.writeUTF(column);
-//    }
-//    out.close();
-//
-//    String command = "DatabaseServer:readRecordWithColumns:1:" + client.getCommon().getSchemaVersion();
-//
-//    RecordIndexPartition[] recordPartitions = client.getCommon().getSchema().getRecordIndexPartitions();
-//    RecordIndexPartition recordPartition = recordPartitions[(int) (id % recordPartitions.length)];
-//
-//    AtomicReference<String> selectedHost = new AtomicReference<>();
-//
-//    Record currRecord = null;
-//    byte[] recordRet = client.send(recordPartition.getShardOwning(), ThreadLocalRandom.current().nextLong(), command, bytesOut.toByteArray(), DatabaseClient.Replica.def, 30000, selectedHost);
-//    if (recordRet != null) {
-//      Record record = new Record(client.getCommon().getTables().get(tableName));
-//      record.deserialize(client.getCommon(), recordRet);
-//      currRecord = record;
-//    }
-//    if (currRecord != null) {
-//      return currRecord;
-//    }
-//    return null;
   }
 
   public static class NextReturn {
@@ -1424,13 +1212,8 @@ public class ExpressionImpl implements Expression {
               cobj.put(ComObject.Tag.count, count);
               cobj.put(ComObject.Tag.method, "ReadManager:batchIndexLookup");
               byte[] lookupRet = client.send(null, shard, -1, cobj, DatabaseClient.Replica.def);
-//              if (previousSchemaVersion < common.getSchemaVersion()) {
-//                throw new SchemaOutOfSyncException();
-//              }
               AtomicInteger serializedSchemaVersion = null;
               Record headerRecord = null;
-//              ByteArrayInputStream bytes = new ByteArrayInputStream(lookupRet);
-//              DataInputStream in = new DataInputStream(bytes);
               ComObject retObj = new ComObject(lookupRet);
               short serializationVersion = retObj.getShort(ComObject.Tag.serializationVersion);
               Map<Integer, Object[][]> retKeys = new HashMap<>();
@@ -1736,10 +1519,6 @@ public class ExpressionImpl implements Expression {
             byte[] lookupRet = client.send(null, localShard, 0, cobj, DatabaseClient.Replica.def);
             retObj = new ComObject(lookupRet);
           }
-//          if (previousSchemaVersion < common.getSchemaVersion()) {
-//            throw new SchemaOutOfSyncException();
-//          }
-
           Long retOffset = retObj.getLong(ComObject.Tag.currOffset);
           if (retOffset != null) {
             currOffset.set(retOffset);

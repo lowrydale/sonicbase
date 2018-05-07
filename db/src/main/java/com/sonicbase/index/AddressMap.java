@@ -15,7 +15,6 @@ import sun.misc.Unsafe;
 import java.io.*;
 import java.lang.reflect.Field;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -69,7 +68,6 @@ public class AddressMap {
     }
     for (int i = 0; i < map.length; i++) {
       map[i] = new LongArrayList();
-      //map[i].defaultReturnValue(-1);
     }
   }
 
@@ -86,11 +84,9 @@ public class AddressMap {
       addressMap[i].defaultReturnValue(-1L);
     }
 
-    //currOuterAddress.set(0);
     map = new LongArrayList[10_000];
     for (int i = 0; i < map.length; i++) {
       map[i] = new LongArrayList();
-      //map[i].defaultReturnValue(-1);
     }
   }
 
@@ -109,40 +105,16 @@ public class AddressMap {
     return writeLocks[slot];
   }
 
-  //  public Object getMutex(long outerAddress) {
-//    int slot = (int) (outerAddress % map.length);
-//    return map[slot];
-//  }
-
   public long getUpdateTime(Long outerAddress) {
     if (outerAddress != null) {
     ReentrantReadWriteLock.ReadLock readLock = getReadLock(outerAddress);
     readLock.lock();
       try {
         return 999999999999999999L;
-//      long innerAddress = getAddress(outerAddress);
-//      long value = 0;
-//      for (int i = 0; i < 8; i++) {
-//        value <<= 8;
-//        value |= (unsafe.getByte(innerAddress + i) & 0xFF);
-//      }
-//      return value;
       }
       finally {
         readLock.unlock();
       }
-
-//      int offset = (int) Math.floor(outerAddress / (float) map.length);
-
-//      long value = -1;
-//      synchronized (getMutex(outerAddress)) {
-//        long innerAddress = map[(int) (outerAddress % map.length)].get(offset);
-//        for (int i = 0; i < 8; i++) {
-//          value <<= 8;
-//          value |= (unsafe.getByte(innerAddress + i) & 0xFF);
-//        }
-//      }
-
     }
     return 0;
   }
@@ -162,73 +134,14 @@ public class AddressMap {
 
 
     return outerAddress;
-
-
-//    try {
-//      Long outerAddress = freeList.poll();
-//      if (outerAddress != null) {
-//        int offset = (int) Math.floor(outerAddress / (float) map.length);
-//        synchronized (getMutex(outerAddress)) {
-//          map[(int) (outerAddress % map.length)].set(offset, innerAddress);
-//        }
-//        return outerAddress;
-//      }
-//      outerAddress = currOuterAddress.incrementAndGet();
-//      int offset = (int) Math.floor(outerAddress / (float) map.length);
-//
-//      //long[] value = new long[]{innerAddress, updateTime};
-//
-//      synchronized (getMutex(outerAddress)) {
-//        int size = map[(int) (outerAddress % map.length)].size();
-//        if (size <= offset) {
-//          while (size < offset) {
-//            map[(int) (outerAddress % map.length)].add(-1);
-//            size++;
-//          }
-//          map[(int) (outerAddress % map.length)].add(innerAddress);
-//        }
-//        else {
-//          map[(int) (outerAddress % map.length)].set(offset, innerAddress);
-//        }
-//      }
-//      if (innerAddress == 0 || innerAddress == -1) {
-//        throw new DatabaseException("Adding invalid address");
-//      }
-//      return outerAddress;
-//    }
-//    catch (Exception e) {
-//      throw new DatabaseException(e);
-//    }
   }
 
   public Long getAddress(long outerAddress) {
-//    ReentrantReadWriteLock.ReadLock readLock = getReadLock(outerAddress);
-//    try {
       long ret = addressMap[(int) (outerAddress % map.length)].get(outerAddress);
       if (ret == -1) {
         return null;
       }
       return ret;
-//    }
-//    finally {
-//      readLock.unlock();
-//    }
-//    return outerAddress;
-
-//    try {
-//      int offset = (int) Math.floor(outerAddress / (float) map.length);
-//      long value = -1;
-//      synchronized (getMutex(outerAddress)) {
-//        value = map[(int) (outerAddress % map.length)].get(offset);
-//      }
-//      if (value == -1) {
-//        return null;
-//      }
-//      return value;
-//    }
-//    catch (Exception e) {
-//      throw new DatabaseException(e);
-//    }
   }
 
   public void removeAddress(long outerAddress, Unsafe unsafe) {
@@ -243,27 +156,6 @@ public class AddressMap {
     finally {
       writeLock.unlock();
     }
-
-//      unsafe.freeMemory(outerAddress);
-
-
-//    try {
-//      int offset = (int) Math.floor(outerAddress / (float)map.length);
-//      long value = -1;
-//      synchronized (getMutex(outerAddress)) {
-//        value = map[(int) (outerAddress % map.length)].set(offset, -1);
-//      }
-//      freeList.add(outerAddress);
-//
-//      long innerAddress = value;
-//      if (innerAddress == 0) {
-//        return;
-//      }
-//      unsafe.freeMemory(innerAddress);
-//    }
-//    catch (Exception e) {
-//      throw new DatabaseException(e);
-//    }
   }
 
   public class IndexValue {
@@ -301,8 +193,6 @@ public class AddressMap {
         }
         ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bytesOut);
-        AtomicInteger AtomicInteger = new AtomicInteger();
-        //out.writeInt(0);
         Varint.writeUnsignedVarInt(records.length, out);
         for (byte[] record : records) {
           Varint.writeUnsignedVarInt(record.length, out);
@@ -346,7 +236,6 @@ public class AddressMap {
       }
 
       byte[] bytes = new byte[4 + (4 * records.length) + recordsLen];
-      //out.writeInt(0);
       int actualLen = 0;
       int offset = 0; //update time
       DataUtils.intToBytes(records.length, bytes, offset);
@@ -373,9 +262,6 @@ public class AddressMap {
         System.arraycopy(compressed, 0, bytes, 0, compressedLength);
         actualLen = bytes.length;
       }
-
-
-      //System.arraycopy(lenBuffer, 0, bytes, 0, lenBuffer.length);
 
       if (bytes.length > 1000000000) {
         throw new DatabaseException("Invalid allocation: size=" + bytes.length);
@@ -417,29 +303,13 @@ public class AddressMap {
     try {
       if (obj instanceof Long) {
 
-//        try read-write lock
-//            try lock for outer and lock for map
         ReentrantReadWriteLock.ReadLock readLock = getReadLock((Long)obj);
         readLock.lock();
         try {
           Long innerAddress = getAddress((Long) obj);
           if (innerAddress == null) {
-//              System.out.println("null address ******************* outerAddress=" + (long) obj);
-//              new Exception().printStackTrace();
             return null;
           }
-
-          //          long updateTime = 0;
-          //          for (int i = 0; i < 8; i++) {
-          //            updateTime <<= 8;
-          //            updateTime |= (unsafe.getByte(innerAddress + i) & 0xFF);
-          //          }
-
-          //          int count = ((unsafe.getByte(innerAddress + 8 + 0)   & 0xff) << 24) |
-          //              ((unsafe.getByte(innerAddress + 8 + 1) & 0xff) << 16) |
-          //              ((unsafe.getByte(innerAddress + 8 + 2) & 0xff) << 8) |
-          //              (unsafe.getByte(innerAddress + 8 + 3) & 0xff);
-
           int origLen = ((unsafe.getByte(innerAddress + 8 + 0) & 0xff) << 24) |
               ((unsafe.getByte(innerAddress + 8 + 1) & 0xff) << 16) |
               ((unsafe.getByte(innerAddress + 8 + 2) & 0xff) << 8) |
@@ -449,10 +319,6 @@ public class AddressMap {
               ((unsafe.getByte(innerAddress + 12 + 1) & 0xff) << 16) |
               ((unsafe.getByte(innerAddress + 12 + 2) & 0xff) << 8) |
               (unsafe.getByte(innerAddress + 12 + 3) & 0xff);
-          //          byte[] bytes = new byte[count];
-          //          for (int i = 0; i < count; i++) {
-          //            bytes[i] = unsafe.getByte(innerAddress + i + 8 + 8);
-          //          }
           if (origLen == -1) {
             int offset = 0;
             int recCount = DataUtils.addressToInt(innerAddress + offset + 16, unsafe);
@@ -485,8 +351,6 @@ public class AddressMap {
             bytes = restored;
 
             DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
-            //in.readInt(); //byte count
-            //in.readInt(); //orig len
             byte[][] ret = new byte[(int) in.readInt()][];
             for (int i = 0; i < ret.length; i++) {
               int len = (int) in.readInt();

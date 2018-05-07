@@ -223,30 +223,6 @@ public class KafkaConsumer implements StreamsConsumer {
         }
       }
 
-//      consumer.subscribe(asList(topic), new ConsumerRebalanceListener() {
-//        public void onPartitionsRevoked(Collection<TopicPartition> partitions) {
-//          Iterator<TopicPartition> topicPartitionIterator = partitions.iterator();
-//          while(topicPartitionIterator.hasNext()) {
-//            TopicPartition topicPartition = topicPartitionIterator.next();
-//            logger.error("onPartitionsRevoked: partition=" + topicPartition.partition());
-//          }
-//        }
-//        public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
-//          Iterator<TopicPartition> topicPartitionIterator = partitions.iterator();
-//          while(topicPartitionIterator.hasNext()){
-//            TopicPartition topicPartition = topicPartitionIterator.next();
-//            logger.error("onPartitionsAssigned: partition=" + topicPartition.partition());
-//            Long offset = partitionOffsets.get(topicPartition.partition());
-//            if (offset == null) {
-//              consumer.seekToBeginning(asList(topicPartition));
-//            }
-//            else {
-//              consumer.seek(topicPartition, offset);
-//            }
-//          }
-//        }
-//      });
-
       this.consumers.add(consumer);
       this.consumer.set(consumer);
       logger.info("kafka consumer initThread - end");

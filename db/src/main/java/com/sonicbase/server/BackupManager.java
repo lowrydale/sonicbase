@@ -90,7 +90,7 @@ public class BackupManager {
 
   public ComObject prepareForBackup(ComObject cobj, boolean replayedCommand) {
 
-    server.getDeltaManager().enableSnapshot(false);
+    server.getSnapshotManager().enableSnapshot(false);
 
     logSlicePoint = server.getLogManager().sliceLogs(true);
 
@@ -107,7 +107,7 @@ public class BackupManager {
     long size = 0;
     size += server.getDeleteManager().getBackupLocalFileSystemSize();
     size += server.getLongRunningCommands().getBackupLocalFileSystemSize();
-    size += server.getDeltaManager().getBackupLocalFileSystemSize();
+    size += server.getSnapshotManager().getBackupLocalFileSystemSize();
     //size += logManager.getBackupLocalFileSystemSize();
     return size;
   }
@@ -333,17 +333,17 @@ public class BackupManager {
           server.getLongRunningCommands().backupFileSystem(directory, subDirectory);
 //          snapshotManager.deleteTempDirs();
 //          snapshotManager.backupFileSystem(directory, subDirectory);
-          server.getDeltaManager().enableSnapshot(false);
-          server.getDeltaManager().deleteTempDirs();
-          server.getDeltaManager().deleteDeletedDirs();
-          server.getDeltaManager().backupFileSystem(directory, subDirectory);
+          server.getSnapshotManager().enableSnapshot(false);
+          server.getSnapshotManager().deleteTempDirs();
+          server.getSnapshotManager().deleteDeletedDirs();
+          server.getSnapshotManager().backupFileSystem(directory, subDirectory);
           synchronized (server.getCommon()) {
             //snapshotManager.backupFileSystemSchema(directory, subDirectory);
-            server.getDeltaManager().backupFileSystemSchema(directory, subDirectory);
+            server.getSnapshotManager().backupFileSystemSchema(directory, subDirectory);
           }
           server.getLogManager().backupFileSystem(directory, subDirectory, logSlicePoint);
 
-          server.getDeltaManager().enableSnapshot(true);
+          server.getSnapshotManager().enableSnapshot(true);
 
           isBackupComplete = true;
 
@@ -388,18 +388,18 @@ public class BackupManager {
           server.getDeleteManager().backupAWS(bucket, prefix, subDirectory);
           server.getLongRunningCommands().backupAWS(bucket, prefix, subDirectory);
           //snapshotManager.deleteTempDirs();
-          server.getDeltaManager().enableSnapshot(false);
-          server.getDeltaManager().deleteDeletedDirs();
-          server.getDeltaManager().deleteTempDirs();
+          server.getSnapshotManager().enableSnapshot(false);
+          server.getSnapshotManager().deleteDeletedDirs();
+          server.getSnapshotManager().deleteTempDirs();
           //snapshotManager.backupAWS(bucket, prefix, subDirectory);
-          server.getDeltaManager().backupAWS(bucket, prefix, subDirectory);
+          server.getSnapshotManager().backupAWS(bucket, prefix, subDirectory);
           synchronized (server.getCommon()) {
             //snapshotManager.backupAWSSchema(bucket, prefix, subDirectory);
-            server.getDeltaManager().backupAWSSchema(bucket, prefix, subDirectory);
+            server.getSnapshotManager().backupAWSSchema(bucket, prefix, subDirectory);
           }
           server.getLogManager().backupAWS(bucket, prefix, subDirectory, logSlicePoint);
 
-          server.getDeltaManager().enableSnapshot(true);
+          server.getSnapshotManager().enableSnapshot(true);
 
           isBackupComplete = true;
         }
@@ -446,7 +446,7 @@ public class BackupManager {
           doDeleteFileSystemBackups(directory, maxBackupCount);
         }
       }
-      server.getDeltaManager().enableSnapshot(true);
+      server.getSnapshotManager().enableSnapshot(true);
       isBackupComplete = false;
       return null;
     }
@@ -530,7 +530,7 @@ public class BackupManager {
     try {
       List<String> files = new ArrayList<>();
 
-      server.getDeltaManager().enableSnapshot(false);
+      server.getSnapshotManager().enableSnapshot(false);
       logSlicePoint = server.getLogManager().sliceLogs(true);
 
       BufferedReader reader = new BufferedReader(new StringReader(logSlicePoint));
@@ -542,7 +542,7 @@ public class BackupManager {
         files.add(line);
       }
       //snapshotManager.getFilesForCurrentSnapshot(files);
-      server.getDeltaManager().getFilesForCurrentSnapshot(files);
+      server.getSnapshotManager().getFilesForCurrentSnapshot(files);
 
       File file = new File(server.getDataDir(), "logSequenceNum/" + server.getShard() + "/" + server.getReplica() + "/logSequenceNum.txt");
       if (file.exists()) {
@@ -584,10 +584,10 @@ public class BackupManager {
         try {
           isServerRoloadRunning = true;
           server.setIsRunning(false);
-          server.getDeltaManager().enableSnapshot(false);
+          server.getSnapshotManager().enableSnapshot(false);
           Thread.sleep(5000);
           //snapshotManager.deleteSnapshots();
-          server.getDeltaManager().deleteSnapshots();
+          server.getSnapshotManager().deleteSnapshots();
 
           File file = new File(server.getDataDir(), "result-sets");
           FileUtils.deleteDirectory(file);
@@ -607,7 +607,7 @@ public class BackupManager {
           server.getCommon().loadSchema(server.getDataDir());
           server.getClient().syncSchema();
           prepareDataFromRestore();
-          server.getDeltaManager().enableSnapshot(true);
+          server.getSnapshotManager().enableSnapshot(true);
           server.setIsRunning(true);
         }
         catch (Exception e) {
@@ -771,75 +771,14 @@ public class BackupManager {
 
       String type = backupConfig.get("type").asText();
       if (type.equals("AWS")) {
-        String bucket = backupConfig.get("bucket").asText();
-        String prefix = backupConfig.get("prefix").asText();
-
-        // if aws
-        //    tell all servers to upload with a specific root directory
-        logger.info("Backup Master - doBackupAWS - begin");
-
-        ComObject docobj = new ComObject();
-        docobj.put(ComObject.Tag.dbName, "__none__");
-        docobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-        docobj.put(ComObject.Tag.method, "BackupManager:doBackupAWS");
-        docobj.put(ComObject.Tag.subDirectory, subDirectory);
-        docobj.put(ComObject.Tag.bucket, bucket);
-        docobj.put(ComObject.Tag.prefix, prefix);
-
-        for (int i = 0; i < server.getShardCount(); i++) {
-          server.getDatabaseClient().send(null, i, masters[i], docobj, DatabaseClient.Replica.specified);
-        }
-
-        logger.info("Backup Master - doBackupAWS - end");
+        doAWSBackup(masters, subDirectory);
       }
       else if (type.equals("fileSystem")) {
-        // if fileSystem
-        //    tell all servers to copy files to backup directory with a specific root directory
-        String directory = backupConfig.get("directory").asText();
-
-        logger.info("Backup Master - doBackupFileSystem - begin");
-
-        ComObject docobj = new ComObject();
-        docobj.put(ComObject.Tag.dbName, "__none__");
-        docobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-        docobj.put(ComObject.Tag.method, "BackupManager:doBackupFileSystem");
-        docobj.put(ComObject.Tag.directory, directory);
-        docobj.put(ComObject.Tag.subDirectory, subDirectory);
-        for (int i = 0; i < server.getShardCount(); i++) {
-          server.getDatabaseClient().send(null, i, masters[i], docobj, DatabaseClient.Replica.specified);
-        }
-
-        logger.info("Backup Master - doBackupFileSystem - end");
+        doFieSystemBackup(masters, subDirectory);
       }
 
-      while (!server.getShutdown()) {
-        ComObject iscobj = new ComObject();
-        iscobj.put(ComObject.Tag.dbName, "__none__");
-        iscobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-        iscobj.put(ComObject.Tag.method, "BackupManager:isBackupComplete");
+      waitForBackupToComplete(masters);
 
-        boolean finished = false;
-        outer:
-        for (int shard = 0; shard < server.getShardCount(); shard++) {
-          try {
-            byte[] currRet = server.getDatabaseClient().send(null, shard, masters[shard], iscobj, DatabaseClient.Replica.specified);
-            ComObject retObj = new ComObject(currRet);
-            finished = retObj.getBoolean(ComObject.Tag.isComplete);
-            if (!finished) {
-              break outer;
-            }
-          }
-          catch (Exception e) {
-            finished = false;
-            logger.error("Error checking if backup complete: shard=" + shard);
-            break outer;
-          }
-        }
-        if (finished) {
-          break;
-        }
-        Thread.sleep(1000);
-      }
       logger.info("Backup Master - doBackup finished");
 
       logger.info("Backup Master - delete old backups - begin");
@@ -856,25 +795,9 @@ public class BackupManager {
       if (shared == null) {
         shared = false;
       }
-      if (maxBackupCount != null) {
-        try {
-          // delete old backups
-          if (type.equals("AWS")) {
-            String bucket = backupConfig.get("bucket").asText();
-            String prefix = backupConfig.get("prefix").asText();
-            shared = true;
-            doDeleteAWSBackups(bucket, prefix, maxBackupCount);
-          }
-          else if (type.equals("fileSystem")) {
-            if (shared) {
-              doDeleteFileSystemBackups(directory, maxBackupCount);
-            }
-          }
-        }
-        catch (Exception e) {
-          logger.error("Error deleting old backups", e);
-        }
-      }
+
+      shared = deleteOldBackups(type, maxBackupCount, directory, shared);
+
       logger.info("Backup Master - delete old backups - finished");
 
       logger.info("Backup Master - finishBackup - begin");
@@ -907,6 +830,103 @@ public class BackupManager {
     }
   }
 
+  private Boolean deleteOldBackups(String type, Integer maxBackupCount, String directory, Boolean shared) {
+    if (maxBackupCount != null) {
+      try {
+        // delete old backups
+        if (type.equals("AWS")) {
+          String bucket = backupConfig.get("bucket").asText();
+          String prefix = backupConfig.get("prefix").asText();
+          shared = true;
+          doDeleteAWSBackups(bucket, prefix, maxBackupCount);
+        }
+        else if (type.equals("fileSystem")) {
+          if (shared) {
+            doDeleteFileSystemBackups(directory, maxBackupCount);
+          }
+        }
+      }
+      catch (Exception e) {
+        logger.error("Error deleting old backups", e);
+      }
+    }
+    return shared;
+  }
+
+  private void waitForBackupToComplete(int[] masters) throws InterruptedException {
+    while (!server.getShutdown()) {
+      ComObject iscobj = new ComObject();
+      iscobj.put(ComObject.Tag.dbName, "__none__");
+      iscobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
+      iscobj.put(ComObject.Tag.method, "BackupManager:isBackupComplete");
+
+      boolean finished = false;
+      outer:
+      for (int shard = 0; shard < server.getShardCount(); shard++) {
+        try {
+          byte[] currRet = server.getDatabaseClient().send(null, shard, masters[shard], iscobj, DatabaseClient.Replica.specified);
+          ComObject retObj = new ComObject(currRet);
+          finished = retObj.getBoolean(ComObject.Tag.isComplete);
+          if (!finished) {
+            break outer;
+          }
+        }
+        catch (Exception e) {
+          finished = false;
+          logger.error("Error checking if backup complete: shard=" + shard);
+          break outer;
+        }
+      }
+      if (finished) {
+        break;
+      }
+      Thread.sleep(1000);
+    }
+  }
+
+  private void doFieSystemBackup(int[] masters, String subDirectory) {
+    // if fileSystem
+    //    tell all servers to copy files to backup directory with a specific root directory
+    String directory = backupConfig.get("directory").asText();
+
+    logger.info("Backup Master - doBackupFileSystem - begin");
+
+    ComObject docobj = new ComObject();
+    docobj.put(ComObject.Tag.dbName, "__none__");
+    docobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
+    docobj.put(ComObject.Tag.method, "BackupManager:doBackupFileSystem");
+    docobj.put(ComObject.Tag.directory, directory);
+    docobj.put(ComObject.Tag.subDirectory, subDirectory);
+    for (int i = 0; i < server.getShardCount(); i++) {
+      server.getDatabaseClient().send(null, i, masters[i], docobj, DatabaseClient.Replica.specified);
+    }
+
+    logger.info("Backup Master - doBackupFileSystem - end");
+  }
+
+  private void doAWSBackup(int[] masters, String subDirectory) {
+    String bucket = backupConfig.get("bucket").asText();
+    String prefix = backupConfig.get("prefix").asText();
+
+    // if aws
+    //    tell all servers to upload with a specific root directory
+    logger.info("Backup Master - doBackupAWS - begin");
+
+    ComObject docobj = new ComObject();
+    docobj.put(ComObject.Tag.dbName, "__none__");
+    docobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
+    docobj.put(ComObject.Tag.method, "BackupManager:doBackupAWS");
+    docobj.put(ComObject.Tag.subDirectory, subDirectory);
+    docobj.put(ComObject.Tag.bucket, bucket);
+    docobj.put(ComObject.Tag.prefix, prefix);
+
+    for (int i = 0; i < server.getShardCount(); i++) {
+      server.getDatabaseClient().send(null, i, masters[i], docobj, DatabaseClient.Replica.specified);
+    }
+
+    logger.info("Backup Master - doBackupAWS - end");
+  }
+
   private void doDeleteAWSBackups(String bucket, String prefix, Integer maxBackupCount) {
     List<String> dirs = server.getAWSClient().listDirectSubdirectories(bucket, prefix);
     Collections.sort(dirs, new Comparator<String>() {
@@ -934,10 +954,10 @@ public class BackupManager {
       server.purgeMemory();
 
       //isRunning.set(false);
-      server.getDeltaManager().enableSnapshot(false);
+      server.getSnapshotManager().enableSnapshot(false);
       Thread.sleep(5000);
       //snapshotManager.deleteSnapshots();
-      server.getDeltaManager().deleteSnapshots();
+      server.getSnapshotManager().deleteSnapshots();
 
       File file = new File(server.getDataDir(), "result-sets/" + server.getShard() + "/" + server.getReplica());
       FileUtils.deleteDirectory(file);
@@ -976,36 +996,13 @@ public class BackupManager {
           restoreFileSystemSingleDir(directory, subDirectory, "nextRecordId");
           server.getDeleteManager().restoreFileSystem(directory, subDirectory);
           server.getLongRunningCommands().restoreFileSystem(directory, subDirectory);
-          //snapshotManager.restoreFileSystem(directory, subDirectory);
-          server.getDeltaManager().restoreFileSystem(directory, subDirectory);
+          server.getSnapshotManager().restoreFileSystem(directory, subDirectory);
 
-//          File file = new File(directory, subDirectory);
-//          file = new File(file, "snapshot/" + getShard() + "/0/schema.bin");
-//          BufferedInputStream in = new BufferedInputStream(new FileInputStream(file));
-//          ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-//          IOUtils.copy(in, bytesOut);
-          // bytesOut.close();
-//
-//          synchronized (common) {
-//            common.deserializeSchema(bytesOut.toByteArray());
-//            common.saveSchema(getClient(), getDataDir());
-//          }
           server.getLogManager().restoreFileSystem(directory, subDirectory);
 
           finishedRestoreFileCopy = true;
 
           prepareDataFromRestore();
-
-          //deleteManager.forceDeletes();
-
-//          synchronized (common) {
-//            if (shard != 0 || common.getServersConfig().getShards()[0].masterReplica != replica) {
-//              long schemaVersion = common.getSchemaVersion() + 100;
-//              common.setSchemaVersion(schemaVersion);
-//            }
-//            common.saveSchema(getClient(), getDataDir());
-//          }
-//          pushSchema();
 
           isRestoreComplete = true;
         }
@@ -1056,7 +1053,7 @@ public class BackupManager {
           server.getDeleteManager().restoreAWS(bucket, prefix, subDirectory);
           server.getLongRunningCommands().restoreAWS(bucket, prefix, subDirectory);
           //snapshotManager.restoreAWS(bucket, prefix, subDirectory);
-          server.getDeltaManager().restoreAWS(bucket, prefix, subDirectory);
+          server.getSnapshotManager().restoreAWS(bucket, prefix, subDirectory);
           server.getLogManager().restoreAWS(bucket, prefix, subDirectory);
 
           finishedRestoreFileCopy = true;
@@ -1110,7 +1107,7 @@ public class BackupManager {
 
   public ComObject finishRestore(ComObject cobj, boolean replayedCommand) {
     try {
-      server.getDeltaManager().enableSnapshot(true);
+      server.getSnapshotManager().enableSnapshot(true);
       //isRunning.set(true);
       isRestoreComplete = false;
       return null;
@@ -1123,7 +1120,7 @@ public class BackupManager {
 
   private void prepareDataFromRestore() throws Exception {
     for (String dbName : server.getDbNames(server.getDataDir())) {
-      server.getDeltaManager().recoverFromSnapshot(dbName);
+      server.getSnapshotManager().recoverFromSnapshot(dbName);
     }
     server.getLogManager().applyLogs();
   }
@@ -1171,7 +1168,7 @@ public class BackupManager {
   private void doRestore(String subDirectory) {
     try {
       server.shutdownRepartitioner();
-      server.getDeltaManager().shutdown();
+      server.getSnapshotManager().shutdown();
 
       finalRestoreException = null;
       doingRestore = true;
@@ -1233,63 +1230,13 @@ public class BackupManager {
 
 
       if (type.equals("AWS")) {
-        // if aws
-        //    tell all servers to upload with a specific root directory
-
-        String bucket = backupConfig.get("bucket").asText();
-        String prefix = backupConfig.get("prefix").asText();
-        cobj = new ComObject();
-        cobj.put(ComObject.Tag.dbName, "__none__");
-        cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-        cobj.put(ComObject.Tag.method, "BackupManager:doRestoreAWS");
-        cobj.put(ComObject.Tag.bucket, bucket);
-        cobj.put(ComObject.Tag.prefix, prefix);
-        cobj.put(ComObject.Tag.subDirectory, subDirectory);
-        ret = server.getDatabaseClient().sendToAllShards(null, 0, cobj, DatabaseClient.Replica.all, true);
+        doAWSRestore(subDirectory);
       }
       else if (type.equals("fileSystem")) {
-        // if fileSystem
-        //    tell all servers to copy files to backup directory with a specific root directory
-        String directory = backupConfig.get("directory").asText();
-        cobj = new ComObject();
-        cobj.put(ComObject.Tag.dbName, "__none__");
-        cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-        cobj.put(ComObject.Tag.method, "BackupManager:doRestoreFileSystem");
-        cobj.put(ComObject.Tag.directory, directory);
-        cobj.put(ComObject.Tag.subDirectory, subDirectory);
-        ret = server.getDatabaseClient().sendToAllShards(null, 0, cobj, DatabaseClient.Replica.all, true);
+        doFileSystemRestore(subDirectory);
       }
 
-      while (!server.getShutdown()) {
-        cobj = new ComObject();
-        cobj.put(ComObject.Tag.dbName, "__none__");
-        cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-        cobj.put(ComObject.Tag.method, "BackupManager:isRestoreComplete");
-
-        boolean finished = false;
-        outer:
-        for (int shard = 0; shard < server.getShardCount(); shard++) {
-          for (int replica = 0; replica < server.getReplicationFactor(); replica++) {
-            try {
-              byte[] currRet = server.getDatabaseClient().send(null, shard, replica, cobj, DatabaseClient.Replica.specified, true);
-              ComObject retObj = new ComObject(currRet);
-              finished = retObj.getBoolean(ComObject.Tag.isComplete);
-              if (!finished) {
-                break outer;
-              }
-            }
-            catch (Exception e) {
-              logger.error("Error checking if restore is complete", e);
-              finished = true;
-              throw e;
-            }
-          }
-        }
-        if (finished) {
-          break;
-        }
-        Thread.sleep(2000);
-      }
+      waitForRestoreToComplete();
 
       synchronized (server.getCommon()) {
         if (server.getShard() != 0 || server.getCommon().getServersConfig().getShards()[0].getMasterReplica() != server.getReplica()) {
@@ -1332,7 +1279,72 @@ public class BackupManager {
     finally {
       doingRestore = false;
       server.startRepartitioner();
-      server.getDeltaManager().runSnapshotLoop();
+      server.getSnapshotManager().runSnapshotLoop();
     }
+  }
+
+  private void waitForRestoreToComplete() throws InterruptedException {
+    ComObject cobj;
+    while (!server.getShutdown()) {
+      cobj = new ComObject();
+      cobj.put(ComObject.Tag.dbName, "__none__");
+      cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
+      cobj.put(ComObject.Tag.method, "BackupManager:isRestoreComplete");
+
+      boolean finished = false;
+      outer:
+      for (int shard = 0; shard < server.getShardCount(); shard++) {
+        for (int replica = 0; replica < server.getReplicationFactor(); replica++) {
+          try {
+            byte[] currRet = server.getDatabaseClient().send(null, shard, replica, cobj, DatabaseClient.Replica.specified, true);
+            ComObject retObj = new ComObject(currRet);
+            finished = retObj.getBoolean(ComObject.Tag.isComplete);
+            if (!finished) {
+              break outer;
+            }
+          }
+          catch (Exception e) {
+            logger.error("Error checking if restore is complete", e);
+            finished = true;
+            throw e;
+          }
+        }
+      }
+      if (finished) {
+        break;
+      }
+      Thread.sleep(2000);
+    }
+  }
+
+  private void doFileSystemRestore(String subDirectory) {
+    ComObject cobj;
+    byte[][] ret;// if fileSystem
+    //    tell all servers to copy files to backup directory with a specific root directory
+    String directory = backupConfig.get("directory").asText();
+    cobj = new ComObject();
+    cobj.put(ComObject.Tag.dbName, "__none__");
+    cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
+    cobj.put(ComObject.Tag.method, "BackupManager:doRestoreFileSystem");
+    cobj.put(ComObject.Tag.directory, directory);
+    cobj.put(ComObject.Tag.subDirectory, subDirectory);
+    ret = server.getDatabaseClient().sendToAllShards(null, 0, cobj, DatabaseClient.Replica.all, true);
+  }
+
+  private void doAWSRestore(String subDirectory) {
+    ComObject cobj;
+    byte[][] ret;// if aws
+    //    tell all servers to upload with a specific root directory
+
+    String bucket = backupConfig.get("bucket").asText();
+    String prefix = backupConfig.get("prefix").asText();
+    cobj = new ComObject();
+    cobj.put(ComObject.Tag.dbName, "__none__");
+    cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
+    cobj.put(ComObject.Tag.method, "BackupManager:doRestoreAWS");
+    cobj.put(ComObject.Tag.bucket, bucket);
+    cobj.put(ComObject.Tag.prefix, prefix);
+    cobj.put(ComObject.Tag.subDirectory, subDirectory);
+    ret = server.getDatabaseClient().sendToAllShards(null, 0, cobj, DatabaseClient.Replica.all, true);
   }
 }

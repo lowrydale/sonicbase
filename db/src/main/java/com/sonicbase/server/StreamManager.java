@@ -47,46 +47,6 @@ public class StreamManager {
     logger = new Logger(null/*server.getDatabaseClient()*/, server.getShard(), server.getReplica());
 
     logger.info("initializing StreamManager");
-
-//    Thread thread = new Thread(new Runnable(){
-//      @Override
-//      public void run() {
-//        while (true) {
-//          try {
-//            ServersConfig servers = server.getCommon().getServersConfig();
-//            ServersConfig.Shard[] shards = servers.getShards();
-//            boolean allShardsAlive = true;
-//            outer:
-//            for (ServersConfig.Shard shard : shards) {
-//              ServersConfig.Host[] hosts = shard.getReplicas();
-//              boolean alive = false;
-//              for (ServersConfig.Host host : hosts) {
-//                if (!host.isDead()) {
-//                  alive = true;
-//                  break;
-//                }
-//              }
-//              if (!alive) {
-//                pauseStreaming = true;
-//                allShardsAlive = false;
-//                break outer;
-//              }
-//            }
-//            if (allShardsAlive) {
-//              pauseStreaming = false;
-//            }
-//            Thread.sleep(1000);
-//          }
-//          catch (InterruptedException e) {
-//            break;
-//          }
-//          catch (Exception e) {
-//            logger.error("Error in Queue Health Detector", e);
-//          }
-//        }
-//      }
-//    });
-//    thread.start();
   }
 
   public void shutdown() {
@@ -476,155 +436,13 @@ public class StreamManager {
         final List<FieldSchema> fields = tableSchema.getFields();
         if (action.equals("insert")) {
 
-          final StringBuilder fieldsStr = new StringBuilder();
-          final StringBuilder parmsStr = new StringBuilder();
-          boolean first = true;
-          for (FieldSchema field : fields) {
-            if (field.getName().equals("_sonicbase_id")) {
-              continue;
-            }
-            if (first) {
-              first = false;
-            }
-            else {
-              fieldsStr.append(",");
-              parmsStr.append(",");
-            }
-            fieldsStr.append(field.getName());
-            parmsStr.append("?");
-          }
-
-          List<JsonNode> msgs = entry.getValue();
-          while (msgs.size() != 0) {
-            PreparedStatement stmt = connections.get(dbName).prepareStatement("insert ignore into " + tableName + " (" + fieldsStr.toString() +
-                ") VALUES (" + parmsStr.toString() + ")");
-            try {
-              for (int i = 0; i < 200 && msgs.size() != 0; i++) {
-                JsonNode message = msgs.remove(0);
-                Object[] record = getCurrRecordFromJson(message, fields);
-                BulkImportManager.setFieldsInInsertStatement(stmt, 1, record, fields);
-
-                stmt.addBatch();
-              }
-              stmt.executeBatch();
-            }
-            finally {
-              stmt.close();
-            }
-          }
+          handleInsert(entry, dbName, tableName, fields);
         }
         else if (action.equals("update")) {
-          for (JsonNode message : entry.getValue()) {
-            ObjectNode json = (ObjectNode) message;
-            JsonNode after =json.get("after");
-            JsonNode before =json.get("before");
-
-            List<FieldSchema> specifiedFields = new ArrayList<>();
-            String str = "update " + tableName + " set ";
-            int offset = 0;
-            int parmOffset = 1;
-            Iterator<Map.Entry<String, JsonNode>> iterator = after.fields();
-            while (iterator.hasNext()) {
-              Map.Entry<String, JsonNode> jsonEntry = iterator.next();
-              if (jsonEntry.getKey().toLowerCase().startsWith("_sonicbase_")) {
-                continue;
-              }
-              if (offset != 0) {
-                str += ", ";
-              }
-              str += " " + jsonEntry.getKey().toLowerCase() + "=? ";
-              for (FieldSchema fieldSchema : fields) {
-                if (fieldSchema.getName().equals(jsonEntry.getKey().toLowerCase())) {
-                  specifiedFields.add(fieldSchema);
-                }
-              }
-              offset++;
-              parmOffset++;
-            }
-            Object[] record = getCurrRecordFromJson(after, specifiedFields);
-
-            str += " where ";
-
-            List<FieldSchema> specifiedWhereFields = new ArrayList<>();
-            offset = 0;
-            iterator = before.fields();
-            while (iterator.hasNext()) {
-              Map.Entry<String, JsonNode> jsonEntry = iterator.next();
-              if (jsonEntry.getKey().toLowerCase().startsWith("_sonicbase_")) {
-                continue;
-              }
-              if (offset != 0) {
-                str += " AND ";
-              }
-              str += " " + jsonEntry.getKey().toLowerCase() + "=? ";
-              for (FieldSchema fieldSchema : fields) {
-                if (fieldSchema.getName().equals(jsonEntry.getKey().toLowerCase())) {
-                  specifiedWhereFields.add(fieldSchema);
-                }
-              }
-              offset++;
-            }
-            Object[] whereRecord = getCurrRecordFromJson(before, specifiedFields);
-
-            PreparedStatement stmt = connections.get(dbName).prepareStatement(str);
-            BulkImportManager.setFieldsInInsertStatement(stmt, 1, record, specifiedFields);
-            BulkImportManager.setFieldsInInsertStatement(stmt, parmOffset, whereRecord, specifiedWhereFields);
-
-            Long sequence0 = null;
-            Long sequence1 = null;
-            Short sequence2 = null;
-            if (after.has("_sonicbase_sequence0") &&
-                after.has("_sonicbase_sequence1") &&
-                after.has("_sonicbase_sequence2")) {
-              sequence0 = after.get("_sonicbase_sequence0").asLong();
-              sequence1 = after.get("_sonicbase_sequence1").asLong();
-              sequence2 = (short)after.get("_sonicbase_sequence2").asInt();
-            }
-            ((StatementProxy)stmt).doUpdate(sequence0, sequence1, sequence2, false);
-          }
+          handleUpdate(entry, dbName, tableName, fields);
         }
         else if (action.equals("delete")) {
-          for (JsonNode message : entry.getValue()) {
-            ObjectNode json = (ObjectNode) message;
-
-            List<FieldSchema> specifiedFields = new ArrayList<>();
-            String str = "delete from " + tableName + " where ";
-            int offset = 0;
-            Iterator<Map.Entry<String, JsonNode>> iterator = json.fields();
-            while (iterator.hasNext()) {
-              Map.Entry<String, JsonNode> jsonEntry = iterator.next();
-              if (jsonEntry.getKey().toLowerCase().startsWith("_sonicbase_")) {
-                continue;
-              }
-              if (offset != 0) {
-                str += " AND ";
-              }
-              str += " " + jsonEntry.getKey().toLowerCase() + "=? ";
-              for (FieldSchema fieldSchema : fields) {
-                if (fieldSchema.getName().equals(jsonEntry.getKey().toLowerCase())) {
-                  specifiedFields.add(fieldSchema);
-                }
-              }
-              offset++;
-            }
-            Object[] record = getCurrRecordFromJson(json, specifiedFields);
-
-            PreparedStatement stmt = connections.get(dbName).prepareStatement(str);
-            BulkImportManager.setFieldsInInsertStatement(stmt, 1, record, specifiedFields);
-
-            Long sequence0 = null;
-            Long sequence1 = null;
-            Short sequence2 = null;
-            if (json.has("_sonicbase_sequence0") &&
-                json.has("_sonicbase_sequence1") &&
-                json.has("_sonicbase_sequence2")) {
-              sequence0 = json.get("_sonicbase_sequence0").asLong();
-              sequence1 = json.get("_sonicbase_sequence1").asLong();
-              sequence2 = (short)json.get("_sonicbase_sequence2").asInt();
-            }
-
-            ((StatementProxy)stmt).doDelete(sequence0, sequence1, sequence2, false);
-          }
+          handleDelete(entry, dbName, tableName, fields);
         }
         else {
           throw new DatabaseException("Unknown publish action: action=" + action);
@@ -635,6 +453,160 @@ public class StreamManager {
       }
     }
     return null;
+  }
+
+  private void handleDelete(Map.Entry<String, List<JsonNode>> entry, String dbName, String tableName, List<FieldSchema> fields) throws SQLException {
+    for (JsonNode message : entry.getValue()) {
+      ObjectNode json = (ObjectNode) message;
+
+      List<FieldSchema> specifiedFields = new ArrayList<>();
+      String str = "delete from " + tableName + " where ";
+      int offset = 0;
+      Iterator<Map.Entry<String, JsonNode>> iterator = json.fields();
+      while (iterator.hasNext()) {
+        Map.Entry<String, JsonNode> jsonEntry = iterator.next();
+        if (jsonEntry.getKey().toLowerCase().startsWith("_sonicbase_")) {
+          continue;
+        }
+        if (offset != 0) {
+          str += " AND ";
+        }
+        str += " " + jsonEntry.getKey().toLowerCase() + "=? ";
+        for (FieldSchema fieldSchema : fields) {
+          if (fieldSchema.getName().equals(jsonEntry.getKey().toLowerCase())) {
+            specifiedFields.add(fieldSchema);
+          }
+        }
+        offset++;
+      }
+      Object[] record = getCurrRecordFromJson(json, specifiedFields);
+
+      PreparedStatement stmt = connections.get(dbName).prepareStatement(str);
+      BulkImportManager.setFieldsInInsertStatement(stmt, 1, record, specifiedFields);
+
+      Long sequence0 = null;
+      Long sequence1 = null;
+      Short sequence2 = null;
+      if (json.has("_sonicbase_sequence0") &&
+          json.has("_sonicbase_sequence1") &&
+          json.has("_sonicbase_sequence2")) {
+        sequence0 = json.get("_sonicbase_sequence0").asLong();
+        sequence1 = json.get("_sonicbase_sequence1").asLong();
+        sequence2 = (short)json.get("_sonicbase_sequence2").asInt();
+      }
+
+      ((StatementProxy)stmt).doDelete(sequence0, sequence1, sequence2, false);
+    }
+  }
+
+  private void handleInsert(Map.Entry<String, List<JsonNode>> entry, String dbName, String tableName, List<FieldSchema> fields) throws SQLException {
+    final StringBuilder fieldsStr = new StringBuilder();
+    final StringBuilder parmsStr = new StringBuilder();
+    boolean first = true;
+    for (FieldSchema field : fields) {
+      if (field.getName().equals("_sonicbase_id")) {
+        continue;
+      }
+      if (first) {
+        first = false;
+      }
+      else {
+        fieldsStr.append(",");
+        parmsStr.append(",");
+      }
+      fieldsStr.append(field.getName());
+      parmsStr.append("?");
+    }
+
+    List<JsonNode> msgs = entry.getValue();
+    while (msgs.size() != 0) {
+      PreparedStatement stmt = connections.get(dbName).prepareStatement("insert ignore into " + tableName + " (" + fieldsStr.toString() +
+          ") VALUES (" + parmsStr.toString() + ")");
+      try {
+        for (int i = 0; i < 200 && msgs.size() != 0; i++) {
+          JsonNode message = msgs.remove(0);
+          Object[] record = getCurrRecordFromJson(message, fields);
+          BulkImportManager.setFieldsInInsertStatement(stmt, 1, record, fields);
+
+          stmt.addBatch();
+        }
+        stmt.executeBatch();
+      }
+      finally {
+        stmt.close();
+      }
+    }
+  }
+
+  private void handleUpdate(Map.Entry<String, List<JsonNode>> entry, String dbName, String tableName, List<FieldSchema> fields) throws SQLException {
+    for (JsonNode message : entry.getValue()) {
+      ObjectNode json = (ObjectNode) message;
+      JsonNode after =json.get("after");
+      JsonNode before =json.get("before");
+
+      List<FieldSchema> specifiedFields = new ArrayList<>();
+      String str = "update " + tableName + " set ";
+      int offset = 0;
+      int parmOffset = 1;
+      Iterator<Map.Entry<String, JsonNode>> iterator = after.fields();
+      while (iterator.hasNext()) {
+        Map.Entry<String, JsonNode> jsonEntry = iterator.next();
+        if (jsonEntry.getKey().toLowerCase().startsWith("_sonicbase_")) {
+          continue;
+        }
+        if (offset != 0) {
+          str += ", ";
+        }
+        str += " " + jsonEntry.getKey().toLowerCase() + "=? ";
+        for (FieldSchema fieldSchema : fields) {
+          if (fieldSchema.getName().equals(jsonEntry.getKey().toLowerCase())) {
+            specifiedFields.add(fieldSchema);
+          }
+        }
+        offset++;
+        parmOffset++;
+      }
+      Object[] record = getCurrRecordFromJson(after, specifiedFields);
+
+      str += " where ";
+
+      List<FieldSchema> specifiedWhereFields = new ArrayList<>();
+      offset = 0;
+      iterator = before.fields();
+      while (iterator.hasNext()) {
+        Map.Entry<String, JsonNode> jsonEntry = iterator.next();
+        if (jsonEntry.getKey().toLowerCase().startsWith("_sonicbase_")) {
+          continue;
+        }
+        if (offset != 0) {
+          str += " AND ";
+        }
+        str += " " + jsonEntry.getKey().toLowerCase() + "=? ";
+        for (FieldSchema fieldSchema : fields) {
+          if (fieldSchema.getName().equals(jsonEntry.getKey().toLowerCase())) {
+            specifiedWhereFields.add(fieldSchema);
+          }
+        }
+        offset++;
+      }
+      Object[] whereRecord = getCurrRecordFromJson(before, specifiedFields);
+
+      PreparedStatement stmt = connections.get(dbName).prepareStatement(str);
+      BulkImportManager.setFieldsInInsertStatement(stmt, 1, record, specifiedFields);
+      BulkImportManager.setFieldsInInsertStatement(stmt, parmOffset, whereRecord, specifiedWhereFields);
+
+      Long sequence0 = null;
+      Long sequence1 = null;
+      Short sequence2 = null;
+      if (after.has("_sonicbase_sequence0") &&
+          after.has("_sonicbase_sequence1") &&
+          after.has("_sonicbase_sequence2")) {
+        sequence0 = after.get("_sonicbase_sequence0").asLong();
+        sequence1 = after.get("_sonicbase_sequence1").asLong();
+        sequence2 = (short)after.get("_sonicbase_sequence2").asInt();
+      }
+      ((StatementProxy)stmt).doUpdate(sequence0, sequence1, sequence2, false);
+    }
   }
 
   public ComObject stopStreaming(ComObject cobj, boolean replayedCommand) {

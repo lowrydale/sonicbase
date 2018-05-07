@@ -313,17 +313,6 @@ public class ResultSetImpl implements ResultSet {
     if (orderByExpressions.size() != 0) {
       if (orderByExpressions.size() > 1 || (selectContext.getSortWithIndex() != null && !selectContext.getSortWithIndex())) {
         if (selectContext.getCurrKeys() != null) {
-//          this.readRecords = new Record[selectContext.getCurrKeys().length][];
-//          int tableCount = selectContext.getTableNames().length;
-//          for (int i = 0; i < readRecords.length; i++) {
-//            readRecords[i] = new Record[tableCount];
-//            long[] keys = selectContext.getCurrKeys()[i];
-//            for (int j = 0; j < tableCount; j++) {
-//              if (keys[j] != -1) {
-//                readRecords[i][j] = doReadRecord(selectContext.getCurrKeys()[i][j], selectContext.getTableNames()[j]);
-//              }
-//            }
-//          }
           sortResults(dbName, databaseClient.getCommon(), readRecords, selectContext.getTableNames(),
               selectStatement.getOrderByExpressions());
         }
@@ -500,33 +489,6 @@ public class ResultSetImpl implements ResultSet {
         && (readRecords == null || readRecords.length == 0)) {
       return false;
     }
-//    if (readRecords != null) {
-//      if (currPos >= readRecords.length) {
-//        return false;
-//      }
-//      currRecord = readRecords[currPos];
-//    }
-//    else {
-//    if (offset != null) {
-//      while (currTotalPos < offset.getOffset() - 1) {
-//        if ((selectContext.getCurrKeys().length == 0 || currPos >= selectContext.getCurrKeys().length)) {
-//          while (true) {
-//            try {
-//              getMoreResults();
-//              break;
-//            }
-//            catch (SchemaOutOfSyncException e) {
-//              continue;
-//            }
-//            catch (Exception e) {
-//              throw new DatabaseException(e);
-//            }
-//          }
-//        }
-//        currPos++;
-//        currTotalPos++;
-//      }
-//    }
 
     if (selectStatement != null && groupByColumns != null) {
       Object[] lastFields = new Object[groupByColumns.size()];
@@ -652,34 +614,12 @@ public class ResultSetImpl implements ResultSet {
         }
       }
     }
-//    if (limit != null) {
-//      if (!limit.isLimitAll() && !limit.isLimitNull()) {
-//        if (offset != null) {
-//          if (currTotalPos >= offset.getOffset() + limit.getRowCount()) {
-//            return false;
-//          }
-//        }
-//        else {
-//          if (currTotalPos >= limit.getRowCount()) {
-//            return false;
-//          }
-//        }
-//      }
-//    }
-    //   readCurrentRecord();
-
 
     if ((setOperation != null && (retKeys == null || retKeys.length == 0)) ||
         (setOperation == null && selectContext.getCurrKeys() == null)) {
       return false;
     }
-//    }
-
-//    if (currRecord == null) {
-//      return false;
-//    }
-
-    return true; //!isAfterLast();
+    return true;
   }
 
 
@@ -2869,76 +2809,6 @@ public class ResultSetImpl implements ResultSet {
         currPos = 0;
         return;
       }
-      //    while (true) {
-      //
-      //      //todo: support multiple tables
-      //      TableSchema tableSchema = databaseClient.getCommon().getTables().get(selectContext.getTableNames()[0]);
-      //      Random rand = new Random(System.currentTimeMillis());
-      //      String command = "DatabaseServer:indexLookup:1:" + databaseClient.getCommon().getSchemaVersion() + ":" + rand.nextLong() + ":query0";
-      //      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      //      DataOutputStream out = new DataOutputStream(bytesOut);
-      //      out.writeUTF(tableSchema.getName());
-      //      out.writeUTF(selectContext.getIndexName());
-      //      Boolean ascending = null;
-      //      if (selectStatement.getOrderByExpressions() == null) {
-      //        out.writeInt(0);
-      //      }
-      //      else {
-      //        out.writeInt(selectStatement.getOrderByExpressions().size());
-      //        for (int j = 0; j < selectStatement.getOrderByExpressions().size(); j++) {
-      //          OrderByExpressionImpl expression = selectStatement.getOrderByExpressions().get(j);
-      //          if (expression.getColumnName().equals(tableSchema.getIndices().get(selectContext.getIndexName()).getFields()[0])) {
-      //            ascending = expression.isAscending();
-      //          }
-      //          expression.serialize(out);
-      //        }
-      //      }
-      //      if (selectContext.getNextKey() == null) {
-      //        out.writeBoolean(false);
-      //      }
-      //      else {
-      //        out.writeBoolean(true);
-      //        out.write(DatabaseCommon.serializeKey(tableSchema, selectContext.getIndexName(), selectContext.getNextKey()));
-      //      }
-      //      if (selectContext.getOperator() == BinaryExpression.Operator.greater) {
-      //        selectContext.setOperator(BinaryExpression.Operator.greaterEqual);
-      //      }
-      //      if (selectContext.getOperator() == BinaryExpression.Operator.less) {
-      //        selectContext.setOperator(BinaryExpression.Operator.lessEqual);
-      //      }
-      //      out.writeInt(selectContext.getOperator().getId());
-      //      out.close();
-      //
-      //      AtomicReference<String> selectedHost = new AtomicReference<>();
-      //
-      //      int previousSchemaVersion = databaseClient.getCommon().getSchemaVersion();
-      //      byte[] lookupRet = databaseClient.send(selectContext.getNextShard(), rand.nextLong(), command, bytesOut.toByteArray(), DatabaseClient.Replica.def, 30000, selectedHost);
-      //      if (previousSchemaVersion < databaseClient.getCommon().getSchemaVersion()) {
-      //        throw new SchemaOutOfSyncException();
-      //      }
-      //      ByteArrayInputStream bytes = new ByteArrayInputStream(lookupRet);
-      //      DataInputStream in = new DataInputStream(bytes);
-      //      int serializationVersion = in.readInt();
-      //      if (in.readBoolean()) {
-      //        selectContext.setNextKey(DatabaseCommon.deserializeKey(tableSchema, in));
-      //      }
-      //      else {
-      //        selectContext.setNextKey(null);
-      //        selectContext.setNextShard(selectContext.getNextShard() + (ascending == null || ascending ? 1 : -1));
-      //      }
-      //      int count = in.readInt();
-      //      long[] currRet = new long[count];
-      //      for (int k = 0; k < count; k++) {
-      //        currRet[k] = in.readLong();
-      //      }
-      //      selectContext.setCurrKeys(currRet);
-      //
-      //      currPos = 0;
-      //      if (count != 0 || (ascending == null || ascending ? selectContext.getNextShard() > databaseClient.getShardCount() :
-      //          selectContext.getNextShard() < 0)) {
-      //        break;
-      //      }
-      //    }
     }
     finally {
       if (histogramEntry != null) {
@@ -3175,15 +3045,6 @@ public class ResultSetImpl implements ResultSet {
                                                        BinaryExpression.Operator lessOp, OptimizationSettings settings) {
     BinaryExpressionImpl outer = new BinaryExpressionImpl();
 
-//    if (!settings.ascend) {
-//      Object[] tmp = lowerKey;
-//      lowerKey = higherKey;
-//      higherKey = tmp;
-//      if (greaterOp == BinaryExpression.Operator.greater) {
-//        greaterOp = BinaryExpression.Operator.greaterEqual;
-//      }
-//    }
-
     String[] fields = getIndexFields(settings);
 
     List<BinaryExpressionImpl> stack = new ArrayList<>();
@@ -3353,14 +3214,6 @@ public class ResultSetImpl implements ResultSet {
 
         SelectStatementHandler handler = (SelectStatementHandler) databaseClient.getStatementHandlerFactory().getHandler(new Select());
         handler.doServerSetSelect(dbName, tableNames, setOperation, this, restrictToThisServer, procedureContext);
-
-//        readRecords = null;
-//        synchronized (recordCache.getRecordsForTable()) {
-//          recordCache .getRecordsForTable().clear();
-//        }
-//
-//        ExpressionImpl.NextReturn ret = new ExpressionImpl.NextReturn(tableNames, retKeys);
-//        readRecords = readRecords(ret);
         currPos = 0;
         break;
       }
@@ -3474,46 +3327,10 @@ public class ResultSetImpl implements ResultSet {
     if (nextReturn == null || nextReturn.getKeys() == null) {
       return null;
     }
-//    List<String> columns = new ArrayList<>();
-//    for (ColumnImpl column : selectStatement.getSelectColumns()) {
-//      columns.add(column.getColumnName());
-//    }
-
-//    for (int i = 0; i < nextReturn.getKeys().length; i++) {
-//      Object[][] id = nextReturn.getKeys()[i];
-//      for (int j = 0; j < id.length; j++) {
-//        Object[] currId = id[j];
-//        if (currId == null) {
-//          continue;
-//        }
-//        if (recordCache.containsKey(nextReturn.getTableNames()[j], currId)) {
-//          continue;
-//        }
-//        Object[][] fullId = new Object[id.length][];
-//        for (int k = 0; k < id.length; k++) {
-//          fullId[k] = null;
-//        }
-//        fullId[j] = currId;
-//        idsToRead.add(fullId);
-//      }
-//    }
     //todo: don't do a contains and a get
 
     while (true) {
       try {
-//        for (int j = 0; j < selectContext.getTableNames().length; j++) {
-//          String tableName = selectContext.getTableNames()[j];
-//
-//          List<ExpressionImpl.IdEntry> keysToRead = new ArrayList<>();
-//          for (int i = 0; i < idsToRead.size(); i++) {
-//            keysToRead.add(new ExpressionImpl.IdEntry(i, idsToRead.get(i)[j]));
-//          }
-//
-////          Map<Integer, Object[][]> keys = ExpressionImpl.readRecords(databaseClient, databaseClient.getCommon().getTables().get(tableName),
-////              keysToRead, nextReturn.getFields().get(nextReturn.getTableNames()[j]), selectContext.getRecordCache());
-//
-//          //Record[][] records = ExpressionImpl.doReadRecords(databaseClient, actualIds, selectContext.getTableNames(), columns);
-//        }
         Object[][][] actualIds = nextReturn.getKeys();
         ExpressionImpl.CachedRecord[][] retRecords = new ExpressionImpl.CachedRecord[actualIds.length][];
 

@@ -48,7 +48,6 @@ public class LicenseManager {
     disableNow = false;
     this.disableNow = false;
     this.haveProLicense = true;
-    //startMasterLicenseValidator();
 
     try {
       checkLicense(new AtomicBoolean(false), new AtomicBoolean(false), new AtomicBoolean(true));
@@ -85,10 +84,6 @@ public class LicenseManager {
     haveProLicense = true;
 
     final AtomicBoolean haventSet = new AtomicBoolean(true);
-    //    if (usingMultipleReplicas) {
-    //      throw new InsufficientLicense("You must have a pro license to use multiple replicas");
-    //    }
-
     final AtomicInteger licensePort = new AtomicInteger();
     String json = null;
     try {
@@ -96,15 +91,8 @@ public class LicenseManager {
     }
     catch (Exception e) {
       logger.error("Error initializing license validator", e);
-//      common.setHaveProLicense(false);
-//      common.saveSchema(getClient(), dataDir);
       haveProLicense = false;
       disableNow = true;
-//      this.haveProLicense = true;
-//      this.disableNow = false;
-//      this.disableDate = null;
-//      this.multipleLicenseServers = false;
-
       haventSet.set(false);
       return;
     }
@@ -123,11 +111,6 @@ public class LicenseManager {
         public void run() {
           while (!shutdownMasterValidatorThread) {
             try {
-//            DatabaseServer.this.haveProLicense = true;
-//            DatabaseServer.this.disableNow = false;
-//            DatabaseServer.this.disableDate = null;
-//            DatabaseServer.this.multipleLicenseServers = false;
-
               doValidateLicense(address, licensePort, lastHaveProLicense, haveHadProLicense, haventSet, false);
             }
             catch (Exception e) {
@@ -140,19 +123,11 @@ public class LicenseManager {
                 disableDate = DateUtils.fromDate(new Date(System.currentTimeMillis() + 7 * 24 * 60 * 60 * 1000));
               }
               else {
-                //  if (haventSet.get() || lastHaveProLicense.get() != false) {
-//              common.setHaveProLicense(false);
-//              common.saveSchema(getClient(), dataDir);
                 haveProLicense = false;
                 lastHaveProLicense.set(false);
                 haventSet.set(false);
                 disableNow = true;
                 disableDate = DateUtils.fromDate(new Date(System.currentTimeMillis()));
-//              DatabaseServer.this.haveProLicense = true;
-//              DatabaseServer.this.disableNow = false;
-//              DatabaseServer.this.disableDate = null;
-//              DatabaseServer.this.multipleLicenseServers = false;
-
               }
               logger.debug("License server not found", e);
             }
@@ -197,7 +172,6 @@ public class LicenseManager {
 
             public void checkServerTrusted(X509Certificate[] certs, String authType) {
             }
-
           }
       };
 
@@ -214,9 +188,6 @@ public class LicenseManager {
       };
       // Install the all-trusting host verifier
       HttpsURLConnection.setDefaultHostnameVerifier(allHostsValid);
-      /*
-       * end of the fix
-       */
 
       URL url = new URL("https://" + address + ":" + licensePort.get() + "/license/checkIn?" +
           "primaryAddress=" + server.getCommon().getServersConfig().getShards()[0].getReplicas()[0].getPrivateAddress() +
@@ -225,17 +196,8 @@ public class LicenseManager {
       URLConnection con = url.openConnection();
       InputStream in = new BufferedInputStream(con.getInputStream());
 
-//      HttpResponse response = restGet("https://" + config.getDict("server").getString("publicAddress") + ":" +
-//          config.getDict("server").getInt("port") + "/license/currUsage");
       ObjectMapper mapper = new ObjectMapper();
       ObjectNode dict = (ObjectNode) mapper.readTree(IOUtils.toString(in, "utf-8"));
-
-//      HttpResponse response = DatabaseClient.restGet("https://" + address + ":" + licensePort.get() + "/license/checkIn?" +
-//        "primaryAddress=" + common.getServersConfig().getShards()[0].getReplicas()[0].getPrivateAddress() +
-//        "&primaryPort=" + common.getServersConfig().getShards()[0].getReplicas()[0].getPort() +
-//        "&cluster=" + cluster + "&cores=" + cores);
-//    String responseStr = StreamUtils.inputStreamToString(response.getContent());
-//    logger.info("CheckIn response: " + responseStr);
 
       this.haveProLicense = dict.get("inCompliance").asBoolean();
       this.disableNow = dict.get("disableNow").asBoolean();
@@ -244,53 +206,40 @@ public class LicenseManager {
       if (haveProLicense) {
         haveHadProLicense.set(true);
       }
-//      this.haveProLicense = true;
-//      this.disableNow = false;
-//      this.multipleLicenseServers = false;
       logger.info("licenseValidator: cores=" + cores + ", lastHaveProLicense=" + lastHaveProLicense.get() +
           ", haveProLicense=" + haveProLicense + ",  disableNow=" + disableNow);
       if (haventSet.get() || lastHaveProLicense.get() != haveProLicense) {
-//        common.setHaveProLicense(haveProLicense);
-//        if (!standalone) {
-//          common.saveSchema(getClient(), dataDir);
-//        }
         lastHaveProLicense.set(haveProLicense);
         haventSet.set(true);
         logger.info("Saving schema with haveProLicense=" + haveProLicense);
       }
     }
     catch (Exception e) {
-//      this.haveProLicense = true;
-//      this.disableNow = false;
-//      this.disableDate = null;
-//      this.multipleLicenseServers = false;
-
-      if (haveHadProLicense.get()) {
-        Date date = new Date(System.currentTimeMillis());
-        Calendar cal = new GregorianCalendar();
-        cal.setTime(date);
-        cal.add(DAY, 7);
-        disableDate = DateUtils.fromDate(cal.getTime());
-
-        this.haveProLicense = true;
-        this.disableNow = false;
-        this.multipleLicenseServers = false;
-      }
-      else {
-        this.haveProLicense = false;
-        this.disableNow = true;
-        disableDate = DateUtils.fromDate(new Date(System.currentTimeMillis()));
-        this.multipleLicenseServers = false;
-      }
-//      common.setHaveProLicense(haveProLicense);
-//      if (!standalone) {
-//        common.saveSchema(getClient(), dataDir);
-//        logger.error("Error validating license", e);
-//      }
-      lastHaveProLicense.set(haveProLicense);
-      haventSet.set(true);
-      logger.error("MasterLicenseValidator error checking licenses", e);
+      handleErrorCheckingLicense(lastHaveProLicense, haveHadProLicense, haventSet, e);
     }
+  }
+
+  private void handleErrorCheckingLicense(AtomicBoolean lastHaveProLicense, AtomicBoolean haveHadProLicense, AtomicBoolean haventSet, Exception e) {
+    if (haveHadProLicense.get()) {
+      Date date = new Date(System.currentTimeMillis());
+      Calendar cal = new GregorianCalendar();
+      cal.setTime(date);
+      cal.add(DAY, 7);
+      disableDate = DateUtils.fromDate(cal.getTime());
+
+      this.haveProLicense = true;
+      this.disableNow = false;
+      this.multipleLicenseServers = false;
+    }
+    else {
+      this.haveProLicense = false;
+      this.disableNow = true;
+      disableDate = DateUtils.fromDate(new Date(System.currentTimeMillis()));
+      this.multipleLicenseServers = false;
+    }
+    lastHaveProLicense.set(haveProLicense);
+    haventSet.set(true);
+    logger.error("MasterLicenseValidator error checking licenses", e);
   }
 
   public void shutdownMasterLicenseValidator() {
@@ -313,16 +262,11 @@ public class LicenseManager {
       logger.info("Overriding pro license");
       haveProLicense = true;
       disableNow = false;
-//      common.setHaveProLicense(haveProLicense);
-//      common.saveSchema(getClient(), dataDir);
       return;
     }
     haveProLicense = true;
 
     final AtomicBoolean haventSet = new AtomicBoolean(true);
-//    if (usingMultipleReplicas) {
-//      throw new InsufficientLicense("You must have a pro license to use multiple replicas");
-//    }
 
     final AtomicInteger licensePort = new AtomicInteger();
     String json = null;
@@ -332,13 +276,6 @@ public class LicenseManager {
     catch (Exception e) {
       logger.error("Error initializing license validator", e);
 
-//      this.haveProLicense = true;
-//      this.disableNow = false;
-//      this.disableDate = null;
-//      this.multipleLicenseServers = false;
-
-//      common.setHaveProLicense(false);
-//      common.saveSchema(getClient(), dataDir);
       haveProLicense = false;
       disableNow = true;
       haventSet.set(false);
@@ -392,8 +329,6 @@ public class LicenseManager {
               hadError = true;
               logger.error("license server not found", e);
               if (haventSet.get() || lastHaveProLicense.get() != false) {
-//                common.setHaveProLicense(false);
-                //common.saveSchema(getClient(), dataDir);
                 haveProLicense = false;
                 lastHaveProLicense.set(false);
                 haventSet.set(false);
@@ -443,7 +378,6 @@ public class LicenseManager {
 
     haveProLicense = retObj.getBoolean(ComObject.Tag.inCompliance);
     disableNow = retObj.getBoolean(ComObject.Tag.disableNow);
-    //DatabaseServer.this.disableDate = retObj.getString(ComObject.Tag.disableDate);
 
     if (haveProLicense) {
       Date date = new Date(System.currentTimeMillis());
@@ -461,16 +395,9 @@ public class LicenseManager {
 
     multipleLicenseServers = retObj.getBoolean(ComObject.Tag.multipleLicenseServers);
 
-//    DatabaseServer.this.haveProLicense = true;
-//    DatabaseServer.this.disableNow = false;
-//    DatabaseServer.this.disableDate = null;
-//    DatabaseServer.this.multipleLicenseServers = false;
-
     logger.info("licenseCheckin: lastHaveProLicense=" + lastHaveProLicense.get() + ", haveProLicense=" + haveProLicense +
         ", disableNow=" + disableNow + ", disableDate=" + disableDate + ", multipleLicenseServers=" + multipleLicenseServers);
     if (haventSet.get() || lastHaveProLicense.get() != haveProLicense) {
-//      common.setHaveProLicense(haveProLicense);
-      //common.saveSchema(getClient(), dataDir);
       lastHaveProLicense.set(haveProLicense);
       haventSet.set(false);
       logger.info("Saving schema with haveProLicense=" + haveProLicense);

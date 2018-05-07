@@ -47,7 +47,6 @@ public class OSStatsManager {
 
   public OSStatsManager(DatabaseServer server) {
     this.server = server;
-    //this.logger = new Logger(server.getDatabaseClient());
   }
 
   public void shutdown() {
@@ -364,119 +363,10 @@ public class OSStatsManager {
     AtomicReference<Double> javaMemMin = new AtomicReference<>();
     try {
       if (server.isMac()) {
-//        ProcessBuilder builder = new ProcessBuilder().command("top", "-l", "1", "-pid", String.valueOf(server.getPid()));
-//        Process p = builder.start();
-//        try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-//          while (!shutdown) {
-//            String line = in.readLine();
-//            if (line == null) {
-//              break;
-//            }
-//            secondToLastLine = lastLine;
-//            lastLine = line;
-//          }
-//          p.waitFor();
-//        }
-//        finally {
-//          p.destroy();
-//        }
-
-        logger.info("getting mac stats");
-        ProcessBuilder builder = new ProcessBuilder().command("top", "-l", "1", "-n" , "0");
-        Process p = builder.start();
-        boolean haveMem = false;
-        boolean haveCpu = false;
-        int linesRead = 0;
-        try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-          while (!shutdown) {
-            String line = in.readLine();
-            if (line == null) {
-              break;
-            }
-            linesRead++;
-            if (line.startsWith("PhysMem:")) {
-              String[] parts = line.split(" ");
-              ret.resGig = getNumber(parts[1]);
-              haveMem = true;
-              logger.info("physMem: " + ret.resGig + ", line=" + line);
-            }
-            else if (line.startsWith("CPU usage:")) {
-              String[] parts = line.split(" ");
-              logger.info("cpu: line=" + line);
-              ret.cpu = 100 - getNumber(parts[6]);
-              logger.info("cpu: " + ret.cpu + ", line=" + line);
-              haveCpu = true;
-            }
-            if (haveMem && haveCpu) {
-              break;
-            }
-          }
-          p.waitFor();
-        }
-        finally {
-          p.destroy();
-        }
-        logger.info("lines=" + linesRead);
-//        secondToLastLine = secondToLastLine.trim();
-//        lastLine = lastLine.trim();
-//        String[] headerParts = secondToLastLine.split("\\s+");
-//        String[] parts = lastLine.split("\\s+");
-//        for (int i = 0; i < headerParts.length; i++) {
-//          if (headerParts[i].toLowerCase().trim().equals("mem")) {
-//            ret.resGig = getMemValue(parts[i]);
-//          }
-//          else if (headerParts[i].toLowerCase().trim().equals("%cpu")) {
-//            ret.cpu = Double.valueOf(parts[i]);
-//          }
-//        }
-        ret.diskAvail = getDiskAvailable()[1];
+        getMacStats(ret);
       }
       else if (server.isUnix()) {
-        String cpuLine = null;
-        ProcessBuilder builder = new ProcessBuilder().command("top", "-b", "-n", "1", "-p", String.valueOf(getPid()));
-        Process p = builder.start();
-        try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-          while (!shutdown) {
-            String line = in.readLine();
-            if (line == null) {
-              break;
-            }
-            if (line.toLowerCase().startsWith("cpu")) {
-              cpuLine = line;
-            }
-            if (lastLine != null || line.trim().toLowerCase().startsWith("pid")) {
-              secondToLastLine = lastLine;
-              lastLine = line;
-            }
-            if (lastLine != null && secondToLastLine != null) {
-              break;
-            }
-          }
-          p.waitFor();
-        }
-        finally {
-          p.destroy();
-        }
-
-        secondToLastLine = secondToLastLine.trim();
-        lastLine = lastLine.trim();
-        String[] headerParts = secondToLastLine.split("\\s+");
-        String[] parts = lastLine.split("\\s+");
-        for (int i = 0; i < headerParts.length; i++) {
-          if (headerParts[i].toLowerCase().trim().equals("res")) {
-            String memStr = parts[i];
-            ret.resGig = getMemValue(memStr);
-          }
-//          else if (headerParts[i].toLowerCase().trim().equals("%cpu")) {
-//            ret.cpu = Double.valueOf(parts[i]);
-//          }
-        }
-
-        int pos = cpuLine.indexOf("%id");
-        int pos2 = cpuLine.lastIndexOf(" ", pos);
-        ret.cpu = 100d - Double.valueOf(cpuLine.substring(pos2, pos).trim());
-
-        ret.diskAvail = getDiskAvailable()[1];
+        getUnixStats(ret, lastLine, secondToLastLine);
       }
       else if (server.isWindows()) {
         ret.resGig = getResGigWindows();
@@ -501,224 +391,306 @@ public class OSStatsManager {
     return ret;
   }
 
+  private void getUnixStats(OSStats ret, String lastLine, String secondToLastLine) throws IOException, InterruptedException {
+    String cpuLine = null;
+    ProcessBuilder builder = new ProcessBuilder().command("top", "-b", "-n", "1", "-p", String.valueOf(getPid()));
+    Process p = builder.start();
+    try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+      while (!shutdown) {
+        String line = in.readLine();
+        if (line == null) {
+          break;
+        }
+        if (line.toLowerCase().startsWith("cpu")) {
+          cpuLine = line;
+        }
+        if (lastLine != null || line.trim().toLowerCase().startsWith("pid")) {
+          secondToLastLine = lastLine;
+          lastLine = line;
+        }
+        if (lastLine != null && secondToLastLine != null) {
+          break;
+        }
+      }
+      p.waitFor();
+    }
+    finally {
+      p.destroy();
+    }
+
+    secondToLastLine = secondToLastLine.trim();
+    lastLine = lastLine.trim();
+    String[] headerParts = secondToLastLine.split("\\s+");
+    String[] parts = lastLine.split("\\s+");
+    for (int i = 0; i < headerParts.length; i++) {
+      if (headerParts[i].toLowerCase().trim().equals("res")) {
+        String memStr = parts[i];
+        ret.resGig = getMemValue(memStr);
+      }
+    }
+
+    int pos = cpuLine.indexOf("%id");
+    int pos2 = cpuLine.lastIndexOf(" ", pos);
+    ret.cpu = 100d - Double.valueOf(cpuLine.substring(pos2, pos).trim());
+
+    ret.diskAvail = getDiskAvailable()[1];
+  }
+
+  private void getMacStats(OSStats ret) throws IOException, InterruptedException {
+    logger.info("getting mac stats");
+    ProcessBuilder builder = new ProcessBuilder().command("top", "-l", "1", "-n" , "0");
+    Process p = builder.start();
+    boolean haveMem = false;
+    boolean haveCpu = false;
+    int linesRead = 0;
+    try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+      while (!shutdown) {
+        String line = in.readLine();
+        if (line == null) {
+          break;
+        }
+        linesRead++;
+        if (line.startsWith("PhysMem:")) {
+          String[] parts = line.split(" ");
+          ret.resGig = getNumber(parts[1]);
+          haveMem = true;
+          logger.info("physMem: " + ret.resGig + ", line=" + line);
+        }
+        else if (line.startsWith("CPU usage:")) {
+          String[] parts = line.split(" ");
+          logger.info("cpu: line=" + line);
+          ret.cpu = 100 - getNumber(parts[6]);
+          logger.info("cpu: " + ret.cpu + ", line=" + line);
+          haveCpu = true;
+        }
+        if (haveMem && haveCpu) {
+          break;
+        }
+      }
+      p.waitFor();
+    }
+    finally {
+      p.destroy();
+    }
+    logger.info("lines=" + linesRead);
+    ret.diskAvail = getDiskAvailable()[1];
+  }
+
   class NetMonitor implements Runnable {
     public void run() {
       List<Double> transRate = new ArrayList<>();
       List<Double> recRate = new ArrayList<>();
       try {
         if (server.isMac()) {
-          while (!shutdown) {
-            ProcessBuilder builder = new ProcessBuilder().command("ifstat");
-            Process p = builder.start();
-            try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-              String firstLine = null;
-              String secondLine = null;
-              Set<Integer> toSkip = new HashSet<>();
-              while (!shutdown) {
-                String line = in.readLine();
-                if (line == null) {
-                  break;
-                }
-                String[] parts = line.trim().split("\\s+");
-                if (firstLine == null) {
-                  for (int i = 0; i < parts.length; i++) {
-                    if (parts[i].toLowerCase().contains("bridge")) {
-                      toSkip.add(i);
-                    }
-                  }
-                  firstLine = line;
-                }
-                else if (secondLine == null) {
-                  secondLine = line;
-                }
-                else {
-                  try {
-                    double trans = 0;
-                    double rec = 0;
-                    for (int i = 0; i < parts.length; i++) {
-                      if (toSkip.contains(i / 2)) {
-                        continue;
-                      }
-                      if (i % 2 == 0) {
-                        rec += Double.valueOf(parts[i]);
-                      }
-                      else if (i % 2 == 1) {
-                        trans += Double.valueOf(parts[i]);
-                      }
-                    }
-                    transRate.add(trans);
-                    recRate.add(rec);
-                    if (transRate.size() > 10) {
-                      transRate.remove(0);
-                    }
-                    if (recRate.size() > 10) {
-                      recRate.remove(0);
-                    }
-                    Double total = 0d;
-                    for (Double currRec : recRate) {
-                      total += currRec;
-                    }
-                    avgRecRate = total / recRate.size();
-
-                    total = 0d;
-                    for (Double currTrans : transRate) {
-                      total += currTrans;
-                    }
-                    avgTransRate = total / transRate.size();
-                  }
-                  catch (Exception e) {
-                    logger.error("Error reading net traffic line: line=" + line, e);
-                  }
-                  break;
-                }
-              }
-              p.waitFor();
-            }
-            finally {
-              p.destroy();
-            }
-            Thread.sleep(1000);
-          }
+          getMacNetStats(transRate, recRate);
         }
         else if (server.isUnix()) {
-          while (!shutdown) {
-            int count = 0;
-            File file = new File(server.getInstallDir(), "tmp/dstat.out");
-            file.getParentFile().mkdirs();
-            file.delete();
-            ProcessBuilder builder = new ProcessBuilder().command("/usr/bin/dstat", "--output", file.getAbsolutePath());
-            Process p = builder.start();
-            try {
-              while (!file.exists()) {
-                Thread.sleep(1000);
-              }
-              outer:
-              while (!shutdown) {
-                try (BufferedReader in = new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
-                  int recvPos = 0;
-                  int sendPos = 0;
-                  boolean nextIsValid = false;
-                  while (!shutdown) {
-                    String line = in.readLine();
-                    if (line == null) {
-                      break;
-                    }
-                    try {
-                      if (count++ > 10000) {
-                        p.destroy();
-                        ;
-                        break outer;
-                      }
-
-          /*
-
-          "Dstat 0.7.0 CSV output"
-        "Author:","Dag Wieers <dag@wieers.com>",,,,"URL:","http://dag.wieers.com/home-made/dstat/"
-        "Host:","ip-10-0-0-79",,,,"User:","ec2-user"
-        "Cmdline:","dstat --output out",,,,"Date:","09 Apr 2017 02:48:19 UTC"
-
-        "total cpu usage",,,,,,"dsk/total",,"net/total",,"paging",,"system",
-        "usr","sys","idl","wai","hiq","siq","read","writ","recv","send","in","out","int","csw"
-        20.409,1.659,74.506,3.404,0.0,0.021,707495.561,82419494.859,0.0,0.0,0.0,0.0,17998.361,18691.991
-        8.794,1.131,77.010,13.065,0.0,0.0,0.0,272334848.0,54.0,818.0,0.0,0.0,1514.0,477.0
-        9.217,1.641,75.758,13.384,0.0,0.0,0.0,276201472.0,54.0,346.0,0.0,0.0,1481.0,392.0
-
-           */
-                      String[] parts = line.split(",");
-                      if (line.contains("usr") && line.contains("recv") && line.contains("send")) {
-                        for (int i = 0; i < parts.length; i++) {
-                          if (parts[i].equals("\"recv\"")) {
-                            recvPos = i;
-                          }
-                          else if (parts[i].equals("\"send\"")) {
-                            sendPos = i;
-                          }
-                        }
-                        nextIsValid = true;
-                      }
-                      else if (nextIsValid) {
-                        Double trans = Double.valueOf(parts[sendPos]);
-                        Double rec = Double.valueOf(parts[recvPos]);
-                        transRate.add(trans);
-                        recRate.add(rec);
-                        if (transRate.size() > 10) {
-                          transRate.remove(0);
-                        }
-                        if (recRate.size() > 10) {
-                          recRate.remove(0);
-                        }
-                        Double total = 0d;
-                        for (Double currRec : recRate) {
-                          total += currRec;
-                        }
-                        avgRecRate = total / recRate.size();
-
-                        total = 0d;
-                        for (Double currTrans : transRate) {
-                          total += currTrans;
-                        }
-                        avgTransRate = total / transRate.size();
-                      }
-                    }
-                    catch (Exception e) {
-                      logger.error("Error reading net traffic line: line=" + line, e);
-                      Thread.sleep(5000);
-                      break outer;
-                    }
-                  }
-                }
-                Thread.sleep(1000);
-              }
-              p.waitFor();
-            }
-            finally {
-              p.destroy();
-            }
-          }
+          getIUnixNetStats(transRate, recRate);
         }
         else if (server.isWindows()) {
-          Double lastReceive = null;
-          Double lastTransmit = null;
-          long lastRecorded = 0;
-          while (!shutdown) {
-            ProcessBuilder builder = new ProcessBuilder().command("netstat", "-e");
-            Process p = builder.start();
-            try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-              while (!shutdown) {
-                String line = in.readLine();
-                if (line.startsWith("Bytes")) {
-                  String[] parts = line.split("\\s+");
-                  String receiveStr = parts[1];
-                  String transmitStr = parts[2];
-                  if (lastReceive == null) {
-                    lastReceive = Double.valueOf(receiveStr);
-                    lastTransmit = Double.valueOf(transmitStr);
-                    lastRecorded = System.currentTimeMillis();
-                  }
-                  else {
-                    Double receive = Double.valueOf(receiveStr);
-                    Double transmit = Double.valueOf(transmitStr);
-                    avgRecRate = (receive - lastReceive) / (System.currentTimeMillis() - lastRecorded) / 1000d;
-                    avgTransRate = (transmit - lastTransmit) / (System.currentTimeMillis() - lastRecorded) / 1000d;
-                    lastReceive = receive;
-                    lastTransmit = transmit;
-                    lastRecorded = System.currentTimeMillis();
-                  }
-                  break;
-                }
-                Thread.sleep(2000);
-              }
-              p.waitFor();
-            }
-            finally {
-              p.destroy();
-            }
-          }
+          getWindowsNetStats();
         }
       }
       catch (Exception e) {
         logger.error("Error in net monitor thread", e);
       }
+    }
+  }
+
+  private void getWindowsNetStats() throws IOException, InterruptedException {
+    Double lastReceive = null;
+    Double lastTransmit = null;
+    long lastRecorded = 0;
+    while (!shutdown) {
+      ProcessBuilder builder = new ProcessBuilder().command("netstat", "-e");
+      Process p = builder.start();
+      try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+        while (!shutdown) {
+          String line = in.readLine();
+          if (line.startsWith("Bytes")) {
+            String[] parts = line.split("\\s+");
+            String receiveStr = parts[1];
+            String transmitStr = parts[2];
+            if (lastReceive == null) {
+              lastReceive = Double.valueOf(receiveStr);
+              lastTransmit = Double.valueOf(transmitStr);
+              lastRecorded = System.currentTimeMillis();
+            }
+            else {
+              Double receive = Double.valueOf(receiveStr);
+              Double transmit = Double.valueOf(transmitStr);
+              avgRecRate = (receive - lastReceive) / (System.currentTimeMillis() - lastRecorded) / 1000d;
+              avgTransRate = (transmit - lastTransmit) / (System.currentTimeMillis() - lastRecorded) / 1000d;
+              lastReceive = receive;
+              lastTransmit = transmit;
+              lastRecorded = System.currentTimeMillis();
+            }
+            break;
+          }
+          Thread.sleep(2000);
+        }
+        p.waitFor();
+      }
+      finally {
+        p.destroy();
+      }
+    }
+  }
+
+  private void getIUnixNetStats(List<Double> transRate, List<Double> recRate) throws IOException, InterruptedException {
+    while (!shutdown) {
+      int count = 0;
+      File file = new File(server.getInstallDir(), "tmp/dstat.out");
+      file.getParentFile().mkdirs();
+      file.delete();
+      ProcessBuilder builder = new ProcessBuilder().command("/usr/bin/dstat", "--output", file.getAbsolutePath());
+      Process p = builder.start();
+      try {
+        while (!file.exists()) {
+          Thread.sleep(1000);
+        }
+        outer:
+        while (!shutdown) {
+          try (BufferedReader in = new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
+            int recvPos = 0;
+            int sendPos = 0;
+            boolean nextIsValid = false;
+            while (!shutdown) {
+              String line = in.readLine();
+              if (line == null) {
+                break;
+              }
+              try {
+                if (count++ > 10000) {
+                  p.destroy();
+                  ;
+                  break outer;
+                }
+                String[] parts = line.split(",");
+                if (line.contains("usr") && line.contains("recv") && line.contains("send")) {
+                  for (int i = 0; i < parts.length; i++) {
+                    if (parts[i].equals("\"recv\"")) {
+                      recvPos = i;
+                    }
+                    else if (parts[i].equals("\"send\"")) {
+                      sendPos = i;
+                    }
+                  }
+                  nextIsValid = true;
+                }
+                else if (nextIsValid) {
+                  Double trans = Double.valueOf(parts[sendPos]);
+                  Double rec = Double.valueOf(parts[recvPos]);
+                  transRate.add(trans);
+                  recRate.add(rec);
+                  if (transRate.size() > 10) {
+                    transRate.remove(0);
+                  }
+                  if (recRate.size() > 10) {
+                    recRate.remove(0);
+                  }
+                  Double total = 0d;
+                  for (Double currRec : recRate) {
+                    total += currRec;
+                  }
+                  avgRecRate = total / recRate.size();
+
+                  total = 0d;
+                  for (Double currTrans : transRate) {
+                    total += currTrans;
+                  }
+                  avgTransRate = total / transRate.size();
+                }
+              }
+              catch (Exception e) {
+                logger.error("Error reading net traffic line: line=" + line, e);
+                Thread.sleep(5000);
+                break outer;
+              }
+            }
+          }
+          Thread.sleep(1000);
+        }
+        p.waitFor();
+      }
+      finally {
+        p.destroy();
+      }
+    }
+  }
+
+  private void getMacNetStats(List<Double> transRate, List<Double> recRate) throws IOException, InterruptedException {
+    while (!shutdown) {
+      ProcessBuilder builder = new ProcessBuilder().command("ifstat");
+      Process p = builder.start();
+      try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+        String firstLine = null;
+        String secondLine = null;
+        Set<Integer> toSkip = new HashSet<>();
+        while (!shutdown) {
+          String line = in.readLine();
+          if (line == null) {
+            break;
+          }
+          String[] parts = line.trim().split("\\s+");
+          if (firstLine == null) {
+            for (int i = 0; i < parts.length; i++) {
+              if (parts[i].toLowerCase().contains("bridge")) {
+                toSkip.add(i);
+              }
+            }
+            firstLine = line;
+          }
+          else if (secondLine == null) {
+            secondLine = line;
+          }
+          else {
+            try {
+              double trans = 0;
+              double rec = 0;
+              for (int i = 0; i < parts.length; i++) {
+                if (toSkip.contains(i / 2)) {
+                  continue;
+                }
+                if (i % 2 == 0) {
+                  rec += Double.valueOf(parts[i]);
+                }
+                else if (i % 2 == 1) {
+                  trans += Double.valueOf(parts[i]);
+                }
+              }
+              transRate.add(trans);
+              recRate.add(rec);
+              if (transRate.size() > 10) {
+                transRate.remove(0);
+              }
+              if (recRate.size() > 10) {
+                recRate.remove(0);
+              }
+              Double total = 0d;
+              for (Double currRec : recRate) {
+                total += currRec;
+              }
+              avgRecRate = total / recRate.size();
+
+              total = 0d;
+              for (Double currTrans : transRate) {
+                total += currTrans;
+              }
+              avgTransRate = total / transRate.size();
+            }
+            catch (Exception e) {
+              logger.error("Error reading net traffic line: line=" + line, e);
+            }
+            break;
+          }
+        }
+        p.waitFor();
+      }
+      finally {
+        p.destroy();
+      }
+      Thread.sleep(1000);
     }
   }
 
@@ -814,8 +786,6 @@ public class OSStatsManager {
       return 0;
     }
     ProcessBuilder builder = new ProcessBuilder().command("bin/get-cpu.bat", String.valueOf(getPid()));
-//    "wmic", "path", "Win32_PerfFormattedData_PerfProc_Process",
-//        "where", "\"IDProcess=" + pid + "\"", "get", "IDProcess,PercentProcessorTime");
     Process p = builder.start();
     try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
       String values = in.readLine();
@@ -898,14 +868,6 @@ public class OSStatsManager {
   }
 
   public String getDiskAvailWindows() throws IOException, InterruptedException {
-    // disk avail:
-    //        SETLOCAL
-    //
-    //        FOR /F "usebackq tokens=1,2" %%f IN (`PowerShell -NoProfile -EncodedCommand "CgBnAHcAbQBpACAAVwBpAG4AMwAyAF8ATABvAGcAaQBjAGEAbABEAGkAcwBrACAALQBGAGkAbAB0AGUAcgAgACIAQwBhAHAAdABpAG8AbgA9ACcAQwA6ACcAIgB8ACUAewAkAGcAPQAxADAANwAzADcANAAxADgAMgA0ADsAWwBpAG4AdABdACQAZgA9ACgAJABfAC4ARgByAGUAZQBTAHAAYQBjAGUALwAkAGcAKQA7AFsAaQBuAHQAXQAkAHQAPQAoACQAXwAuAFMAaQB6AGUALwAkAGcAKQA7AFcAcgBpAHQAZQAtAEgAbwBzAHQAIAAoACQAdAAtACQAZgApACwAJABmAH0ACgA="`) DO ((SET U=%%f)&(SET F=%%g))
-    //
-    //        @ECHO Used: %U%
-    //            @ECHO Free: %F%
-
     if (shutdown) {
       return null;
     }
@@ -980,10 +942,6 @@ public class OSStatsManager {
     Double totalGig = null;
     JsonNode node = server.getConfig().get("maxProcessMemoryTrigger");
     String max = node == null ? null : node.asText();
-//    max = null; //disable for now
-//    if (max == null) {
-//      logger.info("Max process memory not set in config. Not enforcing max memory");
-//    }
 
     Double resGig = null;
     String secondToLastLine = null;
@@ -1125,11 +1083,6 @@ public class OSStatsManager {
       Double totalGig = null;
       JsonNode node = server.getConfig().get("maxProcessMemoryTrigger");
       String max = node == null ? null : node.asText();
-      //    max = null; //disable for now
-      //    if (max == null) {
-      //      logger.info("Max process memory not set in config. Not enforcing max memory");
-      //    }
-
       Double resGig = null;
       String secondToLastLine = null;
       String lastLine = null;

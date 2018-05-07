@@ -2257,7 +2257,7 @@ com.sonicbase.server.SchemaManager$AutoIncrementValue -> com.sonicbase.server.i$
     33:40:void <init>(DataType$Type) -> <init>
     43:44:void setInitialValue() -> a
     47:50:java.lang.Object increment() -> b
-com.sonicbase.server.SnapshotManagerImpl -> com.sonicbase.server.j:
+com.sonicbase.server.SnapshotManager -> com.sonicbase.server.j:
     int SNAPSHOT_PARTITION_COUNT -> a
     java.lang.String SNAPSHOT_STR -> d
     java.lang.String INDEX_STR -> e
@@ -2299,11 +2299,11 @@ com.sonicbase.server.SnapshotManagerImpl -> com.sonicbase.server.j:
     681:687:void deleteTempDirs() -> e
     690:703:void doDeleteTempDirs(java.io.File) -> b
     706:706:boolean isRecovering() -> f
-    26:26:java.util.concurrent.atomic.AtomicLong access$000(com.sonicbase.server.SnapshotManagerImpl) -> a
-    26:26:com.sonicbase.server.DatabaseServer access$100(com.sonicbase.server.SnapshotManagerImpl) -> b
-    26:26:long access$200(com.sonicbase.server.SnapshotManagerImpl) -> c
-    26:26:boolean access$300(com.sonicbase.server.SnapshotManagerImpl) -> d
-com.sonicbase.server.SnapshotManagerImpl$1 -> com.sonicbase.server.j$1:
+    26:26:java.util.concurrent.atomic.AtomicLong access$000(com.sonicbase.server.SnapshotManager) -> a
+    26:26:com.sonicbase.server.DatabaseServer access$100(com.sonicbase.server.SnapshotManager) -> b
+    26:26:long access$200(com.sonicbase.server.SnapshotManager) -> c
+    26:26:boolean access$300(com.sonicbase.server.SnapshotManager) -> d
+com.sonicbase.server.SnapshotManager$1 -> com.sonicbase.server.j$1:
     java.io.File val$indexFile -> a
     IndexSchema val$indexSchema -> b
     TableSchema val$tableSchema -> c
@@ -2314,15 +2314,15 @@ com.sonicbase.server.SnapshotManagerImpl$1 -> com.sonicbase.server.j$1:
     java.lang.String val$tableName -> h
     java.lang.String val$indexName -> i
     long val$indexBegin -> j
-    com.sonicbase.server.SnapshotManagerImpl this$0 -> k
-    196:196:void <init>(com.sonicbase.server.SnapshotManagerImpl,java.io.File,IndexSchema,TableSchema,com.sonicbase.index.Index,java.util.concurrent.atomic.AtomicLong,int,java.util.concurrent.atomic.AtomicLong,java.lang.String,java.lang.String,long) -> <init>
+    com.sonicbase.server.SnapshotManager this$0 -> k
+    196:196:void <init>(com.sonicbase.server.SnapshotManager,java.io.File,IndexSchema,TableSchema,com.sonicbase.index.Index,java.util.concurrent.atomic.AtomicLong,int,java.util.concurrent.atomic.AtomicLong,java.lang.String,java.lang.String,long) -> <init>
     199:243:java.lang.Boolean call() -> a
     196:196:java.lang.Object call() -> call
-com.sonicbase.server.SnapshotManagerImpl$2 -> com.sonicbase.server.j$2:
-    com.sonicbase.server.SnapshotManagerImpl this$0 -> a
-    290:290:void <init>(com.sonicbase.server.SnapshotManagerImpl) -> <init>
+com.sonicbase.server.SnapshotManager$2 -> com.sonicbase.server.j$2:
+    com.sonicbase.server.SnapshotManager this$0 -> a
+    290:290:void <init>(com.sonicbase.server.SnapshotManager) -> <init>
     295:321:void run() -> run
-com.sonicbase.server.SnapshotManagerImpl$3 -> com.sonicbase.server.j$3:
+com.sonicbase.server.SnapshotManager$3 -> com.sonicbase.server.j$3:
     java.util.concurrent.atomic.AtomicLong val$countSaved -> a
     com.sonicbase.index.Index val$index -> b
     boolean val$isPrimaryKey -> c
@@ -2335,14 +2335,14 @@ com.sonicbase.server.SnapshotManagerImpl$3 -> com.sonicbase.server.j$3:
     java.util.concurrent.atomic.AtomicLong val$savedCount -> j
     java.util.concurrent.atomic.AtomicLong val$lastLogged -> k
     long val$subBegin -> l
-    com.sonicbase.server.SnapshotManagerImpl this$0 -> m
-    420:420:void <init>(com.sonicbase.server.SnapshotManagerImpl,java.util.concurrent.atomic.AtomicLong,com.sonicbase.index.Index,boolean,java.io.DataOutputStream[],java.util.Map$Entry,java.util.Map$Entry,java.lang.Long,java.lang.String,int[],java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong,long) -> <init>
+    com.sonicbase.server.SnapshotManager this$0 -> m
+    420:420:void <init>(com.sonicbase.server.SnapshotManager,java.util.concurrent.atomic.AtomicLong,com.sonicbase.index.Index,boolean,java.io.DataOutputStream[],java.util.Map$Entry,java.util.Map$Entry,java.lang.Long,java.lang.String,int[],java.util.concurrent.atomic.AtomicLong,java.util.concurrent.atomic.AtomicLong,long) -> <init>
     423:477:boolean visit(java.lang.Object[],java.lang.Object) -> a
-com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream -> com.sonicbase.server.j$a:
+com.sonicbase.server.SnapshotManager$ByteCounterStream -> com.sonicbase.server.j$a:
     java.io.FileInputStream stream -> b
     java.util.concurrent.atomic.AtomicLong finishedBytes -> c
-    com.sonicbase.server.SnapshotManagerImpl this$0 -> a
-    713:716:void <init>(com.sonicbase.server.SnapshotManagerImpl,java.util.concurrent.atomic.AtomicLong,java.io.FileInputStream) -> <init>
+    com.sonicbase.server.SnapshotManager this$0 -> a
+    713:716:void <init>(com.sonicbase.server.SnapshotManager,java.util.concurrent.atomic.AtomicLong,java.io.FileInputStream) -> <init>
     719:720:void reset() -> reset
     723:723:boolean markSupported() -> markSupported
     727:728:void mark(int) -> mark

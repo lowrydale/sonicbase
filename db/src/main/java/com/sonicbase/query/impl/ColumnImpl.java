@@ -173,12 +173,6 @@ public class ColumnImpl extends ExpressionImpl {
       }
     }
     return null;
-//
-//    if (tableName != null && !tableName.equals(record.getTableSchema().getName())) {
-//      throw new WrongTableException();
-//    }
-//    int offset = record.getTableSchema().getFieldOffset(columnName);
-//    return record.getFields()[offset];
   }
 
   public String getTableName() {

@@ -1,4 +1,4 @@
-package com.sonicbase.socket;
+package com.sonicbase.common;
 
 /**
  * Created by lowryda on 6/17/17.

@@ -10,7 +10,7 @@ import com.sonicbase.query.impl.*;
 import com.sonicbase.schema.Schema;
 import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.socket.DatabaseSocketClient;
-import com.sonicbase.socket.DeadServerException;
+import com.sonicbase.common.DeadServerException;
 import net.sf.jsqlparser.parser.CCJSqlParserManager;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.select.*;

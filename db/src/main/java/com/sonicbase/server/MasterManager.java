@@ -187,15 +187,6 @@ public class MasterManager {
       }
       nextMonitor.set(i);
       break;
-//      // let the lowest monitor initiate the election
-//      if (monitorShards[i] != 0 || monitorReplicas[i] != oldMasterReplica) {
-//        if (monitorShards[i] != shard || monitorReplicas[i] != replica) {
-//          isFirst = false;
-//          break;
-//        }
-//        nextMonitor = i;
-//        break;
-//      }
     }
     if (!isFirst) {
       logger.info("ElectNewMaster shard=" + shard + ", !isFirst, nextMonitor=" + nextMonitor);

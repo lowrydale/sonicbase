@@ -1053,7 +1053,7 @@ public class SchemaManager {
 
       logger.info("Updating schema for Index: db=" + dbName + ", table=" + tableName + ", index=" + indexName + ", schemaVersion=" + schemaVersion);
 
-      File indexDir = server.getDeltaManager().getIndexSchemaDir(dbName, tableName, indexName);
+      File indexDir = server.getSnapshotManager().getIndexSchemaDir(dbName, tableName, indexName);
       File newSchemaFile = new File(indexDir, "schema." + schemaVersion + ".bin");
       File[] indexSchemas = indexDir.listFiles();
       if (indexSchemas != null && indexSchemas.length > 0) {
@@ -1097,7 +1097,7 @@ public class SchemaManager {
 
       logger.info("Updating schema for table: db=" + dbName + ", table=" + tableName + ", schemaVersion=" + schemaVersion);
 
-      File tableDir = server.getDeltaManager().getTableSchemaDir(dbName, tableName);
+      File tableDir = server.getSnapshotManager().getTableSchemaDir(dbName, tableName);
       File newSchemaFile = new File(tableDir, "schema." + schemaVersion + ".bin");
       File[] tableSchemas = tableDir.listFiles();
       if (tableSchemas != null && tableSchemas.length > 0) {
@@ -1138,7 +1138,7 @@ public class SchemaManager {
       String indexName = cobj.getString(ComObject.Tag.indexName);
 
       ComObject retObj = new ComObject();
-      File indexDir = server.getDeltaManager().getIndexSchemaDir(dbName, tableName, indexName);
+      File indexDir = server.getSnapshotManager().getIndexSchemaDir(dbName, tableName, indexName);
       File[] indexSchemas = indexDir.listFiles();
       if (indexSchemas != null && indexSchemas.length > 0) {
         sortSchemaFiles(indexSchemas);
@@ -1160,7 +1160,7 @@ public class SchemaManager {
       String tableName = cobj.getString(ComObject.Tag.tableName);
 
       ComObject retObj = new ComObject();
-      File tableDir = server.getDeltaManager().getTableSchemaDir(dbName, tableName);
+      File tableDir = server.getSnapshotManager().getTableSchemaDir(dbName, tableName);
       File[] tableSchemas = tableDir.listFiles();
       if (tableSchemas != null && tableSchemas.length > 0) {
         sortSchemaFiles(tableSchemas);
@@ -1204,7 +1204,7 @@ public class SchemaManager {
         ComObject tableObj = new ComObject();
         tables.add(tableObj);
         tableObj.put(ComObject.Tag.tableName, tableSchema.getName());
-        File tableDir = server.getDeltaManager().getTableSchemaDir(dbName, tableSchema.getName());
+        File tableDir = server.getSnapshotManager().getTableSchemaDir(dbName, tableSchema.getName());
         File[] tableSchemas = tableDir.listFiles();
         if (tableSchemas != null && tableSchemas.length > 0) {
           sortSchemaFiles(tableSchemas);
@@ -1221,7 +1221,7 @@ public class SchemaManager {
           ComObject indexObj = new ComObject();
           indices.add(indexObj);
           indexObj.put(ComObject.Tag.indexName, indexSchema.getName());
-          File indexDir = server.getDeltaManager().getIndexSchemaDir(dbName, tableSchema.getName(), indexSchema.getName());
+          File indexDir = server.getSnapshotManager().getIndexSchemaDir(dbName, tableSchema.getName(), indexSchema.getName());
           File[] indexSchemas = indexDir.listFiles();
           if (indexSchemas != null && indexSchemas.length > 0) {
             sortSchemaFiles(indexSchemas);

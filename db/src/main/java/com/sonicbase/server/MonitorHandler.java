@@ -224,46 +224,10 @@ public class MonitorHandler extends AbstractHandler {
 
       String timeStr = null;
       String timeStr2 = null;
-      if (time.equals("min15")) {
-        cal.add(MINUTE, -15);
-      }
-      else if (time.equals("hour1")) {
-        cal.add(Calendar.HOUR, -1);
-      }
-      else if (time.equals("hour6")) {
-        cal.add(Calendar.HOUR, -6);
-      }
-      else if (time.equals("hour24")) {
-        cal.add(Calendar.HOUR, -24);
-      }
-      else if (time.equals("day7")) {
-        cal.add(HOUR, -24 * 7);
-      }
-      else if (time.equals("day30")) {
-        cal.add(HOUR, -24 * 30);
-      }
-      else if (time.equals("today")) {
-        Calendar cal2 = new GregorianCalendar();
-        cal2.set(YEAR, cal.get(YEAR));
-        cal2.set(MONTH, cal.get(MONTH));
-        cal2.set(DAY_OF_MONTH, cal.get(DAY_OF_MONTH));
-        cal = cal2;
-      }
-      else if (time.equals("yesterday")) {
-        Calendar cal2 = new GregorianCalendar();
-        cal2.set(YEAR, cal.get(YEAR));
-        cal2.set(MONTH, cal.get(MONTH));
-        cal2.set(DAY_OF_MONTH, cal.get(DAY_OF_MONTH));
 
-        SimpleDateFormat df = new SimpleDateFormat(TIME_FORMAT_STR);
-        df.setTimeZone(TimeZone.getTimeZone("UTC"));
-        timeStr2 = df.format(new Date(cal2.getTimeInMillis()));
-
-        cal2.set(YEAR, cal.get(YEAR));
-        cal2.set(MONTH, cal.get(MONTH));
-        cal2.set(DAY_OF_MONTH, cal.get(DAY_OF_MONTH) - 1);
-        cal = cal2;
-      }
+      SetCalendar setCalendar = new SetCalendar(time, cal, timeStr2).invoke();
+      cal = setCalendar.getCal();
+      timeStr2 = setCalendar.getTimeStr2();
 
       SimpleDateFormat df = new SimpleDateFormat(TIME_FORMAT_STR);
       df.setTimeZone(TimeZone.getTimeZone("UTC"));
@@ -282,25 +246,8 @@ public class MonitorHandler extends AbstractHandler {
         }
         try (ResultSet rs = stmt.executeQuery()) {
           ConcurrentSkipListMap<String, List<OSStats>> stats = new ConcurrentSkipListMap<>();
-          while (rs.next()) {
-            OSStats currStats = new OSStats();
-            currStats.host = rs.getString("host");
-            currStats.time = rs.getString("time_val");
-            currStats.cpu = rs.getDouble("cpu");
-            currStats.resGig = rs.getDouble("res_mem");
-            currStats.javaMemMin = rs.getDouble("jmem_min");
-            currStats.javaMemMax = rs.getDouble("jmem_max");
-            currStats.netIn = rs.getDouble("net_bytes_in");
-            currStats.netOut = rs.getDouble("net_bytes_out");
-            currStats.diskAvail = rs.getDouble("disk_avail");
 
-            List<OSStats> statsList = stats.get(currStats.time);
-            if (statsList == null) {
-              statsList = new ArrayList<>();
-              stats.put(currStats.time, statsList);
-            }
-            statsList.add(currStats);
-          }
+          processReadResults(rs, stats);
 
           String minTime = stats.firstKey();
           String maxTime = stats.firstKey();
@@ -357,35 +304,8 @@ public class MonitorHandler extends AbstractHandler {
           Iterator<Map.Entry<String, List<OSStats>>> iterator = stats.entrySet().iterator();
           String key = buckets.firstKey();
           Map.Entry<String, List<OSStats>> currEntry = null;
-          while (key != null) {
-            if (!iterator.hasNext()) {
-              break;
-            }
-            Histograms historgrams = buckets.get(key);
-            while (iterator.hasNext()) {
-              Map.Entry<String, List<OSStats>> entry = currEntry;
-              currEntry = null;
-              if (entry == null) {
-                entry = iterator.next();
-              }
-              if (entry.getKey().compareTo(key) < 0) {
-                for (OSStats currStats : entry.getValue()) {
-                  historgrams.cpuHistogram.update((long)currStats.cpu);
-                  historgrams.resGigHistogram.update((long)currStats.resGig);
-                  historgrams.javaMemMinHistogram.update((long)currStats.javaMemMin);
-                  historgrams.javaMemMaxHistogram.update((long)currStats.javaMemMax);
-                  historgrams.netInHistogram.update((long)currStats.netIn);
-                  historgrams.netOutHistogram.update((long)currStats.netOut);
-                  historgrams.diskAvailHistogram.update((long)currStats.diskAvail);
-                }
-              }
-              else {
-                currEntry = entry;
-                break;
-              }
-            }
-            key = buckets.higherKey(key);
-          }
+
+          updateHistograms(buckets, iterator, key, currEntry);
 
           for (Histograms h : buckets.values()) {
             h.cpuSnapshot = h.cpuHistogram.getSnapshot();
@@ -401,90 +321,7 @@ public class MonitorHandler extends AbstractHandler {
           for (String currTime : times) {
             timesArray.add(currTime);
           }
-          ArrayNode max = node.putArray("max");
-          for (Map.Entry<String, Histograms> statsList : buckets.entrySet()) {
-            ObjectNode obj = max.addObject();
-            Histograms h = statsList.getValue();
-
-            obj.put("time", statsList.getKey());
-            obj.put("cpu", h.cpuSnapshot.getMax());
-            obj.put("net_in", h.netInSnapshot.getMax());
-            obj.put("net_out", h.netOutSnapshot.getMax());
-            obj.put("r_mem", h.resGigSnapshot.getMax());
-            obj.put("j_min", h.javaMemMinSnapshot.getMax());
-            obj.put("j_max", h.javaMemMaxSnapshot.getMax());
-            obj.put("d_avail", h.diskAvailSnapshot.getMax());
-          }
-          ArrayNode p75 = node.putArray("p75");
-          for (Map.Entry<String, Histograms> statsList : buckets.entrySet()) {
-            ObjectNode obj = p75.addObject();
-            Histograms h = statsList.getValue();
-
-            obj.put("time", statsList.getKey());
-            obj.put("cpu", h.cpuSnapshot.get75thPercentile());
-            obj.put("net_in", h.netInSnapshot.get75thPercentile());
-            obj.put("net_out", h.netOutSnapshot.get75thPercentile());
-            obj.put("r_mem", h.resGigSnapshot.get75thPercentile());
-            obj.put("j_min", h.javaMemMinSnapshot.get75thPercentile());
-            obj.put("j_max", h.javaMemMaxSnapshot.get75thPercentile());
-            obj.put("d_avail", h.diskAvailSnapshot.get75thPercentile());
-          }
-          ArrayNode p95 = node.putArray("p95");
-          for (Map.Entry<String, Histograms> statsList : buckets.entrySet()) {
-            ObjectNode obj = p95.addObject();
-            Histograms h = statsList.getValue();
-
-            obj.put("time", statsList.getKey());
-            obj.put("cpu", h.cpuSnapshot.get95thPercentile());
-            obj.put("net_in", h.netInSnapshot.get95thPercentile());
-            obj.put("net_out", h.netOutSnapshot.get95thPercentile());
-            obj.put("r_mem", h.resGigSnapshot.get95thPercentile());
-            obj.put("j_min", h.javaMemMinSnapshot.get95thPercentile());
-            obj.put("j_max", h.javaMemMaxSnapshot.get95thPercentile());
-            obj.put("d_avail", h.diskAvailSnapshot.get95thPercentile());
-          }
-          ArrayNode p99 = node.putArray("p99");
-          for (Map.Entry<String, Histograms> statsList : buckets.entrySet()) {
-            ObjectNode obj = p99.addObject();
-            Histograms h = statsList.getValue();
-
-            obj.put("time", statsList.getKey());
-            obj.put("cpu", h.cpuSnapshot.get99thPercentile());
-            obj.put("net_in", h.netInSnapshot.get99thPercentile());
-            obj.put("net_out", h.netOutSnapshot.get99thPercentile());
-            obj.put("r_mem", h.resGigSnapshot.get99thPercentile());
-            obj.put("j_min", h.javaMemMinSnapshot.get99thPercentile());
-            obj.put("j_max", h.javaMemMaxSnapshot.get99thPercentile());
-            obj.put("d_avail", h.diskAvailSnapshot.get99thPercentile());
-          }
-          ArrayNode p999 = node.putArray("p999");
-          for (Map.Entry<String, Histograms> statsList : buckets.entrySet()) {
-            ObjectNode obj = p999.addObject();
-            Histograms h = statsList.getValue();
-
-            obj.put("time", statsList.getKey());
-            obj.put("cpu", h.cpuSnapshot.get999thPercentile());
-            obj.put("net_in", h.netInSnapshot.get999thPercentile());
-            obj.put("net_out", h.netOutSnapshot.get999thPercentile());
-            obj.put("r_mem", h.resGigSnapshot.get999thPercentile());
-            obj.put("j_min", h.javaMemMinSnapshot.get999thPercentile());
-            obj.put("j_max", h.javaMemMaxSnapshot.get999thPercentile());
-            obj.put("d_avail", h.diskAvailSnapshot.get999thPercentile());
-          }
-          ArrayNode avg = node.putArray("avg");
-          for (Map.Entry<String, Histograms> statsList : buckets.entrySet()) {
-            ObjectNode obj = avg.addObject();
-            Histograms h = statsList.getValue();
-
-            obj.put("time", statsList.getKey());
-            obj.put("cpu", h.cpuSnapshot.getMean());
-            obj.put("net_in", h.netInSnapshot.getMean());
-            obj.put("net_out", h.netOutSnapshot.getMean());
-            obj.put("r_mem", h.resGigSnapshot.getMean());
-            obj.put("j_min", h.javaMemMinSnapshot.getMean());
-            obj.put("j_max", h.javaMemMaxSnapshot.getMean());
-            obj.put("d_avail", h.diskAvailSnapshot.getMean());
-          }
+          setStats(node, buckets);
         }
       }
     }
@@ -495,6 +332,147 @@ public class MonitorHandler extends AbstractHandler {
       logger.error("Error processing request", e);
     }
     return node.toString();
+  }
+
+  private void processReadResults(ResultSet rs, ConcurrentSkipListMap<String, List<OSStats>> stats) throws SQLException {
+    while (rs.next()) {
+      OSStats currStats = new OSStats();
+      currStats.host = rs.getString("host");
+      currStats.time = rs.getString("time_val");
+      currStats.cpu = rs.getDouble("cpu");
+      currStats.resGig = rs.getDouble("res_mem");
+      currStats.javaMemMin = rs.getDouble("jmem_min");
+      currStats.javaMemMax = rs.getDouble("jmem_max");
+      currStats.netIn = rs.getDouble("net_bytes_in");
+      currStats.netOut = rs.getDouble("net_bytes_out");
+      currStats.diskAvail = rs.getDouble("disk_avail");
+
+      List<OSStats> statsList = stats.get(currStats.time);
+      if (statsList == null) {
+        statsList = new ArrayList<>();
+        stats.put(currStats.time, statsList);
+      }
+      statsList.add(currStats);
+    }
+  }
+
+  private void updateHistograms(ConcurrentSkipListMap<String, Histograms> buckets, Iterator<Map.Entry<String, List<OSStats>>> iterator, String key, Map.Entry<String, List<OSStats>> currEntry) {
+    while (key != null) {
+      if (!iterator.hasNext()) {
+        break;
+      }
+      Histograms historgrams = buckets.get(key);
+      while (iterator.hasNext()) {
+        Map.Entry<String, List<OSStats>> entry = currEntry;
+        currEntry = null;
+        if (entry == null) {
+          entry = iterator.next();
+        }
+        if (entry.getKey().compareTo(key) < 0) {
+          for (OSStats currStats : entry.getValue()) {
+            historgrams.cpuHistogram.update((long)currStats.cpu);
+            historgrams.resGigHistogram.update((long)currStats.resGig);
+            historgrams.javaMemMinHistogram.update((long)currStats.javaMemMin);
+            historgrams.javaMemMaxHistogram.update((long)currStats.javaMemMax);
+            historgrams.netInHistogram.update((long)currStats.netIn);
+            historgrams.netOutHistogram.update((long)currStats.netOut);
+            historgrams.diskAvailHistogram.update((long)currStats.diskAvail);
+          }
+        }
+        else {
+          currEntry = entry;
+          break;
+        }
+      }
+      key = buckets.higherKey(key);
+    }
+  }
+
+  private void setStats(ObjectNode node, ConcurrentSkipListMap<String, Histograms> buckets) {
+    ArrayNode max = node.putArray("max");
+    for (Map.Entry<String, Histograms> statsList : buckets.entrySet()) {
+      ObjectNode obj = max.addObject();
+      Histograms h = statsList.getValue();
+
+      obj.put("time", statsList.getKey());
+      obj.put("cpu", h.cpuSnapshot.getMax());
+      obj.put("net_in", h.netInSnapshot.getMax());
+      obj.put("net_out", h.netOutSnapshot.getMax());
+      obj.put("r_mem", h.resGigSnapshot.getMax());
+      obj.put("j_min", h.javaMemMinSnapshot.getMax());
+      obj.put("j_max", h.javaMemMaxSnapshot.getMax());
+      obj.put("d_avail", h.diskAvailSnapshot.getMax());
+    }
+    ArrayNode p75 = node.putArray("p75");
+    for (Map.Entry<String, Histograms> statsList : buckets.entrySet()) {
+      ObjectNode obj = p75.addObject();
+      Histograms h = statsList.getValue();
+
+      obj.put("time", statsList.getKey());
+      obj.put("cpu", h.cpuSnapshot.get75thPercentile());
+      obj.put("net_in", h.netInSnapshot.get75thPercentile());
+      obj.put("net_out", h.netOutSnapshot.get75thPercentile());
+      obj.put("r_mem", h.resGigSnapshot.get75thPercentile());
+      obj.put("j_min", h.javaMemMinSnapshot.get75thPercentile());
+      obj.put("j_max", h.javaMemMaxSnapshot.get75thPercentile());
+      obj.put("d_avail", h.diskAvailSnapshot.get75thPercentile());
+    }
+    ArrayNode p95 = node.putArray("p95");
+    for (Map.Entry<String, Histograms> statsList : buckets.entrySet()) {
+      ObjectNode obj = p95.addObject();
+      Histograms h = statsList.getValue();
+
+      obj.put("time", statsList.getKey());
+      obj.put("cpu", h.cpuSnapshot.get95thPercentile());
+      obj.put("net_in", h.netInSnapshot.get95thPercentile());
+      obj.put("net_out", h.netOutSnapshot.get95thPercentile());
+      obj.put("r_mem", h.resGigSnapshot.get95thPercentile());
+      obj.put("j_min", h.javaMemMinSnapshot.get95thPercentile());
+      obj.put("j_max", h.javaMemMaxSnapshot.get95thPercentile());
+      obj.put("d_avail", h.diskAvailSnapshot.get95thPercentile());
+    }
+    ArrayNode p99 = node.putArray("p99");
+    for (Map.Entry<String, Histograms> statsList : buckets.entrySet()) {
+      ObjectNode obj = p99.addObject();
+      Histograms h = statsList.getValue();
+
+      obj.put("time", statsList.getKey());
+      obj.put("cpu", h.cpuSnapshot.get99thPercentile());
+      obj.put("net_in", h.netInSnapshot.get99thPercentile());
+      obj.put("net_out", h.netOutSnapshot.get99thPercentile());
+      obj.put("r_mem", h.resGigSnapshot.get99thPercentile());
+      obj.put("j_min", h.javaMemMinSnapshot.get99thPercentile());
+      obj.put("j_max", h.javaMemMaxSnapshot.get99thPercentile());
+      obj.put("d_avail", h.diskAvailSnapshot.get99thPercentile());
+    }
+    ArrayNode p999 = node.putArray("p999");
+    for (Map.Entry<String, Histograms> statsList : buckets.entrySet()) {
+      ObjectNode obj = p999.addObject();
+      Histograms h = statsList.getValue();
+
+      obj.put("time", statsList.getKey());
+      obj.put("cpu", h.cpuSnapshot.get999thPercentile());
+      obj.put("net_in", h.netInSnapshot.get999thPercentile());
+      obj.put("net_out", h.netOutSnapshot.get999thPercentile());
+      obj.put("r_mem", h.resGigSnapshot.get999thPercentile());
+      obj.put("j_min", h.javaMemMinSnapshot.get999thPercentile());
+      obj.put("j_max", h.javaMemMaxSnapshot.get999thPercentile());
+      obj.put("d_avail", h.diskAvailSnapshot.get999thPercentile());
+    }
+    ArrayNode avg = node.putArray("avg");
+    for (Map.Entry<String, Histograms> statsList : buckets.entrySet()) {
+      ObjectNode obj = avg.addObject();
+      Histograms h = statsList.getValue();
+
+      obj.put("time", statsList.getKey());
+      obj.put("cpu", h.cpuSnapshot.getMean());
+      obj.put("net_in", h.netInSnapshot.getMean());
+      obj.put("net_out", h.netOutSnapshot.getMean());
+      obj.put("r_mem", h.resGigSnapshot.getMean());
+      obj.put("j_min", h.javaMemMinSnapshot.getMean());
+      obj.put("j_max", h.javaMemMaxSnapshot.getMean());
+      obj.put("d_avail", h.diskAvailSnapshot.getMean());
+    }
   }
 
   public void shutdown() {
@@ -547,81 +525,22 @@ public class MonitorHandler extends AbstractHandler {
     try {
       getClusters(node);
 
-      //if (cluster == null || cluster.length() == 0 || cluster.equals("_unknown_")) {
       cluster = server.getCluster();
-      //}
 
       Connection conn = getDbConnection(cluster);
 
       SimpleDateFormat df = new SimpleDateFormat(DAY_FORMAT_STR);
-      TimeZone userTimezone = TimeZone.getTimeZone(timezone);
-      //df.setTimeZone();
-
-      //userTimezone.getOffset(
 
       String originalDate = date;
       Calendar dateObj = new GregorianCalendar();
       dateObj.setTime(df.parse(date));
-//        Calendar currentDateObj = new GregorianCalendar();
-//        currentDateObj.setTime(df.parse(currentDate));
-//
-//        long millisDiff = currentDateObj.getTimeInMillis() - dateObj.getTimeInMillis();
-//        int daysDiff = (int) (millisDiff / 1000 / 60 / 60 / 24);
-
-//
-//        SimpleDateFormat dateFormatUtc = new SimpleDateFormat("yyyy-MMM-dd HH:mm:ss");
-//        dateFormatUtc.setTimeZone(TimeZone.getTimeZone("UTC"));
-//        SimpleDateFormat dateFormatLocal = new SimpleDateFormat("yyyy-MMM-dd HH:mm:ss");
-
-//        Calendar now = new GregorianCalendar();
-//        now.setTime(new Date());
-//        now.
-//        now.setTimeInMillis(System.currentTimeMillis());
       TimeZone utcTimezone = TimeZone.getTimeZone("UTC");
-//        df.setTimeZone(utcTimezone);
-//        now.set(HOUR, 0);
-//        now.set(MINUTE, 0);
-//        now.set(SECOND, 0);
-//        now.set(MILLISECOND, 0);
-
-//        now.add(DAY_OF_YEAR, -1 * daysDiff);
-
-//        Date nowDate = dateFormatUtc.parse( dateFormatLocal.format(now.getTime()) );
-//
 
       SimpleDateFormat utfDf = new SimpleDateFormat(DAY_FORMAT_STR);
       utfDf.setTimeZone(utcTimezone);
       date = utfDf.format(dateObj.getTime());//new Date(now.getTimeInMillis()));
 
       System.out.println("originalDate=" + originalDate + ", adjustedDate=" + date);
-      //
-//        currentDateObj.di
-//
-//        Calendar cal = new GregorianCalendar();
-//        cal.setTimeInMillis(dateObj.getTime());
-//        int timezoneOffset = userTimezone.getOffset(cal.getTimeInMillis());
-//        cal.add(MILLISECOND, timezoneOffset);
-//        TimeZone utcTimezone = TimeZone.getTimeZone("UTC");
-//        int utcOffset = utcTimezone.getOffset(cal.getTimeInMillis());
-//        cal.add(MILLISECOND, utcOffset);
-//
-//        Calendar now = new GregorianCalendar();
-//        now.setTimeInMillis(System.currentTimeMillis());
-//        int hour = now.get(HOUR_OF_DAY);
-//        int minute = now.get(MINUTE);
-//        cal.set(HOUR_OF_DAY, hour);
-//        cal.set(MINUTE, minute);
-
-//        Date adjustedateObj = cal.getTime();
-//
-//        df = new SimpleDateFormat(DAY_FORMAT_STR);
-//        df.setTimeZone(TimeZone.getTimeZone("UTC"));
-//        date = df.format(adjustedateObj.getTime());
-//
-//        SimpleDateFormat df2 = new SimpleDateFormat(TIME_FORMAT_STR);
-//        df2.setTimeZone(TimeZone.getTimeZone("UTC"));
-//        String time = df2.format(dateObj.getTime());
-//        System.out.println("date_prev=" + dateObj + ", adjustedate=" + adjustedateObj + ", dateStr=" + date + ", time=" + time);
       checkLicense((ConnectionProxy) conn);
 
 
@@ -746,9 +665,7 @@ public class MonitorHandler extends AbstractHandler {
     try {
       getClusters(node);
 
-      //if (cluster == null || cluster.length() == 0 || cluster.equals("_unknown_")) {
       cluster = server.getCluster();
-      //}
 
       Connection conn = getDbConnection(cluster);
 
@@ -781,5 +698,69 @@ public class MonitorHandler extends AbstractHandler {
       logger.error("Error processing request", e);
     }
     return node.toString();
+  }
+
+  private class SetCalendar {
+    private String time;
+    private Calendar cal;
+    private String timeStr2;
+
+    public SetCalendar(String time, Calendar cal, String timeStr2) {
+      this.time = time;
+      this.cal = cal;
+      this.timeStr2 = timeStr2;
+    }
+
+    public Calendar getCal() {
+      return cal;
+    }
+
+    public String getTimeStr2() {
+      return timeStr2;
+    }
+
+    public SetCalendar invoke() {
+      if (time.equals("min15")) {
+        cal.add(MINUTE, -15);
+      }
+      else if (time.equals("hour1")) {
+        cal.add(Calendar.HOUR, -1);
+      }
+      else if (time.equals("hour6")) {
+        cal.add(Calendar.HOUR, -6);
+      }
+      else if (time.equals("hour24")) {
+        cal.add(Calendar.HOUR, -24);
+      }
+      else if (time.equals("day7")) {
+        cal.add(HOUR, -24 * 7);
+      }
+      else if (time.equals("day30")) {
+        cal.add(HOUR, -24 * 30);
+      }
+      else if (time.equals("today")) {
+        Calendar cal2 = new GregorianCalendar();
+        cal2.set(YEAR, cal.get(YEAR));
+        cal2.set(MONTH, cal.get(MONTH));
+        cal2.set(DAY_OF_MONTH, cal.get(DAY_OF_MONTH));
+        cal = cal2;
+      }
+      else if (time.equals("yesterday")) {
+        Calendar cal2 = new GregorianCalendar();
+        cal2.set(YEAR, cal.get(YEAR));
+        cal2.set(MONTH, cal.get(MONTH));
+        cal2.set(DAY_OF_MONTH, cal.get(DAY_OF_MONTH));
+
+        SimpleDateFormat df = new SimpleDateFormat(TIME_FORMAT_STR);
+        df.setTimeZone(TimeZone.getTimeZone("UTC"));
+        timeStr2 = df.format(new Date(cal2.getTimeInMillis()));
+
+        cal2.set(YEAR, cal.get(YEAR));
+        cal2.set(MONTH, cal.get(MONTH));
+        cal2.set(DAY_OF_MONTH, cal.get(DAY_OF_MONTH) - 1);
+        cal = cal2;
+      }
+      return this;
+    }
   }
 }

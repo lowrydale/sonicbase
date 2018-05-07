@@ -250,10 +250,6 @@ public class ParenthesisImpl extends ExpressionImpl {
   @Override
   public boolean canUseIndex() {
     return false;
-//    if (isNot) {
-//      return false;
-//    }
-//    return expression.canUseIndex();
   }
 
   @Override

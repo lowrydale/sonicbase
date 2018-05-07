@@ -308,16 +308,6 @@ public class DatabaseCommon {
         serializeSchema(out, SERIALIZATION_VERSION);
 
       }
-//      if (getShard() == 0 &&
-//          getServersConfig().getShards()[0].getMasterReplica() == getReplica()) {
-//        String command = "DatabaseServer:ComObject:saveSchema:";
-//        ComObject cobj = new ComObject();
-//        cobj.put(ComObject.Tag.method, "saveSchema");
-//        cobj.put(ComObject.Tag.schemaBytes, serializeSchema(SnapshotManagerImpl.SERIALIZATION_VERSION));
-//        client.send(null, 0, getReplica(), command, cobj, DatabaseClient.Replica.specified);
-//      }
-
-
       loadSchema(dataDir);
       logger.info("Saved schema - postLoad: dir=" + dataRoot);
 
@@ -355,14 +345,8 @@ public class DatabaseCommon {
     try {
       internalReadLock.lock();
       for (String dbName : schema.keySet()) {
-        // getSchemaReadLock(dbName).lock();
-        try {
-          out.writeUTF(dbName);
-          serializeSchema(dbName, out);
-        }
-        finally {
-          //     getSchemaReadLock(dbName).unlock();
-        }
+        out.writeUTF(dbName);
+        serializeSchema(dbName, out);
       }
     }
     finally {
@@ -427,20 +411,10 @@ public class DatabaseCommon {
       int count = in.readInt();
       for (int i = 0; i < count; i++) {
         String dbName = in.readUTF();
-//        if (common.getSchemaWriteLock(dbName) != null) { //not there on client
-//          common.getSchemaWriteLock(dbName).lock();
-//        }
-        try {
-          Schema newSchema = new Schema();
-          newSchema.deserialize(in);
-          schema.put(dbName, newSchema);
-          createSchemaLocks(dbName);
-        }
-        finally {
-//          if (common.getSchemaWriteLock(dbName) != null) {
-//            common.getSchemaWriteLock(dbName).unlock();
-//          }
-        }
+        Schema newSchema = new Schema();
+        newSchema.deserialize(in);
+        schema.put(dbName, newSchema);
+        createSchemaLocks(dbName);
       }
     }
     catch (IOException e) {
@@ -478,7 +452,6 @@ public class DatabaseCommon {
       short serializationVersion = (short)Varint.readSignedVarLong(in);
       Varint.readSignedVarLong(in);
       indexId = (int) Varint.readSignedVarLong(in);
-      //logger.info("tableId=" + tableId + " indexId=" + indexId + ", indexCount=" + tableSchema.getIndices().size());
       IndexSchema indexSchema = tableSchema.getIndexesById().get(indexId);
       int[] columns = indexSchema.getFieldOffsets();
       int keyLength = (int) Varint.readSignedVarLong(in);
@@ -619,7 +592,6 @@ public class DatabaseCommon {
       short serializationVersion = (short)Varint.readSignedVarLong(in);
       Varint.readSignedVarLong(in);
       int indexId = (int) Varint.readSignedVarLong(in);
-      //logger.info("tableId=" + tableId + " indexId=" + indexId + ", indexCount=" + tableSchema.getIndices().size());
       IndexSchema indexSchema = tableSchema.getIndexesById().get(indexId);
       String[] columns = indexSchema.getFields();
       int keyLength = (int) Varint.readSignedVarLong(in);
@@ -1485,11 +1457,6 @@ public class DatabaseCommon {
         dbs.add(dir);
       }
     }
-//    for (String db : common.getDatabases().keySet()) {
-//      dbs.add(db);
-//    }
     return new ArrayList<>(dbs);
-
   }
-
 }

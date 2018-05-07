@@ -17,7 +17,7 @@ import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.ExpressionImpl;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.socket.DeadServerException;
+import com.sonicbase.common.DeadServerException;
 import net.sf.jsqlparser.expression.*;
 import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
 import net.sf.jsqlparser.parser.CCJSqlParserManager;
@@ -149,7 +149,7 @@ public class DatabaseServer {
   private String masterAddress;
   private int masterPort;
   private UpdateManager updateManager;
-  private SnapshotManager deltaManager;
+  private SnapshotManager snapshotManager;
   private TransactionManager transactionManager;
   private ReadManager readManager;
   private LogManager logManager;
@@ -203,7 +203,7 @@ public class DatabaseServer {
       shutdownRepartitioner();
 
       deleteManager.shutdown();
-      deltaManager.shutdown();
+      snapshotManager.shutdown();
       logManager.shutdown();
       executor.shutdownNow();
       methodInvoker.shutdown();
@@ -389,20 +389,11 @@ public class DatabaseServer {
     addressMap = new AddressMap(this);
 
 
-    if (USE_SNAPSHOT_MGR_OLD) {
-      this.deleteManager = new DeleteManagerOld(this);
-    }
-    else {
-      this.deleteManager = new DeleteManagerImpl(this);
-    }
+    this.deleteManager = new DeleteManager(this);
+
     this.updateManager = new UpdateManager(this);
-    //this.snapshotManager = new SnapshotManagerImpl(this);
-    if (USE_SNAPSHOT_MGR_OLD) {
-      this.deltaManager = new SnapshotManagerImpl(this);
-    }
-    else {
-      this.deltaManager = new DeltaManager(this);
-    }
+    this.snapshotManager = new SnapshotManager(this);
+
     this.transactionManager = new TransactionManager(this);
     this.readManager = new ReadManager(this);
     this.logManager = new LogManager(this, new File(dataDir, "log"));
@@ -416,7 +407,7 @@ public class DatabaseServer {
     this.partitionManager = new PartitionManager(this, common);
     this.streamManager = new StreamManager(this);
 
-    this.methodInvoker = new MethodInvoker(this, bulkImportManager, deleteManager, deltaManager, updateManager,
+    this.methodInvoker = new MethodInvoker(this, bulkImportManager, deleteManager, snapshotManager, updateManager,
         transactionManager, readManager, logManager, schemaManager, monitorManager, backupManager, osStatsManager, masterManager);
     this.methodInvoker.registerMethodProvider("BackupManager", backupManager);
     this.methodInvoker.registerMethodProvider("BulkImportManager", bulkImportManager);
@@ -429,7 +420,7 @@ public class DatabaseServer {
     this.methodInvoker.registerMethodProvider("PartitionManager", partitionManager);
     this.methodInvoker.registerMethodProvider("ReadManager", readManager);
     this.methodInvoker.registerMethodProvider("SchemaManager", schemaManager);
-    this.methodInvoker.registerMethodProvider("SnapshotManager", deltaManager);
+    this.methodInvoker.registerMethodProvider("SnapshotManager", snapshotManager);
     this.methodInvoker.registerMethodProvider("StreamManager", streamManager);
     this.methodInvoker.registerMethodProvider("TransactionManager", transactionManager);
     this.methodInvoker.registerMethodProvider("UpdateManager", updateManager);
@@ -1017,8 +1008,8 @@ public class DatabaseServer {
     return streamManager;
   }
 
-  public SnapshotManager getDeltaManager() {
-    return deltaManager;
+  public SnapshotManager getSnapshotManager() {
+    return snapshotManager;
   }
 
   public ComObject getRecoverProgress(ComObject cobj, boolean replayedCommand) {
@@ -1027,8 +1018,8 @@ public class DatabaseServer {
       retObj.put(ComObject.Tag.percentComplete, 0d);
       retObj.put(ComObject.Tag.stage, "waitingForServersToStart");
     }
-    else if (deltaManager.isRecovering()) {
-      deltaManager.getPercentRecoverComplete(retObj);
+    else if (snapshotManager.isRecovering()) {
+      snapshotManager.getPercentRecoverComplete(retObj);
     }
     else if (!getDeleteManager().isForcingDeletes()) {
       retObj.put(ComObject.Tag.percentComplete, logManager.getPercentApplyQueuesComplete());
@@ -1038,7 +1029,7 @@ public class DatabaseServer {
       retObj.put(ComObject.Tag.percentComplete, getDeleteManager().getPercentDeleteComplete());
       retObj.put(ComObject.Tag.stage, "forcingDeletes");
     }
-    Exception error = deltaManager.getErrorRecovering();
+    Exception error = snapshotManager.getErrorRecovering();
     if (error != null) {
       retObj.put(ComObject.Tag.error, true);
     }
@@ -1218,10 +1209,6 @@ public class DatabaseServer {
         executor.shutdownNow();
       }
     }
-  }
-
-  public SnapshotManager getSnapshotManager() {
-    return deltaManager;
   }
 
   public boolean getShutdown() {
@@ -1419,12 +1406,12 @@ public class DatabaseServer {
   }
 
   public void enableSnapshot(boolean enable) {
-    deltaManager.enableSnapshot(enable);
+    snapshotManager.enableSnapshot(enable);
   }
 
   public void runSnapshot() throws InterruptedException, ParseException, IOException {
     for (String dbName : getDbNames(dataDir)) {
-      deltaManager.runSnapshot(dbName);
+      snapshotManager.runSnapshot(dbName);
     }
     getCommon().saveSchema(getClient(), getDataDir());
 
@@ -1440,7 +1427,7 @@ public class DatabaseServer {
       dbNames.add(dbName);
     }
     for (String dbName : dbNames) {
-      deltaManager.recoverFromSnapshot(dbName);
+      snapshotManager.recoverFromSnapshot(dbName);
     }
   }
 

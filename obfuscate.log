@@ -2655,7 +2655,7 @@ to act on classes which have been obfuscated.
   <method class="com.sonicbase.server.DatabaseServer" name="java.lang.Double checkResidentMemory()" map="M"/>
   <method class="com.sonicbase.server.DatabaseServer" name="int getRecordsByIdPartitionCount()" map="N"/>
   <method class="com.sonicbase.server.DatabaseServer" name="ComObject prepareForRestore(ComObject)" map="F"/>
-  <method class="com.sonicbase.server.DatabaseServer" name="com.sonicbase.server.SnapshotManagerImpl access$2300(com.sonicbase.server.DatabaseServer)" map="D"/>
+  <method class="com.sonicbase.server.DatabaseServer" name="com.sonicbase.server.SnapshotManager access$2300(com.sonicbase.server.DatabaseServer)" map="D"/>
   <method class="com.sonicbase.server.DatabaseServer" name="void startLicenseValidator()" map="O"/>
   <method class="com.sonicbase.server.DatabaseServer" name="void syncDbNames()" map="P"/>
   <method class="com.sonicbase.server.DatabaseServer" name="long getCommandCount()" map="Q"/>
@@ -2791,7 +2791,7 @@ to act on classes which have been obfuscated.
   <method class="com.sonicbase.server.DatabaseServer" name="ComObject doRestoreFileSystem(ComObject)" map="_"/>
   <method class="com.sonicbase.server.DatabaseServer" name="ComObject getDatabaseFile(ComObject)" map="a"/>
   <method class="com.sonicbase.server.DatabaseServer" name="java.lang.String getInstallDir()" map="&#x00c8;"/>
-  <method class="com.sonicbase.server.DatabaseServer" name="com.sonicbase.server.SnapshotManagerImpl getSnapshotManager()" map="&#x00c9;"/>
+  <method class="com.sonicbase.server.DatabaseServer" name="com.sonicbase.server.SnapshotManager getSnapshotManager()" map="&#x00c9;"/>
   <method class="com.sonicbase.server.DatabaseServer" name="ComObject reloadServer(ComObject)" map="b"/>
   <method class="com.sonicbase.server.DatabaseServer" name="double access$4402(com.sonicbase.server.DatabaseServer, double)" map="B"/>
   <method class="com.sonicbase.server.DatabaseServer" name="int getReplicationFactor()" map="&#x00ca;"/>
@@ -2893,103 +2893,103 @@ to act on classes which have been obfuscated.
   <method class="com.sonicbase.server.UpdateManager" name="ComObject batchInsertIndexEntryByKey(ComObject, boolean)" map="K"/>
   <method class="com.sonicbase.server.UpdateManager" name="ComObject doDeleteIndexEntryByKey(ComObject, boolean, java.util.concurrent.atomic.AtomicBoolean, java.util.concurrent.atomic.AtomicLong, boolean)" map="C"/>
   <class name="com.sonicbase.common.RecordLockedException" map="E"/>
-  <class name="com.sonicbase.server.SnapshotManagerImpl$3" map="3"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$3" name="val$outStreams" map="k"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$3" name="val$isPrimaryKey" map="l"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$3" name="val$indexEntry" map="m"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$3" name="val$savedCount" map="n"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$3" name="val$tableEntry" map="o"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$3" name="this$0" map="p"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$3" name="val$lastLogged" map="q"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$3" name="val$AtomicInteger" map="r"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$3" name="val$index" map="s"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$3" name="val$countSaved" map="t"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$3" name="val$subBegin" map="u"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$3" name="boolean visit(java.lang.Object[], java.lang.Object)" map="A"/>
-  <class name="com.sonicbase.server.SnapshotManagerImpl$2" map="2"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$2" name="this$0" map="A"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$2" name="void run()" map="run"/>
-  <class name="com.sonicbase.server.SnapshotManagerImpl$1" map="1"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$1" name="val$indexSchema" map="A"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$1" name="val$recoveredCount" map="B"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$1" name="val$currOffset" map="C"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$1" name="val$tableName" map="D"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$1" name="val$indexName" map="E"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$1" name="this$0" map="F"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$1" name="val$indexBegin" map="G"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$1" name="val$tableSchema" map="H"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$1" name="val$lastLogged" map="I"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$1" name="val$indexFile" map="J"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$1" name="val$index" map="K"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$1" name="java.lang.Object call()" map="call"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$1" name="java.lang.Boolean call()" map="A"/>
-  <class name="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" map="_A"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" name="this$0" map="A"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" name="finishedBytes" map="B"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" name="stream" map="C"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" name="void reset()" map="reset"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" name="int read(byte[])" map="read"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" name="void close()" map="close"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" name="boolean markSupported()" map="markSupported"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" name="void mark(int)" map="mark"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" name="int read()" map="read"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" name="int read(byte[], int, int)" map="read"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" name="long skip(long)" map="skip"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" name="int available()" map="available"/>
-  <class name="com.sonicbase.server.SnapshotManagerImpl" map="F"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="DURATION_STR" map="A"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="lockedSnapshots" map="B"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="totalBytes" map="C"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="pauseSnapshotRolling" map="D"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="INDEX_STR" map="E"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="totalFileCount" map="F"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="SNAPSHOT_SERIALIZATION_VERSION_19" map="G"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="SNAPSHOT_STR" map="H"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="SNAPSHOT_BUCKET_COUNT" map="I"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="snapshotThread" map="J"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="SNAPSHOT_SERIALIZATION_VERSION" map="K"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="isRecovering" map="L"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="server" map="M"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="errorRecovering" map="N"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="finishedFileCount" map="O"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="SNAPSHOT_SERIALIZATION_VERSION_21" map="P"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="SNAPSHOT_SERIALIZATION_VERSION_20" map="Q"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="enableSnapshot" map="R"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="lastSnapshot" map="S"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="RATE_STR" map="T"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="finishedBytes" map="U"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="logger" map="V"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="java.lang.Exception getErrorRecovering()" map="A"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void runSnapshot(java.lang.String)" map="A"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="java.lang.String lockSnapshot(java.lang.String)" map="B"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void restoreFileSystem(java.lang.String, java.lang.String)" map="A"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void abortSnapshot()" map="B"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="int getHighestSafeSnapshotVersion(java.io.File)" map="A"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="java.util.concurrent.atomic.AtomicLong access$000(com.sonicbase.server.SnapshotManagerImpl)" map="A"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void enableSnapshot(boolean)" map="A"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void doDeleteInProcessDirs(java.io.File)" map="B"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="boolean isRecovering()" map="C"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void backupAWS(java.lang.String, java.lang.String, java.lang.String)" map="A"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="int getHighestUnsafeSnapshotVersion(java.io.File)" map="C"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="java.lang.String getSnapshotRootDir(java.lang.String)" map="C"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void backupAWSSchema(java.lang.String, java.lang.String, java.lang.String)" map="B"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="double getPercentRecoverComplete()" map="D"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="com.sonicbase.server.DatabaseServer access$100(com.sonicbase.server.SnapshotManagerImpl)" map="B"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void getFilesFromDirectory(java.io.File, java.util.List)" map="A"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void restoreAWS(java.lang.String, java.lang.String, java.lang.String)" map="C"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="java.io.File getSnapshotReplicaDir()" map="E"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void unlockSnapshot(int)" map="A"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void deleteInProcessDirs()" map="F"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void deleteOldSnapshots(java.lang.String)" map="D"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void recoverFromSnapshot(java.lang.String)" map="E"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void pauseSnapshotRolling(boolean)" map="B"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void backupFileSystemSchema(java.lang.String, java.lang.String)" map="B"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="boolean access$300(com.sonicbase.server.SnapshotManagerImpl)" map="C"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void runSnapshotLoop()" map="G"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="long access$200(com.sonicbase.server.SnapshotManagerImpl)" map="D"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void getFilesForCurrentSnapshot(java.util.List)" map="A"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void deleteSnapshots()" map="H"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void backupFileSystem(java.lang.String, java.lang.String)" map="C"/>
+  <class name="com.sonicbase.server.SnapshotManager$3" map="3"/>
+  <field class="com.sonicbase.server.SnapshotManager$3" name="val$outStreams" map="k"/>
+  <field class="com.sonicbase.server.SnapshotManager$3" name="val$isPrimaryKey" map="l"/>
+  <field class="com.sonicbase.server.SnapshotManager$3" name="val$indexEntry" map="m"/>
+  <field class="com.sonicbase.server.SnapshotManager$3" name="val$savedCount" map="n"/>
+  <field class="com.sonicbase.server.SnapshotManager$3" name="val$tableEntry" map="o"/>
+  <field class="com.sonicbase.server.SnapshotManager$3" name="this$0" map="p"/>
+  <field class="com.sonicbase.server.SnapshotManager$3" name="val$lastLogged" map="q"/>
+  <field class="com.sonicbase.server.SnapshotManager$3" name="val$AtomicInteger" map="r"/>
+  <field class="com.sonicbase.server.SnapshotManager$3" name="val$index" map="s"/>
+  <field class="com.sonicbase.server.SnapshotManager$3" name="val$countSaved" map="t"/>
+  <field class="com.sonicbase.server.SnapshotManager$3" name="val$subBegin" map="u"/>
+  <method class="com.sonicbase.server.SnapshotManager$3" name="boolean visit(java.lang.Object[], java.lang.Object)" map="A"/>
+  <class name="com.sonicbase.server.SnapshotManager$2" map="2"/>
+  <field class="com.sonicbase.server.SnapshotManager$2" name="this$0" map="A"/>
+  <method class="com.sonicbase.server.SnapshotManager$2" name="void run()" map="run"/>
+  <class name="com.sonicbase.server.SnapshotManager$1" map="1"/>
+  <field class="com.sonicbase.server.SnapshotManager$1" name="val$indexSchema" map="A"/>
+  <field class="com.sonicbase.server.SnapshotManager$1" name="val$recoveredCount" map="B"/>
+  <field class="com.sonicbase.server.SnapshotManager$1" name="val$currOffset" map="C"/>
+  <field class="com.sonicbase.server.SnapshotManager$1" name="val$tableName" map="D"/>
+  <field class="com.sonicbase.server.SnapshotManager$1" name="val$indexName" map="E"/>
+  <field class="com.sonicbase.server.SnapshotManager$1" name="this$0" map="F"/>
+  <field class="com.sonicbase.server.SnapshotManager$1" name="val$indexBegin" map="G"/>
+  <field class="com.sonicbase.server.SnapshotManager$1" name="val$tableSchema" map="H"/>
+  <field class="com.sonicbase.server.SnapshotManager$1" name="val$lastLogged" map="I"/>
+  <field class="com.sonicbase.server.SnapshotManager$1" name="val$indexFile" map="J"/>
+  <field class="com.sonicbase.server.SnapshotManager$1" name="val$index" map="K"/>
+  <method class="com.sonicbase.server.SnapshotManager$1" name="java.lang.Object call()" map="call"/>
+  <method class="com.sonicbase.server.SnapshotManager$1" name="java.lang.Boolean call()" map="A"/>
+  <class name="com.sonicbase.server.SnapshotManager$ByteCounterStream" map="_A"/>
+  <field class="com.sonicbase.server.SnapshotManager$ByteCounterStream" name="this$0" map="A"/>
+  <field class="com.sonicbase.server.SnapshotManager$ByteCounterStream" name="finishedBytes" map="B"/>
+  <field class="com.sonicbase.server.SnapshotManager$ByteCounterStream" name="stream" map="C"/>
+  <method class="com.sonicbase.server.SnapshotManager$ByteCounterStream" name="void reset()" map="reset"/>
+  <method class="com.sonicbase.server.SnapshotManager$ByteCounterStream" name="int read(byte[])" map="read"/>
+  <method class="com.sonicbase.server.SnapshotManager$ByteCounterStream" name="void close()" map="close"/>
+  <method class="com.sonicbase.server.SnapshotManager$ByteCounterStream" name="boolean markSupported()" map="markSupported"/>
+  <method class="com.sonicbase.server.SnapshotManager$ByteCounterStream" name="void mark(int)" map="mark"/>
+  <method class="com.sonicbase.server.SnapshotManager$ByteCounterStream" name="int read()" map="read"/>
+  <method class="com.sonicbase.server.SnapshotManager$ByteCounterStream" name="int read(byte[], int, int)" map="read"/>
+  <method class="com.sonicbase.server.SnapshotManager$ByteCounterStream" name="long skip(long)" map="skip"/>
+  <method class="com.sonicbase.server.SnapshotManager$ByteCounterStream" name="int available()" map="available"/>
+  <class name="com.sonicbase.server.SnapshotManager" map="F"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="DURATION_STR" map="A"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="lockedSnapshots" map="B"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="totalBytes" map="C"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="pauseSnapshotRolling" map="D"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="INDEX_STR" map="E"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="totalFileCount" map="F"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="SNAPSHOT_SERIALIZATION_VERSION_19" map="G"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="SNAPSHOT_STR" map="H"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="SNAPSHOT_BUCKET_COUNT" map="I"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="snapshotThread" map="J"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="SNAPSHOT_SERIALIZATION_VERSION" map="K"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="isRecovering" map="L"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="server" map="M"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="errorRecovering" map="N"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="finishedFileCount" map="O"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="SNAPSHOT_SERIALIZATION_VERSION_21" map="P"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="SNAPSHOT_SERIALIZATION_VERSION_20" map="Q"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="enableSnapshot" map="R"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="lastSnapshot" map="S"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="RATE_STR" map="T"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="finishedBytes" map="U"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="logger" map="V"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="java.lang.Exception getErrorRecovering()" map="A"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void runSnapshot(java.lang.String)" map="A"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="java.lang.String lockSnapshot(java.lang.String)" map="B"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void restoreFileSystem(java.lang.String, java.lang.String)" map="A"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void abortSnapshot()" map="B"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="int getHighestSafeSnapshotVersion(java.io.File)" map="A"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="java.util.concurrent.atomic.AtomicLong access$000(com.sonicbase.server.SnapshotManager)" map="A"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void enableSnapshot(boolean)" map="A"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void doDeleteInProcessDirs(java.io.File)" map="B"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="boolean isRecovering()" map="C"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void backupAWS(java.lang.String, java.lang.String, java.lang.String)" map="A"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="int getHighestUnsafeSnapshotVersion(java.io.File)" map="C"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="java.lang.String getSnapshotRootDir(java.lang.String)" map="C"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void backupAWSSchema(java.lang.String, java.lang.String, java.lang.String)" map="B"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="double getPercentRecoverComplete()" map="D"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="com.sonicbase.server.DatabaseServer access$100(com.sonicbase.server.SnapshotManager)" map="B"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void getFilesFromDirectory(java.io.File, java.util.List)" map="A"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void restoreAWS(java.lang.String, java.lang.String, java.lang.String)" map="C"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="java.io.File getSnapshotReplicaDir()" map="E"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void unlockSnapshot(int)" map="A"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void deleteInProcessDirs()" map="F"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void deleteOldSnapshots(java.lang.String)" map="D"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void recoverFromSnapshot(java.lang.String)" map="E"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void pauseSnapshotRolling(boolean)" map="B"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void backupFileSystemSchema(java.lang.String, java.lang.String)" map="B"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="boolean access$300(com.sonicbase.server.SnapshotManager)" map="C"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void runSnapshotLoop()" map="G"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="long access$200(com.sonicbase.server.SnapshotManager)" map="D"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void getFilesForCurrentSnapshot(java.util.List)" map="A"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void deleteSnapshots()" map="H"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void backupFileSystem(java.lang.String, java.lang.String)" map="C"/>
   <class name="com.sonicbase.server.DeleteManagerImpl$3" map="3"/>
   <field class="com.sonicbase.server.DeleteManagerImpl$3" name="this$0" map="A"/>
   <method class="com.sonicbase.server.DeleteManagerImpl$3" name="void run()" map="run"/>

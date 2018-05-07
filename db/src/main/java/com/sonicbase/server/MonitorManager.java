@@ -375,41 +375,7 @@ public class MonitorManager {
               stmt.setLong(1, entry.getKey());
               stmt.setString(2, day);
               ResultSet rs = stmt.executeQuery();
-              if (rs.next()) {
-                stmt = conn.prepareStatement("update query_stats set db_name=?, id=?, date_val=?, date_modified=?, query=?, cnt=?, lat_avg=?, lat_75=?, lat_95=?, lat_99=?, lat_999=?, lat_max=? where id=?");
-                stmt.setString(1, entry.getValue().dbName);
-                stmt.setLong(2, id);
-                stmt.setString(3, day);
-                stmt.setLong(4, System.currentTimeMillis());
-                stmt.setString(5, query);
-                stmt.setLong(6, count);
-                stmt.setDouble(7, lat_mean);
-                stmt.setDouble(8, lat_75);
-                stmt.setDouble(9, lat_95);
-                stmt.setDouble(10, lat_99);
-                stmt.setDouble(11, lat_999);
-                stmt.setDouble(12, lat_max);
-                stmt.setLong(13, id);
-                ((StatementProxy) stmt).disableStats();
-                stmt.executeUpdate();
-              }
-              else {
-                stmt = conn.prepareStatement("insert into query_stats (db_name, id, date_val, date_modified, query, cnt, lat_avg, lat_75, lat_95, lat_99, lat_999, lat_max) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                stmt.setString(1, entry.getValue().dbName);
-                stmt.setLong(2, id);
-                stmt.setString(3, day);
-                stmt.setLong(4, System.currentTimeMillis());
-                stmt.setString(5, query);
-                stmt.setLong(6, count);
-                stmt.setDouble(7, lat_mean);
-                stmt.setDouble(8, lat_75);
-                stmt.setDouble(9, lat_95);
-                stmt.setDouble(10, lat_99);
-                stmt.setDouble(11, lat_999);
-                stmt.setDouble(12, lat_max);
-                ((StatementProxy) stmt).disableStats();
-                stmt.executeUpdate();
-              }
+              updateStats(entry, query, id, count, lat_mean, lat_75, lat_95, lat_99, lat_999, lat_max, day, rs);
             }
             catch (Exception e) {
               logger.error("Error persisting stats", e);
@@ -424,6 +390,45 @@ public class MonitorManager {
           logger.error("Error in stats persister thread", e);
         }
       }
+    }
+  }
+
+  private void updateStats(Map.Entry<Long, HistogramEntry> entry, String query, long id, long count, double lat_mean, double lat_75, double lat_95, double lat_99, double lat_999, double lat_max, String day, ResultSet rs) throws SQLException {
+    PreparedStatement stmt;
+    if (rs.next()) {
+      stmt = conn.prepareStatement("update query_stats set db_name=?, id=?, date_val=?, date_modified=?, query=?, cnt=?, lat_avg=?, lat_75=?, lat_95=?, lat_99=?, lat_999=?, lat_max=? where id=?");
+      stmt.setString(1, entry.getValue().dbName);
+      stmt.setLong(2, id);
+      stmt.setString(3, day);
+      stmt.setLong(4, System.currentTimeMillis());
+      stmt.setString(5, query);
+      stmt.setLong(6, count);
+      stmt.setDouble(7, lat_mean);
+      stmt.setDouble(8, lat_75);
+      stmt.setDouble(9, lat_95);
+      stmt.setDouble(10, lat_99);
+      stmt.setDouble(11, lat_999);
+      stmt.setDouble(12, lat_max);
+      stmt.setLong(13, id);
+      ((StatementProxy) stmt).disableStats();
+      stmt.executeUpdate();
+    }
+    else {
+      stmt = conn.prepareStatement("insert into query_stats (db_name, id, date_val, date_modified, query, cnt, lat_avg, lat_75, lat_95, lat_99, lat_999, lat_max) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      stmt.setString(1, entry.getValue().dbName);
+      stmt.setLong(2, id);
+      stmt.setString(3, day);
+      stmt.setLong(4, System.currentTimeMillis());
+      stmt.setString(5, query);
+      stmt.setLong(6, count);
+      stmt.setDouble(7, lat_mean);
+      stmt.setDouble(8, lat_75);
+      stmt.setDouble(9, lat_95);
+      stmt.setDouble(10, lat_99);
+      stmt.setDouble(11, lat_999);
+      stmt.setDouble(12, lat_max);
+      ((StatementProxy) stmt).disableStats();
+      stmt.executeUpdate();
     }
   }
 

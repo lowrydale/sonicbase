@@ -2,7 +2,7 @@ package com.sonicbase.server;
 
 import com.sonicbase.common.*;
 import com.sonicbase.query.DatabaseException;
-import com.sonicbase.socket.DeadServerException;
+import com.sonicbase.common.DeadServerException;
 import org.apache.commons.lang.exception.ExceptionUtils;
 
 import java.lang.reflect.InvocationTargetException;

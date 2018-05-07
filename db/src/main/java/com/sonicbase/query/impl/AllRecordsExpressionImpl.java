@@ -120,22 +120,12 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
     if (indexSchema == null) {
       indexSchema = primaryIndex;
     }
-//    TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(getFromTable());
-//    IndexSchema indexSchema = null;
-//    for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndexes().entrySet()) {
-//      if (entry.getValue().isPrimaryKey()) {
-//        indexSchema = entry.getValue();
-//      }
-//    }
     boolean ascending = true;
-//    List<OrderByExpressionImpl> orderByExpressions = getOrderByExpressions();
 
     if (orderByExpressions != null && orderByExpressions.size() != 0) {
       OrderByExpressionImpl expression = orderByExpressions.get(0);
       String columnName = expression.getColumnName();
-      //if (columnName.equals(tableSchema.getIndices().get(indexSchema.getName()).getFields()[0])) {
-        ascending = expression.isAscending();
-      //}
+      ascending = expression.isAscending();
     }
     if (analyze) {
       return null;

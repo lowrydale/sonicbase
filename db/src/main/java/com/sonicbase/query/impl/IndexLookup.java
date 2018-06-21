@@ -1,10 +1,8 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.query.impl;
 
 import com.codahale.metrics.Timer;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
-import com.sonicbase.server.PartitionManager;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
@@ -13,6 +11,7 @@ import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
+import com.sonicbase.server.PartitionManager;
 import com.sonicbase.server.ReadManager;
 import net.sf.jsqlparser.statement.select.Limit;
 import net.sf.jsqlparser.statement.select.Offset;
@@ -51,6 +50,10 @@ public class IndexLookup {
   private AtomicReference<String> usedIndex;
   private boolean evaluateExpression;
 
+  public int getCount() {
+    return count;
+  }
+
   public void setCount(int count) {
     this.count = count;
   }
@@ -59,28 +62,56 @@ public class IndexLookup {
     this.indexName = indexName;
   }
 
+  public String getIndexName() {
+    return indexName;
+  }
+
   public void setLeftOp(BinaryExpression.Operator leftOp) {
     this.leftOp = leftOp;
+  }
+
+  public BinaryExpression.Operator getLeftOp() {
+    return leftOp;
   }
 
   public void setRightOp(BinaryExpression.Operator rightOp) {
     this.rightOp = rightOp;
   }
 
+  public BinaryExpression.Operator getRightOp() {
+    return rightOp;
+  }
+
   public void setLeftKey(Object[] leftKey) {
     this.leftKey = leftKey;
+  }
+
+  public Object[] getLeftKey() {
+    return leftKey;
   }
 
   public void setRightKey(Object[] rightKey) {
     this.rightKey = rightKey;
   }
 
+  public Object[] getRightKey() {
+    return rightKey;
+  }
+
   public void setLeftOriginalKey(Object[] leftOriginalKey) {
     this.leftOriginalKey = leftOriginalKey;
   }
 
+  public Object[] getLeftOriginalKey() {
+    return leftOriginalKey;
+  }
+
   public void setRightOriginalKey(Object[] rightOriginalKey) {
     this.rightOriginalKey = rightOriginalKey;
+  }
+
+  public Object[] getRightOriginalKey() {
+    return rightOriginalKey;
   }
 
   public void setColumnName(String column) {
@@ -111,8 +142,16 @@ public class IndexLookup {
     this.usedIndex = usedIndex;
   }
 
+  public AtomicReference<String> getUsedIndex() {
+    return usedIndex;
+  }
+
   public void setEvaluateExpression(boolean evaluateExpression) {
     this.evaluateExpression = evaluateExpression;
+  }
+
+  public boolean getEvaluateExpression() {
+    return evaluateExpression;
   }
 
   public SelectContextImpl lookup(ExpressionImpl expression, Expression topLevelExpression) {

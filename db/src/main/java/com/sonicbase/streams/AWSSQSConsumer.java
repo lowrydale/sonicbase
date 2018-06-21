@@ -28,7 +28,7 @@ public class AWSSQSConsumer implements StreamsConsumer {
   private AmazonSQS sqsClient;
   private boolean shutdown;
 
-  class AWSMessage extends Message {
+  class AWSMessage extends com.sonicbase.streams.Message {
     private final com.amazonaws.services.sqs.model.Message message;
 
     public AWSMessage(com.amazonaws.services.sqs.model.Message message, String body) {
@@ -97,7 +97,7 @@ public class AWSSQSConsumer implements StreamsConsumer {
   }
 
   @Override
-  public List<Message> receive() {
+  public List<com.sonicbase.streams.Message> receive() {
     try {
       ReceiveMessageRequest request = new ReceiveMessageRequest(url);
       request.setMaxNumberOfMessages(10);
@@ -105,7 +105,7 @@ public class AWSSQSConsumer implements StreamsConsumer {
       ReceiveMessageResult receivedMessages = sqsClient.receiveMessage(request.withMessageAttributeNames("All"));
 
       List<com.amazonaws.services.sqs.model.Message> innerMessages = receivedMessages.getMessages();
-      List<Message> resultMessages = new ArrayList<>();
+      List<com.sonicbase.streams.Message> resultMessages = new ArrayList<>();
       for (com.amazonaws.services.sqs.model.Message message : innerMessages) {
         ByteBuffer buffer = message.getMessageAttributes().get("message").getBinaryValue();
         byte[] bytes = new byte[buffer.remaining()];
@@ -124,8 +124,8 @@ public class AWSSQSConsumer implements StreamsConsumer {
   }
 
   @Override
-  public void acknowledgeMessages(List<Message> messages) {
-    for (Message message : messages) {
+  public void acknowledgeMessages(List<com.sonicbase.streams.Message> messages) {
+    for (com.sonicbase.streams.Message message : messages) {
       sqsClient.deleteMessage(url, ((AWSMessage) message).message.getReceiptHandle());
     }
   }

@@ -23,7 +23,10 @@ import org.apache.giraph.utils.Varint;
 import java.io.*;
 import java.math.BigDecimal;
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -430,7 +433,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     expression.setProbe(probe);
   }
 
-  public void setColumns(ArrayList<ColumnImpl> columns) {
+  public void setColumns(List<ColumnImpl> columns) {
     this.columns = columns;
   }
 
@@ -448,6 +451,14 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
 
   public Limit getLimit() {
     return limit;
+  }
+
+  public void setAliases(Map<String, ColumnImpl> aliases) {
+    this.aliases = aliases;
+  }
+
+  public void setFunctionAliases(Map<String, SelectFunctionImpl> functionAliases) {
+    this.functionAliases = functionAliases;
   }
 
   class DistinctRecord {
@@ -883,8 +894,6 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
         cobj.put(ComObject.Tag.dbName, dbName);
         cobj.put(ComObject.Tag.currOffset, currOffset.get());
         cobj.put(ComObject.Tag.countReturned, countReturned.get());
-
-        int previousSchemaVersion = client.getCommon().getSchemaVersion();
 
         ComObject retObj = null;
         if (restrictToThisServer) {

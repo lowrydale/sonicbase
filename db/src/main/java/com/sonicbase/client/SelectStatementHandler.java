@@ -95,7 +95,7 @@ public class SelectStatementHandler extends StatementHandler {
   }
 
   public static class SetOperation {
-    private SelectStatementImpl[] selectStatements;
+    public SelectStatementImpl[] selectStatements;
     public String[] operations;
     public OrderByExpressionImpl[] orderBy;
     public long serverSelectPageNumber;

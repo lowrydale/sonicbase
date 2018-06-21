@@ -21,7 +21,7 @@ public class LongRunningCalls {
 
   private Logger logger;
 
-  private final DatabaseServer server;
+  private final com.sonicbase.server.DatabaseServer server;
   private ConcurrentLinkedQueue<Thread> executionThreads = new ConcurrentLinkedQueue<>();
 
   public LongRunningCalls(DatabaseServer server) {

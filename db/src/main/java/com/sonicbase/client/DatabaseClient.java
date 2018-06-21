@@ -2,6 +2,7 @@ package com.sonicbase.client;
 
 import com.codahale.metrics.MetricRegistry;
 import com.sonicbase.common.*;
+import com.sonicbase.common.DeadServerException;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.jdbcdriver.QueryType;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
@@ -10,7 +11,6 @@ import com.sonicbase.query.impl.*;
 import com.sonicbase.schema.Schema;
 import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.socket.DatabaseSocketClient;
-import com.sonicbase.common.DeadServerException;
 import net.sf.jsqlparser.parser.CCJSqlParserManager;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.select.*;
@@ -30,6 +30,21 @@ import java.util.concurrent.atomic.AtomicLong;
  * Time: 7:10 PM
  */
 public class DatabaseClient {
+  public static final short SERIALIZATION_VERSION = 28;
+  public static final short SERIALIZATION_VERSION_28 = 28;
+  public static final short SERIALIZATION_VERSION_27 = 27;
+  public static final short SERIALIZATION_VERSION_26 = 26;
+  public static final short SERIALIZATION_VERSION_25 = 25;
+  public static final short SERIALIZATION_VERSION_24 = 24;
+  public static final short SERIALIZATION_VERSION_23 = 23;
+  public static final short SERIALIZATION_VERSION_22 = 22;
+  public static final short SERIALIZATION_VERSION_21 = 21;
+  public static final short SERIALIZATION_VERSION_20 = 20;
+  public static final short SERIALIZATION_VERSION_19 = 19;
+
+  public static final int SELECT_PAGE_SIZE = 1000;
+  public static final int OPTIMIZED_RANGE_PAGE_SIZE = 4_000;
+
   private final boolean isClient;
   private final int shard;
   private final int replica;
@@ -49,21 +64,6 @@ public class DatabaseClient {
   private static org.apache.log4j.Logger localLogger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
   private static Logger logger;
 
-
-  public static final short SERIALIZATION_VERSION = 28;
-  public static final short SERIALIZATION_VERSION_28 = 28;
-  public static final short SERIALIZATION_VERSION_27 = 27;
-  public static final short SERIALIZATION_VERSION_26 = 26;
-  public static final short SERIALIZATION_VERSION_25 = 25;
-  public static final short SERIALIZATION_VERSION_24 = 24;
-  public static final short SERIALIZATION_VERSION_23 = 23;
-  public static final short SERIALIZATION_VERSION_22 = 22;
-  public static final short SERIALIZATION_VERSION_21 = 21;
-  public static final short SERIALIZATION_VERSION_20 = 20;
-  public static final short SERIALIZATION_VERSION_19 = 19;
-
-  public static final int SELECT_PAGE_SIZE = 1000;
-  public static final int OPTIMIZED_RANGE_PAGE_SIZE = 4_000;
 
   private int pageSize = SELECT_PAGE_SIZE;
 
@@ -112,7 +112,7 @@ public class DatabaseClient {
       "UpdateManager:insertIndexEntryByKey",
       "UpdateManager:insertIndexEntryByKeyWithRecord",
       "removeRecord",
-      "Databaseserver:updateServersConfig",
+      "DatabaseServer:updateServersConfig",
       "UpdateManager:deleteRecord",
       "DatabaseServer:allocateRecordIds",
       "DatabaseServer:setMaxRecordId",
@@ -621,7 +621,7 @@ public class DatabaseClient {
     }
   }
 
-  private void syncConfig() {
+  protected void syncConfig() {
     while (true) {
       if (isShutdown.get()) {
         throw new DatabaseException("Shutting down");
@@ -717,13 +717,13 @@ public class DatabaseClient {
   }
 
   public byte[][] sendToAllShards(
-      final String batchKey,
+      final String method,
       final long auth_user, final ComObject body, final Replica replica) {
-    return sendToAllShards(batchKey, auth_user, body, replica, false);
+    return sendToAllShards(method, auth_user, body, replica, false);
   }
 
   public byte[][] sendToAllShards(
-      final String batchKey,
+      final String method,
       final long auth_user, final ComObject body, final Replica replica, final boolean ignoreDeath) {
     List<Future<byte[]>> futures = new ArrayList<Future<byte[]>>();
     try {
@@ -733,7 +733,7 @@ public class DatabaseClient {
         futures.add(executor.submit(new Callable<byte[]>() {
           @Override
           public byte[] call() {
-            return send(batchKey, shard, auth_user, new ComObject(bodyBytes), replica, ignoreDeath);
+            return send(method, shard, auth_user, new ComObject(bodyBytes), replica, ignoreDeath);
           }
         }));
       }
@@ -758,14 +758,14 @@ public class DatabaseClient {
     }
   }
 
-  public byte[] send(String batchKey,
+  public byte[] send(String method,
                      int shard, long auth_user, ComObject body, Replica replica) {
-    return send(batchKey, shard, auth_user, body, replica, false);
+    return send(method, shard, auth_user, body, replica, false);
   }
 
-  public byte[] send(String batchKey,
+  public byte[] send(String method,
                      int shard, long auth_user, ComObject body, Replica replica, boolean ignoreDeath) {
-    return send(batchKey, servers[shard], shard, auth_user, body, replica, ignoreDeath);
+    return send(method, servers[shard], shard, auth_user, body, replica, ignoreDeath);
   }
 
   public byte[] sendToMaster(ComObject body) {
@@ -905,9 +905,12 @@ public class DatabaseClient {
   private ConcurrentHashMap<String, String> inserted = new ConcurrentHashMap<>();
 
   public byte[] send(
-      String batchKey, Server[] replicas, int shard, long auth_user,
+      String methodStr, Server[] replicas, int shard, long auth_user,
       ComObject body, Replica replica, boolean ignoreDeath) {
     try {
+      if (methodStr != null) {
+        body.put(ComObject.Tag.method, methodStr);
+      }
       if (body == null) {
         body = new ComObject();
       }
@@ -943,7 +946,7 @@ public class DatabaseClient {
                   }
                   else {
                     DatabaseSocketClient.Request request = new DatabaseSocketClient.Request();
-                    request.setBatchKey(batchKey);
+                    request.setBatchKey(null);
                     request.setBody(body.serialize());
                     request.setHostPort(server.hostPort);
                     request.setSocketClient(server.socketClient);
@@ -994,7 +997,7 @@ public class DatabaseClient {
               if (dbServer != null) {
                 return invokeOnServer(dbServer, body.serialize(), false, true);
               }
-              return currReplica.do_send(batchKey, body);
+              return currReplica.do_send(null, body);
             }
             catch (Exception e) {
               syncSchema();
@@ -1012,7 +1015,7 @@ public class DatabaseClient {
                 if (dbServer != null) {
                   return invokeOnServer(dbServer, body.serialize(), false, true);
                 }
-                return currReplica.do_send(batchKey, body);
+                return currReplica.do_send(null, body);
               }
               catch (DeadServerException e1) {
                 throw e;
@@ -1060,7 +1063,7 @@ public class DatabaseClient {
                 if (dbServer != null) {
                   return invokeOnServer(dbServer, body.serialize(), false, true);
                 }
-                return replicas[(int) auth_user].do_send(batchKey, body);
+                return replicas[(int) auth_user].do_send(null, body);
               }
               catch (DeadServerException e) {
                 throw e;
@@ -1102,7 +1105,7 @@ public class DatabaseClient {
                       ret = invokeOnServer(dbServer, body.serialize(), false, true);
                     }
                     else {
-                      ret = currReplica.do_send(batchKey, body.serialize());
+                      ret = currReplica.do_send(null, body.serialize());
                     }
                   }
 
@@ -1204,7 +1207,7 @@ public class DatabaseClient {
                               invokeOnServer(dbServer, body.serialize(), false, true);
                             }
                             else {
-                              currReplica.do_send(batchKey, body.serialize());
+                              currReplica.do_send(null, body.serialize());
                             }
                           }
                         }
@@ -1274,7 +1277,7 @@ public class DatabaseClient {
                         return invokeOnServer(dbServer, body.serialize(), false, true);
                       }
                       else {
-                        return replicas[replicaOffset].do_send(batchKey, body);
+                        return replicas[replicaOffset].do_send(null, body);
                       }
                     }
                     catch (Exception e) {
@@ -1616,13 +1619,13 @@ public class DatabaseClient {
       Map<String, ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo>> orderedKeyInfos,
       List<InsertStatementHandler.KeyInfo> keys) {
     for (final InsertStatementHandler.KeyInfo keyInfo : keys) {
-      ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo> indexMap = orderedKeyInfos.get(keyInfo.getIndexSchema().getKey());
+      ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo> indexMap = orderedKeyInfos.get(keyInfo.getIndexSchema().getName());
       if (indexMap == null) {
         indexMap = new ConcurrentSkipListMap<>(new Comparator<Object[]>() {
           @Override
           public int compare(Object[] o1, Object[] o2) {
             for (int i = 0; i < o1.length; i++) {
-              int value = keyInfo.getIndexSchema().getValue().getComparators()[i].compare(o1[i], o2[i]);
+              int value = keyInfo.getIndexSchema().getComparators()[i].compare(o1[i], o2[i]);
               if (value < 0) {
                 return -1;
               }
@@ -1633,7 +1636,7 @@ public class DatabaseClient {
             return 0;
           }
         });
-        orderedKeyInfos.put(keyInfo.getIndexSchema().getKey(), indexMap);
+        orderedKeyInfos.put(keyInfo.getIndexSchema().getName(), indexMap);
       }
       indexMap.put(keyInfo.getKey(), keyInfo);
     }

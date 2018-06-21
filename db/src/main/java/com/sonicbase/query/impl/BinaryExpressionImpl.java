@@ -345,7 +345,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
             Object[] leftOriginalKey = new Object[fieldCount];
             leftOriginalKey[0] = originalLeftValue;
 
-            IndexLookup indexLookup = new IndexLookup();
+            IndexLookup indexLookup = createIndexLookup();
             indexLookup.setCount(count);
             indexLookup.setIndexName(indexName);
             indexLookup.setLeftOp(operator);
@@ -542,7 +542,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     }
   }
 
-  private String isIndexed(ExpressionImpl expression, AtomicBoolean isColumn) {
+  String isIndexed(ExpressionImpl expression, AtomicBoolean isColumn) {
     String rightColumn = null;
     if (expression instanceof ColumnImpl) {
       isColumn.set(true);
@@ -580,7 +580,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     return null;
   }
 
-  private NextReturn evaluateAndExpression(int count, AtomicReference<String> usedIndex, SelectStatementImpl.Explain explain,
+  protected NextReturn evaluateAndExpression(int count, AtomicReference<String> usedIndex, SelectStatementImpl.Explain explain,
                                            AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset,
                                            boolean analyze, boolean evaluateExpression, int schemaRetryCount) {
     String rightColumn = null;
@@ -694,7 +694,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
           return null;
         }
         else {
-          IndexLookup indexLookup = new IndexLookup();
+          IndexLookup indexLookup = createIndexLookup();
           indexLookup.setCount(count);
           indexLookup.setIndexName(indexName);
           indexLookup.setLeftOp(leftOp);
@@ -826,7 +826,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
               Object[] rightOriginalKey = new Object[fieldCount];
               rightOriginalKey[0] = originalRightValue;
 
-              IndexLookup indexLookup = new IndexLookup();
+              IndexLookup indexLookup = createIndexLookup();
               indexLookup.setCount(count);
               indexLookup.setIndexName(indexName);
               indexLookup.setLeftOp(leftOp);
@@ -891,6 +891,10 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     return null;
   }
 
+  protected IndexLookup createIndexLookup() {
+    return new IndexLookup();
+  }
+
   private Object[] makeSingleKeyExpression(String indexName, String leftColumn, List<Object> leftValues, Operator leftOp, String rightColumn, List<Object> rightValues,
                                            Operator rightOp) {
     if (indexName == null) {
@@ -949,7 +953,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     return count;
   }
 
-  private NextReturn evaluateOneSidedIndex(
+  protected NextReturn evaluateOneSidedIndex(
       final String[] tableNames, int count, ExpressionImpl leftExpression, ExpressionImpl rightExpression, String leftColumn, Operator leftOp,
       Object leftValue, String rightColumn, Operator rightOp, Object rightValue, SelectStatementImpl.Explain explain,
       AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, boolean analyze, int schemaRetryCount) {
@@ -1525,7 +1529,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
         }
         if (lhsValue instanceof BigDecimal || rhsValue instanceof BigDecimal) {
           BigDecimal lhs = (BigDecimal) DataType.getBigDecimalConverter().convert(lhsValue);
-          BigDecimal rhs = (BigDecimal) DataType.getBigDecimalConverter().convert(lhsValue);
+          BigDecimal rhs = (BigDecimal) DataType.getBigDecimalConverter().convert(rhsValue);
           if (operator == Operator.plus) {
             return lhs.add(rhs);
           }

@@ -126,7 +126,7 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
                 cobj.put(ComObject.Tag.sequence1Override, sequence1);
                 cobj.put(ComObject.Tag.sequence2Override, sequence2);
               }
-              client.send("DatabaseServer:deleteRecord", selectedShards.get(0), rand.nextLong(), cobj, DatabaseClient.Replica.def);
+              client.send("UpdateManager:deleteRecord", selectedShards.get(0), rand.nextLong(), cobj, DatabaseClient.Replica.def);
 
               cobj = new ComObject();
               cobj.put(ComObject.Tag.dbName, dbName);

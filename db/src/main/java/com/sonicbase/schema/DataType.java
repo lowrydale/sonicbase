@@ -37,6 +37,9 @@ public class DataType {
 
     @Override
     public Object convert(Object value) {
+      if (value == null) {
+        return null;
+      }
       if (value instanceof Long) {
         return value;
       }
@@ -84,6 +87,9 @@ public class DataType {
   private static Converter stringConverter = new Converter() {
     @Override
     public Object convert(Object value) {
+      if (value == null) {
+        return null;
+      }
       if (value instanceof String) {
         return value;
       }
@@ -117,6 +123,9 @@ public class DataType {
   private static Converter utf8Converter = new Converter() {
     @Override
     public Object convert(Object value) {
+      if (value == null) {
+        return null;
+      }
       if (value instanceof byte[]) {
         return value;
       }
@@ -137,6 +146,9 @@ public class DataType {
   private static Converter byteArrayConverter = new Converter() {
     @Override
     public Object convert(Object value) {
+      if (value == null) {
+        return null;
+      }
       if (value instanceof byte[]) {
         return value;
       }
@@ -152,6 +164,9 @@ public class DataType {
 
     @Override
     public Object convert(Object value) {
+      if (value == null) {
+        return null;
+      }
       if (value instanceof byte[]) {
         return value;
       }
@@ -181,6 +196,9 @@ public class DataType {
 
     @Override
     public Object convert(Object value) {
+      if (value == null) {
+        return null;
+      }
       if (value instanceof Double) {
         return value;
       }
@@ -230,6 +248,9 @@ public class DataType {
   private static Converter intConverter = new Converter() {
     @Override
     public Object convert(Object value) {
+      if (value == null) {
+        return null;
+      }
       if (value instanceof Integer) {
         return value;
       }
@@ -245,6 +266,9 @@ public class DataType {
   private static Converter shortConverter = new Converter() {
     @Override
     public Object convert(Object value) {
+      if (value == null) {
+        return null;
+      }
       if (value instanceof Short) {
         return value;
       }
@@ -260,6 +284,9 @@ public class DataType {
   private static Converter booleanConverter = new Converter() {
     @Override
     public Object convert(Object value) {
+      if (value == null) {
+        return null;
+      }
       if (value instanceof Boolean) {
         return value;
       }
@@ -278,6 +305,9 @@ public class DataType {
   private static Converter byteConverter = new Converter() {
     @Override
     public Object convert(Object value) {
+      if (value == null) {
+        return null;
+      }
       if (value instanceof Byte) {
         return value;
       }
@@ -293,6 +323,9 @@ public class DataType {
   private static Converter floatConverter = new Converter() {
     @Override
     public Object convert(Object value) {
+      if (value == null) {
+        return null;
+      }
       if (value instanceof Float) {
         return value;
       }
@@ -310,6 +343,9 @@ public class DataType {
     @Override
     public Object convert(Object value) {
       BigDecimal ret = null;
+      if (value == null) {
+        return null;
+      }
       if (value instanceof BigDecimal) {
         return value;
       }
@@ -356,6 +392,9 @@ public class DataType {
 
     @Override
     public Object convert(Object value) {
+      if (value == null) {
+        return null;
+      }
       if (value instanceof Date) {
         return value;
       }
@@ -397,6 +436,9 @@ public class DataType {
 
     @Override
     public Object convert(Object value) {
+      if (value == null) {
+        return null;
+      }
       if (value instanceof Time) {
         return value;
       }
@@ -444,6 +486,9 @@ public class DataType {
 
     @Override
     public Object convert(Object value) {
+      if (value == null) {
+        return null;
+      }
       if (value instanceof Timestamp) {
         return value;
       }

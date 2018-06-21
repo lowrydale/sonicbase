@@ -127,6 +127,11 @@ public class TableSchema {
     this.indexes = indices;
   }
 
+  public void addIndex(IndexSchema indexSchema) {
+    this.indexes.put(indexSchema.getName(), indexSchema);
+    this.indexesById.put(indexSchema.getIndexId(), indexSchema);
+  }
+
   class PreviousFields {
     int schemaVersion;
     List<FieldSchema> fields = new ArrayList<>();
@@ -208,30 +213,8 @@ public class TableSchema {
     return fieldOffsets.get(id);
   }
 
-  public IndexSchema addIndex(String indexName, boolean isUnique, String[] fields, Partition[] partitions, int indexId) {
+  public IndexSchema addIndex(String indexName, boolean isPrimaryKey, boolean isUnique, String[] fields, Partition[] partitions, int indexId) {
     Comparator[] comparators = getComparators(fields);
-
-    boolean isPrimaryKey = false;
-    String[] primaryKey = getPrimaryKey();
-    if (fields.length == primaryKey.length) {
-      boolean foundAllFields = true;
-      for (String primaryKeyField : primaryKey) {
-        boolean found = false;
-        for (String indexField : fields) {
-          if (primaryKeyField.equals(indexField)) {
-            found = true;
-            break;
-          }
-        }
-        if (!found) {
-          foundAllFields = false;
-          break;
-        }
-      }
-      if (foundAllFields) {
-        isPrimaryKey = true;
-      }
-    }
 
     boolean isPrimaryKeyGroup = false;
     if (primaryKey.length >= fields.length) {

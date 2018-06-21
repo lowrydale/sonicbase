@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,7 +26,7 @@ import static jdk.nashorn.internal.parser.DateParser.DAY;
 public class LicenseManager {
   private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
 
-  private final DatabaseServer server;
+  private final com.sonicbase.server.DatabaseServer server;
   private boolean shutdownMasterValidatorThread = false;
   private Thread masterLicenseValidatorThread;
   private String disableDate;
@@ -39,7 +38,7 @@ public class LicenseManager {
   private Thread licenseValidatorThread;
 
 
-  public LicenseManager(DatabaseServer server, boolean overrideProLicense) {
+  public LicenseManager(com.sonicbase.server.DatabaseServer server, boolean overrideProLicense) {
     this.server = server;
     this.haveProLicense = true;
     this.disableNow = false;
@@ -87,7 +86,7 @@ public class LicenseManager {
     final AtomicInteger licensePort = new AtomicInteger();
     String json = null;
     try {
-      json = IOUtils.toString(DatabaseServer.class.getResourceAsStream("/config-license-server.json"), "utf-8");
+      json = IOUtils.toString(com.sonicbase.server.DatabaseServer.class.getResourceAsStream("/config-license-server.json"), "utf-8");
     }
     catch (Exception e) {
       logger.error("Error initializing license validator", e);

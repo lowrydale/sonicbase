@@ -215,10 +215,10 @@ public class TestAWSBackup {
       List<ColumnImpl> columns = new ArrayList<>();
       columns.add(new ColumnImpl(null, null, "persons", "socialsecuritynumber", null));
 
-      long size = client.getPartitionSize("test", 0, "children", "_1_socialsecuritynumber");
+      long size = client.getPartitionSize("test", 0, "children", "socialsecuritynumber");
       assertEquals(size, 10);
 
-      client.beginRebalance("test", "persons", "_1__primarykey");
+      client.beginRebalance("test", "persons", "_primarykey");
 
 
       while (true) {
@@ -228,15 +228,15 @@ public class TestAWSBackup {
         Thread.sleep(1000);
       }
 
-      assertEquals(client.getPartitionSize("test", 0, "persons", "_1__primarykey"), 9);
-      assertEquals(client.getPartitionSize("test", 1, "persons", "_1__primarykey"), 11);
-      long count = client.getPartitionSize("test", 0, "children", "_1__primarykey");
+      assertEquals(client.getPartitionSize("test", 0, "persons", "_primarykey"), 9);
+      assertEquals(client.getPartitionSize("test", 1, "persons", "_primarykey"), 11);
+      long count = client.getPartitionSize("test", 0, "children", "_primarykey");
       assertEquals(count, 9);
-      count = client.getPartitionSize("test", 1, "children", "_1__primarykey");
+      count = client.getPartitionSize("test", 1, "children", "_primarykey");
       assertEquals(count, 11);
-      count = client.getPartitionSize("test", 0, "children", "_1_socialsecuritynumber");
+      count = client.getPartitionSize("test", 0, "children", "socialsecuritynumber");
       assertEquals(count, 4);
-      count = client.getPartitionSize("test", 1, "children", "_1_socialsecuritynumber");
+      count = client.getPartitionSize("test", 1, "children", "socialsecuritynumber");
       assertEquals(count, 6);
 
       dbServers[0].enableSnapshot(false);

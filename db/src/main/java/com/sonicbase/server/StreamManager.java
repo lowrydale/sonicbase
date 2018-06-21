@@ -35,7 +35,7 @@ import java.util.concurrent.TimeUnit;
 public class StreamManager {
 
   private Logger logger;
-  private final DatabaseServer server;
+  private final com.sonicbase.server.DatabaseServer server;
   private ConcurrentHashMap<String, Connection> connections = new ConcurrentHashMap<>();
   private boolean shutdown = false;
   private boolean pauseStreaming = false;

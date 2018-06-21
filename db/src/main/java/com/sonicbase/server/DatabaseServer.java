@@ -6,18 +6,16 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
-import com.sonicbase.common.Record;
 import com.sonicbase.index.AddressMap;
 import com.sonicbase.index.Index;
 import com.sonicbase.index.Indices;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
-import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.procedure.*;
 import com.sonicbase.query.DatabaseException;
-import com.sonicbase.query.impl.ExpressionImpl;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.common.DeadServerException;
+import com.sonicbase.common.*;
+import com.sonicbase.procedure.*;
 import net.sf.jsqlparser.expression.*;
 import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
 import net.sf.jsqlparser.parser.CCJSqlParserManager;
@@ -27,7 +25,6 @@ import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.jetbrains.annotations.Nullable;
-import sun.misc.Unsafe;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -36,7 +33,6 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.*;
 import java.io.*;
-import java.lang.reflect.Field;
 import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.cert.CertificateException;
@@ -115,24 +111,8 @@ public class DatabaseServer {
   private MasterManager masterManager;
   private LicenseManager licenseManager;
 
-
-  @SuppressWarnings("restriction")
-  private static Unsafe getUnsafe() {
-    try {
-
-      Field singleoneInstanceField = Unsafe.class.getDeclaredField("theUnsafe");
-      singleoneInstanceField.setAccessible(true);
-      return (Unsafe) singleoneInstanceField.get(null);
-
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-  }
-
   private DatabaseCommon common = new DatabaseCommon();
   private AtomicReference<DatabaseClient> client = new AtomicReference<>();
-  private Unsafe unsafe = getUnsafe();
   private PartitionManager partitionManager;
   private AtomicLong nextRecordId = new AtomicLong();
   private int recordsByIdPartitionCount = 50000;
@@ -157,14 +137,6 @@ public class DatabaseServer {
 
 
   public DatabaseServer() {
-  }
-
-  public boolean isWaitingForServersToStart() {
-    return waitingForServersToStart;
-  }
-
-  public void setWaitingForServersToStart(boolean waitingForServersToStart) {
-    this.waitingForServersToStart = waitingForServersToStart;
   }
 
   public static boolean[][] getDeathOverride() {
@@ -257,12 +229,6 @@ public class DatabaseServer {
       final ObjectNode config, String cluster, String host, int port,
       boolean unitTest, AtomicBoolean isRunning, AtomicBoolean isRecovered, boolean skipLicense, String gclog, String xmx, boolean overrideProLicense) {
 
-//    for (int i = 0; i < shardCount; i++) {
-//      for (int j = 0; j < replicationFactor; j++) {
-//        common.getServersConfig().getShards()[shard].getReplicas()[replica].dead = true;
-//      }
-//    }
-
     this.isRunning = isRunning;
     this.isRecovered = isRecovered;
     this.config = config;
@@ -283,36 +249,9 @@ public class DatabaseServer {
       usingMultipleReplicas = true;
     }
 
-    ObjectMapper mapper = new ObjectMapper();
-
-
-//    try {
-//      ObjectNode licenseConfig = (ObjectNode) mapper.readTree(json);
-//
-//      AtomicInteger licensePort = new AtomicInteger();
-//      licensePort.set(licenseConfig.get("server").get("port").asInt());
-//      final String address = licenseConfig.get("server").get("privateAddress").asText();
-//
-//      final AtomicBoolean lastHaveProLicense = new AtomicBoolean(haveProLicense);
-//      AtomicBoolean haventSet = new AtomicBoolean();
-//
-//      doValidateLicense(address, licensePort, lastHaveProLicense, haventSet, true);
-//    }
-//    catch (IOException e) {
-//      logger.error("Error initializing license validator", e);
-//      common.setHaveProLicense(false);
-//      common.saveSchema(getClient(), dataDir);
-//      DatabaseServer.this.haveProLicense = false;
-//      disableNow = true;
-//    }
-
-
     ObjectNode firstServer = (ObjectNode) shards.get(0).withArray("replicas").get(0);
     ServersConfig serversConfig = null;
     executor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors() * 128, "Sonicbase DatabaseServer Thread");
-//    if (!skipLicense) {
-//      validateLicense(config);
-//    }
 
     if (databaseDict.has("compressRecords")) {
       compressRecords = databaseDict.get("compressRecords").asBoolean();
@@ -364,30 +303,13 @@ public class DatabaseServer {
 
     logger.info("useUnsafe=" + useUnsafe);
 
-    String json = null;
-//    if (overrideProLicense) {
-      common.setHaveProLicense(true);
-//      common.saveSchema(getClient(), dataDir);
-//    }
-//    else {
-//      try {
-//        json = IOUtils.toString(DatabaseServer.class.getResourceAsStream("/config-license-server.json"), "utf-8");
-//      }
-//      catch (Exception e) {
-//        logger.error("Error initializing license validator", e);
-//        common.setHaveProLicense(false);
-//        common.saveSchema(getClient(), dataDir);
-//        DatabaseServer.this.haveProLicense = false;
-//        disableNow = true;
-//      }
-//    }
+    common.setHaveProLicense(true);
 
     this.awsClient = new AWSClient(client.get());
 
     this.licenseManager = new LicenseManager(this, overrideProLicense);
 
     addressMap = new AddressMap(this);
-
 
     this.deleteManager = new DeleteManager(this);
 
@@ -443,14 +365,7 @@ public class DatabaseServer {
       }
     }
 
-
-
-    //recordsById = new IdIndex(!unitTest, (int) (long) databaseDict.getLong("subPartitionsForIdIndex"), (int) (long) databaseDict.getLong("initialIndexSize"), (int) (long) databaseDict.getLong("indexEntrySize"));
-
     this.replicationFactor = shards.get(0).withArray("replicas").size();
-//    if (replicationFactor < 2) {
-//      throw new DatabaseException("Replication Factor must be at least two");
-//    }
 
     backupManager.scheduleBackup();
 
@@ -490,10 +405,6 @@ public class DatabaseServer {
 
     common.setServersConfig(serversConfig);
 
-    //common.getSchema().initRecordsById(shardCount, (int) (long) databaseDict.getLong("partitionCountForRecordIndex"));
-
-    //logger.info("RecordsById: partitionCount=" + common.getSchema().getRecordIndexPartitions().length);
-
     longRunningCommands = new LongRunningCalls(this);
     startLongRunningCommands();
 
@@ -501,8 +412,6 @@ public class DatabaseServer {
 
     disable();
     licenseManager.startLicenseValidator();
-
-    //startMasterMonitor();
 
     logger.info("Started server");
 
@@ -1255,6 +1164,14 @@ public class DatabaseServer {
     return compressRecords;
   }
 
+  public void removeIndex(String dbName, String table, String indexName) {
+    getIndices().get(dbName).getIndices().get(table).remove(indexName);
+  }
+
+  public void setDatabaseClient(DatabaseClient databaseClient) {
+    this.client.set(databaseClient);
+  }
+
   private static class NullX509TrustManager implements X509TrustManager {
     public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
     }
@@ -1292,15 +1209,6 @@ public class DatabaseServer {
         return this.client.get();
       }
       DatabaseClient client = new DatabaseClient(masterAddress, masterPort, common.getShard(), common.getReplica(), false, common, this);
-//      if (client.getCommon().getSchema().getVersion() <= common.getSchema().getVersion()) {
-//        client.getCommon().getSchema().setTables(common.getSchema().getTables());
-//        client.getCommon().getSchema().setServersConfig(common.getSchema().getServersConfig());
-//      }
-//      else {
-//        common.getSchema().setTables(client.getCommon().getTables());
-//        common.getSchema().setServersConfig(client.getCommon().getSchema().getServersConfig());
-//      }
-
       this.client.set(client);
       return this.client.get();
     }
@@ -1330,12 +1238,6 @@ public class DatabaseServer {
         break;
       }
       break;
-//      try {
-//        Thread.sleep(1_000);
-//      }
-//      catch (InterruptedException e) {
-//        throw new DatabaseException(e);
-//      }
     }
     return indexSchema;
   }
@@ -1438,9 +1340,7 @@ public class DatabaseServer {
           innerIndex.clear();
         }
       }
-      //common.getTables(dbName).clear();
     }
-    //common.saveSchema(dataDir);
   }
 
   public void replayLogs() {
@@ -1664,11 +1564,6 @@ public class DatabaseServer {
     DatabaseCommon tempCommon = new DatabaseCommon();
     tempCommon.deserializeSchema(cobj.getByteArray(ComObject.Tag.schemaBytes));
 
-//    if (getShard() == 0 &&
-//        tempCommon.getServersConfig().getShards()[0].getMasterReplica() == getReplica()) {
-//      return null;
-//    }
-
     synchronized (common) {
       if (tempCommon.getSchemaVersion() > common.getSchemaVersion()) {
         common.deserializeSchema(cobj.getByteArray(ComObject.Tag.schemaBytes));
@@ -1795,14 +1690,9 @@ public class DatabaseServer {
 
   public void startRepartitioner() {
     logger.info("startRepartitioner - begin");
-    //shutdownRepartitioner();
-
-    //if (shard == 0 && replica == common.getServersConfig().getShards()[0].getMasterReplica()) {
-    //partitionManager = new PartitionManager(this, common);
-    if (!partitionManager.isRunning())
+    if (!partitionManager.isRunning()) {
       partitionManager.start();
-
-    //}
+    }
     logger.info("startRepartitioner - end");
   }
 
@@ -1832,16 +1722,6 @@ public class DatabaseServer {
     currShard.put(thisReplica, this);
   }
 
-  private boolean isIdInField(String existingValue, String id) {
-    String[] parts = existingValue.split("|");
-    for (String part : parts) {
-      if (part.equals(id)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   public Indices getIndices(String dbName) {
     Indices ret = indexes.get(dbName);
     if (ret == null) {
@@ -1865,10 +1745,6 @@ public class DatabaseServer {
 
   public int getShardCount() {
     return shardCount;
-  }
-
-  public int getRecordsByIdPartitionCount() {
-    return recordsByIdPartitionCount;
   }
 
   public void disableLogProcessor() {
@@ -1991,14 +1867,8 @@ public class DatabaseServer {
     return dataDir;
   }
 
-
   public void setRole(String role) {
-    //if (role.equals("primaryMaster")) {
     this.role = DatabaseClient.Replica.primary;
-//    }
-//    else {
-//      this.role = DatabaseClient.Replica.secondary;
-//    }
   }
 
   public ObjectNode getConfig() {
@@ -2027,126 +1897,8 @@ public class DatabaseServer {
     }
   }
 
-
-  public static int getInt(byte[] array, int offset) {
-    return
-        ((array[offset]   & 0xff) << 24) |
-            ((array[offset+1] & 0xff) << 16) |
-            ((array[offset+2] & 0xff) << 8) |
-            (array[offset+3] & 0xff);
-  }
-
-  public static void putLong(long value, byte[] array, int offset) {
-    array[offset]   = (byte)(0xff & (value >> 56));
-    array[offset+1] = (byte)(0xff & (value >> 48));
-    array[offset+2] = (byte)(0xff & (value >> 40));
-    array[offset+3] = (byte)(0xff & (value >> 32));
-    array[offset+4] = (byte)(0xff & (value >> 24));
-    array[offset+5] = (byte)(0xff & (value >> 16));
-    array[offset+6] = (byte)(0xff & (value >> 8));
-    array[offset+7] = (byte)(0xff & value);
-  }
-
-  public static long getLong(byte[] array, int offset) {
-    return
-        ((long)(array[offset]   & 0xff) << 56) |
-            ((long)(array[offset+1] & 0xff) << 48) |
-            ((long)(array[offset+2] & 0xff) << 40) |
-            ((long)(array[offset+3] & 0xff) << 32) |
-            ((long)(array[offset+4] & 0xff) << 24) |
-            ((long)(array[offset+5] & 0xff) << 16) |
-            ((long)(array[offset+6] & 0xff) << 8) |
-            ((long)(array[offset+7] & 0xff));
-  }
-
-
   public AddressMap getAddressMap() {
     return addressMap;
-  }
-
-
-//todo: snapshot queue periodically
-
-//todo: implement restoreSnapshot()
-
-  public static class LogRequest {
-    private byte[] buffer;
-    private CountDownLatch latch = new CountDownLatch(1);
-    private List<byte[]> buffers;
-    private long[] sequenceNumbers;
-    private long[] times;
-    private long begin;
-    private AtomicLong timeLogging;
-
-    public LogRequest(int size) {
-      this.sequenceNumbers = new long[size];
-      this.times = new long[size];
-    }
-
-    @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP", justification = "copying the returned data is too slow")
-    public byte[] getBuffer() {
-      return buffer;
-    }
-
-    @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP2", justification = "copying the passed in data is too slow")
-    @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
-    public void setBuffer(byte[] buffer) {
-      this.buffer = buffer;
-    }
-
-    public CountDownLatch getLatch() {
-      return latch;
-    }
-
-    public List<byte[]> getBuffers() {
-      return buffers;
-    }
-
-    public long[] getSequences1() {
-      return sequenceNumbers;
-    }
-
-    public long[] getSequences0() {
-      return times;
-    }
-
-    public void setBegin(long begin) {
-      this.begin = begin;
-    }
-
-    public void setTimeLogging(AtomicLong timeLogging) {
-      this.timeLogging = timeLogging;
-    }
-
-    public AtomicLong getTimeLogging() {
-      return timeLogging;
-    }
-
-    public long getBegin() {
-      return begin;
-    }
-  }
-
-
-  public static class Response {
-    private byte[] bytes;
-    private Exception exception;
-
-    public Response(Exception e) {
-      this.exception = e;
-    }
-
-    public Response(byte[] bytes) {
-      this.bytes = bytes;
-    }
-
-    public Exception getException() {
-      return exception;
-    }
-
-    public byte[] getBytes() {
-      return bytes;
-    }
   }
 
   public byte[] invokeMethod(final byte[] body, boolean replayedCommand, boolean enableQueuing) {
@@ -2470,9 +2222,7 @@ public class DatabaseServer {
     if (shard == 0 && replica == common.getServersConfig().getShards()[0].getMasterReplica()) {
       return null;
     }
-//    String dbName = cobj.getString(ComObject.Tag.dbName);
     Long maxId = cobj.getLong(ComObject.Tag.maxId);
-//    common.getSchemaReadLock(dbName).lock();
     try {
       logger.info("setMaxRecordId - begin");
       synchronized (nextIdLock) {
@@ -2492,51 +2242,5 @@ public class DatabaseServer {
     catch (IOException e) {
       throw new DatabaseException(e);
     }
-//    finally {
-//      common.getSchemaReadLock(dbName).unlock();
-//    }
-  }
-
-  class Entry {
-    private long id;
-    private Object[] key;
-    private CountDownLatch latch = new CountDownLatch(1);
-
-    @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP2", justification = "copying the passed in data is too slow")
-    @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
-    public Entry(long id, Object[] key) {
-      this.id = id;
-      this.key = key;
-    }
-  }
-
-  public Record evaluateRecordForQuery(
-      TableSchema tableSchema, Record record,
-      ExpressionImpl whereClause, ParameterHandler parms) {
-
-    boolean pass = (Boolean) whereClause.evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
-    if (pass) {
-      return record;
-    }
-    return null;
-  }
-
-
-  public enum ResultType {
-    records(0),
-    integer(1),
-    bool(2),
-    schema(3);
-
-    private final int type;
-
-    ResultType(int type) {
-      this.type = type;
-    }
-
-    public int getType() {
-      return type;
-    }
-
   }
 }

@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
 import com.sonicbase.common.Record;
@@ -65,7 +64,7 @@ public class IndexLookupWithExpression extends IndexLookup {
         if (entry.getValue() != null && !entry.getValue().equals(0L)) {
           records = server.getAddressMap().fromUnsafeToRecords(entry.getValue());
         }
-        if (parms != null && expression != null && records != null) {
+        if (expression != null && records != null) {
           ProcessWithExpression processWithExpression = new ProcessWithExpression(entry, forceSelectOnServer, records).invoke();
           entry = processWithExpression.getEntry();
           if (processWithExpression.shouldBreak()) {
@@ -157,13 +156,12 @@ public class IndexLookupWithExpression extends IndexLookup {
           if (pass) {
             byte[][] currRecords = new byte[][]{bytes};
             AtomicBoolean done = new AtomicBoolean();
-            records = processViewFlags(dbName, tableSchema, indexSchema, index, viewVersion, entry.getKey(), records, done);
+            records = processViewFlags(viewVersion, records);
             if (records != null) {
 
               int[] keyOffsets = null;
 
-              byte[][] currRet = applySelectToResultRecords(serializationVersion, dbName, columnOffsets, forceSelectOnServer, currRecords,
-                  entry.getKey(), tableSchema, counters, groupContext, keyOffsets);
+              byte[][] currRet = evaluateCounters(columnOffsets, currRecords);
               if (counters == null) {
                 for (byte[] currBytes : currRet) {
                   boolean localDone = false;
@@ -225,12 +223,11 @@ public class IndexLookupWithExpression extends IndexLookup {
 
     public ProcessWithoutExpression invoke() {
       AtomicBoolean done = new AtomicBoolean();
-      records = processViewFlags(dbName, tableSchema, indexSchema, index, viewVersion, entry.getKey(), records, done);
+      records = processViewFlags(viewVersion, records);
       if (records != null) {
         int[] keyOffsets = null;
 
-        byte[][] retRecordsArray = applySelectToResultRecords(serializationVersion, dbName, columnOffsets, forceSelectOnServer, records,
-            entry.getKey(), tableSchema, counters, groupContext, keyOffsets);
+        byte[][] retRecordsArray = evaluateCounters(columnOffsets, records);
         if (counters == null) {
           for (byte[] currBytes : retRecordsArray) {
             boolean localDone = false;

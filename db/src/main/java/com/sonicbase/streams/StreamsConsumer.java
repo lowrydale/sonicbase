@@ -1,5 +1,7 @@
 package com.sonicbase.streams;
 
+import com.sonicbase.streams.Message;
+
 import java.util.List;
 
 public interface StreamsConsumer {
@@ -8,9 +10,9 @@ public interface StreamsConsumer {
 
   void initThread();
 
-  List<Message> receive();
+  List<com.sonicbase.streams.Message> receive();
 
-  void acknowledgeMessages(List<Message> messages);
+  void acknowledgeMessages(List<com.sonicbase.streams.Message> messages);
 
   void handleError(List<Message> messages, Exception e);
 

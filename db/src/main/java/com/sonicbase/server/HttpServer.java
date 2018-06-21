@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
 import com.sonicbase.common.ThreadUtil;
@@ -14,7 +13,7 @@ public class HttpServer {
   public static final String TIME_FORMAT_STR = "yyyy-MM-dd'T'HH:mm:ss";
 
   private static Thread mainThread;
-  private final DatabaseServer server;
+  private final com.sonicbase.server.DatabaseServer server;
   private boolean shutdown;
   private MonitorHandler handler;
 

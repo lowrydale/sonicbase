@@ -9,6 +9,7 @@ import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.jetbrains.annotations.NotNull;
 
@@ -28,7 +29,7 @@ public class BulkImportManager {
   private int BULK_IMPORT_THREAD_COUNT_PER_SERVER = 4;
 
   private final Logger logger;
-  private final DatabaseServer server;
+  private final com.sonicbase.server.DatabaseServer server;
   private boolean shutdown;
 
   public BulkImportManager(final DatabaseServer server) {
@@ -62,7 +63,7 @@ public class BulkImportManager {
   private ConcurrentHashMap<String, AtomicBoolean> cancelBulkImport = new ConcurrentHashMap<>();
 
 
-  public ComObject getBulkImportProgressOnServer(ComObject cobj) {
+  public ComObject getBulkImportProgressOnServer(ComObject cobj, boolean replayedCommand) {
     ComObject retObj = new ComObject();
 
     ComArray array = retObj.putArray(ComObject.Tag.statuses, ComObject.Type.objectType);
@@ -131,7 +132,7 @@ public class BulkImportManager {
 
   private static ConcurrentHashMap<Long, Long> returned = new ConcurrentHashMap<>();
 
-  public ComObject startBulkImportOnServer(final ComObject cobj) {
+  public ComObject startBulkImportOnServer(final ComObject cobj, boolean replayedCommand) {
     final String dbName = cobj.getString(ComObject.Tag.dbName);
     final String tableName = cobj.getString(ComObject.Tag.tableName);
     importCountProcessed.put(dbName + ":" + tableName, new AtomicLong(0));
@@ -613,7 +614,7 @@ public class BulkImportManager {
 
   private AtomicInteger countCoordinating = new AtomicInteger();
 
-  public ComObject coordinateBulkImportForTable(final ComObject cobj) {
+  public ComObject coordinateBulkImportForTable(final ComObject cobj, boolean replayedCommand) {
     final String dbName = cobj.getString(ComObject.Tag.dbName);
     final String tableName = cobj.getString(ComObject.Tag.tableName);
 
@@ -1435,7 +1436,7 @@ public class BulkImportManager {
     return bulkImportStatus;
   }
 
-  public ComObject startBulkImport(final ComObject cobj) {
+  public ComObject startBulkImport(final ComObject cobj, boolean replayedCommand) {
     try {
       final String dbName = cobj.getString(ComObject.Tag.dbName);
       final String tableNames = cobj.getString(ComObject.Tag.tableName);
@@ -1578,14 +1579,14 @@ public class BulkImportManager {
     }
   }
 
-  public ComObject cancelBulkImport(final ComObject cobj) {
+  public ComObject cancelBulkImport(final ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
     String tableName = cobj.getString(ComObject.Tag.tableName);
     cancelBulkImport.put(dbName + ":" + tableName, new AtomicBoolean(true));
     return null;
   }
 
-  public ComObject getBulkImportProgress(ComObject cobj) {
+  public ComObject getBulkImportProgress(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.dbName);
 
     ConcurrentHashMap<String, ConcurrentHashMap<String, BulkImportStatus>> bulkImportStatus = getBulkImportStatus(dbName);

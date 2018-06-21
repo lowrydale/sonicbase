@@ -25,7 +25,7 @@ public class DeleteManager {
 
   private Logger logger;
 
-  private final DatabaseServer databaseServer;
+  private final com.sonicbase.server.DatabaseServer databaseServer;
   private ThreadPoolExecutor executor;
   private Thread mainThread;
   private ThreadPoolExecutor freeExecutor;

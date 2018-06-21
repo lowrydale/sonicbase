@@ -1,6 +1,5 @@
 package com.sonicbase.server;
 
-import com.codahale.metrics.MetricRegistry;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
@@ -16,11 +15,9 @@ import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import net.sf.jsqlparser.statement.select.Limit;
 import net.sf.jsqlparser.statement.select.Offset;
-import org.apache.giraph.utils.Varint;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.Callable;
@@ -36,9 +33,11 @@ public class ReadManager {
 
   private Logger logger;
 
-  private final DatabaseServer server;
+  private final com.sonicbase.server.DatabaseServer server;
   private Thread diskReaper;
   private boolean shutdown;
+  private AtomicInteger lookupCount = new AtomicInteger();
+
 
   public ReadManager(DatabaseServer databaseServer) {
 
@@ -135,15 +134,9 @@ public class ReadManager {
           break;
         }
         byte[][] records = null;
-        //synchronized (index.getMutex(entry.getKey())) {
-          //if (entry.getValue() instanceof Long) {
-          //TODO: unsafe
-            //entry.setValue(index.get(entry.getKey()));
-          //}
-          if (entry.getValue() != null && !entry.getValue().equals(0L)) {
-            records = server.getAddressMap().fromUnsafeToRecords(entry.getValue());
-          }
-        //}
+        if (entry.getValue() != null && !entry.getValue().equals(0L)) {
+          records = server.getAddressMap().fromUnsafeToRecords(entry.getValue());
+        }
         for (byte[] bytes : records) {
           if ((Record.getDbViewFlags(bytes) & Record.DB_VIEW_FLAG_DELETING) != 0) {
             continue;
@@ -186,6 +179,7 @@ public class ReadManager {
           Thread.sleep(10);
         }
         catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
           throw new DatabaseException(e);
         }
       }
@@ -287,11 +281,6 @@ public class ReadManager {
     }
   }
 
-  private static final MetricRegistry METRICS = new MetricRegistry();
-
-  public static final com.codahale.metrics.Timer INDEX_LOOKUP_STATS = METRICS.timer("indexLookup");
-  public static final com.codahale.metrics.Timer BATCH_INDEX_LOOKUP_STATS = METRICS.timer("batchIndexLookup");
-
   public void shutdown() {
     try {
       shutdown = true;
@@ -305,15 +294,12 @@ public class ReadManager {
     }
   }
 
-  private AtomicInteger lookupCount = new AtomicInteger();
-
   @SchemaReadLock
   public ComObject indexLookup(ComObject cobj, boolean replayedCommand) {
     return indexLookup(cobj, null);
   }
 
   public ComObject indexLookup(ComObject cobj, StoredProcedureContextImpl procedureContext) {
-    //Timer.Context context = INDEX_LOOKUP_STATS.time();
     try {
 
       if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
@@ -329,10 +315,6 @@ public class ReadManager {
       if (schemaVersion != null && schemaVersion < server.getSchemaVersion()) {
         throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
       }
-//      else if (server.getSchemaVersion() != server.getDatabaseClient().getCommon().getSchemaVersion()) {
-//        throw new DatabaseException("Schema version mismatch: server=" + server.getSchemaVersion() +
-//            ", client=" + server.getDatabaseClient().getCommon().getSchemaVersion());
-//      }
       else if (schemaVersion != null && schemaVersion > server.getSchemaVersion()) {
         if (server.getShard() != 0 || server.getReplica() != 0) {
           server.getDatabaseClient().syncSchema();
@@ -342,7 +324,6 @@ public class ReadManager {
       }
 
       short serializationVersion = cobj.getShort(ComObject.Tag.serializationVersion);
-      AtomicInteger AtomicInteger = new AtomicInteger();
 
       IndexLookup indexLookup = null;
       if (cobj.getInt(ComObject.Tag.rightOperator) != null) {
@@ -352,7 +333,6 @@ public class ReadManager {
       else {
         indexLookup = new IndexLookupOneKey(server);
       }
-
 
       indexLookup.setProcedureContext(procedureContext);
       indexLookup.setSerializationVersion(serializationVersion);
@@ -398,7 +378,6 @@ public class ReadManager {
       TableSchema tableSchema = null;
       IndexSchema indexSchema = null;
       try {
-        //  logger.info("indexLookup: tableid=" + tableId + ", tableCount=" + common.getTablesById().size() + ", tableNull=" + (common.getTablesById().get(tableId) == null));
         Map<Integer, TableSchema> tablesById = server.getCommon().getTablesById(dbName);
         if (tablesById == null) {
           logger.error("Error");
@@ -445,7 +424,6 @@ public class ReadManager {
         originalLeftKey = DatabaseCommon.deserializeTypedKey(originalLeftBytes);
       }
       indexLookup.setOriginalLeftKey(originalLeftKey);
-      //BinaryExpression.Operator leftOperator = BinaryExpression.Operator.getOperator(in.readInt());
       indexLookup.setLeftOperator(BinaryExpression.Operator.getOperator(cobj.getInt(ComObject.Tag.leftOperator)));
 
       byte[] rightBytes = cobj.getByteArray(ComObject.Tag.rightKey);
@@ -592,53 +570,12 @@ public class ReadManager {
 
       retObj.put(ComObject.Tag.currOffset, currOffset.get());
       retObj.put(ComObject.Tag.countReturned, countReturned.get());
-//
-//      if (schemaVersion < server.getSchemaVersion()) {
-//        throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
-//      }
-
       return retObj;
     }
     catch (IOException e) {
       e.printStackTrace();
       throw new DatabaseException(e);
     }
-    finally {
-      //context.stop();
-    }
-  }
-
-  private Set<Integer> getSimpleColumnOffsets(DataInputStream in, String tableName, TableSchema tableSchema) throws IOException {
-    int count = (int) Varint.readSignedVarLong(in);
-    Set<Integer> columnOffsets = new HashSet<>();
-    for (int i = 0; i < count; i++) {
-      columnOffsets.add((int) Varint.readSignedVarLong(in));
-    }
-    return columnOffsets;
-  }
-
-  private Set<Integer> getColumnOffsets(
-      DataInputStream in, String tableName,
-      TableSchema tableSchema) throws IOException {
-    Set<Integer> columnOffsets = new HashSet<>();
-    int columnCount = (int) Varint.readSignedVarLong(in);
-    for (int i = 0; i < columnCount; i++) {
-      ColumnImpl column = new ColumnImpl();
-      if (in.readBoolean()) {
-        column.setTableName(in.readUTF());
-      }
-      column.setColumnName(in.readUTF());
-      if (column.getTableName() == null || tableName.equals(column.getTableName())) {
-        Integer offset = tableSchema.getFieldOffset(column.getColumnName());
-        if (offset != null) {
-          columnOffsets.add(offset);
-        }
-      }
-    }
-    if (columnOffsets.size() == tableSchema.getFields().size()) {
-      columnOffsets.clear();
-    }
-    return columnOffsets;
   }
 
   @SchemaReadLock
@@ -700,7 +637,6 @@ public class ReadManager {
       select.setLimit(null);
       DiskBasedResultSet diskResults = null;
       if (select.getServerSelectPageNumber() == 0) {
-        //select.setPageSize(1000);
         ResultSetImpl resultSet = (ResultSetImpl) select.execute(dbName, null, null, null, null,
             null, restrictToThisServer, procedureContext, schemaRetryCount);
 
@@ -839,11 +775,6 @@ public class ReadManager {
       }
 
       final String dbName = cobj.getString(ComObject.Tag.dbName);
-//      int schemaVersion = cobj.getInt(ComObject.Tag.schemaVersion);
-//      if (schemaVersion < server.getSchemaVersion()) {
-//        throw new SchemaOutOfSyncException("currVer:" + server.getCommon().getSchemaVersion() + ":");
-//      }
-
       ComArray array = cobj.getArray(ComObject.Tag.selectStatements);
       final SelectStatementImpl[] selectStatements = new SelectStatementImpl[array.getArray().size()];
       for (int i = 0; i < array.getArray().size(); i++) {
@@ -1098,7 +1029,6 @@ public class ReadManager {
       String tableName = null;
       String indexName = null;
       try {
-        //  logger.info("indexLookup: tableid=" + tableId + ", tableCount=" + common.getTablesById().size() + ", tableNull=" + (common.getTablesById().get(tableId) == null));
         TableSchema tableSchema = server.getCommon().getTablesById(dbName).get(tableId);
         tableName = tableSchema.getName();
         for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
@@ -1115,7 +1045,6 @@ public class ReadManager {
       }
       indexLookup.setTableName(tableName);
       indexLookup.setIndexName(indexName);
-      //int srcCount = in.readInt();
       ComArray orderByArray = cobj.getArray(ComObject.Tag.orderByExpressions);
       List<OrderByExpressionImpl> orderByExpressions = new ArrayList<>();
       if (orderByArray != null) {
@@ -1262,16 +1191,10 @@ public class ReadManager {
       Map.Entry<Object[], Object> entry = index.lastEntry();
       if (entry != null) {
         byte[][] records = null;
-        //synchronized (index.getMutex(entry.getKey())) {
-          Object unsafeAddress = entry.getValue();
-          //if (unsafeAddress instanceof Long) {
-          //TODO: unsafe
-           // unsafeAddress = index.get(entry.getKey());
-          //}
-          if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
-            records = server.getAddressMap().fromUnsafeToRecords(unsafeAddress);
-          }
-        //}
+        Object unsafeAddress = entry.getValue();
+        if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
+          records = server.getAddressMap().fromUnsafeToRecords(unsafeAddress);
+        }
         if (records != null) {
           if (isPrimaryKey) {
             maxKey = DatabaseCommon.serializeKey(tableSchema, indexName, entry.getKey());
@@ -1285,16 +1208,10 @@ public class ReadManager {
       entry = index.firstEntry();
       if (entry != null) {
         byte[][] records = null;
-        //synchronized (index.getMutex(entry.getKey())) {
-          Object unsafeAddress = entry.getValue();
-          //if (unsafeAddress instanceof Long) {
-          //TODO: unsafe
-           // unsafeAddress = index.get(entry.getKey());
-          //}
-          if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
-            records = server.getAddressMap().fromUnsafeToRecords(unsafeAddress);
-          }
-        //}
+        Object unsafeAddress = entry.getValue();
+        if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
+          records = server.getAddressMap().fromUnsafeToRecords(unsafeAddress);
+        }
         if (records != null) {
           if (isPrimaryKey) {
             minKey = DatabaseCommon.serializeKey(tableSchema, indexName, entry.getKey());
@@ -1322,7 +1239,6 @@ public class ReadManager {
       throw new DatabaseException(e);
     }
   }
-
 
   @SchemaReadLock
   public ComObject evaluateCounterWithRecord(ComObject cobj, boolean replayedCommand) {
@@ -1352,35 +1268,33 @@ public class ReadManager {
       Object[] key = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
 
       Index index = server.getIndex(dbName, tableName, indexName);
-      //synchronized (index.getMutex(key)) {
-        Object unsafeAddress = index.get(key);
-        if (unsafeAddress != null) {
-          byte[][] records = null;
-          if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
-            records = server.getAddressMap().fromUnsafeToRecords(unsafeAddress);
-          }
-          if (records != null) {
-            Record record = new Record(dbName, server.getCommon(), records[0]);
-            Object value = record.getFields()[tableSchema.getFieldOffset(columnName)];
-            if (minKeyBytes != null) {
-              if (counter.isDestTypeLong()) {
-                counter.setMinLong((Long) DataType.getLongConverter().convert(value));
-              }
-              else {
-                counter.setMinDouble((Double) DataType.getDoubleConverter().convert(value));
-              }
+      Object unsafeAddress = index.get(key);
+      if (unsafeAddress != null) {
+        byte[][] records = null;
+        if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
+          records = server.getAddressMap().fromUnsafeToRecords(unsafeAddress);
+        }
+        if (records != null) {
+          Record record = new Record(dbName, server.getCommon(), records[0]);
+          Object value = record.getFields()[tableSchema.getFieldOffset(columnName)];
+          if (minKeyBytes != null) {
+            if (counter.isDestTypeLong()) {
+              counter.setMinLong((Long) DataType.getLongConverter().convert(value));
             }
             else {
-              if (counter.isDestTypeLong()) {
-                counter.setMaxLong((Long) DataType.getLongConverter().convert(value));
-              }
-              else {
-                counter.setMaxDouble((Double) DataType.getDoubleConverter().convert(value));
-              }
+              counter.setMinDouble((Double) DataType.getDoubleConverter().convert(value));
+            }
+          }
+          else {
+            if (counter.isDestTypeLong()) {
+              counter.setMaxLong((Long) DataType.getLongConverter().convert(value));
+            }
+            else {
+              counter.setMaxDouble((Double) DataType.getDoubleConverter().convert(value));
             }
           }
         }
-      //}
+      }
       ComObject retObj = new ComObject();
       retObj.put(ComObject.Tag.legacyCounter, counter.serialize());
       return retObj;

@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -30,7 +29,7 @@ public class OSStatsManager {
 
   public static final String TIME_FORMAT_STR = "yyyy-MM-dd'T'HH:mm:ss";
 
-  private final DatabaseServer server;
+  private final com.sonicbase.server.DatabaseServer server;
   private Thread persisterThread;
 
   private AtomicBoolean initialized = new AtomicBoolean();

@@ -142,6 +142,27 @@ public class NettyServer {
     return isRecovered.get();
   }
 
+  public static class Response {
+    private byte[] bytes;
+    private Exception exception;
+
+    public Response(Exception e) {
+      this.exception = e;
+    }
+
+    public Response(byte[] bytes) {
+      this.bytes = bytes;
+    }
+
+    public Exception getException() {
+      return exception;
+    }
+
+    public byte[] getBytes() {
+      return bytes;
+    }
+  }
+
 
   public enum ReadState {
     size,
@@ -413,7 +434,7 @@ public class NettyServer {
 
             ArrayList<byte[]> retBytes = new ArrayList<byte[]>();
             try {
-              List<DatabaseServer.LogRequest> logRequests = new ArrayList<>();
+              List<LogManager.LogRequest> logRequests = new ArrayList<>();
 
               long beginProcess = System.nanoTime();
               List<byte[]> ret = doProcessRequests(requests, timeLogging, handlerTime);
@@ -437,7 +458,7 @@ public class NettyServer {
               respBuffer.retain();
 
 
-              for (DatabaseServer.LogRequest logRequest : logRequests) {
+              for (LogManager.LogRequest logRequest : logRequests) {
                 logRequest.getLatch().await();
               }
 
@@ -578,8 +599,8 @@ public class NettyServer {
     List<byte[]> doProcessRequests(List<Request> requests, AtomicLong timeLogging, AtomicLong handlerTime) {
       List<byte[]> finalRet = new ArrayList<>();
       try {
-        List<DatabaseServer.Response> ret = processRequests(requests, timeLogging, handlerTime);
-        for (DatabaseServer.Response response : ret) {
+        List<Response> ret = processRequests(requests, timeLogging, handlerTime);
+        for (Response response : ret) {
           if (response.getException() != null) {
             finalRet.add(returnException("exception: " + response.getException().getMessage(), response.getException()));
           }
@@ -611,14 +632,14 @@ public class NettyServer {
       return finalRet;
     }
 
-    private List<DatabaseServer.Response> processRequests(List<Request> requests, AtomicLong timeLogging, AtomicLong handlerTime) throws IOException {
-      List<DatabaseServer.Response> ret = new ArrayList<>();
+    private List<Response> processRequests(List<Request> requests, AtomicLong timeLogging, AtomicLong handlerTime) throws IOException {
+      List<Response> ret = new ArrayList<>();
       if (requests.size() > 1) {
         ;
       }
       for (Request request : requests) {
         byte[] retBody = getDatabaseServer().invokeMethod(request.body, -1L, (short) -1L, false, true, timeLogging, handlerTime);
-        DatabaseServer.Response response = new DatabaseServer.Response(retBody);
+        Response response = new Response(retBody);
         ret.add(response);
       }
       return ret;

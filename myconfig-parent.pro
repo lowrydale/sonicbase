@@ -10,8 +10,8 @@
 -renamesourcefileattribute SourceFile
 -keepattributes Exceptions,InnerClasses,Signature,Deprecated,SourceFile,LineNumberTable,*Annotation*,EnclosingMethod
 
--keep public class com.sonicbase.bench.CustomFunctions
--keep public class com.sonicbase.bench.TestPerformance
+-keep public class CustomFunctions
+-keep public class TestPerformance
 -keep public class com.sonicbase.jdbcdriver.Driver
 -keep public class com.sonicbase.client.ReconfigureResults
 -keep public class com.sonicbase.jdbcdriver.ConnectionProxy
@@ -51,10 +51,10 @@
     !private <methods>;
 }
 
--keepclassmembers  class com.sonicbase.bench.TestPerformance {
+-keepclassmembers  class TestPerformance {
     !private <methods>;
 }
--keepclassmembers  class com.sonicbase.bench.CustomFunctions {
+-keepclassmembers  class CustomFunctions {
     !private <methods>;
 }
 
@@ -129,7 +129,7 @@
     !private <methods>;
 }
 
--keep public class com.sonicbase.bench.TestPerformance {
+-keep public class TestPerformance {
       public static void main(java.lang.String[]);
 }
 -keep public class com.sonicbase.server.NettyServer {

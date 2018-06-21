@@ -1,7 +1,7 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
 import com.amazonaws.transform.MapEntry;
+import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.index.Index;
 import com.sonicbase.query.BinaryExpression;
 import org.jetbrains.annotations.NotNull;
@@ -13,8 +13,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import static com.sonicbase.client.DatabaseClient.OPTIMIZED_RANGE_PAGE_SIZE;
 
 public class IndexLookupOneKey extends IndexLookup {
 
@@ -69,15 +67,13 @@ public class IndexLookupOneKey extends IndexLookup {
               }
             }
           }
-
-          Object[][] currKeys = null;
           byte[][] currKeyRecords = null;
           byte[][] records = null;
 
           boolean shouldProcess = true;
           shouldProcess = handleProbe(countSkipped, shouldProcess);
           if (shouldProcess) {
-            ProcessKey processKey = new ProcessKey(entry, countSkipped, currEntry, currKeys, currKeyRecords, records).invoke();
+            ProcessKey processKey = new ProcessKey(entry, currEntry, currKeyRecords, records).invoke();
             if (processKey.shouldBreak()) {
               break outer;
             }
@@ -110,7 +106,7 @@ public class IndexLookupOneKey extends IndexLookup {
 
   private boolean handleProbe(AtomicInteger countSkipped, boolean shouldProcess) {
     if (isProbe) {
-      if (countSkipped.incrementAndGet() < OPTIMIZED_RANGE_PAGE_SIZE) {
+      if (countSkipped.incrementAndGet() < DatabaseClient.OPTIMIZED_RANGE_PAGE_SIZE) {
         shouldProcess = false;
       }
       else {
@@ -199,7 +195,6 @@ public class IndexLookupOneKey extends IndexLookup {
         }
         else if (ascending != null && !ascending && originalLeftKey != null &&
             (leftOperator.equals(BinaryExpression.Operator.greater) || leftOperator.equals(BinaryExpression.Operator.greaterEqual))) {
-          //entry = index.ceilingEntry(originalKey);
           if (entry == null) {
             entry = index.lastEntry();
           }
@@ -370,10 +365,7 @@ public class IndexLookupOneKey extends IndexLookup {
           }
 
           AtomicBoolean done = new AtomicBoolean();
-          handleRecord(serializationVersion, dbName, tableSchema, indexSchema, viewVersion, index, keyToUse, parms,
-              evaluateExpression, expression,
-              columnOffsets, forceSelectOnServer, retKeyRecords, retKeys, retRecords, keys, counters, groupContext, records,
-              currKeyRecords, currKeys, offset, currOffset, countReturned, limit, done, countSkipped, isProbe, procedureContext);
+          handleRecord(viewVersion, keyToUse, evaluateExpression, records, currKeyRecords, done);
           if (done.get()) {
             return;
           }
@@ -424,9 +416,7 @@ public class IndexLookupOneKey extends IndexLookup {
             }
             if (value != null) {
               AtomicBoolean done = new AtomicBoolean();
-              handleRecord(serializationVersion, dbName, tableSchema, indexSchema, viewVersion, index, keyToUse, parms, evaluateExpression,
-                  expression, columnOffsets, forceSelectOnServer, retKeyRecords, retKeys, retRecords, keys, counters,
-                  groupContext, records, currKeyRecords, currKeys, offset, currOffset, countReturned, limit, done, countSkipped, isProbe, procedureContext);
+              handleRecord(viewVersion, keyToUse, evaluateExpression, records, currKeyRecords, done);
               if (done.get()) {
                 return;
               }
@@ -493,17 +483,14 @@ public class IndexLookupOneKey extends IndexLookup {
   private class ProcessKey {
     private boolean myResult;
     private Map.Entry<Object[], Object> entry;
-    private AtomicInteger countSkipped;
     private Map.Entry<Object[], Object> currEntry;
-    private Object[][] currKeys;
     private byte[][] currKeyRecords;
     private byte[][] records;
 
-    public ProcessKey(Map.Entry<Object[], Object> entry, AtomicInteger countSkipped, Map.Entry<Object[], Object> currEntry, Object[][] currKeys, byte[][] currKeyRecords, byte[]... records) {
+    public ProcessKey(Map.Entry<Object[], Object> entry, Map.Entry<Object[], Object> currEntry,
+                      byte[][] currKeyRecords, byte[]... records) {
       this.entry = entry;
-      this.countSkipped = countSkipped;
       this.currEntry = currEntry;
-      this.currKeys = currKeys;
       this.currKeyRecords = currKeyRecords;
       this.records = records;
     }
@@ -518,7 +505,7 @@ public class IndexLookupOneKey extends IndexLookup {
 
     public ProcessKey invoke() {
       if (keys) {
-        Object unsafeAddress = currEntry.getValue();//index.get(entry.getKey());
+        Object unsafeAddress = currEntry.getValue();
         if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
           currKeyRecords = server.getAddressMap().fromUnsafeToKeys(unsafeAddress);
         }
@@ -529,15 +516,13 @@ public class IndexLookupOneKey extends IndexLookup {
           records = server.getAddressMap().fromUnsafeToRecords(unsafeAddress);
         }
       }
-      Object[] keyToUse = currEntry.getKey(); //key
+      Object[] keyToUse = currEntry.getKey();
       if (keyToUse == null) {
         keyToUse = originalLeftKey;
       }
       if (currEntry.getValue() != null) {
         AtomicBoolean done = new AtomicBoolean();
-        handleRecord(serializationVersion, dbName, tableSchema, indexSchema, viewVersion, index, keyToUse, parms, evaluateExpression,
-            expression, columnOffsets, forceSelectOnServer, retKeyRecords, retKeys, retRecords, keys, counters, groupContext,
-            records, currKeyRecords, currKeys, offset, currOffset, countReturned, limit, done, countSkipped, isProbe, procedureContext);
+        handleRecord(viewVersion, keyToUse, evaluateExpression, records, currKeyRecords, done);
         if (done.get()) {
           entry = null;
           myResult = true;

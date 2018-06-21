@@ -1,14 +1,12 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
+import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import static com.sonicbase.client.DatabaseClient.OPTIMIZED_RANGE_PAGE_SIZE;
 
 public class IndexLookupTwoKeys extends IndexLookup {
 
@@ -25,15 +23,15 @@ public class IndexLookupTwoKeys extends IndexLookup {
       Object[] greaterKey = leftKey;
       Object[] greaterOriginalKey = originalLeftKey;
       BinaryExpression.Operator lessOp = rightOperator;
-      Object[] lessKey = leftKey;//originalRightKey;
+      Object[] lessKey = leftKey;
       Object[] lessOriginalKey = originalRightKey;
       if (greaterOp == BinaryExpression.Operator.less ||
           greaterOp == BinaryExpression.Operator.lessEqual) {
         greaterOp = rightOperator;
-        greaterKey = leftKey; //rightKey;
+        greaterKey = leftKey;
         greaterOriginalKey = originalRightKey;
         lessOp = leftOperator;
-        lessKey = leftKey;//originalLeftKey;
+        lessKey = leftKey;
         lessOriginalKey = originalLeftKey;
       }
 
@@ -87,7 +85,7 @@ public class IndexLookupTwoKeys extends IndexLookup {
 
           boolean shouldProcess = true;
           if (isProbe) {
-            if (countSkipped.incrementAndGet() < OPTIMIZED_RANGE_PAGE_SIZE) {
+            if (countSkipped.incrementAndGet() < DatabaseClient.OPTIMIZED_RANGE_PAGE_SIZE) {
               shouldProcess = false;
             }
             else {
@@ -95,7 +93,7 @@ public class IndexLookupTwoKeys extends IndexLookup {
             }
           }
           if (shouldProcess) {
-            ProcessKey processKey = new ProcessKey(entry, countSkipped, currKeys, currKeyRecords, records).invoke();
+            ProcessKey processKey = new ProcessKey(entry, currKeyRecords, records).invoke();
             entry = processKey.getEntry();
             if (processKey.shouldBreak()) {
               break outer;
@@ -314,15 +312,11 @@ public class IndexLookupTwoKeys extends IndexLookup {
   private class ProcessKey {
     private boolean myResult;
     private Map.Entry<Object[], Object> entry;
-    private AtomicInteger countSkipped;
-    private Object[][] currKeys;
     private byte[][] currKeyRecords;
     private byte[][] records;
 
-    public ProcessKey(Map.Entry<Object[], Object> entry, AtomicInteger countSkipped, Object[][] currKeys, byte[][] currKeyRecords, byte[]... records) {
+    public ProcessKey(Map.Entry<Object[], Object> entry, byte[][] currKeyRecords, byte[]... records) {
       this.entry = entry;
-      this.countSkipped = countSkipped;
-      this.currKeys = currKeys;
       this.currKeyRecords = currKeyRecords;
       this.records = records;
     }
@@ -344,24 +338,20 @@ public class IndexLookupTwoKeys extends IndexLookup {
           records = server.getAddressMap().fromUnsafeToRecords(entry.getValue());
         }
       }
-      //}
       if (keys) {
         Object unsafeAddress = entry.getValue();
         currKeyRecords = server.getAddressMap().fromUnsafeToKeys(unsafeAddress);
       }
-      else {
-      }
 
       if (entry.getValue() != null) {
-        Object[] keyToUse = entry.getKey();//key;
+        Object[] keyToUse = entry.getKey();
         if (keyToUse == null) {
           keyToUse = originalLeftKey;
         }
 
         AtomicBoolean done = new AtomicBoolean();
-        handleRecord(serializationVersion, dbName, tableSchema, indexSchema, viewVersion, index, keyToUse, parms, evaluateExpression,
-            expression, columnOffsets, forceSelectOnServer, retKeyRecords, retKeys, retRecords, keys, counters, groupContext,
-            records, currKeyRecords, currKeys, offset, currOffset, countReturned, limit, done, countSkipped, isProbe, procedureContext);
+        handleRecord(viewVersion, keyToUse, evaluateExpression,
+            records, currKeyRecords, done);
         if (done.get()) {
           entry = null;
           myResult = true;

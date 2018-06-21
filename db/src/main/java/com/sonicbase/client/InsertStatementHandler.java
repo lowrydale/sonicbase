@@ -34,7 +34,8 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static com.sonicbase.client.DatabaseClient.*;
+import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION;
+import static com.sonicbase.client.DatabaseClient.toLower;
 import static com.sonicbase.server.PartitionManager.findOrderedPartitionForRecord;
 import static com.sonicbase.server.UpdateManager.*;
 
@@ -50,7 +51,9 @@ public class InsertStatementHandler extends StatementHandler {
   }
 
   @Override
-  public Object execute(String dbName, ParameterHandler parms, String sqlToUse, Statement statement, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) throws SQLException {
+  public Object execute(String dbName, ParameterHandler parms, String sqlToUse, Statement statement,
+                        SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
+                        boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) throws SQLException {
     Insert insert = (Insert) statement;
     final InsertStatementImpl insertStatement = new InsertStatementImpl(client);
     insertStatement.setTableName(insert.getTable().getName());
@@ -153,7 +156,7 @@ public class InsertStatementHandler extends StatementHandler {
     private boolean currPartition;
     private Object[] key;
     private int shard;
-    private Map.Entry<String, IndexSchema> indexSchema;
+    private IndexSchema indexSchema;
     public boolean currAndLastMatch;
 
     @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP", justification = "copying the returned data is too slow")
@@ -165,7 +168,7 @@ public class InsertStatementHandler extends StatementHandler {
       return shard;
     }
 
-    public Map.Entry<String, IndexSchema> getIndexSchema() {
+    public IndexSchema getIndexSchema() {
       return indexSchema;
     }
 
@@ -175,7 +178,7 @@ public class InsertStatementHandler extends StatementHandler {
 
     @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP2", justification = "copying the passed in data is too slow")
     @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
-    public KeyInfo(int shard, Object[] key, Map.Entry<String, IndexSchema> indexSchema, boolean currPartition) {
+    public KeyInfo(int shard, Object[] key, IndexSchema indexSchema, boolean currPartition) {
       this.shard = shard;
       this.key = key;
       this.indexSchema = indexSchema;
@@ -189,7 +192,7 @@ public class InsertStatementHandler extends StatementHandler {
       this.key = key;
     }
 
-    public void setIndexSchema(Map.Entry<String, IndexSchema> indexSchema) {
+    public void setIndexSchema(IndexSchema indexSchema) {
       this.indexSchema = indexSchema;
     }
   }
@@ -255,7 +258,7 @@ public class InsertStatementHandler extends StatementHandler {
         throw new DatabaseException("key not generated for record to insert");
       }
       for (final KeyInfo keyInfo : keys) {
-        if (keyInfo.indexSchema.getValue().isPrimaryKey()) {
+        if (keyInfo.indexSchema.isPrimaryKey()) {
           primaryKey.key = keyInfo.key;
           primaryKey.indexSchema = keyInfo.indexSchema;
           break;
@@ -265,9 +268,9 @@ public class InsertStatementHandler extends StatementHandler {
       outer:
       for (final KeyInfo keyInfo : keys) {
         for (KeyInfo completedKey : completed) {
-          Comparator[] comparators = keyInfo.indexSchema.getValue().getComparators();
+          Comparator[] comparators = keyInfo.indexSchema.getComparators();
 
-          if (completedKey.indexSchema.getKey().equals(keyInfo.indexSchema.getKey()) &&
+          if (completedKey.indexSchema.getName().equals(keyInfo.indexSchema.getName()) &&
               DatabaseCommon.compareKey(comparators, completedKey.key, keyInfo.key) == 0
               &&
               completedKey.shard == keyInfo.shard
@@ -283,11 +286,11 @@ public class InsertStatementHandler extends StatementHandler {
         insert.keyInfo = keyInfo;
         insert.record = record;
         insert.tableId = tableId;
-        insert.indexId = keyInfo.indexSchema.getValue().getIndexId();
+        insert.indexId = keyInfo.indexSchema.getIndexId();
         insert.tableName = tableName;
-        insert.primaryKeyIndexName = primaryKey.indexSchema.getKey();
+        insert.primaryKeyIndexName = primaryKey.indexSchema.getName();
         insert.primaryKey = primaryKey.key;
-        if (!keyInfo.indexSchema.getValue().isPrimaryKey()) {
+        if (!keyInfo.indexSchema.isPrimaryKey()) {
           KeyRecord keyRecord = new KeyRecord();
           byte[] primaryKeyBytes = DatabaseCommon.serializeKey(client.getCommon().getTablesById(dbName).get(tableId),
               insert.primaryKeyIndexName, primaryKey.key);
@@ -299,7 +302,7 @@ public class InsertStatementHandler extends StatementHandler {
         insert.columnNames = columnNames;
         insert.values = values;
         insert.id = id;
-        insert.indexName = keyInfo.indexSchema.getKey();
+        insert.indexName = keyInfo.indexSchema.getName();
         insert.ignore = request.ignore;
         ret.add(insert);
       }
@@ -364,7 +367,7 @@ public class InsertStatementHandler extends StatementHandler {
               indexSchema.getKey(), null, com.sonicbase.query.BinaryExpression.Operator.equal, null, key, null);
           for (int partition : selectedShards) {
             int shard = currPartitions[partition].getShardOwning();
-            ret.add(new KeyInfo(shard, key, indexSchema, true));
+            ret.add(new KeyInfo(shard, key, indexSchema.getValue(), true));
           }
 
           selectedShards = findOrderedPartitionForRecord(false, true, fieldOffsets, common, tableSchema,
@@ -381,7 +384,7 @@ public class InsertStatementHandler extends StatementHandler {
               }
             }
             if (!found) {
-              ret.add(new KeyInfo(shard, key, indexSchema, false));
+              ret.add(new KeyInfo(shard, key, indexSchema.getValue(), false));
             }
           }
         }
@@ -404,28 +407,29 @@ public class InsertStatementHandler extends StatementHandler {
       for (int j = 0; j < columnNames.size(); j++) {
         if (fieldSchema.getName().equals(columnNames.get(j))) {
           Object value = values.get(j);
-          value = fieldSchema.getType().getConverter().convert(value);
-
-          if (fieldSchema.getWidth() != 0) {
-            switch (fieldSchema.getType()) {
-              case VARCHAR:
-              case NVARCHAR:
-              case LONGVARCHAR:
-              case LONGNVARCHAR:
-              case CLOB:
-              case NCLOB:
-                String str = new String((byte[]) value, "utf-8");
-                if (str.length() > fieldSchema.getWidth()) {
-                  throw new SQLException("value too long: field=" + fieldSchema.getName() + ", width=" + fieldSchema.getWidth());
-                }
-                break;
-              case VARBINARY:
-              case LONGVARBINARY:
-              case BLOB:
-                if (((byte[]) value).length > fieldSchema.getWidth()) {
-                  throw new SQLException("value too long: field=" + fieldSchema.getName() + ", width=" + fieldSchema.getWidth());
-                }
-                break;
+          if (value != null) {
+            value = fieldSchema.getType().getConverter().convert(value);
+            if (fieldSchema.getWidth() != 0) {
+              switch (fieldSchema.getType()) {
+                case VARCHAR:
+                case NVARCHAR:
+                case LONGVARCHAR:
+                case LONGNVARCHAR:
+                case CLOB:
+                case NCLOB:
+                  String str = new String((byte[]) value, "utf-8");
+                  if (str.length() > fieldSchema.getWidth()) {
+                    throw new SQLException("value too long: field=" + fieldSchema.getName() + ", width=" + fieldSchema.getWidth());
+                  }
+                  break;
+                case VARBINARY:
+                case LONGVARBINARY:
+                case BLOB:
+                  if (((byte[]) value).length > fieldSchema.getWidth()) {
+                    throw new SQLException("value too long: field=" + fieldSchema.getName() + ", width=" + fieldSchema.getWidth());
+                  }
+                  break;
+              }
             }
           }
           valuesToStore[i] = value;
@@ -475,7 +479,7 @@ public class InsertStatementHandler extends StatementHandler {
           List<PreparedInsert> insertsWithRecords = new ArrayList<>();
           List<PreparedInsert> insertsWithKey = new ArrayList<>();
           for (PreparedInsert insert : inserts) {
-            if (insert.keyInfo.indexSchema.getValue().isPrimaryKey()) {
+            if (insert.keyInfo.indexSchema.isPrimaryKey()) {
               insertsWithRecords.add(insert);
             }
             else {
@@ -492,7 +496,7 @@ public class InsertStatementHandler extends StatementHandler {
           for (int i = 0; i < insertsWithKey.size(); i++) {
             PreparedInsert insert = insertsWithKey.get(i);
             insertKey(client, dbName, insertStatement.getTableName(), insert.keyInfo, insert.primaryKeyIndexName,
-                insert.primaryKey, insert.keyRecord, -1, -1, insertStatement.isIgnore(), schemaRetryCount);
+                insert.primaryKey, insert.keyRecord, insertStatement.isIgnore(), schemaRetryCount);
             completed.add(insert.keyInfo);
           }
         }
@@ -523,10 +527,10 @@ public class InsertStatementHandler extends StatementHandler {
   }
 
   public static void insertKey(DatabaseClient client, String dbName, String tableName, KeyInfo keyInfo, String primaryKeyIndexName, Object[] primaryKey,
-                        KeyRecord keyRecord, int shard, int replica, boolean ignore, int schemaRetryCount) {
+                        KeyRecord keyRecord, boolean ignore, int schemaRetryCount) {
     try {
       int tableId = client.getCommon().getTables(dbName).get(tableName).getTableId();
-      int indexId = client.getCommon().getTables(dbName).get(tableName).getIndexes().get(keyInfo.indexSchema.getKey()).getIndexId();
+      int indexId = client.getCommon().getTables(dbName).get(tableName).getIndexes().get(keyInfo.indexSchema.getName()).getIndexId();
       ComObject cobj = serializeInsertKey(client.getCommon(), dbName, 0, tableId, indexId, tableName, keyInfo, primaryKeyIndexName,
           primaryKey, keyRecord, ignore);
 
@@ -535,7 +539,6 @@ public class InsertStatementHandler extends StatementHandler {
 
       cobj.put(ComObject.Tag.dbName, dbName);
       cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "UpdateManager:insertIndexEntryByKey");
       if (schemaRetryCount < 2) {
         cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
       }
@@ -543,7 +546,7 @@ public class InsertStatementHandler extends StatementHandler {
       cobj.put(ComObject.Tag.isCommitting, client.isCommitting());
       cobj.put(ComObject.Tag.transactionId, client.getTransactionId());
 
-      client.send("DatabaseServer:insertIndexEntryByKey", keyInfo.shard, 0, cobj, DatabaseClient.Replica.def);
+      client.send("UpdateManager:insertIndexEntryByKey", keyInfo.shard, 0, cobj, DatabaseClient.Replica.def);
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -559,7 +562,7 @@ public class InsertStatementHandler extends StatementHandler {
     cobj.put(ComObject.Tag.indexId, indexId);
     cobj.put(ComObject.Tag.ignore, ignore);
     cobj.put(ComObject.Tag.originalOffset, originalOffset);
-    byte[] keyBytes = DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), keyInfo.indexSchema.getKey(), keyInfo.key);
+    byte[] keyBytes = DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), keyInfo.indexSchema.getName(), keyInfo.key);
     cobj.put(ComObject.Tag.keyBytes, keyBytes);
     byte[] keyRecordBytes = keyRecord.serialize(SERIALIZATION_VERSION);
     cobj.put(ComObject.Tag.keyRecordBytes, keyRecordBytes);
@@ -579,7 +582,7 @@ public class InsertStatementHandler extends StatementHandler {
                                   int schemaRetryCount) {
     try {
       int tableId = client.getCommon().getTables(dbName).get(tableName).getTableId();
-      int indexId = client.getCommon().getTables(dbName).get(tableName).getIndexes().get(keyInfo.indexSchema.getKey()).getIndexId();
+      int indexId = client.getCommon().getTables(dbName).get(tableName).getIndexes().get(keyInfo.indexSchema.getName()).getIndexId();
       ComObject cobj = serializeInsertKeyWithRecord(dbName, 0, tableId, indexId, tableName, keyInfo, record, ignore);
       cobj.put(ComObject.Tag.dbName, dbName);
       if (schemaRetryCount < 2) {
@@ -632,7 +635,7 @@ public class InsertStatementHandler extends StatementHandler {
     cobj.put(ComObject.Tag.originalIgnore, ignore);
     byte[] recordBytes = record.serialize(client.getCommon(), SERIALIZATION_VERSION);
     cobj.put(ComObject.Tag.recordBytes, recordBytes);
-    cobj.put(ComObject.Tag.keyBytes, DatabaseCommon.serializeKey(client.getCommon().getTables(dbName).get(tableName), keyInfo.indexSchema.getKey(), keyInfo.key));
+    cobj.put(ComObject.Tag.keyBytes, DatabaseCommon.serializeKey(client.getCommon().getTables(dbName).get(tableName), keyInfo.indexSchema.getName(), keyInfo.key));
 
     return cobj;
   }
@@ -831,7 +834,7 @@ public class InsertStatementHandler extends StatementHandler {
           if (client.isExplicitTrans() && insert.ignore) {
             throw new DatabaseException("'ignore' is not supported for batch operations in an explicit transaction");
           }
-          if (insert.keyInfo.indexSchema.getValue().isPrimaryKey()) {
+          if (insert.keyInfo.indexSchema.isPrimaryKey()) {
             withRecordPrepared.add(insert);
             withRecordPreparedMap.put(insert.originalOffset, insert);
           }
@@ -1039,7 +1042,7 @@ public class InsertStatementHandler extends StatementHandler {
               for (PreparedInsert insert : withRecordPrepared) {
                 List<KeyInfo> keys = getKeys(client.getCommon(), client.getCommon().getTables(insert.dbName).get(insert.tableSchema.getName()), insert.columnNames, insert.values, insert.id);
                 for (KeyInfo key : keys) {
-                  if (key.indexSchema.getKey().equals(insert.indexName)) {
+                  if (key.indexSchema.getName().equals(insert.indexName)) {
                     insert.keyInfo.shard = key.shard;
                     break;
                   }
@@ -1049,7 +1052,7 @@ public class InsertStatementHandler extends StatementHandler {
               for (PreparedInsert insert : preparedKeys) {
                 List<KeyInfo> keys = getKeys(client.getCommon(), client.getCommon().getTables(insert.dbName).get(insert.tableSchema.getName()), insert.columnNames, insert.values, insert.id);
                 for (KeyInfo key : keys) {
-                  if (key.indexSchema.getKey().equals(insert.indexName)) {
+                  if (key.indexSchema.getName().equals(insert.indexName)) {
                     insert.keyInfo.shard = key.shard;
                     break;
                   }

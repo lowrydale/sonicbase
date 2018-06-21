@@ -28,9 +28,9 @@ public class MethodInvoker {
   private final UpdateManager updateManager;
   private final TransactionManager transactionManager;
   private final ReadManager readManager;
-  private final LogManager logManager;
+  private final com.sonicbase.server.LogManager logManager;
   private final SchemaManager schemaManager;
-  private final DatabaseServer server;
+  private final com.sonicbase.server.DatabaseServer server;
   private final DatabaseCommon common;
   private final MonitorManager monitorManager;
   private final BackupManager backupManager;
@@ -42,7 +42,7 @@ public class MethodInvoker {
 
   public MethodInvoker(DatabaseServer server, BulkImportManager bulkImportManager, DeleteManager deleteManagerImpl,
                        SnapshotManager deltaManager, UpdateManager updateManager, TransactionManager transactionManager,
-                       ReadManager readManager, LogManager logManager, SchemaManager schemaManager, MonitorManager monitorManager,
+                       ReadManager readManager, com.sonicbase.server.LogManager logManager, SchemaManager schemaManager, MonitorManager monitorManager,
                        BackupManager backupManager, OSStatsManager osStatsManager, MasterManager masterManager) {
     this.server = server;
     this.common = server.getCommon();
@@ -165,7 +165,7 @@ public class MethodInvoker {
       Long existingSequence0 = getExistingSequence0(request);
       Long existingSequence1 = getExistingSequence1(request);
 
-      DatabaseServer.LogRequest logRequest = logManager.logRequest(requestBytes, enableQueuing, methodStr,
+      LogManager.LogRequest logRequest = logManager.logRequest(requestBytes, enableQueuing, methodStr,
           existingSequence0, existingSequence1, timeLogging);
       ComObject ret = null;
 

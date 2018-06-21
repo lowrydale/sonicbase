@@ -59,7 +59,7 @@ Command line suite
 Total tests run: 1, Failures: 0, Skips: 0
 ===============================================
 
-Finished Test: class=com.sonicbase.server.TestLogManager
+Finished Test: class=TestLogManager
 [TestNG] Running:
   Command line suite
 
@@ -93,7 +93,7 @@ Command line suite
 Total tests run: 1, Failures: 0, Skips: 0
 ===============================================
 
-Finished Test: class=com.sonicbase.server.TestLongManagerLostEntries
+Finished Test: class=TestLongManagerLostEntries
 [TestNG] Running:
   Command line suite
 
@@ -661,7 +661,7 @@ Full thread dump Java HotSpot(TM) 64-Bit Server VM (25.144-b01 mixed mode):
 	at java.lang.Thread.join(Thread.java:1326)
 	at com.sonicbase.server.OSStatsManager.shutdown(OSStatsManager.java:54)
 	at com.sonicbase.server.DatabaseServer.shutdown(DatabaseServer.java:326)
-	at com.sonicbase.server.TestLongRunningCommands.test(TestLongRunningCommands.java:98)
+	at TestLongRunningCommands.test(TestLongRunningCommands.java:98)
 	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
 	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
 	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)

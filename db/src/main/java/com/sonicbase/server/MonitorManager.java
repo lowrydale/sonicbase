@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
 import com.codahale.metrics.Histogram;
@@ -32,7 +31,7 @@ public class MonitorManager {
   private static final int MAX_QUERY_COUNT = 10_000;
   public static final String DAY_FORMAT_STR = "yyyy-MM-dd";
 
-  private final DatabaseServer server;
+  private final com.sonicbase.server.DatabaseServer server;
   private final Logger logger;
   private Connection conn;
   private AtomicBoolean initialized = new AtomicBoolean();

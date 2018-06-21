@@ -18,7 +18,6 @@ import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -32,11 +31,17 @@ public class SnapshotManager {
   private static final String DURATION_STR = ", duration(s)=";
   public Logger logger;
 
-  private final DatabaseServer server;
+  private final com.sonicbase.server.DatabaseServer server;
   private long lastSnapshot = -1;
   private boolean enableSnapshot = true;
   private boolean isRecovering = true;
   private boolean shutdown;
+  private long totalBytes = 0;
+  private AtomicLong finishedBytes = new AtomicLong();
+  private int totalFileCount = 0;
+  private int finishedFileCount = 0;
+  private Exception errorRecovering = null;
+
 
   public SnapshotManager(DatabaseServer databaseServer) {
     this.server = databaseServer;
@@ -95,12 +100,6 @@ public class SnapshotManager {
     }
     return highestSnapshot;
   }
-
-  private long totalBytes = 0;
-  private AtomicLong finishedBytes = new AtomicLong();
-  private int totalFileCount = 0;
-  private int finishedFileCount = 0;
-  private Exception errorRecovering = null;
 
   public ComObject finishServerReloadForSource(ComObject cobj, boolean replayedCommand) {
 
@@ -196,7 +195,6 @@ public class SnapshotManager {
             if (!tableFile.isDirectory()) {
               continue;
             }
-            final AtomicBoolean firstThread = new AtomicBoolean();
             for (File indexDir : tableFile.listFiles()) {
               final String indexName = indexDir.getName();
               List<Future> futures = new ArrayList<>();
@@ -207,10 +205,6 @@ public class SnapshotManager {
                 final TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
                 final IndexSchema indexSchema = server.getIndexSchema(dbName, tableSchema.getName(), indexName);
                 final Index index = server.getIndex(dbName, tableName, indexName);
-//                logger.info("Table: table=" + tableName + ", indexName=" + indexName +
-//                    ", schemaNull=" + (indexSchema == null) +
-//                    ", byIdNull=" + (tableSchema.getIndexesById().get(indexSchema.getIndexId()) == null) +
-//                    ", indexId=" + indexSchema.getIndexId());
                 futures.add(executor.submit(new Callable<Boolean>() {
                                               @Override
                                               public Boolean call() throws Exception {
@@ -218,12 +212,9 @@ public class SnapshotManager {
                                                 try (DataInputStream inStream = new DataInputStream(new BufferedInputStream(new ByteCounterStream(finishedBytes, new FileInputStream(indexFile))))) {
                                                   boolean isPrimaryKey = indexSchema.isPrimaryKey();
                                                   while (true) {
-
-                                                    //logger.info("pre check");
                                                     if (!inStream.readBoolean()) {
                                                       break;
                                                     }
-                                                    //logger.info("post check");
                                                     Object[] key = DatabaseCommon.deserializeKey(tableSchema, inStream);
 
                                                     long updateTime = Varint.readUnsignedVarLong(inStream);
@@ -255,7 +246,6 @@ public class SnapshotManager {
                                                     }
 
                                                     if (index.put(key, address) != null) {
-                                                      //throw new DatabaseException("Key already exists");
                                                       logger.error("Key already exists: key=" + DatabaseCommon.keyToString(key));
                                                     }
 
@@ -411,13 +401,6 @@ public class SnapshotManager {
               Thread.sleep(1000);
             }
 
-//            File file = new File(getSnapshotReplicaDir(), "serializationVersion");
-//            file.delete();
-//            file.getParentFile().mkdirs();
-//            try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
-//              writer.write(String.valueOf(DatabaseClient.SERIALIZATION_VERSION));
-//            }
-
             Set<String> dbNames = new HashSet<>();
             for (String dbName : server.getCommon().getDatabases().keySet()) {
               dbNames.add(dbName);
@@ -459,7 +442,7 @@ public class SnapshotManager {
     cobj.put(ComObject.Tag.tableName, tableName);
     cobj.put(ComObject.Tag.indexName, indexSchema.getName());
     cobj.put(ComObject.Tag.method, "UpdateManager:deleteRecord");
-    server.getClient().send("DatabaseServer:deleteRecord", selectedShards.get(0), 0, cobj, DatabaseClient.Replica.def);
+    server.getClient().send("UpdateManager:deleteRecord", selectedShards.get(0), 0, cobj, DatabaseClient.Replica.def);
 
     cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, dbName);
@@ -540,17 +523,11 @@ public class SnapshotManager {
               @Override
               public boolean visit(Object[] key, Object value) throws IOException {
                 int bucket = (int) (countSaved.incrementAndGet() % SNAPSHOT_PARTITION_COUNT);
-
-//                if (DatabaseCommon.compareKey(index.getComparators(), key, last.getKey()) > 0) {
-//                  return false;
-//                }
-
                 byte[][] records = null;
                 long updateTime = 0;
                 synchronized (index.getMutex(key)) {
                   Object currValue = index.get(key);
                   if (currValue == null || currValue.equals(0L)) {
-                    //logger.error("null record: key=" + DatabaseCommon.keyToString(key));
                   }
                   else {
                     if (isPrimaryKey) {
@@ -793,14 +770,6 @@ public class SnapshotManager {
   public void getFilesForCurrentSnapshot(List<String> files) {
     File replicaDir = getSnapshotReplicaDir();
     getFilesFromDirectory(replicaDir, files);
-  }
-
-  public File getSortedDeltaFile(String dbName, String s, String key, String key1, int i) {
-    return null;
-  }
-
-  public File getDeletedDeltaDir(String dbName, String s, String key, String key1) {
-    return null;
   }
 
   private void getFilesFromDirectory(File dir, List<String> files) {

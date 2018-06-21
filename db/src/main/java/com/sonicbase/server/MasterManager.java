@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -8,6 +7,7 @@ import com.sonicbase.common.ComObject;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.ThreadUtil;
 import com.sonicbase.query.DatabaseException;
+import com.sonicbase.server.DatabaseServer;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class MasterManager {
 
   private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
-  private final DatabaseServer server;
+  private final com.sonicbase.server.DatabaseServer server;
   private Timer fixSchemaTimer;
   private ArrayList<Thread> masterMonitorThreadsForShards;
   private Thread masterMonitorThread;

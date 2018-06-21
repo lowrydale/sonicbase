@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -7,6 +6,10 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.util.DateUtils;
+import com.sonicbase.common.ComArray;
+import com.sonicbase.common.ComObject;
+import com.sonicbase.common.InsufficientLicense;
+import com.sonicbase.common.ThreadUtil;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.quartz.*;
@@ -27,7 +30,7 @@ public class BackupManager {
 
   private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
 
-  private final DatabaseServer server;
+  private final com.sonicbase.server.DatabaseServer server;
   private String logSlicePoint;
   private boolean isBackupComplete;
   private boolean isRestoreComplete;
@@ -48,7 +51,7 @@ public class BackupManager {
   private boolean doingRestore;
   private static Object restoreAwsMutex = new Object();
 
-  public BackupManager(DatabaseServer server) {
+  public BackupManager(com.sonicbase.server.DatabaseServer server) {
     this.server = server;
   }
 
@@ -684,7 +687,7 @@ public class BackupManager {
     @Override
     public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
       JobDataMap map = jobExecutionContext.getMergedJobDataMap();
-      DatabaseServer server = (DatabaseServer) map.get("server");
+      com.sonicbase.server.DatabaseServer server = (DatabaseServer) map.get("server");
       server.getBackupManager().doBackup();
     }
   }

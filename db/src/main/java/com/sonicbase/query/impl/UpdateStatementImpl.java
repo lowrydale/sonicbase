@@ -12,6 +12,7 @@ import com.sonicbase.query.UpdateStatement;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.common.*;
 
 import java.sql.SQLException;
 import java.util.*;
@@ -207,7 +208,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
               cobj.put(ComObject.Tag.isCommitting, client.isCommitting());
               cobj.put(ComObject.Tag.transactionId, client.getTransactionId());
               cobj.put(ComObject.Tag.primaryKeyBytes, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), newPrimaryKey));
-              cobj.put(ComObject.Tag.bytes, record.serialize(client.getCommon(), DatabaseClient.SERIALIZATION_VERSION));
+              cobj.put(ComObject.Tag.bytes, record.serialize(client.getCommon(), SERIALIZATION_VERSION));
               if (sequence0 != null && sequence1 != null && sequence2 != null) {
                 cobj.put(ComObject.Tag.sequence0Override, sequence0);
                 cobj.put(ComObject.Tag.sequence1Override, sequence1);
@@ -248,17 +249,17 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
                 if (prevMap == null) {
                   for (Map.Entry<Object[], InsertStatementHandler.KeyInfo> innerNewEntry : newEntry.getValue().entrySet()) {
                     KeyRecord keyRecord = new KeyRecord();
-                    byte[] primaryKeyBytes = client.getCommon().serializeKey(tableSchema, innerNewEntry.getValue().getIndexSchema().getKey(), newPrimaryKey);
+                    byte[] primaryKeyBytes = client.getCommon().serializeKey(tableSchema, innerNewEntry.getValue().getIndexSchema().getName(), newPrimaryKey);
                     keyRecord.setPrimaryKey(primaryKeyBytes);
                     keyRecord.setDbViewNumber(client.getCommon().getSchemaVersion());
                     InsertStatementHandler.insertKey(client, dbName, tableSchema.getName(), innerNewEntry.getValue(), indexSchema.getName(),
-                        newPrimaryKey, keyRecord, -1, -1, false, schemaRetryCount);
+                        newPrimaryKey, keyRecord, false, schemaRetryCount);
                   }
                 }
                 else {
                   for (Map.Entry<Object[], InsertStatementHandler.KeyInfo> innerNewEntry : newEntry.getValue().entrySet()) {
                     if (!prevMap.containsKey(innerNewEntry.getKey())) {
-                      if (innerNewEntry.getValue().getIndexSchema().getKey().equals(indexSchema.getName())) {
+                      if (innerNewEntry.getValue().getIndexSchema().getName().equals(indexSchema.getName())) {
                         continue;
                       }
                       KeyRecord keyRecord = new KeyRecord();
@@ -267,7 +268,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
                       keyRecord.setPrimaryKey(primaryKeyBytes);
                       keyRecord.setDbViewNumber(client.getCommon().getSchemaVersion());
                       InsertStatementHandler.insertKey(client, dbName, tableSchema.getName(), innerNewEntry.getValue(), indexSchema.getName(),
-                          newPrimaryKey, keyRecord, -1, -1, false, schemaRetryCount);
+                          newPrimaryKey, keyRecord, false, schemaRetryCount);
                     }
                   }
                 }
@@ -301,17 +302,17 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
     }
     cobj.put(ComObject.Tag.method, "UpdateManager:deleteIndexEntryByKey");
     cobj.put(ComObject.Tag.tableName, tableName);
-    cobj.put(ComObject.Tag.indexName, keyInfo.getIndexSchema().getKey());
+    cobj.put(ComObject.Tag.indexName, keyInfo.getIndexSchema().getName());
     cobj.put(ComObject.Tag.primaryKeyIndexName, primaryKeyIndexName);
     cobj.put(ComObject.Tag.isExcpliciteTrans, client.isExplicitTrans());
     cobj.put(ComObject.Tag.isCommitting, client.isCommitting());
     cobj.put(ComObject.Tag.transactionId, client.getTransactionId());
 
     cobj.put(ComObject.Tag.serializationVersion, SERIALIZATION_VERSION);
-    cobj.put(ComObject.Tag.keyBytes, DatabaseCommon.serializeKey(client.getCommon().getTables(dbName).get(tableName), keyInfo.getIndexSchema().getKey(), keyInfo.getKey()));
+    cobj.put(ComObject.Tag.keyBytes, DatabaseCommon.serializeKey(client.getCommon().getTables(dbName).get(tableName), keyInfo.getIndexSchema().getName(), keyInfo.getKey()));
     cobj.put(ComObject.Tag.primaryKeyBytes, DatabaseCommon.serializeKey(client.getCommon().getTables(dbName).get(tableName), primaryKeyIndexName, primaryKey));
 
-    client.send("DatabaseServer:deleteIndexEntryByKey", keyInfo.getShard(), 0, cobj, DatabaseClient.Replica.def);
+    client.send("UpdateManager:deleteIndexEntryByKey", keyInfo.getShard(), 0, cobj, DatabaseClient.Replica.def);
   }
 
   public String getTableName() {

@@ -30,16 +30,16 @@ public class LogManager {
   private final List<LogWriter> logWriters = new ArrayList<>();
   private final List<LogWriter> peerLogWriters = new ArrayList<>();
   private static Logger logger;
-  private final DatabaseServer databaseServer;
+  private final com.sonicbase.server.DatabaseServer databaseServer;
   private final ThreadPoolExecutor executor;
   private final File rootDir;
   private final List<Thread> logwWriterThreads = new ArrayList<>();
 
   private long cycleLogsMillis = 60_000;
   private AtomicLong countLogged = new AtomicLong();
-  private final DatabaseServer server;
-  private ArrayBlockingQueue<DatabaseServer.LogRequest> logRequests = new ArrayBlockingQueue<>(2_000);
-  private Map<Integer, ArrayBlockingQueue<DatabaseServer.LogRequest>> peerLogRequests = new ConcurrentHashMap<>();
+  private final com.sonicbase.server.DatabaseServer server;
+  private ArrayBlockingQueue<LogRequest> logRequests = new ArrayBlockingQueue<>(2_000);
+  private Map<Integer, ArrayBlockingQueue<LogRequest>> peerLogRequests = new ConcurrentHashMap<>();
   private AtomicBoolean unbindQueues = new AtomicBoolean();
   private final Object logLock = new Object();
   private AtomicLong logSequenceNumber = new AtomicLong();
@@ -52,7 +52,7 @@ public class LogManager {
   final AtomicInteger countReplayed = new AtomicInteger();
   private AtomicLong countRead = new AtomicLong();
 
-  public LogManager(DatabaseServer databaseServer, File rootDir) {
+  public LogManager(com.sonicbase.server.DatabaseServer databaseServer, File rootDir) {
     this.databaseServer = databaseServer;
     this.server = databaseServer;
     this.rootDir = rootDir;
@@ -74,6 +74,64 @@ public class LogManager {
       Thread thread = ThreadUtil.createThread(logWriter, "SonicBase Log Writer Thread");
       logwWriterThreads.add(thread);
       thread.start();
+    }
+  }
+
+  public static class LogRequest {
+    private byte[] buffer;
+    private CountDownLatch latch = new CountDownLatch(1);
+    private List<byte[]> buffers;
+    private long[] sequenceNumbers;
+    private long[] times;
+    private long begin;
+    private AtomicLong timeLogging;
+
+    public LogRequest(int size) {
+      this.sequenceNumbers = new long[size];
+      this.times = new long[size];
+    }
+
+    @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP", justification = "copying the returned data is too slow")
+    public byte[] getBuffer() {
+      return buffer;
+    }
+
+    @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP2", justification = "copying the passed in data is too slow")
+    @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
+    public void setBuffer(byte[] buffer) {
+      this.buffer = buffer;
+    }
+
+    public CountDownLatch getLatch() {
+      return latch;
+    }
+
+    public List<byte[]> getBuffers() {
+      return buffers;
+    }
+
+    public long[] getSequences1() {
+      return sequenceNumbers;
+    }
+
+    public long[] getSequences0() {
+      return times;
+    }
+
+    public void setBegin(long begin) {
+      this.begin = begin;
+    }
+
+    public void setTimeLogging(AtomicLong timeLogging) {
+      this.timeLogging = timeLogging;
+    }
+
+    public AtomicLong getTimeLogging() {
+      return timeLogging;
+    }
+
+    public long getBegin() {
+      return begin;
     }
   }
 
@@ -102,7 +160,7 @@ public class LogManager {
   public void startLoggingForPeer(int replicaNum) {
     synchronized (peerLogRequests) {
       if (!peerLogRequests.containsKey(replicaNum)) {
-        peerLogRequests.put(replicaNum, new ArrayBlockingQueue<DatabaseServer.LogRequest>(1000));
+        peerLogRequests.put(replicaNum, new ArrayBlockingQueue<LogRequest>(1000));
         LogWriter logWriter = new LogWriter(0, replicaNum, peerLogRequests.get(replicaNum), rootDir, server.getShard(), server.getReplica());
         peerLogWriters.add(logWriter);
         Thread thread = new Thread(logWriter);
@@ -447,7 +505,7 @@ public class LogManager {
       out.writeInt(request.length);
       out.write(request);
 
-      DatabaseServer.LogRequest logRequest = new DatabaseServer.LogRequest(1);
+      LogRequest logRequest = new LogRequest(1);
       logRequest.setBuffer(bytesOut.toByteArray());
       peerLogRequests.get(deadReplica).put(logRequest);
       logRequest.getLatch().await();
@@ -516,7 +574,7 @@ public class LogManager {
 
   public class LogWriter implements Runnable {
     private final int offset;
-    private final ArrayBlockingQueue<DatabaseServer.LogRequest> currLogRequests;
+    private final ArrayBlockingQueue<LogRequest> currLogRequests;
     private final File dataDir;
     private final int shard;
     private final int replica;
@@ -529,7 +587,7 @@ public class LogManager {
 
 
     public LogWriter(
-        int offset, int peerReplicaNum, ArrayBlockingQueue<DatabaseServer.LogRequest> logRequests,
+        int offset, int peerReplicaNum, ArrayBlockingQueue<LogRequest> logRequests,
         File rootDir, int shard, int replica) {
       this.offset = offset;
       this.peerReplicaNum = peerReplicaNum;
@@ -543,13 +601,13 @@ public class LogManager {
     public void run() {
       while (!shutdown && !Thread.interrupted()) {
         try {
-          List<DatabaseServer.LogRequest> requests = new ArrayList<>();
+          List<LogRequest> requests = new ArrayList<>();
           requests.add(currLogRequests.take());
           currLogRequests.drainTo(requests, 100);
 
           logRequests(requests);
 
-          for (DatabaseServer.LogRequest request : requests) {
+          for (LogRequest request : requests) {
             if (request.getTimeLogging() != null) {
               request.getTimeLogging().addAndGet(System.nanoTime() - request.getBegin());
             }
@@ -565,13 +623,13 @@ public class LogManager {
       }
     }
 
-    public void logRequests(List<DatabaseServer.LogRequest> requests) throws IOException, ParseException {
+    public void logRequests(List<LogRequest> requests) throws IOException, ParseException {
       synchronized (this) {
         if (shouldSlice || writer == null || System.currentTimeMillis() - cycleLogsMillis > currQueueTime) {
           closeAndCreateLog();
         }
 
-        for (DatabaseServer.LogRequest request : requests) {
+        for (LogRequest request : requests) {
           writer.writeInt(1);
           writer.write(request.getBuffer());
           countLogged.incrementAndGet();
@@ -658,7 +716,7 @@ public class LogManager {
         }
       }
 
-      replayQueues(dataRootDir, null, false, false);
+      replayLogs(dataRootDir, null, false, false);
 
       long end = System.currentTimeMillis();
 
@@ -752,7 +810,7 @@ public class LogManager {
     List<NettyServer.Request> requests;
     private String methodStr;
 
-    public LogSource(File file, DatabaseServer server, Logger logger, AtomicLong countRead) throws IOException {
+    public LogSource(File file, com.sonicbase.server.DatabaseServer server, Logger logger, AtomicLong countRead) throws IOException {
       InputStream inputStream = null;
       if (file.getName().contains(".gz")) {
         inputStream = new GZIPInputStream(new BufferedInputStream(new FileInputStream(file)));
@@ -771,12 +829,12 @@ public class LogManager {
       return this.totalBytes;
     }
 
-    public boolean take(DatabaseServer server, Logger logger) {
+    public boolean take(com.sonicbase.server.DatabaseServer server, Logger logger) {
       readNext(server, logger);
       return buffer != null;
     }
 
-    public void readNext(DatabaseServer server, Logger logger) {
+    public void readNext(com.sonicbase.server.DatabaseServer server, Logger logger) {
       try {
         int count = in.readInt();
         if (count == 1) {
@@ -864,7 +922,7 @@ public class LogManager {
       File dataRootDir = new File(dataRoot, "self");
       dataRootDir.mkdirs();
 
-      replayQueues(dataRootDir, null, false, true);
+      replayLogs(dataRootDir, null, false, true);
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -877,7 +935,7 @@ public class LogManager {
       File dataRootDir = new File(dataRoot, "self");
       dataRootDir.mkdirs();
 
-      replayQueues(dataRootDir, slicePoint, false, false);
+      replayLogs(dataRootDir, slicePoint, false, false);
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -890,60 +948,8 @@ public class LogManager {
     boolean visit(byte[] buffer);
   }
 
-  public List<File> getLogFiles() {
-    String dataRoot = getLogReplicaDir().getAbsolutePath();
-    File dataRootDir = new File(dataRoot, "self");
-    dataRootDir.mkdirs();
-
-    File[] files = dataRootDir.listFiles();
-    List<File> ret = new ArrayList<>();
-    if (files != null) {
-      for (File file : files) {
-        ret.add(file);
-      }
-    }
-    return ret;
-  }
-
-
-  public void visitQueueEntries(DataInputStream in, LogVisitor visitor) {
-    try {
-      while (true) {
-        try {
-          int count = in.readInt();
-          if (count == 1) {
-            short serializationVersion = (short) Varint.readSignedVarLong(in);
-            long sequence0 = Varint.readSignedVarLong(in);
-            long sequence1 = Varint.readSignedVarLong(in);
-            int size = in.readInt();
-            byte[] buffer = new byte[size];
-            in.readFully(buffer);
-            visitor.visit(buffer);
-          }
-          else {
-            for (int i = 0; i < count; i++) {
-              short serializationVersion = (short) Varint.readSignedVarLong(in);
-              long sequence0 = Varint.readSignedVarLong(in);
-              long sequence1 = Varint.readSignedVarLong(in);
-              int size = in.readInt();
-              byte[] buffer = new byte[size];
-              in.readFully(buffer);
-              visitor.visit(buffer);
-            }
-          }
-        }
-        catch (EOFException e) {
-          break;
-        }
-      }
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-  }
-
-  private void replayQueues(File dataRootDir, final String slicePoint, final boolean beforeSlice, boolean peerFiles) throws IOException {
-    ThreadPoolExecutor executor = ThreadUtil.createExecutor(32, "SonicBase LogManager replayQueues Thread");
+  private void replayLogs(File dataRootDir, final String slicePoint, final boolean beforeSlice, boolean peerFiles) throws IOException {
+    ThreadPoolExecutor executor = ThreadUtil.createExecutor(32, "SonicBase LogManager replayLogs Thread");
     try {
       countReplayed.set(0);
       allCurrentSources.clear();
@@ -1106,12 +1112,12 @@ public class LogManager {
     }
   }
 
-  public DatabaseServer.LogRequest logRequest(byte[] body, boolean enableQueuing, String methodStr,
+  public LogRequest logRequest(byte[] body, boolean enableQueuing, String methodStr,
                                               Long existingSequence0, Long existingSequence1, AtomicLong timeLogging) {
-    DatabaseServer.LogRequest request = null;
+    LogRequest request = null;
     try {
       if (enableQueuing && DatabaseClient.getWriteVerbs().contains(methodStr)) {
-        request = new DatabaseServer.LogRequest(1);
+        request = new LogRequest(1);
         ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bytesOut);
 

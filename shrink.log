@@ -147,13 +147,13 @@
 	<method signature="InExpression createInExpression()" class="StatementImpl" />
 	<method signature="ParameterHandler getParms()" class="StatementImpl" />
 	<field name="parms" class="StatementImpl" />
-	<class name="com.sonicbase.bench.TestDatabaseAdvancedToDo$1" />
-	<method signature="void &lt;init&gt;(com.sonicbase.bench.TestDatabaseAdvancedToDo,com.sonicbase.server.DatabaseServer[],int,com.sonicbase.util.JsonDict)" class="com.sonicbase.bench.TestDatabaseAdvancedToDo$1" />
-	<method signature="java.lang.Object call()" class="com.sonicbase.bench.TestDatabaseAdvancedToDo$1" />
-	<field name="val$dbServers" class="com.sonicbase.bench.TestDatabaseAdvancedToDo$1" />
-	<field name="val$config" class="com.sonicbase.bench.TestDatabaseAdvancedToDo$1" />
-	<field name="this$0" class="com.sonicbase.bench.TestDatabaseAdvancedToDo$1" />
-	<field name="val$shard" class="com.sonicbase.bench.TestDatabaseAdvancedToDo$1" />
+	<class name="TestDatabaseAdvancedToDo$1" />
+	<method signature="void &lt;init&gt;(TestDatabaseAdvancedToDo,com.sonicbase.server.DatabaseServer[],int,com.sonicbase.util.JsonDict)" class="TestDatabaseAdvancedToDo$1" />
+	<method signature="java.lang.Object call()" class="TestDatabaseAdvancedToDo$1" />
+	<field name="val$dbServers" class="TestDatabaseAdvancedToDo$1" />
+	<field name="val$config" class="TestDatabaseAdvancedToDo$1" />
+	<field name="this$0" class="TestDatabaseAdvancedToDo$1" />
+	<field name="val$shard" class="TestDatabaseAdvancedToDo$1" />
 	<class name="com.sonicbase.server.SchemaManager$AutoIncrementValue" />
 	<method signature="java.lang.Object increment()" class="com.sonicbase.server.SchemaManager$AutoIncrementValue" />
 	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.server.SchemaManager$AutoIncrementValue" />
@@ -200,10 +200,10 @@
 	<field name="fields" class="CreateTableStatementImpl" />
 	<field name="tableName" class="CreateTableStatementImpl" />
 	<field name="primaryKey" class="CreateTableStatementImpl" />
-	<class name="com.sonicbase.bench.TestConcurrentSkipListMap" />
-	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.bench.TestConcurrentSkipListMap" />
-	<method signature="void &lt;init&gt;()" class="com.sonicbase.bench.TestConcurrentSkipListMap" />
-	<method signature="void main(java.lang.String[])" class="com.sonicbase.bench.TestConcurrentSkipListMap" />
+	<class name="TestConcurrentSkipListMap" />
+	<method signature="void &lt;clinit&gt;()" class="TestConcurrentSkipListMap" />
+	<method signature="void &lt;init&gt;()" class="TestConcurrentSkipListMap" />
+	<method signature="void main(java.lang.String[])" class="TestConcurrentSkipListMap" />
 	<class name="QueryType" />
 	<method signature="QueryType valueOf(java.lang.String)" class="QueryType" />
 	<method signature="void &lt;clinit&gt;()" class="QueryType" />
@@ -847,13 +847,13 @@
 	<field name="databaseServer" class="com.sonicbase.server.DeleteManagerImpl" />
 	<field name="executor" class="com.sonicbase.server.DeleteManagerImpl" />
 	<field name="logger" class="com.sonicbase.server.DeleteManagerImpl" />
-	<class name="com.sonicbase.bench.TestRebalance$1" />
-	<method signature="void &lt;init&gt;(com.sonicbase.bench.TestRebalance,com.sonicbase.server.DatabaseServer[],int,com.sonicbase.util.JsonDict)" class="com.sonicbase.bench.TestRebalance$1" />
-	<method signature="java.lang.Object call()" class="com.sonicbase.bench.TestRebalance$1" />
-	<field name="val$dbServers" class="com.sonicbase.bench.TestRebalance$1" />
-	<field name="val$config" class="com.sonicbase.bench.TestRebalance$1" />
-	<field name="this$0" class="com.sonicbase.bench.TestRebalance$1" />
-	<field name="val$shard" class="com.sonicbase.bench.TestRebalance$1" />
+	<class name="TestRebalance$1" />
+	<method signature="void &lt;init&gt;(TestRebalance,com.sonicbase.server.DatabaseServer[],int,com.sonicbase.util.JsonDict)" class="TestRebalance$1" />
+	<method signature="java.lang.Object call()" class="TestRebalance$1" />
+	<field name="val$dbServers" class="TestRebalance$1" />
+	<field name="val$config" class="TestRebalance$1" />
+	<field name="this$0" class="TestRebalance$1" />
+	<field name="val$shard" class="TestRebalance$1" />
 	<class name="DatabaseClient$SocketException" />
 	<method signature="void &lt;clinit&gt;()" class="DatabaseClient$SocketException" />
 	<method signature="void &lt;init&gt;(java.lang.String,java.lang.Throwable)" class="DatabaseClient$SocketException" />
@@ -1396,15 +1396,15 @@
 	<field name="config" class="com.sonicbase.server.DatabaseServer" />
 	<field name="shardCount" class="com.sonicbase.server.DatabaseServer" />
 	<field name="batchWriteLock" class="com.sonicbase.server.DatabaseServer" />
-	<class name="com.sonicbase.bench.TestServers$1" />
-	<method signature="void &lt;init&gt;(com.sonicbase.server.NettyServer[])" class="com.sonicbase.bench.TestServers$1" />
-	<method signature="java.lang.Object call()" class="com.sonicbase.bench.TestServers$1" />
-	<field name="val$dbServers" class="com.sonicbase.bench.TestServers$1" />
-	<class name="com.sonicbase.bench.TestServers$2" />
-	<method signature="java.lang.Object call()" class="com.sonicbase.bench.TestServers$2" />
-	<method signature="void &lt;init&gt;(int,com.sonicbase.server.NettyServer[])" class="com.sonicbase.bench.TestServers$2" />
-	<field name="val$dbServers" class="com.sonicbase.bench.TestServers$2" />
-	<field name="val$shard" class="com.sonicbase.bench.TestServers$2" />
+	<class name="TestServers$1" />
+	<method signature="void &lt;init&gt;(com.sonicbase.server.NettyServer[])" class="TestServers$1" />
+	<method signature="java.lang.Object call()" class="TestServers$1" />
+	<field name="val$dbServers" class="TestServers$1" />
+	<class name="TestServers$2" />
+	<method signature="java.lang.Object call()" class="TestServers$2" />
+	<method signature="void &lt;init&gt;(int,com.sonicbase.server.NettyServer[])" class="TestServers$2" />
+	<field name="val$dbServers" class="TestServers$2" />
+	<field name="val$shard" class="TestServers$2" />
 	<class name="DataType$TimeConverter" />
 	<method signature="java.lang.Object convert(java.lang.Object)" class="DataType$TimeConverter" />
 	<method signature="void &lt;clinit&gt;()" class="DataType$TimeConverter" />
@@ -1626,10 +1626,10 @@
 	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.server.DatabaseServer$NetMonitor" />
 	<method signature="void &lt;init&gt;(com.sonicbase.server.DatabaseServer)" class="com.sonicbase.server.DatabaseServer$NetMonitor" />
 	<field name="this$0" class="com.sonicbase.server.DatabaseServer$NetMonitor" />
-	<class name="com.sonicbase.bench.TestMisc" />
-	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.bench.TestMisc" />
-	<method signature="void &lt;init&gt;()" class="com.sonicbase.bench.TestMisc" />
-	<method signature="void test()" class="com.sonicbase.bench.TestMisc" />
+	<class name="TestMisc" />
+	<method signature="void &lt;clinit&gt;()" class="TestMisc" />
+	<method signature="void &lt;init&gt;()" class="TestMisc" />
+	<method signature="void test()" class="TestMisc" />
 	<class name="DataType$ByteArrayComparator" />
 	<method signature="void &lt;clinit&gt;()" class="DataType$ByteArrayComparator" />
 	<method signature="void &lt;init&gt;()" class="DataType$ByteArrayComparator" />
@@ -2499,26 +2499,26 @@
 	<method signature="void &lt;init&gt;()" class="com.sonicbase.util.DataUtil" />
 	<method signature="void writeVLong(java.io.DataOutputStream,long)" class="com.sonicbase.util.DataUtil" />
 	<method signature="double readDouble(byte[],int)" class="com.sonicbase.util.DataUtil" />
-	<class name="com.sonicbase.bench.TestDatabaseAdvancedToDo" />
-	<method signature="void testAlias3()" class="com.sonicbase.bench.TestDatabaseAdvancedToDo" />
-	<method signature="void testHaving()" class="com.sonicbase.bench.TestDatabaseAdvancedToDo" />
-	<method signature="void testCase()" class="com.sonicbase.bench.TestDatabaseAdvancedToDo" />
-	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.bench.TestDatabaseAdvancedToDo" />
-	<method signature="void testAlterTable()" class="com.sonicbase.bench.TestDatabaseAdvancedToDo" />
-	<method signature="void testInsertColumn()" class="com.sonicbase.bench.TestDatabaseAdvancedToDo" />
-	<method signature="void beforeClass()" class="com.sonicbase.bench.TestDatabaseAdvancedToDo" />
-	<method signature="void testInsertFromSelect()" class="com.sonicbase.bench.TestDatabaseAdvancedToDo" />
-	<method signature="void testCreateTableLike()" class="com.sonicbase.bench.TestDatabaseAdvancedToDo" />
-	<method signature="void testChangeFieldDataType()" class="com.sonicbase.bench.TestDatabaseAdvancedToDo" />
-	<method signature="void testToDate()" class="com.sonicbase.bench.TestDatabaseAdvancedToDo" />
-	<method signature="void &lt;init&gt;()" class="com.sonicbase.bench.TestDatabaseAdvancedToDo" />
-	<method signature="void testCopyTable()" class="com.sonicbase.bench.TestDatabaseAdvancedToDo" />
-	<method signature="void testDropTable()" class="com.sonicbase.bench.TestDatabaseAdvancedToDo" />
-	<method signature="void testDropIndex()" class="com.sonicbase.bench.TestDatabaseAdvancedToDo" />
-	<method signature="void testUnion()" class="com.sonicbase.bench.TestDatabaseAdvancedToDo" />
-	<field name="conn" class="com.sonicbase.bench.TestDatabaseAdvancedToDo" />
-	<field name="recordCount" class="com.sonicbase.bench.TestDatabaseAdvancedToDo" />
-	<field name="ids" class="com.sonicbase.bench.TestDatabaseAdvancedToDo" />
+	<class name="TestDatabaseAdvancedToDo" />
+	<method signature="void testAlias3()" class="TestDatabaseAdvancedToDo" />
+	<method signature="void testHaving()" class="TestDatabaseAdvancedToDo" />
+	<method signature="void testCase()" class="TestDatabaseAdvancedToDo" />
+	<method signature="void &lt;clinit&gt;()" class="TestDatabaseAdvancedToDo" />
+	<method signature="void testAlterTable()" class="TestDatabaseAdvancedToDo" />
+	<method signature="void testInsertColumn()" class="TestDatabaseAdvancedToDo" />
+	<method signature="void beforeClass()" class="TestDatabaseAdvancedToDo" />
+	<method signature="void testInsertFromSelect()" class="TestDatabaseAdvancedToDo" />
+	<method signature="void testCreateTableLike()" class="TestDatabaseAdvancedToDo" />
+	<method signature="void testChangeFieldDataType()" class="TestDatabaseAdvancedToDo" />
+	<method signature="void testToDate()" class="TestDatabaseAdvancedToDo" />
+	<method signature="void &lt;init&gt;()" class="TestDatabaseAdvancedToDo" />
+	<method signature="void testCopyTable()" class="TestDatabaseAdvancedToDo" />
+	<method signature="void testDropTable()" class="TestDatabaseAdvancedToDo" />
+	<method signature="void testDropIndex()" class="TestDatabaseAdvancedToDo" />
+	<method signature="void testUnion()" class="TestDatabaseAdvancedToDo" />
+	<field name="conn" class="TestDatabaseAdvancedToDo" />
+	<field name="recordCount" class="TestDatabaseAdvancedToDo" />
+	<field name="ids" class="TestDatabaseAdvancedToDo" />
 	<class name="ResultSetImpl$1" />
 	<method signature="void &lt;init&gt;(int[],int[],boolean[],java.util.Comparator[])" class="ResultSetImpl$1" />
 	<method signature="int compare(ExpressionImpl$CachedRecord[],ExpressionImpl$CachedRecord[])" class="ResultSetImpl$1" />
@@ -2814,20 +2814,20 @@
 	<class name="com.sonicbase.util.SerializationHelper" />
 	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.util.SerializationHelper" />
 	<method signature="void &lt;init&gt;()" class="com.sonicbase.util.SerializationHelper" />
-	<class name="com.sonicbase.bench.TestConcurrentSkipListMap$2" />
-	<method signature="void run()" class="com.sonicbase.bench.TestConcurrentSkipListMap$2" />
-	<method signature="void &lt;init&gt;(java.util.Random,java.util.concurrent.ConcurrentSkipListMap,int,long)" class="com.sonicbase.bench.TestConcurrentSkipListMap$2" />
-	<field name="val$map" class="com.sonicbase.bench.TestConcurrentSkipListMap$2" />
-	<field name="val$begin" class="com.sonicbase.bench.TestConcurrentSkipListMap$2" />
-	<field name="val$offset" class="com.sonicbase.bench.TestConcurrentSkipListMap$2" />
-	<field name="val$rand" class="com.sonicbase.bench.TestConcurrentSkipListMap$2" />
+	<class name="TestConcurrentSkipListMap$2" />
+	<method signature="void run()" class="TestConcurrentSkipListMap$2" />
+	<method signature="void &lt;init&gt;(java.util.Random,java.util.concurrent.ConcurrentSkipListMap,int,long)" class="TestConcurrentSkipListMap$2" />
+	<field name="val$map" class="TestConcurrentSkipListMap$2" />
+	<field name="val$begin" class="TestConcurrentSkipListMap$2" />
+	<field name="val$offset" class="TestConcurrentSkipListMap$2" />
+	<field name="val$rand" class="TestConcurrentSkipListMap$2" />
 	<class name="com.sonicbase.index.Index$1" />
 	<method signature="void &lt;init&gt;()" class="com.sonicbase.index.Index$1" />
 	<method signature="int compare(java.lang.Object,java.lang.Object)" class="com.sonicbase.index.Index$1" />
-	<class name="com.sonicbase.bench.TestConcurrentSkipListMap$1" />
-	<method signature="void &lt;init&gt;()" class="com.sonicbase.bench.TestConcurrentSkipListMap$1" />
-	<method signature="int compare(java.lang.Object[],java.lang.Object[])" class="com.sonicbase.bench.TestConcurrentSkipListMap$1" />
-	<method signature="int compare(java.lang.Object,java.lang.Object)" class="com.sonicbase.bench.TestConcurrentSkipListMap$1" />
+	<class name="TestConcurrentSkipListMap$1" />
+	<method signature="void &lt;init&gt;()" class="TestConcurrentSkipListMap$1" />
+	<method signature="int compare(java.lang.Object[],java.lang.Object[])" class="TestConcurrentSkipListMap$1" />
+	<method signature="int compare(java.lang.Object,java.lang.Object)" class="TestConcurrentSkipListMap$1" />
 	<class name="SchemaOutOfSyncException" />
 	<method signature="void &lt;clinit&gt;()" class="SchemaOutOfSyncException" />
 	<method signature="void &lt;init&gt;()" class="SchemaOutOfSyncException" />
@@ -3932,31 +3932,31 @@
 	<method signature="void setTableName(java.lang.String)" class="DeleteStatement" />
 	<method signature="void setWhereClause(Expression)" class="DeleteStatement" />
 	<method signature="java.lang.Object execute(java.lang.String,SelectStatementImpl$Explain)" class="DeleteStatement" />
-	<class name="com.sonicbase.bench.TestTransactions$1" />
-	<method signature="void &lt;init&gt;(com.sonicbase.bench.TestTransactions,com.sonicbase.server.DatabaseServer[],int,com.sonicbase.util.JsonDict)" class="com.sonicbase.bench.TestTransactions$1" />
-	<method signature="java.lang.Object call()" class="com.sonicbase.bench.TestTransactions$1" />
-	<field name="val$dbServers" class="com.sonicbase.bench.TestTransactions$1" />
-	<field name="val$config" class="com.sonicbase.bench.TestTransactions$1" />
-	<field name="this$0" class="com.sonicbase.bench.TestTransactions$1" />
-	<field name="val$shard" class="com.sonicbase.bench.TestTransactions$1" />
-	<class name="com.sonicbase.bench.TestTransactions$2" />
-	<method signature="void run()" class="com.sonicbase.bench.TestTransactions$2" />
-	<method signature="void &lt;init&gt;(com.sonicbase.bench.TestTransactions,java.util.concurrent.CountDownLatch)" class="com.sonicbase.bench.TestTransactions$2" />
-	<field name="this$0" class="com.sonicbase.bench.TestTransactions$2" />
-	<field name="val$latch" class="com.sonicbase.bench.TestTransactions$2" />
-	<class name="com.sonicbase.bench.TestTransactions$3" />
-	<method signature="void run()" class="com.sonicbase.bench.TestTransactions$3" />
-	<method signature="void &lt;init&gt;(com.sonicbase.bench.TestTransactions,java.util.concurrent.atomic.AtomicBoolean,java.util.concurrent.CountDownLatch)" class="com.sonicbase.bench.TestTransactions$3" />
-	<field name="val$updated" class="com.sonicbase.bench.TestTransactions$3" />
-	<field name="this$0" class="com.sonicbase.bench.TestTransactions$3" />
-	<field name="val$latch" class="com.sonicbase.bench.TestTransactions$3" />
-	<class name="com.sonicbase.bench.TestTransactions$4" />
-	<method signature="void run()" class="com.sonicbase.bench.TestTransactions$4" />
-	<method signature="void &lt;init&gt;(com.sonicbase.bench.TestTransactions,java.util.concurrent.CountDownLatch,java.util.concurrent.CountDownLatch,java.util.concurrent.atomic.AtomicBoolean)" class="com.sonicbase.bench.TestTransactions$4" />
-	<field name="val$updated" class="com.sonicbase.bench.TestTransactions$4" />
-	<field name="this$0" class="com.sonicbase.bench.TestTransactions$4" />
-	<field name="val$latch" class="com.sonicbase.bench.TestTransactions$4" />
-	<field name="val$latch2" class="com.sonicbase.bench.TestTransactions$4" />
+	<class name="TestTransactions$1" />
+	<method signature="void &lt;init&gt;(TestTransactions,com.sonicbase.server.DatabaseServer[],int,com.sonicbase.util.JsonDict)" class="TestTransactions$1" />
+	<method signature="java.lang.Object call()" class="TestTransactions$1" />
+	<field name="val$dbServers" class="TestTransactions$1" />
+	<field name="val$config" class="TestTransactions$1" />
+	<field name="this$0" class="TestTransactions$1" />
+	<field name="val$shard" class="TestTransactions$1" />
+	<class name="TestTransactions$2" />
+	<method signature="void run()" class="TestTransactions$2" />
+	<method signature="void &lt;init&gt;(TestTransactions,java.util.concurrent.CountDownLatch)" class="TestTransactions$2" />
+	<field name="this$0" class="TestTransactions$2" />
+	<field name="val$latch" class="TestTransactions$2" />
+	<class name="TestTransactions$3" />
+	<method signature="void run()" class="TestTransactions$3" />
+	<method signature="void &lt;init&gt;(TestTransactions,java.util.concurrent.atomic.AtomicBoolean,java.util.concurrent.CountDownLatch)" class="TestTransactions$3" />
+	<field name="val$updated" class="TestTransactions$3" />
+	<field name="this$0" class="TestTransactions$3" />
+	<field name="val$latch" class="TestTransactions$3" />
+	<class name="TestTransactions$4" />
+	<method signature="void run()" class="TestTransactions$4" />
+	<method signature="void &lt;init&gt;(TestTransactions,java.util.concurrent.CountDownLatch,java.util.concurrent.CountDownLatch,java.util.concurrent.atomic.AtomicBoolean)" class="TestTransactions$4" />
+	<field name="val$updated" class="TestTransactions$4" />
+	<field name="this$0" class="TestTransactions$4" />
+	<field name="val$latch" class="TestTransactions$4" />
+	<field name="val$latch2" class="TestTransactions$4" />
 	<class name="Parameter$String" />
 	<method signature="int getSqlType()" class="Parameter$String" />
 	<method signature="Parameter$ParameterBase deserialize(java.io.DataInputStream)" class="Parameter$String" />
@@ -3968,18 +3968,18 @@
 	<method signature="void run()" class="com.sonicbase.server.DatabaseServer$1" />
 	<method signature="void &lt;init&gt;(com.sonicbase.server.DatabaseServer)" class="com.sonicbase.server.DatabaseServer$1" />
 	<field name="this$0" class="com.sonicbase.server.DatabaseServer$1" />
-	<class name="com.sonicbase.bench.TestTransactions$5" />
-	<method signature="void run()" class="com.sonicbase.bench.TestTransactions$5" />
-	<method signature="void &lt;init&gt;(com.sonicbase.bench.TestTransactions,java.util.concurrent.CountDownLatch,java.util.concurrent.CountDownLatch)" class="com.sonicbase.bench.TestTransactions$5" />
-	<field name="this$0" class="com.sonicbase.bench.TestTransactions$5" />
-	<field name="val$latch" class="com.sonicbase.bench.TestTransactions$5" />
-	<field name="val$latch2" class="com.sonicbase.bench.TestTransactions$5" />
-	<class name="com.sonicbase.bench.TestTransactions$6" />
-	<method signature="void run()" class="com.sonicbase.bench.TestTransactions$6" />
-	<method signature="void &lt;init&gt;(com.sonicbase.bench.TestTransactions,java.util.concurrent.atomic.AtomicBoolean,java.util.concurrent.CountDownLatch)" class="com.sonicbase.bench.TestTransactions$6" />
-	<field name="val$updated" class="com.sonicbase.bench.TestTransactions$6" />
-	<field name="this$0" class="com.sonicbase.bench.TestTransactions$6" />
-	<field name="val$latch" class="com.sonicbase.bench.TestTransactions$6" />
+	<class name="TestTransactions$5" />
+	<method signature="void run()" class="TestTransactions$5" />
+	<method signature="void &lt;init&gt;(TestTransactions,java.util.concurrent.CountDownLatch,java.util.concurrent.CountDownLatch)" class="TestTransactions$5" />
+	<field name="this$0" class="TestTransactions$5" />
+	<field name="val$latch" class="TestTransactions$5" />
+	<field name="val$latch2" class="TestTransactions$5" />
+	<class name="TestTransactions$6" />
+	<method signature="void run()" class="TestTransactions$6" />
+	<method signature="void &lt;init&gt;(TestTransactions,java.util.concurrent.atomic.AtomicBoolean,java.util.concurrent.CountDownLatch)" class="TestTransactions$6" />
+	<field name="val$updated" class="TestTransactions$6" />
+	<field name="this$0" class="TestTransactions$6" />
+	<field name="val$latch" class="TestTransactions$6" />
 	<class name="com.sonicbase.server.DatabaseServer$3" />
 	<method signature="void run()" class="com.sonicbase.server.DatabaseServer$3" />
 	<method signature="void &lt;init&gt;(com.sonicbase.server.DatabaseServer,int,int)" class="com.sonicbase.server.DatabaseServer$3" />
@@ -4193,10 +4193,10 @@
 	<method signature="void run()" class="com.sonicbase.server.DeleteManagerImpl$3" />
 	<method signature="void &lt;init&gt;(com.sonicbase.server.DeleteManagerImpl)" class="com.sonicbase.server.DeleteManagerImpl$3" />
 	<field name="this$0" class="com.sonicbase.server.DeleteManagerImpl$3" />
-	<class name="com.sonicbase.bench.TestRebalance" />
-	<method signature="void testBasics()" class="com.sonicbase.bench.TestRebalance" />
-	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.bench.TestRebalance" />
-	<method signature="void &lt;init&gt;()" class="com.sonicbase.bench.TestRebalance" />
+	<class name="TestRebalance" />
+	<method signature="void testBasics()" class="TestRebalance" />
+	<method signature="void &lt;clinit&gt;()" class="TestRebalance" />
+	<method signature="void &lt;init&gt;()" class="TestRebalance" />
 	<class name="com.sonicbase.server.DeleteManagerImpl$2" />
 	<method signature="void &lt;init&gt;(com.sonicbase.server.DeleteManagerImpl,java.util.List,com.sonicbase.index.Index)" class="com.sonicbase.server.DeleteManagerImpl$2" />
 	<method signature="java.lang.Object call()" class="com.sonicbase.server.DeleteManagerImpl$2" />
@@ -4427,19 +4427,19 @@
 	<field name="batchThreads" class="DatabaseSocketClient" />
 	<field name="CONNECTION_COUNT" class="DatabaseSocketClient" />
 	<field name="BATCH_THREAD_COUNT" class="DatabaseSocketClient" />
-	<class name="com.sonicbase.bench.TestTransactions" />
-	<method signature="void testConcurrent()" class="com.sonicbase.bench.TestTransactions" />
-	<method signature="java.sql.Connection access$000(com.sonicbase.bench.TestTransactions)" class="com.sonicbase.bench.TestTransactions" />
-	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.bench.TestTransactions" />
-	<method signature="void &lt;init&gt;()" class="com.sonicbase.bench.TestTransactions" />
-	<method signature="void testConcurrentSecondaryKeys()" class="com.sonicbase.bench.TestTransactions" />
-	<method signature="void beforeClass()" class="com.sonicbase.bench.TestTransactions" />
-	<method signature="void testConcurrent2()" class="com.sonicbase.bench.TestTransactions" />
-	<method signature="void test()" class="com.sonicbase.bench.TestTransactions" />
-	<method signature="void testConcurrent3()" class="com.sonicbase.bench.TestTransactions" />
-	<method signature="void testConcurrent4()" class="com.sonicbase.bench.TestTransactions" />
-	<field name="conn2" class="com.sonicbase.bench.TestTransactions" />
-	<field name="conn" class="com.sonicbase.bench.TestTransactions" />
+	<class name="TestTransactions" />
+	<method signature="void testConcurrent()" class="TestTransactions" />
+	<method signature="java.sql.Connection access$000(TestTransactions)" class="TestTransactions" />
+	<method signature="void &lt;clinit&gt;()" class="TestTransactions" />
+	<method signature="void &lt;init&gt;()" class="TestTransactions" />
+	<method signature="void testConcurrentSecondaryKeys()" class="TestTransactions" />
+	<method signature="void beforeClass()" class="TestTransactions" />
+	<method signature="void testConcurrent2()" class="TestTransactions" />
+	<method signature="void test()" class="TestTransactions" />
+	<method signature="void testConcurrent3()" class="TestTransactions" />
+	<method signature="void testConcurrent4()" class="TestTransactions" />
+	<field name="conn2" class="TestTransactions" />
+	<field name="conn" class="TestTransactions" />
 	<class name="MemUtil" />
 	<method signature="double getMemValue(java.lang.String)" class="MemUtil" />
 	<method signature="void &lt;clinit&gt;()" class="MemUtil" />
@@ -4955,10 +4955,10 @@
 	<class name="DataType$Converter" />
 	<method signature="java.lang.Object convert(java.lang.Object)" class="DataType$Converter" />
 	<method signature="void &lt;clinit&gt;()" class="DataType$Converter" />
-	<class name="com.sonicbase.bench.TestServers" />
-	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.bench.TestServers" />
-	<method signature="void &lt;init&gt;()" class="com.sonicbase.bench.TestServers" />
-	<method signature="void main(java.lang.String[])" class="com.sonicbase.bench.TestServers" />
+	<class name="TestServers" />
+	<method signature="void &lt;clinit&gt;()" class="TestServers" />
+	<method signature="void &lt;init&gt;()" class="TestServers" />
+	<method signature="void main(java.lang.String[])" class="TestServers" />
 	<class name="QueryPlan" />
 	<method signature="void &lt;clinit&gt;()" class="QueryPlan" />
 	<method signature="void &lt;init&gt;()" class="QueryPlan" />

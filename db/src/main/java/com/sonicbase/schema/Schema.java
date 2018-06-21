@@ -158,4 +158,8 @@ public class Schema {
   public void setTables(Map<String, TableSchema> tables) {
     this.tables = tables;
   }
+
+  public void setTablesById(Map<Integer, TableSchema> tablesById) {
+    this.tablesById = tablesById;
+  }
 }

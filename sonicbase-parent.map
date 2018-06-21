@@ -1,23 +1,23 @@
-com.sonicbase.bench.CustomFunctions -> com.sonicbase.bench.CustomFunctions:
+CustomFunctions -> CustomFunctions:
     5:5:void <init>() -> <init>
     8:19:java.lang.Object plus(java.lang.Object[]) -> plus
     23:25:java.lang.Object avg(java.lang.Object[]) -> avg
     29:31:java.lang.Object min(java.lang.Object[]) -> min
-com.sonicbase.bench.TestConcurrentSkipListMap -> com.sonicbase.bench.a:
+TestConcurrentSkipListMap -> com.sonicbase.bench.a:
     15:15:void <init>() -> <init>
     17:54:void main(java.lang.String[]) -> a
-com.sonicbase.bench.TestConcurrentSkipListMap$1 -> com.sonicbase.bench.a$1:
+TestConcurrentSkipListMap$1 -> com.sonicbase.bench.a$1:
     17:17:void <init>() -> <init>
     20:29:int compare(java.lang.Object[],java.lang.Object[]) -> a
     17:17:int compare(java.lang.Object,java.lang.Object) -> compare
-com.sonicbase.bench.TestConcurrentSkipListMap$2 -> com.sonicbase.bench.a$2:
+TestConcurrentSkipListMap$2 -> com.sonicbase.bench.a$2:
     java.util.Random val$rand -> a
     java.util.concurrent.ConcurrentSkipListMap val$map -> b
     int val$offset -> c
     long val$begin -> d
     40:40:void <init>(java.util.Random,java.util.concurrent.ConcurrentSkipListMap,int,long) -> <init>
     43:49:void run() -> run
-com.sonicbase.bench.TestDatabaseAdvancedToDo -> com.sonicbase.bench.b:
+TestDatabaseAdvancedToDo -> com.sonicbase.bench.b:
     java.sql.Connection conn -> b
     int recordCount -> c
     java.util.List ids -> a
@@ -36,17 +36,17 @@ com.sonicbase.bench.TestDatabaseAdvancedToDo -> com.sonicbase.bench.b:
     297:298:void testCase() -> l
     307:308:void testDropTable() -> m
     321:322:void testUnion() -> n
-com.sonicbase.bench.TestDatabaseAdvancedToDo$1 -> com.sonicbase.bench.b$1:
+TestDatabaseAdvancedToDo$1 -> com.sonicbase.bench.b$1:
     com.sonicbase.server.DatabaseServer[] val$dbServers -> a
     int val$shard -> b
     com.fasterxml.jackson.databind.node.ObjectNode val$config -> c
-    com.sonicbase.bench.TestDatabaseAdvancedToDo this$0 -> d
-    53:53:void <init>(com.sonicbase.bench.TestDatabaseAdvancedToDo,com.sonicbase.server.DatabaseServer[],int,com.fasterxml.jackson.databind.node.ObjectNode) -> <init>
+    TestDatabaseAdvancedToDo this$0 -> d
+    53:53:void <init>(TestDatabaseAdvancedToDo,com.sonicbase.server.DatabaseServer[],int,com.fasterxml.jackson.databind.node.ObjectNode) -> <init>
     56:62:java.lang.Object call() -> call
-com.sonicbase.bench.TestMisc -> com.sonicbase.bench.c:
+TestMisc -> com.sonicbase.bench.c:
     10:10:void <init>() -> <init>
     14:20:void test() -> a
-com.sonicbase.bench.TestPerformance -> com.sonicbase.bench.TestPerformance:
+TestPerformance -> TestPerformance:
     java.sql.Connection conn -> b
     com.sonicbase.client.DatabaseClient client -> c
     java.util.List serverThreads -> d
@@ -119,66 +119,66 @@ com.sonicbase.bench.TestPerformance -> com.sonicbase.bench.TestPerformance:
     1537:1549:void testUnionAll() -> testUnionAll
     1552:1565:void testIntersect() -> testIntersect
     1568:1581:void testExcept() -> testExcept
-    26:26:void access$200(com.sonicbase.bench.TestPerformance,java.lang.String,int) -> access$200
-    26:26:java.sql.Connection access$300(com.sonicbase.bench.TestPerformance) -> access$300
-    26:26:java.lang.String access$400(com.sonicbase.bench.TestPerformance,int) -> access$400
-com.sonicbase.bench.TestPerformance$1 -> com.sonicbase.bench.TestPerformance$1:
+    26:26:void access$200(TestPerformance,java.lang.String,int) -> access$200
+    26:26:java.sql.Connection access$300(TestPerformance) -> access$300
+    26:26:java.lang.String access$400(TestPerformance,int) -> access$400
+TestPerformance$1 -> TestPerformance$1:
     com.sonicbase.server.NettyServer val$server0_0 -> a
     java.util.concurrent.CountDownLatch val$latch -> b
-    com.sonicbase.bench.TestPerformance this$0 -> c
-    223:223:void <init>(com.sonicbase.bench.TestPerformance,com.sonicbase.server.NettyServer,java.util.concurrent.CountDownLatch) -> <init>
+    TestPerformance this$0 -> c
+    223:223:void <init>(TestPerformance,com.sonicbase.server.NettyServer,java.util.concurrent.CountDownLatch) -> <init>
     226:229:void run() -> run
-com.sonicbase.bench.TestPerformance$2 -> com.sonicbase.bench.TestPerformance$2:
+TestPerformance$2 -> TestPerformance$2:
     com.sonicbase.server.NettyServer val$server0_1 -> a
     java.util.concurrent.CountDownLatch val$latch -> b
-    com.sonicbase.bench.TestPerformance this$0 -> c
-    242:242:void <init>(com.sonicbase.bench.TestPerformance,com.sonicbase.server.NettyServer,java.util.concurrent.CountDownLatch) -> <init>
+    TestPerformance this$0 -> c
+    242:242:void <init>(TestPerformance,com.sonicbase.server.NettyServer,java.util.concurrent.CountDownLatch) -> <init>
     245:248:void run() -> run
-com.sonicbase.bench.TestPerformance$3 -> com.sonicbase.bench.TestPerformance$3:
+TestPerformance$3 -> TestPerformance$3:
     int val$currOffset -> a
-    com.sonicbase.bench.TestPerformance this$0 -> b
-    426:426:void <init>(com.sonicbase.bench.TestPerformance,int) -> <init>
+    TestPerformance this$0 -> b
+    426:426:void <init>(TestPerformance,int) -> <init>
     429:431:java.lang.Object call() -> call
-com.sonicbase.bench.TestPerformance$4 -> com.sonicbase.bench.TestPerformance$4:
+TestPerformance$4 -> TestPerformance$4:
     int val$currOffset -> a
-    com.sonicbase.bench.TestPerformance this$0 -> b
-    445:445:void <init>(com.sonicbase.bench.TestPerformance,int) -> <init>
+    TestPerformance this$0 -> b
+    445:445:void <init>(TestPerformance,int) -> <init>
     448:461:java.lang.Object call() -> call
-com.sonicbase.bench.TestPerformance$5 -> com.sonicbase.bench.TestPerformance$5:
+TestPerformance$5 -> TestPerformance$5:
     int val$currOffset -> a
-    com.sonicbase.bench.TestPerformance this$0 -> b
-    474:474:void <init>(com.sonicbase.bench.TestPerformance,int) -> <init>
+    TestPerformance this$0 -> b
+    474:474:void <init>(TestPerformance,int) -> <init>
     477:490:java.lang.Object call() -> call
-com.sonicbase.bench.TestPerformance$Result -> com.sonicbase.bench.TestPerformance$a:
+TestPerformance$Result -> TestPerformance$a:
     long duration -> b
     int count -> c
-    com.sonicbase.bench.TestPerformance this$0 -> a
-    590:593:void <init>(com.sonicbase.bench.TestPerformance,long,int) -> <init>
-    586:586:long access$000(com.sonicbase.bench.TestPerformance$Result) -> a
-    586:586:int access$100(com.sonicbase.bench.TestPerformance$Result) -> b
-com.sonicbase.bench.TestRebalance -> com.sonicbase.bench.d:
+    TestPerformance this$0 -> a
+    590:593:void <init>(TestPerformance,long,int) -> <init>
+    586:586:long access$000(TestPerformance$Result) -> a
+    586:586:int access$100(TestPerformance$Result) -> b
+TestRebalance -> com.sonicbase.bench.d:
     25:25:void <init>() -> <init>
     29:148:void testBasics() -> a
-com.sonicbase.bench.TestRebalance$1 -> com.sonicbase.bench.d$1:
+TestRebalance$1 -> com.sonicbase.bench.d$1:
     com.sonicbase.server.DatabaseServer[] val$dbServers -> a
     int val$shard -> b
     com.fasterxml.jackson.databind.node.ObjectNode val$config -> c
-    com.sonicbase.bench.TestRebalance this$0 -> d
-    41:41:void <init>(com.sonicbase.bench.TestRebalance,com.sonicbase.server.DatabaseServer[],int,com.fasterxml.jackson.databind.node.ObjectNode) -> <init>
+    TestRebalance this$0 -> d
+    41:41:void <init>(TestRebalance,com.sonicbase.server.DatabaseServer[],int,com.fasterxml.jackson.databind.node.ObjectNode) -> <init>
     44:49:java.lang.Object call() -> call
-com.sonicbase.bench.TestServers -> com.sonicbase.bench.e:
+TestServers -> com.sonicbase.bench.e:
     12:12:void <init>() -> <init>
     17:81:void main(java.lang.String[]) -> a
-com.sonicbase.bench.TestServers$1 -> com.sonicbase.bench.e$1:
+TestServers$1 -> com.sonicbase.bench.e$1:
     com.sonicbase.server.NettyServer[] val$dbServers -> a
     25:25:void <init>(com.sonicbase.server.NettyServer[]) -> <init>
     29:36:java.lang.Object call() -> call
-com.sonicbase.bench.TestServers$2 -> com.sonicbase.bench.e$2:
+TestServers$2 -> com.sonicbase.bench.e$2:
     int val$shard -> a
     com.sonicbase.server.NettyServer[] val$dbServers -> b
     47:47:void <init>(int,com.sonicbase.server.NettyServer[]) -> <init>
     50:67:java.lang.Object call() -> call
-com.sonicbase.bench.TestTransactions -> com.sonicbase.bench.f:
+TestTransactions -> com.sonicbase.bench.f:
     java.sql.Connection conn -> a
     java.sql.Connection conn2 -> b
     26:26:void <init>() -> <init>
@@ -189,43 +189,43 @@ com.sonicbase.bench.TestTransactions -> com.sonicbase.bench.f:
     313:409:void testConcurrent3() -> e
     414:509:void testConcurrent4() -> f
     515:587:void testConcurrentSecondaryKeys() -> g
-    26:26:java.sql.Connection access$000(com.sonicbase.bench.TestTransactions) -> a
-com.sonicbase.bench.TestTransactions$1 -> com.sonicbase.bench.f$1:
+    26:26:java.sql.Connection access$000(TestTransactions) -> a
+TestTransactions$1 -> com.sonicbase.bench.f$1:
     com.sonicbase.server.DatabaseServer[] val$dbServers -> a
     int val$shard -> b
     com.fasterxml.jackson.databind.node.ObjectNode val$config -> c
-    com.sonicbase.bench.TestTransactions this$0 -> d
-    49:49:void <init>(com.sonicbase.bench.TestTransactions,com.sonicbase.server.DatabaseServer[],int,com.fasterxml.jackson.databind.node.ObjectNode) -> <init>
+    TestTransactions this$0 -> d
+    49:49:void <init>(TestTransactions,com.sonicbase.server.DatabaseServer[],int,com.fasterxml.jackson.databind.node.ObjectNode) -> <init>
     52:58:java.lang.Object call() -> call
-com.sonicbase.bench.TestTransactions$2 -> com.sonicbase.bench.f$2:
+TestTransactions$2 -> com.sonicbase.bench.f$2:
     java.util.concurrent.CountDownLatch val$latch -> a
-    com.sonicbase.bench.TestTransactions this$0 -> b
-    193:193:void <init>(com.sonicbase.bench.TestTransactions,java.util.concurrent.CountDownLatch) -> <init>
+    TestTransactions this$0 -> b
+    193:193:void <init>(TestTransactions,java.util.concurrent.CountDownLatch) -> <init>
     197:210:void run() -> run
-com.sonicbase.bench.TestTransactions$3 -> com.sonicbase.bench.f$3:
+TestTransactions$3 -> com.sonicbase.bench.f$3:
     java.util.concurrent.atomic.AtomicBoolean val$updated -> a
     java.util.concurrent.CountDownLatch val$latch -> b
-    com.sonicbase.bench.TestTransactions this$0 -> c
-    265:265:void <init>(com.sonicbase.bench.TestTransactions,java.util.concurrent.atomic.AtomicBoolean,java.util.concurrent.CountDownLatch) -> <init>
+    TestTransactions this$0 -> c
+    265:265:void <init>(TestTransactions,java.util.concurrent.atomic.AtomicBoolean,java.util.concurrent.CountDownLatch) -> <init>
     270:286:void run() -> run
-com.sonicbase.bench.TestTransactions$4 -> com.sonicbase.bench.f$4:
+TestTransactions$4 -> com.sonicbase.bench.f$4:
     java.util.concurrent.CountDownLatch val$latch -> a
     java.util.concurrent.CountDownLatch val$latch2 -> b
     java.util.concurrent.atomic.AtomicBoolean val$updated -> c
-    com.sonicbase.bench.TestTransactions this$0 -> d
-    346:346:void <init>(com.sonicbase.bench.TestTransactions,java.util.concurrent.CountDownLatch,java.util.concurrent.CountDownLatch,java.util.concurrent.atomic.AtomicBoolean) -> <init>
+    TestTransactions this$0 -> d
+    346:346:void <init>(TestTransactions,java.util.concurrent.CountDownLatch,java.util.concurrent.CountDownLatch,java.util.concurrent.atomic.AtomicBoolean) -> <init>
     351:382:void run() -> run
-com.sonicbase.bench.TestTransactions$5 -> com.sonicbase.bench.f$5:
+TestTransactions$5 -> com.sonicbase.bench.f$5:
     java.util.concurrent.CountDownLatch val$latch -> a
     java.util.concurrent.CountDownLatch val$latch2 -> b
-    com.sonicbase.bench.TestTransactions this$0 -> c
-    446:446:void <init>(com.sonicbase.bench.TestTransactions,java.util.concurrent.CountDownLatch,java.util.concurrent.CountDownLatch) -> <init>
+    TestTransactions this$0 -> c
+    446:446:void <init>(TestTransactions,java.util.concurrent.CountDownLatch,java.util.concurrent.CountDownLatch) -> <init>
     450:482:void run() -> run
-com.sonicbase.bench.TestTransactions$6 -> com.sonicbase.bench.f$6:
+TestTransactions$6 -> com.sonicbase.bench.f$6:
     java.util.concurrent.atomic.AtomicBoolean val$updated -> a
     java.util.concurrent.CountDownLatch val$latch -> b
-    com.sonicbase.bench.TestTransactions this$0 -> c
-    544:544:void <init>(com.sonicbase.bench.TestTransactions,java.util.concurrent.atomic.AtomicBoolean,java.util.concurrent.CountDownLatch) -> <init>
+    TestTransactions this$0 -> c
+    544:544:void <init>(TestTransactions,java.util.concurrent.atomic.AtomicBoolean,java.util.concurrent.CountDownLatch) -> <init>
     549:565:void run() -> run
 com.sonicbase.client.DatabaseClient -> com.sonicbase.client.a:
     boolean isClient -> x
@@ -3871,7 +3871,7 @@ com.sonicbase.query.impl.FunctionImpl$MethodObject -> com.sonicbase.query.impl.m
 com.sonicbase.query.impl.FunctionImpl$MinFunction -> com.sonicbase.query.impl.m$G:
     308:308:void <init>() -> <init>
     311:325:java.lang.Object evaluate(com.sonicbase.schema.TableSchema[],com.sonicbase.common.Record[],com.sonicbase.jdbcdriver.ParameterHandler,java.util.List) -> a
-com.sonicbase.query.impl.FunctionImpl$MinTImestampFunction -> com.sonicbase.query.impl.m$H:
+com.sonicbase.query.impl.FunctionImpl$MinTimestampFunction -> com.sonicbase.query.impl.m$H:
     329:329:void <init>() -> <init>
     332:348:java.lang.Object evaluate(com.sonicbase.schema.TableSchema[],com.sonicbase.common.Record[],com.sonicbase.jdbcdriver.ParameterHandler,java.util.List) -> a
 com.sonicbase.query.impl.FunctionImpl$MinuteFunction -> com.sonicbase.query.impl.m$I:

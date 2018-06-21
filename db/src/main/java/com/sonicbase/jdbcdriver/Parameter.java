@@ -228,13 +228,13 @@ public class Parameter {
     private int sqlType;
 
     public Null(int sqlType, java.lang.String typeName) {
-      super(sqlType);
+      super(null);
       this.sqlType = sqlType;
       this.typeName = typeName;
     }
 
     public Null(int sqlType) {
-      super(sqlType);
+      super(null);
       this.sqlType = sqlType;
       typeName = null;
     }

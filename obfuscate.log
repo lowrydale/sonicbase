@@ -1919,102 +1919,102 @@ to act on classes which have been obfuscated.
 </expose>
 <map>
   <package name="com.sonicbase.bench" map="A"/>
-  <class name="com.sonicbase.bench.TestServers$2" map="2"/>
-  <field class="com.sonicbase.bench.TestServers$2" name="val$dbServers" map="A"/>
-  <field class="com.sonicbase.bench.TestServers$2" name="val$shard" map="B"/>
-  <method class="com.sonicbase.bench.TestServers$2" name="java.lang.Object call()" map="call"/>
-  <class name="com.sonicbase.bench.TestServers$1" map="1"/>
-  <field class="com.sonicbase.bench.TestServers$1" name="val$dbServers" map="A"/>
-  <method class="com.sonicbase.bench.TestServers$1" name="java.lang.Object call()" map="call"/>
-  <class name="com.sonicbase.bench.TestServers" map="A"/>
-  <method class="com.sonicbase.bench.TestServers" name="void main(java.lang.String[])" map="A"/>
-  <class name="com.sonicbase.bench.TestRebalance$1" map="1"/>
-  <field class="com.sonicbase.bench.TestRebalance$1" name="this$0" map="A"/>
-  <field class="com.sonicbase.bench.TestRebalance$1" name="val$dbServers" map="B"/>
-  <field class="com.sonicbase.bench.TestRebalance$1" name="val$shard" map="C"/>
-  <field class="com.sonicbase.bench.TestRebalance$1" name="val$config" map="D"/>
-  <method class="com.sonicbase.bench.TestRebalance$1" name="java.lang.Object call()" map="call"/>
-  <class name="com.sonicbase.bench.TestRebalance" map="B"/>
-  <method class="com.sonicbase.bench.TestRebalance" name="void testBasics()" map="A"/>
-  <class name="com.sonicbase.bench.TestMisc" map="C"/>
-  <method class="com.sonicbase.bench.TestMisc" name="void test()" map="A"/>
-  <class name="com.sonicbase.bench.TestConcurrentSkipListMap$2" map="2"/>
-  <field class="com.sonicbase.bench.TestConcurrentSkipListMap$2" name="val$offset" map="A"/>
-  <field class="com.sonicbase.bench.TestConcurrentSkipListMap$2" name="val$begin" map="B"/>
-  <field class="com.sonicbase.bench.TestConcurrentSkipListMap$2" name="val$rand" map="C"/>
-  <field class="com.sonicbase.bench.TestConcurrentSkipListMap$2" name="val$map" map="D"/>
-  <method class="com.sonicbase.bench.TestConcurrentSkipListMap$2" name="void run()" map="run"/>
-  <class name="com.sonicbase.bench.TestConcurrentSkipListMap$1" map="1"/>
-  <method class="com.sonicbase.bench.TestConcurrentSkipListMap$1" name="int compare(java.lang.Object[], java.lang.Object[])" map="A"/>
-  <method class="com.sonicbase.bench.TestConcurrentSkipListMap$1" name="int compare(java.lang.Object, java.lang.Object)" map="compare"/>
-  <class name="com.sonicbase.bench.TestConcurrentSkipListMap" map="D"/>
-  <method class="com.sonicbase.bench.TestConcurrentSkipListMap" name="void main(java.lang.String[])" map="A"/>
-  <class name="com.sonicbase.bench.TestTransactions$6" map="6"/>
-  <field class="com.sonicbase.bench.TestTransactions$6" name="this$0" map="A"/>
-  <field class="com.sonicbase.bench.TestTransactions$6" name="val$updated" map="B"/>
-  <field class="com.sonicbase.bench.TestTransactions$6" name="val$latch" map="C"/>
-  <method class="com.sonicbase.bench.TestTransactions$6" name="void run()" map="run"/>
-  <class name="com.sonicbase.bench.TestTransactions$5" map="5"/>
-  <field class="com.sonicbase.bench.TestTransactions$5" name="this$0" map="A"/>
-  <field class="com.sonicbase.bench.TestTransactions$5" name="val$latch2" map="B"/>
-  <field class="com.sonicbase.bench.TestTransactions$5" name="val$latch" map="C"/>
-  <method class="com.sonicbase.bench.TestTransactions$5" name="void run()" map="run"/>
-  <class name="com.sonicbase.bench.TestTransactions$4" map="4"/>
-  <field class="com.sonicbase.bench.TestTransactions$4" name="this$0" map="A"/>
-  <field class="com.sonicbase.bench.TestTransactions$4" name="val$updated" map="B"/>
-  <field class="com.sonicbase.bench.TestTransactions$4" name="val$latch2" map="C"/>
-  <field class="com.sonicbase.bench.TestTransactions$4" name="val$latch" map="D"/>
-  <method class="com.sonicbase.bench.TestTransactions$4" name="void run()" map="run"/>
-  <class name="com.sonicbase.bench.TestTransactions$3" map="3"/>
-  <field class="com.sonicbase.bench.TestTransactions$3" name="this$0" map="A"/>
-  <field class="com.sonicbase.bench.TestTransactions$3" name="val$updated" map="B"/>
-  <field class="com.sonicbase.bench.TestTransactions$3" name="val$latch" map="C"/>
-  <method class="com.sonicbase.bench.TestTransactions$3" name="void run()" map="run"/>
-  <class name="com.sonicbase.bench.TestTransactions$2" map="2"/>
-  <field class="com.sonicbase.bench.TestTransactions$2" name="this$0" map="A"/>
-  <field class="com.sonicbase.bench.TestTransactions$2" name="val$latch" map="B"/>
-  <method class="com.sonicbase.bench.TestTransactions$2" name="void run()" map="run"/>
-  <class name="com.sonicbase.bench.TestTransactions$1" map="1"/>
-  <field class="com.sonicbase.bench.TestTransactions$1" name="this$0" map="A"/>
-  <field class="com.sonicbase.bench.TestTransactions$1" name="val$dbServers" map="B"/>
-  <field class="com.sonicbase.bench.TestTransactions$1" name="val$shard" map="C"/>
-  <field class="com.sonicbase.bench.TestTransactions$1" name="val$config" map="D"/>
-  <method class="com.sonicbase.bench.TestTransactions$1" name="java.lang.Object call()" map="call"/>
-  <class name="com.sonicbase.bench.TestTransactions" map="E"/>
-  <field class="com.sonicbase.bench.TestTransactions" name="conn2" map="A"/>
-  <field class="com.sonicbase.bench.TestTransactions" name="conn" map="B"/>
-  <method class="com.sonicbase.bench.TestTransactions" name="void testConcurrent4()" map="A"/>
-  <method class="com.sonicbase.bench.TestTransactions" name="void testConcurrentSecondaryKeys()" map="B"/>
-  <method class="com.sonicbase.bench.TestTransactions" name="void testConcurrent()" map="C"/>
-  <method class="com.sonicbase.bench.TestTransactions" name="void testConcurrent3()" map="D"/>
-  <method class="com.sonicbase.bench.TestTransactions" name="java.sql.Connection access$000(com.sonicbase.bench.TestTransactions)" map="A"/>
-  <method class="com.sonicbase.bench.TestTransactions" name="void testConcurrent2()" map="E"/>
-  <method class="com.sonicbase.bench.TestTransactions" name="void beforeClass()" map="F"/>
-  <method class="com.sonicbase.bench.TestTransactions" name="void test()" map="G"/>
-  <class name="com.sonicbase.bench.TestDatabaseAdvancedToDo$1" map="1"/>
-  <field class="com.sonicbase.bench.TestDatabaseAdvancedToDo$1" name="this$0" map="A"/>
-  <field class="com.sonicbase.bench.TestDatabaseAdvancedToDo$1" name="val$dbServers" map="B"/>
-  <field class="com.sonicbase.bench.TestDatabaseAdvancedToDo$1" name="val$shard" map="C"/>
-  <field class="com.sonicbase.bench.TestDatabaseAdvancedToDo$1" name="val$config" map="D"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo$1" name="java.lang.Object call()" map="call"/>
-  <class name="com.sonicbase.bench.TestDatabaseAdvancedToDo" map="F"/>
-  <field class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="ids" map="A"/>
-  <field class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="recordCount" map="B"/>
-  <field class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="conn" map="C"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testAlterTable()" map="A"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void beforeClass()" map="B"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testInsertFromSelect()" map="C"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testAlias3()" map="D"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testDropTable()" map="E"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testCreateTableLike()" map="F"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testHaving()" map="G"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testDropIndex()" map="H"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testInsertColumn()" map="I"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testCopyTable()" map="J"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testCase()" map="K"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testToDate()" map="L"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testUnion()" map="M"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testChangeFieldDataType()" map="N"/>
+  <class name="TestServers$2" map="2"/>
+  <field class="TestServers$2" name="val$dbServers" map="A"/>
+  <field class="TestServers$2" name="val$shard" map="B"/>
+  <method class="TestServers$2" name="java.lang.Object call()" map="call"/>
+  <class name="TestServers$1" map="1"/>
+  <field class="TestServers$1" name="val$dbServers" map="A"/>
+  <method class="TestServers$1" name="java.lang.Object call()" map="call"/>
+  <class name="TestServers" map="A"/>
+  <method class="TestServers" name="void main(java.lang.String[])" map="A"/>
+  <class name="TestRebalance$1" map="1"/>
+  <field class="TestRebalance$1" name="this$0" map="A"/>
+  <field class="TestRebalance$1" name="val$dbServers" map="B"/>
+  <field class="TestRebalance$1" name="val$shard" map="C"/>
+  <field class="TestRebalance$1" name="val$config" map="D"/>
+  <method class="TestRebalance$1" name="java.lang.Object call()" map="call"/>
+  <class name="TestRebalance" map="B"/>
+  <method class="TestRebalance" name="void testBasics()" map="A"/>
+  <class name="TestMisc" map="C"/>
+  <method class="TestMisc" name="void test()" map="A"/>
+  <class name="TestConcurrentSkipListMap$2" map="2"/>
+  <field class="TestConcurrentSkipListMap$2" name="val$offset" map="A"/>
+  <field class="TestConcurrentSkipListMap$2" name="val$begin" map="B"/>
+  <field class="TestConcurrentSkipListMap$2" name="val$rand" map="C"/>
+  <field class="TestConcurrentSkipListMap$2" name="val$map" map="D"/>
+  <method class="TestConcurrentSkipListMap$2" name="void run()" map="run"/>
+  <class name="TestConcurrentSkipListMap$1" map="1"/>
+  <method class="TestConcurrentSkipListMap$1" name="int compare(java.lang.Object[], java.lang.Object[])" map="A"/>
+  <method class="TestConcurrentSkipListMap$1" name="int compare(java.lang.Object, java.lang.Object)" map="compare"/>
+  <class name="TestConcurrentSkipListMap" map="D"/>
+  <method class="TestConcurrentSkipListMap" name="void main(java.lang.String[])" map="A"/>
+  <class name="TestTransactions$6" map="6"/>
+  <field class="TestTransactions$6" name="this$0" map="A"/>
+  <field class="TestTransactions$6" name="val$updated" map="B"/>
+  <field class="TestTransactions$6" name="val$latch" map="C"/>
+  <method class="TestTransactions$6" name="void run()" map="run"/>
+  <class name="TestTransactions$5" map="5"/>
+  <field class="TestTransactions$5" name="this$0" map="A"/>
+  <field class="TestTransactions$5" name="val$latch2" map="B"/>
+  <field class="TestTransactions$5" name="val$latch" map="C"/>
+  <method class="TestTransactions$5" name="void run()" map="run"/>
+  <class name="TestTransactions$4" map="4"/>
+  <field class="TestTransactions$4" name="this$0" map="A"/>
+  <field class="TestTransactions$4" name="val$updated" map="B"/>
+  <field class="TestTransactions$4" name="val$latch2" map="C"/>
+  <field class="TestTransactions$4" name="val$latch" map="D"/>
+  <method class="TestTransactions$4" name="void run()" map="run"/>
+  <class name="TestTransactions$3" map="3"/>
+  <field class="TestTransactions$3" name="this$0" map="A"/>
+  <field class="TestTransactions$3" name="val$updated" map="B"/>
+  <field class="TestTransactions$3" name="val$latch" map="C"/>
+  <method class="TestTransactions$3" name="void run()" map="run"/>
+  <class name="TestTransactions$2" map="2"/>
+  <field class="TestTransactions$2" name="this$0" map="A"/>
+  <field class="TestTransactions$2" name="val$latch" map="B"/>
+  <method class="TestTransactions$2" name="void run()" map="run"/>
+  <class name="TestTransactions$1" map="1"/>
+  <field class="TestTransactions$1" name="this$0" map="A"/>
+  <field class="TestTransactions$1" name="val$dbServers" map="B"/>
+  <field class="TestTransactions$1" name="val$shard" map="C"/>
+  <field class="TestTransactions$1" name="val$config" map="D"/>
+  <method class="TestTransactions$1" name="java.lang.Object call()" map="call"/>
+  <class name="TestTransactions" map="E"/>
+  <field class="TestTransactions" name="conn2" map="A"/>
+  <field class="TestTransactions" name="conn" map="B"/>
+  <method class="TestTransactions" name="void testConcurrent4()" map="A"/>
+  <method class="TestTransactions" name="void testConcurrentSecondaryKeys()" map="B"/>
+  <method class="TestTransactions" name="void testConcurrent()" map="C"/>
+  <method class="TestTransactions" name="void testConcurrent3()" map="D"/>
+  <method class="TestTransactions" name="java.sql.Connection access$000(TestTransactions)" map="A"/>
+  <method class="TestTransactions" name="void testConcurrent2()" map="E"/>
+  <method class="TestTransactions" name="void beforeClass()" map="F"/>
+  <method class="TestTransactions" name="void test()" map="G"/>
+  <class name="TestDatabaseAdvancedToDo$1" map="1"/>
+  <field class="TestDatabaseAdvancedToDo$1" name="this$0" map="A"/>
+  <field class="TestDatabaseAdvancedToDo$1" name="val$dbServers" map="B"/>
+  <field class="TestDatabaseAdvancedToDo$1" name="val$shard" map="C"/>
+  <field class="TestDatabaseAdvancedToDo$1" name="val$config" map="D"/>
+  <method class="TestDatabaseAdvancedToDo$1" name="java.lang.Object call()" map="call"/>
+  <class name="TestDatabaseAdvancedToDo" map="F"/>
+  <field class="TestDatabaseAdvancedToDo" name="ids" map="A"/>
+  <field class="TestDatabaseAdvancedToDo" name="recordCount" map="B"/>
+  <field class="TestDatabaseAdvancedToDo" name="conn" map="C"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testAlterTable()" map="A"/>
+  <method class="TestDatabaseAdvancedToDo" name="void beforeClass()" map="B"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testInsertFromSelect()" map="C"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testAlias3()" map="D"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testDropTable()" map="E"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testCreateTableLike()" map="F"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testHaving()" map="G"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testDropIndex()" map="H"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testInsertColumn()" map="I"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testCopyTable()" map="J"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testCase()" map="K"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testToDate()" map="L"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testUnion()" map="M"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testChangeFieldDataType()" map="N"/>
   <class name="com.sonicbase.server.NettyServer$3" map="3"/>
   <field class="com.sonicbase.server.NettyServer$3" name="this$0" map="A"/>
   <field class="com.sonicbase.server.NettyServer$3" name="val$isRunning" map="B"/>

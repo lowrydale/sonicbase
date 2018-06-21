@@ -4,7 +4,6 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
-import com.sonicbase.server.PartitionManager;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.BinaryExpression;
@@ -14,6 +13,7 @@ import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
+import com.sonicbase.server.PartitionManager;
 import net.sf.jsqlparser.statement.select.Limit;
 import net.sf.jsqlparser.statement.select.Offset;
 import org.apache.giraph.utils.Varint;
@@ -247,7 +247,7 @@ public class ExpressionImpl implements Expression {
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
       cobj.put(ComObject.Tag.method, "ReadManager:evaluateCounterGetKeys");
 
-      String batchKey = "DatabaseServer:evaluateCounterGetKeys";
+      String batchKey = "ReadManager:evaluateCounterGetKeys";
 
       Counter lastCounter = null;
       int shardCount = common.getServersConfig().getShardCount();
@@ -342,7 +342,7 @@ public class ExpressionImpl implements Expression {
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
     cobj.put(ComObject.Tag.method, "ReadManager:evaluateCounterWithRecord");
 
-    String batchKey = "DatabaseServer:evaluateCounterWithRecord";
+    String batchKey = "ReadManager:evaluateCounterWithRecord";
 
     TableSchema tableSchema = common.getTables(dbName).get(counter.getTableName());
     Object[] key = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
@@ -788,10 +788,10 @@ public class ExpressionImpl implements Expression {
       List<IdEntry> keysToRead, String[] columns, List<ColumnImpl> selectColumns, RecordCache recordCache,
       int viewVersion, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) {
 
-    columns = new String[selectColumns.size()];
-    for (int i = 0; i < selectColumns.size(); i++) {
-      columns[i] = selectColumns.get(i).getColumnName();
-    }
+//    columns = new String[selectColumns.size()];
+//    for (int i = 0; i < selectColumns.size(); i++) {
+//      columns[i] = selectColumns.get(i).getColumnName();
+//    }
 
     HashMap<Integer, Object[][]> ret = doReadRecords(dbName, client, pageSize, forceSelectOnServer, tableSchema,
         keysToRead, columns, selectColumns, recordCache, viewVersion, restrictToThisServer, procedureContext, schemaRetryCount);
@@ -1516,7 +1516,7 @@ public class ExpressionImpl implements Expression {
             retObj = ((DatabaseServer)client.getDatabaseServer()).getMethodInvoker().getReadManager().indexLookupExpression(cobj, procedureContext);
           }
           else {
-            byte[] lookupRet = client.send(null, localShard, 0, cobj, DatabaseClient.Replica.def);
+            byte[] lookupRet = client.send("ReadManager:indexLookupExpression", localShard, 0, cobj, DatabaseClient.Replica.def);
             retObj = new ComObject(lookupRet);
           }
           Long retOffset = retObj.getLong(ComObject.Tag.currOffset);

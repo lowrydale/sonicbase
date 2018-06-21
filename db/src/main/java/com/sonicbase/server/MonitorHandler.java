@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
 import com.codahale.metrics.ExponentiallyDecayingReservoir;
@@ -39,7 +38,7 @@ import static java.util.Calendar.MONTH;
 public class MonitorHandler extends AbstractHandler {
 
   private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
-  private final DatabaseServer server;
+  private final com.sonicbase.server.DatabaseServer server;
   private static ConcurrentHashMap<String, Connection> connections = new ConcurrentHashMap<>();
 
 

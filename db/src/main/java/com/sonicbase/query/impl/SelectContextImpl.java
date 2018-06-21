@@ -1,6 +1,5 @@
 package com.sonicbase.query.impl;
 
-import com.sonicbase.procedure.RecordEvaluator;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.BinaryExpression;
 
@@ -25,15 +24,6 @@ public class SelectContextImpl {
   private Boolean sortWithIndex;
   private StoredProcedureContextImpl procedureContext;
 
-  //  public SelectContextImpl(long[] keys, boolean canUseIndex, String tableName) {
-//    this.currKeys = new long[keys.length][1];
-//    for (int i = 0; i < keys.length; i++) {
-//      currKeys[i] = new long[]{keys[i]};
-//    }
-//    this.sortWithIndex = canUseIndex;
-//    this.tableNames = new String[]{tableName};
-//  }
-//
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
   @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public SelectContextImpl(
@@ -137,17 +127,6 @@ public class SelectContextImpl {
     this.lastKeys = this.currKeys;
     this.currKeys = ids;
   }
-
-//  public void setCurrKeys(long[] keys) {
-//    if (keys == null) {
-//      this.currKeys = null;
-//      return;
-//    }
-//    this.currKeys = new long[keys.length][1];
-//    for (int i = 0; i < keys.length; i++) {
-//      currKeys[i] = new long[]{keys[i]};
-//    }
-//  }
 
   public void setSortWithIndex(Boolean sortWithIndex) {
     this.sortWithIndex = sortWithIndex;

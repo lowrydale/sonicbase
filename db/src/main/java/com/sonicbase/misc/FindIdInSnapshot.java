@@ -3,7 +3,7 @@ package com.sonicbase.misc;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.Logger;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.server.DeltaManager;
+import com.sonicbase.server.SnapshotManager;
 import org.apache.giraph.utils.Varint;
 
 import java.io.*;
@@ -13,7 +13,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static com.sonicbase.server.DeltaManager.SNAPSHOT_PARTITION_COUNT;
+import static com.sonicbase.server.SnapshotManager.SNAPSHOT_PARTITION_COUNT;
 
 
 /**
@@ -40,7 +40,7 @@ public class FindIdInSnapshot {
 
     File snapshotBaseDir = new File(dataRoot, "snapshot/" + shard + "/" + replica + "/" +
         dbName);
-    int highestSnapshot = DeltaManager.getHighestCommittedSnapshotVersion(snapshotBaseDir, logger);
+    int highestSnapshot = SnapshotManager.getHighestCommittedSnapshotVersion(snapshotBaseDir, logger);
 
     if (highestSnapshot == -1) {
       System.out.println("highestSnapshot=-1");

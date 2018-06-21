@@ -27,7 +27,6 @@ public class ComObject {
 
   static Int2ObjectOpenHashMap<DynamicType> typesByTag = new Int2ObjectOpenHashMap<>();
 
-
   public static class DynamicType {
     int tag;
 
@@ -256,7 +255,27 @@ public class ComObject {
     bigDecimalValue(185, bigDecimalType),
     byteValue(186, tinyIntType),
     shortValue(187, smallIntType),
-    byteArrayValue(188, byteArrayType);
+    byteArrayValue(188, byteArrayType),
+    beginMillis(189, longType),
+    duration(190, longType),
+    durationDouble(191, doubleType),
+    histogramSnapshot(192, arrayType),
+    lat_avg(193, doubleType),
+    lat_75(194, doubleType),
+    lat_95(195, doubleType),
+    lat_99(196, doubleType),
+    lat_999(197, doubleType),
+    lat_max(198, doubleType),
+    latenciesBytes(199, byteArrayType),
+    countReturned(200, longType),
+    originalOffset(201, intType),
+    batchResponses(202, arrayType),
+    intStatus(203, intType),
+    originalIgnore(204, booleanType),
+    databases(205, arrayType),
+    hasDiscrepancy(206, booleanType),
+    tableSchema(207, byteArrayType),
+    indexSchema(208, byteArrayType);
 
 
     public final int tag;
@@ -435,6 +454,13 @@ public class ComObject {
     map.put(tag.tag, ret);
     return ret;
   }
+
+  public ComArray putArray(Tag tag, ComArray newArray) {
+    map.put(tag.tag, newArray);
+    return newArray;
+  }
+
+
 
   public ComArray getArray(Tag tag) {
     return (ComArray)map.get(tag.tag);

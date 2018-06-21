@@ -48,18 +48,18 @@ to act on classes which have been obfuscated.
 <!-- WARNING: Unresolved external dependency: org.testng.annotations.Test not found! -->
 <!-- WARNING: Unresolved external dependency: org.testng.annotations.Test not found! -->
 <!-- WARNING: Unresolved external dependency: org.testng.annotations.Test not found! -->
-<!-- WARNING: No mapping found: org.codehaus.plexus.util.FileUtils -->
+<!-- WARNING: No mapping found: org.apache.commons.io.FileUtils -->
 <!-- WARNING: No mapping found: org.testng.Assert -->
 <!-- WARNING: No mapping found: org.testng.Assert -->
 <!-- WARNING: No mapping found: org.testng.Assert -->
-<!-- WARNING: Unresolved external dependency: org.codehaus.plexus.util.FileUtils not found! -->
+<!-- WARNING: Unresolved external dependency: org.apache.commons.io.FileUtils not found! -->
 <!-- WARNING: Unresolved external dependency: org.testng.Assert not found! -->
 <!-- WARNING: Unresolved external dependency: org.testng.annotations.Test not found! -->
 <!-- WARNING: Unresolved external dependency: org.testng.annotations.Test not found! -->
-<!-- WARNING: No mapping found: org.codehaus.plexus.util.FileUtils -->
+<!-- WARNING: No mapping found: org.apache.commons.io.FileUtils -->
 <!-- WARNING: No mapping found: org.testng.Assert -->
 <!-- WARNING: No mapping found: org.testng.Assert -->
-<!-- WARNING: Unresolved external dependency: org.codehaus.plexus.util.FileUtils not found! -->
+<!-- WARNING: Unresolved external dependency: org.apache.commons.io.FileUtils not found! -->
 <!-- WARNING: Unresolved external dependency: org.testng.Assert not found! -->
 <!-- WARNING: No mapping found: org.testng.Assert -->
 <!-- WARNING: Unresolved external dependency: org.testng.Assert not found! -->
@@ -74,13 +74,13 @@ to act on classes which have been obfuscated.
 <!-- WARNING: Unresolved external dependency: org.testng.annotations.Test not found! -->
 <!-- WARNING: Unresolved external dependency: org.testng.annotations.Test not found! -->
 <!-- WARNING: Unresolved external dependency: org.testng.annotations.Test not found! -->
-<!-- WARNING: No mapping found: org.codehaus.plexus.util.FileUtils -->
+<!-- WARNING: No mapping found: org.apache.commons.io.FileUtils -->
 <!-- WARNING: No mapping found: org.testng.Assert -->
 <!-- WARNING: No mapping found: org.testng.Assert -->
 <!-- WARNING: No mapping found: org.testng.Assert -->
 <!-- WARNING: No mapping found: org.testng.Assert -->
 <!-- WARNING: No mapping found: org.testng.Assert -->
-<!-- WARNING: Unresolved external dependency: org.codehaus.plexus.util.FileUtils not found! -->
+<!-- WARNING: Unresolved external dependency: org.apache.commons.io.FileUtils not found! -->
 <!-- WARNING: Unresolved external dependency: org.testng.Assert not found! -->
 <!-- WARNING: Unresolved external dependency: net.sf.jsqlparser.statement.Statement not found! -->
 <!-- WARNING: Unresolved external dependency: net.sf.jsqlparser.statement.Statement not found! -->
@@ -1078,8 +1078,8 @@ to act on classes which have been obfuscated.
 <!-- WARNING: No mapping found: org.apache.commons.io.IOUtils -->
 <!-- WARNING: Unresolved external dependency: org.apache.commons.io.IOUtils not found! -->
 <expose>
-  <class name="com.sonicbase.research.socket.NettyServer"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="void main(java.lang.String[])"/>
+  <class name="com.sonicbase.server.NettyServer"/>
+  <method class="com.sonicbase.server.NettyServer" name="void main(java.lang.String[])"/>
   <class name="ReconfigureResults"/>
   <method class="ReconfigureResults" name="boolean isHandedOffToMaster()"/>
   <method class="ReconfigureResults" name="int getShardCount()"/>
@@ -1158,7 +1158,7 @@ to act on classes which have been obfuscated.
   <method class="com.sonicbase.server.MethodInvoker" name="ComObject createTable(ComObject, boolean)"/>
   <method class="com.sonicbase.server.MethodInvoker" name="ComObject dropIndexSlave(ComObject, boolean)"/>
   <method class="com.sonicbase.server.MethodInvoker" name="ComObject prepareSourceForServerReload(ComObject, boolean)"/>
-  <method class="com.sonicbase.server.MethodInvoker" name="void setRepartitioner(com.sonicbase.index.Repartitioner)"/>
+  <method class="com.sonicbase.server.MethodInvoker" name="void setRepartitioner(com.sonicbase.server.PartitionManager)"/>
   <method class="com.sonicbase.server.MethodInvoker" name="ComObject isRepartitioningComplete(ComObject, boolean)"/>
   <method class="com.sonicbase.server.MethodInvoker" name="ComObject testWrite(ComObject, boolean)"/>
   <method class="com.sonicbase.server.MethodInvoker" name="ComObject expirePreparedStatement(ComObject, boolean)"/>
@@ -1919,190 +1919,190 @@ to act on classes which have been obfuscated.
 </expose>
 <map>
   <package name="com.sonicbase.bench" map="A"/>
-  <class name="com.sonicbase.bench.TestServers$2" map="2"/>
-  <field class="com.sonicbase.bench.TestServers$2" name="val$dbServers" map="A"/>
-  <field class="com.sonicbase.bench.TestServers$2" name="val$shard" map="B"/>
-  <method class="com.sonicbase.bench.TestServers$2" name="java.lang.Object call()" map="call"/>
-  <class name="com.sonicbase.bench.TestServers$1" map="1"/>
-  <field class="com.sonicbase.bench.TestServers$1" name="val$dbServers" map="A"/>
-  <method class="com.sonicbase.bench.TestServers$1" name="java.lang.Object call()" map="call"/>
-  <class name="com.sonicbase.bench.TestServers" map="A"/>
-  <method class="com.sonicbase.bench.TestServers" name="void main(java.lang.String[])" map="A"/>
-  <class name="com.sonicbase.bench.TestRebalance$1" map="1"/>
-  <field class="com.sonicbase.bench.TestRebalance$1" name="this$0" map="A"/>
-  <field class="com.sonicbase.bench.TestRebalance$1" name="val$dbServers" map="B"/>
-  <field class="com.sonicbase.bench.TestRebalance$1" name="val$shard" map="C"/>
-  <field class="com.sonicbase.bench.TestRebalance$1" name="val$config" map="D"/>
-  <method class="com.sonicbase.bench.TestRebalance$1" name="java.lang.Object call()" map="call"/>
-  <class name="com.sonicbase.bench.TestRebalance" map="B"/>
-  <method class="com.sonicbase.bench.TestRebalance" name="void testBasics()" map="A"/>
-  <class name="com.sonicbase.bench.TestMisc" map="C"/>
-  <method class="com.sonicbase.bench.TestMisc" name="void test()" map="A"/>
-  <class name="com.sonicbase.bench.TestConcurrentSkipListMap$2" map="2"/>
-  <field class="com.sonicbase.bench.TestConcurrentSkipListMap$2" name="val$offset" map="A"/>
-  <field class="com.sonicbase.bench.TestConcurrentSkipListMap$2" name="val$begin" map="B"/>
-  <field class="com.sonicbase.bench.TestConcurrentSkipListMap$2" name="val$rand" map="C"/>
-  <field class="com.sonicbase.bench.TestConcurrentSkipListMap$2" name="val$map" map="D"/>
-  <method class="com.sonicbase.bench.TestConcurrentSkipListMap$2" name="void run()" map="run"/>
-  <class name="com.sonicbase.bench.TestConcurrentSkipListMap$1" map="1"/>
-  <method class="com.sonicbase.bench.TestConcurrentSkipListMap$1" name="int compare(java.lang.Object[], java.lang.Object[])" map="A"/>
-  <method class="com.sonicbase.bench.TestConcurrentSkipListMap$1" name="int compare(java.lang.Object, java.lang.Object)" map="compare"/>
-  <class name="com.sonicbase.bench.TestConcurrentSkipListMap" map="D"/>
-  <method class="com.sonicbase.bench.TestConcurrentSkipListMap" name="void main(java.lang.String[])" map="A"/>
-  <class name="com.sonicbase.bench.TestTransactions$6" map="6"/>
-  <field class="com.sonicbase.bench.TestTransactions$6" name="this$0" map="A"/>
-  <field class="com.sonicbase.bench.TestTransactions$6" name="val$updated" map="B"/>
-  <field class="com.sonicbase.bench.TestTransactions$6" name="val$latch" map="C"/>
-  <method class="com.sonicbase.bench.TestTransactions$6" name="void run()" map="run"/>
-  <class name="com.sonicbase.bench.TestTransactions$5" map="5"/>
-  <field class="com.sonicbase.bench.TestTransactions$5" name="this$0" map="A"/>
-  <field class="com.sonicbase.bench.TestTransactions$5" name="val$latch2" map="B"/>
-  <field class="com.sonicbase.bench.TestTransactions$5" name="val$latch" map="C"/>
-  <method class="com.sonicbase.bench.TestTransactions$5" name="void run()" map="run"/>
-  <class name="com.sonicbase.bench.TestTransactions$4" map="4"/>
-  <field class="com.sonicbase.bench.TestTransactions$4" name="this$0" map="A"/>
-  <field class="com.sonicbase.bench.TestTransactions$4" name="val$updated" map="B"/>
-  <field class="com.sonicbase.bench.TestTransactions$4" name="val$latch2" map="C"/>
-  <field class="com.sonicbase.bench.TestTransactions$4" name="val$latch" map="D"/>
-  <method class="com.sonicbase.bench.TestTransactions$4" name="void run()" map="run"/>
-  <class name="com.sonicbase.bench.TestTransactions$3" map="3"/>
-  <field class="com.sonicbase.bench.TestTransactions$3" name="this$0" map="A"/>
-  <field class="com.sonicbase.bench.TestTransactions$3" name="val$updated" map="B"/>
-  <field class="com.sonicbase.bench.TestTransactions$3" name="val$latch" map="C"/>
-  <method class="com.sonicbase.bench.TestTransactions$3" name="void run()" map="run"/>
-  <class name="com.sonicbase.bench.TestTransactions$2" map="2"/>
-  <field class="com.sonicbase.bench.TestTransactions$2" name="this$0" map="A"/>
-  <field class="com.sonicbase.bench.TestTransactions$2" name="val$latch" map="B"/>
-  <method class="com.sonicbase.bench.TestTransactions$2" name="void run()" map="run"/>
-  <class name="com.sonicbase.bench.TestTransactions$1" map="1"/>
-  <field class="com.sonicbase.bench.TestTransactions$1" name="this$0" map="A"/>
-  <field class="com.sonicbase.bench.TestTransactions$1" name="val$dbServers" map="B"/>
-  <field class="com.sonicbase.bench.TestTransactions$1" name="val$shard" map="C"/>
-  <field class="com.sonicbase.bench.TestTransactions$1" name="val$config" map="D"/>
-  <method class="com.sonicbase.bench.TestTransactions$1" name="java.lang.Object call()" map="call"/>
-  <class name="com.sonicbase.bench.TestTransactions" map="E"/>
-  <field class="com.sonicbase.bench.TestTransactions" name="conn2" map="A"/>
-  <field class="com.sonicbase.bench.TestTransactions" name="conn" map="B"/>
-  <method class="com.sonicbase.bench.TestTransactions" name="void testConcurrent4()" map="A"/>
-  <method class="com.sonicbase.bench.TestTransactions" name="void testConcurrentSecondaryKeys()" map="B"/>
-  <method class="com.sonicbase.bench.TestTransactions" name="void testConcurrent()" map="C"/>
-  <method class="com.sonicbase.bench.TestTransactions" name="void testConcurrent3()" map="D"/>
-  <method class="com.sonicbase.bench.TestTransactions" name="java.sql.Connection access$000(com.sonicbase.bench.TestTransactions)" map="A"/>
-  <method class="com.sonicbase.bench.TestTransactions" name="void testConcurrent2()" map="E"/>
-  <method class="com.sonicbase.bench.TestTransactions" name="void beforeClass()" map="F"/>
-  <method class="com.sonicbase.bench.TestTransactions" name="void test()" map="G"/>
-  <class name="com.sonicbase.bench.TestDatabaseAdvancedToDo$1" map="1"/>
-  <field class="com.sonicbase.bench.TestDatabaseAdvancedToDo$1" name="this$0" map="A"/>
-  <field class="com.sonicbase.bench.TestDatabaseAdvancedToDo$1" name="val$dbServers" map="B"/>
-  <field class="com.sonicbase.bench.TestDatabaseAdvancedToDo$1" name="val$shard" map="C"/>
-  <field class="com.sonicbase.bench.TestDatabaseAdvancedToDo$1" name="val$config" map="D"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo$1" name="java.lang.Object call()" map="call"/>
-  <class name="com.sonicbase.bench.TestDatabaseAdvancedToDo" map="F"/>
-  <field class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="ids" map="A"/>
-  <field class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="recordCount" map="B"/>
-  <field class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="conn" map="C"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testAlterTable()" map="A"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void beforeClass()" map="B"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testInsertFromSelect()" map="C"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testAlias3()" map="D"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testDropTable()" map="E"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testCreateTableLike()" map="F"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testHaving()" map="G"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testDropIndex()" map="H"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testInsertColumn()" map="I"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testCopyTable()" map="J"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testCase()" map="K"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testToDate()" map="L"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testUnion()" map="M"/>
-  <method class="com.sonicbase.bench.TestDatabaseAdvancedToDo" name="void testChangeFieldDataType()" map="N"/>
-  <class name="com.sonicbase.research.socket.NettyServer$3" map="3"/>
-  <field class="com.sonicbase.research.socket.NettyServer$3" name="this$0" map="A"/>
-  <field class="com.sonicbase.research.socket.NettyServer$3" name="val$isRunning" map="B"/>
-  <field class="com.sonicbase.research.socket.NettyServer$3" name="val$databaseServer" map="C"/>
-  <method class="com.sonicbase.research.socket.NettyServer$3" name="void run()" map="run"/>
-  <class name="com.sonicbase.research.socket.NettyServer$2" map="2"/>
-  <field class="com.sonicbase.research.socket.NettyServer$2" name="this$0" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer$2" name="void run()" map="run"/>
-  <class name="com.sonicbase.research.socket.NettyServer$Request" map="_A"/>
-  <field class="com.sonicbase.research.socket.NettyServer$Request" name="sequence0" map="A"/>
-  <field class="com.sonicbase.research.socket.NettyServer$Request" name="body" map="B"/>
-  <field class="com.sonicbase.research.socket.NettyServer$Request" name="response" map="C"/>
-  <field class="com.sonicbase.research.socket.NettyServer$Request" name="latch" map="D"/>
-  <field class="com.sonicbase.research.socket.NettyServer$Request" name="command" map="E"/>
-  <field class="com.sonicbase.research.socket.NettyServer$Request" name="sequence1" map="F"/>
-  <method class="com.sonicbase.research.socket.NettyServer$Request" name="byte[] getBody()" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer$Request" name="void setBody(byte[])" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer$Request" name="java.lang.String access$000(com.sonicbase.research.socket.NettyServer$Request)" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer$Request" name="byte[] access$102(com.sonicbase.research.socket.NettyServer$Request, byte[])" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer$Request" name="long getSequence1()" map="B"/>
-  <method class="com.sonicbase.research.socket.NettyServer$Request" name="java.lang.String access$002(com.sonicbase.research.socket.NettyServer$Request, java.lang.String)" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer$Request" name="void setCommand(java.lang.String)" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer$Request" name="byte[] access$100(com.sonicbase.research.socket.NettyServer$Request)" map="B"/>
-  <method class="com.sonicbase.research.socket.NettyServer$Request" name="long getSequence0()" map="C"/>
-  <method class="com.sonicbase.research.socket.NettyServer$Request" name="java.lang.String getCommand()" map="D"/>
-  <class name="com.sonicbase.research.socket.NettyServer$1" map="1"/>
-  <field class="com.sonicbase.research.socket.NettyServer$1" name="this$0" map="this$0"/>
-  <method class="com.sonicbase.research.socket.NettyServer$1" name="void initChannel(io.netty.channel.Channel)" map="initChannel"/>
-  <method class="com.sonicbase.research.socket.NettyServer$1" name="void initChannel(io.netty.channel.socket.SocketChannel)" map="initChannel"/>
-  <class name="com.sonicbase.research.socket.NettyServer$RequestHandler" map="_B"/>
-  <method class="com.sonicbase.research.socket.NettyServer$RequestHandler" name="java.lang.String handleCommandOld(java.lang.String, java.lang.String)" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer$RequestHandler" name="java.lang.String handleCommand(java.lang.String, java.lang.String)" map="B"/>
-  <class name="com.sonicbase.research.socket.NettyServer$ReadState" map="_C"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ReadState" name="bytes" map="A"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ReadState" name="$VALUES" map="B"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ReadState" name="size" map="C"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ReadState" name="dlqSize" map="D"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ReadState" name="dlqBytes" map="E"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ReadState" name="com.sonicbase.research.socket.NettyServer$ReadState valueOf(java.lang.String)" map="valueOf"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ReadState" name="com.sonicbase.research.socket.NettyServer$ReadState[] values()" map="values"/>
-  <class name="com.sonicbase.research.socket.NettyServer$ServerHandler" map="_D"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="respBuffer" map="A"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="command" map="B"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="readState" map="C"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="destBuff" map="D"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="this$0" map="this$0"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="len" map="E"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="bodyLen" map="F"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="intBuff" map="G"/>
-  <field class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="alloc" map="H"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="void channelRead(io.netty.channel.ChannelHandlerContext, java.lang.Object)" map="channelRead"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="void channelReadComplete(io.netty.channel.ChannelHandlerContext)" map="channelReadComplete"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="void handlerAdded(io.netty.channel.ChannelHandlerContext)" map="handlerAdded"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="java.util.List doProcessRequests(java.util.List)" map="doProcessRequests"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="byte[] doProcessRequest(com.sonicbase.research.socket.NettyServer$Request)" map="doProcessRequest"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="java.util.List processRequests(java.util.List)" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="byte[] processRequest(java.lang.String, byte[])" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="byte[] returnException(java.lang.String, java.lang.Throwable)" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="void exceptionCaught(io.netty.channel.ChannelHandlerContext, java.lang.Throwable)" map="exceptionCaught"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="void handlerRemoved(io.netty.channel.ChannelHandlerContext)" map="handlerRemoved"/>
-  <method class="com.sonicbase.research.socket.NettyServer$ServerHandler" name="void processError(java.lang.String, java.util.List, java.lang.Throwable)" map="A"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="databaseServer" map="A"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="port" map="B"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="ENABLE_COMPRESSION" map="C"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="UTF8_STR" map="D"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="f" map="E"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="HOST_STR" map="F"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="dlqServer" map="G"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="bossGroup" map="H"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="PORT_STR" map="I"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="cluster" map="J"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="logger" map="K"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="workerGroup" map="L"/>
-  <field class="com.sonicbase.research.socket.NettyServer" name="isRunning" map="M"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="java.lang.String getHelpPage(com.sonicbase.research.socket.NettyServer)" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="void setDlqServer(com.sonicbase.research.socket.NettyServer$RequestHandler)" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="Logger access$300()" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="void startServer(java.lang.String[], java.lang.String, boolean)" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="boolean access$200(com.sonicbase.research.socket.NettyServer)" map="B"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="boolean isRunning()" map="B"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="byte[] sendResponse(byte[], java.io.OutputStream, byte[], int, java.util.ArrayList, java.io.ByteArrayOutputStream)" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="byte[] compress(byte[])" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="com.sonicbase.research.socket.NettyServer$Request deserializeRequest(java.io.InputStream, byte[])" map="A"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="com.sonicbase.server.DatabaseServer getDatabaseServer()" map="C"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="byte[] uncompress(byte[])" map="B"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="void run()" map="D"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="com.sonicbase.research.socket.NettyServer$RequestHandler getDlqServer()" map="E"/>
-  <method class="com.sonicbase.research.socket.NettyServer" name="void setDatabaseServer(com.sonicbase.server.DatabaseServer)" map="A"/>
+  <class name="TestServers$2" map="2"/>
+  <field class="TestServers$2" name="val$dbServers" map="A"/>
+  <field class="TestServers$2" name="val$shard" map="B"/>
+  <method class="TestServers$2" name="java.lang.Object call()" map="call"/>
+  <class name="TestServers$1" map="1"/>
+  <field class="TestServers$1" name="val$dbServers" map="A"/>
+  <method class="TestServers$1" name="java.lang.Object call()" map="call"/>
+  <class name="TestServers" map="A"/>
+  <method class="TestServers" name="void main(java.lang.String[])" map="A"/>
+  <class name="TestRebalance$1" map="1"/>
+  <field class="TestRebalance$1" name="this$0" map="A"/>
+  <field class="TestRebalance$1" name="val$dbServers" map="B"/>
+  <field class="TestRebalance$1" name="val$shard" map="C"/>
+  <field class="TestRebalance$1" name="val$config" map="D"/>
+  <method class="TestRebalance$1" name="java.lang.Object call()" map="call"/>
+  <class name="TestRebalance" map="B"/>
+  <method class="TestRebalance" name="void testBasics()" map="A"/>
+  <class name="TestMisc" map="C"/>
+  <method class="TestMisc" name="void test()" map="A"/>
+  <class name="TestConcurrentSkipListMap$2" map="2"/>
+  <field class="TestConcurrentSkipListMap$2" name="val$offset" map="A"/>
+  <field class="TestConcurrentSkipListMap$2" name="val$begin" map="B"/>
+  <field class="TestConcurrentSkipListMap$2" name="val$rand" map="C"/>
+  <field class="TestConcurrentSkipListMap$2" name="val$map" map="D"/>
+  <method class="TestConcurrentSkipListMap$2" name="void run()" map="run"/>
+  <class name="TestConcurrentSkipListMap$1" map="1"/>
+  <method class="TestConcurrentSkipListMap$1" name="int compare(java.lang.Object[], java.lang.Object[])" map="A"/>
+  <method class="TestConcurrentSkipListMap$1" name="int compare(java.lang.Object, java.lang.Object)" map="compare"/>
+  <class name="TestConcurrentSkipListMap" map="D"/>
+  <method class="TestConcurrentSkipListMap" name="void main(java.lang.String[])" map="A"/>
+  <class name="TestTransactions$6" map="6"/>
+  <field class="TestTransactions$6" name="this$0" map="A"/>
+  <field class="TestTransactions$6" name="val$updated" map="B"/>
+  <field class="TestTransactions$6" name="val$latch" map="C"/>
+  <method class="TestTransactions$6" name="void run()" map="run"/>
+  <class name="TestTransactions$5" map="5"/>
+  <field class="TestTransactions$5" name="this$0" map="A"/>
+  <field class="TestTransactions$5" name="val$latch2" map="B"/>
+  <field class="TestTransactions$5" name="val$latch" map="C"/>
+  <method class="TestTransactions$5" name="void run()" map="run"/>
+  <class name="TestTransactions$4" map="4"/>
+  <field class="TestTransactions$4" name="this$0" map="A"/>
+  <field class="TestTransactions$4" name="val$updated" map="B"/>
+  <field class="TestTransactions$4" name="val$latch2" map="C"/>
+  <field class="TestTransactions$4" name="val$latch" map="D"/>
+  <method class="TestTransactions$4" name="void run()" map="run"/>
+  <class name="TestTransactions$3" map="3"/>
+  <field class="TestTransactions$3" name="this$0" map="A"/>
+  <field class="TestTransactions$3" name="val$updated" map="B"/>
+  <field class="TestTransactions$3" name="val$latch" map="C"/>
+  <method class="TestTransactions$3" name="void run()" map="run"/>
+  <class name="TestTransactions$2" map="2"/>
+  <field class="TestTransactions$2" name="this$0" map="A"/>
+  <field class="TestTransactions$2" name="val$latch" map="B"/>
+  <method class="TestTransactions$2" name="void run()" map="run"/>
+  <class name="TestTransactions$1" map="1"/>
+  <field class="TestTransactions$1" name="this$0" map="A"/>
+  <field class="TestTransactions$1" name="val$dbServers" map="B"/>
+  <field class="TestTransactions$1" name="val$shard" map="C"/>
+  <field class="TestTransactions$1" name="val$config" map="D"/>
+  <method class="TestTransactions$1" name="java.lang.Object call()" map="call"/>
+  <class name="TestTransactions" map="E"/>
+  <field class="TestTransactions" name="conn2" map="A"/>
+  <field class="TestTransactions" name="conn" map="B"/>
+  <method class="TestTransactions" name="void testConcurrent4()" map="A"/>
+  <method class="TestTransactions" name="void testConcurrentSecondaryKeys()" map="B"/>
+  <method class="TestTransactions" name="void testConcurrent()" map="C"/>
+  <method class="TestTransactions" name="void testConcurrent3()" map="D"/>
+  <method class="TestTransactions" name="java.sql.Connection access$000(TestTransactions)" map="A"/>
+  <method class="TestTransactions" name="void testConcurrent2()" map="E"/>
+  <method class="TestTransactions" name="void beforeClass()" map="F"/>
+  <method class="TestTransactions" name="void test()" map="G"/>
+  <class name="TestDatabaseAdvancedToDo$1" map="1"/>
+  <field class="TestDatabaseAdvancedToDo$1" name="this$0" map="A"/>
+  <field class="TestDatabaseAdvancedToDo$1" name="val$dbServers" map="B"/>
+  <field class="TestDatabaseAdvancedToDo$1" name="val$shard" map="C"/>
+  <field class="TestDatabaseAdvancedToDo$1" name="val$config" map="D"/>
+  <method class="TestDatabaseAdvancedToDo$1" name="java.lang.Object call()" map="call"/>
+  <class name="TestDatabaseAdvancedToDo" map="F"/>
+  <field class="TestDatabaseAdvancedToDo" name="ids" map="A"/>
+  <field class="TestDatabaseAdvancedToDo" name="recordCount" map="B"/>
+  <field class="TestDatabaseAdvancedToDo" name="conn" map="C"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testAlterTable()" map="A"/>
+  <method class="TestDatabaseAdvancedToDo" name="void beforeClass()" map="B"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testInsertFromSelect()" map="C"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testAlias3()" map="D"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testDropTable()" map="E"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testCreateTableLike()" map="F"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testHaving()" map="G"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testDropIndex()" map="H"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testInsertColumn()" map="I"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testCopyTable()" map="J"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testCase()" map="K"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testToDate()" map="L"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testUnion()" map="M"/>
+  <method class="TestDatabaseAdvancedToDo" name="void testChangeFieldDataType()" map="N"/>
+  <class name="com.sonicbase.server.NettyServer$3" map="3"/>
+  <field class="com.sonicbase.server.NettyServer$3" name="this$0" map="A"/>
+  <field class="com.sonicbase.server.NettyServer$3" name="val$isRunning" map="B"/>
+  <field class="com.sonicbase.server.NettyServer$3" name="val$databaseServer" map="C"/>
+  <method class="com.sonicbase.server.NettyServer$3" name="void run()" map="run"/>
+  <class name="com.sonicbase.server.NettyServer$2" map="2"/>
+  <field class="com.sonicbase.server.NettyServer$2" name="this$0" map="A"/>
+  <method class="com.sonicbase.server.NettyServer$2" name="void run()" map="run"/>
+  <class name="com.sonicbase.server.NettyServer$Request" map="_A"/>
+  <field class="com.sonicbase.server.NettyServer$Request" name="sequence0" map="A"/>
+  <field class="com.sonicbase.server.NettyServer$Request" name="body" map="B"/>
+  <field class="com.sonicbase.server.NettyServer$Request" name="response" map="C"/>
+  <field class="com.sonicbase.server.NettyServer$Request" name="latch" map="D"/>
+  <field class="com.sonicbase.server.NettyServer$Request" name="command" map="E"/>
+  <field class="com.sonicbase.server.NettyServer$Request" name="sequence1" map="F"/>
+  <method class="com.sonicbase.server.NettyServer$Request" name="byte[] getBody()" map="A"/>
+  <method class="com.sonicbase.server.NettyServer$Request" name="void setBody(byte[])" map="A"/>
+  <method class="com.sonicbase.server.NettyServer$Request" name="java.lang.String access$000(com.sonicbase.server.NettyServer$Request)" map="A"/>
+  <method class="com.sonicbase.server.NettyServer$Request" name="byte[] access$102(com.sonicbase.server.NettyServer$Request, byte[])" map="A"/>
+  <method class="com.sonicbase.server.NettyServer$Request" name="long getSequence1()" map="B"/>
+  <method class="com.sonicbase.server.NettyServer$Request" name="java.lang.String access$002(com.sonicbase.server.NettyServer$Request, java.lang.String)" map="A"/>
+  <method class="com.sonicbase.server.NettyServer$Request" name="void setCommand(java.lang.String)" map="A"/>
+  <method class="com.sonicbase.server.NettyServer$Request" name="byte[] access$100(com.sonicbase.server.NettyServer$Request)" map="B"/>
+  <method class="com.sonicbase.server.NettyServer$Request" name="long getSequence0()" map="C"/>
+  <method class="com.sonicbase.server.NettyServer$Request" name="java.lang.String getCommand()" map="D"/>
+  <class name="com.sonicbase.server.NettyServer$1" map="1"/>
+  <field class="com.sonicbase.server.NettyServer$1" name="this$0" map="this$0"/>
+  <method class="com.sonicbase.server.NettyServer$1" name="void initChannel(io.netty.channel.Channel)" map="initChannel"/>
+  <method class="com.sonicbase.server.NettyServer$1" name="void initChannel(io.netty.channel.socket.SocketChannel)" map="initChannel"/>
+  <class name="com.sonicbase.server.NettyServer$RequestHandler" map="_B"/>
+  <method class="com.sonicbase.server.NettyServer$RequestHandler" name="java.lang.String handleCommandOld(java.lang.String, java.lang.String)" map="A"/>
+  <method class="com.sonicbase.server.NettyServer$RequestHandler" name="java.lang.String handleCommand(java.lang.String, java.lang.String)" map="B"/>
+  <class name="com.sonicbase.server.NettyServer$ReadState" map="_C"/>
+  <field class="com.sonicbase.server.NettyServer$ReadState" name="bytes" map="A"/>
+  <field class="com.sonicbase.server.NettyServer$ReadState" name="$VALUES" map="B"/>
+  <field class="com.sonicbase.server.NettyServer$ReadState" name="size" map="C"/>
+  <field class="com.sonicbase.server.NettyServer$ReadState" name="dlqSize" map="D"/>
+  <field class="com.sonicbase.server.NettyServer$ReadState" name="dlqBytes" map="E"/>
+  <method class="com.sonicbase.server.NettyServer$ReadState" name="com.sonicbase.server.NettyServer$ReadState valueOf(java.lang.String)" map="valueOf"/>
+  <method class="com.sonicbase.server.NettyServer$ReadState" name="com.sonicbase.server.NettyServer$ReadState[] values()" map="values"/>
+  <class name="com.sonicbase.server.NettyServer$ServerHandler" map="_D"/>
+  <field class="com.sonicbase.server.NettyServer$ServerHandler" name="respBuffer" map="A"/>
+  <field class="com.sonicbase.server.NettyServer$ServerHandler" name="command" map="B"/>
+  <field class="com.sonicbase.server.NettyServer$ServerHandler" name="readState" map="C"/>
+  <field class="com.sonicbase.server.NettyServer$ServerHandler" name="destBuff" map="D"/>
+  <field class="com.sonicbase.server.NettyServer$ServerHandler" name="this$0" map="this$0"/>
+  <field class="com.sonicbase.server.NettyServer$ServerHandler" name="len" map="E"/>
+  <field class="com.sonicbase.server.NettyServer$ServerHandler" name="bodyLen" map="F"/>
+  <field class="com.sonicbase.server.NettyServer$ServerHandler" name="intBuff" map="G"/>
+  <field class="com.sonicbase.server.NettyServer$ServerHandler" name="alloc" map="H"/>
+  <method class="com.sonicbase.server.NettyServer$ServerHandler" name="void channelRead(io.netty.channel.ChannelHandlerContext, java.lang.Object)" map="channelRead"/>
+  <method class="com.sonicbase.server.NettyServer$ServerHandler" name="void channelReadComplete(io.netty.channel.ChannelHandlerContext)" map="channelReadComplete"/>
+  <method class="com.sonicbase.server.NettyServer$ServerHandler" name="void handlerAdded(io.netty.channel.ChannelHandlerContext)" map="handlerAdded"/>
+  <method class="com.sonicbase.server.NettyServer$ServerHandler" name="java.util.List doProcessRequests(java.util.List)" map="doProcessRequests"/>
+  <method class="com.sonicbase.server.NettyServer$ServerHandler" name="byte[] doProcessRequest(com.sonicbase.server.NettyServer$Request)" map="doProcessRequest"/>
+  <method class="com.sonicbase.server.NettyServer$ServerHandler" name="java.util.List processRequests(java.util.List)" map="A"/>
+  <method class="com.sonicbase.server.NettyServer$ServerHandler" name="byte[] processRequest(java.lang.String, byte[])" map="A"/>
+  <method class="com.sonicbase.server.NettyServer$ServerHandler" name="byte[] returnException(java.lang.String, java.lang.Throwable)" map="A"/>
+  <method class="com.sonicbase.server.NettyServer$ServerHandler" name="void exceptionCaught(io.netty.channel.ChannelHandlerContext, java.lang.Throwable)" map="exceptionCaught"/>
+  <method class="com.sonicbase.server.NettyServer$ServerHandler" name="void handlerRemoved(io.netty.channel.ChannelHandlerContext)" map="handlerRemoved"/>
+  <method class="com.sonicbase.server.NettyServer$ServerHandler" name="void processError(java.lang.String, java.util.List, java.lang.Throwable)" map="A"/>
+  <field class="com.sonicbase.server.NettyServer" name="databaseServer" map="A"/>
+  <field class="com.sonicbase.server.NettyServer" name="port" map="B"/>
+  <field class="com.sonicbase.server.NettyServer" name="ENABLE_COMPRESSION" map="C"/>
+  <field class="com.sonicbase.server.NettyServer" name="UTF8_STR" map="D"/>
+  <field class="com.sonicbase.server.NettyServer" name="f" map="E"/>
+  <field class="com.sonicbase.server.NettyServer" name="HOST_STR" map="F"/>
+  <field class="com.sonicbase.server.NettyServer" name="dlqServer" map="G"/>
+  <field class="com.sonicbase.server.NettyServer" name="bossGroup" map="H"/>
+  <field class="com.sonicbase.server.NettyServer" name="PORT_STR" map="I"/>
+  <field class="com.sonicbase.server.NettyServer" name="cluster" map="J"/>
+  <field class="com.sonicbase.server.NettyServer" name="logger" map="K"/>
+  <field class="com.sonicbase.server.NettyServer" name="workerGroup" map="L"/>
+  <field class="com.sonicbase.server.NettyServer" name="isRunning" map="M"/>
+  <method class="com.sonicbase.server.NettyServer" name="java.lang.String getHelpPage(com.sonicbase.server.NettyServer)" map="A"/>
+  <method class="com.sonicbase.server.NettyServer" name="void setDlqServer(com.sonicbase.server.NettyServer$RequestHandler)" map="A"/>
+  <method class="com.sonicbase.server.NettyServer" name="Logger access$300()" map="A"/>
+  <method class="com.sonicbase.server.NettyServer" name="void startServer(java.lang.String[], java.lang.String, boolean)" map="A"/>
+  <method class="com.sonicbase.server.NettyServer" name="boolean access$200(com.sonicbase.server.NettyServer)" map="B"/>
+  <method class="com.sonicbase.server.NettyServer" name="boolean isRunning()" map="B"/>
+  <method class="com.sonicbase.server.NettyServer" name="byte[] sendResponse(byte[], java.io.OutputStream, byte[], int, java.util.ArrayList, java.io.ByteArrayOutputStream)" map="A"/>
+  <method class="com.sonicbase.server.NettyServer" name="byte[] compress(byte[])" map="A"/>
+  <method class="com.sonicbase.server.NettyServer" name="com.sonicbase.server.NettyServer$Request deserializeRequest(java.io.InputStream, byte[])" map="A"/>
+  <method class="com.sonicbase.server.NettyServer" name="com.sonicbase.server.DatabaseServer getDatabaseServer()" map="C"/>
+  <method class="com.sonicbase.server.NettyServer" name="byte[] uncompress(byte[])" map="B"/>
+  <method class="com.sonicbase.server.NettyServer" name="void run()" map="D"/>
+  <method class="com.sonicbase.server.NettyServer" name="com.sonicbase.server.NettyServer$RequestHandler getDlqServer()" map="E"/>
+  <method class="com.sonicbase.server.NettyServer" name="void setDatabaseServer(com.sonicbase.server.DatabaseServer)" map="A"/>
   <class name="com.sonicbase.research.socket.ChangeRequest" map="A"/>
   <field class="com.sonicbase.research.socket.ChangeRequest" name="socket" map="A"/>
   <field class="com.sonicbase.research.socket.ChangeRequest" name="CHANGEOPS" map="B"/>
@@ -2655,7 +2655,7 @@ to act on classes which have been obfuscated.
   <method class="com.sonicbase.server.DatabaseServer" name="java.lang.Double checkResidentMemory()" map="M"/>
   <method class="com.sonicbase.server.DatabaseServer" name="int getRecordsByIdPartitionCount()" map="N"/>
   <method class="com.sonicbase.server.DatabaseServer" name="ComObject prepareForRestore(ComObject)" map="F"/>
-  <method class="com.sonicbase.server.DatabaseServer" name="com.sonicbase.server.SnapshotManagerImpl access$2300(com.sonicbase.server.DatabaseServer)" map="D"/>
+  <method class="com.sonicbase.server.DatabaseServer" name="com.sonicbase.server.SnapshotManager access$2300(com.sonicbase.server.DatabaseServer)" map="D"/>
   <method class="com.sonicbase.server.DatabaseServer" name="void startLicenseValidator()" map="O"/>
   <method class="com.sonicbase.server.DatabaseServer" name="void syncDbNames()" map="P"/>
   <method class="com.sonicbase.server.DatabaseServer" name="long getCommandCount()" map="Q"/>
@@ -2776,7 +2776,7 @@ to act on classes which have been obfuscated.
   <method class="com.sonicbase.server.DatabaseServer" name="ComObject isEntireRestoreComplete(ComObject)" map="X"/>
   <method class="com.sonicbase.server.DatabaseServer" name="java.util.concurrent.ThreadPoolExecutor getExecutor()" map="&#x00c5;"/>
   <method class="com.sonicbase.server.DatabaseServer" name="void doDeleteFileSystemBackups(java.lang.String, int)" map="A"/>
-  <method class="com.sonicbase.server.DatabaseServer" name="com.sonicbase.index.Repartitioner getRepartitioner()" map="&#x00c6;"/>
+  <method class="com.sonicbase.server.DatabaseServer" name="com.sonicbase.server.PartitionManager getRepartitioner()" map="&#x00c6;"/>
   <method class="com.sonicbase.server.DatabaseServer" name="ComObject getOSStats(ComObject)" map="Y"/>
   <method class="com.sonicbase.server.DatabaseServer" name="boolean access$1600(com.sonicbase.server.DatabaseServer)" map="S"/>
   <method class="com.sonicbase.server.DatabaseServer" name="ComObject finishRestore(ComObject)" map="Z"/>
@@ -2791,7 +2791,7 @@ to act on classes which have been obfuscated.
   <method class="com.sonicbase.server.DatabaseServer" name="ComObject doRestoreFileSystem(ComObject)" map="_"/>
   <method class="com.sonicbase.server.DatabaseServer" name="ComObject getDatabaseFile(ComObject)" map="a"/>
   <method class="com.sonicbase.server.DatabaseServer" name="java.lang.String getInstallDir()" map="&#x00c8;"/>
-  <method class="com.sonicbase.server.DatabaseServer" name="com.sonicbase.server.SnapshotManagerImpl getSnapshotManager()" map="&#x00c9;"/>
+  <method class="com.sonicbase.server.DatabaseServer" name="com.sonicbase.server.SnapshotManager getSnapshotManager()" map="&#x00c9;"/>
   <method class="com.sonicbase.server.DatabaseServer" name="ComObject reloadServer(ComObject)" map="b"/>
   <method class="com.sonicbase.server.DatabaseServer" name="double access$4402(com.sonicbase.server.DatabaseServer, double)" map="B"/>
   <method class="com.sonicbase.server.DatabaseServer" name="int getReplicationFactor()" map="&#x00ca;"/>
@@ -2892,104 +2892,104 @@ to act on classes which have been obfuscated.
   <method class="com.sonicbase.server.UpdateManager" name="ComObject doUpdateRecord(ComObject, boolean, java.util.concurrent.atomic.AtomicBoolean, java.util.concurrent.atomic.AtomicLong, boolean)" map="B"/>
   <method class="com.sonicbase.server.UpdateManager" name="ComObject batchInsertIndexEntryByKey(ComObject, boolean)" map="K"/>
   <method class="com.sonicbase.server.UpdateManager" name="ComObject doDeleteIndexEntryByKey(ComObject, boolean, java.util.concurrent.atomic.AtomicBoolean, java.util.concurrent.atomic.AtomicLong, boolean)" map="C"/>
-  <class name="com.sonicbase.server.RecordLockedException" map="E"/>
-  <class name="com.sonicbase.server.SnapshotManagerImpl$3" map="3"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$3" name="val$outStreams" map="k"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$3" name="val$isPrimaryKey" map="l"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$3" name="val$indexEntry" map="m"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$3" name="val$savedCount" map="n"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$3" name="val$tableEntry" map="o"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$3" name="this$0" map="p"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$3" name="val$lastLogged" map="q"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$3" name="val$AtomicInteger" map="r"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$3" name="val$index" map="s"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$3" name="val$countSaved" map="t"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$3" name="val$subBegin" map="u"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$3" name="boolean visit(java.lang.Object[], java.lang.Object)" map="A"/>
-  <class name="com.sonicbase.server.SnapshotManagerImpl$2" map="2"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$2" name="this$0" map="A"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$2" name="void run()" map="run"/>
-  <class name="com.sonicbase.server.SnapshotManagerImpl$1" map="1"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$1" name="val$indexSchema" map="A"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$1" name="val$recoveredCount" map="B"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$1" name="val$currOffset" map="C"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$1" name="val$tableName" map="D"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$1" name="val$indexName" map="E"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$1" name="this$0" map="F"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$1" name="val$indexBegin" map="G"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$1" name="val$tableSchema" map="H"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$1" name="val$lastLogged" map="I"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$1" name="val$indexFile" map="J"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$1" name="val$index" map="K"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$1" name="java.lang.Object call()" map="call"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$1" name="java.lang.Boolean call()" map="A"/>
-  <class name="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" map="_A"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" name="this$0" map="A"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" name="finishedBytes" map="B"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" name="stream" map="C"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" name="void reset()" map="reset"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" name="int read(byte[])" map="read"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" name="void close()" map="close"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" name="boolean markSupported()" map="markSupported"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" name="void mark(int)" map="mark"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" name="int read()" map="read"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" name="int read(byte[], int, int)" map="read"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" name="long skip(long)" map="skip"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl$ByteCounterStream" name="int available()" map="available"/>
-  <class name="com.sonicbase.server.SnapshotManagerImpl" map="F"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="DURATION_STR" map="A"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="lockedSnapshots" map="B"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="totalBytes" map="C"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="pauseSnapshotRolling" map="D"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="INDEX_STR" map="E"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="totalFileCount" map="F"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="SNAPSHOT_SERIALIZATION_VERSION_19" map="G"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="SNAPSHOT_STR" map="H"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="SNAPSHOT_BUCKET_COUNT" map="I"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="snapshotThread" map="J"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="SNAPSHOT_SERIALIZATION_VERSION" map="K"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="isRecovering" map="L"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="server" map="M"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="errorRecovering" map="N"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="finishedFileCount" map="O"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="SNAPSHOT_SERIALIZATION_VERSION_21" map="P"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="SNAPSHOT_SERIALIZATION_VERSION_20" map="Q"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="enableSnapshot" map="R"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="lastSnapshot" map="S"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="RATE_STR" map="T"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="finishedBytes" map="U"/>
-  <field class="com.sonicbase.server.SnapshotManagerImpl" name="logger" map="V"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="java.lang.Exception getErrorRecovering()" map="A"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void runSnapshot(java.lang.String)" map="A"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="java.lang.String lockSnapshot(java.lang.String)" map="B"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void restoreFileSystem(java.lang.String, java.lang.String)" map="A"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void abortSnapshot()" map="B"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="int getHighestSafeSnapshotVersion(java.io.File)" map="A"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="java.util.concurrent.atomic.AtomicLong access$000(com.sonicbase.server.SnapshotManagerImpl)" map="A"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void enableSnapshot(boolean)" map="A"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void doDeleteInProcessDirs(java.io.File)" map="B"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="boolean isRecovering()" map="C"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void backupAWS(java.lang.String, java.lang.String, java.lang.String)" map="A"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="int getHighestUnsafeSnapshotVersion(java.io.File)" map="C"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="java.lang.String getSnapshotRootDir(java.lang.String)" map="C"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void backupAWSSchema(java.lang.String, java.lang.String, java.lang.String)" map="B"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="double getPercentRecoverComplete()" map="D"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="com.sonicbase.server.DatabaseServer access$100(com.sonicbase.server.SnapshotManagerImpl)" map="B"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void getFilesFromDirectory(java.io.File, java.util.List)" map="A"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void restoreAWS(java.lang.String, java.lang.String, java.lang.String)" map="C"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="java.io.File getSnapshotReplicaDir()" map="E"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void unlockSnapshot(int)" map="A"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void deleteInProcessDirs()" map="F"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void deleteOldSnapshots(java.lang.String)" map="D"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void recoverFromSnapshot(java.lang.String)" map="E"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void pauseSnapshotRolling(boolean)" map="B"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void backupFileSystemSchema(java.lang.String, java.lang.String)" map="B"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="boolean access$300(com.sonicbase.server.SnapshotManagerImpl)" map="C"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void runSnapshotLoop()" map="G"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="long access$200(com.sonicbase.server.SnapshotManagerImpl)" map="D"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void getFilesForCurrentSnapshot(java.util.List)" map="A"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void deleteSnapshots()" map="H"/>
-  <method class="com.sonicbase.server.SnapshotManagerImpl" name="void backupFileSystem(java.lang.String, java.lang.String)" map="C"/>
+  <class name="com.sonicbase.common.RecordLockedException" map="E"/>
+  <class name="com.sonicbase.server.SnapshotManager$3" map="3"/>
+  <field class="com.sonicbase.server.SnapshotManager$3" name="val$outStreams" map="k"/>
+  <field class="com.sonicbase.server.SnapshotManager$3" name="val$isPrimaryKey" map="l"/>
+  <field class="com.sonicbase.server.SnapshotManager$3" name="val$indexEntry" map="m"/>
+  <field class="com.sonicbase.server.SnapshotManager$3" name="val$savedCount" map="n"/>
+  <field class="com.sonicbase.server.SnapshotManager$3" name="val$tableEntry" map="o"/>
+  <field class="com.sonicbase.server.SnapshotManager$3" name="this$0" map="p"/>
+  <field class="com.sonicbase.server.SnapshotManager$3" name="val$lastLogged" map="q"/>
+  <field class="com.sonicbase.server.SnapshotManager$3" name="val$AtomicInteger" map="r"/>
+  <field class="com.sonicbase.server.SnapshotManager$3" name="val$index" map="s"/>
+  <field class="com.sonicbase.server.SnapshotManager$3" name="val$countSaved" map="t"/>
+  <field class="com.sonicbase.server.SnapshotManager$3" name="val$subBegin" map="u"/>
+  <method class="com.sonicbase.server.SnapshotManager$3" name="boolean visit(java.lang.Object[], java.lang.Object)" map="A"/>
+  <class name="com.sonicbase.server.SnapshotManager$2" map="2"/>
+  <field class="com.sonicbase.server.SnapshotManager$2" name="this$0" map="A"/>
+  <method class="com.sonicbase.server.SnapshotManager$2" name="void run()" map="run"/>
+  <class name="com.sonicbase.server.SnapshotManager$1" map="1"/>
+  <field class="com.sonicbase.server.SnapshotManager$1" name="val$indexSchema" map="A"/>
+  <field class="com.sonicbase.server.SnapshotManager$1" name="val$recoveredCount" map="B"/>
+  <field class="com.sonicbase.server.SnapshotManager$1" name="val$currOffset" map="C"/>
+  <field class="com.sonicbase.server.SnapshotManager$1" name="val$tableName" map="D"/>
+  <field class="com.sonicbase.server.SnapshotManager$1" name="val$indexName" map="E"/>
+  <field class="com.sonicbase.server.SnapshotManager$1" name="this$0" map="F"/>
+  <field class="com.sonicbase.server.SnapshotManager$1" name="val$indexBegin" map="G"/>
+  <field class="com.sonicbase.server.SnapshotManager$1" name="val$tableSchema" map="H"/>
+  <field class="com.sonicbase.server.SnapshotManager$1" name="val$lastLogged" map="I"/>
+  <field class="com.sonicbase.server.SnapshotManager$1" name="val$indexFile" map="J"/>
+  <field class="com.sonicbase.server.SnapshotManager$1" name="val$index" map="K"/>
+  <method class="com.sonicbase.server.SnapshotManager$1" name="java.lang.Object call()" map="call"/>
+  <method class="com.sonicbase.server.SnapshotManager$1" name="java.lang.Boolean call()" map="A"/>
+  <class name="com.sonicbase.server.SnapshotManager$ByteCounterStream" map="_A"/>
+  <field class="com.sonicbase.server.SnapshotManager$ByteCounterStream" name="this$0" map="A"/>
+  <field class="com.sonicbase.server.SnapshotManager$ByteCounterStream" name="finishedBytes" map="B"/>
+  <field class="com.sonicbase.server.SnapshotManager$ByteCounterStream" name="stream" map="C"/>
+  <method class="com.sonicbase.server.SnapshotManager$ByteCounterStream" name="void reset()" map="reset"/>
+  <method class="com.sonicbase.server.SnapshotManager$ByteCounterStream" name="int read(byte[])" map="read"/>
+  <method class="com.sonicbase.server.SnapshotManager$ByteCounterStream" name="void close()" map="close"/>
+  <method class="com.sonicbase.server.SnapshotManager$ByteCounterStream" name="boolean markSupported()" map="markSupported"/>
+  <method class="com.sonicbase.server.SnapshotManager$ByteCounterStream" name="void mark(int)" map="mark"/>
+  <method class="com.sonicbase.server.SnapshotManager$ByteCounterStream" name="int read()" map="read"/>
+  <method class="com.sonicbase.server.SnapshotManager$ByteCounterStream" name="int read(byte[], int, int)" map="read"/>
+  <method class="com.sonicbase.server.SnapshotManager$ByteCounterStream" name="long skip(long)" map="skip"/>
+  <method class="com.sonicbase.server.SnapshotManager$ByteCounterStream" name="int available()" map="available"/>
+  <class name="com.sonicbase.server.SnapshotManager" map="F"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="DURATION_STR" map="A"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="lockedSnapshots" map="B"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="totalBytes" map="C"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="pauseSnapshotRolling" map="D"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="INDEX_STR" map="E"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="totalFileCount" map="F"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="SNAPSHOT_SERIALIZATION_VERSION_19" map="G"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="SNAPSHOT_STR" map="H"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="SNAPSHOT_BUCKET_COUNT" map="I"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="snapshotThread" map="J"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="SNAPSHOT_SERIALIZATION_VERSION" map="K"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="isRecovering" map="L"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="server" map="M"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="errorRecovering" map="N"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="finishedFileCount" map="O"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="SNAPSHOT_SERIALIZATION_VERSION_21" map="P"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="SNAPSHOT_SERIALIZATION_VERSION_20" map="Q"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="enableSnapshot" map="R"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="lastSnapshot" map="S"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="RATE_STR" map="T"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="finishedBytes" map="U"/>
+  <field class="com.sonicbase.server.SnapshotManager" name="logger" map="V"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="java.lang.Exception getErrorRecovering()" map="A"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void runSnapshot(java.lang.String)" map="A"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="java.lang.String lockSnapshot(java.lang.String)" map="B"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void restoreFileSystem(java.lang.String, java.lang.String)" map="A"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void abortSnapshot()" map="B"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="int getHighestSafeSnapshotVersion(java.io.File)" map="A"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="java.util.concurrent.atomic.AtomicLong access$000(com.sonicbase.server.SnapshotManager)" map="A"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void enableSnapshot(boolean)" map="A"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void doDeleteInProcessDirs(java.io.File)" map="B"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="boolean isRecovering()" map="C"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void backupAWS(java.lang.String, java.lang.String, java.lang.String)" map="A"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="int getHighestUnsafeSnapshotVersion(java.io.File)" map="C"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="java.lang.String getSnapshotRootDir(java.lang.String)" map="C"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void backupAWSSchema(java.lang.String, java.lang.String, java.lang.String)" map="B"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="double getPercentRecoverComplete()" map="D"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="com.sonicbase.server.DatabaseServer access$100(com.sonicbase.server.SnapshotManager)" map="B"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void getFilesFromDirectory(java.io.File, java.util.List)" map="A"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void restoreAWS(java.lang.String, java.lang.String, java.lang.String)" map="C"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="java.io.File getSnapshotReplicaDir()" map="E"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void unlockSnapshot(int)" map="A"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void deleteInProcessDirs()" map="F"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void deleteOldSnapshots(java.lang.String)" map="D"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void recoverFromSnapshot(java.lang.String)" map="E"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void pauseSnapshotRolling(boolean)" map="B"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void backupFileSystemSchema(java.lang.String, java.lang.String)" map="B"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="boolean access$300(com.sonicbase.server.SnapshotManager)" map="C"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void runSnapshotLoop()" map="G"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="long access$200(com.sonicbase.server.SnapshotManager)" map="D"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void getFilesForCurrentSnapshot(java.util.List)" map="A"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void deleteSnapshots()" map="H"/>
+  <method class="com.sonicbase.server.SnapshotManager" name="void backupFileSystem(java.lang.String, java.lang.String)" map="C"/>
   <class name="com.sonicbase.server.DeleteManagerImpl$3" map="3"/>
   <field class="com.sonicbase.server.DeleteManagerImpl$3" name="this$0" map="A"/>
   <method class="com.sonicbase.server.DeleteManagerImpl$3" name="void run()" map="run"/>
@@ -3058,7 +3058,7 @@ to act on classes which have been obfuscated.
   <field class="com.sonicbase.server.LogManager$LogSource" name="sequence1" map="J"/>
   <field class="com.sonicbase.server.LogManager$LogSource" name="sequence0" map="K"/>
   <field class="com.sonicbase.server.LogManager$LogSource" name="in" map="L"/>
-  <method class="com.sonicbase.server.LogManager$LogSource" name="com.sonicbase.research.socket.NettyServer$Request readRequest()" map="A"/>
+  <method class="com.sonicbase.server.LogManager$LogSource" name="com.sonicbase.server.NettyServer$Request readRequest()" map="A"/>
   <method class="com.sonicbase.server.LogManager$LogSource" name="long getTotalBytes()" map="B"/>
   <method class="com.sonicbase.server.LogManager$LogSource" name="void readNext()" map="C"/>
   <method class="com.sonicbase.server.LogManager$LogSource" name="long getBytesRead()" map="D"/>
@@ -3564,229 +3564,229 @@ to act on classes which have been obfuscated.
   <method class="com.sonicbase.util.DataUtil" name="void writeVLong(byte[], long, com.sonicbase.util.DataUtil$ResultLength)" map="A"/>
   <method class="com.sonicbase.util.DataUtil" name="double readDouble(byte[], int)" map="B"/>
   <package name="com.sonicbase.index" map="B"/>
-  <class name="com.sonicbase.index.Repartitioner$MapEntry" map="_A"/>
-  <field class="com.sonicbase.index.Repartitioner$MapEntry" name="key" map="A"/>
-  <field class="com.sonicbase.index.Repartitioner$MapEntry" name="value" map="B"/>
-  <class name="com.sonicbase.index.Repartitioner$GetKeyAtOffset" map="_B"/>
-  <method class="com.sonicbase.index.Repartitioner$GetKeyAtOffset" name="java.util.List getKeyAtOffset(java.lang.String, int, java.lang.String, java.lang.String, java.util.List)" map="A"/>
-  <class name="com.sonicbase.index.Repartitioner$MoveProcessor$1$1" map="1"/>
-  <field class="com.sonicbase.index.Repartitioner$MoveProcessor$1$1" name="val$list" map="A"/>
-  <field class="com.sonicbase.index.Repartitioner$MoveProcessor$1$1" name="this$2" map="B"/>
-  <method class="com.sonicbase.index.Repartitioner$MoveProcessor$1$1" name="void run()" map="run"/>
-  <class name="com.sonicbase.index.Repartitioner$MoveProcessor$1" map="1"/>
-  <field class="com.sonicbase.index.Repartitioner$MoveProcessor$1" name="this$1" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner$MoveProcessor$1" name="void run()" map="run"/>
-  <class name="com.sonicbase.index.Repartitioner$MoveProcessor" map="_C"/>
-  <field class="com.sonicbase.index.Repartitioner$MoveProcessor" name="countFinished" map="A"/>
-  <field class="com.sonicbase.index.Repartitioner$MoveProcessor" name="keysToDelete" map="B"/>
-  <field class="com.sonicbase.index.Repartitioner$MoveProcessor" name="shutdown" map="C"/>
-  <field class="com.sonicbase.index.Repartitioner$MoveProcessor" name="executor" map="D"/>
-  <field class="com.sonicbase.index.Repartitioner$MoveProcessor" name="this$0" map="E"/>
-  <field class="com.sonicbase.index.Repartitioner$MoveProcessor" name="countStarted" map="F"/>
-  <field class="com.sonicbase.index.Repartitioner$MoveProcessor" name="queue" map="G"/>
-  <field class="com.sonicbase.index.Repartitioner$MoveProcessor" name="isPrimaryKey" map="H"/>
-  <field class="com.sonicbase.index.Repartitioner$MoveProcessor" name="index" map="I"/>
-  <field class="com.sonicbase.index.Repartitioner$MoveProcessor" name="dbName" map="J"/>
-  <field class="com.sonicbase.index.Repartitioner$MoveProcessor" name="thread" map="K"/>
-  <field class="com.sonicbase.index.Repartitioner$MoveProcessor" name="tableName" map="L"/>
-  <field class="com.sonicbase.index.Repartitioner$MoveProcessor" name="indexName" map="M"/>
-  <field class="com.sonicbase.index.Repartitioner$MoveProcessor" name="shard" map="N"/>
-  <method class="com.sonicbase.index.Repartitioner$MoveProcessor" name="java.lang.String access$800(com.sonicbase.index.Repartitioner$MoveProcessor)" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner$MoveProcessor" name="java.util.concurrent.atomic.AtomicInteger access$700(com.sonicbase.index.Repartitioner$MoveProcessor)" map="B"/>
-  <method class="com.sonicbase.index.Repartitioner$MoveProcessor" name="java.lang.String access$1000(com.sonicbase.index.Repartitioner$MoveProcessor)" map="C"/>
-  <method class="com.sonicbase.index.Repartitioner$MoveProcessor" name="void await()" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner$MoveProcessor" name="com.sonicbase.index.Index access$1600(com.sonicbase.index.Repartitioner$MoveProcessor)" map="D"/>
-  <method class="com.sonicbase.index.Repartitioner$MoveProcessor" name="void shutdown()" map="B"/>
-  <method class="com.sonicbase.index.Repartitioner$MoveProcessor" name="java.util.concurrent.ConcurrentLinkedQueue access$1700(com.sonicbase.index.Repartitioner$MoveProcessor)" map="E"/>
-  <method class="com.sonicbase.index.Repartitioner$MoveProcessor" name="void start()" map="C"/>
-  <method class="com.sonicbase.index.Repartitioner$MoveProcessor" name="java.lang.String access$900(com.sonicbase.index.Repartitioner$MoveProcessor)" map="F"/>
-  <method class="com.sonicbase.index.Repartitioner$MoveProcessor" name="int access$1200(com.sonicbase.index.Repartitioner$MoveProcessor)" map="G"/>
-  <method class="com.sonicbase.index.Repartitioner$MoveProcessor" name="java.util.concurrent.ArrayBlockingQueue access$600(com.sonicbase.index.Repartitioner$MoveProcessor)" map="H"/>
-  <method class="com.sonicbase.index.Repartitioner$MoveProcessor" name="java.util.concurrent.ThreadPoolExecutor access$1900(com.sonicbase.index.Repartitioner$MoveProcessor)" map="I"/>
-  <method class="com.sonicbase.index.Repartitioner$MoveProcessor" name="java.util.concurrent.atomic.AtomicInteger access$1800(com.sonicbase.index.Repartitioner$MoveProcessor)" map="J"/>
-  <method class="com.sonicbase.index.Repartitioner$MoveProcessor" name="boolean access$500(com.sonicbase.index.Repartitioner$MoveProcessor)" map="K"/>
-  <method class="com.sonicbase.index.Repartitioner$MoveProcessor" name="boolean access$1100(com.sonicbase.index.Repartitioner$MoveProcessor)" map="L"/>
-  <class name="com.sonicbase.index.Repartitioner$MoveRequest" map="_D"/>
-  <field class="com.sonicbase.index.Repartitioner$MoveRequest" name="key" map="A"/>
-  <field class="com.sonicbase.index.Repartitioner$MoveRequest" name="shouldDeleteNow" map="B"/>
-  <field class="com.sonicbase.index.Repartitioner$MoveRequest" name="content" map="C"/>
-  <method class="com.sonicbase.index.Repartitioner$MoveRequest" name="byte[][] getContent()" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner$MoveRequest" name="java.lang.Object[] getKey()" map="B"/>
-  <method class="com.sonicbase.index.Repartitioner$MoveRequest" name="boolean access$1400(com.sonicbase.index.Repartitioner$MoveRequest)" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner$MoveRequest" name="void setContent(byte[][])" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner$MoveRequest" name="java.lang.Object[] access$1500(com.sonicbase.index.Repartitioner$MoveRequest)" map="B"/>
-  <method class="com.sonicbase.index.Repartitioner$MoveRequest" name="void setKey(java.lang.Object[])" map="A"/>
-  <class name="com.sonicbase.index.Repartitioner$TableIndexCounts" map="_E"/>
-  <field class="com.sonicbase.index.Repartitioner$TableIndexCounts" name="indices" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner$TableIndexCounts" name="java.util.concurrent.ConcurrentHashMap getIndices()" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner$TableIndexCounts" name="java.util.concurrent.ConcurrentHashMap access$2300(com.sonicbase.index.Repartitioner$TableIndexCounts)" map="A"/>
-  <class name="com.sonicbase.index.Repartitioner$10" map="10"/>
-  <field class="com.sonicbase.index.Repartitioner$10" name="val$ret" map="A"/>
-  <field class="com.sonicbase.index.Repartitioner$10" name="val$client" map="B"/>
-  <field class="com.sonicbase.index.Repartitioner$10" name="val$shard" map="C"/>
-  <field class="com.sonicbase.index.Repartitioner$10" name="val$dbName" map="D"/>
-  <method class="com.sonicbase.index.Repartitioner$10" name="java.lang.Object call()" map="call"/>
-  <class name="com.sonicbase.index.Repartitioner$OffsetEntry" map="_F"/>
-  <field class="com.sonicbase.index.Repartitioner$OffsetEntry" name="partitionOffset" map="A"/>
-  <field class="com.sonicbase.index.Repartitioner$OffsetEntry" name="offset" map="B"/>
-  <method class="com.sonicbase.index.Repartitioner$OffsetEntry" name="int getPartitionOffset()" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner$OffsetEntry" name="long getOffset()" map="B"/>
-  <class name="com.sonicbase.index.Repartitioner$9" map="9"/>
-  <field class="com.sonicbase.index.Repartitioner$9" name="this$0" map="A"/>
-  <field class="com.sonicbase.index.Repartitioner$9" name="val$cobj" map="B"/>
-  <field class="com.sonicbase.index.Repartitioner$9" name="val$replica" map="C"/>
-  <method class="com.sonicbase.index.Repartitioner$9" name="java.lang.Object call()" map="call"/>
-  <class name="com.sonicbase.index.Repartitioner$8$1" map="1"/>
-  <field class="com.sonicbase.index.Repartitioner$8$1" name="val$toProcess" map="A"/>
-  <field class="com.sonicbase.index.Repartitioner$8$1" name="this$1" map="B"/>
-  <method class="com.sonicbase.index.Repartitioner$8$1" name="void run()" map="run"/>
-  <class name="com.sonicbase.index.Repartitioner$8" map="8"/>
-  <field class="com.sonicbase.index.Repartitioner$8" name="val$cobj" map="A"/>
-  <field class="com.sonicbase.index.Repartitioner$8" name="val$countVisited" map="B"/>
-  <field class="com.sonicbase.index.Repartitioner$8" name="val$dbName" map="C"/>
-  <field class="com.sonicbase.index.Repartitioner$8" name="val$countFinished" map="D"/>
-  <field class="com.sonicbase.index.Repartitioner$8" name="val$indexSchema" map="E"/>
-  <field class="com.sonicbase.index.Repartitioner$8" name="val$executor" map="F"/>
-  <field class="com.sonicbase.index.Repartitioner$8" name="val$tableName" map="G"/>
-  <field class="com.sonicbase.index.Repartitioner$8" name="val$indexName" map="H"/>
-  <field class="com.sonicbase.index.Repartitioner$8" name="this$0" map="I"/>
-  <field class="com.sonicbase.index.Repartitioner$8" name="val$tableSchema" map="J"/>
-  <field class="com.sonicbase.index.Repartitioner$8" name="val$fieldOffsets" map="K"/>
-  <field class="com.sonicbase.index.Repartitioner$8" name="val$index" map="L"/>
-  <field class="com.sonicbase.index.Repartitioner$8" name="val$currEntries" map="M"/>
-  <field class="com.sonicbase.index.Repartitioner$8" name="val$countSubmitted" map="N"/>
-  <method class="com.sonicbase.index.Repartitioner$8" name="boolean visit(java.lang.Object[], java.lang.Object)" map="A"/>
-  <class name="com.sonicbase.index.Repartitioner$7$1" map="1"/>
-  <field class="com.sonicbase.index.Repartitioner$7$1" name="val$toProcess" map="A"/>
-  <field class="com.sonicbase.index.Repartitioner$7$1" name="this$1" map="B"/>
-  <method class="com.sonicbase.index.Repartitioner$7$1" name="void run()" map="run"/>
-  <class name="com.sonicbase.index.Repartitioner$7" map="7"/>
-  <field class="com.sonicbase.index.Repartitioner$7" name="val$cobj" map="O"/>
-  <field class="com.sonicbase.index.Repartitioner$7" name="val$countVisited" map="P"/>
-  <field class="com.sonicbase.index.Repartitioner$7" name="val$dbName" map="Q"/>
-  <field class="com.sonicbase.index.Repartitioner$7" name="val$countFinished" map="R"/>
-  <field class="com.sonicbase.index.Repartitioner$7" name="val$indexSchema" map="S"/>
-  <field class="com.sonicbase.index.Repartitioner$7" name="val$executor" map="T"/>
-  <field class="com.sonicbase.index.Repartitioner$7" name="val$tableName" map="U"/>
-  <field class="com.sonicbase.index.Repartitioner$7" name="val$indexName" map="V"/>
-  <field class="com.sonicbase.index.Repartitioner$7" name="this$0" map="W"/>
-  <field class="com.sonicbase.index.Repartitioner$7" name="val$tableSchema" map="X"/>
-  <field class="com.sonicbase.index.Repartitioner$7" name="val$fieldOffsets" map="Y"/>
-  <field class="com.sonicbase.index.Repartitioner$7" name="val$index" map="Z"/>
-  <field class="com.sonicbase.index.Repartitioner$7" name="val$currEntries" map="_"/>
-  <field class="com.sonicbase.index.Repartitioner$7" name="val$countSubmitted" map="a"/>
-  <method class="com.sonicbase.index.Repartitioner$7" name="boolean visit(java.lang.Object[], java.lang.Object)" map="A"/>
-  <class name="com.sonicbase.index.Repartitioner$6" map="6"/>
-  <field class="com.sonicbase.index.Repartitioner$6" name="val$tableName" map="A"/>
-  <field class="com.sonicbase.index.Repartitioner$6" name="val$entry" map="B"/>
-  <field class="com.sonicbase.index.Repartitioner$6" name="val$getKey" map="C"/>
-  <field class="com.sonicbase.index.Repartitioner$6" name="val$indexName" map="D"/>
-  <field class="com.sonicbase.index.Repartitioner$6" name="val$newPartitions" map="E"/>
-  <field class="com.sonicbase.index.Repartitioner$6" name="val$dbName" map="F"/>
-  <method class="com.sonicbase.index.Repartitioner$6" name="java.lang.Object call()" map="call"/>
-  <class name="com.sonicbase.index.Repartitioner$5" map="5"/>
-  <method class="com.sonicbase.index.Repartitioner$5" name="int compare(com.sonicbase.index.Repartitioner$OffsetEntry, com.sonicbase.index.Repartitioner$OffsetEntry)" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner$5" name="int compare(java.lang.Object, java.lang.Object)" map="compare"/>
-  <class name="com.sonicbase.index.Repartitioner$GlobalIndexCounts" map="_G"/>
-  <field class="com.sonicbase.index.Repartitioner$GlobalIndexCounts" name="tables" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner$GlobalIndexCounts" name="java.util.concurrent.ConcurrentHashMap access$2200(com.sonicbase.index.Repartitioner$GlobalIndexCounts)" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner$GlobalIndexCounts" name="java.util.concurrent.ConcurrentHashMap getTables()" map="A"/>
-  <class name="com.sonicbase.index.Repartitioner$4" map="4"/>
-  <field class="com.sonicbase.index.Repartitioner$4" name="this$0" map="A"/>
-  <field class="com.sonicbase.index.Repartitioner$4" name="val$shard" map="B"/>
-  <field class="com.sonicbase.index.Repartitioner$4" name="val$finalTableName" map="C"/>
-  <field class="com.sonicbase.index.Repartitioner$4" name="val$indexName" map="D"/>
-  <field class="com.sonicbase.index.Repartitioner$4" name="val$dbName" map="E"/>
-  <field class="com.sonicbase.index.Repartitioner$4" name="val$masters" map="F"/>
-  <method class="com.sonicbase.index.Repartitioner$4" name="java.lang.Object call()" map="call"/>
-  <class name="com.sonicbase.index.Repartitioner$3" map="3"/>
-  <field class="com.sonicbase.index.Repartitioner$3" name="this$0" map="A"/>
-  <field class="com.sonicbase.index.Repartitioner$3" name="val$comparators" map="B"/>
-  <method class="com.sonicbase.index.Repartitioner$3" name="int compare(java.lang.Object, java.lang.Object)" map="compare"/>
-  <method class="com.sonicbase.index.Repartitioner$3" name="int compare(TableSchema$Partition, TableSchema$Partition)" map="A"/>
-  <class name="com.sonicbase.index.Repartitioner$2" map="2"/>
-  <field class="com.sonicbase.index.Repartitioner$2" name="this$0" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner$2" name="java.util.List getKeyAtOffset(java.lang.String, int, java.lang.String, java.lang.String, java.util.List)" map="A"/>
-  <class name="com.sonicbase.index.Repartitioner$IndexCounts" map="_H"/>
-  <field class="com.sonicbase.index.Repartitioner$IndexCounts" name="counts" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner$IndexCounts" name="java.util.concurrent.ConcurrentHashMap access$2400(com.sonicbase.index.Repartitioner$IndexCounts)" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner$IndexCounts" name="java.util.concurrent.ConcurrentHashMap getCounts()" map="A"/>
-  <class name="com.sonicbase.index.Repartitioner$1" map="1"/>
-  <field class="com.sonicbase.index.Repartitioner$1" name="this$0" map="A"/>
-  <field class="com.sonicbase.index.Repartitioner$1" name="val$offset" map="B"/>
-  <field class="com.sonicbase.index.Repartitioner$1" name="val$currPartitionSizes" map="C"/>
-  <field class="com.sonicbase.index.Repartitioner$1" name="val$indexName" map="D"/>
-  <field class="com.sonicbase.index.Repartitioner$1" name="val$dbName" map="E"/>
-  <field class="com.sonicbase.index.Repartitioner$1" name="val$currTableName" map="F"/>
-  <method class="com.sonicbase.index.Repartitioner$1" name="java.lang.Object call()" map="call"/>
-  <class name="com.sonicbase.index.Repartitioner" map="A"/>
-  <field class="com.sonicbase.index.Repartitioner" name="isRepartitioningIndex" map="A"/>
-  <field class="com.sonicbase.index.Repartitioner" name="currIndexRepartitioning" map="B"/>
-  <field class="com.sonicbase.index.Repartitioner" name="INDEX_STR" map="C"/>
-  <field class="com.sonicbase.index.Repartitioner" name="indices" map="D"/>
-  <field class="com.sonicbase.index.Repartitioner" name="isShardRepartitioningComplete" map="E"/>
-  <field class="com.sonicbase.index.Repartitioner" name="isComplete" map="F"/>
-  <field class="com.sonicbase.index.Repartitioner" name="minSizeForRepartition" map="G"/>
-  <field class="com.sonicbase.index.Repartitioner" name="beginRepartitioningThread" map="H"/>
-  <field class="com.sonicbase.index.Repartitioner" name="NAME_STR" map="I"/>
-  <field class="com.sonicbase.index.Repartitioner" name="common" map="J"/>
-  <field class="com.sonicbase.index.Repartitioner" name="isRebalancing" map="K"/>
-  <field class="com.sonicbase.index.Repartitioner" name="tableToDeleteEntriesFrom" map="L"/>
-  <field class="com.sonicbase.index.Repartitioner" name="entriesToDelete" map="M"/>
-  <field class="com.sonicbase.index.Repartitioner" name="shutdown" map="N"/>
-  <field class="com.sonicbase.index.Repartitioner" name="currTableRepartitioning" map="O"/>
-  <field class="com.sonicbase.index.Repartitioner" name="deletingComplete" map="P"/>
-  <field class="com.sonicbase.index.Repartitioner" name="databaseServer" map="Q"/>
-  <field class="com.sonicbase.index.Repartitioner" name="repartitioningComplete" map="R"/>
-  <field class="com.sonicbase.index.Repartitioner" name="repartitioningRecordsByIdComplete" map="S"/>
-  <field class="com.sonicbase.index.Repartitioner" name="moveProcessors" map="T"/>
-  <field class="com.sonicbase.index.Repartitioner" name="logger" map="U"/>
-  <method class="com.sonicbase.index.Repartitioner" name="ComObject doRebalanceOrderedIndex(ComObject)" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="ComObject getIndexCounts(ComObject)" map="B"/>
-  <method class="com.sonicbase.index.Repartitioner" name="void logPartitionsToApply(java.lang.String, java.lang.String, java.lang.String, java.util.List)" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="void deleteIndexEntry(java.lang.String, java.lang.String, java.lang.Object[])" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="void calculatePartitions(java.lang.String, int, java.util.List, java.lang.String, java.lang.String, long[], long, com.sonicbase.index.Repartitioner$GetKeyAtOffset)" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="void run()" map="run"/>
-  <method class="com.sonicbase.index.Repartitioner" name="ComObject beginRebalance(ComObject)" map="C"/>
-  <method class="com.sonicbase.index.Repartitioner" name="ComObject moveIndexEntries(ComObject)" map="D"/>
-  <method class="com.sonicbase.index.Repartitioner" name="void access$2100(com.sonicbase.index.Repartitioner, com.sonicbase.index.Repartitioner$MoveProcessor[], java.lang.String, java.lang.String, java.util.List, com.sonicbase.index.Index, IndexSchema, java.lang.String, int[], TableSchema, ComObject)" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="void setMinSizeForRepartition(int)" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="DatabaseCommon access$200(com.sonicbase.index.Repartitioner)" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="ComObject getPartitionSize(ComObject)" map="E"/>
-  <method class="com.sonicbase.index.Repartitioner" name="java.util.List findOrderedPartitionForRecord(boolean, boolean, int[], DatabaseCommon, TableSchema, java.lang.String, java.util.List, BinaryExpression$Operator, BinaryExpression$Operator, java.lang.Object[], java.lang.Object[])" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="ComObject isRepartitioningComplete(ComObject)" map="F"/>
-  <method class="com.sonicbase.index.Repartitioner" name="boolean undeleteIndexEntry(java.lang.String, java.lang.String, java.lang.String, java.lang.Object[], byte[])" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="void resetRepartitioningComplete()" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="com.sonicbase.index.Repartitioner$MoveProcessor[] access$2000(com.sonicbase.index.Repartitioner)" map="B"/>
-  <method class="com.sonicbase.index.Repartitioner" name="void doSelectPartitions(TableSchema$Partition[], TableSchema, java.lang.String, BinaryExpression$Operator, java.util.Comparator[], java.lang.Object[], boolean, java.util.List)" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="long getPartitionSize(java.lang.String, int, java.lang.String, java.lang.String)" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="byte[] beginRebalance(java.lang.String, java.util.List)" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="ComObject notifyRepartitioningComplete(ComObject)" map="G"/>
-  <method class="com.sonicbase.index.Repartitioner" name="void deleteRecordsOnOtherReplicas(java.lang.String, java.lang.String, java.lang.String, java.util.concurrent.ConcurrentLinkedQueue)" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="ComObject stopRepartitioning(ComObject)" map="H"/>
-  <method class="com.sonicbase.index.Repartitioner" name="long access$000(com.sonicbase.index.Repartitioner, java.lang.String, int, java.lang.String, java.lang.String)" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="void stopShardsFromRepartitioning()" map="B"/>
-  <method class="com.sonicbase.index.Repartitioner" name="java.util.concurrent.ConcurrentHashMap getIndicesToDeleteFrom(java.lang.String, java.lang.String)" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="ComObject rebalanceOrderedIndex(ComObject)" map="I"/>
-  <method class="com.sonicbase.index.Repartitioner" name="Logger access$400()" map="C"/>
-  <method class="com.sonicbase.index.Repartitioner" name="java.util.List access$100(com.sonicbase.index.Repartitioner, java.lang.String, int, java.lang.String, java.lang.String, java.util.List)" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="byte[] finishRebalance(java.lang.String, byte[])" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="void logCurrPartitions(java.lang.String, java.lang.String, java.lang.String, TableSchema$Partition[])" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="com.sonicbase.server.DatabaseServer access$300(com.sonicbase.index.Repartitioner)" map="C"/>
-  <method class="com.sonicbase.index.Repartitioner" name="int getCompareValue(java.util.Comparator[], java.lang.Object[], java.lang.Object[])" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="ComObject deleteMovedRecords(ComObject)" map="J"/>
-  <method class="com.sonicbase.index.Repartitioner" name="void doSelectPartitions(TableSchema$Partition[], TableSchema, java.lang.String, BinaryExpression$Operator, java.util.Comparator[], java.lang.Object[], java.lang.Object[], boolean, java.util.List)" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="void moveIndexEntriesToShard(java.lang.String, java.lang.String, java.lang.String, boolean, int, java.util.List)" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="void resetDeletingComplete()" map="D"/>
-  <method class="com.sonicbase.index.Repartitioner" name="boolean addToRebalance(java.util.List, java.util.Map$Entry, java.lang.String, com.sonicbase.index.Repartitioner$IndexCounts, boolean)" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="java.util.List getKeyAtOffset(java.lang.String, int, java.lang.String, java.lang.String, java.util.List)" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="void shutdown()" map="E"/>
-  <method class="com.sonicbase.index.Repartitioner" name="com.sonicbase.index.Repartitioner$GlobalIndexCounts getIndexCounts(java.lang.String, DatabaseClient)" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="ComObject isShardRepartitioningComplete(ComObject, boolean)" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="void access$1300(com.sonicbase.index.Repartitioner, java.lang.String, java.lang.String, java.lang.String, boolean, int, java.util.List)" map="A"/>
-  <method class="com.sonicbase.index.Repartitioner" name="boolean isRepartitioningComplete()" map="F"/>
-  <method class="com.sonicbase.index.Repartitioner" name="ComObject getKeyAtOffset(ComObject)" map="K"/>
-  <method class="com.sonicbase.index.Repartitioner" name="void doProcessEntries(com.sonicbase.index.Repartitioner$MoveProcessor[], java.lang.String, java.lang.String, java.util.List, com.sonicbase.index.Index, IndexSchema, java.lang.String, int[], TableSchema, ComObject)" map="A"/>
+  <class name="com.sonicbase.server.PartitionManager$MapEntry" map="_A"/>
+  <field class="com.sonicbase.server.PartitionManager$MapEntry" name="key" map="A"/>
+  <field class="com.sonicbase.server.PartitionManager$MapEntry" name="value" map="B"/>
+  <class name="com.sonicbase.server.PartitionManager$GetKeyAtOffset" map="_B"/>
+  <method class="com.sonicbase.server.PartitionManager$GetKeyAtOffset" name="java.util.List getKeyAtOffset(java.lang.String, int, java.lang.String, java.lang.String, java.util.List)" map="A"/>
+  <class name="com.sonicbase.server.PartitionManager$MoveProcessor$1$1" map="1"/>
+  <field class="com.sonicbase.server.PartitionManager$MoveProcessor$1$1" name="val$list" map="A"/>
+  <field class="com.sonicbase.server.PartitionManager$MoveProcessor$1$1" name="this$2" map="B"/>
+  <method class="com.sonicbase.server.PartitionManager$MoveProcessor$1$1" name="void run()" map="run"/>
+  <class name="com.sonicbase.server.PartitionManager$MoveProcessor$1" map="1"/>
+  <field class="com.sonicbase.server.PartitionManager$MoveProcessor$1" name="this$1" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager$MoveProcessor$1" name="void run()" map="run"/>
+  <class name="com.sonicbase.server.PartitionManager$MoveProcessor" map="_C"/>
+  <field class="com.sonicbase.server.PartitionManager$MoveProcessor" name="countFinished" map="A"/>
+  <field class="com.sonicbase.server.PartitionManager$MoveProcessor" name="keysToDelete" map="B"/>
+  <field class="com.sonicbase.server.PartitionManager$MoveProcessor" name="shutdown" map="C"/>
+  <field class="com.sonicbase.server.PartitionManager$MoveProcessor" name="executor" map="D"/>
+  <field class="com.sonicbase.server.PartitionManager$MoveProcessor" name="this$0" map="E"/>
+  <field class="com.sonicbase.server.PartitionManager$MoveProcessor" name="countStarted" map="F"/>
+  <field class="com.sonicbase.server.PartitionManager$MoveProcessor" name="queue" map="G"/>
+  <field class="com.sonicbase.server.PartitionManager$MoveProcessor" name="isPrimaryKey" map="H"/>
+  <field class="com.sonicbase.server.PartitionManager$MoveProcessor" name="index" map="I"/>
+  <field class="com.sonicbase.server.PartitionManager$MoveProcessor" name="dbName" map="J"/>
+  <field class="com.sonicbase.server.PartitionManager$MoveProcessor" name="thread" map="K"/>
+  <field class="com.sonicbase.server.PartitionManager$MoveProcessor" name="tableName" map="L"/>
+  <field class="com.sonicbase.server.PartitionManager$MoveProcessor" name="indexName" map="M"/>
+  <field class="com.sonicbase.server.PartitionManager$MoveProcessor" name="shard" map="N"/>
+  <method class="com.sonicbase.server.PartitionManager$MoveProcessor" name="java.lang.String access$800(com.sonicbase.server.PartitionManager$MoveProcessor)" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager$MoveProcessor" name="java.util.concurrent.atomic.AtomicInteger access$700(com.sonicbase.server.PartitionManager$MoveProcessor)" map="B"/>
+  <method class="com.sonicbase.server.PartitionManager$MoveProcessor" name="java.lang.String access$1000(com.sonicbase.server.PartitionManager$MoveProcessor)" map="C"/>
+  <method class="com.sonicbase.server.PartitionManager$MoveProcessor" name="void await()" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager$MoveProcessor" name="com.sonicbase.index.Index access$1600(com.sonicbase.server.PartitionManager$MoveProcessor)" map="D"/>
+  <method class="com.sonicbase.server.PartitionManager$MoveProcessor" name="void shutdown()" map="B"/>
+  <method class="com.sonicbase.server.PartitionManager$MoveProcessor" name="java.util.concurrent.ConcurrentLinkedQueue access$1700(com.sonicbase.server.PartitionManager$MoveProcessor)" map="E"/>
+  <method class="com.sonicbase.server.PartitionManager$MoveProcessor" name="void start()" map="C"/>
+  <method class="com.sonicbase.server.PartitionManager$MoveProcessor" name="java.lang.String access$900(com.sonicbase.server.PartitionManager$MoveProcessor)" map="F"/>
+  <method class="com.sonicbase.server.PartitionManager$MoveProcessor" name="int access$1200(com.sonicbase.server.PartitionManager$MoveProcessor)" map="G"/>
+  <method class="com.sonicbase.server.PartitionManager$MoveProcessor" name="java.util.concurrent.ArrayBlockingQueue access$600(com.sonicbase.server.PartitionManager$MoveProcessor)" map="H"/>
+  <method class="com.sonicbase.server.PartitionManager$MoveProcessor" name="java.util.concurrent.ThreadPoolExecutor access$1900(com.sonicbase.server.PartitionManager$MoveProcessor)" map="I"/>
+  <method class="com.sonicbase.server.PartitionManager$MoveProcessor" name="java.util.concurrent.atomic.AtomicInteger access$1800(com.sonicbase.server.PartitionManager$MoveProcessor)" map="J"/>
+  <method class="com.sonicbase.server.PartitionManager$MoveProcessor" name="boolean access$500(com.sonicbase.server.PartitionManager$MoveProcessor)" map="K"/>
+  <method class="com.sonicbase.server.PartitionManager$MoveProcessor" name="boolean access$1100(com.sonicbase.server.PartitionManager$MoveProcessor)" map="L"/>
+  <class name="com.sonicbase.server.PartitionManager$MoveRequest" map="_D"/>
+  <field class="com.sonicbase.server.PartitionManager$MoveRequest" name="key" map="A"/>
+  <field class="com.sonicbase.server.PartitionManager$MoveRequest" name="shouldDeleteNow" map="B"/>
+  <field class="com.sonicbase.server.PartitionManager$MoveRequest" name="content" map="C"/>
+  <method class="com.sonicbase.server.PartitionManager$MoveRequest" name="byte[][] getContent()" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager$MoveRequest" name="java.lang.Object[] getKey()" map="B"/>
+  <method class="com.sonicbase.server.PartitionManager$MoveRequest" name="boolean access$1400(com.sonicbase.server.PartitionManager$MoveRequest)" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager$MoveRequest" name="void setContent(byte[][])" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager$MoveRequest" name="java.lang.Object[] access$1500(com.sonicbase.server.PartitionManager$MoveRequest)" map="B"/>
+  <method class="com.sonicbase.server.PartitionManager$MoveRequest" name="void setKey(java.lang.Object[])" map="A"/>
+  <class name="com.sonicbase.server.PartitionManager$TableIndexCounts" map="_E"/>
+  <field class="com.sonicbase.server.PartitionManager$TableIndexCounts" name="indices" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager$TableIndexCounts" name="java.util.concurrent.ConcurrentHashMap getIndices()" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager$TableIndexCounts" name="java.util.concurrent.ConcurrentHashMap access$2300(com.sonicbase.server.PartitionManager$TableIndexCounts)" map="A"/>
+  <class name="com.sonicbase.server.PartitionManager$10" map="10"/>
+  <field class="com.sonicbase.server.PartitionManager$10" name="val$ret" map="A"/>
+  <field class="com.sonicbase.server.PartitionManager$10" name="val$client" map="B"/>
+  <field class="com.sonicbase.server.PartitionManager$10" name="val$shard" map="C"/>
+  <field class="com.sonicbase.server.PartitionManager$10" name="val$dbName" map="D"/>
+  <method class="com.sonicbase.server.PartitionManager$10" name="java.lang.Object call()" map="call"/>
+  <class name="com.sonicbase.server.PartitionManager$OffsetEntry" map="_F"/>
+  <field class="com.sonicbase.server.PartitionManager$OffsetEntry" name="partitionOffset" map="A"/>
+  <field class="com.sonicbase.server.PartitionManager$OffsetEntry" name="offset" map="B"/>
+  <method class="com.sonicbase.server.PartitionManager$OffsetEntry" name="int getPartitionOffset()" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager$OffsetEntry" name="long getOffset()" map="B"/>
+  <class name="com.sonicbase.server.PartitionManager$9" map="9"/>
+  <field class="com.sonicbase.server.PartitionManager$9" name="this$0" map="A"/>
+  <field class="com.sonicbase.server.PartitionManager$9" name="val$cobj" map="B"/>
+  <field class="com.sonicbase.server.PartitionManager$9" name="val$replica" map="C"/>
+  <method class="com.sonicbase.server.PartitionManager$9" name="java.lang.Object call()" map="call"/>
+  <class name="com.sonicbase.server.PartitionManager$8$1" map="1"/>
+  <field class="com.sonicbase.server.PartitionManager$8$1" name="val$toProcess" map="A"/>
+  <field class="com.sonicbase.server.PartitionManager$8$1" name="this$1" map="B"/>
+  <method class="com.sonicbase.server.PartitionManager$8$1" name="void run()" map="run"/>
+  <class name="com.sonicbase.server.PartitionManager$8" map="8"/>
+  <field class="com.sonicbase.server.PartitionManager$8" name="val$cobj" map="A"/>
+  <field class="com.sonicbase.server.PartitionManager$8" name="val$countVisited" map="B"/>
+  <field class="com.sonicbase.server.PartitionManager$8" name="val$dbName" map="C"/>
+  <field class="com.sonicbase.server.PartitionManager$8" name="val$countFinished" map="D"/>
+  <field class="com.sonicbase.server.PartitionManager$8" name="val$indexSchema" map="E"/>
+  <field class="com.sonicbase.server.PartitionManager$8" name="val$executor" map="F"/>
+  <field class="com.sonicbase.server.PartitionManager$8" name="val$tableName" map="G"/>
+  <field class="com.sonicbase.server.PartitionManager$8" name="val$indexName" map="H"/>
+  <field class="com.sonicbase.server.PartitionManager$8" name="this$0" map="I"/>
+  <field class="com.sonicbase.server.PartitionManager$8" name="val$tableSchema" map="J"/>
+  <field class="com.sonicbase.server.PartitionManager$8" name="val$fieldOffsets" map="K"/>
+  <field class="com.sonicbase.server.PartitionManager$8" name="val$index" map="L"/>
+  <field class="com.sonicbase.server.PartitionManager$8" name="val$currEntries" map="M"/>
+  <field class="com.sonicbase.server.PartitionManager$8" name="val$countSubmitted" map="N"/>
+  <method class="com.sonicbase.server.PartitionManager$8" name="boolean visit(java.lang.Object[], java.lang.Object)" map="A"/>
+  <class name="com.sonicbase.server.PartitionManager$7$1" map="1"/>
+  <field class="com.sonicbase.server.PartitionManager$7$1" name="val$toProcess" map="A"/>
+  <field class="com.sonicbase.server.PartitionManager$7$1" name="this$1" map="B"/>
+  <method class="com.sonicbase.server.PartitionManager$7$1" name="void run()" map="run"/>
+  <class name="com.sonicbase.server.PartitionManager$7" map="7"/>
+  <field class="com.sonicbase.server.PartitionManager$7" name="val$cobj" map="O"/>
+  <field class="com.sonicbase.server.PartitionManager$7" name="val$countVisited" map="P"/>
+  <field class="com.sonicbase.server.PartitionManager$7" name="val$dbName" map="Q"/>
+  <field class="com.sonicbase.server.PartitionManager$7" name="val$countFinished" map="R"/>
+  <field class="com.sonicbase.server.PartitionManager$7" name="val$indexSchema" map="S"/>
+  <field class="com.sonicbase.server.PartitionManager$7" name="val$executor" map="T"/>
+  <field class="com.sonicbase.server.PartitionManager$7" name="val$tableName" map="U"/>
+  <field class="com.sonicbase.server.PartitionManager$7" name="val$indexName" map="V"/>
+  <field class="com.sonicbase.server.PartitionManager$7" name="this$0" map="W"/>
+  <field class="com.sonicbase.server.PartitionManager$7" name="val$tableSchema" map="X"/>
+  <field class="com.sonicbase.server.PartitionManager$7" name="val$fieldOffsets" map="Y"/>
+  <field class="com.sonicbase.server.PartitionManager$7" name="val$index" map="Z"/>
+  <field class="com.sonicbase.server.PartitionManager$7" name="val$currEntries" map="_"/>
+  <field class="com.sonicbase.server.PartitionManager$7" name="val$countSubmitted" map="a"/>
+  <method class="com.sonicbase.server.PartitionManager$7" name="boolean visit(java.lang.Object[], java.lang.Object)" map="A"/>
+  <class name="com.sonicbase.server.PartitionManager$6" map="6"/>
+  <field class="com.sonicbase.server.PartitionManager$6" name="val$tableName" map="A"/>
+  <field class="com.sonicbase.server.PartitionManager$6" name="val$entry" map="B"/>
+  <field class="com.sonicbase.server.PartitionManager$6" name="val$getKey" map="C"/>
+  <field class="com.sonicbase.server.PartitionManager$6" name="val$indexName" map="D"/>
+  <field class="com.sonicbase.server.PartitionManager$6" name="val$newPartitions" map="E"/>
+  <field class="com.sonicbase.server.PartitionManager$6" name="val$dbName" map="F"/>
+  <method class="com.sonicbase.server.PartitionManager$6" name="java.lang.Object call()" map="call"/>
+  <class name="com.sonicbase.server.PartitionManager$5" map="5"/>
+  <method class="com.sonicbase.server.PartitionManager$5" name="int compare(com.sonicbase.server.PartitionManager$OffsetEntry, com.sonicbase.server.PartitionManager$OffsetEntry)" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager$5" name="int compare(java.lang.Object, java.lang.Object)" map="compare"/>
+  <class name="com.sonicbase.server.PartitionManager$GlobalIndexCounts" map="_G"/>
+  <field class="com.sonicbase.server.PartitionManager$GlobalIndexCounts" name="tables" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager$GlobalIndexCounts" name="java.util.concurrent.ConcurrentHashMap access$2200(com.sonicbase.server.PartitionManager$GlobalIndexCounts)" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager$GlobalIndexCounts" name="java.util.concurrent.ConcurrentHashMap getTables()" map="A"/>
+  <class name="com.sonicbase.server.PartitionManager$4" map="4"/>
+  <field class="com.sonicbase.server.PartitionManager$4" name="this$0" map="A"/>
+  <field class="com.sonicbase.server.PartitionManager$4" name="val$shard" map="B"/>
+  <field class="com.sonicbase.server.PartitionManager$4" name="val$finalTableName" map="C"/>
+  <field class="com.sonicbase.server.PartitionManager$4" name="val$indexName" map="D"/>
+  <field class="com.sonicbase.server.PartitionManager$4" name="val$dbName" map="E"/>
+  <field class="com.sonicbase.server.PartitionManager$4" name="val$masters" map="F"/>
+  <method class="com.sonicbase.server.PartitionManager$4" name="java.lang.Object call()" map="call"/>
+  <class name="com.sonicbase.server.PartitionManager$3" map="3"/>
+  <field class="com.sonicbase.server.PartitionManager$3" name="this$0" map="A"/>
+  <field class="com.sonicbase.server.PartitionManager$3" name="val$comparators" map="B"/>
+  <method class="com.sonicbase.server.PartitionManager$3" name="int compare(java.lang.Object, java.lang.Object)" map="compare"/>
+  <method class="com.sonicbase.server.PartitionManager$3" name="int compare(TableSchema$Partition, TableSchema$Partition)" map="A"/>
+  <class name="com.sonicbase.server.PartitionManager$2" map="2"/>
+  <field class="com.sonicbase.server.PartitionManager$2" name="this$0" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager$2" name="java.util.List getKeyAtOffset(java.lang.String, int, java.lang.String, java.lang.String, java.util.List)" map="A"/>
+  <class name="com.sonicbase.server.PartitionManager$IndexCounts" map="_H"/>
+  <field class="com.sonicbase.server.PartitionManager$IndexCounts" name="counts" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager$IndexCounts" name="java.util.concurrent.ConcurrentHashMap access$2400(com.sonicbase.server.PartitionManager$IndexCounts)" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager$IndexCounts" name="java.util.concurrent.ConcurrentHashMap getCounts()" map="A"/>
+  <class name="com.sonicbase.server.PartitionManager$1" map="1"/>
+  <field class="com.sonicbase.server.PartitionManager$1" name="this$0" map="A"/>
+  <field class="com.sonicbase.server.PartitionManager$1" name="val$offset" map="B"/>
+  <field class="com.sonicbase.server.PartitionManager$1" name="val$currPartitionSizes" map="C"/>
+  <field class="com.sonicbase.server.PartitionManager$1" name="val$indexName" map="D"/>
+  <field class="com.sonicbase.server.PartitionManager$1" name="val$dbName" map="E"/>
+  <field class="com.sonicbase.server.PartitionManager$1" name="val$currTableName" map="F"/>
+  <method class="com.sonicbase.server.PartitionManager$1" name="java.lang.Object call()" map="call"/>
+  <class name="com.sonicbase.server.PartitionManager" map="A"/>
+  <field class="com.sonicbase.server.PartitionManager" name="isRepartitioningIndex" map="A"/>
+  <field class="com.sonicbase.server.PartitionManager" name="currIndexRepartitioning" map="B"/>
+  <field class="com.sonicbase.server.PartitionManager" name="INDEX_STR" map="C"/>
+  <field class="com.sonicbase.server.PartitionManager" name="indices" map="D"/>
+  <field class="com.sonicbase.server.PartitionManager" name="isShardRepartitioningComplete" map="E"/>
+  <field class="com.sonicbase.server.PartitionManager" name="isComplete" map="F"/>
+  <field class="com.sonicbase.server.PartitionManager" name="minSizeForRepartition" map="G"/>
+  <field class="com.sonicbase.server.PartitionManager" name="beginRepartitioningThread" map="H"/>
+  <field class="com.sonicbase.server.PartitionManager" name="NAME_STR" map="I"/>
+  <field class="com.sonicbase.server.PartitionManager" name="common" map="J"/>
+  <field class="com.sonicbase.server.PartitionManager" name="isRebalancing" map="K"/>
+  <field class="com.sonicbase.server.PartitionManager" name="tableToDeleteEntriesFrom" map="L"/>
+  <field class="com.sonicbase.server.PartitionManager" name="entriesToDelete" map="M"/>
+  <field class="com.sonicbase.server.PartitionManager" name="shutdown" map="N"/>
+  <field class="com.sonicbase.server.PartitionManager" name="currTableRepartitioning" map="O"/>
+  <field class="com.sonicbase.server.PartitionManager" name="deletingComplete" map="P"/>
+  <field class="com.sonicbase.server.PartitionManager" name="databaseServer" map="Q"/>
+  <field class="com.sonicbase.server.PartitionManager" name="repartitioningComplete" map="R"/>
+  <field class="com.sonicbase.server.PartitionManager" name="repartitioningRecordsByIdComplete" map="S"/>
+  <field class="com.sonicbase.server.PartitionManager" name="moveProcessors" map="T"/>
+  <field class="com.sonicbase.server.PartitionManager" name="logger" map="U"/>
+  <method class="com.sonicbase.server.PartitionManager" name="ComObject doRebalanceOrderedIndex(ComObject)" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="ComObject getIndexCounts(ComObject)" map="B"/>
+  <method class="com.sonicbase.server.PartitionManager" name="void logPartitionsToApply(java.lang.String, java.lang.String, java.lang.String, java.util.List)" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="void deleteIndexEntry(java.lang.String, java.lang.String, java.lang.Object[])" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="void calculatePartitions(java.lang.String, int, java.util.List, java.lang.String, java.lang.String, long[], long, com.sonicbase.server.PartitionManager$GetKeyAtOffset)" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="void run()" map="run"/>
+  <method class="com.sonicbase.server.PartitionManager" name="ComObject beginRebalance(ComObject)" map="C"/>
+  <method class="com.sonicbase.server.PartitionManager" name="ComObject moveIndexEntries(ComObject)" map="D"/>
+  <method class="com.sonicbase.server.PartitionManager" name="void access$2100(com.sonicbase.server.PartitionManager, com.sonicbase.server.PartitionManager$MoveProcessor[], java.lang.String, java.lang.String, java.util.List, com.sonicbase.index.Index, IndexSchema, java.lang.String, int[], TableSchema, ComObject)" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="void setMinSizeForRepartition(int)" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="DatabaseCommon access$200(com.sonicbase.server.PartitionManager)" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="ComObject getPartitionSize(ComObject)" map="E"/>
+  <method class="com.sonicbase.server.PartitionManager" name="java.util.List findOrderedPartitionForRecord(boolean, boolean, int[], DatabaseCommon, TableSchema, java.lang.String, java.util.List, BinaryExpression$Operator, BinaryExpression$Operator, java.lang.Object[], java.lang.Object[])" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="ComObject isRepartitioningComplete(ComObject)" map="F"/>
+  <method class="com.sonicbase.server.PartitionManager" name="boolean undeleteIndexEntry(java.lang.String, java.lang.String, java.lang.String, java.lang.Object[], byte[])" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="void resetRepartitioningComplete()" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="com.sonicbase.server.PartitionManager$MoveProcessor[] access$2000(com.sonicbase.server.PartitionManager)" map="B"/>
+  <method class="com.sonicbase.server.PartitionManager" name="void doSelectPartitions(TableSchema$Partition[], TableSchema, java.lang.String, BinaryExpression$Operator, java.util.Comparator[], java.lang.Object[], boolean, java.util.List)" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="long getPartitionSize(java.lang.String, int, java.lang.String, java.lang.String)" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="byte[] beginRebalance(java.lang.String, java.util.List)" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="ComObject notifyRepartitioningComplete(ComObject)" map="G"/>
+  <method class="com.sonicbase.server.PartitionManager" name="void deleteRecordsOnOtherReplicas(java.lang.String, java.lang.String, java.lang.String, java.util.concurrent.ConcurrentLinkedQueue)" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="ComObject stopRepartitioning(ComObject)" map="H"/>
+  <method class="com.sonicbase.server.PartitionManager" name="long access$000(com.sonicbase.server.PartitionManager, java.lang.String, int, java.lang.String, java.lang.String)" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="void stopShardsFromRepartitioning()" map="B"/>
+  <method class="com.sonicbase.server.PartitionManager" name="java.util.concurrent.ConcurrentHashMap getIndicesToDeleteFrom(java.lang.String, java.lang.String)" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="ComObject rebalanceOrderedIndex(ComObject)" map="I"/>
+  <method class="com.sonicbase.server.PartitionManager" name="Logger access$400()" map="C"/>
+  <method class="com.sonicbase.server.PartitionManager" name="java.util.List access$100(com.sonicbase.server.PartitionManager, java.lang.String, int, java.lang.String, java.lang.String, java.util.List)" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="byte[] finishRebalance(java.lang.String, byte[])" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="void logCurrPartitions(java.lang.String, java.lang.String, java.lang.String, TableSchema$Partition[])" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="com.sonicbase.server.DatabaseServer access$300(com.sonicbase.server.PartitionManager)" map="C"/>
+  <method class="com.sonicbase.server.PartitionManager" name="int getCompareValue(java.util.Comparator[], java.lang.Object[], java.lang.Object[])" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="ComObject deleteMovedRecords(ComObject)" map="J"/>
+  <method class="com.sonicbase.server.PartitionManager" name="void doSelectPartitions(TableSchema$Partition[], TableSchema, java.lang.String, BinaryExpression$Operator, java.util.Comparator[], java.lang.Object[], java.lang.Object[], boolean, java.util.List)" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="void moveIndexEntriesToShard(java.lang.String, java.lang.String, java.lang.String, boolean, int, java.util.List)" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="void resetDeletingComplete()" map="D"/>
+  <method class="com.sonicbase.server.PartitionManager" name="boolean addToRebalance(java.util.List, java.util.Map$Entry, java.lang.String, com.sonicbase.server.PartitionManager$IndexCounts, boolean)" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="java.util.List getKeyAtOffset(java.lang.String, int, java.lang.String, java.lang.String, java.util.List)" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="void shutdown()" map="E"/>
+  <method class="com.sonicbase.server.PartitionManager" name="com.sonicbase.server.PartitionManager$GlobalIndexCounts getIndexCounts(java.lang.String, DatabaseClient)" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="ComObject isShardRepartitioningComplete(ComObject, boolean)" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="void access$1300(com.sonicbase.server.PartitionManager, java.lang.String, java.lang.String, java.lang.String, boolean, int, java.util.List)" map="A"/>
+  <method class="com.sonicbase.server.PartitionManager" name="boolean isRepartitioningComplete()" map="F"/>
+  <method class="com.sonicbase.server.PartitionManager" name="ComObject getKeyAtOffset(ComObject)" map="K"/>
+  <method class="com.sonicbase.server.PartitionManager" name="void doProcessEntries(com.sonicbase.server.PartitionManager$MoveProcessor[], java.lang.String, java.lang.String, java.util.List, com.sonicbase.index.Index, IndexSchema, java.lang.String, int[], TableSchema, ComObject)" map="A"/>
   <class name="com.sonicbase.index.Indices" map="B"/>
   <field class="com.sonicbase.index.Indices" name="indexes" map="A"/>
   <method class="com.sonicbase.index.Indices" name="void addIndex(TableSchema, java.lang.String, java.util.Comparator[])" map="A"/>

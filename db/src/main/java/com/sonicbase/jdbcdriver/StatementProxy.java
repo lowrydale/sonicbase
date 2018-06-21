@@ -1,8 +1,11 @@
 package com.sonicbase.jdbcdriver;
 
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.client.InsertStatementHandler;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
+import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.ResultSetImpl;
+import net.sf.jsqlparser.statement.insert.Insert;
 
 import java.io.InputStream;
 import java.io.Reader;
@@ -33,6 +36,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
   private ParameterHandler parms = new ParameterHandler();
   private boolean restrictToThisServer = false;
   private StoredProcedureContextImpl procedureContext;
+  private boolean disableStats;
 
   StatementProxy(ConnectionProxy connectionProxy, DatabaseClient databaseClient, String sql) throws SQLException {
     this.connectionProxy = connectionProxy;
@@ -40,7 +44,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
     this.sql = sql;
     this.dbName = connectionProxy.getDbName();
 
-    DatabaseClient.batch.set(null);
+    InsertStatementHandler.batch.set(null);
   }
 
   public void close() throws SQLException {
@@ -151,10 +155,16 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
 
   public void addBatch() throws SQLException {
     try {
-      if (DatabaseClient.batch.get() == null) {
-        DatabaseClient.batch.set(new ArrayList<DatabaseClient.InsertRequest>());
+      if (InsertStatementHandler.batch.get() == null) {
+        InsertStatementHandler.batch.set(new ArrayList<InsertStatementHandler.InsertRequest>());
       }
-      databaseClient.executeQuery(dbName, QueryType.execute0, sql, parms, restrictToThisServer, procedureContext);
+      String normalizedSQL = sql.trim().toLowerCase();
+      if (!normalizedSQL.startsWith("insert")) {
+        int pos = normalizedSQL.indexOf(" ");
+        String verb = normalizedSQL.substring(0, pos);
+        throw new DatabaseException("Verb not supported by batch operations: verb=" + verb);
+      }
+      databaseClient.executeQuery(dbName, QueryType.execute0, sql, parms, restrictToThisServer, procedureContext, disableStats);
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -162,12 +172,13 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
   }
 
   public void clearBatch() throws SQLException {
-    DatabaseClient.batch.set(null);
+    InsertStatementHandler.batch.set(null);
   }
 
   public int[] executeBatch() throws SQLException {
     try {
-      return databaseClient.executeBatch();
+      InsertStatementHandler handler = (InsertStatementHandler) databaseClient.getStatementHandlerFactory().getHandler(new Insert());
+      return handler.executeBatch();
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -190,7 +201,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
 
   public ResultSet executeQuery() throws SQLException {
     try {
-      ResultSetImpl ret = (ResultSetImpl) databaseClient.executeQuery(dbName, QueryType.query1, sql, parms, restrictToThisServer, procedureContext);
+      ResultSetImpl ret = (ResultSetImpl) databaseClient.executeQuery(dbName, QueryType.query1, sql, parms, restrictToThisServer, procedureContext, disableStats);
       return new ResultSetProxy(connectionProxy, ret);
     }
     catch (Exception e) {
@@ -200,7 +211,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
 
   public ResultSet executeQuery(String sql) throws SQLException {
     try {
-      ResultSetImpl ret = (ResultSetImpl)databaseClient.executeQuery(dbName, QueryType.query1, sql, parms, restrictToThisServer, procedureContext);
+      ResultSetImpl ret = (ResultSetImpl)databaseClient.executeQuery(dbName, QueryType.query1, sql, parms, restrictToThisServer, procedureContext, disableStats);
       return new ResultSetProxy(connectionProxy, ret);
     }
     catch (Exception e) {
@@ -210,7 +221,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
 
   public int executeUpdate() throws SQLException {
     try {
-      return (Integer) databaseClient.executeQuery(dbName, QueryType.update0, sql, parms, restrictToThisServer, procedureContext);
+      return (Integer) databaseClient.executeQuery(dbName, QueryType.update0, sql, parms, restrictToThisServer, procedureContext, disableStats);
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -219,7 +230,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
 
   public int executeUpdate(String sql) throws SQLException {
     try {
-      return (Integer) databaseClient.executeQuery(dbName, QueryType.update1, sql, parms, restrictToThisServer, procedureContext);
+      return (Integer) databaseClient.executeQuery(dbName, QueryType.update1, sql, parms, restrictToThisServer, procedureContext, disableStats);
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -238,17 +249,18 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
     throw new NotImplementedException();
   }
 
-  public void doUpdate(Long sequence0, Long sequence1, Short sequence2) throws SQLException {
-    databaseClient.executeQuery(dbName, QueryType.update0, sql, parms, false, sequence0, sequence1, sequence2, restrictToThisServer, procedureContext);
+  public void doUpdate(Long sequence0, Long sequence1, Short sequence2, boolean disableStats) throws SQLException {
+    databaseClient.executeQuery(dbName, QueryType.update0, sql, parms, false, sequence0, sequence1, sequence2, restrictToThisServer, procedureContext, disableStats);
   }
 
-  public void doDelete(Long sequence0, Long sequence1, Short sequence2) throws SQLException {
-    databaseClient.executeQuery(dbName, QueryType.update0, sql, parms, false, sequence0, sequence1, sequence2, restrictToThisServer, procedureContext);
+  public void doDelete(Long sequence0, Long sequence1, Short sequence2, boolean disableStats) throws SQLException {
+    databaseClient.executeQuery(dbName, QueryType.update0, sql, parms, false, sequence0, sequence1, sequence2, restrictToThisServer, procedureContext, disableStats);
   }
 
   public boolean execute() throws SQLException {
     try {
-      return (Integer) databaseClient.executeQuery(dbName, QueryType.execute0, sql, parms, restrictToThisServer, procedureContext) > 0;
+      int ret = (int)(Integer) databaseClient.executeQuery(dbName, QueryType.execute0, sql, parms, restrictToThisServer, procedureContext, disableStats);
+      return ret > 0;
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -257,7 +269,8 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
 
   public boolean execute(String sql) throws SQLException {
     try {
-      return (Integer) databaseClient.executeQuery(dbName, QueryType.execute0, sql, parms, restrictToThisServer, procedureContext) > 0;
+      int ret = (Integer) databaseClient.executeQuery(dbName, QueryType.execute0, sql, parms, restrictToThisServer, procedureContext, disableStats);
+      return ret > 0;
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -266,7 +279,8 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
 
   public boolean execute(String sql, int autoGeneratedKeys) throws SQLException {
     try {
-      return (Integer) databaseClient.executeQuery(dbName, QueryType.execute1, sql, parms, restrictToThisServer, procedureContext) > 0;
+      int ret = (Integer) databaseClient.executeQuery(dbName, QueryType.execute1, sql, parms, restrictToThisServer, procedureContext, disableStats);
+      return ret > 0;
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -275,7 +289,8 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
 
   public boolean execute(String sql, int[] columnIndexes) throws SQLException {
     try {
-      return (Integer) databaseClient.executeQuery(dbName, QueryType.execute2, sql, parms, restrictToThisServer, procedureContext) > 0;
+      int ret = (Integer) databaseClient.executeQuery(dbName, QueryType.execute2, sql, parms, restrictToThisServer, procedureContext, disableStats);
+      return ret > 0;
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -284,7 +299,8 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
 
   public boolean execute(String sql, String[] columnNames) throws SQLException {
     try {
-      return (Integer) databaseClient.executeQuery(dbName, QueryType.execute3, sql, parms, restrictToThisServer, procedureContext) > 0;
+      int ret = (Integer) databaseClient.executeQuery(dbName, QueryType.execute3, sql, parms, restrictToThisServer, procedureContext, disableStats);
+      return ret > 0;
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -781,6 +797,10 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
 
   public void setProcedureContext(StoredProcedureContextImpl procedureContext) {
     this.procedureContext = procedureContext;
+  }
+
+  public void disableStats() {
+    this.disableStats = true;
   }
 }
 

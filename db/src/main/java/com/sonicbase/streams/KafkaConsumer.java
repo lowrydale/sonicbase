@@ -34,7 +34,7 @@ public class KafkaConsumer implements StreamsConsumer {
   private String jsonConfig;
   private String jsonQueueConfig;
 
-  class KafkaMessage extends Message {
+  class KafkaMessage extends com.sonicbase.streams.Message {
     private final int partition;
     private final long offset;
 
@@ -223,30 +223,6 @@ public class KafkaConsumer implements StreamsConsumer {
         }
       }
 
-//      consumer.subscribe(asList(topic), new ConsumerRebalanceListener() {
-//        public void onPartitionsRevoked(Collection<TopicPartition> partitions) {
-//          Iterator<TopicPartition> topicPartitionIterator = partitions.iterator();
-//          while(topicPartitionIterator.hasNext()) {
-//            TopicPartition topicPartition = topicPartitionIterator.next();
-//            logger.error("onPartitionsRevoked: partition=" + topicPartition.partition());
-//          }
-//        }
-//        public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
-//          Iterator<TopicPartition> topicPartitionIterator = partitions.iterator();
-//          while(topicPartitionIterator.hasNext()){
-//            TopicPartition topicPartition = topicPartitionIterator.next();
-//            logger.error("onPartitionsAssigned: partition=" + topicPartition.partition());
-//            Long offset = partitionOffsets.get(topicPartition.partition());
-//            if (offset == null) {
-//              consumer.seekToBeginning(asList(topicPartition));
-//            }
-//            else {
-//              consumer.seek(topicPartition, offset);
-//            }
-//          }
-//        }
-//      });
-
       this.consumers.add(consumer);
       this.consumer.set(consumer);
       logger.info("kafka consumer initThread - end");
@@ -307,7 +283,7 @@ public class KafkaConsumer implements StreamsConsumer {
   ConcurrentHashMap<Integer, Long> partitionOffsets = new ConcurrentHashMap<>();
 
   @Override
-  public List<Message> receive() {
+  public List<com.sonicbase.streams.Message> receive() {
     try {
       if (ownedPartitions.size() == 0) {
         Thread.sleep(1_000);
@@ -315,7 +291,7 @@ public class KafkaConsumer implements StreamsConsumer {
       }
 
       ConsumerRecords<String, String> records = consumer.get().poll(100);
-      List<Message> resultMessages = new ArrayList<>();
+      List<com.sonicbase.streams.Message> resultMessages = new ArrayList<>();
       for (ConsumerRecord<String, String> record : records) {
         resultMessages.add(new KafkaMessage(record.value(), record.partition(), record.offset()));
       }
@@ -327,8 +303,8 @@ public class KafkaConsumer implements StreamsConsumer {
   }
 
   @Override
-  public void acknowledgeMessages(List<Message> messages) {
-    for (Message message : messages) {
+  public void acknowledgeMessages(List<com.sonicbase.streams.Message> messages) {
+    for (com.sonicbase.streams.Message message : messages) {
       partitionOffsets.put(((KafkaMessage) message).partition, ((KafkaMessage) message).offset);
 
       if (messageCountSinceSavedSequence.incrementAndGet() % 1000 == 0) {

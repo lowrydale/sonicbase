@@ -21,11 +21,24 @@ public class LongRunningCalls {
 
   private Logger logger;
 
-  private final DatabaseServer server;
+  private final com.sonicbase.server.DatabaseServer server;
+  private ConcurrentLinkedQueue<Thread> executionThreads = new ConcurrentLinkedQueue<>();
 
   public LongRunningCalls(DatabaseServer server) {
     this.server = server;
-    this.logger = new Logger(server.getDatabaseClient());
+    this.logger = new Logger(null/*server.getDatabaseClient()*/);
+  }
+
+  public void shutdown() {
+    for (Thread thread : executionThreads) {
+      try {
+        thread.interrupt();
+        thread.join();
+      }
+      catch (Exception e) {
+        logger.error("Error shutting down thread", e);
+      }
+    }
   }
 
   public void load() {
@@ -220,7 +233,7 @@ public class LongRunningCalls {
     }
   }
 
-  public static class SingleCommand {
+  public class SingleCommand {
     final LongRunningCalls longRunningCommands;
     byte[] body;
 
@@ -250,9 +263,15 @@ public class LongRunningCalls {
       Thread thread = new Thread(new Runnable(){
         @Override
         public void run() {
-          doExecute(parentList);
+          try {
+            doExecute(parentList);
+          }
+          finally {
+            executionThreads.remove(Thread.currentThread());
+          }
         }
       });
+      executionThreads.add(thread);
       thread.start();
     }
 

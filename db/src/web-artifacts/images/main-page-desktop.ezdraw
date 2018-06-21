@@ -5,9 +5,9 @@
 	<key>AAAA_CurrentOSXVersion</key>
 	<string>MacOS Sierra: 1349.910000</string>
 	<key>AAAA_DKDDocumentVersion</key>
-	<string>3052 App Store  : 2001 v0</string>
+	<string>3053 App Store  : 2001 v0</string>
 	<key>AAAA_EazyDrawVersion</key>
-	<string>3052</string>
+	<string>3053</string>
 	<key>BBB_DKDQuicklookData</key>
 	<data>
 	/9j/4AAQSkZJRgABAQAASABIAAD/4QBMRXhpZgAATU0AKgAAAAgAAYdpAAQAAAABAAAA
@@ -786,7 +786,7 @@
 	/FIBwNPxmosVOpAFDA//2Q==
 	</data>
 	<key>DKDChangeTimeStamp</key>
-	<string>2017-09-27 16:24:54 +0000</string>
+	<string>2018-04-24 20:34:35 +0000</string>
 	<key>DKDCreateTimeStamp</key>
 	<string>2017-06-20 03:36:17 +0000</string>
 	<key>DKDDisplayGraphicDetails</key>
@@ -874,6 +874,8 @@
 			<string>1</string>
 		</dict>
 	</dict>
+	<key>DKDDocumentTag</key>
+	<string>C8CB67C1</string>
 	<key>DKDExportDoc</key>
 	<dict>
 		<key>BMPExporBackground</key>
@@ -9437,52 +9439,40 @@
 					</dict>
 					<key>KeyedText</key>
 					<data>
-					YnBsaXN0MDDUAQIDBAUGfn9YJHZlcnNpb25Y
+					YnBsaXN0MDDUAQIDBAUGVldYJHZlcnNpb25Y
 					JG9iamVjdHNZJGFyY2hpdmVyVCR0b3ASAAGG
-					oK8QHAcIERUcIi0uLzA2OUBER0pNUVlaXWBs
-					bW5xdXlVJG51bGzUCQoLDA0ODxBYTlNTdHJp
-					bmdfEA9OU0F0dHJpYnV0ZUluZm9cTlNBdHRy
-					aWJ1dGVzViRjbGFzc4ACgBmABIAb0gwSExRZ
-					TlMuc3RyaW5ngANqAFMAbwBuAGkAYwBCAGEA
-					cwBlISLSFhcYGVokY2xhc3NuYW1lWCRjbGFz
-					c2VzXxAPTlNNdXRhYmxlU3RyaW5noxgaG1hO
-					U1N0cmluZ1hOU09iamVjdNIdDB4hWk5TLm9i
-					amVjdHOiHyCABYAVgBjTIx0MJCgsV05TLmtl
-					eXOjJSYngAaAB4AIoykqK4AJgAuAEYAUV05T
-					Q29sb3JfEBBOU1BhcmFncmFwaFN0eWxlVk5T
-					Rm9udNMxMgwzNDVVTlNSR0JcTlNDb2xvclNw
-					YWNlRjEgMSAxABABgArSFhc3OFdOU0NvbG9y
-					ojcb1DoMOzw9PjQ/Wk5TVGFiU3RvcHNfEB9O
-					U0FsbG93c1RpZ2h0ZW5pbmdGb3JUcnVuY2F0
-					aW9uXxAUTlNEZWZhdWx0VGFiSW50ZXJ2YWyA
-					DIAQI0BCAAAAAAAA0h0MQUOhQoANgA/SDEVG
-					P1pOU0xvY2F0aW9ugA7SFhdISVlOU1RleHRU
-					YWKiSBvSFhdLTFdOU0FycmF5oksb0hYXTk9f
-					EBdOU011dGFibGVQYXJhZ3JhcGhTdHlsZaNO
-					UBtfEBBOU1BhcmFncmFwaFN0eWxl1FJTVAxV
-					VldYVk5TU2l6ZVhOU2ZGbGFnc1ZOU05hbWUj
-					QE0AAAAAAAAQEIASgBNZSGVsdmV0aWNh0hYX
-					W1xWTlNGb250olsb0hYXXl9cTlNEaWN0aW9u
-					YXJ5ol4b0yMdDGFmLKRiJiclgBaAB4AIgAak
-					ZyorKYAXgAuAEYAJgBRaTlNMaWdhdHVyZRAC
-					0hYXb3BeTlNNdXRhYmxlQXJyYXmjb0sb0nIM
-					c3RXTlMuZGF0YUQJAAEBgBrSFhd2d11OU011
-					dGFibGVEYXRho3Z4G1ZOU0RhdGHSFhd6e18Q
-					GU5TTXV0YWJsZUF0dHJpYnV0ZWRTdHJpbmej
-					fH0bXxAZTlNNdXRhYmxlQXR0cmlidXRlZFN0
-					cmluZ18QEk5TQXR0cmlidXRlZFN0cmluZ18Q
-					D05TS2V5ZWRBcmNoaXZlctGAgVRyb290gAEA
-					CAARABoAIwAtADIANwBWAFwAZQBuAIAAjQCU
-					AJYAmACaAJwAoQCrAK0AwgDHANIA2wDtAPEA
-					+gEDAQgBEwEWARgBGgEcASMBKwEvATEBMwE1
-					ATkBOwE9AT8BQQFJAVwBYwFqAXABfQGEAYYB
-					iAGNAZUBmAGhAawBzgHlAecB6QHyAfcB+QH7
-					Af0CAgINAg8CFAIeAiECJgIuAjECNgJQAlQC
-					ZwJwAncCgAKHApACkgKUApYCoAKlAqwCrwK0
-					AsECxALLAtAC0gLUAtYC2ALdAt8C4QLjAuUC
-					5wLyAvQC+QMIAwwDEQMZAx4DIAMlAzMDNwM+
-					A0MDXwNjA38DlAOmA6kDrgAAAAAAAAIBAAAA
-					AAAAAIIAAAAAAAAAAAAAAAAAAAOw
+					oK8QFAcIDxAcHR4fJSsyNjk8P0NLTE9SVSRu
+					dWxs0wkKCwwNDlhOU1N0cmluZ1YkY2xhc3Nc
+					TlNBdHRyaWJ1dGVzgAKAE4ADagBTAG8AbgBp
+					AGMAQgBhAHMAZSEi0xESChMXG1dOUy5rZXlz
+					Wk5TLm9iamVjdHOjFBUWgASABYAGoxgZGoAH
+					gAmAD4ASV05TQ29sb3JfEBBOU1BhcmFncmFw
+					aFN0eWxlVk5TRm9udNMgIQoiIyRVTlNSR0Jc
+					TlNDb2xvclNwYWNlRjEgMSAxABABgAjSJico
+					KVokY2xhc3NuYW1lWCRjbGFzc2VzV05TQ29s
+					b3KiKCpYTlNPYmplY3TULAotLi8wIzFaTlNU
+					YWJTdG9wc18QH05TQWxsb3dzVGlnaHRlbmlu
+					Z0ZvclRydW5jYXRpb25fEBROU0RlZmF1bHRU
+					YWJJbnRlcnZhbIAKgA4jQEIAAAAAAADSEgoz
+					NaE0gAuADdIKNzgxWk5TTG9jYXRpb26ADNIm
+					Jzo7WU5TVGV4dFRhYqI6KtImJz0+V05TQXJy
+					YXmiPSrSJidAQV8QF05TTXV0YWJsZVBhcmFn
+					cmFwaFN0eWxlo0BCKl8QEE5TUGFyYWdyYXBo
+					U3R5bGXUREVGCkdISUpWTlNTaXplWE5TZkZs
+					YWdzVk5TTmFtZSNATQAAAAAAABAQgBCAEVlI
+					ZWx2ZXRpY2HSJidNTlZOU0ZvbnSiTSrSJidQ
+					UVxOU0RpY3Rpb25hcnmiUCrSJidTVF8QEk5T
+					QXR0cmlidXRlZFN0cmluZ6JVKl8QEk5TQXR0
+					cmlidXRlZFN0cmluZ18QD05TS2V5ZWRBcmNo
+					aXZlctFYWVRyb290gAEACAARABoAIwAtADIA
+					NwBOAFQAWwBkAGsAeAB6AHwAfgCTAJoAogCt
+					ALEAswC1ALcAuwC9AL8AwQDDAMsA3gDlAOwA
+					8gD/AQYBCAEKAQ8BGgEjASsBLgE3AUABSwFt
+					AYQBhgGIAZEBlgGYAZoBnAGhAawBrgGzAb0B
+					wAHFAc0B0AHVAe8B8wIGAg8CFgIfAiYCLwIx
+					AjMCNQI/AkQCSwJOAlMCYAJjAmgCfQKAApUC
+					pwKqAq8AAAAAAAACAQAAAAAAAABaAAAAAAAA
+					AAAAAAAAAAACsQ==
 					</data>
 					<key>Locked</key>
 					<string>NO</string>
@@ -9928,7 +9918,7 @@
 		<string>NO</string>
 	</dict>
 	<key>DKDSaveTimeStamp</key>
-	<string>2017-09-27 16:24:58 +0000</string>
+	<string>2018-04-24 20:34:41 +0000</string>
 	<key>DKDTablet</key>
 	<dict>
 		<key>PenMax</key>
@@ -10124,7 +10114,7 @@
 		<key>CursorMode</key>
 		<string>Nothing</string>
 		<key>DocCenter</key>
-		<string>{640, 385.5}</string>
+		<string>{640, 386}</string>
 		<key>DocumentFileName</key>
 		<string>/Users/lowryda/Dropbox/git/sonicbase/db/src/web-artifacts/images/main-page-desktop.ezdraw</string>
 		<key>DrawersOnMainView</key>
@@ -10142,7 +10132,7 @@
 		<key>LayersDrawerEdgePreference</key>
 		<string>Auto</string>
 		<key>WindowLocation</key>
-		<string>120 169 1440 858 0 0 1680 1028 </string>
+		<string>120 168 1440 859 0 0 1680 1028 </string>
 		<key>ZoomPercent</key>
 		<string>100.000000</string>
 	</dict>

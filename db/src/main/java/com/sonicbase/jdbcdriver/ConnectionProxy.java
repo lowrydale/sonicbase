@@ -7,6 +7,7 @@ package com.sonicbase.jdbcdriver;
  */
 
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.client.DescribeStatementHandler;
 import com.sonicbase.client.ReconfigureResults;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Logger;
@@ -67,7 +68,7 @@ public class ConnectionProxy implements Connection {
         db = outerParts[1];
         db = db.toLowerCase();
       }
-      client = new DatabaseClient(hosts, -1, -1, true, server.getCommon(), server);
+      client = new DatabaseClient(hosts, server.getShard(), server.getReplica(), true, server.getCommon(), server, false);
       if (db != null) {
         client.initDb(db);
       }
@@ -186,7 +187,7 @@ public class ConnectionProxy implements Connection {
   }
 
   public static com.sonicbase.query.ResultSet describeLicenses() {
-    return DatabaseClient.describeLicenses();
+    return DescribeStatementHandler.describeLicenses();
   }
 
     public enum Replica {
@@ -232,13 +233,6 @@ public class ConnectionProxy implements Connection {
       return client.getCommon().getTables(dbName);
     }
     return clients.get(url).client.getCommon().getTables(dbName);
-  }
-
-  public String debugRecord(String dbName, String tableName, String indexName, String key) {
-    if (client != null) {
-      return client.debugRecord(dbName, tableName, indexName, key);
-    }
-    return clients.get(url).client.debugRecord(dbName, tableName, indexName, key);
   }
 
   public ReconfigureResults reconfigureCluster() {

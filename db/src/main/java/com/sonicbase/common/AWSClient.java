@@ -225,9 +225,6 @@ public class AWSClient {
     AmazonS3 s3client = getS3Client();
     try {
       destFile.getParentFile().mkdirs();
-//      TransferManager manager = getTransferManager();
-//      Download download = manager.download(bucket, key, destFile);
-//      download.waitForCompletion();
       S3Object object = s3client.getObject(
           new GetObjectRequest(bucket, key));
       try (InputStream objectData = object.getObjectContent();

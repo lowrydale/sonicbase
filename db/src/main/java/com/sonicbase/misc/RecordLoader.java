@@ -45,8 +45,14 @@ public class RecordLoader {
 
     Connection conn = DriverManager.getConnection("jdbc:sonicbase:" + address + ":9010/db");
 
-    PreparedStatement stmt = conn.prepareStatement("create table Persons (id1 BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id1))");
-    stmt.executeUpdate();
+    PreparedStatement stmt;
+    try {
+      stmt = conn.prepareStatement("create table Persons (id1 BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id1))");
+      stmt.executeUpdate();
+    }
+    catch (Exception e) {
+      System.out.println(e.getMessage());
+    }
 
     int id = 0;
     int batchSize = 200;

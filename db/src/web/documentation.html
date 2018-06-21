@@ -108,7 +108,15 @@ var TREE_ITEMS = [
                 ['Producers', 'docs/streaming-producer.html?framed=true']
             ],
             ['License Server',  'docs/license-server.html?framed=true'],
-            ['Monitoring',  'docs/monitoring.html?framed=true'],
+            ['Monitoring', 0,
+                ['From Admin Client',  'docs/monitoring.html?framed=true'],
+                ['From Browser', 0,
+                    ['Overview',  'docs/monitor-overview.html?framed=true'],
+                    ['Health',  'docs/monitor-health.html?framed=true'],
+                    ['OS Stats',  'docs/monitor-os-stats.html?framed=true'],
+                    ['Query Stats',  'docs/monitor-query-stats.html?framed=true']
+                ]
+            ],
             ['Rolling Restart',  'docs/rolling-restart.html?framed=true']
 		]
 	]
@@ -261,8 +269,12 @@ var TREE_TPL = {
                     <a href="docs/streaming-consumer.html">Pro - Streaming Analytics - Consumers</a><br/>
                  <a href="docs/streaming-producer.html">Pro - Streaming Analytics- Producers</a><br/>
                  <a href="docs/license-server.html">Pro - License Server</a><br/>
-                    <a href="docs/monitoring.html">Pro - Monitoring</a><br/>
-                 <a href="docs/rolling-restart.html">Pro - Rolling Restart</a><br/>
+                    <a href="docs/monitoring.html">Pro - Monitoring From Admin Client</a><br/>
+               <a href="docs/monitor-overivew.html">Pro - Monitoring From Browser - Overview</a><br/>
+               <a href="docs/monitor-health.html">Pro - Monitoring From Browser - Health</a><br/>
+               <a href="docs/monitor-os-stats.html">Pro - Monitoring From Browser - OS Stats</a><br/>
+               <a href="docs/monitor-query-stats.html">Pro - Monitoring From Browser - Query Stats</a><br/>
+               <a href="docs/rolling-restart.html">Pro - Rolling Restart</a><br/>
              </div>
          </div>
      </div>

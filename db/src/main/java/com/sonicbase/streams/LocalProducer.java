@@ -6,6 +6,10 @@ import java.util.concurrent.ArrayBlockingQueue;
 public class LocalProducer implements StreamsProducer {
   public static ArrayBlockingQueue<String> queue = new ArrayBlockingQueue<>(1000);
 
+  public static ArrayBlockingQueue<String> getQueue() {
+    return queue;
+  }
+
   @Override
   public void init(String cluster, String jsonConfig, String jsonQueueConfig) {
   }

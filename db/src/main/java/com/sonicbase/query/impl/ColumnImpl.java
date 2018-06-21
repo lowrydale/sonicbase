@@ -173,12 +173,6 @@ public class ColumnImpl extends ExpressionImpl {
       }
     }
     return null;
-//
-//    if (tableName != null && !tableName.equals(record.getTableSchema().getName())) {
-//      throw new WrongTableException();
-//    }
-//    int offset = record.getTableSchema().getFieldOffset(columnName);
-//    return record.getFields()[offset];
   }
 
   public String getTableName() {
@@ -203,12 +197,13 @@ public class ColumnImpl extends ExpressionImpl {
   }
 
   @Override
-  public NextReturn next(SelectStatementImpl.Explain explainBuilder, AtomicLong currOffset, Limit limit, Offset offset) {
+  public NextReturn next(SelectStatementImpl.Explain explainBuilder, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
     return null;
   }
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset, boolean b, boolean analyze) {
+  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
+                         Limit limit, Offset offset, boolean b, boolean analyze, int schemaRetryCount) {
     return null;
   }
 

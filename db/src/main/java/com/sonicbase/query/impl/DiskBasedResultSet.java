@@ -8,6 +8,8 @@ import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
+import net.sf.jsqlparser.statement.select.Limit;
+import net.sf.jsqlparser.statement.select.Offset;
 import org.anarres.lzo.LzoDecompressor1x;
 import org.anarres.lzo.LzoInputStream;
 import org.anarres.lzo.LzoOutputStream;
@@ -16,7 +18,10 @@ import org.apache.giraph.utils.Varint;
 
 import java.io.*;
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -28,6 +33,10 @@ public class DiskBasedResultSet {
   private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
 
   private static AtomicLong nextResultSetId = new AtomicLong();
+  private int countReturned;
+  private int currOffset;
+  private Limit limit;
+  private Offset offset;
   private StoredProcedureContextImpl procedureContext;
   private boolean restrictToThisServer;
   private boolean setOperator;
@@ -39,18 +48,24 @@ public class DiskBasedResultSet {
   private long resultSetId;
 
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
+  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP2", justification = "copying the passed in data is too slow")
   @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public DiskBasedResultSet(
       final short serializationVersion,
       final String dbName,
       DatabaseServer databaseServer,
+      Offset offset,
+      Limit limit,
       final String[] tableNames, int[] tableOffsets, final ResultSetImpl[] resultSets, final List<OrderByExpressionImpl> orderByExpressions,
       int count, SelectStatementImpl select, boolean setOperator) {
     this.server = databaseServer;
     this.tableNames = tableNames;
     this.select = select;
     this.count = count;
+    this.currOffset = 0;
+    this.countReturned = 0;
+    this.offset = offset;
+    this.limit = limit;
     this.setOperator = setOperator;
     File file = null;
     this.orderByExpressions = orderByExpressions;
@@ -66,11 +81,6 @@ public class DiskBasedResultSet {
     }
     final File finalFile = file;
 
-//    if (records != null && records.length < count) {
-//      ResultSetImpl.sortResults(server.getClient().getCommon(), select, records, tableNames);
-//      sorted = true;
-//    }
-//    writeRecordsToFile(out, records);
     final AtomicInteger fileOffset = new AtomicInteger();
 
     Map<String, Integer> tableOffsets2 = new HashMap<>();
@@ -125,7 +135,7 @@ public class DiskBasedResultSet {
       for (int k = 0; k < resultSets.length; k++) {
         final int localK = k;
         final boolean finalSelectAll = selectAll;
-        futures.add(executor.submit(new Callable(){
+        futures.add(executor.submit(new Callable() {
           @Override
           public Object call() throws Exception {
             ResultSetImpl rs = resultSets[localK];
@@ -147,37 +157,20 @@ public class DiskBasedResultSet {
                     }
                 }
               }
-              //        ExpressionImpl.CachedRecord[] newRow = new ExpressionImpl.CachedRecord[tableNames.length];
-              //        newRow[k] = row[0];
-              //        batch.add(newRow);
               batch.add(row);
             }
-            //    if (!sorted) {
             while (true) {
               rs.setPageSize(1000);
               rs.forceSelectOnServer();
               long begin = System.currentTimeMillis();
-              rs.getMoreResults();
+              int schemaRetryCount = 0;
+              rs.getMoreResults(schemaRetryCount);
               records = rs.getReadRecordsAndSerializedRecords();
               if (records == null) {
                 break;
               }
               logger.info("got more results: duration=" + (System.currentTimeMillis() - begin) + ", recordCount=" + records.length);
               for (ExpressionImpl.CachedRecord[] row : records) {
-                //        if (!selectAll) {
-                //          for (int i = 0; i < row.length; i++) {
-                //            if (row[i] == null) {
-                //              continue;
-                //            }
-                //            for (int j = 0; j < row[i].getFields().length; j++)
-                //            if (!keepers[i][j]) {
-                //              row[i].getFields()[j] = null;
-                //            }
-                //          }
-                //        }
-                //          ExpressionImpl.CachedRecord[] newRow = new ExpressionImpl.CachedRecord[tableNames.length];
-                //          newRow[k] = row[0];
-                //          batch.add(newRow);
                 batch.add(row);
               }
               synchronized (rs.getRecordCache().getRecordsForTable()) {
@@ -229,6 +222,28 @@ public class DiskBasedResultSet {
     }
     mergeSort(serializationVersion, dbName, file);
 
+    File offsetLimitFile = new File(file, "offset-limit.txt");
+    try {
+      try (DataOutputStream out = new DataOutputStream(new FileOutputStream(offsetLimitFile))) {
+        if (offset == null) {
+          out.writeBoolean(false);
+        }
+        else {
+          out.writeBoolean(true);
+          out.writeLong(offset.getOffset());
+        }
+        if (limit == null) {
+          out.writeBoolean(false);
+        }
+        else {
+          out.writeBoolean(true);
+          out.writeLong(limit.getRowCount());
+        }
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
     updateAccessTime(file);
   }
 
@@ -269,11 +284,11 @@ public class DiskBasedResultSet {
         if (records != null) {
           return false;
         }
-        records = ((ResultSetImpl)rs).getReadRecordsAndSerializedRecords();
+        records = ((ResultSetImpl) rs).getReadRecordsAndSerializedRecords();
         pos = 0;
         return true;
       }
-      byte[][][] bytes = ((DiskBasedResultSet)rs).nextPage(pageNum++);
+      byte[][][] bytes = ((DiskBasedResultSet) rs).nextPage(pageNum++);
       if (bytes == null) {
         return false;
       }
@@ -332,12 +347,6 @@ public class DiskBasedResultSet {
       }
       file.mkdirs();
     }
-
-//    if (records != null && records.length < count) {
-//      ResultSetImpl.sortResults(server.getClient().getCommon(), select, records, tableNames);
-//      sorted = true;
-//    }
-//    writeRecordsToFile(out, records);
     AtomicInteger fileOffset = new AtomicInteger();
 
     Map<String, Integer> tableOffsets = new HashMap<>();
@@ -554,12 +563,6 @@ public class DiskBasedResultSet {
         else {
           file.setLastModified(System.currentTimeMillis());
         }
-        //      try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(timeFile)))) {
-        //        writer.write(str);
-        //      }
-        //      catch (IOException e) {
-        //        throw new DatabaseException(e);
-        //      }
       }
       catch (Exception e) {
         throw new DatabaseException(e);
@@ -589,27 +592,7 @@ public class DiskBasedResultSet {
   }
 
   private void mergeSort(short serializationVersion, String dbName, File file) {
-
     mergeNFiles(serializationVersion, dbName, file, file.listFiles());
-//    while (true) {
-//      File[] files = file.listFiles();
-//      if (files.length == 1) {
-//        break;
-//      }
-//      int offset = 0;
-//      for (; offset < files.length; offset += 2) {
-//        if (offset >= files.length - 1) {
-//          break;
-//        }
-//        mergeTwoFiles(file, files[offset], files[offset + 1], files.length == 2);
-//      }
-//      if (offset - 1 == files.length) {
-//        mergeTwoFiles(file, files[offset - 1], files[0], true);
-//      }
-//      if (files.length <= 2) {
-//        return;
-//      }
-//    }
   }
 
   private void mergeTwoFiles(short serializationVersion, String dbName, File file, File file1, File file2, boolean lastTwoFiles) throws Exception {
@@ -620,8 +603,7 @@ public class DiskBasedResultSet {
     File outFile = new File(file, name);
     DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new LzoOutputStream(new FileOutputStream(outFile))));
     try (DataInputStream in1 = new DataInputStream(new BufferedInputStream(new LzoInputStream(new FileInputStream(file1), new LzoDecompressor1x())));
-        DataInputStream in2 = new DataInputStream(new BufferedInputStream(new LzoInputStream(new FileInputStream(file2), new LzoDecompressor1x()))))
-    {
+         DataInputStream in2 = new DataInputStream(new BufferedInputStream(new LzoInputStream(new FileInputStream(file2), new LzoDecompressor1x())))) {
 
       Comparator<Record[]> comparator = null;
       if (orderByExpressions.size() > 0) {
@@ -958,8 +940,8 @@ public class DiskBasedResultSet {
   }
 
   private DataOutputStream writeRow(short serializationVersion,
-      Record[] row, DataOutputStream out, AtomicInteger rowNumber, AtomicInteger page,
-      File file)  {
+                                    Record[] row, DataOutputStream out, AtomicInteger rowNumber, AtomicInteger page,
+                                    File file) {
     try {
       for (int i = 0; i < row.length; i++) {
         if (row[i] == null) {
@@ -1023,35 +1005,32 @@ public class DiskBasedResultSet {
 
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
-//      try (BufferedOutputStream bufferedOut = new BufferedOutputStream(new FileOutputStream(subFile), 65_000);//new LzoOutputStream());
-//        DataOutputStream out = new DataOutputStream(bufferedOut)) {
 
-        for (int i = 0; i < records.length; i++) {
-          for (int j = 0; j < records[0].length; j++) {
-            ExpressionImpl.CachedRecord record = records[i][j];
-            if (record == null) {
-              out.writeBoolean(false);
-            }
-            else {
-              out.writeBoolean(true);
-              Record rec = record.getRecord();//record.serialize(server.getCommon());
-              byte[] bytes = rec.serialize(server.getCommon(), serializationVersion);
-              Varint.writeSignedVarLong(bytes.length, out);
-              out.write(bytes);
-            }
+      for (int i = 0; i < records.length; i++) {
+        for (int j = 0; j < records[0].length; j++) {
+          ExpressionImpl.CachedRecord record = records[i][j];
+          if (record == null) {
+            out.writeBoolean(false);
+          }
+          else {
+            out.writeBoolean(true);
+            Record rec = record.getRecord();//record.serialize(server.getCommon());
+            byte[] bytes = rec.serialize(server.getCommon(), serializationVersion);
+            Varint.writeSignedVarLong(bytes.length, out);
+            out.write(bytes);
           }
         }
-        RandomAccessFile randomAccessFile = new RandomAccessFile(subFile, "rwd");
-        randomAccessFile.write(bytesOut.toByteArray());
-        randomAccessFile.close();
-//      }
+      }
+      RandomAccessFile randomAccessFile = new RandomAccessFile(subFile, "rwd");
+      randomAccessFile.write(bytesOut.toByteArray());
+      randomAccessFile.close();
     }
     catch (IOException e) {
       throw new DatabaseException(e);
     }
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
+  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP2", justification = "copying the passed in data is too slow")
   @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public DiskBasedResultSet(
       DatabaseServer databaseServer, SelectStatementImpl select, String[] tableNames, long resultSetId, boolean restrictToThisServer,
@@ -1091,56 +1070,35 @@ public class DiskBasedResultSet {
       randomAccessFile.close();
 
       DataInputStream in = new DataInputStream(new ByteArrayInputStream(buffer));
-//      try (BufferedInputStream bufferedIn = new BufferedInputStream(new FileInputStream(subFile), 65_000);//new LzoInputStream(, new LzoDecompressor1x()));
-//           DataInputStream in = new DataInputStream(bufferedIn)) {
 
-        AtomicInteger AtomicInteger = new AtomicInteger();
-
-        //    //skip to the right page
-        //    try {
-        //      for (int i = 0; i < pageNumber * count; i++) {
-        //        for (int j = 0; j < tableNames.length; j++) {
-        //          if (in.readBoolean()) {
-        //            int len = (int) Varint.readSignedVarLong(in, AtomicInteger);
-        //            byte[] bytes = new byte[len];
-        //            in.readFully(bytes);
-        //          }
-        //        }
-        //      }
-        //    }
-        //    catch (EOFException e) {
-        //      //expected
-        //    }
-
-        List<byte[][]> records = new ArrayList<>();
-        try {
-          while (true) {
-            byte[][] row = new byte[tableNames.length][];
-            for (int j = 0; j < tableNames.length; j++) {
-              if (in.readBoolean()) {
-                int len = (int) Varint.readSignedVarLong(in);
-                byte[] bytes = new byte[len];
-                in.readFully(bytes);
-                row[j] = bytes;
-              }
+      List<byte[][]> records = new ArrayList<>();
+      try {
+        while (true) {
+          byte[][] row = new byte[tableNames.length][];
+          for (int j = 0; j < tableNames.length; j++) {
+            if (in.readBoolean()) {
+              int len = (int) Varint.readSignedVarLong(in);
+              byte[] bytes = new byte[len];
+              in.readFully(bytes);
+              row[j] = bytes;
             }
-            records.add(row);
           }
+          records.add(row);
         }
-        catch (EOFException e) {
-          //expected
-        }
+      }
+      catch (EOFException e) {
+        //expected
+      }
 
-        if (records.size() == 0) {
-          return null;
-        }
+      if (records.size() == 0) {
+        return null;
+      }
 
-        byte[][][] ret = new byte[records.size()][][];
-        for (int i = 0; i < ret.length; i++) {
-          ret[i] = records.get(i);
-        }
-        return ret;
-//      }
+      byte[][][] ret = new byte[records.size()][][];
+      for (int i = 0; i < ret.length; i++) {
+        ret[i] = records.get(i);
+      }
+      return ret;
     }
     catch (Exception e) {
       throw new DatabaseException(e);

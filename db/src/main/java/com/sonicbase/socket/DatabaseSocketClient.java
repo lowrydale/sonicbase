@@ -1,6 +1,7 @@
 package com.sonicbase.socket;
 
 import com.sonicbase.common.ComObject;
+import com.sonicbase.common.DeadServerException;
 import com.sonicbase.query.DatabaseException;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -42,15 +44,15 @@ public class DatabaseSocketClient {
   private static ConcurrentHashMap<String, ArrayBlockingQueue<Connection>> pools = new ConcurrentHashMap<>();
 
   private static AtomicInteger connectionCount = new AtomicInteger();
-  private List<Thread> batchThreads = new ArrayList<>();
   private static ConcurrentLinkedQueue<Connection> openConnections = new ConcurrentLinkedQueue<>();
+  private static boolean shutdown;
 
 
   public static int getConnectionCount() {
     return connectionCount.get();
   }
 
-  private static Connection borrow_connection(String host, int port) {
+  private static Connection borrow_connection(final String host, final int port) {
     for (int i = 0; i < 1; i++) {
       try {
         Connection sock = null;
@@ -59,31 +61,43 @@ public class DatabaseSocketClient {
           pool = new ArrayBlockingQueue<>(CONNECTION_COUNT);
           pools.put(host + ":" + port, pool);
         }
-//        if (connectionCount.get() >= CONNECTION_COUNT) {
-//          sock = pool.poll(20000, TimeUnit.MILLISECONDS);
-//          if (sock == null) {
-//            throw new DatabaseException("Pool returned null connection - max connections");
-//          }
-//        }
-//        else {
         sock = pool.poll(0, TimeUnit.MILLISECONDS);
         if (sock == null) {
           try {
+            final CountDownLatch latch = new CountDownLatch(1);
+            final AtomicReference<Connection> newSock = new AtomicReference<>();
             connectionCount.incrementAndGet();
-            sock = new Connection(host, port);//new NioClient(host, port);
-            openConnections.add(sock);
+            Thread thread = new Thread(new Runnable(){
+              @Override
+              public void run() {
+                try {
+                  newSock.set(new Connection(host, port));//new NioClient(host, port);
+                  openConnections.add(newSock.get());
+                  latch.countDown();
+                }
+                catch (Exception e) {
+                  logger.error("Error connecting to server: host=" + host + ", port=" + port);
+                }
+              }
+            });
+            thread.start();
+            if (latch.await(20_000, TimeUnit.MILLISECONDS)) {
+              sock = newSock.get();
+            }
+            else {
+              thread.interrupt();
+              thread.join();
+              throw new DatabaseException("Error connecting to server: host=" + host + ", port=" + port);
+            }
           }
           catch (Exception t) {
             throw new Exception("Error creating connection: host=" + host + ", port=" + port, t);
           }
         }
         sock.count_called++;
-        //}
         return sock;
       }
       catch (Exception t) {
-        //logger.error("Error borrowing connection: host=" + host + ", port=" + port);
-        //   t.printStackTrace();
         try {
           Thread.sleep(100);
         }
@@ -98,7 +112,6 @@ public class DatabaseSocketClient {
 
   public static void return_connection(
       Connection sock, String host, int port) {
-//      synchronized (borrowLock) {
     if (sock != null) {
       try {
         pools.get(host + ":" + port).put(sock);
@@ -107,64 +120,47 @@ public class DatabaseSocketClient {
         throw new DatabaseException(e);
       }
     }
-//      }
   }
 
   private static EventLoopGroup clientGroup = new NioEventLoopGroup(); // NIO event loops are also OK
 
-  public List<Thread> getBatchThreads() {
-    return batchThreads;
-  }
 
-  public void shutdown() {
-    synchronized (batchThreads) {
-      for (Thread thread : batchThreads) {
-        thread.interrupt();
-        try {
-          thread.join();
-        }
-        catch (InterruptedException e) {
-          throw new DatabaseException(e);
+  public static void shutdown() {
+    shutdown = true;
+    synchronized (DatabaseSocketClient.class) {
+      for (ArrayBlockingQueue<Connection> pool : pools.values()) {
+        while (true) {
+          try {
+            Connection conn = pool.poll(1, TimeUnit.MILLISECONDS);
+            if (conn == null) {
+              break;
+            }
+          }
+          catch (InterruptedException e) {
+            logger.error("Error closing connection pool");
+          }
         }
       }
-    }
-    if (true) {
-      synchronized (DatabaseSocketClient.class) {
-        for (ArrayBlockingQueue<Connection> pool : pools.values()) {
-          while (true) {
-            try {
-              Connection conn = pool.poll(1, TimeUnit.MILLISECONDS);
-              if (conn == null) {
-                break;
-              }
-            }
-            catch (InterruptedException e) {
-              logger.error("Error closing connection pool");
-            }
-          }
+      List<Connection> toRemove = new ArrayList<>();
+      for (Connection conn : openConnections) {
+        try {
+          conn.sock.shutdownInput();
+          conn.sock.shutdownOutput();
+          conn.sock.close();
+          toRemove.add(conn);
         }
-        List<Connection> toRemove = new ArrayList<>();
-        for (Connection conn : openConnections) {
-          try {
-            conn.sock.shutdownInput();
-            conn.sock.shutdownOutput();
-            conn.sock.close();
-            toRemove.add(conn);
-          }
-          catch (IOException e) {
-            logger.info("Error closing connection");
-          }
+        catch (IOException e) {
+          logger.info("Error closing connection");
         }
-        for (Connection curr : toRemove) {
-          openConnections.remove(curr);
-        }
+      }
+      for (Connection curr : toRemove) {
+        openConnections.remove(curr);
       }
     }
   }
 
   public static class NioClient {
     private ClientNioHandler clientHandler;
-    //private io.netty.channel.Channel channel;
 
     public NioClient(String address, int port) {
 
@@ -190,23 +186,6 @@ public class DatabaseSocketClient {
         throw new DatabaseException(e);
       }
 
-
-//      NioEventLoopGroup workerGroup = new NioEventLoopGroup();
-//      Bootstrap b = new Bootstrap();
-//      b.group(workerGroup);
-//      b.channel(NioSocketChannel.class);
-//
-//      this.clientHandler = new ClientNioHandler();
-//      b.handler(new ChannelInitializer<io.netty.channel.socket.SocketChannel>() {
-//
-//        @Override
-//        public void initChannel(io.netty.channel.socket.SocketChannel ch) throws Exception {
-//          ch.pipeline().addLast(clientHandler);
-//          NioClient.this.channel = ch;
-//        }
-//      });
-//
-//      b.connect(address, port);
       while (clientHandler.channel == null) {
         try {
           Thread.sleep(1);
@@ -242,7 +221,6 @@ public class DatabaseSocketClient {
 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) {
-      //this.channel = ctx.channel();
     }
 
     @Override
@@ -255,7 +233,6 @@ public class DatabaseSocketClient {
         if (body == null) {
           int bytesToRead = Math.min(4 - lenPos, ((ByteBuf) msg).readableBytes());
           ((ByteBuf) msg).readBytes(lenBytes, lenPos, bytesToRead);
-          //System.arraycopy(((ByteBuf) msg).array(), 0, lenBytes, lenPos, bytesToRead);
           lenPos += bytesToRead;
           if (lenPos == 4) {
             body = new byte[Util.readRawLittleEndian32(lenBytes)];
@@ -264,10 +241,8 @@ public class DatabaseSocketClient {
             if (bytesToRead < ((ByteBuf) msg).readableBytes()) {
               bytesToRead = ((ByteBuf) msg).readableBytes();
               ((ByteBuf) msg).readBytes(body, bodyPos, bytesToRead);
-              //  System.arraycopy(((ByteBuf) msg).array(), 0, body, bodyPos, bytesToRead);
               bodyPos += bytesToRead;
               if (bodyPos == body.length) {
-                //ctx.close();
                 bodyPos = lenPos = 0;
                 latch.countDown();
               }
@@ -277,10 +252,8 @@ public class DatabaseSocketClient {
         else if (body != null) {
           int numBytesToRead = ((ByteBuf) msg).readableBytes();
           ((ByteBuf) msg).readBytes(body, bodyPos, numBytesToRead);
-          //          System.arraycopy(((ByteBuf) msg).array(), 0, body, bodyPos, ((ByteBuf) msg).readableBytes());
           bodyPos += numBytesToRead;
           if (bodyPos == body.length) {
-            //ctx.close();
             bodyPos = lenPos = 0;
             latch.countDown();
           }
@@ -311,10 +284,7 @@ public class DatabaseSocketClient {
           this.sock.connect(address);
           this.sock.configureBlocking(true);
 
-          //      this.sock = new Socket(host, port);
           sock.socket().setSoLinger(true, 120);
-          //
-          //sock.setSoLinger(false, 0);
           sock.socket().setKeepAlive(true);
           sock.socket().setReuseAddress(true);
           sock.socket().setSoTimeout(100000000);
@@ -398,7 +368,6 @@ public class DatabaseSocketClient {
   public static void sendBatch(String host, int port, List<Request> requests) {
     try {
       long begin = System.nanoTime();
-      //while (true) {
       totalCallCount.incrementAndGet();
       if (callCount.incrementAndGet() % 10000 == 0) {
         int connectionCount = 0;
@@ -463,33 +432,21 @@ public class DatabaseSocketClient {
       boolean shouldReturn = true;
       Connection sock = borrow_connection(host, port);
       try {
-        //System.out.println("borrow: " + (end - begin) / 1000000f);
-
         ByteArrayOutputStream sockBytes = new ByteArrayOutputStream();
 
         sockBytes.write(intBuff);
-//          ByteBuffer buf = ByteBuffer.wrap(intBuff);
-//          sock.sock.write(buf);
         if (COMPRESS) {
           byte[] originalLenBuff = new byte[4];
           Util.writeRawLittleEndian32(originalBodyLen, originalLenBuff);
-          //buf = ByteBuffer.wrap(originalLenBuff);
-          //sock.sock.write(buf);
           sockBytes.write(originalLenBuff);
 
         }
-//          CRC32 checksum = new CRC32();
-//          checksum.update(body, 0, body.length);
         long checksumValue = 0;//checksum.getValue();
-        //checksumValue = Arrays.hashCode(body);
         byte[] longBuff = new byte[8];
 
         Util.writeRawLittleEndian64(checksumValue, longBuff);
-        //buf = ByteBuffer.wrap(longBuff);
-        //sock.sock.write(buf);
         sockBytes.write(longBuff);
 
-        //sock.sock.write(ByteBuffer.wrap(body));
         sockBytes.write(body);
 
         long beginRequest = System.nanoTime();
@@ -503,14 +460,6 @@ public class DatabaseSocketClient {
 
         byte[] responseBody = readResponse(intBuff, sock, totalRead, bodyLen, processingBegin);
 
-
-        //
-        //                    int lenRead = in.read(responseBody, totalRead, responseBody.length - totalRead);
-        //                    if (lenRead == -1) {
-        //                      throw new Exception("EOF");
-        //                    }
-        //
-
         int offset = 0;
         if (COMPRESS) {
           originalBodyLen = Util.readRawLittleEndian32(responseBody, 0);
@@ -518,15 +467,6 @@ public class DatabaseSocketClient {
         }
         long responseChecksum = Util.readRawLittleEndian64(responseBody, offset);
         offset += 8;
-        //body = new byte[responseBody.length - offset];
-        //System.arraycopy(responseBody, offset, body, 0, body.length);
-
-//          checksum = new CRC32();
-//          checksum.update(body, 0, body.length);
-        checksumValue = 0;//checksum.getValue();
-//          if (checksumValue != responseChecksum) {
-//            throw new DatabaseException("Checksum mismatch");
-//          }
 
         if (DatabaseSocketClient.COMPRESS) {
           if (DatabaseSocketClient.LZO_COMPRESSION) {
@@ -604,7 +544,6 @@ public class DatabaseSocketClient {
       }
       buf.flip();
       buf.get(intBuff, totalRead, nBytes);
-      //System.arraycopy(buf.array(), 0, intBuff, totalRead, nBytes);
       buf.clear();
 
       totalRead += nBytes;
@@ -613,25 +552,14 @@ public class DatabaseSocketClient {
         break;
       }
     }
-    //              int lenRead = sock.sock.read(intBuff, totalRead, intBuff.length - totalRead);
-    //              if (lenRead == -1) {
-    //                throw new Exception("EOF");
-    //}
-    //        totalRead += nBytes;
-    //        if (totalRead == intBuff.length) {
-    //          bodyLen = Util.readRawLittleEndian32(intBuff);
-    //          break;
-    //        }
 
     totalRead = 0;
     byte[] responseBody = new byte[bodyLen];
-    //while (true) {
     nBytes = 0;
     buf = ByteBuffer.allocateDirect(responseBody.length - totalRead);
     while ((nBytes = sock.sock.read(buf)) > 0) {
       buf.flip();
       buf.get(responseBody, totalRead, nBytes);
-      //System.arraycopy(buf.array(), 0, responseBody, totalRead, nBytes);
       buf.clear();
 
       totalRead += nBytes;
@@ -765,175 +693,5 @@ public class DatabaseSocketClient {
     catch (Exception e) {
       throw new DatabaseException(e);
     }
-//    long begin = System.nanoTime();
-//    NioClient sock = borrow_connection(host, port);
-//    try {
-//      long end = System.nanoTime();
-//      //System.out.println("borrow: " + (end - begin) / 1000000f);
-//      //sock.sock.setSoTimeout(timeout);
-//      //OutputStream out = new BufferedOutputStream(sock.sock.getOutputStream());
-//
-//      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-//      byte[] intBuff = new byte[4];
-//      byte[] commandBytes = command.getBytes("utf-8");
-//      Util.writeRawLittleEndian32(commandBytes.length, intBuff);
-//      bytesOut.write(intBuff);
-//      int origBodyLen = body == null ? 0 : body.length;
-//      if (body == null) {
-//        Util.writeRawLittleEndian32(0, intBuff);
-//        bytesOut.write(intBuff);
-//      }
-//      else {
-//        if (COMPRESS) {
-//          if (LZO_COMPRESSION) {
-//            LZ4Factory factory = LZ4Factory.fastestInstance();
-//
-//            LZ4Compressor compressor = factory.fastCompressor();
-//            int maxCompressedLength = compressor.maxCompressedLength(body.length);
-//            byte[] compressed = new byte[maxCompressedLength];
-//            int compressedLength = compressor.compress(body, 0, body.length, compressed, 0, maxCompressedLength);
-//            body = new byte[compressedLength];
-//            System.arraycopy(compressed, 0, body, 0, compressedLength);
-//          }
-//          else {
-//            ByteArrayOutputStream bodyBytesOut = new ByteArrayOutputStream();
-//            GZIPOutputStream bodyOut = new GZIPOutputStream(bodyBytesOut);
-//            bodyOut.write(body);
-//            bodyOut.close();
-//            body = bodyBytesOut.toByteArray();
-//          }
-//          Util.writeRawLittleEndian32(body.length + 12, intBuff);
-//          bytesOut.write(intBuff);
-//        }
-//        else {
-//          Util.writeRawLittleEndian32(body.length + 8, intBuff);
-//          bytesOut.write(intBuff);
-//        }
-//      }
-//      bytesOut.write(commandBytes);
-//      if (body != null) {
-//        if (COMPRESS) {
-//          Util.writeRawLittleEndian32(origBodyLen, intBuff);
-//          bytesOut.write(intBuff);
-//        }
-//        CRC32 checksum = new CRC32();
-//        checksum.update(body, 0, body.length);
-//        long checksumValue = checksum.getValue();
-//        checksumValue = Arrays.hashCode(body);
-//        byte[] longBuff = new byte[8];
-//        Util.writeRawLittleEndian64(checksumValue, longBuff);
-//        bytesOut.write(longBuff);
-//
-//        bytesOut.write(body);
-//      }
-//      bytesOut.close();
-//      sock.clientHandler.latch = new CountDownLatch(1);
-//      sock.clientHandler.channel.write(ByteBuffer.wrap(bytesOut.toByteArray()));
-//      sock.clientHandler.channel.flush();
-//      //out.flush();
-//      //InputStream in = new BufferedInputStream(sock.sock.getInputStream());
-//      int totalRead = 0;
-//
-//      boolean success = false;
-//      int responseLen = 0;
-//      byte[] headerBuff = new byte[1 + 4];
-//
-//      sock.clientHandler.await();
-//
-////      int bodyLen = 0;
-////      while (true) {
-////        int nBytes = 0;
-////        ByteBuffer buf = ByteBuffer.allocate(intBuff.length - totalRead);
-////        while ((nBytes = nBytes = sock.sock.read(buf)) > 0) {
-////          buf.flip();
-////          System.arraycopy(buf.array(), 0, intBuff, totalRead, nBytes);
-////          buf.flip();
-////        }
-////              int lenRead = sock.sock.read(intBuff, totalRead, intBuff.length - totalRead);
-////              if (lenRead == -1) {
-////                throw new Exception("EOF");
-//        //}
-////        totalRead += nBytes;
-////        if (totalRead == intBuff.length) {
-////          bodyLen = Util.readRawLittleEndian32(intBuff);
-////          break;
-////        }
-////      }
-//
-////      totalRead = 0;
-////      byte[] responseBody = new byte[bodyLen];
-////      while (true) {
-////        int nBytes = 0;
-////        ByteBuffer buf = ByteBuffer.allocate(responseBody.length - totalRead);
-////        while ((nBytes = nBytes = sock.sock.read(buf)) > 0) {
-////          buf.flip();
-////          System.arraycopy(buf.array(), 0, responseBody, totalRead, nBytes);
-////          buf.flip();
-////        }
-////
-//////              int lenRead = in.read(responseBody, totalRead, responseBody.length - totalRead);
-//////              if (lenRead == -1) {
-//////                throw new Exception("EOF");
-//////              }
-////        totalRead += nBytes;
-////        if (totalRead == responseBody.length) {
-////          break;
-////        }
-////      }
-//
-//
-////      while (true) {
-////        int nBytes = 0;
-////        ByteBuffer buf = ByteBuffer.allocate(headerBuff.length - totalRead);
-////        while ((nBytes = nBytes = sock.sock.read(buf)) > 0) {
-////          buf.flip();
-////          System.arraycopy(buf.array(), 0, headerBuff, totalRead, nBytes);
-////          buf.flip();
-////        }
-////        int lenRead = in.read(headerBuff, totalRead, headerBuff.length - totalRead);
-////        if (lenRead == -1) {
-////          throw new Exception("EOF");
-////        }
-////        totalRead += nBytes;
-////        if (totalRead == headerBuff.length) {
-////          success = headerBuff[0] == 1;
-////          responseLen = Util.readRawLittleEndian32(headerBuff, 1);
-////          break;
-////        }
-////      }
-//
-////      totalRead = 0;
-////      byte[] retBytes = new byte[responseLen];
-////      while (true) {
-////        int nBytes = 0;
-////        ByteBuffer buf = ByteBuffer.allocate(retBytes.length - totalRead);
-////        while ((nBytes = nBytes = sock.sock.read(buf)) > 0) {
-////          buf.flip();
-////          System.arraycopy(buf.array(), 0, retBytes, totalRead, nBytes);
-////          buf.flip();
-////        }
-////        int lenRead = in.read(retBytes, totalRead, retBytes.length - totalRead);
-////        if (lenRead == -1) {
-////          throw new Exception("EOF");
-////        }
-////        totalRead += nBytes;
-////        if (totalRead == retBytes.length) {
-////          if (!success) {
-////            throw new Exception(new String(retBytes, "utf-8"));
-////          }
-////          break;
-////        }
-////      }
-//      return_connection(sock, host, port);
-//
-//      return sock.clientHandler.body;
-//    }
-//    catch (SocketException e) {
-//      sock.clientHandler.channel.close();
-//      connectionCount.decrementAndGet();
-//      throw e;
-//    }
   }
-
-
 }

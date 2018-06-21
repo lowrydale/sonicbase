@@ -29,11 +29,11 @@ public class LocalConsumer implements StreamsConsumer {
   }
 
   @Override
-  public List<Message> receive() {
+  public List<com.sonicbase.streams.Message> receive() {
     try {
-      List<Message> ret = new ArrayList<>();
+      List<com.sonicbase.streams.Message> ret = new ArrayList<>();
       for (int i = 0; i < 10; i++) {
-        Message message = new Message();
+        com.sonicbase.streams.Message message = new com.sonicbase.streams.Message();
         String msg = LocalProducer.queue.poll(100, TimeUnit.MILLISECONDS);
         if (msg != null) {
           message.setBody(msg);
@@ -51,7 +51,7 @@ public class LocalConsumer implements StreamsConsumer {
   }
 
   @Override
-  public void acknowledgeMessages(List<Message> messages) {
+  public void acknowledgeMessages(List<com.sonicbase.streams.Message> messages) {
   }
 
   @Override

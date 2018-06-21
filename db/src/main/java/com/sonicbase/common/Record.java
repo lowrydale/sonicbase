@@ -43,14 +43,6 @@ public class Record {
     try {
       DataInputStream sin = new DataInputStream(new ByteArrayInputStream(bytes, !readHeader ? 26 : 0, !readHeader ? bytes.length - 26 : bytes.length));
       if (!readHeader) {
-//        int toSkip = 8 + 8 + 2 * 4 + 2;
-//        while (true) {
-//          int skipped = sin.skipBytes(toSkip);
-//          toSkip -= skipped;
-//          if (toSkip == 0) {
-//            break;
-//          }
-//        }
       }
       else {
         short serializationVersion = sin.readShort();

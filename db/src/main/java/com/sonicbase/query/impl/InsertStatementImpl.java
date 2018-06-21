@@ -1,13 +1,10 @@
 package com.sonicbase.query.impl;
 
 
+import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComArray;
 import com.sonicbase.common.ComObject;
-import com.sonicbase.procedure.RecordEvaluator;
-import com.sonicbase.procedure.StoredProcedureContextImpl;
-import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.InsertStatement;
-import com.sonicbase.client.DatabaseClient;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,17 +29,6 @@ public class InsertStatementImpl extends StatementImpl implements InsertStatemen
     this.tableName = tableName.toLowerCase();
   }
 
-  @Override
-  public Object execute(String dbName, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
-                        boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) throws DatabaseException {
-    try {
-      return client.doInsert(dbName, this, getParms());
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-  }
-
   public List<Object> getValues() {
     return values;
   }
@@ -54,32 +40,6 @@ public class InsertStatementImpl extends StatementImpl implements InsertStatemen
   public List<String> getColumns() {
     return columnNames;
   }
-
-//  List srcColumns = stmt.getColumns();
-//    ExpressionList items = (ExpressionList) stmt.getItemsList();
-//    List srcExpressions = items.getExpressions();
-//    for (int i = 0; i < srcColumns.size(); i++) {
-//      Column column = (Column) srcColumns.get(i);
-//      columnNames.add(column.getColumnName().toLowerCase());
-//      Expression expression = (Expression) srcExpressions.get(i);
-//      //todo: this doesn't handle out of order fields
-//      if (expression instanceof JdbcParameter) {
-//        values.add(new ParameterNode());
-//      }
-//      else if (expression instanceof StringValue) {
-//        values.add(((StringValue) expression).getValue());
-//      }
-//      else if (expression instanceof LongValue) {
-//        values.add(((LongValue) expression).getValue());
-//      }
-//      else if (expression instanceof DoubleValue) {
-//        values.add(((DoubleValue) expression).getValue());
-//      }
-//      else {
-//        throw new Exception("Unexpected column type: " + expression.getClass().getName());
-//      }
-
-
 
   @Override
   public void addValue(String columnName, Object value) {
@@ -108,7 +68,6 @@ public class InsertStatementImpl extends StatementImpl implements InsertStatemen
     cobj.put(ComObject.Tag.tableName, tableName);
 
     //todo: add support for values when needed
-    //cobj.putArray(ComObject.Tag.insearverValues, ComObject.Type.objectType);
 
     ComArray columnsArray = cobj.putArray(ComObject.Tag.columns, ComObject.Type.stringType);
     for (String column : columnNames) {

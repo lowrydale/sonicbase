@@ -60,7 +60,7 @@ if [ "$_JMX_PORT_" != "" ]; then
   export _JAVA_OPTS_=$_JAVA_OPTS_' -Dcom.sun.management.jmxremote.port='$_JMX_PORT_
 fi
 echo "search_home=$SEARCH_HOME"
-_SEARCH_CLASSPATH_=$SEARCH_HOME/target/:$SEARCH_HOME/config/
+_SEARCH_CLASSPATH_=$SEARCH_HOME/target/:$SEARCH_HOME/config/:$SEARCH_HOME/mgmt/
 for f in $SEARCH_HOME/lib/*.jar; do
   _SEARCH_CLASSPATH_=$_SEARCH_CLASSPATH_:$f
 done

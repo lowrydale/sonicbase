@@ -2,6 +2,7 @@ package com.sonicbase.server;
 
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Record;
+import com.sonicbase.common.RecordLockedException;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 
@@ -29,7 +30,7 @@ public class TransactionManager {
     deleteEntryByKey
   }
 
-  private final DatabaseServer server;
+  private final com.sonicbase.server.DatabaseServer server;
   private ConcurrentHashMap<Long, Transaction> transactions = new ConcurrentHashMap<>();
   private ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Object[], RecordLock>>> locks = new ConcurrentHashMap<>();
 

@@ -94,13 +94,15 @@ public class ParenthesisImpl extends ExpressionImpl {
   }
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset, boolean b, boolean analyze) {
-    NextReturn ret = doNext(explain, count, currOffset, limit, offset);
+  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
+                         Limit limit, Offset offset, boolean b, boolean analyze, int schemaRetryCount) {
+    NextReturn ret = doNext(explain, count, currOffset, countReturned, limit, offset, schemaRetryCount);
     return ret;
 //    return expression.next(count, eplain, currOffset, limit, offset, b);
   }
 
-  private NextReturn doNext(SelectStatementImpl.Explain explain, int count, AtomicLong currOffset, Limit limit, Offset offset) {
+  private NextReturn doNext(SelectStatementImpl.Explain explain, int count, AtomicLong currOffset,
+                            AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
     if (isNot) {
       TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(getTableName());
       IndexSchema indexSchema = null;
@@ -120,11 +122,23 @@ public class ParenthesisImpl extends ExpressionImpl {
       }
       BinaryExpression.Operator op = ascending ? BinaryExpression.Operator.greater : BinaryExpression.Operator.less;
       AtomicReference<String> usedIndex = new AtomicReference<>();
-      SelectContextImpl context = lookupIds(dbName, getClient().getCommon(), getClient(), getReplica(), count, tableSchema.getName(), indexSchema.getName(), isForceSelectOnServer(),
-          op, null, getOrderByExpressions(), getNextKey(), getParms(), this, null, getNextKey(), null,
-          getColumns(), indexSchema.getFields()[0], getNextShard(), getRecordCache(), usedIndex, isNot, getViewVersion(),
-          getCounters(), getGroupByContext(), debug, currOffset, limit, offset, isProbe(), isRestrictToThisServer(),
-          getProcedureContext());
+
+      IndexLookup indexLookup = new IndexLookup();
+      indexLookup.setCount(count);
+      indexLookup.setIndexName(indexSchema.getName());
+      indexLookup.setLeftOp(op);
+      indexLookup.setLeftKey(getNextKey());
+      indexLookup.setLeftOriginalKey(getNextKey());
+      indexLookup.setColumnName(indexSchema.getFields()[0]);
+      indexLookup.setCurrOffset(currOffset);
+      indexLookup.setCountReturned(countReturned);
+      indexLookup.setLimit(limit);
+      indexLookup.setOffset(offset);
+      indexLookup.setSchemaRetryCount(schemaRetryCount);
+      indexLookup.setUsedIndex(usedIndex);
+      indexLookup.setEvaluateExpression(isNot);
+
+      SelectContextImpl context = indexLookup.lookup(this, getTopLevelExpression());
       setNextShard(context.getNextShard());
       setNextKey(context.getNextKey());
       NextReturn ret = new NextReturn();
@@ -138,8 +152,8 @@ public class ParenthesisImpl extends ExpressionImpl {
   }
 
 
-  public NextReturn next(SelectStatementImpl.Explain explainBuilder, AtomicLong currOffset, Limit limit, Offset offset) {
-    NextReturn ret = doNext(null,1000, currOffset, limit, offset);
+  public NextReturn next(SelectStatementImpl.Explain explainBuilder, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
+    NextReturn ret = doNext(null,1000, currOffset, countReturned, limit, offset, schemaRetryCount);
     return ret;
   }
 
@@ -236,10 +250,6 @@ public class ParenthesisImpl extends ExpressionImpl {
   @Override
   public boolean canUseIndex() {
     return false;
-//    if (isNot) {
-//      return false;
-//    }
-//    return expression.canUseIndex();
   }
 
   @Override

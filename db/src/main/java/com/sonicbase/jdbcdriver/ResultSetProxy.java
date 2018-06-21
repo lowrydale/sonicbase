@@ -907,92 +907,26 @@ public class ResultSetProxy implements java.sql.ResultSet {
 
   public Date getDate(int columnIndex, Calendar cal) throws SQLException {
     throw new NotImplementedException();
-//    if (getCurrentRow() == null) {
-//      wasNull = true;
-//      return null;
-//    }
-//    Date ret = getCurrentRow().getDate(columnIndex, cal);
-//    if (ret == null) {
-//      wasNull = true;
-//      return null;
-//    }
-//    wasNull = false;
-//    return ret;
   }
 
   public Date getDate(String columnLabel, Calendar cal) throws SQLException {
     throw new NotImplementedException();
-//      columnLabel = getNameFromAlias(columnLabel, getCurrentRow().getSelectStatement());
-//    if (getCurrentRow() == null) {
-//      wasNull = true;
-//      return null;
-//    }
-//    Date ret = getCurrentRow().getDate(columnLabel, cal);
-//    if (ret == null) {
-//      wasNull = true;
-//      return null;
-//    }
-//    wasNull = false;
-//    return ret;
   }
 
   public Time getTime(int columnIndex, Calendar cal) throws SQLException {
     throw new NotImplementedException();
-//    try {
-//      Time ret = resultSet.getTime(columnIndex, cal);
-//      if (ret == null) {
-//        wasNull = true;
-//        return null;
-//      }
-//      wasNull = false;
-//      return ret;
-//    }
-//    catch (Exception e) {
-//      throw new SQLException(e);
-//    }
   }
 
   public Time getTime(String columnLabel, Calendar cal) throws SQLException {
     throw new NotImplementedException();
-//      columnLabel = getNameFromAlias(columnLabel, getCurrentRow().getSelectStatement());
-//    if (getCurrentRow() == null) {
-//      wasNull = true;
-//      return null;
-//    }
-//    Time ret = getCurrentRow().getTime(columnLabel, cal);
-//    if (ret == null) {
-//      wasNull = true;
-//      return null;
-//    }
-//    wasNull = false;
-//    return ret;
   }
 
   public Timestamp getTimestamp(int columnIndex, Calendar cal) throws SQLException {
     throw new NotImplementedException();
-//    Timestamp ret = resultSet.getTimestamp(columnIndex, cal);
-//    if (ret == null) {
-//      wasNull = true;
-//      return null;
-//    }
-//    wasNull = false;
-//    return ret;
   }
 
   public Timestamp getTimestamp(String columnLabel, Calendar cal) throws SQLException {
     throw new NotImplementedException();
-//      columnLabel = getNameFromAlias(columnLabel, getCurrentRow().getSelectStatement());
-//    if (getCurrentRow() == null) {
-//      wasNull = true;
-//      return null;
-//    }
-//    Timestamp ret = getCurrentRow().getTimestamp(columnLabel, cal);
-//    if (ret == null) {
-//      wasNull = true;
-//      return null;
-//    }
-//    wasNull = false;
-//    return ret;
   }
 
   public URL getURL(int columnIndex) throws SQLException {
@@ -1114,29 +1048,6 @@ public class ResultSetProxy implements java.sql.ResultSet {
   }
 
   public ResultSetMetaData getMetaData() throws SQLException {
-//    if (resultSetMetadataForBufferedRow != null) {
-//      return resultSetMetadataForBufferedRow;
-//    }
-//
-//    if (this.statement instanceof SelectStatement) {
-//      SelectStatement selectStatement = (SelectStatement) statement;
-//      List<FromTable> fromList = selectStatement.getSelectNode().getFromList();
-//      Table table = null;
-//      if (resultSets.size() > 0 && resultSets.get(0).resultSet != null) {
-//        return resultSets.get(0).resultSet.getMetaData();
-//      }
-////      else {
-////        table = lookupTableByName.get(fromList.get(0).getTableName().toUpperCase()); //todo: support multiple froms
-////        if (table == null) {
-////          return new MetaDataProxy();
-////        }
-////      }
-//      return new MetaDataProxy();
-//      //todo: all branches have same result
-//    }
-//    else {
-//      return new MetaDataProxy();
-//    }
     throw new SQLException("not supported");
   }
 

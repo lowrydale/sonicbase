@@ -38,7 +38,7 @@ public class Logger {
               ComObject cobj = new ComObject();
               cobj.put(ComObject.Tag.dbName, "__none__");
               cobj.put(ComObject.Tag.schemaVersion, error.client.getCommon().getSchemaVersion());
-              cobj.put(ComObject.Tag.method, "logError");
+              cobj.put(ComObject.Tag.method, "DatabaseServer.logError");
               cobj.put(ComObject.Tag.isClient, isClient);
               cobj.put(ComObject.Tag.host, hostName);
               cobj.put(ComObject.Tag.message, error.msg);
@@ -64,7 +64,7 @@ public class Logger {
           }
         }
       }, "SonicBase Log Sender Thread");
-      sendThread.start();
+      //sendThread.start();
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -91,6 +91,10 @@ public class Logger {
 
   public static void setReady() {
     ready = true;
+  }
+
+  public static ArrayBlockingQueue<Error> getQueue() {
+    return queue;
   }
 
   public void errorLocalOnly(String msg, Throwable throwable) {
@@ -157,17 +161,17 @@ public class Logger {
         }
       }
       if (ready && databaseClient != null) {
-        if (queue.size() < 9_000) {
-          if (shard != -1) {
-            queue.put(new Error(databaseClient, "shard=" + shard + ", replica=" + replica + " " + msg, e));
-          }
-          else {
-            queue.put(new Error(databaseClient, msg, e));
-          }
-        }
-        else {
-          logger.error(msg, e);
-        }
+//        if (queue.size() < 9_000) {
+//          if (shard != -1) {
+//            queue.put(new Error(databaseClient, "shard=" + shard + ", replica=" + replica + " " + msg, e));
+//          }
+//          else {
+//            queue.put(new Error(databaseClient, msg, e));
+//          }
+//        }
+//        else {
+//          logger.error(msg, e);
+//        }
       }
     }
     catch (Exception e1) {
@@ -185,20 +189,20 @@ public class Logger {
         return;
       }
       if (ready) {
-        if (queue.size() < 9_000) {
-          if (shard != -1) {
-            queue.put(new Error(databaseClient, "shard=" + shard + ", replica=" + replica + " " + msg, e));
-          }
-          else {
-            queue.put(new Error(databaseClient, msg, e));
-          }
-        }
-        else {
-          logger.error(msg, e);
-        }
+//        if (queue.size() < 9_000) {
+//          if (shard != -1) {
+//            queue.put(new Error(databaseClient, "shard=" + shard + ", replica=" + replica + " " + msg, e));
+//          }
+//          else {
+//            queue.put(new Error(databaseClient, msg, e));
+//          }
+//        }
+//        else {
+//          logger.error(msg, e);
+//        }
       }
     }
-    catch (InterruptedException e1) {
+    catch (Exception e1) {
       throw new DatabaseException(e1);
     }
   }

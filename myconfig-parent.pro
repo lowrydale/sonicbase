@@ -1,5 +1,5 @@
--injars       db/target/sonicbase-core-unobfuscated-1.2.11.jar
--outjars      db/target/sonicbase-core-1.2.11.jar
+-injars       db/target/sonicbase-core-unobfuscated-1.2.12.jar
+-outjars      db/target/sonicbase-core-1.2.12.jar
 -libraryjars  <java.home>/lib/rt.jar
 -printmapping sonicbase-parent.map
 
@@ -10,8 +10,8 @@
 -renamesourcefileattribute SourceFile
 -keepattributes Exceptions,InnerClasses,Signature,Deprecated,SourceFile,LineNumberTable,*Annotation*,EnclosingMethod
 
--keep public class com.sonicbase.bench.CustomFunctions
--keep public class com.sonicbase.bench.TestPerformance
+-keep public class CustomFunctions
+-keep public class TestPerformance
 -keep public class com.sonicbase.jdbcdriver.Driver
 -keep public class com.sonicbase.client.ReconfigureResults
 -keep public class com.sonicbase.jdbcdriver.ConnectionProxy
@@ -34,11 +34,27 @@
 -keep public class com.sonicbase.util.DateUtils
 -keep public class com.sonicbase.common.SchemaOutOfSyncException
 -keep public class com.sonicbase.server.LogManager$ByteCounterStream
+-keep public class com.sonicbase.common.Logger
+-keep public class com.sonicbase.server.HttpServer
+-keep public class com.sonicbase.server.MonitorHandler
 
--keepclassmembers  class com.sonicbase.bench.TestPerformance {
+
+-keepclassmembers  class com.sonicbase.server.MonitorHandler {
     !private <methods>;
 }
--keepclassmembers  class com.sonicbase.bench.CustomFunctions {
+
+-keepclassmembers  class com.sonicbase.server.HttpServer {
+    !private <methods>;
+}
+
+-keepclassmembers  class com.sonicbase.common.Logger {
+    !private <methods>;
+}
+
+-keepclassmembers  class TestPerformance {
+    !private <methods>;
+}
+-keepclassmembers  class CustomFunctions {
     !private <methods>;
 }
 
@@ -113,10 +129,10 @@
     !private <methods>;
 }
 
--keep public class com.sonicbase.bench.TestPerformance {
+-keep public class TestPerformance {
       public static void main(java.lang.String[]);
 }
--keep public class com.sonicbase.research.socket.NettyServer {
+-keep public class com.sonicbase.server.NettyServer {
       public static void main(java.lang.String[]);
 }
 -keep public class com.sonicbase.misc.FindIdInSnapshot {
@@ -143,8 +159,8 @@
 -keep public class com.sonicbase.streams.KafkaConsumer
 -keep public class com.sonicbase.streams.StreamsConsumer
 -keep public class com.sonicbase.streams.Message
--keep public class com.sonicbase.research.socket.NettyServer$MyChannelInitializer
--keep public class com.sonicbase.research.socket.NettyServer$ServerHandler
+-keep public class com.sonicbase.server.NettyServer$MyChannelInitializer
+-keep public class com.sonicbase.server.NettyServer$ServerHandler
 -keep public class com.sonicbase.server.MethodInvoker
 -keep public class com.sonicbase.procedure.MyStoredProcedure1
 -keep public class com.sonicbase.procedure.MyStoredProcedure2
@@ -163,6 +179,11 @@
 -keep public class com.sonicbase.website.Tutorial
 -keep public class com.sonicbase.misc.TestMissing
 
+
+-keepclassmembers  class com.sonicbase.streams.LocalProducer {
+    !private <methods>;
+    !public <methods>;
+}
 
 -keepclassmembers  class com.sonicbase.misc.TestMissing {
       public static void main(java.lang.String[]);
@@ -246,7 +267,7 @@
 -keepclassmembers  class com.sonicbase.server.LogManager$ByteCounterStream {
     !private <methods>;
 }
--keepclassmembers class com.sonicbase.research.socket.NettyServer {
+-keepclassmembers class com.sonicbase.server.NettyServer {
     !private <methods>;
     private <methods>;
 }
@@ -262,11 +283,11 @@
     !private <methods>;
     private <methods>;
 }
--keepclassmembers class com.sonicbase.research.socket.NettyServer$ServerHandler {
+-keepclassmembers class com.sonicbase.server.NettyServer$ServerHandler {
     !private <methods>;
     private <methods>;
 }
--keepclassmembers class com.sonicbase.research.socket.NettyServer$MyChannelInitializer {
+-keepclassmembers class com.sonicbase.server.NettyServer$MyChannelInitializer {
     !private <methods>;
     private <methods>;
 }

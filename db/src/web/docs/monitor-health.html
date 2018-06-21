@@ -1,0 +1,64 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>SonicBase - Monitoring Health</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="desription" content="SonicBase Monitoring for Cluster Health.">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="../javascript/main.js"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-109032274-1');
+        ga('require', 'displayfeatures');
+    </script>
+</head>
+
+<body>
+<div class="container">
+    <header id="myHeader">
+        <div class="mobile">
+            <a href="../index.html">
+                <h4 class="logo">SonicBase™</h4>
+            </a>
+        </div>
+
+        <div class="desktop">
+            <a href="../index.html">
+                <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+            </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+        </div>
+    </header>
+
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+    <div class="main-page-text">
+
+        The health page shows the general health of the cluster. Each box on the page represents a server in the cluster.
+        A green box means the server is healthy. A red box means the server is down. The master replica is marked with
+        an "M". Each shard has a master. The master of shard zero is the main cluster master.
+        Each box is also marked with the host and port of the server.
+<br/><br/>
+        <img src="../images/health.png" width="800px"/>
+
+    </div>
+</div>
+</body>
+</html>

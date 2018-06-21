@@ -66,7 +66,7 @@ public class TestAWSBackup {
         //          String role = "primaryMaster";
 
         dbServers[shard] = new DatabaseServer();
-        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), null, true);
+        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
         dbServers[shard].setRole(role);
         dbServers[shard].disableLogProcessor();
         dbServers[shard].setMinSizeForRepartition(0);
@@ -197,7 +197,7 @@ public class TestAWSBackup {
 
       while (true) {
         ComObject cobj = new ComObject();
-        cobj.put(ComObject.Tag.method, "areAllLongRunningCommandsComplete");
+        cobj.put(ComObject.Tag.method, "DatabaseServer:areAllLongRunningCommandsComplete");
 
         byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().sendToMaster(cobj);
         if (new String(bytes).equals("true")) {
@@ -215,10 +215,10 @@ public class TestAWSBackup {
       List<ColumnImpl> columns = new ArrayList<>();
       columns.add(new ColumnImpl(null, null, "persons", "socialsecuritynumber", null));
 
-      long size = client.getPartitionSize("test", 0, "children", "_1_socialsecuritynumber");
+      long size = client.getPartitionSize("test", 0, "children", "socialsecuritynumber");
       assertEquals(size, 10);
 
-      client.beginRebalance("test", "persons", "_1__primarykey");
+      client.beginRebalance("test", "persons", "_primarykey");
 
 
       while (true) {
@@ -228,15 +228,15 @@ public class TestAWSBackup {
         Thread.sleep(1000);
       }
 
-      assertEquals(client.getPartitionSize("test", 0, "persons", "_1__primarykey"), 9);
-      assertEquals(client.getPartitionSize("test", 1, "persons", "_1__primarykey"), 11);
-      long count = client.getPartitionSize("test", 0, "children", "_1__primarykey");
+      assertEquals(client.getPartitionSize("test", 0, "persons", "_primarykey"), 9);
+      assertEquals(client.getPartitionSize("test", 1, "persons", "_primarykey"), 11);
+      long count = client.getPartitionSize("test", 0, "children", "_primarykey");
       assertEquals(count, 9);
-      count = client.getPartitionSize("test", 1, "children", "_1__primarykey");
+      count = client.getPartitionSize("test", 1, "children", "_primarykey");
       assertEquals(count, 11);
-      count = client.getPartitionSize("test", 0, "children", "_1_socialsecuritynumber");
+      count = client.getPartitionSize("test", 0, "children", "socialsecuritynumber");
       assertEquals(count, 4);
-      count = client.getPartitionSize("test", 1, "children", "_1_socialsecuritynumber");
+      count = client.getPartitionSize("test", 1, "children", "socialsecuritynumber");
       assertEquals(count, 6);
 
       dbServers[0].enableSnapshot(false);
@@ -281,7 +281,7 @@ public class TestAWSBackup {
 
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "__none__");
-      cobj.put(ComObject.Tag.method, "getLastBackupDir");
+      cobj.put(ComObject.Tag.method, "BackupManager:getLastBackupDir");
       cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
       byte[] ret = client.send(null, 0, 0, cobj, DatabaseClient.Replica.master);
       ComObject retObj = new ComObject(ret);
@@ -311,7 +311,7 @@ public class TestAWSBackup {
       cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "test");
       cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "forceDeletes");
+      cobj.put(ComObject.Tag.method, "DeleteManager:forceDeletes");
       client.sendToAllShards(null, 0, cobj, DatabaseClient.Replica.all);
 
       executor.shutdownNow();

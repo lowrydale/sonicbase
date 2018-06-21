@@ -12,6 +12,4 @@ public interface CreateTableStatement {
   void addField(String name, int sqlType);
 
   void setPrimaryKey(List<String> columnNames);
-
-  int execute(String dbName) throws DatabaseException;
 }

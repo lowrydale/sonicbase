@@ -48,17 +48,6 @@ public class CreateIndexStatementImpl implements CreateIndexStatement {
     }
   }
 
-  @Override
-  public int execute(String dbName) throws DatabaseException {
-    try {
-      client.doCreateIndex(dbName, this);
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-    return 1;
-  }
-
   public void setIsUnique(boolean isUnique) {
     this.isUnique = isUnique;
   }

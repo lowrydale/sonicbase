@@ -129,9 +129,6 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
         serializeExpression(expression, out);
       }
       serializeExpression(leftExpression, out);
-//      out.writeShort(SnapshotManagerImpl.SNAPSHOT_SERIALIZATION_VERSION);
-//      out.writeInt(leftExpression.getType().getId());
-//      leftExpression.serialize(out);
       out.writeBoolean(isNot);
       if (tableName == null) {
         out.writeByte(0);
@@ -168,11 +165,9 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
       leftExpression = deserializeExpression(in);
       isNot = in.readBoolean();
 
-      //if (this.serializationVersion >= SnapshotManagerImpl.SERIALIZATION_VERSION_22) {
-        if (1 == in.readByte()) {
-          tableName = in.readUTF();
-        }
-      //}
+      if (1 == in.readByte()) {
+        tableName = in.readUTF();
+      }
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -201,7 +196,8 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
   }
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset, boolean b, boolean analyze) {
+  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
+                         Limit limit, Offset offset, boolean b, boolean analyze, int schemaRetryCount) {
     if (getNextShard() == -2) {
       return new NextReturn(new String[]{getTableName()}, null);
     }
@@ -252,12 +248,23 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
 
       Object[] key = new Object[]{value};
       AtomicReference<String> usedIndex = new AtomicReference<>();
-      SelectContextImpl currRet = lookupIds(dbName, getClient().getCommon(), getClient(), getReplica(), count,
-          tableName, indexSchema.getName(), isForceSelectOnServer(),
-          BinaryExpression.Operator.equal, null,
-          null, key, getParms(), this, null, key, null, getColumns(), cNode.getColumnName(), -1, getRecordCache(), usedIndex,
-          false, getViewVersion(), getCounters(), getGroupByContext(), debug, currOffset, limit,
-          offset, isProbe(), isRestrictToThisServer(), getProcedureContext());
+
+      IndexLookup indexLookup = new IndexLookup();
+      indexLookup.setCount(count);
+      indexLookup.setIndexName(indexSchema.getName());
+      indexLookup.setLeftOp(BinaryExpression.Operator.equal);
+      indexLookup.setLeftKey(key);
+      indexLookup.setLeftOriginalKey(key);
+      indexLookup.setColumnName(cNode.getColumnName());
+      indexLookup.setCurrOffset(currOffset);
+      indexLookup.setCountReturned(countReturned);
+      indexLookup.setLimit(limit);
+      indexLookup.setOffset(offset);
+      indexLookup.setSchemaRetryCount(schemaRetryCount);
+      indexLookup.setUsedIndex(usedIndex);
+      indexLookup.setEvaluateExpression(false);
+
+      SelectContextImpl currRet = indexLookup.lookup(this, getTopLevelExpression());
       ret = aggregateResults(ret, currRet.getCurrKeys());
     }
     setNextShard(-2);
@@ -265,8 +272,8 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
   }
 
 
-  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset) {
-    return next(DatabaseClient.SELECT_PAGE_SIZE, explain, currOffset, limit, offset, false, false);
+  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
+    return next(DatabaseClient.SELECT_PAGE_SIZE, explain, currOffset, countReturned, limit, offset, false, false, schemaRetryCount);
   }
 
   @Override

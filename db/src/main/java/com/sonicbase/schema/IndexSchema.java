@@ -17,11 +17,12 @@ public class IndexSchema {
   private Comparator[] comparators;
   private TableSchema.Partition[] lastPartitions;
   private TableSchema.Partition[] currPartitions;
+  private int[] fieldOffsets;
 
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
   @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public IndexSchema(String name, int indexId, boolean isUnique, String[] fields, Comparator[] comparators,
-                     TableSchema.Partition[] partitions, boolean isPrimaryKey, boolean isPrimaryKeyGroup) {
+                     TableSchema.Partition[] partitions, boolean isPrimaryKey, boolean isPrimaryKeyGroup, TableSchema tableSchema) {
     this.name = name;
     this.indexId = indexId;
     this.isUnique = isUnique;
@@ -29,6 +30,7 @@ public class IndexSchema {
     for (int i = 0; i < fields.length; i++) {
       this.fields[i] = fields[i].toLowerCase();
     }
+    calculateFieldOffsets(tableSchema);
     this.comparators = comparators;
     this.currPartitions = partitions;
     this.isPrimaryKey = isPrimaryKey;
@@ -53,8 +55,16 @@ public class IndexSchema {
 
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
   @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
-  public void setFields(String[] fields) {
+  public void setFields(String[] fields, TableSchema tableSchema) {
     this.fields = fields;
+    calculateFieldOffsets(tableSchema);
+  }
+
+  private void calculateFieldOffsets(TableSchema tableSchema) {
+    this.fieldOffsets = new int[fields.length];
+    for (int i = 0; i < fieldOffsets.length; i++) {
+      fieldOffsets[i] = tableSchema.getFieldOffset(fields[i]);
+    }
   }
 
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
@@ -88,6 +98,10 @@ public class IndexSchema {
   @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public void setComparators(Comparator[] comparators) {
     this.comparators = comparators;
+  }
+
+  public int[] getFieldOffsets() {
+    return fieldOffsets;
   }
 
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP", justification="copying the returned data is too slow")

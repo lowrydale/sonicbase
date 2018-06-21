@@ -42,7 +42,7 @@ public class FunctionImpl extends ExpressionImpl {
     max_timestamp(new MaxTimestampFunction()),
     sum(new SumFunction()),
     min(new MinFunction()),
-    min_timestamp(new MinTImestampFunction()),
+    min_timestamp(new MinTimestampFunction()),
     bit_shift_left(new BitShiftLeftFunction()),
     bit_shift_right(new BitShiftRightFunction()),
     bit_and(new BitAndFunction()),
@@ -326,7 +326,7 @@ public class FunctionImpl extends ExpressionImpl {
     }
   }
 
-  static class MinTImestampFunction implements FunctionBase {
+  static class MinTimestampFunction implements FunctionBase {
     @Override
     public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
       Timestamp min = null;
@@ -923,12 +923,13 @@ public class FunctionImpl extends ExpressionImpl {
   }
 
   @Override
-  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset) {
+  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
     return null;
   }
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, Limit limit, Offset offset, boolean evaluateExpression, boolean analyze) {
+  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
+                         Limit limit, Offset offset, boolean evaluateExpression, boolean analyze, int schemaRetryCount) {
     return null;
   }
 

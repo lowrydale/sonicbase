@@ -1,5 +1,7 @@
 package com.sonicbase.query;
 
+import com.sonicbase.jdbcdriver.NotImplementedException;
+
 import java.io.InputStream;
 import java.io.Reader;
 import java.math.BigDecimal;
@@ -27,7 +29,7 @@ public interface ResultSet {
 
   Double getDouble(String columnLabel);
 
-  BigDecimal getBigDecimal(String columnLabel, int scale);
+  BigDecimal getBigDecimal(String columnLabel, int scale) throws NotImplementedException;
 
   byte[] getBytes(String columnLabel);
 
@@ -44,6 +46,8 @@ public interface ResultSet {
   Reader getCharacterStream(String columnLabel);
 
   BigDecimal getBigDecimal(String columnLabel);
+
+  String getString(int columnIndex);
 
   Integer getInt(int columnIndex);
 

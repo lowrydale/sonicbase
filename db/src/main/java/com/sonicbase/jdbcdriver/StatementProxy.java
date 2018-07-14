@@ -38,7 +38,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
   private StoredProcedureContextImpl procedureContext;
   private boolean disableStats;
 
-  StatementProxy(ConnectionProxy connectionProxy, DatabaseClient databaseClient, String sql) throws SQLException {
+  public StatementProxy(ConnectionProxy connectionProxy, DatabaseClient databaseClient, String sql) throws SQLException {
     this.connectionProxy = connectionProxy;
     this.databaseClient = databaseClient;
     this.sql = sql;
@@ -501,21 +501,11 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
   }
 
   public void setObject(int parameterIndex, Object x, int targetSqlType) throws SQLException {
-    try {
-      parms.setObject(parameterIndex, x, targetSqlType);
-    }
-    catch (Exception e) {
-      throw new SQLException(e);
-    }
+    throw new SQLException("not supported");
   }
 
   public void setObject(int parameterIndex, Object x) throws SQLException {
-    try {
-      parms.setObject(parameterIndex, x);
-    }
-    catch (Exception e) {
-      throw new SQLException(e);
-    }
+    throw new SQLException("not supported");
   }
 
   public void setCharacterStream(int parameterIndex, Reader reader, int length) throws SQLException {
@@ -528,12 +518,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
   }
 
   public void setRef(int parameterIndex, Ref x) throws SQLException {
-    try {
-      parms.setRef(parameterIndex, x);
-    }
-    catch (Exception e) {
-      throw new SQLException(e);
-    }
+    throw new SQLException("not supported");
   }
 
   public void setBlob(int parameterIndex, Blob x) throws SQLException {
@@ -555,12 +540,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
   }
 
   public void setArray(int parameterIndex, Array x) throws SQLException {
-    try {
-      parms.setArray(parameterIndex, x);
-    }
-    catch (Exception e) {
-      throw new SQLException(e);
-    }
+    throw new SQLException("not supported");
   }
 
   public ResultSetMetaData getMetaData() throws SQLException {
@@ -568,30 +548,15 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
   }
 
   public void setDate(int parameterIndex, Date x, Calendar cal) throws SQLException {
-    try {
-      parms.setDate(parameterIndex, x, cal);
-    }
-    catch (Exception e) {
-      throw new SQLException(e);
-    }
+    throw new SQLException("not supported");
   }
 
   public void setTime(int parameterIndex, Time x, Calendar cal) throws SQLException {
-    try {
-      parms.setTime(parameterIndex, x, cal);
-    }
-    catch (Exception e) {
-      throw new SQLException(e);
-    }
+    throw new SQLException("not supported");
   }
 
   public void setTimestamp(int parameterIndex, Timestamp x, Calendar cal) throws SQLException {
-    try {
-      parms.setTimestamp(parameterIndex, x, cal);
-    }
-    catch (Exception e) {
-      throw new SQLException(e);
-    }
+    throw new SQLException("not supported");
   }
 
   public void setNull(int parameterIndex, int sqlType, String typeName) throws SQLException {
@@ -604,12 +569,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
   }
 
   public void setURL(int parameterIndex, URL x) throws SQLException {
-    try {
-      parms.setURL(parameterIndex, x);
-    }
-    catch (Exception e) {
-      throw new SQLException(e);
-    }
+    throw new SQLException("not supported");
   }
 
   public ParameterMetaData getParameterMetaData() throws SQLException {
@@ -617,12 +577,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
   }
 
   public void setRowId(int parameterIndex, RowId x) throws SQLException {
-    try {
-      parms.setRowId(parameterIndex, x);
-    }
-    catch (Exception e) {
-      throw new SQLException(e);
-    }
+    throw new SQLException("not supported");
   }
 
   public void setNString(int parameterIndex, String value) throws SQLException {
@@ -680,26 +635,16 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
   }
 
   public void setSQLXML(int parameterIndex, SQLXML xmlObject) throws SQLException {
-    try {
-      parms.setSQLXML(parameterIndex, xmlObject);
-    }
-    catch (Exception e) {
-      throw new SQLException(e);
-    }
+    throw new SQLException("not supported");
   }
 
   public void setObject(int parameterIndex, Object x, int targetSqlType, int scaleOrLength) throws SQLException {
-    try {
-      parms.setObject(parameterIndex, x, targetSqlType, scaleOrLength);
-    }
-    catch (Exception e) {
-      throw new SQLException(e);
-    }
+    throw new SQLException("not supported");
   }
 
   public void setAsciiStream(int parameterIndex, InputStream x, long length) throws SQLException {
     try {
-      parms.setAsciiStream(parameterIndex, x, length);
+      parms.setAsciiStream(parameterIndex, x, (int)length);
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -708,7 +653,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
 
   public void setBinaryStream(int parameterIndex, InputStream x, long length) throws SQLException {
     try {
-      parms.setBinaryStream(parameterIndex, x, length);
+      parms.setBinaryStream(parameterIndex, x, (int)length);
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -717,7 +662,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
 
   public void setCharacterStream(int parameterIndex, Reader reader, long length) throws SQLException {
     try {
-      parms.setCharacterStream(parameterIndex, reader, length);
+      parms.setCharacterStream(parameterIndex, reader, (int)length);
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -801,6 +746,14 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
 
   public void disableStats() {
     this.disableStats = true;
+  }
+
+  public void setParms(ParameterHandler parms) {
+    this.parms = parms;
+  }
+
+  public String getSql() {
+    return sql;
   }
 }
 

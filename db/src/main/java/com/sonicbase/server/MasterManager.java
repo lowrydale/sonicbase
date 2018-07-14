@@ -7,7 +7,6 @@ import com.sonicbase.common.ComObject;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.ThreadUtil;
 import com.sonicbase.query.DatabaseException;
-import com.sonicbase.server.DatabaseServer;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -65,6 +64,10 @@ public class MasterManager {
   }
 
   public void startMasterMonitor() {
+    startMasterMonitor(null);
+  }
+
+  public void startMasterMonitor(Long timeoutOverride) {
     if (server.getReplicationFactor() == 1) {
       if (server.getShard() != 0) {
         return;
@@ -80,7 +83,7 @@ public class MasterManager {
             catch (Exception e) {
               logger.error("Error promoting to master", e);
               try {
-                Thread.sleep(2000);
+                Thread.sleep(timeoutOverride == null ? 2000 : timeoutOverride);
               }
               catch (InterruptedException e1) {
                 break;
@@ -125,7 +128,7 @@ public class MasterManager {
                 AtomicInteger nextMonitor = new AtomicInteger(-1);
                 while (!server.getShutdown() && nextMonitor.get() == -1) {
                   try {
-                    Thread.sleep(2000);
+                    Thread.sleep(timeoutOverride == null ? 2000 : timeoutOverride);
                     electNewMaster(shard, -1, monitorShards, monitorReplicas, nextMonitor);
                   }
                   catch (Exception e) {
@@ -134,7 +137,7 @@ public class MasterManager {
                 }
                 while (!server.getShutdown()) {
                   try {
-                    Thread.sleep(server.getDeathOverride() == null ? 2000 : 1000);
+                    Thread.sleep(timeoutOverride == null ? (server.getDeathOverride() == null ? 2000 : 1000) : timeoutOverride);
 
                     final int masterReplica = server.getCommon().getServersConfig().getShards()[shard].getMasterReplica();
                     if (masterReplica == -1) {
@@ -396,8 +399,6 @@ public class MasterManager {
       server.getLogManager().skipToMaxSequenceNumber();
 
       if (server.getShard() == 0) {
-        server.getLicenseManager().shutdownMasterLicenseValidator();
-        server.getLicenseManager().startMasterLicenseValidator();
 
         fixSchemaTimer = new Timer();
         fixSchemaTimer.schedule(new TimerTask(){
@@ -406,8 +407,6 @@ public class MasterManager {
             server.getSchemaManager().reconcileSchema();
           }
         }, 5 * 60 * 1000, 5 * 60 * 1000);
-
-        server.getMonitorManager().startMasterMonitor();
 
         server.startStreamsConsumerMonitor();
 

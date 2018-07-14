@@ -477,9 +477,9 @@ public class ReadManagerTest {
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 
-    byte[][] records = IndexLookupTest.createRecords(common, tableSchema, 10);
+    byte[][] records = IndexLookupTest.createRecords(common, tableSchema, 2000);
 
-    List<Object[]> keys = IndexLookupTest.createKeys(10);
+    List<Object[]> keys = IndexLookupTest.createKeys(2000);
 
     int k = 0;
     for (Object[] key : keys) {
@@ -573,10 +573,10 @@ public class ReadManagerTest {
     retObj = readManager.serverSetSelect(cobj, false);
 
     ComArray retArray = retObj.getArray(ComObject.Tag.tableRecords);
-    for (int j = 0; j < records.length; j++) {
+    for (int j = 0; j < 1000; j++) {
       ComArray recordArray = (ComArray) retArray.getArray().get(j);
       assertEquals(recordArray.getArray().get(0), records[j]);
     }
-    assertEquals(retArray.getArray().size(), records.length);
+    assertEquals(retArray.getArray().size(), 1001);
   }
 }

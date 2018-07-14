@@ -80,13 +80,8 @@ public class ParameterHandler {
     getCurrParmsByIndex().put(parameterIndex, new Parameter.BigDecimal(x));
   }
 
-  public void setString(int parameterIndex, String x) throws SQLException {
-    try {
-      getCurrParmsByIndex().put(parameterIndex, new Parameter.String(x.getBytes("utf-8")));
-    }
-    catch (Exception e) {
-      throw new SQLException(e);
-    }
+  public void setString(int parameterIndex, String x) throws SQLException, UnsupportedEncodingException {
+    getCurrParmsByIndex().put(parameterIndex, new Parameter.String(x.getBytes("utf-8")));
   }
 
   public void setBytes(int parameterIndex, byte[] x) throws SQLException {
@@ -105,11 +100,11 @@ public class ParameterHandler {
     getCurrParmsByIndex().put(parameterIndex, new Parameter.Timestamp(x));
   }
 
-  public void setAsciiStream(int parameterIndex, InputStream x, int length) throws SQLException {
+  public void setAsciiStream(int parameterIndex, InputStream x, int length) throws SQLException, IOException {
     getCurrParmsByIndex().put(parameterIndex, new Parameter.AsciiStream(x, length));
   }
 
-  public void setUnicodeStream(int parameterIndex, InputStream x, int length) throws SQLException {
+  public void setUnicodeStream(int parameterIndex, InputStream x, int length) throws SQLException, IOException {
     getCurrParmsByIndex().put(parameterIndex, new Parameter.UnicodeStream(x, length));
   }
 
@@ -118,7 +113,7 @@ public class ParameterHandler {
     byte[] bytes = new byte[length];
     try {
       x.read(bytes);
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       throw new SQLException(ex);
     }
     getCurrParmsByIndex().put(parameterIndex, new Parameter.BinaryStream(bytes, length));
@@ -129,67 +124,20 @@ public class ParameterHandler {
     currParmsByName.clear();
   }
 
-  public void setObject(int parameterIndex, Object x, int targetSqlType) throws SQLException {
-    throw new SQLException("not supported");
+  public void setCharacterStream(int parameterIndex, Reader reader, int length) throws SQLException, IOException {
+    getCurrParmsByIndex().put(parameterIndex, new Parameter.CharacterStream(reader, length));
   }
-
-  public void setObject(int parameterIndex, Object x) throws SQLException {
-    throw new SQLException("not supported");
-  }
-
-  public void setCharacterStream(int parameterIndex, Reader reader, int length) throws SQLException {
-    try {
-      getCurrParmsByIndex().put(parameterIndex, new Parameter.CharacterStream(reader, length));
-    }
-    catch (IOException e) {
-      throw new SQLException(e);
-    }
-  }
-
-  public void setRef(int parameterIndex, Ref x) throws SQLException {
-    throw new SQLException("not supported");
-   }
 
   public void setBlob(int parameterIndex, Blob x) throws SQLException {
     getCurrParmsByIndex().put(parameterIndex, new Parameter.Blob(x));
   }
 
-  public void setClob(int parameterIndex, Clob x) throws SQLException {
-    try {
-      getCurrParmsByIndex().put(parameterIndex, new Parameter.Clob(x));
-    }
-    catch (UnsupportedEncodingException e) {
-      throw new SQLException(e);
-    }
-  }
-
-  public void setArray(int parameterIndex, Array x) throws SQLException {
-    getCurrParmsByIndex().put(parameterIndex, new Parameter.Array(x));
-  }
-
-  public ResultSetMetaData getMetaData() throws SQLException {
-    //todo: implement
-    throw new NotImplementedException();
-  }
-
-  public void setDate(int parameterIndex, Date x, Calendar cal) throws SQLException {
-    getCurrParmsByIndex().put(parameterIndex, new Parameter.Date(x, cal));
-  }
-
-  public void setTime(int parameterIndex, Time x, Calendar cal) throws SQLException {
-    getCurrParmsByIndex().put(parameterIndex, new Parameter.Time(x, cal));
-  }
-
-  public void setTimestamp(int parameterIndex, Timestamp x, Calendar cal) throws SQLException {
-    getCurrParmsByIndex().put(parameterIndex, new Parameter.Timestamp(x, cal));
+  public void setClob(int parameterIndex, Clob x) throws SQLException, UnsupportedEncodingException {
+    getCurrParmsByIndex().put(parameterIndex, new Parameter.Clob(x));
   }
 
   public void setNull(int parameterIndex, int sqlType, String typeName) throws SQLException {
     getCurrParmsByIndex().put(parameterIndex, new Parameter.Null(sqlType, typeName));
-  }
-
-  public void setURL(int parameterIndex, URL x) throws SQLException {
-    throw new SQLException("not supported");
   }
 
   public ParameterMetaData getParameterMetaData() throws SQLException {
@@ -197,11 +145,7 @@ public class ParameterHandler {
     throw new NotImplementedException();
   }
 
-  public void setRowId(int parameterIndex, RowId x) throws SQLException {
-    getCurrParmsByIndex().put(parameterIndex, new Parameter.RowId(x));
-  }
-
-  public void setNString(int parameterIndex, String value) throws SQLException {
+  public void setNString(int parameterIndex, String value) throws SQLException, UnsupportedEncodingException {
     getCurrParmsByIndex().put(parameterIndex, new Parameter.NString(value));
   }
 
@@ -209,61 +153,23 @@ public class ParameterHandler {
     getCurrParmsByIndex().put(parameterIndex, new Parameter.NCharacterStream(value, length));
   }
 
-  public void setNClob(int parameterIndex, NClob value) throws SQLException {
-    try {
-      getCurrParmsByIndex().put(parameterIndex, new Parameter.NClob(value));
-    }
-    catch (UnsupportedEncodingException e) {
-      throw new SQLException(e);
-    }
+  public void setNClob(int parameterIndex, NClob value) throws SQLException, UnsupportedEncodingException {
+    getCurrParmsByIndex().put(parameterIndex, new Parameter.NClob(value));
   }
 
-  public void setClob(int parameterIndex, Reader reader, long length) throws SQLException {
+  public void setClob(int parameterIndex, Reader reader, long length) throws SQLException, IOException {
     getCurrParmsByIndex().put(parameterIndex, new Parameter.ClobReader(reader, length));
   }
 
-  public void setBlob(int parameterIndex, InputStream inputStream, long length) throws SQLException {
-//noblob
-//    getCurrParmsByIndex().put(parameterIndex, new Parameter.BlobStream(inputStream, length));
+  public void setBlob(int parameterIndex, InputStream inputStream, long length) throws SQLException, IOException {
+    getCurrParmsByIndex().put(parameterIndex, new Parameter.Blob(inputStream, (int)length));
   }
 
-  public void setNClob(int parameterIndex, Reader reader, long length) throws SQLException {
+  public void setNClob(int parameterIndex, Reader reader, long length) throws SQLException, IOException {
     getCurrParmsByIndex().put(parameterIndex, new Parameter.NClobReader(reader, length));
   }
 
-  public void setSQLXML(int parameterIndex, SQLXML xmlObject) throws SQLException {
-    throw new SQLException("not supported");
-  }
-
-  public void setObject(int parameterIndex, Object x, int targetSqlType, int scaleOrLength) throws SQLException {
-    throw new SQLException("not supported");
-  }
-
-  public void setAsciiStream(int parameterIndex, InputStream x, long length) throws SQLException {
-    getCurrParmsByIndex().put(parameterIndex, new Parameter.AsciiStream(x, length));
-  }
-
-  public void setBinaryStream(int parameterIndex, InputStream x, long length) throws SQLException {
-//noblob
-    byte[] bytes = new byte[(int)length];
-    try {
-      x.read(bytes);
-    } catch (IOException ex) {
-      throw new SQLException(ex);
-    }
-    getCurrParmsByIndex().put(parameterIndex, new Parameter.BinaryStream(bytes, length));
-  }
-
-  public void setCharacterStream(int parameterIndex, Reader reader, long length) throws SQLException {
-    try {
-      getCurrParmsByIndex().put(parameterIndex, new Parameter.CharacterStream(reader, length));
-    }
-    catch (IOException e) {
-      throw new SQLException(e);
-    }
-  }
-
-  public void setAsciiStream(int parameterIndex, InputStream x) throws SQLException {
+  public void setAsciiStream(int parameterIndex, InputStream x) throws SQLException, IOException {
     getCurrParmsByIndex().put(parameterIndex, new Parameter.AsciiStream(x));
   }
 
@@ -276,45 +182,35 @@ public class ParameterHandler {
       bytes = out.toByteArray();
       x.read(bytes);
     }
-    catch (IOException ex) {
+    catch (Exception ex) {
       throw new SQLException(ex);
     }
     getCurrParmsByIndex().put(parameterIndex, new Parameter.BinaryStream(bytes, bytes.length));
 
   }
 
-  public void setCharacterStream(int parameterIndex, Reader reader) throws SQLException {
-    try {
-      getCurrParmsByIndex().put(parameterIndex, new Parameter.CharacterStream(reader));
-    }
-    catch (IOException e) {
-      throw new SQLException(e);
-    }
+  public void setCharacterStream(int parameterIndex, Reader reader) throws SQLException, IOException {
+    getCurrParmsByIndex().put(parameterIndex, new Parameter.CharacterStream(reader));
   }
 
-  public void setNCharacterStream(int parameterIndex, Reader value) throws SQLException {
+  public void setNCharacterStream(int parameterIndex, Reader value) throws SQLException, IOException {
     getCurrParmsByIndex().put(parameterIndex, new Parameter.NCharacterStream(value));
   }
 
-  public void setClob(int parameterIndex, Reader reader) throws SQLException {
+  public void setClob(int parameterIndex, Reader reader) throws SQLException, IOException {
     getCurrParmsByIndex().put(parameterIndex, new Parameter.ClobReader(reader));
   }
 
-  public void setBlob(int parameterIndex, InputStream inputStream) throws SQLException {
-    try {
-      ByteArrayOutputStream out = new ByteArrayOutputStream();
-      IOUtils.copy(inputStream, out);
-      out.close();
-      byte[] bytes = out.toByteArray();
+  public void setBlob(int parameterIndex, InputStream inputStream) throws SQLException, IOException {
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    IOUtils.copy(inputStream, out);
+    out.close();
+    byte[] bytes = out.toByteArray();
 
-      getCurrParmsByIndex().put(parameterIndex, new Parameter.Blob(bytes));
-    }
-    catch (IOException e) {
-      throw new SQLException(e);
-    }
+    getCurrParmsByIndex().put(parameterIndex, new Parameter.Blob(bytes));
   }
 
-  public void setNClob(int parameterIndex, Reader reader) throws SQLException {
+  public void setNClob(int parameterIndex, Reader reader) throws SQLException, IOException {
     getCurrParmsByIndex().put(parameterIndex, new Parameter.NClobReader(reader));
   }
 
@@ -358,6 +254,9 @@ public class ParameterHandler {
         DataInputStream innerIn = new DataInputStream(new ByteArrayInputStream(bytes));
         int sqlType = innerIn.readInt();
         switch (sqlType) {
+          case Types.BLOB:
+            currParmsByIndex.put(i + 1, Parameter.Blob.deserialize(innerIn));
+            break;
           case Types.NCLOB:
             currParmsByIndex.put(i + 1, Parameter.NClob.deserialize(innerIn));
             break;
@@ -366,6 +265,9 @@ public class ParameterHandler {
             break;
           case Types.VARCHAR:
             currParmsByIndex.put(i + 1, Parameter.String.deserialize(innerIn));
+            break;
+          case Types.NVARCHAR:
+            currParmsByIndex.put(i + 1, Parameter.NString.deserialize(innerIn));
             break;
           case Types.VARBINARY:
             currParmsByIndex.put(i + 1, Parameter.Bytes.deserialize(innerIn));
@@ -387,8 +289,8 @@ public class ParameterHandler {
           case Types.CHAR:
             currParmsByIndex.put(i + 1, Parameter.Short.deserialize(innerIn));
             break;
-          case Types.REAL:
           case Types.FLOAT:
+          case Types.REAL:
             currParmsByIndex.put(i + 1, Parameter.Float.deserialize(innerIn));
             break;
           case Types.DOUBLE:

@@ -17,6 +17,8 @@ import net.sf.jsqlparser.statement.select.Limit;
 import net.sf.jsqlparser.statement.select.Offset;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.*;
@@ -31,7 +33,8 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class ReadManager {
 
-  private Logger logger;
+  private static Logger logger = LoggerFactory.getLogger(ReadManager.class);
+
 
   private final com.sonicbase.server.DatabaseServer server;
   private Thread diskReaper;
@@ -42,7 +45,6 @@ public class ReadManager {
   public ReadManager(DatabaseServer databaseServer) {
 
     this.server = databaseServer;
-    this.logger = new Logger(null/*databaseServer.getDatabaseClient()*/);
 
     startDiskResultsReaper();
   }

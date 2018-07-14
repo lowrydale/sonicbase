@@ -10,6 +10,8 @@ import com.sonicbase.util.DateUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.giraph.utils.Varint;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.*;
@@ -23,7 +25,7 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public class DeleteManager {
 
-  private Logger logger;
+  private static Logger logger = LoggerFactory.getLogger(DeleteManager.class);
 
   private final com.sonicbase.server.DatabaseServer databaseServer;
   private ThreadPoolExecutor executor;
@@ -36,7 +38,6 @@ public class DeleteManager {
 
   public DeleteManager(final DatabaseServer databaseServer) {
     this.databaseServer = databaseServer;
-    logger = new Logger(/*databaseServer.getDatabaseClient()*/ null);
     this.executor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors() * 2, "SonicBase DeleteManager Thread");
     this.freeExecutor = ThreadUtil.createExecutor(4, "SonicBase DeleteManager FreeExecutor Thread");
     freeThread = ThreadUtil.createThread(new Runnable(){
@@ -290,70 +291,6 @@ public class DeleteManager {
     }
   }
 
-  public void restoreAWS(String bucket, String prefix, String subDirectory) {
-    try {
-      AWSClient awsClient = databaseServer.getAWSClient();
-      File destDir = getReplicaRoot();
-      subDirectory += "/deletes/" + databaseServer.getShard() + "/0";
-
-      FileUtils.deleteDirectory(destDir);
-      destDir.mkdirs();
-
-      awsClient.downloadDirectory(bucket, prefix, subDirectory, destDir);
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-  }
-
-  public long getBackupLocalFileSystemSize() {
-    File dir = getReplicaRoot();
-    return com.sonicbase.common.FileUtils.sizeOfDirectory(dir);
-  }
-
-  public void delteTempDirs() {
-
-  }
-
-  public void backupFileSystem(String directory, String subDirectory) {
-    try {
-      File dir = getReplicaRoot();
-      File destDir = new File(directory, subDirectory + "/deletes/" + databaseServer.getShard() + "/0");
-      if (dir.exists()) {
-        FileUtils.copyDirectory(dir, destDir);
-      }
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-  }
-
-  public void restoreFileSystem(String directory, String subDirectory) {
-    try {
-      File destDir = getReplicaRoot();
-      if (destDir.exists()) {
-        FileUtils.deleteDirectory(destDir);
-      }
-      destDir.mkdirs();
-      File srcDir = new File(directory, subDirectory + "/deletes/" + databaseServer.getShard() + "/0");
-      if (srcDir.exists()) {
-        FileUtils.copyDirectory(srcDir, destDir);
-      }
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-  }
-
-  public void getFiles(List<String> files) {
-    File dir = getReplicaRoot();
-    File[] currFiles = dir.listFiles();
-    if (currFiles != null) {
-      for (File file : currFiles) {
-        files.add(file.getAbsolutePath());
-      }
-    }
-  }
 
   public void shutdown() {
     this.shutdown = true;

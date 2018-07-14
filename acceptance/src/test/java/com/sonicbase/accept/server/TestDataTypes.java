@@ -7,13 +7,10 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.sonicbase.client.DatabaseClient;
-import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.server.DatabaseServer;
-import com.sonicbase.streams.LocalProducer;
-import com.sonicbase.streams.Message;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -46,7 +43,7 @@ public class TestDataTypes {
     for (com.sonicbase.server.DatabaseServer server : dbServers) {
       server.shutdown();
     }
-    Logger.queue.clear();
+;
     System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size() + ", class=TestDataTypes");
     for (DatabaseClient client : DatabaseClient.allClients) {
       System.out.println("Stack:\n" + client.getAllocatedStack());
@@ -100,8 +97,6 @@ public class TestDataTypes {
     conn.close();
 
     conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/test", "user", "password");
-
-    Logger.setReady(false);
 
     executor.shutdownNow();
   }
@@ -241,28 +236,13 @@ public class TestDataTypes {
       Thread.sleep(1000);
     }
 
+
     assertEquals(client.getPartitionSize("test", 0, "persons", "_primarykey"), 9);
     assertEquals(client.getPartitionSize("test", 1, "persons", "_primarykey"), 11);
 //    assertEquals(client.getPartitionSize(2, "persons", "_1__primarykey"), 9);
 //    assertEquals(client.getPartitionSize(3, "persons", "_1__primarykey"), 8);
 
     client.shutdown();
-  }
-
-  private int countRecords(List<Message> msgs) {
-      int count = 0;
-      for (Message msg : msgs) {
-        try {
-          ObjectMapper mapper = new ObjectMapper();
-          ObjectNode dict = (ObjectNode) mapper.readTree(msg.getBody());
-          ArrayNode array = dict.withArray("records");
-          count += array.size();
-        }
-        catch (Exception e) {
-          System.out.println("bad json=" + msg.getBody());
-        }
-      }
-      return count;
   }
 
   public static void assertJsonEquals(String lhs, String rhs) {
@@ -274,8 +254,6 @@ public class TestDataTypes {
 
   @Test
   public void testBasics() throws Exception {
-
-    LocalProducer.queue.clear();
 
     initTypes();
 

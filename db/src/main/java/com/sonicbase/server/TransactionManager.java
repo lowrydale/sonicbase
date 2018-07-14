@@ -1,6 +1,5 @@
 package com.sonicbase.server;
 
-import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Record;
 import com.sonicbase.common.RecordLockedException;
 import com.sonicbase.schema.IndexSchema;
@@ -14,9 +13,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * Responsible for
- */
 public class TransactionManager {
 
   public enum OperationType {
@@ -130,26 +126,6 @@ public class TransactionManager {
     public List<RecordLock> getLocks() {
       return locks;
     }
-  }
-
-  ComObject abortTransaction(String command, byte[] body) {
-    String[] parts = command.split(":");
-    String dbName = parts[5];
-    long transactionId = Long.valueOf(parts[6]);
-
-    synchronized (locks) {
-      Transaction trans = transactions.get(transactionId);
-      if (trans != null) {
-        List<RecordLock> locks = trans.locks;
-        for (RecordLock lock : locks) {
-          String tableName = lock.tableName;
-          Object[] primaryKey = lock.primaryKey;
-          this.locks.get(tableName).remove(primaryKey);
-        }
-        transactions.remove(transactionId);
-      }
-    }
-    return null;
   }
 
   public void deleteLock(String dbName, String tableName, String indexName, long transactionId, TableSchema tableSchema, Object[] primaryKey) {

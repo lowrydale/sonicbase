@@ -12,6 +12,8 @@ import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.EOFException;
 import java.io.UnsupportedEncodingException;
@@ -28,13 +30,13 @@ public class BulkImportManager {
 
   private int BULK_IMPORT_THREAD_COUNT_PER_SERVER = 4;
 
-  private final Logger logger;
+  private static Logger logger = LoggerFactory.getLogger(BulkImportManager.class);
+
   private final com.sonicbase.server.DatabaseServer server;
   private boolean shutdown;
 
   public BulkImportManager(final DatabaseServer server) {
     this.server = server;
-    logger = new Logger(/*server.getDatabaseClient()*/ null, server.getShard(), server.getReplica());
   }
 
   public void shutdown() {
@@ -180,7 +182,7 @@ public class BulkImportManager {
             final int port = replicasArray.get(0).get("port").asInt();
 
             Class.forName("com.sonicbase.jdbcdriver.Driver");
-            try (Connection insertConn = DriverManager.getConnection("jdbc:sonicbase:" + address + ":" + port + "/" + dbName)) {
+            try (Connection insertConn = getConnection(dbName, address, port)) {
               final StringBuilder fieldsStr = new StringBuilder();
               final StringBuilder parmsStr = new StringBuilder();
               boolean first = true;
@@ -217,10 +219,10 @@ public class BulkImportManager {
                       String password = cobj.getString(ComObject.Tag.password);
 
                       if (user != null) {
-                        localConn = DriverManager.getConnection(cobj.getString(ComObject.Tag.connectString), user, password);
+                        localConn = getConnection(cobj.getString(ComObject.Tag.connectString), user, password);
                       }
                       else {
-                        localConn = DriverManager.getConnection(cobj.getString(ComObject.Tag.connectString));
+                        localConn = getConnection(cobj.getString(ComObject.Tag.connectString));
                       }
 
                       IndexSchema indexSchema = null;
@@ -406,7 +408,7 @@ public class BulkImportManager {
     logger.info("bulkImport finished reading records: currSlice=" + currSlice);
   }
 
-  private Object[] getCurrRecordFromResultSet(ResultSet rs, List<FieldSchema> fields) throws SQLException {
+  protected Object[] getCurrRecordFromResultSet(ResultSet rs, List<FieldSchema> fields) throws SQLException {
     final Object[] currRecord = new Object[fields.size()];
 
     int offset = 0;
@@ -614,6 +616,10 @@ public class BulkImportManager {
 
   private AtomicInteger countCoordinating = new AtomicInteger();
 
+  public int getCountCoordinating() {
+    return countCoordinating.get();
+  }
+
   public ComObject coordinateBulkImportForTable(final ComObject cobj, boolean replayedCommand) {
     final String dbName = cobj.getString(ComObject.Tag.dbName);
     final String tableName = cobj.getString(ComObject.Tag.tableName);
@@ -662,10 +668,10 @@ public class BulkImportManager {
             long count = 0;
             try {
               if (user != null) {
-                conn = DriverManager.getConnection(cobj.getString(ComObject.Tag.connectString), user, password);
+                conn = getConnection(cobj.getString(ComObject.Tag.connectString), user, password);
               }
               else {
-                conn = DriverManager.getConnection(cobj.getString(ComObject.Tag.connectString));
+                conn = getConnection(cobj.getString(ComObject.Tag.connectString));
               }
 
               PreparedStatement stmt = conn.prepareStatement("select count(*) from " + tableName);
@@ -809,7 +815,7 @@ public class BulkImportManager {
 
         //todo: make failsafe
         Class.forName("com.sonicbase.jdbcdriver.Driver");
-        try (Connection insertConn = DriverManager.getConnection("jdbc:sonicbase:" + address + ":" + port + "/" + dbName)) {
+        try (Connection insertConn = getConnection(dbName, address, port)) {
           final AtomicInteger countSubmitted = new AtomicInteger();
           final AtomicInteger countFinished = new AtomicInteger();
           final AtomicLong countProcessed = importCountProcessed.get(dbName + ":" + tableName);
@@ -861,6 +867,18 @@ public class BulkImportManager {
       String exceptionStr = ExceptionUtils.getStackTrace(e);
       importException.put(dbName + ":" + tableName, exceptionStr);
     }
+  }
+
+  protected Connection getConnection(String dbName, String address, int port) throws SQLException {
+    return DriverManager.getConnection("jdbc:sonicbase:" + address + ":" + port + "/" + dbName);
+  }
+
+  protected Connection getConnection(String connectString) throws SQLException {
+    return DriverManager.getConnection(connectString);
+  }
+
+  protected Connection getConnection(String connectString, String username, String password) throws SQLException {
+    return DriverManager.getConnection(connectString, username, password);
   }
 
   private void doCoordinateBulkLoad(Connection conn, long count, int serverCount, int totalThreadCount,
@@ -1011,7 +1029,7 @@ public class BulkImportManager {
     }
   }
 
-  private Object getValueOfField(ResultSet rs, String keyField, DataType.Type dataType) throws SQLException, UnsupportedEncodingException {
+  protected Object getValueOfField(ResultSet rs, String keyField, DataType.Type dataType) throws SQLException, UnsupportedEncodingException {
     switch (dataType) {
       case BIGINT:
         return rs.getLong(keyField);
@@ -1054,6 +1072,8 @@ public class BulkImportManager {
       case BLOB:
         return rs.getBytes(keyField);
       case CLOB:
+        return rs.getString(keyField).getBytes("utf-8");
+      case NCLOB:
         return rs.getString(keyField).getBytes("utf-8");
       case BOOLEAN:
         return rs.getBoolean(keyField);
@@ -1382,7 +1402,7 @@ public class BulkImportManager {
 
   private AtomicInteger coordinatesCalled = new AtomicInteger();
 
-  private ConcurrentHashMap<String, ConcurrentHashMap<String, BulkImportStatus>> getBulkImportStatus(String dbName) {
+  protected ConcurrentHashMap<String, ConcurrentHashMap<String, BulkImportStatus>> getBulkImportStatus(String dbName) {
     ConcurrentHashMap<String, ConcurrentHashMap<String, BulkImportStatus>> bulkImportStatus = new ConcurrentHashMap<>();
 
     try {

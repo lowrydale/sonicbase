@@ -10,7 +10,6 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.client.DescribeStatementHandler;
 import com.sonicbase.client.ReconfigureResults;
 import com.sonicbase.common.ComObject;
-import com.sonicbase.common.Logger;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
@@ -39,11 +38,22 @@ public class ConnectionProxy implements Connection {
   private DatabaseClient client;
   private boolean autoCommit;
   private java.util.Map<String, Class<?>> typemap;
-  private int rsHoldability;
   private Properties _clientInfo;
   private Properties properties;
   private boolean closed = false;
   private int shard;
+
+  public void addClient(String url, DatabaseClient client) {
+    ConnectionProxy.ClientEntry clientEntry = clients.get(url);
+    if (clientEntry == null) {
+      clientEntry = new ConnectionProxy.ClientEntry(client);
+      clients.put(url, clientEntry);
+    }
+  }
+
+  public void setClient(DatabaseClient client) {
+    this.client = client;
+  }
 
 
   private class ClientEntry {
@@ -72,8 +82,6 @@ public class ConnectionProxy implements Connection {
       if (db != null) {
         client.initDb(db);
       }
-      Logger.setIsClient(true);
-      Logger.setReady();
       this.dbName = db;
       this.url = url;
     }
@@ -87,30 +95,34 @@ public class ConnectionProxy implements Connection {
     this.properties = properties;
     initGlobalContext();
     try {
-      String[] outerParts = url.split("/");
-      String hostsStr = outerParts[0].substring("jdbc:sonicbase:".length());
-      String[] hosts = hostsStr.split(",");
-      String db = null;
-      if (outerParts.length > 1) {
-        db = outerParts[1];
-        db = db.toLowerCase();
-      }
-      synchronized (clientMutex) {
-        ClientEntry clientEntry = clients.get(url);
-        if (clientEntry == null) {
-          DatabaseClient client = new DatabaseClient(hosts, -1, -1, false);
-          clientEntry = new ClientEntry(client);
-          clients.put(url, clientEntry);
-          if (db != null) {
-            client.initDb(db);
-          }
+      if (!url.equalsIgnoreCase("mock")) {
+        String[] outerParts = url.split("/");
+        String hostsStr = outerParts[0].substring("jdbc:sonicbase:".length());
+        String[] hosts = hostsStr.split(",");
+        String db = null;
+        if (outerParts.length > 1) {
+          db = outerParts[1];
+          db = db.toLowerCase();
         }
-        clientEntry.refCount.incrementAndGet();
-        Logger.setIsClient(true);
-        Logger.setReady();
+        synchronized (clientMutex) {
+          ClientEntry clientEntry = clients.get(url);
+          if (clientEntry == null) {
+            DatabaseClient client = new DatabaseClient(hosts, -1, -1, false);
+            clientEntry = new ClientEntry(client);
+            clients.put(url, clientEntry);
+            if (db != null) {
+              client.initDb(db);
+            }
+          }
+          clientEntry.refCount.incrementAndGet();
+        }
+        this.dbName = db;
+        this.url = url;
       }
-      this.dbName = db;
-      this.url = url;
+      else {
+        this.dbName = null;
+        this.url = url;
+      }
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -258,7 +270,7 @@ public class ConnectionProxy implements Connection {
     }
   }
 
-    protected void checkClosed() throws SQLException {
+    public void checkClosed() throws SQLException {
       if (isClosed()) {
         throw new SQLException("This connection has been closed.");
       }
@@ -299,6 +311,7 @@ public class ConnectionProxy implements Connection {
       else {
         clients.get(url).client.commit(dbName, null);
       }
+      autoCommit = true;
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -313,6 +326,7 @@ public class ConnectionProxy implements Connection {
       else {
         clients.get(url).client.rollback(dbName);
       }
+      autoCommit = true;
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -373,13 +387,15 @@ public class ConnectionProxy implements Connection {
   }
 
   public void setCatalog(String catalog) throws SQLException {
+    throw new NotImplementedException();
   }
 
   public String getCatalog() throws SQLException {
-    return null;
+    throw new NotImplementedException();
   }
 
   public void setTransactionIsolation(int level) throws SQLException {
+    throw new NotImplementedException();
   }
 
   public int getTransactionIsolation() throws SQLException {
@@ -426,39 +442,15 @@ public class ConnectionProxy implements Connection {
   }
 
   public Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException {
-    try {
-      if (client != null) {
-        return new StatementProxy(this, client, null);
-      }
-      return new StatementProxy(this, clients.get(url).client, null);
-    }
-    catch (Exception e) {
-      throw new SQLException(e);
-    }
+    throw new NotImplementedException();
   }
 
   public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
-    try {
-      if (client != null) {
-        return new StatementProxy(this, client, null);
-      }
-      return new StatementProxy(this, clients.get(url).client, null);
-    }
-    catch (Exception e) {
-      throw new SQLException(e);
-    }
+    throw new NotImplementedException();
   }
 
   public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
-    try {
-      if (client != null) {
-        return new StatementProxy(this, client, sql);
-      }
-      return new StatementProxy(this, clients.get(url).client, sql);
-    }
-    catch (Exception e) {
-      throw new SQLException(e);
-    }
+    throw new NotImplementedException();
   }
 
   public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
@@ -466,51 +458,19 @@ public class ConnectionProxy implements Connection {
   }
 
   public PreparedStatement prepareStatement(String sql, int autoGeneratedKeys) throws SQLException {
-    try {
-      if (client != null) {
-        return new StatementProxy(this, client, sql);
-      }
-      return new StatementProxy(this, clients.get(url).client, sql);
-    }
-    catch (Exception e) {
-      throw new SQLException(e);
-    }
+    throw new NotImplementedException();
   }
 
   public PreparedStatement prepareStatement(String sql, int[] columnIndexes) throws SQLException {
-    try {
-      if (client != null) {
-        return new StatementProxy(this, client, sql);
-      }
-      return new StatementProxy(this, clients.get(url).client, sql);
-    }
-    catch (Exception e) {
-      throw new SQLException(e);
-    }
+    throw new NotImplementedException();
   }
 
   public PreparedStatement prepareStatement(String sql, String[] columnNames) throws SQLException {
-    try {
-      if (client != null) {
-        return new StatementProxy(this, client, sql);
-      }
-      return new StatementProxy(this, clients.get(url).client, sql);
-    }
-    catch (Exception e) {
-      throw new SQLException(e);
-    }
+    throw new NotImplementedException();
   }
 
   public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency) throws SQLException {
-    try {
-      if (client != null) {
-        return new StatementProxy(this, client, sql);
-      }
-      return new StatementProxy(this, clients.get(url).client, sql);
-    }
-    catch (Exception e) {
-      throw new SQLException(e);
-    }
+    throw new NotImplementedException();
   }
 
   public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency) throws SQLException {
@@ -531,31 +491,12 @@ public class ConnectionProxy implements Connection {
     typemap = map;
   }
 
-  public void setHoldability(int holdability) throws SQLException
-  {
-    try {
-      checkClosed();
-
-      switch (holdability)
-      {
-      case ResultSet.CLOSE_CURSORS_AT_COMMIT:
-          rsHoldability = holdability;
-          break;
-      case ResultSet.HOLD_CURSORS_OVER_COMMIT:
-          rsHoldability = holdability;
-          break;
-      default:
-          throw new SQLException("Unknown ResultSet holdability setting: " + holdability);
-      }
-    }
-    catch (Exception e) {
-      throw new SQLException(e);
-    }
-
+  public void setHoldability(int holdability) throws SQLException {
+    throw new NotImplementedException();
   }
 
   public int getHoldability() throws SQLException {
-    return rsHoldability;
+    throw new NotImplementedException();
   }
 
   public Savepoint setSavepoint() throws SQLException {
@@ -591,79 +532,46 @@ public class ConnectionProxy implements Connection {
   }
 
   public boolean isValid(int timeout) throws SQLException {
-    //todo: implement
     throw new NotImplementedException();
   }
 
   public void setClientInfo(String name, String value) throws SQLClientInfoException {
-    Map<String, ClientInfoStatus> failures = new HashMap<String, ClientInfoStatus>();
-    failures.put(name, ClientInfoStatus.REASON_UNKNOWN_PROPERTY);
-    throw new SQLClientInfoException(failures);
+    throw new SQLClientInfoException();
   }
 
   public void setClientInfo(Properties properties) throws SQLClientInfoException {
-    if (properties == null || properties.size() == 0)
-        return;
-
-    Map<String, ClientInfoStatus> failures = new HashMap<String, ClientInfoStatus>();
-
-    Iterator<String> i = properties.stringPropertyNames().iterator();
-    while (i.hasNext()) {
-        failures.put(i.next(), ClientInfoStatus.REASON_UNKNOWN_PROPERTY);
-    }
-    throw new SQLClientInfoException(failures);
+    throw new SQLClientInfoException();
   }
 
   public String getClientInfo(String name) throws SQLException {
-    try {
-      checkClosed();
-      return null;
-    }
-    catch (Exception e) {
-      throw new SQLException(e);
-    }
+    throw new SQLClientInfoException();
   }
 
   public Properties getClientInfo() throws SQLException {
-    try {
-      checkClosed();
-      if (_clientInfo == null) {
-          _clientInfo = new Properties();
-      }
-      return _clientInfo;
-    }
-    catch (Exception e) {
-      throw new SQLException(e);
-    }
+    throw new SQLClientInfoException();
   }
 
   public Array createArrayOf(String typeName, Object[] elements) throws SQLException {
-    //todo: implement
     throw new NotImplementedException();
   }
 
   public Struct createStruct(String typeName, Object[] attributes) throws SQLException {
-    //todo: implement
     throw new NotImplementedException();
   }
 
   public void setSchema(String schema) throws SQLException {
-    // todo: implement for JDK 1.7
     throw new NotImplementedException();
   }
 
   public String getSchema() throws SQLException {
-    // todo: implement for JDK 1.7
     throw new NotImplementedException();
   }
 
   public void abort(Executor executor) throws SQLException {
-    // todo: implement for JDK 1.7
     throw new NotImplementedException();
   }
 
   public void setNetworkTimeout(Executor executor, int milliseconds) throws SQLException {
-    // todo: implement for JDK 1.7
     throw new NotImplementedException();
   }
 
@@ -673,12 +581,10 @@ public class ConnectionProxy implements Connection {
   }
 
   public <T> T unwrap(Class<T> iface) throws SQLException {
-    //todo: validate cast
-    return (T) this;
+    throw new NotImplementedException();
   }
 
   public boolean isWrapperFor(Class<?> iface) throws SQLException {
-    //todo: validate iface
     throw new NotImplementedException();
   }
 

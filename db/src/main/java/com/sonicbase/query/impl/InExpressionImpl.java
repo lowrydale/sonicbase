@@ -37,11 +37,15 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
   public InExpressionImpl() {
   }
 
+  public List<ExpressionImpl> getExpressions() {
+    return expressionList;
+  }
+
   public String toString() {
     String ret = "";
     ret += leftExpression.toString();
     if (isNot) {
-      ret += "not";
+      ret += " not";
     }
     ret += " in (";
     boolean first = true;
@@ -69,13 +73,6 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
       for (ExpressionImpl expression : expressionList) {
         expression.setTableName(tableName);
       }
-    }
-  }
-
-  public void setExpressionList(List<Expression> expressionList) {
-    this.expressionList = new ArrayList<>();
-    for (Expression expression : expressionList) {
-      this.expressionList.add((ExpressionImpl)expression);
     }
   }
 
@@ -278,15 +275,15 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
 
   @Override
   public boolean canUseIndex() {
-    if (leftExpression instanceof ColumnImpl) {
-      String columnName = ((ColumnImpl) leftExpression).getColumnName();
-
-      for (Map.Entry<String, IndexSchema> entry : getClient().getCommon().getTables(dbName).get(tableName).getIndices().entrySet()) {
-        if (entry.getValue().getFields()[0].equals(columnName)) {
-          return true;
-        }
-      }
-    }
+//    if (leftExpression instanceof ColumnImpl) {
+//      String columnName = ((ColumnImpl) leftExpression).getColumnName();
+//
+//      for (Map.Entry<String, IndexSchema> entry : getClient().getCommon().getTables(dbName).get(tableName).getIndices().entrySet()) {
+//        if (entry.getValue().getFields()[0].equals(columnName)) {
+//          return true;
+//        }
+//      }
+//    }
     return false;
   }
 

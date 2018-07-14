@@ -15,6 +15,8 @@ import net.sf.jsqlparser.parser.CCJSqlParserManager;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.select.*;
 import org.apache.commons.lang.exception.ExceptionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.StringReader;
 import java.sql.SQLException;
@@ -62,7 +64,7 @@ public class DatabaseClient {
   private static ThreadPoolExecutor executor = null;
 
   private static org.apache.log4j.Logger localLogger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
-  private static Logger logger;
+  private static Logger logger = LoggerFactory.getLogger(DatabaseClient.class);
 
 
   private int pageSize = SELECT_PAGE_SIZE;
@@ -116,6 +118,8 @@ public class DatabaseClient {
       "UpdateManager:deleteRecord",
       "DatabaseServer:allocateRecordIds",
       "DatabaseServer:setMaxRecordId",
+      "DatabaseServer:updateIndexSchema",
+      "DatabaseServer:updateSchema",
       "reserveNextId",
       "DatabaseServer:updateSchema",
       "expirePreparedStatement",
@@ -210,8 +214,6 @@ public class DatabaseClient {
     }
 
     configureServers();
-
-    logger = new Logger(this);
 
     statsTimer = new java.util.Timer();
 
@@ -373,9 +375,8 @@ public class DatabaseClient {
         if (schemaRetryCount < 2) {
           cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
         }
-        cobj.put(ComObject.Tag.method, "UpdateManager:commit");
         cobj.put(ComObject.Tag.transactionId, transactionId.get());
-        sendToAllShards(null, 0, cobj, DatabaseClient.Replica.def);
+        sendToAllShards("UpdateManager:commit", 0, cobj, DatabaseClient.Replica.def);
 
         isExplicitTrans.set(false);
         transactionOps.set(null);
@@ -405,9 +406,8 @@ public class DatabaseClient {
     if (schemaRetryCount < 2) {
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
     }
-    cobj.put(ComObject.Tag.method, "UpdateManager:rollback");
     cobj.put(ComObject.Tag.transactionId, transactionId.get());
-    sendToAllShards(null, 0, cobj, DatabaseClient.Replica.def);
+    sendToAllShards("UpdateManager:rollback", 0, cobj, DatabaseClient.Replica.def);
 
     isExplicitTrans.set(false);
     transactionOps.set(null);
@@ -560,19 +560,30 @@ public class DatabaseClient {
     return clientStatsHandler;
   }
 
-  static class SocketException extends Exception {
-    public SocketException(String s, Throwable t) {
-      super(s, t);
-    }
+  public void setIsExplicitTrans(boolean isExplicitTrans) {
+    this.isExplicitTrans.set(isExplicitTrans);
+  }
 
-    public SocketException(String s) {
-      super(s);
-    }
+  public void setIsCommitting(boolean isCommitting) {
+    this.isCommitting.set(isCommitting);
+  }
+
+  public void setTransactionId(long transactionId) {
+    this.transactionId.set(transactionId);
+  }
+
+  public void setServers(Server[][] servers) {
+    this.servers = servers;
+  }
+
+  public void setClientStatsHandler(ClientStatsHandler clientStatsHandler) {
+    this.clientStatsHandler = clientStatsHandler;
   }
 
   public static class Server {
     private boolean dead;
     private String hostPort;
+    private AtomicInteger replicaOffset = new AtomicInteger();
 
     public Server(String host, int port) {
       this.hostPort = host + ":" + port;
@@ -596,10 +607,10 @@ public class DatabaseClient {
     public boolean isDead() {
       return dead;
     }
-  }
 
-  public byte[] do_send(List<DatabaseSocketClient.Request> requests) {
-    return DatabaseSocketClient.do_send(requests);
+    public void setDead(boolean dead) {
+      this.dead = dead;
+    }
   }
 
   public void configureServers() {
@@ -630,12 +641,11 @@ public class DatabaseClient {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "DatabaseServer:getConfig");
       try {
         byte[] ret = null;
         int receivedReplica = -1;
         try {
-          ret = send(null, 0, 0, cobj, Replica.specified);
+          ret = send("DatabaseServer:getConfig", 0, 0, cobj, Replica.specified);
           receivedReplica = 0;
         }
         catch (Exception e) {
@@ -768,6 +778,13 @@ public class DatabaseClient {
     return send(method, servers[shard], shard, auth_user, body, replica, ignoreDeath);
   }
 
+  public byte[] sendToMaster(String method, ComObject body) {
+    if (method != null) {
+      body.put(ComObject.Tag.method, method);
+    }
+    return sendToMaster(body);
+  }
+
   public byte[] sendToMaster(ComObject body) {
     Exception lastException = null;
     for (int j = 0; j < 2; j++) {
@@ -831,7 +848,7 @@ public class DatabaseClient {
     return null;
   }
 
-  private void handleSchemaOutOfSyncException(Exception e) {
+  protected void handleSchemaOutOfSyncException(Exception e) {
     try {
       boolean schemaOutOfSync = false;
       String msg = null;
@@ -955,7 +972,7 @@ public class DatabaseClient {
                 }
               }
               if (!local) {
-                ret = DatabaseSocketClient.do_send(requests);
+                ret = do_sendOnSocket(requests);
               }
               return ret;
             }
@@ -1256,7 +1273,7 @@ public class DatabaseClient {
             else {
               Exception lastException = null;
               boolean success = false;
-              int offset = ThreadLocalRandom.current().nextInt(replicas.length);
+              int offset = servers[shard][0].replicaOffset.incrementAndGet() % replicas.length;
               outer:
               for (int i = 0; i < 10; i++) {
                 if (isShutdown.get()) {
@@ -1335,6 +1352,12 @@ public class DatabaseClient {
     return null;
   }
 
+  public byte[] do_sendOnSocket(List<DatabaseSocketClient.Request> requests) {
+    byte[] ret;
+    ret = DatabaseSocketClient.do_send(requests);
+    return ret;
+  }
+
   private byte[] invokeOnServer(Object dbServer, byte[] body, boolean replayedCommand, boolean enableQueuing) {
     try {
       return ((DatabaseServer) dbServer).invokeMethod(body, replayedCommand, enableQueuing);
@@ -1378,8 +1401,7 @@ public class DatabaseClient {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "BackupManager:isEntireBackupComplete");
-      byte[] ret = send(null, 0, 0, cobj, DatabaseClient.Replica.master);
+      byte[] ret = send("BackupManager:isEntireBackupComplete", 0, 0, cobj, DatabaseClient.Replica.master);
       ComObject retObj = new ComObject(ret);
       return retObj.getBoolean(ComObject.Tag.isComplete);
     }
@@ -1393,8 +1415,7 @@ public class DatabaseClient {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "BackupManager:isEntireRestoreComplete");
-      byte[] ret = send(null, 0, 0, cobj, DatabaseClient.Replica.master);
+      byte[] ret = send("BackupManager:isEntireRestoreComplete", 0, 0, cobj, DatabaseClient.Replica.master);
       ComObject retObj = new ComObject(ret);
       return retObj.getBoolean(ComObject.Tag.isComplete);
     }
@@ -1408,9 +1429,8 @@ public class DatabaseClient {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "BackupManager:startRestore");
       cobj.put(ComObject.Tag.directory, subDir);
-      byte[] ret = send(null, 0, 0, cobj, DatabaseClient.Replica.master);
+      byte[] ret = send("BackupManager:startRestore", 0, 0, cobj, DatabaseClient.Replica.master);
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -1421,8 +1441,7 @@ public class DatabaseClient {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, "__none__");
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-    cobj.put(ComObject.Tag.method, "BackupManager:startBackup");
-    byte[] ret = send(null, 0, 0, cobj, DatabaseClient.Replica.master);
+    byte[] ret = send("BackupManager:startBackup", 0, 0, cobj, DatabaseClient.Replica.master);
   }
 
 
@@ -1531,7 +1550,7 @@ public class DatabaseClient {
           boolean success = false;
           try {
             Object ret = null;
-            StatementHandler handler = statementHandlerFactory.getHandler(statement);
+            StatementHandler handler = getHandler(statement);
             if (handler != null) {
               ret = handler.execute(dbName, parms, sqlToUse, statement, null, sequence0, sequence1, sequence2,
                   restrictToThisServer, procedureContext, schemaRetryCount);
@@ -1555,10 +1574,14 @@ public class DatabaseClient {
           schemaRetryCount++;
           continue;
         }
-        logger.sendErrorToServer("Error processing request", e);
+        logger.error("Error processing request", e);
         throw new SQLException(e);
       }
     }
+  }
+
+  public StatementHandler getHandler(Statement statement) {
+    return statementHandlerFactory.getHandler(statement);
   }
 
   public static String removeOffsetAndLimit(String sql, Limit limit, Offset offset) {
@@ -1606,7 +1629,7 @@ public class DatabaseClient {
       CCJSqlParserManager parser = new CCJSqlParserManager();
       Statement statement = parser.parse(new StringReader(sql));
       SelectStatementImpl.Explain explain = new SelectStatementImpl.Explain();
-      StatementHandler handler = statementHandlerFactory.getHandler(statement);
+      StatementHandler handler = getHandler(statement);
       return (ResultSet) handler.execute(dbName, parms, null, (Select) statement, explain, null, null, null, false, null, 0);
     }
     catch (Exception e) {
@@ -1615,7 +1638,7 @@ public class DatabaseClient {
   }
 
 
-  public void populateOrderedKeyInfo(
+  public static void populateOrderedKeyInfo(
       Map<String, ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo>> orderedKeyInfos,
       List<InsertStatementHandler.KeyInfo> keys) {
     for (final InsertStatementHandler.KeyInfo keyInfo : keys) {
@@ -1652,25 +1675,6 @@ public class DatabaseClient {
     }
   }
 
-
-
-  private static ConcurrentHashMap<Long, Integer> addedRecords = new ConcurrentHashMap<>();
-
-  public byte[] checkAddedRecords(String command, byte[] body) {
-    logger.info("begin checkAddedRecords");
-    for (int i = 0; i < 1000000; i++) {
-      if (addedRecords.get((long) i) == null) {
-        logger.error("missing record: id=" + i + ", count=0");
-      }
-    }
-    logger.info("finished checkAddedRecords");
-    return null;
-  }
-
-
-
-
-
   public long allocateId(String dbName) {
     long id = -1;
     synchronized (idAllocatorLock) {
@@ -1681,8 +1685,7 @@ public class DatabaseClient {
         ComObject cobj = new ComObject();
         cobj.put(ComObject.Tag.dbName, dbName);
         cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-        cobj.put(ComObject.Tag.method, "DatabaseServer:allocateRecordIds");
-        byte[] ret = sendToMaster(cobj);
+        byte[] ret = sendToMaster("DatabaseServer:allocateRecordIds", cobj);
         ComObject retObj = new ComObject(ret);
         nextId.set(retObj.getLong(ComObject.Tag.nextId));
         maxAllocatedId.set(retObj.getLong(ComObject.Tag.maxId));
@@ -1704,8 +1707,7 @@ public class DatabaseClient {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-    cobj.put(ComObject.Tag.method, "PartitionManager:isRepartitioningComplete");
-    byte[] bytes = sendToMaster(cobj);
+    byte[] bytes = sendToMaster("PartitionManager:isRepartitioningComplete", cobj);
     ComObject retObj = new ComObject(bytes);
     return retObj.getBoolean(ComObject.Tag.finished);
   }
@@ -1720,8 +1722,7 @@ public class DatabaseClient {
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
     cobj.put(ComObject.Tag.tableName, tableName);
     cobj.put(ComObject.Tag.indexName, indexName);
-    cobj.put(ComObject.Tag.method, "PartitionManager:getPartitionSize");
-    byte[] bytes = send(null, shard, replica, cobj, DatabaseClient.Replica.specified);
+    byte[] bytes = send("PartitionManager:getPartitionSize", shard, replica, cobj, DatabaseClient.Replica.specified);
     ComObject retObj = new ComObject(bytes);
     return retObj.getLong(ComObject.Tag.size);
   }
@@ -1749,12 +1750,11 @@ public class DatabaseClient {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "DatabaseServer:getSchema");
       try {
 
         byte[] ret = null;
         try {
-          ret = sendToMaster(cobj);
+          ret = sendToMaster("DatabaseServer:getSchema", cobj);
         }
         catch (Exception e) {
           logger.error("Error getting schema from master", e);
@@ -1769,7 +1769,7 @@ public class DatabaseClient {
               continue;
             }
             try {
-              ret = send(null, 0, replica, cobj, Replica.specified);
+              ret = send("DatabaseServer:getSchema", 0, replica, cobj, Replica.specified);
               break;
             }
             catch (Exception e) {
@@ -1817,9 +1817,8 @@ public class DatabaseClient {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.dbName, "__none__");
       cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "DatabaseServer:getConfig");
 
-      byte[] ret = send(null, selectShard(0), auth_user, cobj, DatabaseClient.Replica.def);
+      byte[] ret = send("DatabaseServer:getConfig", selectShard(0), auth_user, cobj, DatabaseClient.Replica.def);
       ComObject retObj = new ComObject(ret);
       common.deserializeConfig(retObj.getByteArray(ComObject.Tag.configBytes));
     }
@@ -1832,8 +1831,7 @@ public class DatabaseClient {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
-    cobj.put(ComObject.Tag.method, "PartitionManager:beginRebalance");
     cobj.put(ComObject.Tag.force, false);
-    sendToMaster(cobj);
+    sendToMaster("PartitionManager:beginRebalance", cobj);
   }
 }

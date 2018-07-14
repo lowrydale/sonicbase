@@ -1210,8 +1210,7 @@ public class ExpressionImpl implements Expression {
               cobj.put(ComObject.Tag.dbName, dbName);
               cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
               cobj.put(ComObject.Tag.count, count);
-              cobj.put(ComObject.Tag.method, "ReadManager:batchIndexLookup");
-              byte[] lookupRet = client.send(null, shard, -1, cobj, DatabaseClient.Replica.def);
+              byte[] lookupRet = client.send("ReadManager:batchIndexLookup", shard, -1, cobj, DatabaseClient.Replica.def);
               AtomicInteger serializedSchemaVersion = null;
               Record headerRecord = null;
               ComObject retObj = new ComObject(lookupRet);

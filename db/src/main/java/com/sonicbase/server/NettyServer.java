@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
-import com.sonicbase.common.Logger;
 import com.sonicbase.common.ThreadUtil;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.socket.DatabaseSocketClient;
@@ -23,6 +22,8 @@ import net.jpountz.lz4.LZ4FastDecompressor;
 import org.apache.commons.cli.*;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -42,7 +43,7 @@ import java.util.zip.GZIPOutputStream;
  */
 public class NettyServer {
 
-  private static Logger logger;
+  private static Logger logger = LoggerFactory.getLogger(NettyServer.class);
 
   public static final boolean ENABLE_COMPRESSION = false;
   private static final String UTF8_STR = "utf-8";
@@ -553,49 +554,6 @@ public class NettyServer {
       //       ((ByteBuf)msg).release(); // (3)
     }
 
-    private void processError(String respStr, List<byte[]> buffers, Throwable t) throws IOException {
-      logger.error("Error processing request", t);
-      StringBuilder errorResponse = new StringBuilder();
-      errorResponse.append("Response: ").append(respStr).append("\n");
-      t.fillInStackTrace();
-      StringWriter sWriter = new StringWriter();
-      PrintWriter writer = new PrintWriter(sWriter);
-      t.printStackTrace(writer);
-      writer.close();
-      errorResponse.append(sWriter.toString());
-      byte[] retBytes = errorResponse.toString().getBytes(UTF8_STR);
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      bytesOut.write(0);
-      Util.writeRawLittleEndian32(retBytes.length, intBuff);
-      bytesOut.write(intBuff);
-      bytesOut.write(retBytes);
-      buffers.add(bytesOut.toByteArray());
-    }
-
-    byte[] doProcessRequest(Request request) {
-      try {
-        byte[] ret = processRequest(request.body);
-
-        int size = 0;
-        if (ret != null) {
-          size = ret.length;
-        }
-        byte[] intBuff = new byte[4];
-        Util.writeRawLittleEndian32(size, intBuff);
-        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-        bytesOut.write(1);
-        bytesOut.write(intBuff);
-        if (ret != null) {
-          bytesOut.write(ret);
-        }
-        bytesOut.close();
-        return bytesOut.toByteArray();
-      }
-      catch (Exception t) {
-        return returnException("exception: " + t.getMessage(), t);
-      }
-    }
-
     List<byte[]> doProcessRequests(List<Request> requests, AtomicLong timeLogging, AtomicLong handlerTime) {
       List<byte[]> finalRet = new ArrayList<>();
       try {
@@ -679,37 +637,14 @@ public class NettyServer {
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) { // (4)
       // Close the connection when an exception is raised.
-      if (cause.getMessage().contains("Connection reset")) {
-        logger.errorLocalOnly("Netty Exception Caught", cause);
-      }
-      else {
-        logger.error("Netty Exception Caught", cause);
-      }
+      logger.error("Netty Exception Caught", cause);
+
       ctx.close();
     }
   }
 
-  public static byte[] compress(byte[] retBytes) throws IOException {
-    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-    GZIPOutputStream out = new GZIPOutputStream(bytesOut);
-    out.write(retBytes);
-    out.close();
-
-    return bytesOut.toByteArray();
-  }
-
-  public static byte[] uncompress(byte[] b) throws IOException {
-    GZIPInputStream in = new GZIPInputStream(new ByteArrayInputStream(b));
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
-    IOUtils.copy(in, out);
-    out.close();
-    return out.toByteArray();
-  }
-
   public void setDatabaseServer(DatabaseServer databaseServer) {
     this.databaseServer = databaseServer;
-    logger = new Logger(/*databaseServer.getDatabaseClient()*/null);
-    Logger.setIsClient(false);
   }
 
   public DatabaseServer getDatabaseServer() {
@@ -910,8 +845,6 @@ public class NettyServer {
         System.exit(1);
       }
 
-
-      Logger.setReady();
 
       nettyThread.join();
       logger.info("joined netty thread");

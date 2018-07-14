@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
-import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.query.impl.ColumnImpl;
 import com.sonicbase.schema.IndexSchema;
@@ -52,7 +51,6 @@ public class TestFailover {
         server.shutdown();
       }
     }
-    Logger.queue.clear();
 
   }
 

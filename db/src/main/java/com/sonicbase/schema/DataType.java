@@ -46,11 +46,24 @@ public class DataType {
 
       long ret = 0;
       if (value instanceof String) {
-        ret = (long) Long.valueOf((String) value);
+        try {
+          ret = (long) Long.valueOf((String) value);
+        }
+        catch (NumberFormatException e) {
+          ret = (long) (double)Double.valueOf((String) value);
+        }
       }
       else if (value instanceof byte[]) {
         try {
           ret = (long) Long.valueOf(new String((byte[]) value, "utf-8"));
+        }
+        catch (NumberFormatException e) {
+          try {
+            ret = (long) (double)Double.valueOf(new String((byte[]) value, "utf-8"));
+          }
+          catch (UnsupportedEncodingException e1) {
+            throw new DatabaseException(e1);
+          }
         }
         catch (UnsupportedEncodingException e) {
           throw new DatabaseException(e);
@@ -293,6 +306,9 @@ public class DataType {
       if (value instanceof byte[]) {
         return new String((byte[])value).equalsIgnoreCase("true");
       }
+      if (value instanceof String) {
+        return ((String)value).equalsIgnoreCase("true");
+      }
       long ret = (Long) longConverter.convert(value);
       return ret == 1;
     }
@@ -351,29 +367,32 @@ public class DataType {
       }
       else if (value instanceof byte[]) {
         try {
-          ret = BigDecimal.ONE.valueOf(Double.valueOf(new String((byte[]) value, "utf-8")));
+          ret = BigDecimal.valueOf(Double.valueOf(new String((byte[]) value, "utf-8")));
         }
         catch (UnsupportedEncodingException e) {
           throw new DatabaseException(e);
         }
       }
+      else if (value instanceof String) {
+        ret = BigDecimal.valueOf(Double.valueOf((String)value));
+      }
       else if (value instanceof Float) {
-        ret = new BigDecimal((float) (Float) value);
+        ret = BigDecimal.valueOf((float) (Float) value);
       }
       else if (value instanceof Double) {
-        ret = new BigDecimal((double) (Double) value);
+        ret = BigDecimal.valueOf((double) (Double) value);
       }
       else if (value instanceof Integer) {
-        ret = new BigDecimal((int) (Integer) value);
+        ret = BigDecimal.valueOf((int) (Integer) value);
       }
       else if (value instanceof Long) {
-        ret = new BigDecimal((long) (Long) value);
+        ret = BigDecimal.valueOf((long) (Long) value);
       }
       else if (value instanceof Short) {
-        ret = new BigDecimal((short) (Short) value);
+        ret = BigDecimal.valueOf((short) (Short) value);
       }
       else if (value instanceof Byte) {
-        ret = new BigDecimal((short) (byte) (Byte) value);
+        ret = BigDecimal.valueOf((short) (byte) (Byte) value);
       }
       else {
         throw new DatabaseException("Incompatible datatypes: lhs=BigDecimal, rhs=" + value.getClass().getName());
@@ -583,8 +602,14 @@ public class DataType {
   }
 
   private static Integer compareNumerics(Object o1, Object o2) {
-    if (o1 == null || o2 == null) {
+    if (o1 == null && o2 == null) {
       return 0;
+    }
+    if (o1 == null) {
+      return -1;
+    }
+    if (o2 == null) {
+      return 1;
     }
     if (o1 instanceof Double) {
       Double lhs = (Double) o1;
@@ -724,9 +749,6 @@ public class DataType {
   private static Comparator intComparator = new Comparator() {
     @Override
     public int compare(Object o1, Object o2) {
-      if (o1 == null || o2 == null) {
-        return 0;
-      }
       Integer ret = compareNumerics(o1, o2);
       if (ret == null) {
         Integer lhs = (Integer) intConverter.convert(o1);
@@ -744,9 +766,16 @@ public class DataType {
   private static Comparator doubleComparator = new Comparator() {
     @Override
     public int compare(Object o1, Object o2) {
-      if (o1 == null || o2 == null) {
+      if (o1 == null && o2 == null) {
         return 0;
       }
+      if (o1 == null) {
+        return -1;
+      }
+      if (o2 == null) {
+        return 1;
+      }
+
       Integer ret = compareNumerics(o1, o2);
       if (ret == null) {
         Double lhs = (Double) doubleConverter.convert(o1);
@@ -764,9 +793,6 @@ public class DataType {
   private static Comparator floatComparator = new Comparator() {
     @Override
     public int compare(Object o1, Object o2) {
-      if (o1 == null || o2 == null) {
-        return 0;
-      }
       Integer ret = compareNumerics(o1, o2);
       if (ret == null) {
         Float lhs = (Float) floatConverter.convert(o1);
@@ -785,9 +811,16 @@ public class DataType {
     @Override
     public int compare(Object o1, Object o2) {
       try {
-        if (o1 == null || o2 == null) {
+        if (o1 == null && o2 == null) {
           return 0;
         }
+        if (o1 == null) {
+          return -1;
+        }
+        if (o2 == null) {
+          return 1;
+        }
+
         o1 = stringConverter.convert(o1);
         o2 = stringConverter.convert(o2);
         return ((String) o1).compareTo((String) o2);
@@ -807,9 +840,16 @@ public class DataType {
     @Override
     public int compare(Object o1, Object o2) {
       try {
-        if (o1 == null || o2 == null) {
+        if (o1 == null && o2 == null) {
           return 0;
         }
+        if (o1 == null) {
+          return -1;
+        }
+        if (o2 == null) {
+          return 1;
+        }
+
         o1 = utf8Converter.convert(o1);
         o2 = utf8Converter.convert(o2);
         return (new String((byte[])o1, "utf-8")).compareTo(new String((byte[])o2, "utf-8"));
@@ -829,9 +869,6 @@ public class DataType {
   private static Comparator byteComparator = new Comparator() {
     @Override
     public int compare(Object o1, Object o2) {
-      if (o1 == null || o2 == null) {
-        return 0;
-      }
       Integer ret = compareNumerics(o1, o2);
       if (ret == null) {
         Byte lhs = (Byte) byteConverter.convert(o1);
@@ -849,9 +886,6 @@ public class DataType {
   private static Comparator shortComparator = new Comparator() {
     @Override
     public int compare(Object o1, Object o2) {
-      if (o1 == null || o2 == null) {
-        return 0;
-      }
       Integer ret = compareNumerics(o1, o2);
       if (ret == null) {
         Short lhs = (Short) shortConverter.convert(o1);
@@ -869,8 +903,14 @@ public class DataType {
   private static Comparator bigDecimalComparator = new Comparator() {
     @Override
     public int compare(Object o1, Object o2) {
-      if (o1 == null || o2 == null) {
+      if (o1 == null && o2 == null) {
         return 0;
+      }
+      if (o1 == null) {
+        return -1;
+      }
+      if (o2 == null) {
+        return 1;
       }
       BigDecimal lhs = (BigDecimal) bigDecimalConverter.convert(o1);
       BigDecimal rhs = (BigDecimal) bigDecimalConverter.convert(o2);
@@ -885,12 +925,21 @@ public class DataType {
   private static Comparator dateComparator = new Comparator() {
     @Override
     public int compare(Object o1, Object o2) {
-      if (o1 == null || o2 == null) {
+      if (o1 == null && o2 == null) {
         return 0;
+      }
+      if (o1 == null) {
+        return -1;
+      }
+      if (o2 == null) {
+        return 1;
       }
       Date lhs = (Date) dateConverter.convert(o1);
       Date rhs = (Date) dateConverter.convert(o2);
-      return lhs.compareTo(rhs);
+      String l = lhs.toString();
+      String r = rhs.toString();
+
+      return l.compareTo(r);
     }
   };
 
@@ -901,12 +950,20 @@ public class DataType {
   private static Comparator timeComparator = new Comparator() {
     @Override
     public int compare(Object o1, Object o2) {
-      if (o1 == null || o2 == null) {
+      if (o1 == null && o2 == null) {
         return 0;
+      }
+      if (o1 == null) {
+        return -1;
+      }
+      if (o2 == null) {
+        return 1;
       }
       Time lhs = (Time) timeConverter.convert(o1);
       Time rhs = (Time) timeConverter.convert(o2);
-      return lhs.compareTo(rhs);
+      String l = lhs.toString();
+      String r = rhs.toString();
+      return l.compareTo(r);
     }
   };
 
@@ -917,8 +974,14 @@ public class DataType {
   private static Comparator timestampComparator = new Comparator() {
     @Override
     public int compare(Object o1, Object o2) {
-      if (o1 == null || o2 == null) {
+      if (o1 == null && o2 == null) {
         return 0;
+      }
+      if (o1 == null) {
+        return -1;
+      }
+      if (o2 == null) {
+        return 1;
       }
       Timestamp lhs = (Timestamp) timestampConverter.convert(o1);
       Timestamp rhs = (Timestamp) timestampConverter.convert(o2);
@@ -935,8 +998,14 @@ public class DataType {
 
     @Override
     public int compare(Object o1, Object o2) {
-      if (o1 == null || o2 == null) {
+      if (o1 == null && o2 == null) {
         return 0;
+      }
+      if (o1 == null) {
+        return -1;
+      }
+      if (o2 == null) {
+        return 1;
       }
       if (!(o1 instanceof byte[]) || !(o2 instanceof byte[])) {
         throw new DatabaseException("Datatype mismatch - expecting byte[]: found=" + o1.getClass().getName() + ", found=" + o2.getClass().getName());
@@ -962,8 +1031,14 @@ public class DataType {
   private static Comparator blobComparator = new Comparator() {
     @Override
     public int compare(Object o1, Object o2) {
-      if (o1 == null || o2 == null) {
+      if (o1 == null && o2 == null) {
         return 0;
+      }
+      if (o1 == null) {
+        return -1;
+      }
+      if (o2 == null) {
+        return 1;
       }
       if (!(o1 instanceof byte[]) || !(o2 instanceof byte[])) {
         throw new DatabaseException("Datatype mismatch - expecting byte[]: found=" + o1.getClass().getName() + ", found=" + o2.getClass().getName());

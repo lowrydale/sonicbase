@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
-import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.IOUtils;
@@ -31,7 +30,6 @@ public class TestSnapshotManager {
     final com.sonicbase.server.DatabaseServer[] dbServers = new com.sonicbase.server.DatabaseServer[4];
     Connection conn = null;
     try {
-      Logger.disable();
 
       String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
       ObjectMapper mapper = new ObjectMapper();
@@ -58,7 +56,7 @@ public class TestSnapshotManager {
         //          String role = "primaryMaster";
 
         dbServers[shard] = new com.sonicbase.server.DatabaseServer();
-        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true),new AtomicBoolean(true), null, true);
+        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true), null, true);
         dbServers[shard].setRole(role);
         dbServers[shard].disableLogProcessor();
         dbServers[shard].setMinSizeForRepartition(0);
@@ -94,8 +92,6 @@ public class TestSnapshotManager {
       conn.close();
 
       conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/test", "user", "password");
-
-      Logger.setReady(false);
 
       DatabaseClient client = ((ConnectionProxy) conn).getDatabaseClient();
 
@@ -166,7 +162,7 @@ public class TestSnapshotManager {
       stmt = conn.prepareStatement("select count(*) from persons");
       ret = stmt.executeQuery();
       ret.next();
-      assertEquals(ret.getInt(1),  count - 2); //8 and 9 aren't recorded
+      assertEquals(ret.getInt(1), count - 2); //8 and 9 aren't recorded
 
       validateRecord(conn, 0);
       validateRecord(conn, 1);
@@ -272,8 +268,6 @@ public class TestSnapshotManager {
       for (DatabaseClient client : DatabaseClient.allClients) {
         System.out.println("Stack:\n" + client.getAllocatedStack());
       }
-
-      Logger.queue.clear();
     }
   }
 
@@ -381,7 +375,7 @@ public class TestSnapshotManager {
       for (com.sonicbase.server.DatabaseServer server : dbServers) {
         server.shutdown();
       }
-      Logger.queue.clear();
+
       System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size() + ", class=TestSnapshotManager");
       for (DatabaseClient client : DatabaseClient.allClients) {
         System.out.println("Stack:\n" + client.getAllocatedStack());
@@ -603,7 +597,7 @@ public class TestSnapshotManager {
       for (com.sonicbase.server.DatabaseServer server : dbServers) {
         server.shutdown();
       }
-      Logger.queue.clear();
+
       System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size() + ", class=TestSnapshotManager");
       for (DatabaseClient client : DatabaseClient.allClients) {
         System.out.println("Stack:\n" + client.getAllocatedStack());
@@ -827,7 +821,7 @@ public class TestSnapshotManager {
       for (com.sonicbase.server.DatabaseServer server : dbServers) {
         server.shutdown();
       }
-      Logger.queue.clear();
+
       System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size() + ", class=TestSnapshotManager");
       for (DatabaseClient client : DatabaseClient.allClients) {
         System.out.println("Stack:\n" + client.getAllocatedStack());

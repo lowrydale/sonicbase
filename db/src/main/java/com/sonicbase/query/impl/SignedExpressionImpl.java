@@ -72,6 +72,7 @@ public class SignedExpressionImpl extends ExpressionImpl {
   @Override
   public void deserialize(short serializationVersion, DataInputStream in) {
     try {
+      super.deserialize(serializationVersion, in);
       expression = deserializeExpression(in);
       isNegative = in.readBoolean();
     }

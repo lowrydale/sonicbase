@@ -267,7 +267,7 @@ public class IndexLookup {
               retObj = readManager.indexLookup(cobj, expression.getProcedureContext());
             }
             else {
-              byte[] lookupRet = client.send(null, localShard, 0, cobj, DatabaseClient.Replica.def);
+              byte[] lookupRet = client.send("ReadManager:indexLookup", localShard, 0, cobj, DatabaseClient.Replica.def);
               retObj = new ComObject(lookupRet);
             }
 
@@ -635,13 +635,13 @@ public class IndexLookup {
 
     public SelectShard invoke() {
       int lastShard;
-      selectedShards = PartitionManager.findOrderedPartitionForRecord(false, true, fieldOffsets, common, tableSchema,
-          indexSchema.getName(), orderByExpressions, leftOp, rightOp, leftOriginalKey, rightOriginalKey);
-      if (selectedShards.size() == 0) {
+//      selectedShards = PartitionManager.findOrderedPartitionForRecord(false, true, fieldOffsets, common, tableSchema,
+//          indexSchema.getName(), orderByExpressions, leftOp, rightOp, leftOriginalKey, rightOriginalKey);
+//      if (selectedShards.size() == 0) {
         currPartitions = true;
         selectedShards = PartitionManager.findOrderedPartitionForRecord(true, false, fieldOffsets, common, tableSchema,
             indexSchema.getName(), orderByExpressions, leftOp, rightOp, leftOriginalKey, rightOriginalKey);
-      }
+//      }
 
       if (localShard == -1) {
         localShard = nextShard = selectedShards.get(currShardOffset);

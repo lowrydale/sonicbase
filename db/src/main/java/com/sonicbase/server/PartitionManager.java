@@ -13,6 +13,8 @@ import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.Schema;
 import com.sonicbase.schema.TableSchema;
 import org.apache.commons.lang.exception.ExceptionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.*;
@@ -29,8 +31,7 @@ public class PartitionManager extends Thread {
 
   private static final String INDEX_STR = ", index=";
   private static final String NAME_STR = "name";
-  private static Logger logger;
-
+  private static Logger logger = LoggerFactory.getLogger(PartitionManager.class);
 
   private final DatabaseServer databaseServer;
   private final DatabaseCommon common;
@@ -45,6 +46,11 @@ public class PartitionManager extends Thread {
   private AtomicLong countMoved = new AtomicLong();
   private boolean isRunning = false;
   public AtomicBoolean isRebalancing = new AtomicBoolean();
+  private Integer batchOverride = null;
+
+  public void setBatchOverride(Integer millis) {
+    this.batchOverride = millis;
+  }
 
   public enum RepartitionerState {
     idle,
@@ -79,7 +85,6 @@ public class PartitionManager extends Thread {
 
   public PartitionManager(DatabaseServer databaseServer, DatabaseCommon common) {
     super("PartitionManager Thread");
-    logger = new Logger(null /*databaseServer.getDatabaseClient()*/);
     this.databaseServer = databaseServer;
     this.common = common;
     this.indices = databaseServer.getIndices();
@@ -170,14 +175,13 @@ public class PartitionManager extends Thread {
         Map<String, List<TableSchema.Partition>> copiedPartitionsToApply = new HashMap<>();
         Map<String, List<TableSchema.Partition>> newPartitionsToApply = new HashMap<>();
 
-        PrepareToReShardPartitions prepareToReshardPartitions = new PrepareToReShardPartitions(dbName, toRebalance, tableName, begin, partitionSizes, copiedPartitionsToApply, newPartitionsToApply).invoke();
+        PrepareToReShardPartitions prepareToReshardPartitions = new PrepareToReShardPartitions(dbName, toRebalance,
+            tableName, begin, partitionSizes, copiedPartitionsToApply, newPartitionsToApply).invoke();
         tableName = prepareToReshardPartitions.getTableName();
 
         begin = prepareToReshardPartitions.getBegin();
 
         reshardPartitions(dbName, toRebalance, copiedPartitionsToApply, newPartitionsToApply);
-
-        databaseServer.pushSchema();
 
         isRepartitioningIndex.set(true);
 
@@ -359,12 +363,17 @@ public class PartitionManager extends Thread {
         }
         list.add(entry);
       }
-
+      SnapshotManager snapshotManager = databaseServer.getSnapshotManager();
+      snapshotManager.saveIndexSchema(dbName, databaseServer.getCommon().getSchemaVersion() + 1, tableSchema, tableSchema.getIndices().get(indexName));
+      databaseServer.pushIndexSchema(dbName, databaseServer.getCommon().getSchemaVersion() + 1, tableSchema, tableSchema.getIndices().get(indexName));
+      databaseServer.pushSchema();
     }
 
     common.setSchema(dbName, schema);
 
     common.saveSchema(databaseServer.getClient(), databaseServer.getDataDir());
+
+    databaseServer.pushSchema();
   }
 
   public static class PartitionEntry {
@@ -1141,7 +1150,8 @@ public class PartitionManager extends Thread {
       public boolean visit(Object[] key, Object value) throws IOException {
         countVisited.incrementAndGet();
         currEntries.get().add(new MapEntry(key, value));
-        if (currEntries.get().size() >= 10000 * databaseServer.getShardCount()) {
+        if (currEntries.get().size() >= (batchOverride == null ? 10000 : batchOverride) *
+            databaseServer.getShardCount()) {
           final List<MapEntry> toProcess = currEntries.get();
           currEntries.set(new ArrayList<MapEntry>());
           countSubmitted.incrementAndGet();
@@ -1190,7 +1200,7 @@ public class PartitionManager extends Thread {
   private void doProcessEntry(Object[] key, Object value, AtomicLong countVisited, AtomicReference<ArrayList<MapEntry>> currEntries, AtomicInteger countSubmitted, ThreadPoolExecutor executor, final String tableName, final String indexName, final Index index, final IndexSchema indexSchema, final String dbName, final int[] fieldOffsets, final TableSchema tableSchema, final ComObject cobj, final AtomicInteger countFinished) {
     countVisited.incrementAndGet();
     currEntries.get().add(new MapEntry(key, value));
-    if (currEntries.get().size() >= 50000 * databaseServer.getShardCount()) {
+    if (currEntries.get().size() >= (batchOverride == null ? 50000 : batchOverride) * databaseServer.getShardCount()) {
       final List<MapEntry> toProcess = currEntries.get();
       currEntries.set(new ArrayList<MapEntry>());
       countSubmitted.incrementAndGet();
@@ -1456,7 +1466,7 @@ public class PartitionManager extends Thread {
             }
           }
           list.add(new MoveRequest(entry.key, content, shouldDeleteNow));
-          if (list.size() > 50000) {
+          if (list.size() > (batchOverride == null ? 50000 : batchOverride)) {
             moveRequests.put(shard, new ArrayList<MoveRequest>());
             MoveRequestList requestList = new MoveRequestList(list);
             lists.add(requestList);
@@ -1779,8 +1789,7 @@ public class PartitionManager extends Thread {
             ComObject cobj = new ComObject();
             cobj.put(ComObject.Tag.dbName, dbName);
             cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-            cobj.put(ComObject.Tag.method, "PartitionManager:getIndexCounts");
-            byte[] response = client.send(null, shard, 0, cobj, DatabaseClient.Replica.master);
+            byte[] response = client.send("PartitionManager:getIndexCounts", shard, 0, cobj, DatabaseClient.Replica.master);
             synchronized (ret) {
               ComObject retObj = new ComObject(response);
               ComArray tables = retObj.getArray(ComObject.Tag.tables);

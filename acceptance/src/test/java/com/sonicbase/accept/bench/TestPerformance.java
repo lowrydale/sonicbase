@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
-import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.server.NettyServer;
@@ -198,7 +197,7 @@ public class TestPerformance {
   public void setup(float outerFactor) throws IOException, InterruptedException, SQLException, ClassNotFoundException, ExecutionException {
     try {
       int outerCount = (int) (outerFactor * 5_000);
-      Logger.disable();
+
       String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-2-servers-a.json")), "utf-8");
       ObjectMapper mapper = new ObjectMapper();
       final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
@@ -215,7 +214,6 @@ public class TestPerformance {
 
       String role = "primaryMaster";
 
-      Logger.setReady(false);
 
       if (server) {
         final CountDownLatch latch = new CountDownLatch(4);
@@ -231,7 +229,7 @@ public class TestPerformance {
         serverThreads.add(thread);
         thread.start();
         while (true) {
-          Logger.setReady(false);
+
           if (server0_0.isRunning()) {
             break;
           }
@@ -251,7 +249,7 @@ public class TestPerformance {
         thread.start();
 
         while (true) {
-          Logger.setReady(false);
+
           if (server0_1.isRunning()) {
             break;
           }
@@ -297,7 +295,7 @@ public class TestPerformance {
 //        }
 
         while (true) {
-          Logger.setReady(false);
+
           if (server0_0.isRunning() && server0_1.isRunning() /*&& server1_0.isRunning() && server1_1.isRunning()*/) {
             break;
           }
@@ -338,7 +336,6 @@ public class TestPerformance {
       }
 
 
-      Logger.setReady(false);
 
       if (true || server) {
         //

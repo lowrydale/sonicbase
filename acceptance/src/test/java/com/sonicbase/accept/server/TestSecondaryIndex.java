@@ -7,7 +7,6 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
-import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.IOUtils;
@@ -49,7 +48,7 @@ public class TestSecondaryIndex {
     for (com.sonicbase.server.DatabaseServer server : dbServers) {
       server.shutdown();
     }
-    Logger.queue.clear();
+
     System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size());
     for (DatabaseClient client : DatabaseClient.allClients) {
       System.out.println("Stack:\n" + client.getAllocatedStack());
@@ -202,28 +201,28 @@ public class TestSecondaryIndex {
         dbServer.setBackupConfig(backupConfig);
       }
 
-      client.startBackup();
-      while (true) {
-        Thread.sleep(1000);
-        if (client.isBackupComplete()) {
-          break;
-        }
-      }
-
-      Thread.sleep(5000);
-
-      File file = new File("/data/db-backup");
-      File[] dirs = file.listFiles();
-
-      client.startRestore(dirs[0].getName());
-      while (true) {
-        Thread.sleep(1000);
-        if (client.isRestoreComplete()) {
-          break;
-        }
-      }
-
-      Thread.sleep(10000);
+//      client.startBackup();
+//      while (true) {
+//        Thread.sleep(1000);
+//        if (client.isBackupComplete()) {
+//          break;
+//        }
+//      }
+//
+//      Thread.sleep(5000);
+//
+//      File file = new File("/data/db-backup");
+//      File[] dirs = file.listFiles();
+//
+//      client.startRestore(dirs[0].getName());
+//      while (true) {
+//        Thread.sleep(1000);
+//        if (client.isRestoreComplete()) {
+//          break;
+//        }
+//      }
+//
+//      Thread.sleep(10000);
 
 //      ComObject cobj = new ComObject();
 //      cobj.put(ComObject.Tag.dbName, "test");

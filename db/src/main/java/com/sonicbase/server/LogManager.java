@@ -7,6 +7,8 @@ import com.sonicbase.util.DateUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.giraph.utils.Varint;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.text.ParseException;
@@ -29,7 +31,8 @@ public class LogManager {
   private static boolean PARALLEL_APPLY_LOGS = true;
   private final List<LogWriter> logWriters = new ArrayList<>();
   private final List<LogWriter> peerLogWriters = new ArrayList<>();
-  private static Logger logger;
+  private static Logger logger = LoggerFactory.getLogger(ReadManager.class);
+
   private final com.sonicbase.server.DatabaseServer databaseServer;
   private final ThreadPoolExecutor executor;
   private final File rootDir;
@@ -56,7 +59,6 @@ public class LogManager {
     this.databaseServer = databaseServer;
     this.server = databaseServer;
     this.rootDir = rootDir;
-    logger = new Logger(null/*databaseServer.getDatabaseClient()*/);
     executor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors() * 8, "SonicBase LogManager Thread");
 
     synchronized (this) {
@@ -298,139 +300,6 @@ public class LogManager {
       throw new DatabaseException(e);
     }
 
-  }
-
-  public long getBackupLocalFileSystemSize() {
-    File srcDir = new File(getLogReplicaDir(), "self");
-    long size = FileUtils.sizeOfDirectory(srcDir);
-
-    for (int replica = 0; replica < server.getReplicationFactor(); replica++) {
-      srcDir = new File(getLogReplicaDir(), "peer-" + replica);
-      size += FileUtils.sizeOfDirectory(srcDir);
-    }
-    return size;
-  }
-
-  public void backupFileSystem(String directory, String subDirectory, String logSlicePoint) {
-    try {
-      File srcDir = new File(getLogReplicaDir(), "self");
-      File destDir = new File(directory, subDirectory + "/queue/" + server.getShard() + "/0/self");
-      backupLogDir(logSlicePoint, destDir, srcDir);
-
-      for (int replica = 0; replica < server.getReplicationFactor(); replica++) {
-        srcDir = new File(getLogReplicaDir(), "peer-" + replica);
-        destDir = new File(directory, subDirectory + "/queue/" + server.getShard() + "/0/peer-" + replica);
-        backupLogDir(logSlicePoint, destDir, srcDir);
-      }
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-  }
-
-  private void backupLogDir(String logSlicePoint, File destDir, File srcDir) throws IOException {
-    File[] files = srcDir.listFiles();
-    if (files != null) {
-      Set<String> sliceFiles = new HashSet<>();
-      BufferedReader reader = new BufferedReader(new StringReader(logSlicePoint));
-      while (true) {
-        String line = reader.readLine();
-        if (line == null) {
-          break;
-        }
-        sliceFiles.add(line);
-      }
-      destDir.mkdirs();
-      for (File file : files) {
-        if (sliceFiles.contains(file.getAbsolutePath())) {
-          File destFile = new File(destDir, file.getName());
-          FileUtils.copyFile(file, destFile);
-        }
-      }
-    }
-  }
-
-  private void backupLogDirToAWS(AWSClient awsClient, String logSlicePoint, String bucket, String prefix, String destDir, File srcDir) throws IOException {
-    File[] files = srcDir.listFiles();
-    if (files != null) {
-      Set<String> sliceFiles = new HashSet<>();
-      BufferedReader reader = new BufferedReader(new StringReader(logSlicePoint));
-      while (true) {
-        String line = reader.readLine();
-        if (line == null) {
-          break;
-        }
-        sliceFiles.add(line);
-      }
-      for (File file : files) {
-        if (sliceFiles.contains(file.getAbsolutePath())) {
-          awsClient.uploadFile(bucket, prefix, destDir, file);
-        }
-      }
-    }
-  }
-
-  public void restoreFileSystem(String directory, String subDirectory) {
-    try {
-      File destDir = new File(getLogReplicaDir(), "self");
-      File srcDir = new File(directory, subDirectory + "/queue/" + server.getShard() + "/0/self");
-      restoreLogDir(srcDir, destDir);
-
-      for (int replica = 0; replica < server.getReplicationFactor(); replica++) {
-        destDir = new File(getLogReplicaDir(), "peer-" + replica);
-        srcDir = new File(directory, subDirectory + "/queue/" + server.getShard() + "/0/peer-" + replica);
-        restoreLogDir(srcDir, destDir);
-      }
-
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-  }
-
-  private void restoreLogDir(File srcDir, File destDir) throws IOException {
-    if (destDir.exists()) {
-      FileUtils.deleteDirectory(destDir);
-    }
-    destDir.mkdirs();
-
-    if (srcDir.exists()) {
-      FileUtils.copyDirectory(srcDir, destDir);
-    }
-  }
-
-  public void backupAWS(String bucket, String prefix, String subDirectory, String logSlicePoint) {
-    AWSClient awsClient = server.getAWSClient();
-    try {
-      File srcDir = new File(getLogReplicaDir(), "self");
-      String destDir = subDirectory + "/queue/" + server.getShard() + "/0/self";
-      backupLogDirToAWS(awsClient, logSlicePoint, bucket, prefix, destDir, srcDir);
-
-      for (int replica = 0; replica < server.getReplicationFactor(); replica++) {
-        srcDir = new File(getLogReplicaDir(), "peer-" + replica);
-        destDir = subDirectory + "/queue/" + server.getShard() + "/0/peer-" + replica;
-        backupLogDirToAWS(awsClient, logSlicePoint, bucket, prefix, destDir, srcDir);
-      }
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-  }
-
-  public void restoreAWS(String bucket, String prefix, String subDirectory) {
-    try {
-      AWSClient awsClient = server.getAWSClient();
-      File destDir = getLogReplicaDir();
-      subDirectory += "/queue/" + server.getShard() + "/0";
-
-      FileUtils.deleteDirectory(destDir);
-      destDir.mkdirs();
-
-      awsClient.downloadDirectory(bucket, prefix, subDirectory, destDir);
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
   }
 
   public ComObject getLogFile(ComObject cobj, boolean replayedCommand) {

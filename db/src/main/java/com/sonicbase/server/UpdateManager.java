@@ -14,21 +14,24 @@ import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.streams.StreamsProducer;
-import com.sonicbase.util.DateUtils;
-import com.sonicbase.common.*;
-import com.sun.jersey.json.impl.writer.JsonEncoder;
 import org.apache.commons.lang.exception.ExceptionUtils;
-import sun.misc.BASE64Encoder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
-import java.sql.*;
+import java.lang.reflect.Method;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.*;
-import java.util.Date;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -44,12 +47,13 @@ public class UpdateManager {
   public static final int BATCH_STATUS_SUCCCESS = SUCCESS_NO_INFO;
   public static final int BATCH_STATUS_FAILED = EXECUTE_FAILED;
   public static final int BATCH_STATUS_UNIQUE_CONSTRAINT_VIOLATION = -100;
-
-  private Logger logger;
+  private static Logger logger = LoggerFactory.getLogger(UpdateManager.class);
 
   private static final String CURR_VER_STR = "currVer:";
   private final com.sonicbase.server.DatabaseServer server;
-  private List<StreamsProducer> producers = new ArrayList<>();
+  private Class<?> streamManagerClass;
+  private Object streamManager;
+  private List<Object> producers = new ArrayList<>();
   private int maxPublishBatchSize = 10;
   private int publisherThreadCount;
   private Thread[] publisherThreads;
@@ -62,18 +66,20 @@ public class UpdateManager {
   private AtomicLong insertCount = new AtomicLong();
   private AtomicLong lastReset = new AtomicLong(System.currentTimeMillis());
   private ThreadLocal<Boolean> threadLocalIsBatchRequest = new ThreadLocal<>();
-  private ThreadLocal<List<MessageRequest>> threadLocalMessageRequests = new ThreadLocal<>();
-
-  private ArrayBlockingQueue<MessageRequest> publishQueue = new ArrayBlockingQueue<>(30_000);
-
 
 
   public UpdateManager(DatabaseServer databaseServer) {
     this.server = databaseServer;
-    this.logger = new Logger(/*databaseServer.getDatabaseClient()*/null);
-
-    initStreamProducers();
-    initPublisher();
+    try {
+      streamManagerClass = Class.forName("com.sonicbase.server.StreamManager");
+      Method method = streamManagerClass.getMethod("initPublisher");
+      streamManager = streamManagerClass.newInstance();
+      method.invoke(streamManager);
+    }
+    catch (Exception e) {
+      logger.error("Error initializing stream manager", e);
+      streamManager = null;
+    }
   }
 
   public void shutdown() {
@@ -88,47 +94,6 @@ public class UpdateManager {
         }
         catch (InterruptedException e) {
           throw new DatabaseException(e);
-        }
-      }
-    }
-  }
-
-  private void initStreamProducers() {
-    final ObjectNode config = server.getConfig();
-    ObjectNode queueDict = (ObjectNode) config.get("streams");
-    logger.info("Starting stream producers: streams notNull=" + (queueDict != null));
-    if (queueDict != null) {
-      if (queueDict.has("publisherThreadCount")) {
-        publisherThreadCount = queueDict.get("publisherThreadCount").asInt();
-      }
-      else {
-        publisherThreadCount = 8;
-      }
-      if (!server.haveProLicense()) {
-        throw new InsufficientLicense("You must have a pro license to use stream integration");
-      }
-      logger.info("Starting streams. Have license: publisherThreadCount=" + publisherThreadCount);
-
-      ArrayNode streams = queueDict.withArray("producers");
-      for (int i = 0; i < streams.size(); i++) {
-        try {
-          final ObjectNode stream = (ObjectNode) streams.get(i);
-          final String className = stream.get("className").asText();
-          Integer maxBatchSize = stream.get("maxBatchSize").asInt();
-          if (maxBatchSize == null) {
-            maxBatchSize = 10;
-          }
-          this.maxPublishBatchSize = maxBatchSize;
-
-          logger.info("starting stream producer: config=" + stream.toString());
-          StreamsProducer producer = (StreamsProducer) Class.forName(className).newInstance();
-
-          producer.init(server.getCluster(), config.toString(), stream.toString());
-
-          producers.add(producer);
-        }
-        catch (Exception e) {
-          logger.error("Error initializing stream producer: config=" + streams.toString(), e);
         }
       }
     }
@@ -207,6 +172,7 @@ public class UpdateManager {
           for (int j = 0; j < fieldSchemas.size(); j++) {
             if (fieldSchemas.get(j).getName().equals(indexFields[i])) {
               key[i] = record.getFields()[j];
+              break;
             }
           }
         }
@@ -487,9 +453,9 @@ public class UpdateManager {
                                            AtomicBoolean isExplicitTransRet, AtomicLong transactionIdRet,
                                            boolean isCommitting) throws EOFException {
     try {
-      if (server.getOSStatsManager().getAboveMemoryThreshold().get()) {
-        throw new DatabaseException("Above max memory threshold. Further inserts are not allowed");
-      }
+//      if (server.getOSStatsManager().getAboveMemoryThreshold().get()) {
+//        throw new DatabaseException("Above max memory threshold. Further inserts are not allowed");
+//      }
 
       String dbName = outerCobj.getString(ComObject.Tag.dbName);
       Integer schemaVersion = outerCobj.getInt(ComObject.Tag.schemaVersion);
@@ -583,10 +549,15 @@ public class UpdateManager {
     }
 
     threadLocalIsBatchRequest.set(true);
-    if (threadLocalMessageRequests.get() != null) {
-      logger.warn("Left over batch messages: count=" + threadLocalMessageRequests.get().size());
+    if (streamManager != null) {
+      try {
+        Method method = streamManagerClass.getMethod("initBatchInsert");
+        method.invoke(streamManager);
+      }
+      catch (Exception e) {
+        throw new DatabaseException(e);
+      }
     }
-    threadLocalMessageRequests.set(new ArrayList<MessageRequest>());
 
     String dbName = cobj.getString(ComObject.Tag.dbName);
     final long sequence0 = cobj.getLong(ComObject.Tag.sequence0);
@@ -686,7 +657,15 @@ public class UpdateManager {
         trans.addOperation(batchInsertWithRecord, command, cobj.serialize(), replayedCommand);
       }
 
-      publishBatch(cobj);
+      if (streamManager != null) {
+        try {
+          Method method = streamManagerClass.getMethod("publishBatch", ComObject.class);
+          method.invoke(streamManager, cobj);
+        }
+        catch (Exception e) {
+          throw new DatabaseException(e);
+        }
+      }
 
       batchDuration.addAndGet(System.nanoTime() - begin);
     }
@@ -697,7 +676,15 @@ public class UpdateManager {
       throw new DatabaseException(e);
     }
     finally {
-      threadLocalMessageRequests.set(null);
+      if (streamManager != null) {
+        try {
+          Method method = streamManagerClass.getMethod("batchInsertFinish");
+          method.invoke(streamManager);
+        }
+        catch (Exception e) {
+          throw new DatabaseException(e);
+        }
+      }
       threadLocalIsBatchRequest.set(false);
     }
     retObj.put(ComObject.Tag.count, count);
@@ -754,9 +741,9 @@ public class UpdateManager {
     int originalOffset = cobj.getInt(ComObject.Tag.originalOffset);
 
     try {
-      if (server.getOSStatsManager().getAboveMemoryThreshold().get()) {
-        throw new DatabaseException("Above max memory threshold. Further inserts are not allowed");
-      }
+//      if (server.getOSStatsManager().getAboveMemoryThreshold().get()) {
+//        throw new DatabaseException("Above max memory threshold. Further inserts are not allowed");
+//      }
 
       String dbName = outerCobj.getString(ComObject.Tag.dbName);
       Integer schemaVersion = outerCobj.getInt(ComObject.Tag.schemaVersion);
@@ -917,10 +904,16 @@ public class UpdateManager {
               break;
             case batchInsertWithRecord:
               threadLocalIsBatchRequest.set(true);
-              if (threadLocalMessageRequests.get() != null) {
-                logger.warn("Left over batch messages: count=" + threadLocalMessageRequests.get().size());
+              if (streamManager != null) {
+                try {
+                  Method method = streamManagerClass.getMethod("initBatchInsert");
+                  method.invoke(streamManager);
+                }
+                catch (Exception e) {
+                  throw new DatabaseException(e);
+                }
               }
-              threadLocalMessageRequests.set(new ArrayList<MessageRequest>());
+
               try {
                 cobj = new ComObject(opBody);
                 array = cobj.getArray(ComObject.Tag.insertObjects);
@@ -929,11 +922,27 @@ public class UpdateManager {
                   doInsertIndexEntryByKeyWithRecord(cobj, innerObj, sequence0, sequence1, (short) i, op.getReplayed(),
                       transactionId, isExplicitTrans, true, null);
                 }
-                publishBatch(cobj);
+                if (streamManager != null) {
+                  try {
+                    Method method = streamManagerClass.getMethod("publishBatch", ComObject.class);
+                    method.invoke(streamManager, cobj);
+                  }
+                  catch (Exception e) {
+                    throw new DatabaseException(e);
+                  }
+                }
               }
               finally {
                 threadLocalIsBatchRequest.set(false);
-                threadLocalMessageRequests.set(null);
+                if (streamManager != null) {
+                  try {
+                    Method method = streamManagerClass.getMethod("batchInsertFinish");
+                    method.invoke(streamManager);
+                  }
+                  catch (Exception e) {
+                    throw new DatabaseException(e);
+                  }
+                }
               }
 
               break;
@@ -1058,7 +1067,16 @@ public class UpdateManager {
             server.getAddressMap().freeUnsafeIds(value);
           }
         }
-        publishInsertOrUpdate(cobj, dbName, tableName, bytes, existingBytes, UpdateType.update);
+        if (streamManager != null) {
+          try {
+            Method method = streamManagerClass.getMethod("publishInsertOrUpdate", ComObject.class,
+                String.class, String.class, byte[].class, byte[].class, UpdateType.class);
+            method.invoke(streamManager, cobj, dbName, tableName, bytes, existingBytes, UpdateType.update);
+          }
+          catch (Exception e) {
+            throw new DatabaseException(e);
+          }
+        }
       }
       else {
         if (transactionId != 0) {
@@ -1279,18 +1297,31 @@ public class UpdateManager {
         if (threadLocalIsBatchRequest.get() != null && threadLocalIsBatchRequest.get()) {
           if (!dbName.equals("_sonicbase_sys")) {
             if (!producers.isEmpty()) {
-              MessageRequest request = new MessageRequest();
-              request.dbName = dbName;
-              request.tableName = tableName;
-              request.recordBytes = recordBytes;
-              request.updateType = UpdateType.insert;
-              threadLocalMessageRequests.get().add(request);
+              if (streamManager != null) {
+                try {
+                  Method method = streamManagerClass.getMethod("addToBatch",
+                      String.class, String.class, byte[].class, UpdateType.class);
+                  method.invoke(streamManager, dbName, tableName, recordBytes, UpdateType.insert);
+                }
+                catch (Exception e) {
+                  throw new DatabaseException(e);
+                }
+              }
             }
           }
         }
         else {
           if (Record.DB_VIEW_FLAG_DELETING != Record.getDbViewFlags(recordBytes)) {
-            publishInsertOrUpdate(cobj, dbName, tableName, recordBytes, null, UpdateType.insert);
+            if (streamManager != null) {
+              try {
+                Method method = streamManagerClass.getMethod("publishInsertOrUpdate", ComObject.class,
+                    String.class, String.class, byte[].class, byte[].class, UpdateType.class);
+                method.invoke(streamManager, cobj, dbName, tableName, recordBytes, null, UpdateType.insert);
+              }
+              catch (Exception e) {
+                throw new DatabaseException(e);
+              }
+            }
           }
         }
       }
@@ -1306,275 +1337,6 @@ public class UpdateManager {
     delete
   }
 
-  class MessageRequest {
-    private String dbName;
-    private String tableName;
-    private byte[] recordBytes;
-    private UpdateType updateType;
-    private byte[] existingBytes;
-  }
-
-  public void initPublisher() {
-    final ObjectNode config = server.getConfig();
-    ObjectNode queueDict = (ObjectNode) config.get("streams");
-    if (queueDict != null) {
-      if (!server.haveProLicense()) {
-        throw new InsufficientLicense("You must have a pro license to use streams integration");
-      }
-
-      publisherThreads = new Thread[publisherThreadCount];
-      for (int i = 0; i < publisherThreads.length; i++) {
-        publisherThreads[i] = new Thread(new Runnable() {
-          @Override
-          public void run() {
-            List<MessageRequest> toProcess = new ArrayList<>();
-            long lastTimePublished = System.currentTimeMillis();
-            while (!shutdown) {
-              try {
-                for (int i = 0; i < maxPublishBatchSize * 4; i++) {
-                  MessageRequest initialRequest = publishQueue.poll(100, TimeUnit.MILLISECONDS);
-                  if (initialRequest == null) {
-                  }
-                  else {
-                    toProcess.add(initialRequest);
-                  }
-                  if (System.currentTimeMillis() - lastTimePublished > 2000) {
-                    break;
-                  }
-                }
-
-                if (toProcess.size() != 0) {
-                  publishMessages(toProcess);
-                  toProcess.clear();
-                }
-                lastTimePublished = System.currentTimeMillis();
-              }
-              catch (Exception e) {
-                logger.error("error in message publisher", e);
-              }
-            }
-          }
-        });
-        publisherThreads[i].start();
-      }
-    }
-  }
-
-  private void publishMessages(List<MessageRequest> toProcess) {
-    List<MessageRequest> batch = new ArrayList<>();
-    List<String> messages = new ArrayList<>();
-    try {
-      for (MessageRequest request : toProcess) {
-        batch.add(request);
-        if (batch.size() >= maxPublishBatchSize) {
-          buildBatchMessage(batch, messages);
-          batch = new ArrayList<>();
-        }
-      }
-      if (batch.size() != 0) {
-        buildBatchMessage(batch, messages);
-      }
-
-      for (StreamsProducer producer : producers) {
-        producer.publish(messages);
-      }
-    }
-    catch (Exception e) {
-      logger.error("error publishing message", e);
-    }
-  }
-
-  private void buildBatchMessage(List<MessageRequest> batch, List<String> messages) {
-    StringBuilder builder = new StringBuilder();
-    builder.append("{");
-    builder.append("\"events\":[");
-
-    int offset = 0;
-    for (MessageRequest currRequest : batch) {
-      if (offset != 0) {
-        builder.append(",");
-      }
-      builder.append("{");
-
-      if (currRequest.updateType == UpdateType.update) {
-        builder.append("\"_sonicbase_dbname\": \"").append(currRequest.dbName).append("\",");
-        builder.append("\"_sonicbase_tablename\": \"").append(currRequest.tableName).append("\",");
-        builder.append("\"_sonicbase_action\": \"").append(currRequest.updateType).append("\",");
-        builder.append("\"before\" : {");
-
-        TableSchema tableSchema = server.getCommon().getTableSchema(currRequest.dbName, currRequest.tableName, server.getDataDir());
-        Record record = new Record(currRequest.dbName, server.getCommon(), currRequest.existingBytes);
-        getJsonFromRecord(builder, tableSchema, record);
-        builder.append("},");
-        builder.append("\"after\": {");
-        record = new Record(currRequest.dbName, server.getCommon(), currRequest.recordBytes);
-        getJsonFromRecord(builder, tableSchema, record);
-        builder.append("}");
-
-      }
-      else {
-        TableSchema tableSchema = server.getCommon().getTableSchema(currRequest.dbName, currRequest.tableName, server.getDataDir());
-        Record record = new Record(currRequest.dbName, server.getCommon(), currRequest.recordBytes);
-
-        builder.append("\"_sonicbase_dbname\": \"").append(currRequest.dbName).append("\",");
-        builder.append("\"_sonicbase_tablename\": \"").append(currRequest.tableName).append("\",");
-        builder.append("\"_sonicbase_action\": \"").append(currRequest.updateType).append("\",");
-
-        getJsonFromRecord(builder, tableSchema, record);
-      }
-      builder.append("}");
-      offset++;
-    }
-
-    builder.append("]}");
-    messages.add(builder.toString());
-  }
-
-  private void publishBatch(ComObject cobj) {
-    if (!producers.isEmpty() && threadLocalMessageRequests.get() != null && threadLocalMessageRequests.get().size() != 0) {
-      try {
-        if (!cobj.getBoolean(ComObject.Tag.currRequestIsMaster)) {
-          return;
-        }
-
-        List<MessageRequest> toPublish = new ArrayList<>();
-        while(true) {
-          for (int i = 0; threadLocalMessageRequests.get().size() != 0; i++) {
-            toPublish.add(threadLocalMessageRequests.get().remove(0));
-          }
-          if (threadLocalMessageRequests.get().size() == 0) {
-            break;
-          }
-        }
-        for (MessageRequest msg : toPublish) {
-          if (!msg.dbName.equals("_sonicbase_sys")) {
-            publishQueue.put(msg);
-          }
-        }
-      }
-      catch (Exception e) {
-        logger.error("Error publishing messages", e);
-      }
-      finally {
-        threadLocalMessageRequests.set(null);
-        threadLocalIsBatchRequest.set(false);
-      }
-    }
-  }
-
-  private void publishInsertOrUpdate(ComObject cobj, String dbName, String tableName, byte[] recordBytes, byte[] existingBytes, UpdateType updateType) {
-    if (dbName.equals("_sonicbase_sys")) {
-      return;
-    }
-    if (!producers.isEmpty()) {
-      if (!server.haveProLicense()) {
-        throw new InsufficientLicense("You must have a pro license to use streams integration");
-      }
-
-      try {
-        if (!cobj.getBoolean(ComObject.Tag.currRequestIsMaster)) {
-          return;
-        }
-
-        MessageRequest request = new MessageRequest();
-        request.dbName = dbName;
-        request.tableName = tableName;
-        request.recordBytes = recordBytes;
-        request.existingBytes = existingBytes;
-        request.updateType = updateType;
-        publishQueue.put(request);
-      }
-      catch (Exception e) {
-        logger.error("Error publishing message", e);
-      }
-    }
-  }
-
-  public static void getJsonFromRecord(StringBuilder builder, TableSchema tableSchema, Record record) {
-    String fieldName = null;
-    try {
-
-      builder.append("\"_sonicbase_sequence0\": ").append(record.getSequence0()).append(",");
-      builder.append("\"_sonicbase_sequence1\": ").append(record.getSequence1()).append(",");
-      builder.append("\"_sonicbase_sequence2\": ").append(record.getSequence2());
-
-      List<FieldSchema> fields = tableSchema.getFields();
-      for (FieldSchema fieldSchema : fields) {
-        fieldName = fieldSchema.getName();
-        if (fieldName.equals("_sonicbase_id")) {
-          continue;
-        }
-        int offset = tableSchema.getFieldOffset(fieldName);
-        Object[] recordFields = record.getFields();
-        if (recordFields[offset] == null) {
-          continue;
-        }
-
-        builder.append(",");
-        switch (fieldSchema.getType()) {
-          case VARCHAR:
-          case CHAR:
-          case LONGVARCHAR:
-          case CLOB:
-          case NCHAR:
-          case NVARCHAR:
-          case LONGNVARCHAR:
-          case NCLOB: {
-            String value = new String((byte[]) recordFields[offset], "utf-8");
-            value = JsonEncoder.encode(value);
-            builder.append("\"").append(fieldName).append("\": \"").append(value).append("\"");
-          }
-            break;
-          case BIT:
-          case TINYINT:
-          case SMALLINT:
-          case INTEGER:
-          case BIGINT:
-          case FLOAT:
-          case REAL:
-          case DOUBLE:
-          case NUMERIC:
-          case DECIMAL:
-          case BOOLEAN:
-          case ROWID:
-            builder.append("\"").append(fieldName).append("\": ").append(String.valueOf(recordFields[offset]));
-            break;
-          case DATE:{
-            Calendar cal = Calendar.getInstance();
-            cal.setTime((Date)recordFields[offset]);
-
-            String value = DateUtils.toDbString(cal);
-            value = JsonEncoder.encode(value);
-            builder.append("\"").append(fieldName).append("\": ").append("\"").append(value).append("\"");
-          }
-          break;
-          case TIME: {
-            String value = DateUtils.toDbTimeString((Time)recordFields[offset]);
-            value = JsonEncoder.encode(value);
-            builder.append("\"").append(fieldName).append("\": ").append("\"").append(value).append("\"");
-          }
-          break;
-          case TIMESTAMP: {
-            String value = DateUtils.toDbTimestampString((Timestamp)recordFields[offset]);
-            value = JsonEncoder.encode(value);
-            builder.append("\"").append(fieldName).append("\": \"").append(value).append("\"");
-          }
-            break;
-          case BINARY:
-          case VARBINARY:
-          case LONGVARBINARY:
-          case BLOB:
-            builder.append("\"").append(fieldName).append("\": \"").append(
-                new BASE64Encoder().encode((byte[]) recordFields[offset])).append("\"");
-            break;
-        }
-
-      }
-    }
-    catch (Exception e) {
-      throw new DatabaseException("Error converting record: field=" + fieldName, e);
-    }
-  }
 
   @SchemaReadLock
   public ComObject deleteRecord(ComObject cobj, boolean replayedCommand) {
@@ -1660,7 +1422,16 @@ public class UpdateManager {
 
         if (tableSchema.getIndices().get(indexName).isPrimaryKey()) {
           for (byte[] innerBytes : bytes) {
-            publishInsertOrUpdate(cobj, dbName, tableName, innerBytes, null, UpdateType.delete);
+            if (streamManager != null) {
+              try {
+                Method method = streamManagerClass.getMethod("publishInsertOrUpdate", ComObject.class,
+                    String.class, String.class, byte[].class, byte[].class, UpdateType.class);
+                method.invoke(streamManager, cobj, dbName, tableName, innerBytes, null, UpdateType.delete);
+              }
+              catch (Exception e) {
+                throw new DatabaseException(e);
+              }
+            }
           }
         }
       }
@@ -1860,7 +1631,7 @@ public class UpdateManager {
 
       //todo: make failsafe
       Class.forName("com.sonicbase.jdbcdriver.Driver");
-      final Connection conn = DriverManager.getConnection("jdbc:sonicbase:" + address + ":" + port + "/" + dbName);
+      final Connection conn = getSonicBaseConnection(dbName, address, port);
       try {
         String destColumnsStr = "";
         String destParmsStr = "";
@@ -1925,6 +1696,7 @@ public class UpdateManager {
                 case CHAR:
                 case VARCHAR:
                 case CLOB:
+                case NCLOB:
                 case NCHAR:
                 case NVARCHAR:
                 case LONGNVARCHAR:
@@ -1976,5 +1748,9 @@ public class UpdateManager {
     catch (Exception e) {
       throw new DatabaseException(e);
     }
+  }
+
+  protected Connection getSonicBaseConnection(String dbName, String address, int port) throws SQLException {
+    return DriverManager.getConnection("jdbc:sonicbase:" + address + ":" + port + "/" + dbName);
   }
 }

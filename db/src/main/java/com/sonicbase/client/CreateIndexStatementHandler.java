@@ -52,7 +52,6 @@ public class CreateIndexStatementHandler extends StatementHandler {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-    cobj.put(ComObject.Tag.method, "SchemaManager:createIndex");
     cobj.put(ComObject.Tag.masterSlave, "master");
     cobj.put(ComObject.Tag.tableName, statement.getTableName());
     cobj.put(ComObject.Tag.indexName, statement.getName());
@@ -70,7 +69,7 @@ public class CreateIndexStatementHandler extends StatementHandler {
 
     cobj.put(ComObject.Tag.fieldsStr, builder.toString());
 
-    byte[] ret = client.sendToMaster(cobj);
+    byte[] ret = client.sendToMaster("SchemaManager:createIndex", cobj);
     ComObject retObj = new ComObject(ret);
     client.getCommon().deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
   }

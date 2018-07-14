@@ -98,6 +98,7 @@
     </properties>
 
   <modules>
+    <module>acceptance</module>
     <module>db</module>
     <module>sonicbase</module>
     <module>obfuscated</module>

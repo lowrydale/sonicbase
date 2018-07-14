@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
-import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.FileUtils;
@@ -43,7 +42,7 @@ public class TestDataTypes2 {
     for (DatabaseServer server : dbServers) {
       server.shutdown();
     }
-    Logger.queue.clear();
+
   }
 
   @BeforeClass
@@ -94,7 +93,7 @@ public class TestDataTypes2 {
 
     conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/test", "user", "password");
 
-    Logger.setReady(false);
+
 
     DatabaseClient client = ((ConnectionProxy)conn).getDatabaseClient();
 

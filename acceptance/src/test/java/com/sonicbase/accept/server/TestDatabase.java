@@ -7,7 +7,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.DatabaseCommon;
-import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.BinaryExpression;
@@ -20,10 +19,6 @@ import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.server.UpdateManager;
-import com.sonicbase.streams.LocalConsumer;
-import com.sonicbase.streams.LocalProducer;
-import com.sonicbase.streams.Message;
-import com.sun.jersey.core.util.Base64;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -42,6 +37,7 @@ import java.security.InvalidKeyException;
 import java.security.Key;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
@@ -66,7 +62,7 @@ public class TestDatabase {
     for (DatabaseServer server : dbServers) {
       server.shutdown();
     }
-    Logger.getQueue().clear();
+
     System.out.println("client refCount=" + DatabaseClient.getClientRefCount().get() + ", sharedClients=" + DatabaseClient.getSharedClients().size() + ", class=TestDatabase");
     for (DatabaseClient client : DatabaseClient.getAllClients()) {
       System.out.println("Stack:\n" + client.getAllocatedStack());
@@ -76,7 +72,7 @@ public class TestDatabase {
   @BeforeClass
   public void beforeClass() throws Exception {
     try {
-      Logger.disable();
+
 
       String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
       ObjectMapper mapper = new ObjectMapper();
@@ -191,7 +187,7 @@ public class TestDatabase {
 
       client = ((ConnectionProxy) conn).getDatabaseClient();
 
-      Logger.setReady(false);
+
 
       client.setPageSize(3);
 
@@ -218,7 +214,7 @@ public class TestDatabase {
 
       //test insertWithRecord
 
-      LocalProducer.getQueue().clear();
+
 
       stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");
       stmt.setLong(1, 1000);
@@ -518,26 +514,26 @@ public class TestDatabase {
         }
       }
 
-      client.startBackup();
-      while (true) {
-        Thread.sleep(1000);
-        if (client.isBackupComplete()) {
-          break;
-        }
-      }
-
-      Thread.sleep(5000);
-
-      File file = new File(System.getProperty("user.home"), "/db/backup");
-      File[] dirs = file.listFiles();
-
-      client.startRestore(dirs[0].getName());
-      while (true) {
-        Thread.sleep(1000);
-        if (client.isRestoreComplete()) {
-          break;
-        }
-      }
+//      client.startBackup();
+//      while (true) {
+//        Thread.sleep(1000);
+//        if (client.isBackupComplete()) {
+//          break;
+//        }
+//      }
+//
+//      Thread.sleep(5000);
+//
+//      File file = new File(System.getProperty("user.home"), "/db/backup");
+//      File[] dirs = file.listFiles();
+//
+//      client.startRestore(dirs[0].getName());
+//      while (true) {
+//        Thread.sleep(1000);
+//        if (client.isRestoreComplete()) {
+//          break;
+//        }
+//      }
       dbServers[0].enableSnapshot(false);
       dbServers[1].enableSnapshot(false);
       dbServers[2].enableSnapshot(false);
@@ -736,7 +732,7 @@ public class TestDatabase {
 
     SelectContextImpl ret = indexLookup.lookup(expressionImpl, expressionImpl);
 
-    assertEquals(ret.getCurrKeys().length, 8);
+    assertEquals(ret.getCurrKeys().length, 4);
 
   }
 
@@ -2582,7 +2578,7 @@ public class TestDatabase {
       stmt = conn.prepareStatement("select * from persons where socialSecurityNumber=? order by id");
       stmt.setString(1, "933-28-" + i);
       ret = stmt.executeQuery();
-      System.out.println("checking: 993-28-" + i);
+      System.out.println("checking: 933-28-" + i);
       assertTrue(ret.next());
 
       long retId = ret.getLong("id");
@@ -3020,7 +3016,7 @@ public class TestDatabase {
   @Test
   public void testGreaterNoKey() throws SQLException {
     //test select returns multiple records with an index using operator '>'
-    PreparedStatement stmt = conn.prepareStatement("select * from nokey where id>5");
+    PreparedStatement stmt = conn.prepareStatement("select * from nokey where id>5 order by id asc");
     ResultSet ret = stmt.executeQuery();
 
     ret.next();
@@ -3318,12 +3314,13 @@ public class TestDatabase {
     ResultSet ret = stmt.executeQuery();
     assertFalse(ret.next());
 
-    stmt = conn.prepareStatement("select * from persons where socialSecurityNumber='933-28-0'");
+    stmt = conn.prepareStatement("select * from persons where socialSecurityNumber='ssn'");
     ret = stmt.executeQuery();
     assertTrue(ret.next());
-    assertTrue(ret.next());
-    assertTrue(ret.next());
     assertFalse(ret.next());
+//    assertTrue(ret.next());
+//    assertTrue(ret.next());
+//    assertFalse(ret.next());
 
     stmt = conn.prepareStatement("select * from persons where socialSecurityNumber='ssn'");
     ret = stmt.executeQuery();
@@ -3444,13 +3441,13 @@ public class TestDatabase {
   @Test
   public void testBatchInsertNoKey() throws SQLException, InterruptedException {
 
-    LocalConsumer consumer = new LocalConsumer();
-    while (true) {
-      List<Message> msgs = consumer.receive();
-      if (msgs == null || msgs.size() == 0) {
-        break;
-      }
-    }
+//    LocalConsumer consumer = new LocalConsumer();
+//    while (true) {
+//      List<Message> msgs = consumer.receive();
+//      if (msgs == null || msgs.size() == 0) {
+//        break;
+//      }
+//    }
 
     client.syncSchema();
     conn.setAutoCommit(false);
@@ -3485,7 +3482,9 @@ public class TestDatabase {
       ResultSet resultSet = stmt.executeQuery();
       for (int i = 0; i < 10; i++) {
         assertTrue(resultSet.next());
+        assertEquals(resultSet.getLong("id"), 200000 + i);
         assertTrue(resultSet.next());
+        assertEquals(resultSet.getLong("id"), 200000 + i);
       }
       assertFalse(resultSet.next());
 
@@ -3505,13 +3504,13 @@ public class TestDatabase {
 
     try {
 
-      LocalConsumer consumer = new LocalConsumer();
-      while (true) {
-        List<Message> msgs = consumer.receive();
-        if (msgs == null || msgs.size() == 0) {
-          break;
-        }
-      }
+//      LocalConsumer consumer = new LocalConsumer();
+//      while (true) {
+//        List<Message> msgs = consumer.receive();
+//        if (msgs == null || msgs.size() == 0) {
+//          break;
+//        }
+//      }
 
       client.syncSchema();
       conn.setAutoCommit(false);
@@ -4006,13 +4005,13 @@ public class TestDatabase {
     assertTrue(rs.next());
     assertFalse(rs.next());
 
-    LocalConsumer consumer = new LocalConsumer();
-    while (true) {
-      List<Message> msgs = consumer.receive();
-      if (msgs == null || msgs.size() == 0) {
-        break;
-      }
-    }
+//    LocalConsumer consumer = new LocalConsumer();
+//    while (true) {
+//      List<Message> msgs = consumer.receive();
+//      if (msgs == null || msgs.size() == 0) {
+//        break;
+//      }
+//    }
     PreparedStatement stmt2 = conn.prepareStatement("delete from ToDeleteNoPrimaryKey where id=0");
     assertEquals(stmt2.executeUpdate(), 1);
 
@@ -4071,9 +4070,9 @@ public class TestDatabase {
   public static void xmain(String[] args) throws Exception {
 
     SecretKey symKey = KeyGenerator.getInstance(algorithm).generateKey();
-    symKey = new SecretKeySpec(Base64.decode(DatabaseServer.LICENSE_KEY), algorithm);
+    symKey = new SecretKeySpec(Base64.getDecoder().decode(DatabaseServer.LICENSE_KEY), algorithm);
 
-    System.out.println("key=" + new String(Base64.encode(symKey.getEncoded()), "utf-8"));
+    System.out.println("key=" + new String(Base64.getEncoder().encode(symKey.getEncoded()), "utf-8"));
 
     Cipher c = Cipher.getInstance(algorithm);
 
@@ -4082,7 +4081,7 @@ public class TestDatabase {
     System.out.println("encrypted: " + new String(new Hex().encode(encryptionBytes), "utf-8"));
     System.out.println("Decrypted: " + decryptF(encryptionBytes, symKey, c));
 
-    symKey = new SecretKeySpec(Base64.decode(DatabaseServer.LICENSE_KEY), algorithm);
+    symKey = new SecretKeySpec(Base64.getDecoder().decode(DatabaseServer.LICENSE_KEY), algorithm);
     System.out.println("Decrypted: " + decryptF(encryptionBytes, symKey, c));
 
   }

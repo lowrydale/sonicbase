@@ -4,6 +4,8 @@ import com.sonicbase.common.*;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.common.DeadServerException;
 import org.apache.commons.lang.exception.ExceptionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -20,7 +22,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * Created by lowryda on 7/28/17.
  */
 public class MethodInvoker {
-  private Logger logger;
+  private static Logger logger = LoggerFactory.getLogger(MethodInvoker.class);
 
   private final BulkImportManager bulkImportManager;
   private final DeleteManager deleteManagerImpl;
@@ -32,9 +34,6 @@ public class MethodInvoker {
   private final SchemaManager schemaManager;
   private final com.sonicbase.server.DatabaseServer server;
   private final DatabaseCommon common;
-  private final MonitorManager monitorManager;
-  private final BackupManager backupManager;
-  private final OSStatsManager osStatsManager;
   private final MasterManager masterManager;
   private boolean shutdown;
   private AtomicInteger testWriteCallCount = new AtomicInteger();
@@ -42,8 +41,8 @@ public class MethodInvoker {
 
   public MethodInvoker(DatabaseServer server, BulkImportManager bulkImportManager, DeleteManager deleteManagerImpl,
                        SnapshotManager deltaManager, UpdateManager updateManager, TransactionManager transactionManager,
-                       ReadManager readManager, com.sonicbase.server.LogManager logManager, SchemaManager schemaManager, MonitorManager monitorManager,
-                       BackupManager backupManager, OSStatsManager osStatsManager, MasterManager masterManager) {
+                       ReadManager readManager, com.sonicbase.server.LogManager logManager, SchemaManager schemaManager,
+                       MasterManager masterManager) {
     this.server = server;
     this.common = server.getCommon();
     this.bulkImportManager = bulkImportManager;
@@ -54,9 +53,6 @@ public class MethodInvoker {
     this.readManager = readManager;
     this.logManager = logManager;
     this.schemaManager = schemaManager;
-    this.monitorManager = monitorManager;
-    this.backupManager = backupManager;
-    this.osStatsManager = osStatsManager;
     this.masterManager = masterManager;
 
     Method[] methods = MethodInvoker.class.getMethods();
@@ -68,8 +64,10 @@ public class MethodInvoker {
         }
       }
     }
+  }
 
-    logger = new Logger(null/*server.getDatabaseClient()*/);
+  public int getEchoCount() {
+    return echoCount.get();
   }
 
   public void shutdown() {

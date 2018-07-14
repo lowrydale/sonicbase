@@ -11,6 +11,8 @@ import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import org.apache.commons.io.FileUtils;
 import org.apache.giraph.utils.Varint;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.text.ParseException;
@@ -29,7 +31,8 @@ public class SnapshotManager {
   private static final String INDEX_STR = ", index=";
   private static final String RATE_STR = ", rate=";
   private static final String DURATION_STR = ", duration(s)=";
-  public Logger logger;
+  private static Logger logger = LoggerFactory.getLogger(SnapshotManager.class);
+
 
   private final com.sonicbase.server.DatabaseServer server;
   private long lastSnapshot = -1;
@@ -45,7 +48,6 @@ public class SnapshotManager {
 
   public SnapshotManager(DatabaseServer databaseServer) {
     this.server = databaseServer;
-    this.logger = new Logger(null/*databaseServer.getDatabaseClient()*/);
   }
 
   public static int getHighestCommittedSnapshotVersion(File snapshotRootDir, Logger logger) {
@@ -646,114 +648,6 @@ public class SnapshotManager {
     }
   }
 
-  public void deleteSnapshots() {
-    File dir = getSnapshotReplicaDir();
-    try {
-      FileUtils.deleteDirectory(dir);
-      dir.mkdirs();
-    }
-    catch (IOException e) {
-      throw new DatabaseException(e);
-    }
-  }
-
-  public void backupFileSystemSchema(String directory, String subDirectory) {
-    try {
-      File file = new File(directory, subDirectory);
-      file = new File(file, SNAPSHOT_STR + server.getShard() + "/0/schema.bin");
-      file.getParentFile().mkdirs();
-
-      File sourceFile = new File(getSnapshotReplicaDir(), "schema.bin");
-      FileUtils.copyFile(sourceFile, file);
-
-
-      file = new File(directory, subDirectory);
-      file = new File(file, SNAPSHOT_STR + server.getShard() + "/0/config.bin");
-      file.getParentFile().mkdirs();
-
-      sourceFile = new File(getSnapshotReplicaDir(), "config.bin");
-      if (sourceFile.exists()) {
-        FileUtils.copyFile(sourceFile, file);
-      }
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-  }
-
-  public void backupFileSystem(String directory, String subDirectory) {
-    try {
-      File file = new File(directory, subDirectory);
-      file = new File(file, SNAPSHOT_STR + server.getShard() + "/0");
-      FileUtils.deleteDirectory(file);
-      file.mkdirs();
-
-      if (getSnapshotReplicaDir().exists()) {
-        FileUtils.copyDirectory(getSnapshotReplicaDir(), file);
-      }
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-  }
-
-  public void restoreFileSystem(String directory, String subDirectory) {
-    try {
-      File file = new File(directory, subDirectory);
-      file = new File(file, SNAPSHOT_STR + server.getShard() + "/0");
-
-      if (getSnapshotReplicaDir().exists()) {
-        FileUtils.deleteDirectory(getSnapshotReplicaDir());
-      }
-      getSnapshotReplicaDir().mkdirs();
-
-      if (file.exists()) {
-        FileUtils.copyDirectory(file, getSnapshotReplicaDir());
-      }
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-  }
-
-  public void backupAWSSchema(String bucket, String prefix, String subDirectory) {
-    AWSClient awsClient = server.getAWSClient();
-    File srcFile = new File(getSnapshotReplicaDir(), "schema.bin");
-    subDirectory += "/" + SNAPSHOT_STR + server.getShard() + "/0";
-
-    awsClient.uploadFile(bucket, prefix, subDirectory, srcFile);
-
-    srcFile = new File(getSnapshotReplicaDir(), "config.bin");
-
-    if (srcFile.exists()) {
-      awsClient.uploadFile(bucket, prefix, subDirectory, srcFile);
-    }
-  }
-
-  public void backupAWS(String bucket, String prefix, String subDirectory) {
-    AWSClient awsClient = server.getAWSClient();
-    File srcDir = getSnapshotReplicaDir();
-    subDirectory += "/" + SNAPSHOT_STR + server.getShard() + "/0";
-
-    awsClient.uploadDirectory(bucket, prefix, subDirectory, srcDir);
-  }
-
-  public void restoreAWS(String bucket, String prefix, String subDirectory) {
-    try {
-      AWSClient awsClient = server.getAWSClient();
-      File destDir = getSnapshotReplicaDir();
-      subDirectory += "/" + SNAPSHOT_STR + server.getShard() + "/0";
-
-      FileUtils.deleteDirectory(getSnapshotReplicaDir());
-      getSnapshotReplicaDir().mkdirs();
-
-      awsClient.downloadDirectory(bucket, prefix, subDirectory, destDir);
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-  }
-
   public void shutdown() {
     this.shutdown = true;
     if (snapshotThread != null) {
@@ -767,11 +661,6 @@ public class SnapshotManager {
     }
   }
 
-  public void getFilesForCurrentSnapshot(List<String> files) {
-    File replicaDir = getSnapshotReplicaDir();
-    getFilesFromDirectory(replicaDir, files);
-  }
-
   private void getFilesFromDirectory(File dir, List<String> files) {
     File[] currFiles = dir.listFiles();
     if (currFiles != null) {
@@ -781,36 +670,6 @@ public class SnapshotManager {
         }
         else {
           files.add(file.getAbsolutePath());
-        }
-      }
-    }
-  }
-
-  public void deleteTempDirs() {
-    try {
-      File dir = getSnapshotReplicaDir();
-      doDeleteTempDirs(dir);
-    }
-    catch (Exception e) {
-
-    }
-  }
-
-  public void deleteDeletedDirs() {
-
-  }
-
-  private void doDeleteTempDirs(File dir) throws IOException {
-    File[] files = dir.listFiles();
-    if (files != null) {
-      for (File file : files) {
-        if (file.isDirectory()) {
-          if (file.getName().contains("tmp")) {
-            FileUtils.deleteDirectory(file);
-          }
-          else {
-            doDeleteTempDirs(file);
-          }
         }
       }
     }

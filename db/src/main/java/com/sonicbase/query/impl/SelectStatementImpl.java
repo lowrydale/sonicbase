@@ -461,7 +461,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     this.functionAliases = functionAliases;
   }
 
-  class DistinctRecord {
+  public class DistinctRecord {
     private final Record record;
     private final List<ColumnImpl> selectColumns;
     private final Comparator[] comparators;
@@ -883,14 +883,13 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     }
   }
 
-  private ExpressionImpl.NextReturn serverSelect(String dbName, boolean serverSort, String[] tableNames, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) throws Exception {
+  public ExpressionImpl.NextReturn serverSelect(String dbName, boolean serverSort, String[] tableNames, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) throws Exception {
     while (true) {
       try {
         ComObject cobj = new ComObject();
         cobj.put(ComObject.Tag.legacySelectStatement, serialize());
         cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
         cobj.put(ComObject.Tag.count, pageSize);
-        cobj.put(ComObject.Tag.method, "ReadManager:serverSelect");
         cobj.put(ComObject.Tag.dbName, dbName);
         cobj.put(ComObject.Tag.currOffset, currOffset.get());
         cobj.put(ComObject.Tag.countReturned, countReturned.get());
@@ -900,7 +899,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
           retObj = ((DatabaseServer)client.getDatabaseServer()).getMethodInvoker().getReadManager().serverSelect(cobj, restrictToThisServer, procedureContext);
         }
         else {
-          byte[] recordRet = client.send(null, Math.abs(ThreadLocalRandom.current().nextInt() % client.getShardCount()),
+          byte[] recordRet = client.send("ReadManager:serverSelect", Math.abs(ThreadLocalRandom.current().nextInt() % client.getShardCount()),
               Math.abs(ThreadLocalRandom.current().nextLong()), cobj, DatabaseClient.Replica.def);
           retObj = new ComObject(recordRet);
         }

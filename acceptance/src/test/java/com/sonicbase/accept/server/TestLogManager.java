@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
-import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.IOUtils;
@@ -43,7 +42,7 @@ public class TestLogManager {
     for (com.sonicbase.server.DatabaseServer server : dbServers) {
       server.shutdown();
     }
-    Logger.queue.clear();
+
     System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size() + ", class=TestLogManager");
     for (DatabaseClient client : DatabaseClient.allClients) {
       System.out.println("Stack:\n" + client.getAllocatedStack());
@@ -53,7 +52,7 @@ public class TestLogManager {
 
   @BeforeClass
   public void beforeClass() throws Exception {
-    Logger.disable();
+
 
     String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
     ObjectMapper mapper = new ObjectMapper();
@@ -215,7 +214,7 @@ public class TestLogManager {
     assertFalse(ret.next());
 
     for (com.sonicbase.server.DatabaseServer server : dbServers) {
-      server.truncateTablesQuietly();
+      server.purgeMemory();
     }
 
     try {

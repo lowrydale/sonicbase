@@ -51,9 +51,7 @@ public class DeleteManagerTest {
     final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
 
     when(server.getConfig()).thenReturn(config);
-    OSStatsManager statsManager = new OSStatsManager(server);
-    when(server.getOSStatsManager()).thenReturn(statsManager);
-    TransactionManager transManager = new TransactionManager(server);
+     TransactionManager transManager = new TransactionManager(server);
     when(server.getTransactionManager()).thenReturn(transManager);
 
     DatabaseCommon common = IndexLookupTest.createCommon(tableSchema);

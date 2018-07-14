@@ -7,13 +7,11 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.DatabaseCommon;
-import com.sonicbase.common.Logger;
 import com.sonicbase.index.Index;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.server.DatabaseServer;
-import com.sonicbase.streams.LocalProducer;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -48,7 +46,7 @@ public class TestJoins {
     for (com.sonicbase.server.DatabaseServer server : dbServers) {
       server.shutdown();
     }
-    Logger.queue.clear();
+
     System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size() + ", class=TestJoins");
     for (DatabaseClient client : DatabaseClient.allClients) {
       System.out.println("Stack:\n" + client.getAllocatedStack());
@@ -58,7 +56,7 @@ public class TestJoins {
 
   @BeforeClass
   public void beforeClass() throws Exception {
-    Logger.disable();
+
 
     String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
     ObjectMapper mapper = new ObjectMapper();
@@ -116,7 +114,7 @@ public class TestJoins {
 
     client = ((ConnectionProxy)conn).getDatabaseClient();
 
-    Logger.setReady(false);
+
 
     client.setPageSize(3);
 
@@ -134,7 +132,7 @@ public class TestJoins {
 
     //test upsert
 
-    LocalProducer.queue.clear();
+
 
 
     stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");

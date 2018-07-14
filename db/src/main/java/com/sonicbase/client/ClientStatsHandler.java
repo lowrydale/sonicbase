@@ -40,17 +40,23 @@ public class ClientStatsHandler {
 
     private final String cluster;
     private final DatabaseClient client;
-
+    private Long sleepOverride = null;
     public QueryStatsRecorder(DatabaseClient client, String cluster) {
       this.client = client;
       this.cluster = cluster;
+      sleepOverride = null;
+    }
+    public QueryStatsRecorder(DatabaseClient client, String cluster, long sleepOverride) {
+      this.client = client;
+      this.cluster = cluster;
+      this.sleepOverride = sleepOverride;
     }
 
     @Override
     public void run() {
       while (!client.getShutdown()) {
         try {
-          Thread.sleep(15_000);
+          Thread.sleep(sleepOverride == null ? 15_000 : sleepOverride);
 
           boolean oneIsAlive = false;
           DatabaseClient sharedClient = client.getSharedClients().get(cluster);
@@ -68,7 +74,6 @@ public class ClientStatsHandler {
           }
 
           ComObject cobj = new ComObject();
-          cobj.put(ComObject.Tag.method, "MonitorManager:registerStats");
           ComArray array = cobj.putArray(ComObject.Tag.histogramSnapshot, ComObject.Type.objectType);
 
           if (registeredQueries.get(cluster) == null) {
@@ -108,7 +113,7 @@ public class ClientStatsHandler {
             entry.histogram = null;
           }
 
-          byte[] ret = sharedClient.send(null, 0, 0, cobj, DatabaseClient.Replica.def);
+          byte[] ret = sharedClient.send("MonitorManager:registerStats", 0, 0, cobj, DatabaseClient.Replica.def);
         }
         catch (InterruptedException e) {
           break;
@@ -129,7 +134,7 @@ public class ClientStatsHandler {
   private static ConcurrentHashMap<String, ConcurrentHashMap<String, HistogramEntry>> registeredQueries = new ConcurrentHashMap<>();
 
   public static class HistogramEntry {
-    private Histogram histogram;
+    public Histogram histogram;
     private long queryId;
     public String dbName;
     public String query;
@@ -166,7 +171,7 @@ public class ClientStatsHandler {
       cobj.put(ComObject.Tag.sql, sql);
 
       DatabaseClient sharedClient = client.getSharedClients().get(cluster);
-      byte[] ret = sharedClient.sendToMaster(cobj);
+      byte[] ret = sendToMasterOnSharedClient(cobj, sharedClient);
       if (ret != null) {
         ComObject retObj = new ComObject(ret);
         entry = new HistogramEntry();
@@ -185,6 +190,10 @@ public class ClientStatsHandler {
       logger.error("Error registering completed query", e);
     }
     return null;
+  }
+
+  public byte[] sendToMasterOnSharedClient(ComObject cobj, DatabaseClient sharedClient) {
+    return sharedClient.sendToMaster(cobj);
   }
 
 }

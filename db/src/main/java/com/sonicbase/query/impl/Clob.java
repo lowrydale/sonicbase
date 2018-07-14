@@ -32,7 +32,7 @@ public class Clob implements java.sql.Clob {
     if (data == null || pos + length > data.length()) {
       throw new SQLException("out of bounds");
     }
-    return data.substring((int)pos, length);
+    return data.substring((int)pos, (int) (pos + length));
   }
 
   @Override
@@ -129,7 +129,7 @@ public class Clob implements java.sql.Clob {
     if (data == null) {
       throw new SQLException("null data");
     }
-    String ret = data.substring((int)pos, (int)length);
+    String ret = data.substring((int)pos, (int)(pos + length));
     return new StringReader(ret);
   }
 

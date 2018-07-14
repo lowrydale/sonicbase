@@ -282,10 +282,9 @@ public class DescribeStatementHandler {
           ComObject cobj = new ComObject();
           cobj.put(ComObject.Tag.dbName, "__none__");
           cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-          cobj.put(ComObject.Tag.method, "DatabaseServer:getSchema");
           byte[] ret = null;
           try {
-            ret = client.send(null, j, i, cobj, DatabaseClient.Replica.specified);
+            ret = client.send("DatabaseServer:getSchema", j, i, cobj, DatabaseClient.Replica.specified);
             ComObject retObj = new ComObject(ret);
             DatabaseCommon tmpCommon = new DatabaseCommon();
             tmpCommon.deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
@@ -401,10 +400,6 @@ public class DescribeStatementHandler {
 
   }
 
-
-
-
-
   class Entry {
     public Entry(String table, String index, int shard, String result) {
       this.table = table;
@@ -502,8 +497,7 @@ public class DescribeStatementHandler {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, dbName);
     cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-    cobj.put(ComObject.Tag.method, "PartitionManager:getRepartitionerState");
-    byte[] ret = client.sendToMaster(cobj);
+    byte[] ret = client.sendToMaster("PartitionManager:getRepartitionerState", cobj);
     ComObject retObj = new ComObject(ret);
 
     StringBuilder builder = new StringBuilder();

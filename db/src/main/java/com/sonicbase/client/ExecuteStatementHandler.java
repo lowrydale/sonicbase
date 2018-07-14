@@ -32,11 +32,10 @@ public class ExecuteStatementHandler extends StatementHandler {
     }
 
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.method, "DatabaseServer:executeProcedurePrimary");
     cobj.put(ComObject.Tag.sql, sqlToUse);
     cobj.put(ComObject.Tag.dbName, dbName);
 
-    byte[] ret = client.send(null, ThreadLocalRandom.current().nextInt(0, client.getShardCount()), 0, cobj, DatabaseClient.Replica.def);
+    byte[] ret = client.send("DatabaseServer:executeProcedurePrimary", ThreadLocalRandom.current().nextInt(0, client.getShardCount()), 0, cobj, DatabaseClient.Replica.def);
     if (ret != null) {
 
       ComObject retObj = new ComObject(ret);

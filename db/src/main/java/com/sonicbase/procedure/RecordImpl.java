@@ -50,49 +50,51 @@ public class RecordImpl implements Record {
     }
     else {
       ComArray array = cobj.getArray(ComObject.Tag.fields);
-      for (int i = 0; i < array.getArray().size(); i++) {
-        ComObject parm = (ComObject) array.getArray().get(i);
-        String fieldName = parm.getString(ComObject.Tag.fieldName);
-        Map<Integer, Object> fields = parm.getMap();
-        for (Map.Entry<Integer, Object> field : fields.entrySet()) {
-          if (field.getKey() == ComObject.Tag.stringValue.tag) {
-            this.fieldMap.put(fieldName, parm.getString(ComObject.Tag.stringValue));
-          }
-          else if (field.getKey() == ComObject.Tag.longValue.tag) {
-            fieldMap.put(fieldName, parm.getLong(ComObject.Tag.longValue));
-          }
-          else if (field.getKey() == ComObject.Tag.intValue.tag) {
-            fieldMap.put(fieldName, parm.getInt(ComObject.Tag.intValue));
-          }
-          else if (field.getKey() == ComObject.Tag.booleanValue.tag) {
-            fieldMap.put(fieldName, parm.getBoolean(ComObject.Tag.booleanValue));
-          }
-          else if (field.getKey() == ComObject.Tag.timeValue.tag) {
-            fieldMap.put(fieldName, parm.getTime(ComObject.Tag.timeValue));
-          }
-          else if (field.getKey() == ComObject.Tag.dateValue.tag) {
-            fieldMap.put(fieldName, parm.getDate(ComObject.Tag.dateValue));
-          }
-          else if (field.getKey() == ComObject.Tag.timestampValue.tag) {
-            fieldMap.put(fieldName, parm.getTimestamp(ComObject.Tag.timestampValue));
-          }
-          else if (field.getKey() == ComObject.Tag.floatValue.tag) {
-            fieldMap.put(fieldName, parm.getFloat(ComObject.Tag.floatValue));
-          }
-          else if (field.getKey() == ComObject.Tag.doubleValue.tag) {
-            fieldMap.put(fieldName, parm.getDouble(ComObject.Tag.doubleValue));
-          }
-          else if (field.getKey() == ComObject.Tag.bigDecimalValue.tag) {
-            fieldMap.put(fieldName, parm.getBigDecimal(ComObject.Tag.bigDecimalValue));
-          }
-          else if (field.getKey() == ComObject.Tag.byteValue.tag) {
-            fieldMap.put(fieldName, parm.getByte(ComObject.Tag.byteValue));
-          }
-          else if (field.getKey() == ComObject.Tag.shortValue.tag) {
-            fieldMap.put(fieldName, parm.getShort(ComObject.Tag.shortValue));
-          }
-          else if (field.getKey() == ComObject.Tag.byteArrayValue.tag) {
-            fieldMap.put(fieldName, parm.getByteArray(ComObject.Tag.byteArrayValue));
+      if (array != null) {
+        for (int i = 0; i < array.getArray().size(); i++) {
+          ComObject parm = (ComObject) array.getArray().get(i);
+          String fieldName = parm.getString(ComObject.Tag.fieldName);
+          Map<Integer, Object> fields = parm.getMap();
+          for (Map.Entry<Integer, Object> field : fields.entrySet()) {
+            if (field.getKey() == ComObject.Tag.stringValue.tag) {
+              this.fieldMap.put(fieldName, parm.getString(ComObject.Tag.stringValue));
+            }
+            else if (field.getKey() == ComObject.Tag.longValue.tag) {
+              fieldMap.put(fieldName, parm.getLong(ComObject.Tag.longValue));
+            }
+            else if (field.getKey() == ComObject.Tag.intValue.tag) {
+              fieldMap.put(fieldName, parm.getInt(ComObject.Tag.intValue));
+            }
+            else if (field.getKey() == ComObject.Tag.booleanValue.tag) {
+              fieldMap.put(fieldName, parm.getBoolean(ComObject.Tag.booleanValue));
+            }
+            else if (field.getKey() == ComObject.Tag.timeValue.tag) {
+              fieldMap.put(fieldName, parm.getTime(ComObject.Tag.timeValue));
+            }
+            else if (field.getKey() == ComObject.Tag.dateValue.tag) {
+              fieldMap.put(fieldName, parm.getDate(ComObject.Tag.dateValue));
+            }
+            else if (field.getKey() == ComObject.Tag.timestampValue.tag) {
+              fieldMap.put(fieldName, parm.getTimestamp(ComObject.Tag.timestampValue));
+            }
+            else if (field.getKey() == ComObject.Tag.floatValue.tag) {
+              fieldMap.put(fieldName, parm.getFloat(ComObject.Tag.floatValue));
+            }
+            else if (field.getKey() == ComObject.Tag.doubleValue.tag) {
+              fieldMap.put(fieldName, parm.getDouble(ComObject.Tag.doubleValue));
+            }
+            else if (field.getKey() == ComObject.Tag.bigDecimalValue.tag) {
+              fieldMap.put(fieldName, parm.getBigDecimal(ComObject.Tag.bigDecimalValue));
+            }
+            else if (field.getKey() == ComObject.Tag.byteValue.tag) {
+              fieldMap.put(fieldName, parm.getByte(ComObject.Tag.byteValue));
+            }
+            else if (field.getKey() == ComObject.Tag.shortValue.tag) {
+              fieldMap.put(fieldName, parm.getShort(ComObject.Tag.shortValue));
+            }
+            else if (field.getKey() == ComObject.Tag.byteArrayValue.tag) {
+              fieldMap.put(fieldName, parm.getByteArray(ComObject.Tag.byteArrayValue));
+            }
           }
         }
       }

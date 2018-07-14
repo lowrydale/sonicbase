@@ -213,7 +213,7 @@
   <priority>0.64</priority>
 </url>
 <url>
-  <loc>http://sonicbase.com/docs/jdbc-client.html</loc>
+  <loc>http://sonicbase.com/docs/jdbc-driver.html</loc>
   <lastmod>2018-02-26T02:21:05+00:00</lastmod>
   <priority>0.64</priority>
 </url>
@@ -328,7 +328,7 @@
   <priority>0.64</priority>
 </url>
 <url>
-  <loc>http://sonicbase.com/docs/jdbc-client.html?framed=true</loc>
+  <loc>http://sonicbase.com/docs/jdbc-driver.html?framed=true</loc>
   <lastmod>2018-02-26T02:21:05+00:00</lastmod>
   <priority>0.64</priority>
 </url>

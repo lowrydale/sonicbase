@@ -7,6 +7,8 @@ import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.CreateTableStatementImpl;
 import com.sonicbase.schema.*;
 import org.apache.commons.io.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -23,13 +25,13 @@ import static com.sonicbase.common.DatabaseCommon.sortSchemaFiles;
  */
 public class SchemaManager {
 
-  private Logger logger;
+  private static Logger logger = LoggerFactory.getLogger(SchemaManager.class);
+
 
   private final com.sonicbase.server.DatabaseServer server;
 
   public SchemaManager(com.sonicbase.server.DatabaseServer databaseServer) {
     this.server = databaseServer;
-    this.logger = new Logger(null/*databaseServer.getDatabaseClient()*/);
   }
 
   public static class AutoIncrementValue {
@@ -756,6 +758,15 @@ public class SchemaManager {
       return null;
     }
 
+    String tableName = cobj.getString(ComObject.Tag.tableName);
+    ComArray array = cobj.getArray(ComObject.Tag.indices);
+    for (int i = 0; i < array.getArray().size(); i++) {
+      String indexName = (String) array.getArray().get(i);
+      server.removeIndex(dbName, tableName, indexName);
+      SnapshotManager snapshotManager = server.getSnapshotManager();
+      snapshotManager.deleteIndexSchema(dbName, server.getCommon().getSchemaVersion(), tableName, indexName);
+    }
+
     DatabaseCommon tmpCommon = new DatabaseCommon();
     tmpCommon.deserializeSchema(cobj.getByteArray(ComObject.Tag.schemaBytes));
     if (tmpCommon.getSchemaVersion() > server.getCommon().getSchemaVersion()) {
@@ -763,12 +774,6 @@ public class SchemaManager {
       server.getCommon().saveSchema(server.getClient(), server.getDataDir());
     }
 
-    String tableName = cobj.getString(ComObject.Tag.tableName);
-    ComArray array = cobj.getArray(ComObject.Tag.indices);
-    for (int i = 0; i < array.getArray().size(); i++) {
-      String indexName = (String) array.getArray().get(i);
-      server.removeIndex(dbName, tableName, indexName);
-    }
     return null;
   }
 
@@ -807,6 +812,7 @@ public class SchemaManager {
         for (IndexSchema indexSchema : toDrop) {
           server.removeIndex(dbName, table, indexSchema.getName());
           server.getCommon().getTableSchema(dbName, table, server.getDataDir()).getIndices().remove(indexSchema.getName());
+          server.getCommon().getTableSchema(dbName, table, server.getDataDir()).getIndexesById().remove(indexSchema.getIndexId());
           SnapshotManager snapshotManager = server.getSnapshotManager();
           snapshotManager.deleteIndexSchema(dbName, server.getCommon().getSchemaVersion(), table, indexSchema.getName());
         }

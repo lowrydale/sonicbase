@@ -4,6 +4,7 @@ import com.sonicbase.client.ClientStatsHandler;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.client.SelectStatementHandler;
 import com.sonicbase.common.*;
+import com.sonicbase.jdbcdriver.NotImplementedException;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.procedure.RecordImpl;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
@@ -29,6 +30,7 @@ import org.jetbrains.annotations.Nullable;
 import java.io.*;
 import java.math.BigDecimal;
 import java.sql.Date;
+import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.*;
@@ -390,20 +392,12 @@ public class ResultSetImpl implements ResultSet {
     }
   }
 
-  public String getIndexUsed() {
-    return indexUsed;
-  }
-
   public boolean isAfterLast() {
     return currRecord == null;
   }
 
   public boolean next() throws DatabaseException {
     currPos++;
-
-//    if (selectStatement.getFunctionAliases().size() != 0) {
-//      return currPos == 0;
-//    }
 
     if (describeStrs != null) {
       if (currPos > describeStrs.length - 1) {
@@ -728,7 +722,10 @@ public class ResultSetImpl implements ResultSet {
           TableSchema tableSchema = databaseClient.getCommon().getTables(dbName).get(label[0]);
           Integer offset = tableSchema.getFieldOffset(label[1]);
           if (offset != null) {
-            return doGetField(i, label, offset, columnLabel);
+            Object ret = doGetField(i, label, offset, columnLabel);
+            if (ret != null) {
+              return ret;
+            }
           }
         }
       }
@@ -737,7 +734,10 @@ public class ResultSetImpl implements ResultSet {
       TableSchema tableSchema = databaseClient.getCommon().getTables(dbName).get(tableNames[i]);
       Integer offset = tableSchema.getFieldOffset(label[1]);
       if (offset != null) {
-        return doGetField(i, label, offset, columnLabel);
+        Object ret = doGetField(i, label, offset, columnLabel);
+        if (ret != null) {
+          return ret;
+        }
       }
     }
     return null;
@@ -860,7 +860,7 @@ public class ResultSetImpl implements ResultSet {
     ExpressionImpl.CachedRecord cachedRecord = getDirectFieldValue(columnLabel);
     if (cachedRecord != null) {
       Object obj = cachedRecord.getRecord().getFields()[fieldInfo.fieldOffset];
-      return getByte(obj, fieldInfo.function == null ? null : fieldInfo.function.getName());
+      return getByte(obj, fieldInfo.function);
     }
 
     String[] actualColumn = null;
@@ -873,13 +873,14 @@ public class ResultSetImpl implements ResultSet {
       fieldInfo.function = function;
     }
 
-    return getByte(ret, function == null ? null : function.getName());
+    return getByte(ret, function);
   }
 
-  private Byte getByte(Object ret, String function) {
+  private Byte getByte(Object ret, SelectFunctionImpl function) {
     if (function != null) {
       String retString = getRetString(ret);
-      if (function.equals(LENGTH_STR)) {
+      String functionName = function.getName();
+      if (functionName.equals(LENGTH_STR)) {
         return (byte) retString.length();
       }
     }
@@ -909,7 +910,7 @@ public class ResultSetImpl implements ResultSet {
     ExpressionImpl.CachedRecord cachedRecord = getDirectFieldValue(columnLabel);
     if (cachedRecord != null) {
       Object obj = cachedRecord.getRecord().getFields()[fieldInfo.fieldOffset];
-      Short retString1 = getShort(obj, fieldInfo.function == null ? null : fieldInfo.function.getName());
+      Short retString1 = getShort(obj, fieldInfo.function);
       if (retString1 != null) {
         return retString1;
       }
@@ -927,7 +928,7 @@ public class ResultSetImpl implements ResultSet {
       fieldInfo.function = function;
     }
 
-    Short retString1 = getShort(ret, function == null ? null : function.getName());
+    Short retString1 = getShort(ret, function);
     if (retString1 != null) {
       return retString1;
     }
@@ -951,10 +952,11 @@ public class ResultSetImpl implements ResultSet {
     return actualColumn;
   }
 
-  private Short getShort(Object ret, String function) {
+  private Short getShort(Object ret, SelectFunctionImpl function) {
     String retString = getRetString(ret);
     if (function != null) {
-      if (function.equals(LENGTH_STR)) {
+      String functionName = function.getName();
+      if (functionName.equals(LENGTH_STR)) {
         return (short) retString.length();
       }
     }
@@ -1278,25 +1280,11 @@ public class ResultSetImpl implements ResultSet {
   }
 
   public BigDecimal getBigDecimal(String columnLabel, int scale) {
-    if (recordsResults != null) {
-      return cachedRecordResultAsRecord.getBigDecimal(columnLabel, scale);
-    }
-
-    FieldInfo fieldInfo = fieldInfos.get(columnLabel);
-    ExpressionImpl.CachedRecord cachedRecord = getDirectFieldValue(columnLabel);
-    if (cachedRecord != null) {
-      Object obj = cachedRecord.getRecord().getFields()[fieldInfo.fieldOffset];
-      return getBigDecimal(obj, scale);
-    }
-
-    String[] actualColumn = getActualColumn(columnLabel);
-    Object ret = getField(actualColumn, columnLabel);
-
-    return getBigDecimal(ret, scale);
+    throw new DatabaseException("not supported");
   }
 
   private BigDecimal getBigDecimal(Object ret, int scale) {
-    return (BigDecimal) DataType.getBigDecimalConverter().convert(ret);
+    throw new DatabaseException("not supported");
   }
 
   public byte[] getBytes(String columnLabel) {
@@ -1444,6 +1432,9 @@ public class ResultSetImpl implements ResultSet {
     ExpressionImpl.CachedRecord cachedRecord = getDirectFieldValue(columnLabel);
     if (cachedRecord != null) {
       Object obj = cachedRecord.getRecord().getFields()[fieldInfo.fieldOffset];
+      if (obj == null) {
+        return null;
+      }
       return new InputStreamReader(new ByteArrayInputStream((byte[]) obj));
     }
 
@@ -1554,7 +1545,7 @@ public class ResultSetImpl implements ResultSet {
   public BigDecimal getBigDecimal(int columnIndex) {
     String[] actualColumn = getActualColumn(columnIndex);
     Object ret = getField(actualColumn, actualColumn[1]);
-    return getBigDecimal(ret, -1);
+    return (BigDecimal) DataType.getBigDecimalConverter().convert(ret);
   }
 
   @Override
@@ -1587,9 +1578,7 @@ public class ResultSetImpl implements ResultSet {
 
   @Override
   public BigDecimal getBigDecimal(int columnIndex, int scale) {
-    String[] actualColumn = getActualColumn(columnIndex);
-    Object ret = getField(actualColumn, actualColumn[1]);
-    return getBigDecimal(ret, scale);
+    throw new DatabaseException("Not supported");
   }
 
   @Override
@@ -1671,7 +1660,7 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnIndex);
     Object ret = getField(actualColumn, actualColumn[1]);
     SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(actualColumn[1]));
-    return getShort(ret, function.getName());
+    return getShort(ret, function);
   }
 
   @Override
@@ -1679,7 +1668,7 @@ public class ResultSetImpl implements ResultSet {
     String[] actualColumn = getActualColumn(columnIndex);
     Object ret = getField(actualColumn, actualColumn[1]);
     SelectFunctionImpl function = functionAliases.get(DatabaseClient.toLower(actualColumn[1]));
-    return getByte(ret, function.getName());
+    return getByte(ret, function);
   }
 
   @Override
@@ -1846,98 +1835,6 @@ public class ResultSetImpl implements ResultSet {
         databaseClient.getClientStatsHandler().registerCompletedQueryForStats(dbName, histogramEntry, beginMillis, beginNanos);
       }
     }
-
-  }
-
-  private String[] getIndexFields(ResultSetImpl.OptimizationSettings settings) {
-    TableSchema tableSchema = databaseClient.getCommon().getTables(dbName).get(settings.fromTable);
-    String[] fields = null;
-    for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
-      if (entry.getValue().getFields()[0].equals(settings.leftColumn.columnName)) {
-        fields = entry.getValue().getFields();
-        break;
-      }
-    }
-    return fields;
-  }
-
-  private void getTwoKeySettingsForOneSideExpression(BinaryExpressionImpl lookupExpression, OptimizationSettings
-      settings,
-                                                     ColumnSettings greater, ColumnSettings less) {
-    BinaryExpressionImpl leftExpression = (BinaryExpressionImpl) lookupExpression.getLeftExpression();
-    BinaryExpressionImpl rightExpression = (BinaryExpressionImpl) lookupExpression.getRightExpression();
-
-    if (leftExpression.getLeftExpression() instanceof ConstantImpl ||
-        leftExpression.getLeftExpression() instanceof ParameterImpl) {
-      greater.value = ExpressionImpl.getValueFromExpression(selectStatement.getParms(), leftExpression.getLeftExpression());
-      getColumnSettings(settings, greater, leftExpression.getRightExpression(), leftExpression.getOperator());
-    }
-    else {
-      greater.value = ExpressionImpl.getValueFromExpression(selectStatement.getParms(), leftExpression.getRightExpression());
-      getColumnSettings(settings, greater, leftExpression.getLeftExpression(), leftExpression.getOperator());
-    }
-
-    if (rightExpression.getLeftExpression() instanceof ConstantImpl ||
-        rightExpression.getLeftExpression() instanceof ParameterImpl) {
-      less.value = ExpressionImpl.getValueFromExpression(selectStatement.getParms(), rightExpression.getLeftExpression());
-      getColumnSettings(settings, less, rightExpression.getRightExpression(), rightExpression.getOperator());
-    }
-    else {
-      less.value = ExpressionImpl.getValueFromExpression(selectStatement.getParms(), rightExpression.getRightExpression());
-      getColumnSettings(settings, less, rightExpression.getLeftExpression(), rightExpression.getOperator());
-    }
-  }
-
-  private void getColumnSettings(OptimizationSettings settings, ColumnSettings columnSettings,
-                                 ExpressionImpl columnExpression, BinaryExpression.Operator operator2) {
-    ColumnImpl column = (ColumnImpl) columnExpression;
-    String tableName = column.getTableName();
-    if (tableName == null) {
-      tableName = selectStatement.getFromTable();
-    }
-    String columnName = column.getColumnName();
-    TableSchema tableSchema = databaseClient.getCommon().getTables(dbName).get(tableName);
-    int fieldOffset = tableSchema.getFieldOffset(columnName);
-    FieldSchema fieldSchema = tableSchema.getFields().get(fieldOffset);
-    DataType.Type type = fieldSchema.getType();
-    BinaryExpression.Operator operator = operator2;
-    settings.fromTable = selectStatement.getFromTable();
-    columnSettings.columnTableName = tableName;
-    columnSettings.columnName = columnName;
-    columnSettings.columnType = type;
-    columnSettings.operator = operator;
-    columnSettings.fieldOffset = tableSchema.getFieldOffset(columnName);
-  }
-
-  private BinaryExpressionImpl convertStackToTree(List<BinaryExpressionImpl> stack) {
-    BinaryExpressionImpl left;
-    if (stack.size() == 1) {
-      left = stack.remove(0);
-    }
-    else {
-      left = new BinaryExpressionImpl();
-      left.setOperator(BinaryExpression.Operator.and);
-      left.setLeftExpression(stack.remove(0));
-      left.setRightExpression(stack.remove(0));
-    }
-    while (stack.size() > 0) {
-      BinaryExpressionImpl e = null;
-      if (stack.size() == 1) {
-        e = stack.remove(0);
-      }
-      else {
-        e = new BinaryExpressionImpl();
-        e.setOperator(BinaryExpression.Operator.and);
-        e.setLeftExpression(stack.remove(0));
-        e.setRightExpression(stack.remove(0));
-      }
-      BinaryExpressionImpl and = new BinaryExpressionImpl();
-      and.setOperator(BinaryExpression.Operator.and);
-      and.setLeftExpression(left);
-      and.setRightExpression(e);
-      left = and;
-    }
-    return left;
   }
 
   private void getMoreServerSetResults() {

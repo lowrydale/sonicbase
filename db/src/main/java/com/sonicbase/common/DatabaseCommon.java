@@ -176,12 +176,15 @@ public class DatabaseCommon {
         try {
           tableSchema.deserialize(in, serializationVersion);
           TableSchema existingSchema = dbSchema.getTables().get(tableSchema.getName());
-          if (existingSchema != null) {
-            for (IndexSchema indexSchema : existingSchema.getIndexes().values()) {
-              tableSchema.getIndexes().put(indexSchema.getName(), indexSchema);
-              tableSchema.getIndexesById().put(indexSchema.getIndexId(), indexSchema);
-            }
-          }
+//          if (existingSchema != null) {
+//            for (IndexSchema indexSchema : existingSchema.getIndexes().values()) {
+//              tableSchema.getIndexes().put(indexSchema.getName(), indexSchema);
+//              tableSchema.getIndexesById().put(indexSchema.getIndexId(), indexSchema);
+//            }
+//          }
+          existingSchema.getIndexesById().clear();
+          existingSchema.getIndexes().clear(); //ignore indices in the table will read index files
+
           dbSchema.getTables().put(tableSchema.getName(), tableSchema);
           dbSchema.getTablesById().put(tableSchema.getTableId(), tableSchema);
           File indicesDir = new File(tableFile, "/indices");
@@ -246,43 +249,6 @@ public class DatabaseCommon {
     }
   }
 
-  public void saveSchema(byte[] bytes, String dataDir) {
-    try {
-      internalWriteLock.lock();
-      String dataRoot = null;
-      if (USE_SNAPSHOT_MGR_OLD) {
-        dataRoot = new File(dataDir, "snapshot/" + shard + "/" + replica).getAbsolutePath();
-      }
-      else {
-        dataRoot = new File(dataDir, "delta/" + shard + "/" + replica).getAbsolutePath();
-      }
-        File schemaFile = new File(dataRoot, "schema.bin");
-        if (schemaFile.exists()) {
-          schemaFile.delete();
-        }
-
-        schemaFile.getParentFile().mkdirs();
-        try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(schemaFile)))) {
-          if (getShard() == 0 &&
-              getServersConfig().getShards()[0].getMasterReplica() == getReplica()) {
-            this.schemaVersion++;
-            //          schema.get(dbName).incrementSchemaVersion();
-          }
-          serializeSchema(out, SERIALIZATION_VERSION);
-        }
-
-
-        loadSchema(dataDir);
-        logger.info("Saved schema - postLoad: dir=" + dataRoot);
-
-    }
-    catch (IOException e) {
-      throw new DatabaseException(e);
-    }
-    finally {
-      internalWriteLock.unlock();
-    }
-  }
   public void saveSchema(DatabaseClient client, String dataDir) {
     try {
       internalWriteLock.lock();

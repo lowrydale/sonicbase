@@ -7,7 +7,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.KeyRecord;
-import com.sonicbase.common.Logger;
 import com.sonicbase.index.Index;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.schema.TableSchema;
@@ -49,7 +48,7 @@ public class TestTransactions {
     for (com.sonicbase.server.DatabaseServer server : dbServers) {
       server.shutdown();
     }
-    Logger.queue.clear();
+
     System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size());
     for (DatabaseClient client : DatabaseClient.allClients) {
       System.out.println("Stack:\n" + client.getAllocatedStack());
@@ -59,7 +58,6 @@ public class TestTransactions {
 
   @BeforeClass
   public void beforeClass() throws Exception {
-    Logger.disable();
 
     String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
     ObjectMapper mapper = new ObjectMapper();
@@ -108,8 +106,6 @@ public class TestTransactions {
 
 
     conn2 = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/test", "user", "password");
-
-    Logger.setReady(false);
 
     PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
     stmt.executeUpdate();

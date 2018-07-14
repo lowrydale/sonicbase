@@ -201,7 +201,6 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
               if (schemaRetryCount < 2) {
                 cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
               }
-              cobj.put(ComObject.Tag.method, "UpdateManager:updateRecord");
               cobj.put(ComObject.Tag.tableName, tableName);
               cobj.put(ComObject.Tag.indexName, indexSchema.getName());
               cobj.put(ComObject.Tag.isExcpliciteTrans, client.isExplicitTrans());
@@ -215,8 +214,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
                 cobj.put(ComObject.Tag.sequence2Override, sequence2);
               }
 
-
-              client.send(null, selectedShards.get(0), rand.nextLong(), cobj, DatabaseClient.Replica.def);
+              client.send("UpdateManager:updateRecord", selectedShards.get(0), rand.nextLong(), cobj, DatabaseClient.Replica.def);
 
               //update keys
 
@@ -225,8 +223,8 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
               Map<String, ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo>> orderedKeyInfosPrevious = new HashMap<>();
               Map<String, ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo>> orderedKeyInfosNew = new HashMap<>();
 
-              client.populateOrderedKeyInfo(orderedKeyInfosPrevious, previousKeys);
-              client.populateOrderedKeyInfo(orderedKeyInfosNew, newKeys);
+              DatabaseClient.populateOrderedKeyInfo(orderedKeyInfosPrevious, previousKeys);
+              DatabaseClient.populateOrderedKeyInfo(orderedKeyInfosNew, newKeys);
 
               for (Map.Entry<String, ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo>> previousEntry : orderedKeyInfosPrevious.entrySet()) {
                 ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo> newMap = orderedKeyInfosNew.get(previousEntry.getKey());

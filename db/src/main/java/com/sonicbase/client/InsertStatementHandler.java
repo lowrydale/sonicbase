@@ -132,7 +132,7 @@ public class InsertStatementHandler extends StatementHandler {
     public boolean ignore;
   }
 
-  class PreparedInsert {
+  public class PreparedInsert {
     String dbName;
     int tableId;
     int indexId;
@@ -265,6 +265,7 @@ public class InsertStatementHandler extends StatementHandler {
         }
       }
 
+      int offset = originalOffset.getAndIncrement();
       outer:
       for (final KeyInfo keyInfo : keys) {
         for (KeyInfo completedKey : completed) {
@@ -281,7 +282,7 @@ public class InsertStatementHandler extends StatementHandler {
 
         PreparedInsert insert = new PreparedInsert();
         insert.dbName = dbName;
-        insert.originalOffset = originalOffset.getAndIncrement();
+        insert.originalOffset = offset;
         insert.originalStatement = request.insertStatement;
         insert.keyInfo = keyInfo;
         insert.record = record;
@@ -370,23 +371,23 @@ public class InsertStatementHandler extends StatementHandler {
             ret.add(new KeyInfo(shard, key, indexSchema.getValue(), true));
           }
 
-          selectedShards = findOrderedPartitionForRecord(false, true, fieldOffsets, common, tableSchema,
-              indexSchema.getKey(), null, com.sonicbase.query.BinaryExpression.Operator.equal, null, key, null);
-
-          for (int partition : selectedShards) {
-            boolean found = false;
-            int shard = lastPartitions[partition].getShardOwning();
-            for (KeyInfo keyInfo : ret) {
-              if (keyInfo.shard == shard) {
-                keyInfo.currAndLastMatch = true;
-                found = true;
-                break;
-              }
-            }
-            if (!found) {
-              ret.add(new KeyInfo(shard, key, indexSchema.getValue(), false));
-            }
-          }
+//          selectedShards = findOrderedPartitionForRecord(false, true, fieldOffsets, common, tableSchema,
+//              indexSchema.getKey(), null, com.sonicbase.query.BinaryExpression.Operator.equal, null, key, null);
+//
+//          for (int partition : selectedShards) {
+//            boolean found = false;
+//            int shard = lastPartitions[partition].getShardOwning();
+//            for (KeyInfo keyInfo : ret) {
+//              if (keyInfo.shard == shard) {
+//                keyInfo.currAndLastMatch = true;
+//                found = true;
+//                break;
+//              }
+//            }
+//            if (!found) {
+//              ret.add(new KeyInfo(shard, key, indexSchema.getValue(), false));
+//            }
+//          }
         }
       }
     }
@@ -588,7 +589,6 @@ public class InsertStatementHandler extends StatementHandler {
       if (schemaRetryCount < 2) {
         cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
       }
-      cobj.put(ComObject.Tag.method, "UpdateManager:insertIndexEntryByKeyWithRecord");
       cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
       cobj.put(ComObject.Tag.isExcpliciteTrans, client.isExplicitTrans());
       cobj.put(ComObject.Tag.isCommitting, client.isCommitting());
@@ -599,7 +599,7 @@ public class InsertStatementHandler extends StatementHandler {
       Exception lastException = null;
       //for (int i = 0; i < replicaCount; i++) {
       try {
-        byte[] ret = client.send(null, keyInfo.shard, 0, cobj, DatabaseClient.Replica.def);
+        byte[] ret = client.send("UpdateManager:insertIndexEntryByKeyWithRecord", keyInfo.shard, 0, cobj, DatabaseClient.Replica.def);
         if (ret == null) {
           throw new FailedToInsertException("No response for key insert");
         }
@@ -640,7 +640,7 @@ public class InsertStatementHandler extends StatementHandler {
     return cobj;
   }
 
-  private int convertInsertToUpdate(String dbName, InsertStatementImpl insertStatement) throws SQLException {
+  public int convertInsertToUpdate(String dbName, InsertStatementImpl insertStatement) throws SQLException {
     List<String> columns = insertStatement.getColumns();
     String sql = "update " + insertStatement.getTableName() + " set ";
     boolean first = true;
@@ -884,7 +884,6 @@ public class InsertStatementHandler extends StatementHandler {
             cobj1.put(ComObject.Tag.isExcpliciteTrans, client.isExplicitTrans());
             cobj1.put(ComObject.Tag.isCommitting, client.isCommitting());
             cobj1.put(ComObject.Tag.transactionId, client.getTransactionId());
-            cobj1.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
 
             cobj1.putArray(ComObject.Tag.insertObjects, ComObject.Type.objectType);
             cobjs1.add(cobj1);
@@ -898,7 +897,6 @@ public class InsertStatementHandler extends StatementHandler {
             cobj2.put(ComObject.Tag.isExcpliciteTrans, client.isExplicitTrans());
             cobj2.put(ComObject.Tag.isCommitting, client.isCommitting());
             cobj2.put(ComObject.Tag.transactionId, client.getTransactionId());
-            cobj2.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
             cobj2.putArray(ComObject.Tag.insertObjects, ComObject.Type.objectType);
             cobjs2.add(cobj2);
 
@@ -927,7 +925,7 @@ public class InsertStatementHandler extends StatementHandler {
                   ComObject retObj = new ComObject();
                   return retObj;
                 }
-                byte[] ret = client.send(null, offset, 0, cobjs1.get(offset), DatabaseClient.Replica.def);
+                byte[] ret = client.send("UpdateManager:batchInsertIndexEntryByKeyWithRecord", offset, 0, cobjs1.get(offset), DatabaseClient.Replica.def);
                 if (ret == null) {
                   throw new FailedToInsertException("No response for key insert");
                 }
@@ -1001,7 +999,7 @@ public class InsertStatementHandler extends StatementHandler {
                 if (cobjs2.get(offset).getArray(ComObject.Tag.insertObjects).getArray().size() == 0) {
                   return null;
                 }
-                client.send(null, offset, 0, cobjs2.get(offset), DatabaseClient.Replica.def);
+                client.send("UpdateManager:batchInsertIndexEntryByKey", offset, 0, cobjs2.get(offset), DatabaseClient.Replica.def);
 
                 for (PreparedInsert insert : processed.get(offset)) {
                   preparedKeys.remove(insert);

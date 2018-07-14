@@ -2,10 +2,11 @@ package com.sonicbase.server;
 
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.AWSClient;
-import com.sonicbase.common.Logger;
 import com.sonicbase.query.DatabaseException;
 import org.apache.commons.io.FileUtils;
 import org.apache.giraph.utils.Varint;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.text.ParseException;
@@ -19,14 +20,13 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  */
 public class LongRunningCalls {
 
-  private Logger logger;
+  private static Logger logger = LoggerFactory.getLogger(LongRunningCalls.class);
 
   private final com.sonicbase.server.DatabaseServer server;
   private ConcurrentLinkedQueue<Thread> executionThreads = new ConcurrentLinkedQueue<>();
 
   public LongRunningCalls(DatabaseServer server) {
     this.server = server;
-    this.logger = new Logger(null/*server.getDatabaseClient()*/);
   }
 
   public void shutdown() {
@@ -161,76 +161,6 @@ public class LongRunningCalls {
 
   public SingleCommand createSingleCommand(byte[] body) {
     return new SingleCommand(this, body);
-  }
-
-  public long getBackupLocalFileSystemSize() {
-    File dir = getReplicaRoot();
-    return com.sonicbase.common.FileUtils.sizeOfDirectory(dir);
-  }
-
-
-  public void backupFileSystem(String directory, String subDirectory) {
-    try {
-      File dir = getReplicaRoot();
-      File destDir = new File(directory, subDirectory + "/lrc/" + server.getShard() + "/0");
-      if (dir.exists()) {
-        FileUtils.copyDirectory(dir, destDir);
-      }
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-  }
-
-  public void restoreFileSystem(String directory, String subDirectory) {
-    try {
-      File destDir = getReplicaRoot();
-      if (destDir.exists()) {
-        FileUtils.deleteDirectory(destDir);
-      }
-      destDir.mkdirs();
-      File srcDir = new File(directory, subDirectory + "/lrc/" + server.getShard() + "/0");
-      if (srcDir.exists()) {
-        FileUtils.copyDirectory(srcDir, destDir);
-      }
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-  }
-
-  public void restoreAWS(String bucket, String prefix, String subDirectory) {
-    try {
-      AWSClient awsClient = server.getAWSClient();
-      File destDir = getReplicaRoot();
-      subDirectory += "/lrc/" + server.getShard() + "/0";
-
-      FileUtils.deleteDirectory(destDir);
-      destDir.mkdirs();
-
-      awsClient.downloadDirectory(bucket, prefix, subDirectory, destDir);
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-  }
-
-  public void backupAWS(String bucket, String prefix, String subDirectory) {
-    AWSClient awsClient = server.getAWSClient();
-    File srcDir = getReplicaRoot();
-    subDirectory += "/lrc/" + server.getShard() + "/0";
-
-    awsClient.uploadDirectory(bucket, prefix, subDirectory, srcDir);
-  }
-
-  public void getFiles(List<String> files) {
-    File dir = getReplicaRoot();
-    File[] currFiles = dir.listFiles();
-    if (currFiles != null) {
-      for (File file : currFiles) {
-        files.add(file.getAbsolutePath());
-      }
-    }
   }
 
   public class SingleCommand {

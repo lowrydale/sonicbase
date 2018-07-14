@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
-import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.FileUtils;
@@ -36,13 +35,13 @@ public class TestDeltaManager {
     for (DatabaseServer server : dbServers) {
       server.shutdown();
     }
-    Logger.queue.clear();
+
   }
 
   @Test
   public void test() throws InterruptedException, ExecutionException, ClassNotFoundException, SQLException, IOException {
     try {
-      Logger.disable();
+
 
       String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
       ObjectMapper mapper = new ObjectMapper();
@@ -107,7 +106,7 @@ public class TestDeltaManager {
 
       conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/test", "user", "password");
 
-      Logger.setReady(false);
+
 
       DatabaseClient client = ((ConnectionProxy) conn).getDatabaseClient();
 

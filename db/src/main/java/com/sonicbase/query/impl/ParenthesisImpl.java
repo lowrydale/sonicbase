@@ -96,8 +96,7 @@ public class ParenthesisImpl extends ExpressionImpl {
   @Override
   public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
                          Limit limit, Offset offset, boolean b, boolean analyze, int schemaRetryCount) {
-    NextReturn ret = doNext(explain, count, currOffset, countReturned, limit, offset, schemaRetryCount);
-    return ret;
+    return doNext(explain, count, currOffset, countReturned, limit, offset, schemaRetryCount);
 //    return expression.next(count, eplain, currOffset, limit, offset, b);
   }
 
@@ -149,6 +148,7 @@ public class ParenthesisImpl extends ExpressionImpl {
     else {
       return null;//return expression.next(explain, currOffset, limit, offset);
     }
+//    return null;
   }
 
 

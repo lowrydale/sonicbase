@@ -5,13 +5,11 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
-import com.sonicbase.common.Logger;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.server.NettyServer;
-import com.sonicbase.streams.LocalProducer;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -43,7 +41,6 @@ public class TestStoredProcedures {
     for (com.sonicbase.server.DatabaseServer server : dbServers) {
       server.shutdown();
     }
-    Logger.queue.clear();
     serverA1.shutdown();
     serverA2.shutdown();
 
@@ -57,7 +54,6 @@ public class TestStoredProcedures {
 
   @BeforeClass
   public void beforeClass() throws Exception {
-    Logger.disable();
 
     String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-2-servers-a.json")), "utf-8");
     ObjectMapper mapper = new ObjectMapper();
@@ -137,7 +133,6 @@ public class TestStoredProcedures {
 
     conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9010/db", "user", "password");
 
-    Logger.setReady(false);
 
     DatabaseClient client = ((ConnectionProxy)conn).getDatabaseClient();
 
@@ -147,7 +142,6 @@ public class TestStoredProcedures {
 
     //test upsert
 
-    LocalProducer.queue.clear();
 
     for (int i = 0; i < 10; i++) {
       stmt = conn.prepareStatement("insert into persons (id1, id2, id3, id4, id5, num, socialSecurityNumber, relatives, restricted, gender, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");

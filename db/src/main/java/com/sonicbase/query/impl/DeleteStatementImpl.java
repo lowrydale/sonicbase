@@ -120,7 +120,6 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
               cobj.put(ComObject.Tag.isExcpliciteTrans, client.isExplicitTrans());
               cobj.put(ComObject.Tag.isCommitting, client.isCommitting());
               cobj.put(ComObject.Tag.transactionId, client.getTransactionId());
-              cobj.put(ComObject.Tag.method, "UpdateManager:deleteRecord");
               if (sequence0 != null && sequence1 != null && sequence2 != null) {
                 cobj.put(ComObject.Tag.sequence0Override, sequence0);
                 cobj.put(ComObject.Tag.sequence1Override, sequence1);
@@ -138,7 +137,6 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
               cobj.put(ComObject.Tag.isExcpliciteTrans, client.isExplicitTrans());
               cobj.put(ComObject.Tag.isCommitting, client.isCommitting());
               cobj.put(ComObject.Tag.transactionId, client.getTransactionId());
-              cobj.put(ComObject.Tag.method, "UpdateManager:deleteIndexEntry");
               byte[] bytes = record.serialize(client.getCommon(), DatabaseClient.SERIALIZATION_VERSION);
               cobj.put(ComObject.Tag.recordBytes, bytes);
               if (sequence0 != null && sequence1 != null && sequence2 != null) {
@@ -147,7 +145,7 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
                 cobj.put(ComObject.Tag.sequence2Override, sequence2);
               }
 
-              client.sendToAllShards(null, rand.nextLong(), cobj, DatabaseClient.Replica.def);
+              client.sendToAllShards("UpdateManager:deleteIndexEntry", rand.nextLong(), cobj, DatabaseClient.Replica.def);
               countDeleted++;
             }
           }

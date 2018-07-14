@@ -16,6 +16,8 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.query.DatabaseException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -29,14 +31,13 @@ import java.util.Set;
 public class AWSClient {
 
   private final DatabaseClient client;
-  private final Logger logger;
+  private static Logger logger = LoggerFactory.getLogger(AWSClient.class);
+
   private File installDir;
   private TransferManager transferManager;
 
   public AWSClient(DatabaseClient client) {
     this.client = client;
-    this.logger = new Logger(client);
-
   }
 
   public TransferManager getTransferManager() {

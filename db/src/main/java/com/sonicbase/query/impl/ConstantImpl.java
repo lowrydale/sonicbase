@@ -33,7 +33,8 @@ public class ConstantImpl extends ExpressionImpl {
   }
 
   public String toString() {
-    if (sqlType == DataType.Type.VARCHAR.getValue() ||
+    if (sqlType == DataType.Type.CHAR.getValue() ||
+        sqlType == DataType.Type.VARCHAR.getValue() ||
         sqlType == DataType.Type.NVARCHAR.getValue() ||
         sqlType == DataType.Type.LONGVARCHAR.getValue() ||
         sqlType == DataType.Type.LONGNVARCHAR.getValue() ||
@@ -145,8 +146,7 @@ public class ConstantImpl extends ExpressionImpl {
     }
     else if (value instanceof BigDecimal) {
       BigDecimal bd = (BigDecimal)value;
-      bd.negate();
-      value = bd;
+      value = bd.negate();
     }
   }
 

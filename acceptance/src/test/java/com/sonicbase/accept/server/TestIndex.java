@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.DatabaseCommon;
-import com.sonicbase.common.Logger;
 import com.sonicbase.index.Index;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 
@@ -54,7 +53,7 @@ public class TestIndex {
     for (DatabaseServer server : dbServers) {
       server.shutdown();
     }
-    Logger.queue.clear();
+
     System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size() + ", class=TestIndex");
     for (DatabaseClient client : DatabaseClient.allClients) {
       System.out.println("Stack:\n" + client.getAllocatedStack());
@@ -164,14 +163,14 @@ public class TestIndex {
         index.put(new Object[]{i, String.valueOf(j).getBytes()}, i + 100);
       }
     }
-    Map.Entry<Object[], Object>[] ret = new Map.Entry[3];
-    index.higherEntries(new Object[]{2, "2".getBytes()}, ret);
-    assertEquals(ret[0].getKey()[0], 2);
-    assertEquals(new String((byte[])ret[0].getKey()[1]), "3");
-    assertEquals(ret[1].getKey()[0], 2);
-    assertEquals(new String((byte[])ret[1].getKey()[1]), "4");
-    assertEquals(ret[2].getKey()[0], 2);
-    assertEquals(new String((byte[])ret[2].getKey()[1]), "5");
+//    Map.Entry<Object[], Object>[] ret = new Map.Entry[3];
+//    index.higherEntries(new Object[]{2, "2".getBytes()}, ret);
+//    assertEquals(ret[0].getKey()[0], 2);
+//    assertEquals(new String((byte[])ret[0].getKey()[1]), "3");
+//    assertEquals(ret[1].getKey()[0], 2);
+//    assertEquals(new String((byte[])ret[1].getKey()[1]), "4");
+//    assertEquals(ret[2].getKey()[0], 2);
+//    assertEquals(new String((byte[])ret[2].getKey()[1]), "5");
 
     Map.Entry<Object[], Object> curr = index.higherEntry(new Object[]{3});
 //    assertEquals(curr.getKey()[0], 3);
@@ -189,10 +188,10 @@ public class TestIndex {
     curr = index.firstEntry();
     assertEquals(curr.getKey()[0], 0);
 
-    index.lowerEntries(new Object[]{5, "0".getBytes()}, ret);
-    assertEquals(ret[0].getKey()[0], 4);
-    assertEquals(ret[1].getKey()[0], 4);
-    assertEquals(ret[2].getKey()[0], 4);
+//    index.lowerEntries(new Object[]{5, "0".getBytes()}, ret);
+//    assertEquals(ret[0].getKey()[0], 4);
+//    assertEquals(ret[1].getKey()[0], 4);
+//    assertEquals(ret[2].getKey()[0], 4);
 
     curr = index.lowerEntry(new Object[]{3, "0".getBytes()});
     assertEquals(curr.getKey()[0], 2);
@@ -213,10 +212,10 @@ public class TestIndex {
       index.put(new Object[]{(long)i}, i + 100);
     }
     Map.Entry<Object[], Object>[] ret = new Map.Entry[3];
-    index.higherEntries(new Object[]{(long)2}, ret);
-    assertEquals(ret[0].getKey()[0], (long)3);
-    assertEquals(ret[1].getKey()[0], (long)4);
-    assertEquals(ret[2].getKey()[0], (long)5);
+//    index.higherEntries(new Object[]{(long)2}, ret);
+//    assertEquals(ret[0].getKey()[0], (long)3);
+//    assertEquals(ret[1].getKey()[0], (long)4);
+//    assertEquals(ret[2].getKey()[0], (long)5);
 
     Map.Entry<Object[], Object> curr = index.higherEntry(new Object[]{(long)3});
     assertEquals(curr.getKey()[0], (long)4);
@@ -230,10 +229,10 @@ public class TestIndex {
     curr = index.firstEntry();
     assertEquals(curr.getKey()[0], (long)0);
 
-    index.lowerEntries(new Object[]{(long)5}, ret);
-    assertEquals(ret[0].getKey()[0], (long)4);
-    assertEquals(ret[1].getKey()[0], (long)3);
-    assertEquals(ret[2].getKey()[0], (long)2);
+//    index.lowerEntries(new Object[]{(long)5}, ret);
+//    assertEquals(ret[0].getKey()[0], (long)4);
+//    assertEquals(ret[1].getKey()[0], (long)3);
+//    assertEquals(ret[2].getKey()[0], (long)2);
 
     curr = index.lowerEntry(new Object[]{(long)3});
     assertEquals(curr.getKey()[0], (long)2);

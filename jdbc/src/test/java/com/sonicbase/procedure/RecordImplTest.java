@@ -1,0 +1,403 @@
+/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
+package com.sonicbase.procedure;
+
+import com.sonicbase.common.ComArray;
+import com.sonicbase.common.ComObject;
+import com.sonicbase.common.DatabaseCommon;
+import com.sonicbase.schema.TableSchema;
+import com.sonicbase.util.TestUtils;
+import org.testng.annotations.Test;
+
+import java.io.UnsupportedEncodingException;
+import java.math.BigDecimal;
+import java.sql.Date;
+import java.sql.Time;
+import java.sql.Timestamp;
+
+import static org.testng.Assert.assertEquals;
+
+public class RecordImplTest {
+
+  @Test
+  public void test() throws UnsupportedEncodingException {
+
+    TableSchema tableSchema = TestUtils.createTable();
+    DatabaseCommon common = new DatabaseCommon();
+    common.getTables("test").put(tableSchema.getName(), tableSchema);
+    common.getTablesById("test").put(tableSchema.getTableId(), tableSchema);
+    byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
+
+    RecordImpl record = new RecordImpl("test", common, (short)100, "test", tableSchema, new com.sonicbase.common.Record("test", common, records[0]));
+    assertEquals((long)record.getLong("field1"), 200L);
+    assertEquals(record.getString("field2"), "0-value");
+    assertEquals(record.getTimestamp("field3"), new Timestamp(200));
+    assertEquals(record.getInt("field4"), 1200);
+    assertEquals((short)record.getShort("field5"), (short)0);
+    assertEquals((byte)record.getByte("field6"), (byte)0);
+    assertEquals(record.getString("field7"), "0-value");
+    assertEquals(record.getString("field8"), "0-value");
+    assertEquals(record.getDouble("field9"), 0d);
+    assertEquals(record.getFloat("field10"), 0f);
+    assertEquals(record.getDouble("field11"), 0d);
+    assertEquals(record.getBoolean("field12"), true);
+    assertEquals(record.getBoolean("field13"), true);
+    assertEquals(record.getString("field14"), "0-value");
+    assertEquals(record.getString("field15"), "0-value");
+    assertEquals(record.getString("field16"), "0-value");
+    assertEquals(record.getString("field17"), "0-value");
+    assertEquals(record.getString("field18"), "0-value");
+    assertEquals(record.getString("field19"), "0-value");
+    assertEquals(record.getBytes("field20"), "0-value".getBytes("utf-8"));
+    assertEquals(record.getBytes("field21"), "0-value".getBytes("utf-8"));
+    assertEquals(record.getBytes("field22"), "0-value".getBytes("utf-8"));
+    assertEquals(record.getBigDecimal("field23", 10), new BigDecimal(0));
+    assertEquals(record.getBigDecimal("field24", 10), new BigDecimal(0));
+    assertEquals(record.getDate("field25"), new Date(1900, 10, 1));
+    assertEquals(record.getTime("field26"), new Time(1, 0, 0));
+    assertEquals(record.getTimestamp("field27"), new Timestamp(0));
+
+    ComObject cobj = record.serialize();
+
+    record = new RecordImpl(common, cobj);
+
+    assertEquals((long)record.getLong("field1"), 200L);
+    assertEquals(record.getString("field2"), "0-value");
+    assertEquals(record.getTimestamp("field3"), new Timestamp(200));
+    assertEquals(record.getInt("field4"), 1200);
+    assertEquals((short)record.getShort("field5"), (short)0);
+    assertEquals((byte)record.getByte("field6"), (byte)0);
+    assertEquals(record.getString("field7"), "0-value");
+    assertEquals(record.getString("field8"), "0-value");
+    assertEquals(record.getDouble("field9"), 0d);
+    assertEquals(record.getFloat("field10"), 0f);
+    assertEquals(record.getDouble("field11"), 0d);
+    assertEquals(record.getBoolean("field12"), true);
+    assertEquals(record.getBoolean("field13"), true);
+    assertEquals(record.getString("field14"), "0-value");
+    assertEquals(record.getString("field15"), "0-value");
+    assertEquals(record.getString("field16"), "0-value");
+    assertEquals(record.getString("field17"), "0-value");
+    assertEquals(record.getString("field18"), "0-value");
+    assertEquals(record.getString("field19"), "0-value");
+    assertEquals(record.getBytes("field20"), "0-value".getBytes("utf-8"));
+    assertEquals(record.getBytes("field21"), "0-value".getBytes("utf-8"));
+    assertEquals(record.getBytes("field22"), "0-value".getBytes("utf-8"));
+    assertEquals(record.getBigDecimal("field23", 10), new BigDecimal(0));
+    assertEquals(record.getBigDecimal("field24", 10), new BigDecimal(0));
+    assertEquals(record.getDate("field25"), new Date(1900, 10, 1));
+    assertEquals(record.getTime("field26"), new Time(1, 0, 0));
+    assertEquals(record.getTimestamp("field27"), new Timestamp(0));
+  }
+
+  @Test
+  public void testNoTableSchema() throws UnsupportedEncodingException {
+
+    TableSchema tableSchema = TestUtils.createTable();
+    DatabaseCommon common = new DatabaseCommon();
+    common.getTables("test").put(tableSchema.getName(), tableSchema);
+    common.getTablesById("test").put(tableSchema.getTableId(), tableSchema);
+    byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
+
+    ComObject cobj = new ComObject();
+    ComArray array  = cobj.putArray(ComObject.Tag.fields, ComObject.Type.objectType);
+    ComObject field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field1");
+    field.put(ComObject.Tag.longValue, 200L);
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field2");
+    field.put(ComObject.Tag.stringValue, "0-value");
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field3");
+    field.put(ComObject.Tag.timestampValue, new Timestamp(200));
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field4");
+    field.put(ComObject.Tag.intValue, 1200);
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field5");
+    field.put(ComObject.Tag.shortValue, (short)0);
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field6");
+    field.put(ComObject.Tag.byteValue, (byte)0);
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field7");
+    field.put(ComObject.Tag.stringValue, "0-value");
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field8");
+    field.put(ComObject.Tag.stringValue, "0-value");
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field9");
+    field.put(ComObject.Tag.doubleValue, 0d);
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field10");
+    field.put(ComObject.Tag.floatValue, 0f);
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field11");
+    field.put(ComObject.Tag.doubleValue, 0d);
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field12");
+    field.put(ComObject.Tag.booleanValue, true);
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field13");
+    field.put(ComObject.Tag.booleanValue, true);
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field14");
+    field.put(ComObject.Tag.stringValue, "0-value");
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field15");
+    field.put(ComObject.Tag.stringValue, "0-value");
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field16");
+    field.put(ComObject.Tag.stringValue, "0-value");
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field17");
+    field.put(ComObject.Tag.stringValue, "0-value");
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field18");
+    field.put(ComObject.Tag.stringValue, "0-value");
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field19");
+    field.put(ComObject.Tag.stringValue, "0-value");
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field20");
+    field.put(ComObject.Tag.byteArrayValue, "0-value".getBytes("utf-8"));
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field21");
+    field.put(ComObject.Tag.byteArrayValue, "0-value".getBytes("utf-8"));
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field22");
+    field.put(ComObject.Tag.byteArrayValue, "0-value".getBytes("utf-8"));
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field23");
+    field.put(ComObject.Tag.bigDecimalValue, new BigDecimal(0));
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field24");
+    field.put(ComObject.Tag.bigDecimalValue, new BigDecimal(0));
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field25");
+    field.put(ComObject.Tag.dateValue, new Date(1900, 10, 1));
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field26");
+    field.put(ComObject.Tag.timeValue, new Time(1, 0, 0));
+    array.add(field);
+    field = new ComObject();
+    field.put(ComObject.Tag.fieldName, "field27");
+    field.put(ComObject.Tag.timestampValue, new Timestamp(0));
+    array.add(field);
+
+    RecordImpl record = new RecordImpl(common, cobj);
+    assertEquals((long)record.getLong("field1"), 200L);
+    assertEquals(record.getString("field2"), "0-value");
+    assertEquals(record.getTimestamp("field3"), new Timestamp(200));
+    assertEquals(record.getInt("field4"), 1200);
+    assertEquals((short)record.getShort("field5"), (short)0);
+    assertEquals((byte)record.getByte("field6"), (byte)0);
+    assertEquals(record.getString("field7"), "0-value");
+    assertEquals(record.getString("field8"), "0-value");
+    assertEquals(record.getDouble("field9"), 0d);
+    assertEquals(record.getFloat("field10"), 0f);
+    assertEquals(record.getDouble("field11"), 0d);
+    assertEquals(record.getBoolean("field12"), true);
+    assertEquals(record.getBoolean("field13"), true);
+    assertEquals(record.getString("field14"), "0-value");
+    assertEquals(record.getString("field15"), "0-value");
+    assertEquals(record.getString("field16"), "0-value");
+    assertEquals(record.getString("field17"), "0-value");
+    assertEquals(record.getString("field18"), "0-value");
+    assertEquals(record.getString("field19"), "0-value");
+    assertEquals(record.getBytes("field20"), "0-value".getBytes("utf-8"));
+    assertEquals(record.getBytes("field21"), "0-value".getBytes("utf-8"));
+    assertEquals(record.getBytes("field22"), "0-value".getBytes("utf-8"));
+    assertEquals(record.getBigDecimal("field23", 10), new BigDecimal(0));
+    assertEquals(record.getBigDecimal("field24", 10), new BigDecimal(0));
+    assertEquals(record.getDate("field25"), new Date(1900, 10, 1));
+    assertEquals(record.getTime("field26"), new Time(1, 0, 0));
+    assertEquals(record.getTimestamp("field27"), new Timestamp(0));
+
+    cobj = record.serialize();
+
+    record = new RecordImpl(common, cobj);
+
+    assertEquals((long)record.getLong("field1"), 200L);
+    assertEquals(record.getString("field2"), "0-value");
+    assertEquals(record.getTimestamp("field3"), new Timestamp(200));
+    assertEquals(record.getInt("field4"), 1200);
+    assertEquals((short)record.getShort("field5"), (short)0);
+    assertEquals((byte)record.getByte("field6"), (byte)0);
+    assertEquals(record.getString("field7"), "0-value");
+    assertEquals(record.getString("field8"), "0-value");
+    assertEquals(record.getDouble("field9"), 0d);
+    assertEquals(record.getFloat("field10"), 0f);
+    assertEquals(record.getDouble("field11"), 0d);
+    assertEquals(record.getBoolean("field12"), true);
+    assertEquals(record.getBoolean("field13"), true);
+    assertEquals(record.getString("field14"), "0-value");
+    assertEquals(record.getString("field15"), "0-value");
+    assertEquals(record.getString("field16"), "0-value");
+    assertEquals(record.getString("field17"), "0-value");
+    assertEquals(record.getString("field18"), "0-value");
+    assertEquals(record.getString("field19"), "0-value");
+    assertEquals(record.getBytes("field20"), "0-value".getBytes("utf-8"));
+    assertEquals(record.getBytes("field21"), "0-value".getBytes("utf-8"));
+    assertEquals(record.getBytes("field22"), "0-value".getBytes("utf-8"));
+    assertEquals(record.getBigDecimal("field23", 10), new BigDecimal(0));
+    assertEquals(record.getBigDecimal("field24", 10), new BigDecimal(0));
+    assertEquals(record.getDate("field25"), new Date(1900, 10, 1));
+    assertEquals(record.getTime("field26"), new Time(1, 0, 0));
+    assertEquals(record.getTimestamp("field27"), new Timestamp(0));
+  }
+
+  @Test
+  public void testSetNoSchema() throws UnsupportedEncodingException {
+    DatabaseCommon common = new DatabaseCommon();
+    ComObject cobj = new ComObject();
+    RecordImpl record = new RecordImpl(common, cobj);
+    record.setLong("field1", 200L);
+    assertEquals((long)record.getLong("field1"), 200L);
+    record.setString("field2", "0-value");
+    assertEquals(record.getString("field2"), "0-value");
+    record.setTimestamp("field3", new Timestamp(200));
+    assertEquals(record.getTimestamp("field3"), new Timestamp(200));
+    record.setInt("field4", 1200);
+    assertEquals(record.getInt("field4"), 1200);
+    record.setShort("field5", (short)0);
+    assertEquals((short)record.getShort("field5"), (short)0);
+    record.setByte("field6", (byte)0);
+    assertEquals((byte)record.getByte("field6"), (byte)0);
+    record.setString("field7", "0-value");
+    assertEquals(record.getString("field7"), "0-value");
+    record.setString("field8", "0-value");
+    assertEquals(record.getString("field8"), "0-value");
+    record.setDouble("field9", 0d);
+    assertEquals(record.getDouble("field9"), 0d);
+    record.setFloat("field10", 0f);
+    assertEquals(record.getFloat("field10"), 0f);
+    record.setDouble("field11", 0d);
+    assertEquals(record.getDouble("field11"), 0d);
+    record.setBoolean("field12", true);
+    assertEquals(record.getBoolean("field12"), true);
+    record.setBoolean("field13", true);
+    assertEquals(record.getBoolean("field13"), true);
+    record.setString("field14", "0-value");
+    assertEquals(record.getString("field14"), "0-value");
+    record.setString("field15", "0-value");
+    assertEquals(record.getString("field15"), "0-value");
+    record.setString("field16", "0-value");
+    assertEquals(record.getString("field16"), "0-value");
+    record.setString("field17", "0-value");
+    assertEquals(record.getString("field17"), "0-value");
+    record.setString("field18", "0-value");
+    assertEquals(record.getString("field18"), "0-value");
+    record.setString("field19", "0-value");
+    assertEquals(record.getString("field19"), "0-value");
+    record.setBytes("field20", "0-value".getBytes("utf-8"));
+    assertEquals(record.getBytes("field20"), "0-value".getBytes("utf-8"));
+    record.setBytes("field21", "0-value".getBytes("utf-8"));
+    assertEquals(record.getBytes("field21"), "0-value".getBytes("utf-8"));
+    record.setBytes("field22", "0-value".getBytes("utf-8"));
+    assertEquals(record.getBytes("field22"), "0-value".getBytes("utf-8"));
+    record.setBigDecimal("field23", new BigDecimal(0));
+    assertEquals(record.getBigDecimal("field23", 10), new BigDecimal(0));
+    record.setBigDecimal("field24", new BigDecimal(0));
+    assertEquals(record.getBigDecimal("field24", 10), new BigDecimal(0));
+    record.setDate("field25", new Date(1900, 10, 1));
+    assertEquals(record.getDate("field25"), new Date(1900, 10, 1));
+    record.setTime("field26", new Time(1, 0, 0));
+    assertEquals(record.getTime("field26"), new Time(1, 0, 0));
+    record.setTimestamp("field27", new Timestamp(0));
+    assertEquals(record.getTimestamp("field27"), new Timestamp(0));
+
+
+  }
+
+  @Test
+  public void testSetWithSchema() throws UnsupportedEncodingException {
+    TableSchema tableSchema = TestUtils.createTable();
+    DatabaseCommon common = new DatabaseCommon();
+    common.getTables("test").put(tableSchema.getName(), tableSchema);
+    common.getTablesById("test").put(tableSchema.getTableId(), tableSchema);
+    byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
+
+    RecordImpl record = new RecordImpl("test", common, (short)100, "test", tableSchema, new com.sonicbase.common.Record("test", common, records[1]));
+    record.setLong("field1", 200L);
+    assertEquals((long)record.getLong("field1"), 200L);
+    record.setString("field2", "0-value");
+    assertEquals(record.getString("field2"), "0-value");
+    record.setTimestamp("field3", new Timestamp(200));
+    assertEquals(record.getTimestamp("field3"), new Timestamp(200));
+    record.setInt("field4", 1200);
+    assertEquals(record.getInt("field4"), 1200);
+    record.setShort("field5", (short)0);
+    assertEquals((short)record.getShort("field5"), (short)0);
+    record.setByte("field6", (byte)0);
+    assertEquals((byte)record.getByte("field6"), (byte)0);
+    record.setString("field7", "0-value");
+    assertEquals(record.getString("field7"), "0-value");
+    record.setString("field8", "0-value");
+    assertEquals(record.getString("field8"), "0-value");
+    record.setDouble("field9", 0d);
+    assertEquals(record.getDouble("field9"), 0d);
+    record.setFloat("field10", 0f);
+    assertEquals(record.getFloat("field10"), 0f);
+    record.setDouble("field11", 0d);
+    assertEquals(record.getDouble("field11"), 0d);
+    record.setBoolean("field12", true);
+    assertEquals(record.getBoolean("field12"), true);
+    record.setBoolean("field13", true);
+    assertEquals(record.getBoolean("field13"), true);
+    record.setString("field14", "0-value");
+    assertEquals(record.getString("field14"), "0-value");
+    record.setString("field15", "0-value");
+    assertEquals(record.getString("field15"), "0-value");
+    record.setString("field16", "0-value");
+    assertEquals(record.getString("field16"), "0-value");
+    record.setString("field17", "0-value");
+    assertEquals(record.getString("field17"), "0-value");
+    record.setString("field18", "0-value");
+    assertEquals(record.getString("field18"), "0-value");
+    record.setString("field19", "0-value");
+    assertEquals(record.getString("field19"), "0-value");
+    record.setBytes("field20", "0-value".getBytes("utf-8"));
+    assertEquals(record.getBytes("field20"), "0-value".getBytes("utf-8"));
+    record.setBytes("field21", "0-value".getBytes("utf-8"));
+    assertEquals(record.getBytes("field21"), "0-value".getBytes("utf-8"));
+    record.setBytes("field22", "0-value".getBytes("utf-8"));
+    assertEquals(record.getBytes("field22"), "0-value".getBytes("utf-8"));
+    record.setBigDecimal("field23", new BigDecimal(0));
+    assertEquals(record.getBigDecimal("field23", 10), new BigDecimal(0));
+    record.setBigDecimal("field24", new BigDecimal(0));
+    assertEquals(record.getBigDecimal("field24", 10), new BigDecimal(0));
+    record.setDate("field25", new Date(1900, 10, 1));
+    assertEquals(record.getDate("field25"), new Date(1900, 10, 1));
+    record.setTime("field26", new Time(1, 0, 0));
+    assertEquals(record.getTime("field26"), new Time(1, 0, 0));
+    record.setTimestamp("field27", new Timestamp(0));
+    assertEquals(record.getTimestamp("field27"), new Timestamp(0));
+
+
+  }
+}

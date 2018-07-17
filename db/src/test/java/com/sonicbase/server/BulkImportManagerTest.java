@@ -11,10 +11,9 @@ import com.sonicbase.index.AddressMap;
 import com.sonicbase.index.Index;
 import com.sonicbase.index.Indices;
 import com.sonicbase.query.DatabaseException;
-import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import com.sonicbase.util.TestUtils;
 import org.apache.commons.io.IOUtils;
 import org.jetbrains.annotations.NotNull;
 import org.mockito.invocation.InvocationOnMock;
@@ -76,9 +75,9 @@ public class BulkImportManagerTest {
     when(server.getAddressMap()).thenReturn(addressMap);
     when(server.getBatchRepartCount()).thenReturn(new AtomicInteger(0));
     Map<Integer, TableSchema> tables = new HashMap<>();
-    tableSchema = IndexLookupTest.createTable();
-    indexSchema = IndexLookupTest.createIndexSchema(tableSchema);
-    stringIndexSchema = IndexLookupTest.createStringIndexSchema(tableSchema);
+    tableSchema = TestUtils.createTable();
+    indexSchema = TestUtils.createIndexSchema(tableSchema);
+    stringIndexSchema = TestUtils.createStringIndexSchema(tableSchema);
 
     when(server.getIndexSchema(anyString(), anyString(), anyString())).thenReturn(indexSchema);
     when(server.getShardCount()).thenReturn(2);
@@ -92,7 +91,7 @@ public class BulkImportManagerTest {
     transManager = new TransactionManager(server);
     when(server.getTransactionManager()).thenReturn(transManager);
 
-    common = IndexLookupTest.createCommon(tableSchema);
+    common = TestUtils.createCommon(tableSchema);
     JsonNode node = new ObjectMapper().readTree(" { \"shards\" : [\n" +
         "    {\n" +
         "      \"replicas\": [\n" +
@@ -123,9 +122,9 @@ public class BulkImportManagerTest {
     when(server.getIndices()).thenReturn(map);
     when(server.getIndices(anyString())).thenReturn(map.get("test"));
 
-    records = IndexLookupTest.createRecords(common, tableSchema, 10);
+    records = TestUtils.createRecords(common, tableSchema, 10);
 
-    keys = IndexLookupTest.createKeys(10);
+    keys = TestUtils.createKeys(10);
 
     updateManager = new UpdateManager(server);
 
@@ -725,7 +724,7 @@ public class BulkImportManagerTest {
 
   @Test
   public void testBulkImportOnServerCoordinateNoIndex() throws UnsupportedEncodingException, SQLException, InterruptedException {
-    tableSchema2 = IndexLookupTest.createTable2();
+    tableSchema2 = TestUtils.createTable2();
     common.getTables("test").put(tableSchema2.getName(), tableSchema2);
 
     ResultSet rs = createResultSetMock();

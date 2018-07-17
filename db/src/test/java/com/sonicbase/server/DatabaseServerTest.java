@@ -10,6 +10,7 @@ import com.sonicbase.index.Indices;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.util.TestUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.log4j.Logger;
 import org.mockito.invocation.InvocationOnMock;
@@ -104,8 +105,8 @@ public class DatabaseServerTest {
     assertEquals(override.length, 2);
     assertEquals(override[0].length, 2);
 
-    TableSchema tableSchema = IndexLookupTest.createTable();
-    IndexSchema indexSchema = IndexLookupTest.createIndexSchema(tableSchema);
+    TableSchema tableSchema = TestUtils.createTable();
+    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
     server.getCommon().getTables("test").put(tableSchema.getName(), tableSchema);
 
     server.getIndices().put("test", new Indices());
@@ -186,8 +187,8 @@ public class DatabaseServerTest {
     DatabaseServer server = new DatabaseServer();
     DatabaseClient client = mock(DatabaseClient.class);
     server.setDatabaseClient(client);
-    TableSchema tableSchema = IndexLookupTest.createTable();
-    IndexSchema indexSchema = IndexLookupTest.createIndexSchema(tableSchema);
+    TableSchema tableSchema = TestUtils.createTable();
+    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
     final AtomicInteger syncCalled = new AtomicInteger();
 
     doAnswer(invocationOnMock -> { if (syncCalled.incrementAndGet() == 1) {

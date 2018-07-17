@@ -103,7 +103,7 @@ Connect to the database with the following code:<br/>
         <br/>
         <pre class="java"><code>
 ComboPooledDataSource cpds = new ComboPooledDataSource();
-cpds.setDriverClass("Driver");
+cpds.setDriverClass("com.sonicbase.jdbcdriver.Driver");
 cpds.setJdbcUrl("jdbc:sonicbase:localhost:9010/db");
 <br/>
 cpds.setMinPoolSize(5);

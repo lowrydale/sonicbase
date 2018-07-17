@@ -457,7 +457,7 @@ ReconfigureResults -> com.sonicbase.b.b:
     10:13:void <init>(boolean,int) -> <init>
     16:16:boolean isHandedOffToMaster() -> a
     20:20:int getShardCount() -> b
-com.sonicbase.common.AWSClient -> com.sonicbase.c.a:
+AWSClient -> com.sonicbase.c.a:
     DatabaseClient client -> a
     Logger logger -> b
     java.io.File installDir -> c
@@ -477,21 +477,21 @@ com.sonicbase.common.AWSClient -> com.sonicbase.c.a:
     276:287:byte[] downloadBytes(java.lang.String,java.lang.String) -> b
     292:381:void downloadDirectory(java.lang.String,java.lang.String,java.lang.String,java.io.File) -> d
     384:423:java.util.List listDirectSubdirectories(java.lang.String,java.lang.String) -> c
-    24:24:Logger access$000(com.sonicbase.common.AWSClient) -> a
-com.sonicbase.common.AWSClient$1 -> com.sonicbase.c.a$1:
+    24:24:Logger access$000(AWSClient) -> a
+AWSClient$1 -> com.sonicbase.c.a$1:
     java.lang.String val$bucket -> a
     java.lang.String val$prefix -> b
     java.lang.String val$path -> c
     java.io.File val$file -> d
-    com.sonicbase.common.AWSClient this$0 -> e
-    175:175:void <init>(com.sonicbase.common.AWSClient,java.lang.String,java.lang.String,java.lang.String,java.io.File) -> <init>
+    AWSClient this$0 -> e
+    175:175:void <init>(AWSClient,java.lang.String,java.lang.String,java.lang.String,java.io.File) -> <init>
     178:196:java.lang.Object call() -> call
-com.sonicbase.common.AWSClient$2 -> com.sonicbase.c.a$2:
+AWSClient$2 -> com.sonicbase.c.a$2:
     java.lang.String val$bucket -> a
     java.lang.String val$finalKey -> b
     java.io.File val$destFile -> c
-    com.sonicbase.common.AWSClient this$0 -> d
-    314:314:void <init>(com.sonicbase.common.AWSClient,java.lang.String,java.lang.String,java.io.File) -> <init>
+    AWSClient this$0 -> d
+    314:314:void <init>(AWSClient,java.lang.String,java.lang.String,java.io.File) -> <init>
     318:335:void run() -> run
 ComArray -> com.sonicbase.c.b:
     ComObject$DynamicType nestedType -> a
@@ -2575,7 +2575,7 @@ DeleteStatementImpl -> com.sonicbase.f.a.j:
     55:148:java.lang.Object execute(java.lang.String,SelectStatementImpl$Explain) -> a
     155:157:void serialize(java.io.DataOutputStream) -> a
     160:162:void deserialize(java.io.DataInputStream) -> a
-com.sonicbase.query.impl.DiskBasedResultSet -> com.sonicbase.f.a.k:
+DiskBasedResultSet -> com.sonicbase.f.a.k:
     org.apache.log4j.Logger logger -> a
     java.util.concurrent.atomic.AtomicLong nextResultSetId -> b
     int count -> c
@@ -2599,32 +2599,32 @@ com.sonicbase.query.impl.DiskBasedResultSet -> com.sonicbase.f.a.k:
     621:627:void delete() -> b
     630:688:byte[][][] nextPage(int,int) -> a
     28:30:void <clinit>() -> <clinit>
-com.sonicbase.query.impl.DiskBasedResultSet$1 -> com.sonicbase.f.a.k$1:
+DiskBasedResultSet$1 -> com.sonicbase.f.a.k$1:
     int[] val$fieldOffsets -> a
     int[] val$tableOffsets -> b
     boolean[] val$ascendingFlags -> c
     java.util.Comparator[] val$comparators -> d
-    com.sonicbase.query.impl.DiskBasedResultSet this$0 -> e
-    302:302:void <init>(com.sonicbase.query.impl.DiskBasedResultSet,int[],int[],boolean[],java.util.Comparator[]) -> <init>
+    DiskBasedResultSet this$0 -> e
+    302:302:void <init>(DiskBasedResultSet,int[],int[],boolean[],java.util.Comparator[]) -> <init>
     305:324:int compare(Record[],Record[]) -> a
     302:302:int compare(java.lang.Object,java.lang.Object) -> compare
-com.sonicbase.query.impl.DiskBasedResultSet$2 -> com.sonicbase.f.a.k$2:
+DiskBasedResultSet$2 -> com.sonicbase.f.a.k$2:
     int[] val$fieldOffsets -> a
     int[] val$tableOffsets -> b
     boolean[] val$ascendingFlags -> c
     java.util.Comparator[] val$comparators -> d
-    com.sonicbase.query.impl.DiskBasedResultSet this$0 -> e
-    430:430:void <init>(com.sonicbase.query.impl.DiskBasedResultSet,int[],int[],boolean[],java.util.Comparator[]) -> <init>
-    433:452:int compare(com.sonicbase.query.impl.DiskBasedResultSet$MergeRow,com.sonicbase.query.impl.DiskBasedResultSet$MergeRow) -> a
+    DiskBasedResultSet this$0 -> e
+    430:430:void <init>(DiskBasedResultSet,int[],int[],boolean[],java.util.Comparator[]) -> <init>
+    433:452:int compare(DiskBasedResultSet$MergeRow,DiskBasedResultSet$MergeRow) -> a
     430:430:int compare(java.lang.Object,java.lang.Object) -> compare
-com.sonicbase.query.impl.DiskBasedResultSet$MergeRow -> com.sonicbase.f.a.k$a:
+DiskBasedResultSet$MergeRow -> com.sonicbase.f.a.k$a:
     int streamOffset -> a
     Record[] row -> b
     385:385:void <init>() -> <init>
-    385:385:Record[] access$000(com.sonicbase.query.impl.DiskBasedResultSet$MergeRow) -> a
-    385:385:Record[] access$002(com.sonicbase.query.impl.DiskBasedResultSet$MergeRow,Record[]) -> a
-    385:385:int access$102(com.sonicbase.query.impl.DiskBasedResultSet$MergeRow,int) -> a
-    385:385:int access$100(com.sonicbase.query.impl.DiskBasedResultSet$MergeRow) -> b
+    385:385:Record[] access$000(DiskBasedResultSet$MergeRow) -> a
+    385:385:Record[] access$002(DiskBasedResultSet$MergeRow,Record[]) -> a
+    385:385:int access$102(DiskBasedResultSet$MergeRow,int) -> a
+    385:385:int access$100(DiskBasedResultSet$MergeRow) -> b
 ExpressionImpl -> com.sonicbase.f.a.l:
     org.apache.log4j.Logger logger -> f
     java.util.Map typesById -> g
@@ -4132,7 +4132,7 @@ com.sonicbase.server.DatabaseServer -> com.sonicbase.server.b:
     boolean isRestoreComplete -> M
     java.lang.Exception backupException -> N
     java.lang.Exception restoreException -> O
-    com.sonicbase.common.AWSClient awsClient -> P
+    AWSClient awsClient -> P
     boolean doingBackup -> Q
     boolean onlyQueueCommands -> R
     boolean doingRestore -> S
@@ -4213,7 +4213,7 @@ com.sonicbase.server.DatabaseServer -> com.sonicbase.server.b:
     748:846:void startDeathMonitor() -> aw
     849:864:void handleHealthChange(java.util.concurrent.atomic.AtomicBoolean,boolean,boolean,int,int) -> a
     870:940:void checkHealthOfServer(int,int,java.util.concurrent.atomic.AtomicBoolean,boolean) -> a
-    943:943:com.sonicbase.common.AWSClient getAWSClient() -> e
+    943:943:AWSClient getAWSClient() -> e
     948:957:void disable() -> f
     960:960:java.util.concurrent.ThreadPoolExecutor getExecutor() -> g
     964:964:java.lang.Thread[][] getDeathMonitorThreads() -> h
@@ -4953,7 +4953,7 @@ com.sonicbase.server.LogManager -> com.sonicbase.server.LogManager:
     209:218:void deleteLogs() -> f
     222:235:void backupFileSystem(java.lang.String,java.lang.String,java.lang.String) -> a
     238:257:void backupLogDir(java.lang.String,java.io.File,java.io.File) -> a
-    260:277:void backupLogDirToAWS(com.sonicbase.common.AWSClient,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.io.File) -> a
+    260:277:void backupLogDirToAWS(AWSClient,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.io.File) -> a
     281:295:void restoreFileSystem(java.lang.String,java.lang.String) -> a
     298:306:void restoreLogDir(java.io.File,java.io.File) -> a
     309:324:void backupAWS(java.lang.String,java.lang.String,java.lang.String,java.lang.String) -> a
@@ -5347,7 +5347,7 @@ com.sonicbase.server.ReadManager$ProcessKeyContainsColumns -> com.sonicbase.serv
     2571:2571:byte[][] getRecords() -> d
     2576:2637:com.sonicbase.server.ReadManager$ProcessKeyContainsColumns invoke() -> e
     2641:2641:java.lang.Object[][] getCurrKeys() -> f
-com.sonicbase.common.RecordLockedException -> com.sonicbase.server.g:
+RecordLockedException -> com.sonicbase.server.g:
     7:8:void <init>() -> <init>
     11:12:void <init>(java.lang.String) -> <init>
     15:16:void <init>(java.lang.String,java.lang.Exception) -> <init>
@@ -5822,7 +5822,7 @@ com.sonicbase.socket.DatabaseSocketClient$Request -> com.sonicbase.h.a$e:
     307:307:byte[] access$1002(com.sonicbase.socket.DatabaseSocketClient$Request,byte[]) -> b
     307:307:java.lang.Exception access$500(com.sonicbase.socket.DatabaseSocketClient$Request) -> e
     307:307:boolean access$1200(com.sonicbase.socket.DatabaseSocketClient$Request) -> f
-com.sonicbase.common.DeadServerException -> com.sonicbase.h.b:
+DeadServerException -> com.sonicbase.h.b:
     8:10:void <init>() -> <init>
     13:14:void <init>(java.lang.String) -> <init>
     17:18:void <init>(java.lang.Throwable) -> <init>

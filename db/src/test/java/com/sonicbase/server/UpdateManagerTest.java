@@ -18,9 +18,9 @@ import com.sonicbase.query.impl.InsertStatementImpl;
 import com.sonicbase.query.impl.SelectStatementImpl;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.util.TestUtils;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.parser.CCJSqlParserManager;
-import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.insert.Insert;
 import net.sf.jsqlparser.statement.select.PlainSelect;
 import net.sf.jsqlparser.statement.select.Select;
@@ -44,8 +44,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION;
-import static com.sonicbase.server.UpdateManager.BATCH_STATUS_FAILED;
-import static com.sonicbase.server.UpdateManager.BATCH_STATUS_SUCCCESS;
+import static com.sonicbase.client.InsertStatementHandler.BATCH_STATUS_FAILED;
+import static com.sonicbase.client.InsertStatementHandler.BATCH_STATUS_SUCCCESS;
 import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -86,9 +86,9 @@ public class UpdateManagerTest {
     when(server.getAddressMap()).thenReturn(addressMap);
     when(server.getBatchRepartCount()).thenReturn(new AtomicInteger(0));
     Map<Integer, TableSchema> tables = new HashMap<>();
-    tableSchema = IndexLookupTest.createTable();
-    indexSchema = IndexLookupTest.createIndexSchema(tableSchema);
-    stringIndexSchema = IndexLookupTest.createStringIndexSchema(tableSchema);
+    tableSchema = TestUtils.createTable();
+    indexSchema = TestUtils.createIndexSchema(tableSchema);
+    stringIndexSchema = TestUtils.createStringIndexSchema(tableSchema);
 
     when(server.getIndexSchema(anyString(), anyString(), anyString())).thenReturn(indexSchema);
     when(server.getShardCount()).thenReturn(2);
@@ -102,7 +102,7 @@ public class UpdateManagerTest {
     transManager = new TransactionManager(server);
     when(server.getTransactionManager()).thenReturn(transManager);
 
-    common = IndexLookupTest.createCommon(tableSchema);
+    common = TestUtils.createCommon(tableSchema);
     JsonNode node = new ObjectMapper().readTree(" { \"shards\" : [\n" +
         "    {\n" +
         "      \"replicas\": [\n" +
@@ -133,9 +133,9 @@ public class UpdateManagerTest {
     when(server.getIndices()).thenReturn(map);
     when(server.getIndices(anyString())).thenReturn(map.get("test"));
 
-    records = IndexLookupTest.createRecords(common, tableSchema, 10);
+    records = TestUtils.createRecords(common, tableSchema, 10);
 
-    keys = IndexLookupTest.createKeys(10);
+    keys = TestUtils.createKeys(10);
 
     updateManager = new UpdateManager(server);
 
@@ -520,7 +520,7 @@ public class UpdateManagerTest {
 
     assertEquals(stringIndex.size(), 0);
 
-    IndexLookupTest.createStringIndexSchema(tableSchema);
+    TestUtils.createStringIndexSchema(tableSchema);
 
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.dbName, "test");

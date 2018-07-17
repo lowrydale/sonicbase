@@ -3,7 +3,7 @@ package com.sonicbase.index;
 
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.server.IndexLookupTest;
+import com.sonicbase.util.TestUtils;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
@@ -17,9 +17,9 @@ public class IndexTest {
 
   @Test
   public void test() throws UnsupportedEncodingException {
-    TableSchema tableSchema = IndexLookupTest.createTable();
-    IndexSchema indexSchema = IndexLookupTest.createStringIndexSchema(tableSchema);
-    List<Object[]> keys = IndexLookupTest.createKeysForStringIndex(10);
+    TableSchema tableSchema = TestUtils.createTable();
+    IndexSchema indexSchema = TestUtils.createStringIndexSchema(tableSchema);
+    List<Object[]> keys = TestUtils.createKeysForStringIndex(10);
     Index index = new Index(tableSchema, indexSchema.getName(), indexSchema.getComparators());
 
     index.put(keys.get(0), 100);
@@ -67,9 +67,9 @@ public class IndexTest {
 
   @Test
   public void testBigDecimal() throws UnsupportedEncodingException {
-    TableSchema tableSchema = IndexLookupTest.createTable();
-    IndexSchema indexSchema = IndexLookupTest.createBigDecimalIndexSchema(tableSchema);
-    List<Object[]> keys = IndexLookupTest.createKeysForBigDecimalIndex(10);
+    TableSchema tableSchema = TestUtils.createTable();
+    IndexSchema indexSchema = TestUtils.createBigDecimalIndexSchema(tableSchema);
+    List<Object[]> keys = TestUtils.createKeysForBigDecimalIndex(10);
     Index index = new Index(tableSchema, indexSchema.getName(), indexSchema.getComparators());
 
     index.put(keys.get(0), 100);

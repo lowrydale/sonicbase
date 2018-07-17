@@ -1,9 +1,7 @@
 package com.sonicbase.server;
 
 import com.sonicbase.client.DatabaseClient;
-import com.sonicbase.common.AWSClient;
 import com.sonicbase.query.DatabaseException;
-import org.apache.commons.io.FileUtils;
 import org.apache.giraph.utils.Varint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,7 +9,6 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.text.ParseException;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -108,7 +105,7 @@ public class LongRunningCalls {
     }
   }
 
-  private File getReplicaRoot() {
+  public File getReplicaRoot() {
     return new File(server.getDataDir(), "lrc/" + server.getShard() + "/" + server.getReplica());
   }
 

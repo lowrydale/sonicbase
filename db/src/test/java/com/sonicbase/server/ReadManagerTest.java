@@ -19,6 +19,7 @@ import com.sonicbase.query.impl.*;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.util.TestUtils;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.parser.CCJSqlParserManager;
 import net.sf.jsqlparser.schema.Column;
@@ -49,12 +50,12 @@ public class ReadManagerTest {
     when(server.getAddressMap()).thenReturn(addressMap);
     when(server.getBatchRepartCount()).thenReturn(new AtomicInteger(0));
     Map<Integer, TableSchema> tables = new HashMap<>();
-    TableSchema tableSchema = IndexLookupTest.createTable();
-    IndexSchema indexSchema = IndexLookupTest.createIndexSchema(tableSchema);
+    TableSchema tableSchema = TestUtils.createTable();
+    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
 
     when(server.getIndexSchema(anyString(), anyString(), anyString())).thenReturn(indexSchema);
 
-    DatabaseCommon common = IndexLookupTest.createCommon(tableSchema);
+    DatabaseCommon common = TestUtils.createCommon(tableSchema);
 
     when(server.getCommon()).thenReturn(common);
 
@@ -62,9 +63,9 @@ public class ReadManagerTest {
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 
-    byte[][] records = IndexLookupTest.createRecords(common, tableSchema, 10);
+    byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
 
-    List<Object[]> keys = IndexLookupTest.createKeys(10);
+    List<Object[]> keys = TestUtils.createKeys(10);
 
     int i = 0;
     for (Object[] key : keys) {
@@ -133,12 +134,12 @@ public class ReadManagerTest {
     when(server.getAddressMap()).thenReturn(addressMap);
     when(server.getBatchRepartCount()).thenReturn(new AtomicInteger(0));
     Map<Integer, TableSchema> tables = new HashMap<>();
-    TableSchema tableSchema = IndexLookupTest.createTable();
-    IndexSchema indexSchema = IndexLookupTest.createIndexSchema(tableSchema);
+    TableSchema tableSchema = TestUtils.createTable();
+    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
 
     when(server.getIndexSchema(anyString(), anyString(), anyString())).thenReturn(indexSchema);
 
-    DatabaseCommon common = IndexLookupTest.createCommon(tableSchema);
+    DatabaseCommon common = TestUtils.createCommon(tableSchema);
 
     when(server.getCommon()).thenReturn(common);
 
@@ -146,9 +147,9 @@ public class ReadManagerTest {
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 
-    byte[][] records = IndexLookupTest.createRecords(common, tableSchema, 10);
+    byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
 
-    List<Object[]> keys = IndexLookupTest.createKeys(10);
+    List<Object[]> keys = TestUtils.createKeys(10);
 
     int i = 0;
     for (Object[] key : keys) {
@@ -214,12 +215,12 @@ public class ReadManagerTest {
     when(server.getAddressMap()).thenReturn(addressMap);
     when(server.getBatchRepartCount()).thenReturn(new AtomicInteger(0));
     Map<Integer, TableSchema> tables = new HashMap<>();
-    TableSchema tableSchema = IndexLookupTest.createTable();
-    IndexSchema indexSchema = IndexLookupTest.createIndexSchema(tableSchema);
+    TableSchema tableSchema = TestUtils.createTable();
+    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
 
     when(server.getIndexSchema(anyString(), anyString(), anyString())).thenReturn(indexSchema);
 
-    DatabaseCommon common = IndexLookupTest.createCommon(tableSchema);
+    DatabaseCommon common = TestUtils.createCommon(tableSchema);
 
     when(server.getCommon()).thenReturn(common);
 
@@ -227,9 +228,9 @@ public class ReadManagerTest {
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 
-    byte[][] records = IndexLookupTest.createRecords(common, tableSchema, 10);
+    byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
 
-    List<Object[]> keys = IndexLookupTest.createKeys(10);
+    List<Object[]> keys = TestUtils.createKeys(10);
 
     int i = 0;
     for (Object[] key : keys) {
@@ -278,12 +279,12 @@ public class ReadManagerTest {
     when(server.getAddressMap()).thenReturn(addressMap);
     when(server.getBatchRepartCount()).thenReturn(new AtomicInteger(0));
     Map<Integer, TableSchema> tables = new HashMap<>();
-    TableSchema tableSchema = IndexLookupTest.createTable();
-    IndexSchema indexSchema = IndexLookupTest.createIndexSchema(tableSchema);
+    TableSchema tableSchema = TestUtils.createTable();
+    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
 
     when(server.getIndexSchema(anyString(), anyString(), anyString())).thenReturn(indexSchema);
 
-    DatabaseCommon common = IndexLookupTest.createCommon(tableSchema);
+    DatabaseCommon common = TestUtils.createCommon(tableSchema);
 
     when(server.getCommon()).thenReturn(common);
 
@@ -291,9 +292,9 @@ public class ReadManagerTest {
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 
-    byte[][] records = IndexLookupTest.createRecords(common, tableSchema, 10);
+    byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
 
-    List<Object[]> keys = IndexLookupTest.createKeys(10);
+    List<Object[]> keys = TestUtils.createKeys(10);
 
     int i = 0;
     for (Object[] key : keys) {
@@ -347,12 +348,12 @@ public class ReadManagerTest {
     when(server.getAddressMap()).thenReturn(addressMap);
     when(server.getBatchRepartCount()).thenReturn(new AtomicInteger(0));
     Map<Integer, TableSchema> tables = new HashMap<>();
-    TableSchema tableSchema = IndexLookupTest.createTable();
-    IndexSchema indexSchema = IndexLookupTest.createIndexSchema(tableSchema);
+    TableSchema tableSchema = TestUtils.createTable();
+    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
 
     when(server.getIndexSchema(anyString(), anyString(), anyString())).thenReturn(indexSchema);
 
-    DatabaseCommon common = IndexLookupTest.createCommon(tableSchema);
+    DatabaseCommon common = TestUtils.createCommon(tableSchema);
     JsonNode node = new ObjectMapper().readTree(" { \"shards\" : [\n" +
         "    {\n" +
         "      \"replicas\": [\n" +
@@ -373,9 +374,9 @@ public class ReadManagerTest {
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 
-    byte[][] records = IndexLookupTest.createRecords(common, tableSchema, 10);
+    byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
 
-    List<Object[]> keys = IndexLookupTest.createKeys(10);
+    List<Object[]> keys = TestUtils.createKeys(10);
 
     int i = 0;
     for (Object[] key : keys) {
@@ -451,12 +452,12 @@ public class ReadManagerTest {
     when(server.getAddressMap()).thenReturn(addressMap);
     when(server.getBatchRepartCount()).thenReturn(new AtomicInteger(0));
     Map<Integer, TableSchema> tables = new HashMap<>();
-    TableSchema tableSchema = IndexLookupTest.createTable();
-    IndexSchema indexSchema = IndexLookupTest.createIndexSchema(tableSchema);
+    TableSchema tableSchema = TestUtils.createTable();
+    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
 
     when(server.getIndexSchema(anyString(), anyString(), anyString())).thenReturn(indexSchema);
 
-    DatabaseCommon common = IndexLookupTest.createCommon(tableSchema);
+    DatabaseCommon common = TestUtils.createCommon(tableSchema);
     JsonNode node = new ObjectMapper().readTree(" { \"shards\" : [\n" +
         "    {\n" +
         "      \"replicas\": [\n" +
@@ -477,9 +478,9 @@ public class ReadManagerTest {
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 
-    byte[][] records = IndexLookupTest.createRecords(common, tableSchema, 2000);
+    byte[][] records = TestUtils.createRecords(common, tableSchema, 2000);
 
-    List<Object[]> keys = IndexLookupTest.createKeys(2000);
+    List<Object[]> keys = TestUtils.createKeys(2000);
 
     int k = 0;
     for (Object[] key : keys) {

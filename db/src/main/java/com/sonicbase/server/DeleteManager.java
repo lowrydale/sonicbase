@@ -7,7 +7,6 @@ import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.DateUtils;
-import org.apache.commons.io.FileUtils;
 import org.apache.giraph.utils.Varint;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -239,7 +238,7 @@ public class DeleteManager {
     }
   }
 
-  private File getReplicaRoot() {
+  public File getReplicaRoot() {
     return new File(databaseServer.getDataDir(), "deletes/" + databaseServer.getShard() + "/" + databaseServer.getReplica() + "/");
   }
 
@@ -280,17 +279,6 @@ public class DeleteManager {
     }, "SonicBase Deletion Thread");
     mainThread.start();
   }
-
-  public void backupAWS(String bucket, String prefix, String subDirectory) {
-    AWSClient awsClient = databaseServer.getAWSClient();
-    File srcDir = getReplicaRoot();
-    subDirectory += "/deletes/" + databaseServer.getShard() + "/0";
-
-    if (srcDir.exists()) {
-      awsClient.uploadDirectory(bucket, prefix, subDirectory, srcDir);
-    }
-  }
-
 
   public void shutdown() {
     this.shutdown = true;

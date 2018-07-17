@@ -6,6 +6,7 @@ import com.sonicbase.index.AddressMap;
 import com.sonicbase.index.Index;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.util.TestUtils;
 import org.testng.annotations.Test;
 
 import java.io.UnsupportedEncodingException;
@@ -30,15 +31,15 @@ public class IndexLookupOneKeyTest {
     IndexLookupOneKey indexLookup = new IndexLookupOneKey(server);
 
     Map<Integer, TableSchema> tables = new HashMap<>();
-    TableSchema tableSchema = IndexLookupTest.createTable();
-    indexLookup.indexSchema = IndexLookupTest.createIndexSchema(tableSchema);
+    TableSchema tableSchema = TestUtils.createTable();
+    indexLookup.indexSchema = TestUtils.createIndexSchema(tableSchema);
     indexLookup.setTableSchema(tableSchema);
 
-    DatabaseCommon common = IndexLookupTest.createCommon(tableSchema);
+    DatabaseCommon common = TestUtils.createCommon(tableSchema);
 
-    byte[][] records = IndexLookupTest.createRecords(common, tableSchema, 10);
+    byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
 
-    List<Object[]> keys = IndexLookupTest.createKeys(10);
+    List<Object[]> keys = TestUtils.createKeys(10);
 
     indexLookup.currOffset = new AtomicLong();
     indexLookup.countReturned = new AtomicLong();

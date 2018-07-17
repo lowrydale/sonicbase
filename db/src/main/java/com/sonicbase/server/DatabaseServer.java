@@ -14,34 +14,23 @@ import com.sonicbase.procedure.*;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.common.*;
-import com.sonicbase.procedure.*;
 import net.sf.jsqlparser.expression.*;
 import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
 import net.sf.jsqlparser.parser.CCJSqlParserManager;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.execute.Execute;
-import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.exception.ExceptionUtils;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.*;
 import java.io.*;
-import java.security.InvalidKeyException;
-import java.security.Key;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.ParseException;
 import java.util.*;
@@ -50,8 +39,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 
 /**
@@ -76,12 +63,11 @@ public class DatabaseServer {
   private String host;
   private String cluster;
 
-  public static final String LICENSE_KEY = "CPuDJRkHB3nq45LObWTCHLNzwWFn8bUT";
-  public static final String FOUR_SERVER_LICENSE = "15443f8a6727fcd935fad36afcd9125e";
   public AtomicBoolean isRunning;
   private ThreadPoolExecutor executor;
   private boolean compressRecords = false;
   private boolean useUnsafe;
+  private String gclog;
   private String xmx;
   private String installDir;
   private boolean throttleInsert;
@@ -124,48 +110,14 @@ public class DatabaseServer {
   private ReadManager readManager;
   private LogManager logManager;
   private SchemaManager schemaManager;
+  private Object proServer;
+  private LicenseManagerProxy licenseManager;
 
   public DatabaseServer() {
   }
 
   public static boolean[][] getDeathOverride() {
     return deathOverride;
-  }
-
-  public void shutdown() {
-    try {
-      shutdown = true;
-
-      if (streamsConsumerMonitorthread != null) {
-        streamsConsumerMonitorthread.interrupt();
-        streamsConsumerMonitorthread.join();
-      }
-
-      if (longRunningCommands != null) {
-        longRunningCommands.shutdown();
-      }
-      shutdownDeathMonitor();
-      shutdownRepartitioner();
-
-      deleteManager.shutdown();
-      snapshotManager.shutdown();
-      logManager.shutdown();
-      executor.shutdownNow();
-      methodInvoker.shutdown();
-      client.get().shutdown();
-      if (connectionForStoredProcedure != null) {
-        connectionForStoredProcedure.close();
-      }
-      readManager.shutdown();
-      transactionManager.shutdown();
-      updateManager.shutdown();
-      bulkImportManager.shutdown();
-
-      executor.shutdownNow();
-    }
-    catch (Exception e) {
-      throw new DatabaseException("Error shutting down DatabaseServer", e);
-    }
   }
 
   public MethodInvoker getMethodInvoker() {
@@ -202,6 +154,7 @@ public class DatabaseServer {
     this.cluster = cluster;
     this.host = host;
     this.port = port;
+    this.gclog = gclog;
     this.xmx = xmx;
 
     ObjectNode databaseDict = config;
@@ -274,6 +227,8 @@ public class DatabaseServer {
 
     addressMap = new AddressMap(this);
 
+    common.setServersConfig(serversConfig);
+
     this.deleteManager = new DeleteManager(this);
 
     this.updateManager = new UpdateManager(this);
@@ -305,6 +260,19 @@ public class DatabaseServer {
     this.methodInvoker.registerMethodProvider("TransactionManager", transactionManager);
     this.methodInvoker.registerMethodProvider("UpdateManager", updateManager);
     this.methodInvoker.registerMethodProvider("DatabaseServer", this);
+    this.longRunningCommands = new LongRunningCalls(this);
+
+    try {
+      Class proClz = Class.forName("com.sonicbase.server.ProServer");
+      Constructor ctor = proClz.getConstructor(DatabaseServer.class);
+      proServer = ctor.newInstance(this);
+    }
+    catch (Exception e) {
+      logger.error("Error initializing pro server", e);
+    }
+
+    updateManager.initStreamManager();
+    licenseManager = new LicenseManagerProxy(proServer);
 
     this.replicationFactor = shards.get(0).withArray("replicas").size();
 
@@ -342,9 +310,6 @@ public class DatabaseServer {
       schemaManager.addAllIndices(dbName);
     }
 
-    common.setServersConfig(serversConfig);
-
-    longRunningCommands = new LongRunningCalls(this);
     startLongRunningCommands();
 
     disable();
@@ -353,12 +318,62 @@ public class DatabaseServer {
 
   }
 
+  public void shutdown() {
+    try {
+      shutdown = true;
+
+      if (proServer != null) {
+        try {
+          Class proClz = Class.forName("com.sonicbase.server.ProServer");
+          Method method = proClz.getMethod("shutdown");
+          method.invoke(proServer);
+        }
+        catch (Exception e) {
+          logger.error("Error shutting down pro server");
+        }
+      }
+      if (streamsConsumerMonitorthread != null) {
+        streamsConsumerMonitorthread.interrupt();
+        streamsConsumerMonitorthread.join();
+      }
+
+      if (longRunningCommands != null) {
+        longRunningCommands.shutdown();
+      }
+      shutdownDeathMonitor();
+      shutdownRepartitioner();
+
+      deleteManager.shutdown();
+      snapshotManager.shutdown();
+      logManager.shutdown();
+      executor.shutdownNow();
+      methodInvoker.shutdown();
+      client.get().shutdown();
+      if (connectionForStoredProcedure != null) {
+        connectionForStoredProcedure.close();
+      }
+      readManager.shutdown();
+      transactionManager.shutdown();
+      updateManager.shutdown();
+      bulkImportManager.shutdown();
+
+      executor.shutdownNow();
+    }
+    catch (Exception e) {
+      throw new DatabaseException("Error shutting down DatabaseServer", e);
+    }
+  }
+
   public String getHost() {
     return host;
   }
 
   public int getPort() {
     return port;
+  }
+
+  public String getGcLog() {
+    return gclog;
   }
 
   public void setBackupConfig(ObjectNode backup) {
@@ -393,6 +408,7 @@ public class DatabaseServer {
 
 
   public void startStreamsConsumerMonitor() {
+    updateManager.startStreamsConsumerMasterMonitor();
   }
 
   public void shutdownDeathMonitor() {
@@ -453,6 +469,7 @@ public class DatabaseServer {
                 shutdownDeathMonitor();
                 shutdownRepartitioner();
 
+                licenseManager.shutdownMasterLicenseValidator();
 
                 masterManager.shutdownFixSchemaTimer();
 
@@ -674,10 +691,6 @@ public class DatabaseServer {
     return installDir;
   }
 
-  public boolean haveProLicense() {
-    return false;
-  }
-
   public SnapshotManager getSnapshotManager() {
     return snapshotManager;
   }
@@ -884,6 +897,10 @@ public class DatabaseServer {
     return shutdown;
   }
 
+  public String getXmx() {
+    return xmx;
+  }
+
   public MasterManager getMasterManager() {
     return masterManager;
   }
@@ -926,6 +943,14 @@ public class DatabaseServer {
 
   public void setDataDir(String dataDir) {
     this.dataDir = dataDir;
+  }
+
+  public Object getProServer() {
+    return proServer;
+  }
+
+  public void startMasterLicenseValidator() {
+    licenseManager.startMasterLicenseValidator();
   }
 
   private static class NullX509TrustManager implements X509TrustManager {
@@ -1146,6 +1171,10 @@ public class DatabaseServer {
 
   public boolean isRunning() {
     return isRunning.get();
+  }
+
+  public void setIsRunning(boolean isRunning) {
+    this.isRunning.set(isRunning);
   }
 
   public boolean isRecovered() {
@@ -1468,14 +1497,12 @@ public class DatabaseServer {
   public ComObject healthCheck(ComObject cobj, boolean replayedCommand) {
     ComObject retObj = new ComObject();
     retObj.put(ComObject.Tag.status, "{\"status\" : \"ok\"}");
-    retObj.put(ComObject.Tag.haveProLicense, haveProLicense());
     return retObj;
   }
 
   public ComObject healthCheckPriority(ComObject cobj, boolean replayedCommand) {
     ComObject retObj = new ComObject();
     retObj.put(ComObject.Tag.status, "{\"status\" : \"ok\"}");
-    retObj.put(ComObject.Tag.haveProLicense, haveProLicense());
     return retObj;
   }
 
@@ -1548,6 +1575,26 @@ public class DatabaseServer {
     catch (Exception e) {
       throw new DatabaseException(e);
     }
+  }
+
+  //dynamically invoked
+  public ComObject serverSelect(ComObject cobj, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) {
+    return readManager.serverSelect(cobj, restrictToThisServer, procedureContext);
+  }
+
+  //dynamically invoked
+  public ComObject serverSetSelect(ComObject cobj, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) {
+    return readManager.serverSetSelect(cobj, restrictToThisServer, procedureContext);
+  }
+
+  //dynamically invoked
+  public ComObject indexLookupExpression(ComObject cobj, StoredProcedureContextImpl context) {
+    return readManager.indexLookupExpression(cobj, context);
+  }
+
+  //dynamically invoked
+  public ComObject indexLookup(ComObject cobj, StoredProcedureContextImpl context) {
+    return readManager.indexLookup(cobj, context);
   }
 
   public AddressMap getAddressMap() {

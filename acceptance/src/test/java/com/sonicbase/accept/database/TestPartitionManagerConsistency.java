@@ -17,6 +17,7 @@ import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
+import com.sonicbase.util.PartitionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.testng.annotations.BeforeClass;
@@ -210,11 +211,11 @@ public class TestPartitionManagerConsistency {
                   boolean isCurrPartitions = ((ResultSetProxy)rs).isCurrPartitions();
 
                   boolean currPartitions = false;
-                  List<Integer> selectedShards = PartitionManager.findOrderedPartitionForRecord(false, true, fieldOffsets, dbServers[0].getCommon(), tableSchema,
+                  List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(false, true, fieldOffsets, dbServers[0].getCommon(), tableSchema,
                       "_1__primarykey", null, BinaryExpression.Operator.equal, null, new Object[]{i},
                       null);
                   if (selectedShards.size() == 0) {
-                    selectedShards = PartitionManager.findOrderedPartitionForRecord(true, false, fieldOffsets, dbServers[0].getCommon(), tableSchema,
+                    selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, fieldOffsets, dbServers[0].getCommon(), tableSchema,
                         indexSchema.getName(), null, BinaryExpression.Operator.equal, null, new Object[]{i}, null);
                     currPartitions = true;
                   }

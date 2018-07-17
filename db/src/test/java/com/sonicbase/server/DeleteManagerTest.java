@@ -14,6 +14,7 @@ import com.sonicbase.index.Index;
 import com.sonicbase.index.Indices;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.util.TestUtils;
 import org.apache.commons.io.IOUtils;
 import org.testng.annotations.Test;
 
@@ -39,8 +40,8 @@ public class DeleteManagerTest {
     when(server.getAddressMap()).thenReturn(addressMap);
     when(server.getBatchRepartCount()).thenReturn(new AtomicInteger(0));
     Map<Integer, TableSchema> tables = new HashMap<>();
-    final TableSchema tableSchema = IndexLookupTest.createTable();
-    IndexSchema indexSchema = IndexLookupTest.createIndexSchema(tableSchema);
+    final TableSchema tableSchema = TestUtils.createTable();
+    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
 
     when(server.getIndexSchema(anyString(), anyString(), anyString())).thenReturn(indexSchema);
     when(server.getShardCount()).thenReturn(2);
@@ -54,7 +55,7 @@ public class DeleteManagerTest {
      TransactionManager transManager = new TransactionManager(server);
     when(server.getTransactionManager()).thenReturn(transManager);
 
-    DatabaseCommon common = IndexLookupTest.createCommon(tableSchema);
+    DatabaseCommon common = TestUtils.createCommon(tableSchema);
     JsonNode node = new ObjectMapper().readTree(" { \"shards\" : [\n" +
         "    {\n" +
         "      \"replicas\": [\n" +
@@ -82,9 +83,9 @@ public class DeleteManagerTest {
     when(server.getIndices()).thenReturn(map);
     when(server.getIndices(anyString())).thenReturn(map.get("test"));
 
-    byte[][] records = IndexLookupTest.createRecords(common, tableSchema, 10);
+    byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
 
-    final List<Object[]> keys = IndexLookupTest.createKeys(10);
+    final List<Object[]> keys = TestUtils.createKeys(10);
 
     int k = 0;
     for (Object[] key : keys) {

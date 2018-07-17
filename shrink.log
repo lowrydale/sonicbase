@@ -1182,10 +1182,10 @@
 	<method signature="ComObject doRestoreFileSystem(ComObject)" class="com.sonicbase.server.DatabaseServer" />
 	<method signature="boolean electNewMaster(int,int,int[],int[])" class="com.sonicbase.server.DatabaseServer" />
 	<method signature="void setConfig(com.sonicbase.util.JsonDict,java.lang.String,java.lang.String,int,boolean,java.util.concurrent.atomic.AtomicBoolean,boolean,java.lang.String,java.lang.String,boolean)" class="com.sonicbase.server.DatabaseServer" />
-	<method signature="com.sonicbase.common.AWSClient access$3500(com.sonicbase.server.DatabaseServer)" class="com.sonicbase.server.DatabaseServer" />
+	<method signature="AWSClient access$3500(com.sonicbase.server.DatabaseServer)" class="com.sonicbase.server.DatabaseServer" />
 	<method signature="int access$200(com.sonicbase.server.DatabaseServer)" class="com.sonicbase.server.DatabaseServer" />
 	<method signature="org.apache.log4j.Logger getClientErrorLogger()" class="com.sonicbase.server.DatabaseServer" />
-	<method signature="com.sonicbase.common.AWSClient getAWSClient()" class="com.sonicbase.server.DatabaseServer" />
+	<method signature="AWSClient getAWSClient()" class="com.sonicbase.server.DatabaseServer" />
 	<method signature="void pushSchema()" class="com.sonicbase.server.DatabaseServer" />
 	<method signature="int getShard()" class="com.sonicbase.server.DatabaseServer" />
 	<method signature="boolean isNoLongerMaster()" class="com.sonicbase.server.DatabaseServer" />
@@ -3050,7 +3050,7 @@
 	<class name="com.sonicbase.server.LogManager" />
 	<method signature="void startLoggingForPeer(int)" class="com.sonicbase.server.LogManager" />
 	<method signature="double getPercentApplyQueuesComplete()" class="com.sonicbase.server.LogManager" />
-	<method signature="void backupLogDirToAWS(com.sonicbase.common.AWSClient,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.io.File)" class="com.sonicbase.server.LogManager" />
+	<method signature="void backupLogDirToAWS(AWSClient,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.io.File)" class="com.sonicbase.server.LogManager" />
 	<method signature="void restoreAWS(java.lang.String,java.lang.String,java.lang.String)" class="com.sonicbase.server.LogManager" />
 	<method signature="boolean access$100(com.sonicbase.server.LogManager)" class="com.sonicbase.server.LogManager" />
 	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.server.LogManager" />
@@ -3853,26 +3853,26 @@
 	<field name="id" class="ExpressionImpl$Type" />
 	<field name="parenthesis" class="ExpressionImpl$Type" />
 	<field name="$VALUES" class="ExpressionImpl$Type" />
-	<class name="com.sonicbase.common.AWSClient" />
-	<method signature="com.amazonaws.services.s3.transfer.TransferManager getTransferManager()" class="com.sonicbase.common.AWSClient" />
-	<method signature="byte[] downloadBytes(java.lang.String,java.lang.String)" class="com.sonicbase.common.AWSClient" />
-	<method signature="void downloadDirectory(java.lang.String,java.lang.String,java.lang.String,java.io.File)" class="com.sonicbase.common.AWSClient" />
-	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.common.AWSClient" />
-	<method signature="com.amazonaws.services.s3.AmazonS3 getS3Client()" class="com.sonicbase.common.AWSClient" />
-	<method signature="void deleteDirectory(java.lang.String,java.lang.String)" class="com.sonicbase.common.AWSClient" />
-	<method signature="void downloadFile(java.lang.String,java.lang.String,java.lang.String,java.io.File)" class="com.sonicbase.common.AWSClient" />
-	<method signature="void &lt;init&gt;(DatabaseClient)" class="com.sonicbase.common.AWSClient" />
-	<method signature="java.util.List listDirectSubdirectories(java.lang.String,java.lang.String)" class="com.sonicbase.common.AWSClient" />
-	<method signature="java.io.File getInstallDir()" class="com.sonicbase.common.AWSClient" />
-	<method signature="Logger access$000(com.sonicbase.common.AWSClient)" class="com.sonicbase.common.AWSClient" />
-	<method signature="void uploadDirectory(java.lang.String,java.lang.String,java.lang.String,java.io.File)" class="com.sonicbase.common.AWSClient" />
-	<method signature="void downloadFile(java.lang.String,java.lang.String,java.io.File)" class="com.sonicbase.common.AWSClient" />
-	<method signature="void uploadFile(java.lang.String,java.lang.String,java.lang.String,java.io.File)" class="com.sonicbase.common.AWSClient" />
-	<method signature="com.sonicbase.util.JsonDict getConfig()" class="com.sonicbase.common.AWSClient" />
-	<field name="executor" class="com.sonicbase.common.AWSClient" />
-	<field name="logger" class="com.sonicbase.common.AWSClient" />
-	<field name="client" class="com.sonicbase.common.AWSClient" />
-	<field name="installDir" class="com.sonicbase.common.AWSClient" />
+	<class name="AWSClient" />
+	<method signature="com.amazonaws.services.s3.transfer.TransferManager getTransferManager()" class="AWSClient" />
+	<method signature="byte[] downloadBytes(java.lang.String,java.lang.String)" class="AWSClient" />
+	<method signature="void downloadDirectory(java.lang.String,java.lang.String,java.lang.String,java.io.File)" class="AWSClient" />
+	<method signature="void &lt;clinit&gt;()" class="AWSClient" />
+	<method signature="com.amazonaws.services.s3.AmazonS3 getS3Client()" class="AWSClient" />
+	<method signature="void deleteDirectory(java.lang.String,java.lang.String)" class="AWSClient" />
+	<method signature="void downloadFile(java.lang.String,java.lang.String,java.lang.String,java.io.File)" class="AWSClient" />
+	<method signature="void &lt;init&gt;(DatabaseClient)" class="AWSClient" />
+	<method signature="java.util.List listDirectSubdirectories(java.lang.String,java.lang.String)" class="AWSClient" />
+	<method signature="java.io.File getInstallDir()" class="AWSClient" />
+	<method signature="Logger access$000(AWSClient)" class="AWSClient" />
+	<method signature="void uploadDirectory(java.lang.String,java.lang.String,java.lang.String,java.io.File)" class="AWSClient" />
+	<method signature="void downloadFile(java.lang.String,java.lang.String,java.io.File)" class="AWSClient" />
+	<method signature="void uploadFile(java.lang.String,java.lang.String,java.lang.String,java.io.File)" class="AWSClient" />
+	<method signature="com.sonicbase.util.JsonDict getConfig()" class="AWSClient" />
+	<field name="executor" class="AWSClient" />
+	<field name="logger" class="AWSClient" />
+	<field name="client" class="AWSClient" />
+	<field name="installDir" class="AWSClient" />
 	<class name="Parameter$Array" />
 	<method signature="int getSqlType()" class="Parameter$Array" />
 	<method signature="void &lt;clinit&gt;()" class="Parameter$Array" />
@@ -4308,14 +4308,14 @@
 	<method signature="void &lt;init&gt;(com.sonicbase.server.LongRunningCommands$SingleCommand,java.util.concurrent.ConcurrentLinkedQueue)" class="com.sonicbase.server.LongRunningCommands$SingleCommand$1" />
 	<field name="this$0" class="com.sonicbase.server.LongRunningCommands$SingleCommand$1" />
 	<field name="val$parentList" class="com.sonicbase.server.LongRunningCommands$SingleCommand$1" />
-	<class name="com.sonicbase.common.AWSClient$1" />
-	<method signature="void &lt;init&gt;(com.sonicbase.common.AWSClient,java.lang.String,java.lang.String,java.lang.String,java.io.File)" class="com.sonicbase.common.AWSClient$1" />
-	<method signature="java.lang.Object call()" class="com.sonicbase.common.AWSClient$1" />
-	<field name="val$file" class="com.sonicbase.common.AWSClient$1" />
-	<field name="this$0" class="com.sonicbase.common.AWSClient$1" />
-	<field name="val$prefix" class="com.sonicbase.common.AWSClient$1" />
-	<field name="val$path" class="com.sonicbase.common.AWSClient$1" />
-	<field name="val$bucket" class="com.sonicbase.common.AWSClient$1" />
+	<class name="AWSClient$1" />
+	<method signature="void &lt;init&gt;(AWSClient,java.lang.String,java.lang.String,java.lang.String,java.io.File)" class="AWSClient$1" />
+	<method signature="java.lang.Object call()" class="AWSClient$1" />
+	<field name="val$file" class="AWSClient$1" />
+	<field name="this$0" class="AWSClient$1" />
+	<field name="val$prefix" class="AWSClient$1" />
+	<field name="val$path" class="AWSClient$1" />
+	<field name="val$bucket" class="AWSClient$1" />
 	<class name="Parameter$Blob" />
 	<method signature="int getSqlType()" class="Parameter$Blob" />
 	<method signature="Parameter$ParameterBase deserialize(java.io.DataInputStream)" class="Parameter$Blob" />
@@ -4324,13 +4324,13 @@
 	<method signature="void &lt;init&gt;(java.sql.Blob)" class="Parameter$Blob" />
 	<method signature="void &lt;init&gt;(byte[])" class="Parameter$Blob" />
 	<method signature="void &lt;init&gt;(Parameter$ParameterBase)" class="Parameter$Blob" />
-	<class name="com.sonicbase.common.AWSClient$2" />
-	<method signature="void run()" class="com.sonicbase.common.AWSClient$2" />
-	<method signature="void &lt;init&gt;(com.sonicbase.common.AWSClient,java.lang.String,java.lang.String,java.io.File)" class="com.sonicbase.common.AWSClient$2" />
-	<field name="val$destFile" class="com.sonicbase.common.AWSClient$2" />
-	<field name="val$finalKey" class="com.sonicbase.common.AWSClient$2" />
-	<field name="this$0" class="com.sonicbase.common.AWSClient$2" />
-	<field name="val$bucket" class="com.sonicbase.common.AWSClient$2" />
+	<class name="AWSClient$2" />
+	<method signature="void run()" class="AWSClient$2" />
+	<method signature="void &lt;init&gt;(AWSClient,java.lang.String,java.lang.String,java.io.File)" class="AWSClient$2" />
+	<field name="val$destFile" class="AWSClient$2" />
+	<field name="val$finalKey" class="AWSClient$2" />
+	<field name="this$0" class="AWSClient$2" />
+	<field name="val$bucket" class="AWSClient$2" />
 	<class name="DatabaseSocketClient$NioClient" />
 	<method signature="DatabaseSocketClient$ClientNioHandler access$000(DatabaseSocketClient$NioClient)" class="DatabaseSocketClient$NioClient" />
 	<method signature="void &lt;clinit&gt;()" class="DatabaseSocketClient$NioClient" />
@@ -4389,12 +4389,12 @@
 	<field name="longRunningCommands" class="com.sonicbase.server.LongRunningCommands$SingleCommand" />
 	<field name="body" class="com.sonicbase.server.LongRunningCommands$SingleCommand" />
 	<field name="command" class="com.sonicbase.server.LongRunningCommands$SingleCommand" />
-	<class name="com.sonicbase.common.RecordLockedException" />
-	<method signature="void &lt;init&gt;(java.lang.Exception)" class="com.sonicbase.common.RecordLockedException" />
-	<method signature="void &lt;init&gt;(java.lang.String,java.lang.Exception)" class="com.sonicbase.common.RecordLockedException" />
-	<method signature="void &lt;clinit&gt;()" class="com.sonicbase.common.RecordLockedException" />
-	<method signature="void &lt;init&gt;()" class="com.sonicbase.common.RecordLockedException" />
-	<method signature="void &lt;init&gt;(java.lang.String)" class="com.sonicbase.common.RecordLockedException" />
+	<class name="RecordLockedException" />
+	<method signature="void &lt;init&gt;(java.lang.Exception)" class="RecordLockedException" />
+	<method signature="void &lt;init&gt;(java.lang.String,java.lang.Exception)" class="RecordLockedException" />
+	<method signature="void &lt;clinit&gt;()" class="RecordLockedException" />
+	<method signature="void &lt;init&gt;()" class="RecordLockedException" />
+	<method signature="void &lt;init&gt;(java.lang.String)" class="RecordLockedException" />
 	<class name="DatabaseSocketClient" />
 	<method signature="DatabaseSocketClient$Connection borrow_connection(java.lang.String,int)" class="DatabaseSocketClient" />
 	<method signature="byte[] do_send(java.lang.String,java.lang.String,byte[],java.lang.String)" class="DatabaseSocketClient" />

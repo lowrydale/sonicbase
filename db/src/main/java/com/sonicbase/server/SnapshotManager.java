@@ -9,6 +9,7 @@ import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.util.PartitionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.giraph.utils.Varint;
 import org.slf4j.Logger;
@@ -27,7 +28,7 @@ public class SnapshotManager {
 
   public static final int SNAPSHOT_PARTITION_COUNT = 128;
 
-  private static final String SNAPSHOT_STR = "snapshot/";
+  public static final String SNAPSHOT_STR = "snapshot/";
   private static final String INDEX_STR = ", index=";
   private static final String RATE_STR = ", rate=";
   private static final String DURATION_STR = ", duration(s)=";
@@ -306,14 +307,15 @@ public class SnapshotManager {
     }
   }
 
-  private File getSnapshotReplicaDir() {
+  public File getSnapshotReplicaDir() {
     return new File(server.getDataDir(), SNAPSHOT_STR + server.getShard() + "/" + server.getReplica());
   }
-  private String getSnapshotRootDir(String dbName) {
+
+  public String getSnapshotRootDir(String dbName) {
     return new File(getSnapshotReplicaDir(), dbName).getAbsolutePath();
   }
 
-  private String getSnapshotSchemaDir(String dbName) {
+  public String getSnapshotSchemaDir(String dbName) {
     return new File(getSnapshotReplicaDir(), "_sonicbase_schema/" + dbName).getAbsolutePath();
   }
 
@@ -429,7 +431,7 @@ public class SnapshotManager {
 
   public void deleteRecord(String dbName, String tableName, TableSchema tableSchema, IndexSchema indexSchema, Object[] key, byte[] record, int[] fieldOffsets) {
 
-    List<Integer> selectedShards = PartitionManager.findOrderedPartitionForRecord(true, false,
+    List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false,
         fieldOffsets, server.getClient().getCommon(), tableSchema,
         indexSchema.getName(), null, BinaryExpression.Operator.equal, null, key, null);
     if (selectedShards.size() == 0) {

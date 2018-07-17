@@ -44,6 +44,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.sonicbase.client.InsertStatementHandler.BATCH_STATUS_SUCCCESS;
 import static org.testng.Assert.*;
 
 public class TestDatabase {
@@ -291,7 +292,7 @@ public class TestDatabase {
       }
       int[] batchRet = stmt.executeBatch();
       for (int i = 0; i < recordCount; i++) {
-        assertEquals(batchRet[i], UpdateManager.BATCH_STATUS_SUCCCESS);
+        assertEquals(batchRet[i], BATCH_STATUS_SUCCCESS);
       }
 
       stmt = conn.prepareStatement("select * from persons where id=0");

@@ -44,15 +44,11 @@ import static java.sql.Statement.SUCCESS_NO_INFO;
  */
 public class UpdateManager {
 
-  public static final int BATCH_STATUS_SUCCCESS = SUCCESS_NO_INFO;
-  public static final int BATCH_STATUS_FAILED = EXECUTE_FAILED;
-  public static final int BATCH_STATUS_UNIQUE_CONSTRAINT_VIOLATION = -100;
   private static Logger logger = LoggerFactory.getLogger(UpdateManager.class);
 
   private static final String CURR_VER_STR = "currVer:";
   private final com.sonicbase.server.DatabaseServer server;
-  private Class<?> streamManagerClass;
-  private Object streamManager;
+  private StreamManagerProxy streamManager;
   private List<Object> producers = new ArrayList<>();
   private int maxPublishBatchSize = 10;
   private int publisherThreadCount;
@@ -70,15 +66,15 @@ public class UpdateManager {
 
   public UpdateManager(DatabaseServer databaseServer) {
     this.server = databaseServer;
+  }
+
+  public void initStreamManager() {
+    streamManager = new StreamManagerProxy(server.getProServer());
     try {
-      streamManagerClass = Class.forName("com.sonicbase.server.StreamManager");
-      Method method = streamManagerClass.getMethod("initPublisher");
-      streamManager = streamManagerClass.newInstance();
-      method.invoke(streamManager);
+      streamManager.initPublisher();
     }
     catch (Exception e) {
       logger.error("Error initializing stream manager", e);
-      streamManager = null;
     }
   }
 
@@ -521,6 +517,10 @@ public class UpdateManager {
     }
   }
 
+  public void startStreamsConsumerMasterMonitor() {
+    streamManager.startStreamsConsumerMasterMonitor();
+  }
+
   private static class InsertRequest {
     private final ComObject innerObj;
     private final long sequence0;
@@ -549,15 +549,7 @@ public class UpdateManager {
     }
 
     threadLocalIsBatchRequest.set(true);
-    if (streamManager != null) {
-      try {
-        Method method = streamManagerClass.getMethod("initBatchInsert");
-        method.invoke(streamManager);
-      }
-      catch (Exception e) {
-        throw new DatabaseException(e);
-      }
-    }
+    streamManager.initBatchInsert();
 
     String dbName = cobj.getString(ComObject.Tag.dbName);
     final long sequence0 = cobj.getLong(ComObject.Tag.sequence0);
@@ -657,15 +649,7 @@ public class UpdateManager {
         trans.addOperation(batchInsertWithRecord, command, cobj.serialize(), replayedCommand);
       }
 
-      if (streamManager != null) {
-        try {
-          Method method = streamManagerClass.getMethod("publishBatch", ComObject.class);
-          method.invoke(streamManager, cobj);
-        }
-        catch (Exception e) {
-          throw new DatabaseException(e);
-        }
-      }
+      streamManager.publishBatch(cobj);
 
       batchDuration.addAndGet(System.nanoTime() - begin);
     }
@@ -676,15 +660,7 @@ public class UpdateManager {
       throw new DatabaseException(e);
     }
     finally {
-      if (streamManager != null) {
-        try {
-          Method method = streamManagerClass.getMethod("batchInsertFinish");
-          method.invoke(streamManager);
-        }
-        catch (Exception e) {
-          throw new DatabaseException(e);
-        }
-      }
+      streamManager.batchInsertFinish();
       threadLocalIsBatchRequest.set(false);
     }
     retObj.put(ComObject.Tag.count, count);
@@ -808,7 +784,7 @@ public class UpdateManager {
         synchronized (batchResponses) {
           ComObject obj = new ComObject();
           obj.put(ComObject.Tag.originalOffset, originalOffset);
-          obj.put(ComObject.Tag.intStatus, BATCH_STATUS_SUCCCESS);
+          obj.put(ComObject.Tag.intStatus, InsertStatementHandler.BATCH_STATUS_SUCCCESS);
           batchResponses.add(obj);
         }
       }
@@ -822,7 +798,7 @@ public class UpdateManager {
           synchronized (batchResponses) {
             ComObject obj = new ComObject();
             obj.put(ComObject.Tag.originalOffset, originalOffset);
-            obj.put(ComObject.Tag.intStatus, BATCH_STATUS_UNIQUE_CONSTRAINT_VIOLATION);
+            obj.put(ComObject.Tag.intStatus, InsertStatementHandler.BATCH_STATUS_UNIQUE_CONSTRAINT_VIOLATION);
             batchResponses.add(obj);
           }
         }
@@ -832,7 +808,7 @@ public class UpdateManager {
           synchronized (batchResponses) {
             ComObject obj = new ComObject();
             obj.put(ComObject.Tag.originalOffset, originalOffset);
-            obj.put(ComObject.Tag.intStatus, BATCH_STATUS_FAILED);
+            obj.put(ComObject.Tag.intStatus, InsertStatementHandler.BATCH_STATUS_FAILED);
             batchResponses.add(obj);
           }
         }
@@ -904,15 +880,7 @@ public class UpdateManager {
               break;
             case batchInsertWithRecord:
               threadLocalIsBatchRequest.set(true);
-              if (streamManager != null) {
-                try {
-                  Method method = streamManagerClass.getMethod("initBatchInsert");
-                  method.invoke(streamManager);
-                }
-                catch (Exception e) {
-                  throw new DatabaseException(e);
-                }
-              }
+              streamManager.initBatchInsert();
 
               try {
                 cobj = new ComObject(opBody);
@@ -922,29 +890,12 @@ public class UpdateManager {
                   doInsertIndexEntryByKeyWithRecord(cobj, innerObj, sequence0, sequence1, (short) i, op.getReplayed(),
                       transactionId, isExplicitTrans, true, null);
                 }
-                if (streamManager != null) {
-                  try {
-                    Method method = streamManagerClass.getMethod("publishBatch", ComObject.class);
-                    method.invoke(streamManager, cobj);
-                  }
-                  catch (Exception e) {
-                    throw new DatabaseException(e);
-                  }
-                }
+                streamManager.publishBatch(cobj);
               }
               finally {
                 threadLocalIsBatchRequest.set(false);
-                if (streamManager != null) {
-                  try {
-                    Method method = streamManagerClass.getMethod("batchInsertFinish");
-                    method.invoke(streamManager);
-                  }
-                  catch (Exception e) {
-                    throw new DatabaseException(e);
-                  }
-                }
+                streamManager.batchInsertFinish();
               }
-
               break;
             case update:
               doUpdateRecord(new ComObject(op.getBody()), op.getReplayed(), null, null, true);
@@ -1067,16 +1018,7 @@ public class UpdateManager {
             server.getAddressMap().freeUnsafeIds(value);
           }
         }
-        if (streamManager != null) {
-          try {
-            Method method = streamManagerClass.getMethod("publishInsertOrUpdate", ComObject.class,
-                String.class, String.class, byte[].class, byte[].class, UpdateType.class);
-            method.invoke(streamManager, cobj, dbName, tableName, bytes, existingBytes, UpdateType.update);
-          }
-          catch (Exception e) {
-            throw new DatabaseException(e);
-          }
-        }
+        streamManager.publishInsertOrUpdate(cobj, dbName, tableName, bytes, existingBytes, UpdateType.update);
       }
       else {
         if (transactionId != 0) {
@@ -1297,31 +1239,13 @@ public class UpdateManager {
         if (threadLocalIsBatchRequest.get() != null && threadLocalIsBatchRequest.get()) {
           if (!dbName.equals("_sonicbase_sys")) {
             if (!producers.isEmpty()) {
-              if (streamManager != null) {
-                try {
-                  Method method = streamManagerClass.getMethod("addToBatch",
-                      String.class, String.class, byte[].class, UpdateType.class);
-                  method.invoke(streamManager, dbName, tableName, recordBytes, UpdateType.insert);
-                }
-                catch (Exception e) {
-                  throw new DatabaseException(e);
-                }
-              }
+              streamManager.addToBatch(dbName, tableName, recordBytes, UpdateType.insert);
             }
           }
         }
         else {
           if (Record.DB_VIEW_FLAG_DELETING != Record.getDbViewFlags(recordBytes)) {
-            if (streamManager != null) {
-              try {
-                Method method = streamManagerClass.getMethod("publishInsertOrUpdate", ComObject.class,
-                    String.class, String.class, byte[].class, byte[].class, UpdateType.class);
-                method.invoke(streamManager, cobj, dbName, tableName, recordBytes, null, UpdateType.insert);
-              }
-              catch (Exception e) {
-                throw new DatabaseException(e);
-              }
-            }
+            streamManager.publishInsertOrUpdate(cobj, dbName, tableName, recordBytes, null, UpdateType.insert);
           }
         }
       }
@@ -1422,16 +1346,7 @@ public class UpdateManager {
 
         if (tableSchema.getIndices().get(indexName).isPrimaryKey()) {
           for (byte[] innerBytes : bytes) {
-            if (streamManager != null) {
-              try {
-                Method method = streamManagerClass.getMethod("publishInsertOrUpdate", ComObject.class,
-                    String.class, String.class, byte[].class, byte[].class, UpdateType.class);
-                method.invoke(streamManager, cobj, dbName, tableName, innerBytes, null, UpdateType.delete);
-              }
-              catch (Exception e) {
-                throw new DatabaseException(e);
-              }
-            }
+            streamManager.publishInsertOrUpdate(cobj, dbName, tableName, innerBytes, null, UpdateType.delete);
           }
         }
       }

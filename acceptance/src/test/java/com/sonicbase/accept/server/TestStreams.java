@@ -141,7 +141,7 @@ public class TestStreams {
 ////
 ////      //DatabaseClient client = new DatabaseClient("localhost", 9010, true);
 ////
-//      Class.forName("com.sonicbase.jdbcdriver.Driver");
+//      Class.forName("Driver");
 //
 //      connA = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9010", "user", "password");
 //

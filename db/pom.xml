@@ -2,10 +2,10 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.sonicbase</groupId>
-    <artifactId>sonicbase-core-unobfuscated</artifactId>
+    <artifactId>sonicbase-server</artifactId>
     <packaging>jar</packaging>
     <version>1.2.12</version>
-    <name>sonicbase-core</name>
+    <name>sonicbase-server</name>
     <url>http://maven.apache.org</url>
 
     <parent>
@@ -76,93 +76,28 @@
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>24.0-jre</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-util</artifactId>
-            <version>8.0.0.v20110901</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-server</artifactId>
-            <version>8.0.0.v20110901</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-http</artifactId>
-            <version>8.0.0.v20110901</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-continuation</artifactId>
-            <version>8.0.0.v20110901</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-io</artifactId>
-            <version>8.0.0.v20110901</version>
-            <scope>provided</scope>
-        </dependency>
-
-
-        <dependency>
-            <groupId>javax.servlet</groupId>
-            <artifactId>javax.servlet-api</artifactId>
-            <version>4.0.0</version>
-            <scope>provided</scope>
         </dependency>
 
         <dependency>
             <groupId>io.dropwizard.metrics</groupId>
             <artifactId>metrics-core</artifactId>
-            <version>4.0.2</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.ignite</groupId>
-            <artifactId>ignite-core</artifactId>
-            <version>2.3.0</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.ignite</groupId>
-            <artifactId>ignite-spring</artifactId>
-            <version>2.3.0</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.ignite</groupId>
-            <artifactId>ignite-indexing</artifactId>
-            <version>2.3.0</version>
-            <scope>provided</scope>
         </dependency>
 
         <dependency>
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
-            <version>6.0.6</version>
             <scope>provided</scope>
         </dependency>
 
         <dependency>
             <groupId>com.sonicbase</groupId>
-            <artifactId>sonicbase-jdbc-unobfuscated</artifactId>
-            <version>1.2.12</version>
+            <artifactId>sonicbase-jdbc</artifactId>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>
             <groupId>org.apache.giraph</groupId>
             <artifactId>giraph-core</artifactId>
-            <version>1.2.0</version>
             <scope>provided</scope>
             <exclusions>
                 <exclusion>
@@ -175,27 +110,23 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.9.6</version>
             <scope>provided</scope>
         </dependency>
 
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-core</artifactId>
-            <version>2.9.6</version>
         </dependency>
 
         <dependency>
             <groupId>org.apache.kafka</groupId>
             <artifactId>kafka-clients</artifactId>
-            <version>0.11.0.1</version>
             <scope>provided</scope>
         </dependency>
 
         <dependency>
             <groupId>com.mashape.unirest</groupId>
             <artifactId>unirest-java</artifactId>
-            <version>1.4.9</version>
             <scope>provided</scope>
         </dependency>
 
@@ -203,7 +134,6 @@
         <dependency>
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
-            <version>2.5</version>
             <scope>provided</scope>
         </dependency>
 
@@ -211,7 +141,6 @@
         <dependency>
             <groupId>net.jpountz.lz4</groupId>
             <artifactId>lz4</artifactId>
-            <version>1.3.0</version>
             <scope>provided</scope>
         </dependency>
 
@@ -219,7 +148,6 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-crypto</artifactId>
-            <version>1.0.0</version>
             <scope>provided</scope>
         </dependency>
 
@@ -227,7 +155,6 @@
         <dependency>
             <groupId>org.apache.maven.plugin-tools</groupId>
             <artifactId>maven-plugin-annotations</artifactId>
-            <version>3.2</version>
             <scope>provided</scope>
         </dependency>
 
@@ -235,7 +162,6 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
-            <version>3.3.2</version>
             <scope>provided</scope>
         </dependency>
 
@@ -243,7 +169,6 @@
         <dependency>
             <groupId>log4j</groupId>
             <artifactId>log4j</artifactId>
-            <version>1.2.17</version>
             <scope>provided</scope>
         </dependency>
 
@@ -251,15 +176,13 @@
         <dependency>
             <groupId>org.testng</groupId>
             <artifactId>testng</artifactId>
-            <version>6.8</version>
-            <scope>provided</scope>
+            <scope>test</scope>
         </dependency>
 
         <!--Apache 2.0 - license confirmed-->
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
-            <version>2.2.3</version>
             <scope>provided</scope>
         </dependency>
 
@@ -267,7 +190,6 @@
         <dependency>
             <groupId>com.github.jsqlparser</groupId>
             <artifactId>jsqlparser</artifactId>
-            <version>0.9.5</version>
             <scope>provided</scope>
         </dependency>
 
@@ -275,7 +197,6 @@
         <dependency>
             <groupId>org.quartz-scheduler</groupId>
             <artifactId>quartz</artifactId>
-            <version>2.2.1</version>
             <scope>provided</scope>
         </dependency>
 
@@ -283,7 +204,6 @@
         <dependency>
             <groupId>org.quartz-scheduler</groupId>
             <artifactId>quartz-jobs</artifactId>
-            <version>2.2.1</version>
             <scope>provided</scope>
         </dependency>
 
@@ -291,7 +211,6 @@
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-bundle</artifactId>
-            <version>1.11.279</version>
             <scope>provided</scope>
         </dependency>
 
@@ -299,7 +218,6 @@
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk</artifactId>
-            <version>1.11.279</version>
             <scope>provided</scope>
         </dependency>
 
@@ -307,14 +225,12 @@
         <dependency>
             <groupId>it.unimi.dsi</groupId>
             <artifactId>fastutil</artifactId>
-            <version>7.0.2</version>
             <scope>provided</scope>
         </dependency>
 
         <dependency>
             <groupId>com.google.http-client</groupId>
             <artifactId>google-http-client</artifactId>
-            <version>1.17.0-rc</version>
             <scope>provided</scope>
         </dependency>
 
@@ -323,7 +239,6 @@
         <dependency>
             <groupId>commons-configuration</groupId>
             <artifactId>commons-configuration</artifactId>
-            <version>1.6</version>
             <scope>provided</scope>
         </dependency>
 
@@ -331,7 +246,6 @@
         <dependency>
             <groupId>org.anarres.lzo</groupId>
             <artifactId>lzo-hadoop</artifactId>
-            <version>1.0.5</version>
             <scope>provided</scope>
             <exclusions>
                 <exclusion>
@@ -355,7 +269,6 @@
         <dependency>
             <groupId>org.anarres.lzo</groupId>
             <artifactId>lzo-core</artifactId>
-            <version>1.0.5</version>
             <scope>provided</scope>
         </dependency>
 
@@ -375,17 +288,9 @@
             <scope>provided</scope>
         </dependency>
 
-        <!--<dependency>-->
-        <!--<groupId>io.netty</groupId>-->
-        <!--<artifactId>netty-transport-native-epoll</artifactId>-->
-        <!--<classifier>linux-x86_64</classifier>-->
-        <!--<version>4.0.36.Final</version>-->
-        <!--</dependency>-->
-
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-all</artifactId>
-            <version>1.10.19</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

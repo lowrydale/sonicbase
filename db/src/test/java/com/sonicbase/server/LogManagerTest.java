@@ -12,8 +12,6 @@ import com.sonicbase.common.FileUtils;
 import com.sonicbase.common.ServersConfig;
 import com.sonicbase.index.Indices;
 import com.sonicbase.query.DatabaseException;
-import com.sonicbase.server.DatabaseServer;
-import com.sonicbase.server.LogManager;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.testng.annotations.Test;

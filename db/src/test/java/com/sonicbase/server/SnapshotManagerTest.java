@@ -13,6 +13,7 @@ import com.sonicbase.index.AddressMap;
 import com.sonicbase.index.Index;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.util.TestUtils;
 import org.testng.annotations.Test;
 
 import java.io.File;
@@ -36,15 +37,15 @@ public class SnapshotManagerTest {
     when(server.getAddressMap()).thenReturn(addressMap);
     when(server.getBatchRepartCount()).thenReturn(new AtomicInteger(0));
     Map<Integer, TableSchema> tables = new HashMap<>();
-    TableSchema tableSchema = IndexLookupTest.createTable();
-    IndexSchema indexSchema = IndexLookupTest.createIndexSchema(tableSchema);
+    TableSchema tableSchema = TestUtils.createTable();
+    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
 
     when(server.getDataDir()).thenReturn("/tmp/database");
     FileUtils.deleteDirectory(new File("/tmp/database"));
 
     when(server.getIndexSchema(anyString(), anyString(), anyString())).thenReturn(indexSchema);
 
-    DatabaseCommon common = IndexLookupTest.createCommon(tableSchema);
+    DatabaseCommon common = TestUtils.createCommon(tableSchema);
     JsonNode node = new ObjectMapper().readTree(" { \"shards\" : [\n" +
         "    {\n" +
         "      \"replicas\": [\n" +
@@ -67,9 +68,9 @@ public class SnapshotManagerTest {
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 
-    byte[][] records = IndexLookupTest.createRecords(common, tableSchema, 10);
+    byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
 
-    List<Object[]> keys = IndexLookupTest.createKeys(10);
+    List<Object[]> keys = TestUtils.createKeys(10);
 
     int k = 0;
     for (Object[] key : keys) {

@@ -2710,7 +2710,7 @@ to act on classes which have been obfuscated.
   <method class="com.sonicbase.server.DatabaseServer" name="java.lang.String access$1800(com.sonicbase.server.DatabaseServer)" map="L"/>
   <method class="com.sonicbase.server.DatabaseServer" name="void startRepartitioner()" map="k"/>
   <method class="com.sonicbase.server.DatabaseServer" name="ComObject doBackupAWS(ComObject)" map="M"/>
-  <method class="com.sonicbase.server.DatabaseServer" name="com.sonicbase.common.AWSClient getAWSClient()" map="l"/>
+  <method class="com.sonicbase.server.DatabaseServer" name="AWSClient getAWSClient()" map="l"/>
   <method class="com.sonicbase.server.DatabaseServer" name="byte[] startBackup(ComObject)" map="N"/>
   <method class="com.sonicbase.server.DatabaseServer" name="DatabaseClient getDatabaseClient()" map="m"/>
   <method class="com.sonicbase.server.DatabaseServer" name="org.apache.log4j.Logger access$1900()" map="n"/>
@@ -2725,7 +2725,7 @@ to act on classes which have been obfuscated.
   <method class="com.sonicbase.server.DatabaseServer" name="void access$2800(com.sonicbase.server.DatabaseServer, java.lang.String, java.lang.String, java.lang.String, java.lang.String)" map="A"/>
   <method class="com.sonicbase.server.DatabaseServer" name="ComObject reserveNextIdFromReplica(ComObject)" map="P"/>
   <method class="com.sonicbase.server.DatabaseServer" name="ComObject isEntireBackupComplete(ComObject)" map="Q"/>
-  <method class="com.sonicbase.server.DatabaseServer" name="com.sonicbase.common.AWSClient access$3500(com.sonicbase.server.DatabaseServer)" map="N"/>
+  <method class="com.sonicbase.server.DatabaseServer" name="AWSClient access$3500(com.sonicbase.server.DatabaseServer)" map="N"/>
   <method class="com.sonicbase.server.DatabaseServer" name="java.util.concurrent.locks.ReentrantReadWriteLock$ReadLock getBatchReadLock()" map="q"/>
   <method class="com.sonicbase.server.DatabaseServer" name="int access$200(com.sonicbase.server.DatabaseServer)" map="O"/>
   <method class="com.sonicbase.server.DatabaseServer" name="com.sonicbase.util.JsonDict getConfig()" map="r"/>
@@ -2892,7 +2892,7 @@ to act on classes which have been obfuscated.
   <method class="com.sonicbase.server.UpdateManager" name="ComObject doUpdateRecord(ComObject, boolean, java.util.concurrent.atomic.AtomicBoolean, java.util.concurrent.atomic.AtomicLong, boolean)" map="B"/>
   <method class="com.sonicbase.server.UpdateManager" name="ComObject batchInsertIndexEntryByKey(ComObject, boolean)" map="K"/>
   <method class="com.sonicbase.server.UpdateManager" name="ComObject doDeleteIndexEntryByKey(ComObject, boolean, java.util.concurrent.atomic.AtomicBoolean, java.util.concurrent.atomic.AtomicLong, boolean)" map="C"/>
-  <class name="com.sonicbase.common.RecordLockedException" map="E"/>
+  <class name="RecordLockedException" map="E"/>
   <class name="com.sonicbase.server.SnapshotManager$3" map="3"/>
   <field class="com.sonicbase.server.SnapshotManager$3" name="val$outStreams" map="k"/>
   <field class="com.sonicbase.server.SnapshotManager$3" name="val$isPrimaryKey" map="l"/>
@@ -3143,7 +3143,7 @@ to act on classes which have been obfuscated.
   <method class="com.sonicbase.server.LogManager" name="void deletePeerLogs(int)" map="D"/>
   <method class="com.sonicbase.server.LogManager" name="void logRequestForPeer(java.lang.String, byte[], long, long, int)" map="A"/>
   <method class="com.sonicbase.server.LogManager" name="void restoreFileSystem(java.lang.String, java.lang.String)" map="A"/>
-  <method class="com.sonicbase.server.LogManager" name="void backupLogDirToAWS(com.sonicbase.common.AWSClient, java.lang.String, java.lang.String, java.lang.String, java.lang.String, java.io.File)" map="A"/>
+  <method class="com.sonicbase.server.LogManager" name="void backupLogDirToAWS(AWSClient, java.lang.String, java.lang.String, java.lang.String, java.lang.String, java.io.File)" map="A"/>
   <method class="com.sonicbase.server.LogManager" name="void unbindQueues()" map="I"/>
   <method class="com.sonicbase.server.LogManager" name="void applyQueues()" map="J"/>
   <method class="com.sonicbase.server.LogManager" name="long getNextSequencenNum()" map="K"/>
@@ -4044,37 +4044,37 @@ to act on classes which have been obfuscated.
   <field class="ComArray" name="nestedType" map="A"/>
   <field class="ComArray" name="array" map="B"/>
   <method class="ComArray" name="void deserialize(java.io.DataInputStream)" map="A"/>
-  <class name="com.sonicbase.common.AWSClient$2" map="2"/>
-  <field class="com.sonicbase.common.AWSClient$2" name="this$0" map="A"/>
-  <field class="com.sonicbase.common.AWSClient$2" name="val$destFile" map="B"/>
-  <field class="com.sonicbase.common.AWSClient$2" name="val$bucket" map="C"/>
-  <field class="com.sonicbase.common.AWSClient$2" name="val$finalKey" map="D"/>
-  <method class="com.sonicbase.common.AWSClient$2" name="void run()" map="run"/>
-  <class name="com.sonicbase.common.AWSClient$1" map="1"/>
-  <field class="com.sonicbase.common.AWSClient$1" name="this$0" map="A"/>
-  <field class="com.sonicbase.common.AWSClient$1" name="val$bucket" map="B"/>
-  <field class="com.sonicbase.common.AWSClient$1" name="val$file" map="C"/>
-  <field class="com.sonicbase.common.AWSClient$1" name="val$path" map="D"/>
-  <field class="com.sonicbase.common.AWSClient$1" name="val$prefix" map="E"/>
-  <method class="com.sonicbase.common.AWSClient$1" name="java.lang.Object call()" map="call"/>
-  <class name="com.sonicbase.common.AWSClient" map="G"/>
-  <field class="com.sonicbase.common.AWSClient" name="client" map="A"/>
-  <field class="com.sonicbase.common.AWSClient" name="logger" map="B"/>
-  <field class="com.sonicbase.common.AWSClient" name="installDir" map="C"/>
-  <field class="com.sonicbase.common.AWSClient" name="executor" map="D"/>
-  <method class="com.sonicbase.common.AWSClient" name="void uploadDirectory(java.lang.String, java.lang.String, java.lang.String, java.io.File)" map="A"/>
-  <method class="com.sonicbase.common.AWSClient" name="com.sonicbase.util.JsonDict getConfig()" map="A"/>
-  <method class="com.sonicbase.common.AWSClient" name="void downloadFile(java.lang.String, java.lang.String, java.lang.String, java.io.File)" map="B"/>
-  <method class="com.sonicbase.common.AWSClient" name="Logger access$000(com.sonicbase.common.AWSClient)" map="A"/>
-  <method class="com.sonicbase.common.AWSClient" name="java.util.List listDirectSubdirectories(java.lang.String, java.lang.String)" map="A"/>
-  <method class="com.sonicbase.common.AWSClient" name="void deleteDirectory(java.lang.String, java.lang.String)" map="B"/>
-  <method class="com.sonicbase.common.AWSClient" name="com.amazonaws.services.s3.transfer.TransferManager getTransferManager()" map="B"/>
-  <method class="com.sonicbase.common.AWSClient" name="void downloadFile(java.lang.String, java.lang.String, java.io.File)" map="A"/>
-  <method class="com.sonicbase.common.AWSClient" name="void downloadDirectory(java.lang.String, java.lang.String, java.lang.String, java.io.File)" map="C"/>
-  <method class="com.sonicbase.common.AWSClient" name="com.amazonaws.services.s3.AmazonS3 getS3Client()" map="C"/>
-  <method class="com.sonicbase.common.AWSClient" name="java.io.File getInstallDir()" map="D"/>
-  <method class="com.sonicbase.common.AWSClient" name="byte[] downloadBytes(java.lang.String, java.lang.String)" map="C"/>
-  <method class="com.sonicbase.common.AWSClient" name="void uploadFile(java.lang.String, java.lang.String, java.lang.String, java.io.File)" map="D"/>
+  <class name="AWSClient$2" map="2"/>
+  <field class="AWSClient$2" name="this$0" map="A"/>
+  <field class="AWSClient$2" name="val$destFile" map="B"/>
+  <field class="AWSClient$2" name="val$bucket" map="C"/>
+  <field class="AWSClient$2" name="val$finalKey" map="D"/>
+  <method class="AWSClient$2" name="void run()" map="run"/>
+  <class name="AWSClient$1" map="1"/>
+  <field class="AWSClient$1" name="this$0" map="A"/>
+  <field class="AWSClient$1" name="val$bucket" map="B"/>
+  <field class="AWSClient$1" name="val$file" map="C"/>
+  <field class="AWSClient$1" name="val$path" map="D"/>
+  <field class="AWSClient$1" name="val$prefix" map="E"/>
+  <method class="AWSClient$1" name="java.lang.Object call()" map="call"/>
+  <class name="AWSClient" map="G"/>
+  <field class="AWSClient" name="client" map="A"/>
+  <field class="AWSClient" name="logger" map="B"/>
+  <field class="AWSClient" name="installDir" map="C"/>
+  <field class="AWSClient" name="executor" map="D"/>
+  <method class="AWSClient" name="void uploadDirectory(java.lang.String, java.lang.String, java.lang.String, java.io.File)" map="A"/>
+  <method class="AWSClient" name="com.sonicbase.util.JsonDict getConfig()" map="A"/>
+  <method class="AWSClient" name="void downloadFile(java.lang.String, java.lang.String, java.lang.String, java.io.File)" map="B"/>
+  <method class="AWSClient" name="Logger access$000(AWSClient)" map="A"/>
+  <method class="AWSClient" name="java.util.List listDirectSubdirectories(java.lang.String, java.lang.String)" map="A"/>
+  <method class="AWSClient" name="void deleteDirectory(java.lang.String, java.lang.String)" map="B"/>
+  <method class="AWSClient" name="com.amazonaws.services.s3.transfer.TransferManager getTransferManager()" map="B"/>
+  <method class="AWSClient" name="void downloadFile(java.lang.String, java.lang.String, java.io.File)" map="A"/>
+  <method class="AWSClient" name="void downloadDirectory(java.lang.String, java.lang.String, java.lang.String, java.io.File)" map="C"/>
+  <method class="AWSClient" name="com.amazonaws.services.s3.AmazonS3 getS3Client()" map="C"/>
+  <method class="AWSClient" name="java.io.File getInstallDir()" map="D"/>
+  <method class="AWSClient" name="byte[] downloadBytes(java.lang.String, java.lang.String)" map="C"/>
+  <method class="AWSClient" name="void uploadFile(java.lang.String, java.lang.String, java.lang.String, java.io.File)" map="D"/>
   <package name="com.sonicbase.test" map="C"/>
   <class name="com.sonicbase.test.TestAWSBackup" map="A"/>
   <field class="com.sonicbase.test.TestAWSBackup" name="client" map="A"/>

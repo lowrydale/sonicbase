@@ -99,7 +99,7 @@ Finished Test: class=TestLongManagerLostEntries
 
 Echoed
 Echoed
-Exception in thread "Thread-384" com.sonicbase.query.DatabaseException: com.sonicbase.query.DatabaseException: java.lang.reflect.InvocationTargetException
+Exception in thread "Thread-384" DatabaseException: DatabaseException: java.lang.reflect.InvocationTargetException
 	at com.sonicbase.server.MethodInvoker.invokeMethod(MethodInvoker.java:285)
 	at com.sonicbase.server.DatabaseServer.invokeMethod(DatabaseServer.java:5089)
 	at com.sonicbase.server.DatabaseServer.invokeMethod(DatabaseServer.java:5081)
@@ -107,7 +107,7 @@ Exception in thread "Thread-384" com.sonicbase.query.DatabaseException: com.soni
 	at com.sonicbase.server.LongRunningCalls$SingleCommand.access$000(LongRunningCalls.java:236)
 	at com.sonicbase.server.LongRunningCalls$SingleCommand$1.run(LongRunningCalls.java:267)
 	at java.lang.Thread.run(Thread.java:748)
-Caused by: com.sonicbase.query.DatabaseException: java.lang.reflect.InvocationTargetException
+Caused by: DatabaseException: java.lang.reflect.InvocationTargetException
 	at com.sonicbase.server.MethodInvoker.invokeMethod(MethodInvoker.java:229)
 	... 6 more
 Caused by: java.lang.reflect.InvocationTargetException
@@ -117,7 +117,7 @@ Caused by: java.lang.reflect.InvocationTargetException
 	at java.lang.reflect.Method.invoke(Method.java:498)
 	at com.sonicbase.server.MethodInvoker.invokeMethod(MethodInvoker.java:211)
 	... 6 more
-Caused by: com.sonicbase.query.DatabaseException: java.lang.InterruptedException: sleep interrupted
+Caused by: DatabaseException: java.lang.InterruptedException: sleep interrupted
 	at com.sonicbase.server.MethodInvoker.block(MethodInvoker.java:873)
 	... 11 more
 Caused by: java.lang.InterruptedException: sleep interrupted
@@ -138,7 +138,7 @@ Full thread dump Java HotSpot(TM) 64-Bit Server VM (25.144-b01 mixed mode):
 "SonicBase Stats Recorder - cluster=4-servers" #6094 prio=5 os_prio=31 tid=0x00007fd40cc96800 nid=0x8f47 waiting on condition [0x000070000eca0000]
    java.lang.Thread.State: TIMED_WAITING (sleeping)
 	at java.lang.Thread.sleep(Native Method)
-	at com.sonicbase.client.DatabaseClient$QueryStatsRecorder.run(DatabaseClient.java:2095)
+	at DatabaseClient$QueryStatsRecorder.run(DatabaseClient.java:2095)
 	at java.lang.Thread.run(Thread.java:748)
 
 "Timer-155" #6093 prio=5 os_prio=31 tid=0x00007fd40cd71800 nid=0x6dc0f in Object.wait() [0x000070000eb9d000]
@@ -178,15 +178,15 @@ Full thread dump Java HotSpot(TM) 64-Bit Server VM (25.144-b01 mixed mode):
 	at com.sonicbase.socket.DatabaseSocketClient.borrow_connection(DatabaseSocketClient.java:90)
 	at com.sonicbase.socket.DatabaseSocketClient.sendBatch(DatabaseSocketClient.java:472)
 	at com.sonicbase.socket.DatabaseSocketClient.do_send(DatabaseSocketClient.java:722)
-	at com.sonicbase.client.DatabaseClient$Server.do_send(DatabaseClient.java:929)
-	at com.sonicbase.client.DatabaseClient.send(DatabaseClient.java:1434)
-	at com.sonicbase.client.DatabaseClient.send(DatabaseClient.java:1116)
-	at com.sonicbase.client.DatabaseClient.send(DatabaseClient.java:1104)
-	at com.sonicbase.client.DatabaseClient.doSyncSchema(DatabaseClient.java:5182)
-	- locked <0x00000007966cdbc8> (a com.sonicbase.common.DatabaseCommon)
-	at com.sonicbase.client.DatabaseClient.syncSchema(DatabaseClient.java:5153)
-	at com.sonicbase.client.DatabaseClient.initDb(DatabaseClient.java:1034)
-	at com.sonicbase.jdbcdriver.ConnectionProxy.<init>(ConnectionProxy.java:72)
+	at DatabaseClient$Server.do_send(DatabaseClient.java:929)
+	at DatabaseClient.send(DatabaseClient.java:1434)
+	at DatabaseClient.send(DatabaseClient.java:1116)
+	at DatabaseClient.send(DatabaseClient.java:1104)
+	at DatabaseClient.doSyncSchema(DatabaseClient.java:5182)
+	- locked <0x00000007966cdbc8> (a DatabaseCommon)
+	at DatabaseClient.syncSchema(DatabaseClient.java:5153)
+	at DatabaseClient.initDb(DatabaseClient.java:1034)
+	at ConnectionProxy.<init>(ConnectionProxy.java:72)
 	at com.sonicbase.server.DatabaseServer.getSysConnection(DatabaseServer.java:1026)
 	- locked <0x00000007966cde50> (a java.lang.Object)
 	at com.sonicbase.server.MonitorManager.initMonitoringTables(MonitorManager.java:77)
@@ -198,11 +198,11 @@ Full thread dump Java HotSpot(TM) 64-Bit Server VM (25.144-b01 mixed mode):
 	at com.sonicbase.server.MethodInvoker.invokeMethod(MethodInvoker.java:211)
 	at com.sonicbase.server.DatabaseServer.invokeMethod(DatabaseServer.java:5089)
 	at com.sonicbase.server.DatabaseServer.invokeMethod(DatabaseServer.java:5081)
-	at com.sonicbase.client.DatabaseClient.invokeOnServer(DatabaseClient.java:1726)
-	at com.sonicbase.client.DatabaseClient.send(DatabaseClient.java:1468)
-	at com.sonicbase.client.DatabaseClient.send(DatabaseClient.java:1116)
-	at com.sonicbase.client.DatabaseClient.send(DatabaseClient.java:1104)
-	at com.sonicbase.client.DatabaseClient$QueryStatsRecorder.run(DatabaseClient.java:2153)
+	at DatabaseClient.invokeOnServer(DatabaseClient.java:1726)
+	at DatabaseClient.send(DatabaseClient.java:1468)
+	at DatabaseClient.send(DatabaseClient.java:1116)
+	at DatabaseClient.send(DatabaseClient.java:1104)
+	at DatabaseClient$QueryStatsRecorder.run(DatabaseClient.java:2153)
 	at java.lang.Thread.run(Thread.java:748)
 
 "Timer-152" #6063 prio=5 os_prio=31 tid=0x00007fd40550e000 nid=0x5bd0f in Object.wait() [0x000070000f5bb000]
@@ -216,7 +216,7 @@ Full thread dump Java HotSpot(TM) 64-Bit Server VM (25.144-b01 mixed mode):
 "SonicBase Prepared Stamement Reaper" #6061 prio=5 os_prio=31 tid=0x00007fd406237800 nid=0x4a90f waiting on condition [0x000070000f3b5000]
    java.lang.Thread.State: TIMED_WAITING (sleeping)
 	at java.lang.Thread.sleep(Native Method)
-	at com.sonicbase.query.impl.ExpressionImpl$3.run(ExpressionImpl.java:1508)
+	at ExpressionImpl$3.run(ExpressionImpl.java:1508)
 	at java.lang.Thread.run(Thread.java:748)
 
 "SonicBase OS Stats Persister" #6059 prio=5 os_prio=31 tid=0x00007fd40ea44800 nid=0x14c27 in Object.wait() [0x000070000f1af000]
@@ -225,8 +225,8 @@ Full thread dump Java HotSpot(TM) 64-Bit Server VM (25.144-b01 mixed mode):
 	at java.lang.Thread.join(Thread.java:1252)
 	- locked <0x000000079656b170> (a java.lang.Thread)
 	at java.lang.Thread.join(Thread.java:1326)
-	at com.sonicbase.client.DatabaseClient.shutdown(DatabaseClient.java:581)
-	at com.sonicbase.jdbcdriver.ConnectionProxy.close(ConnectionProxy.java:357)
+	at DatabaseClient.shutdown(DatabaseClient.java:581)
+	at ConnectionProxy.close(ConnectionProxy.java:357)
 	at com.sonicbase.server.DatabaseServer.getSysConnection(DatabaseServer.java:1031)
 	at com.sonicbase.server.OSStatsManager.initMonitoringTables(OSStatsManager.java:91)
 	at com.sonicbase.server.OSStatsManager$StatsPersister.run(OSStatsManager.java:216)

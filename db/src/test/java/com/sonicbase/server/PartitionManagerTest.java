@@ -15,6 +15,8 @@ import com.sonicbase.index.Index;
 import com.sonicbase.index.Indices;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.util.PartitionUtils;
+import com.sonicbase.util.TestUtils;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.testng.annotations.Test;
@@ -46,15 +48,15 @@ public class PartitionManagerTest {
     when(server.getAddressMap()).thenReturn(addressMap);
     when(server.getBatchRepartCount()).thenReturn(new AtomicInteger(0));
     Map<Integer, TableSchema> tables = new HashMap<>();
-    final TableSchema tableSchema = IndexLookupTest.createTable();
-    IndexSchema indexSchema = IndexLookupTest.createIndexSchema(tableSchema);
+    final TableSchema tableSchema = TestUtils.createTable();
+    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
 
     when(server.getIndexSchema(anyString(), anyString(), anyString())).thenReturn(indexSchema);
     when(server.getShardCount()).thenReturn(2);
     when(server.getReplicationFactor()).thenReturn(1);
     when(server.getSnapshotManager()).thenReturn(mock(SnapshotManager.class));
 
-    DatabaseCommon common = IndexLookupTest.createCommon(tableSchema);
+    DatabaseCommon common = TestUtils.createCommon(tableSchema);
     JsonNode node = new ObjectMapper().readTree(" { \"shards\" : [\n" +
         "    {\n" +
         "      \"replicas\": [\n" +
@@ -82,9 +84,9 @@ public class PartitionManagerTest {
     when(server.getIndices()).thenReturn(map);
     when(server.getIndices(anyString())).thenReturn(map.get("test"));
 
-    byte[][] records = IndexLookupTest.createRecords(common, tableSchema, 10);
+    byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
 
-    final List<Object[]> keys = IndexLookupTest.createKeys(10);
+    final List<Object[]> keys = TestUtils.createKeys(10);
 
     int i = 0;
     for (Object[] key : keys) {
@@ -204,15 +206,15 @@ public class PartitionManagerTest {
     when(server.getAddressMap()).thenReturn(addressMap);
     when(server.getBatchRepartCount()).thenReturn(new AtomicInteger(0));
     Map<Integer, TableSchema> tables = new HashMap<>();
-    final TableSchema tableSchema = IndexLookupTest.createTable();
-    IndexSchema indexSchema = IndexLookupTest.createIndexSchema(tableSchema, 2);
+    final TableSchema tableSchema = TestUtils.createTable();
+    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema, 2);
 
     when(server.getIndexSchema(anyString(), anyString(), anyString())).thenReturn(indexSchema);
     when(server.getShardCount()).thenReturn(2);
     when(server.getReplicationFactor()).thenReturn(1);
     when(server.getShard()).thenReturn(1);
 
-    DatabaseCommon common = IndexLookupTest.createCommon(tableSchema);
+    DatabaseCommon common = TestUtils.createCommon(tableSchema);
     JsonNode node = new ObjectMapper().readTree(" { \"shards\" : [\n" +
         "    {\n" +
         "      \"replicas\": [\n" +
@@ -240,9 +242,9 @@ public class PartitionManagerTest {
     when(server.getIndices()).thenReturn(map);
     when(server.getIndices(anyString())).thenReturn(map.get("test"));
 
-    byte[][] records = IndexLookupTest.createRecords(common, tableSchema, 10);
+    byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
 
-    final List<Object[]> keys = IndexLookupTest.createKeys(10);
+    final List<Object[]> keys = TestUtils.createKeys(10);
 
     int i = 0;
     for (Object[] key : keys) {
@@ -356,15 +358,15 @@ public class PartitionManagerTest {
     when(server.getAddressMap()).thenReturn(addressMap);
     when(server.getBatchRepartCount()).thenReturn(new AtomicInteger(0));
     Map<Integer, TableSchema> tables = new HashMap<>();
-    final TableSchema tableSchema = IndexLookupTest.createTable();
-    IndexSchema indexSchema = IndexLookupTest.createIndexSchema(tableSchema, 2);
+    final TableSchema tableSchema = TestUtils.createTable();
+    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema, 2);
 
     when(server.getIndexSchema(anyString(), anyString(), anyString())).thenReturn(indexSchema);
     when(server.getShardCount()).thenReturn(2);
     when(server.getReplicationFactor()).thenReturn(1);
     when(server.getShard()).thenReturn(1);
 
-    DatabaseCommon common = IndexLookupTest.createCommon(tableSchema);
+    DatabaseCommon common = TestUtils.createCommon(tableSchema);
     JsonNode node = new ObjectMapper().readTree(" { \"shards\" : [\n" +
         "    {\n" +
         "      \"replicas\": [\n" +
@@ -386,7 +388,7 @@ public class PartitionManagerTest {
     when(client.getShardCount()).thenReturn(2);
     when(server.getClient()).thenReturn(client);
     when(server.getDatabaseClient()).thenReturn(client);
-    byte[][] records = IndexLookupTest.createRecords(common, tableSchema, 10);
+    byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
 
     Indices indices = new Indices();
     indices.addIndex(tableSchema, indexSchema.getName(), indexSchema.getComparators());
@@ -401,7 +403,7 @@ public class PartitionManagerTest {
     ThreadPoolExecutor executor = new ThreadPoolExecutor(5, 5, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
     try {
       when(client.getExecutor()).thenReturn(executor);
-      final List<Object[]> keys = IndexLookupTest.createKeys(10);
+      final List<Object[]> keys = TestUtils.createKeys(10);
 
       int i = 0;
       for (Object[] key : keys) {
@@ -431,7 +433,7 @@ public class PartitionManagerTest {
       cobj.put(ComObject.Tag.size, (long) 10);
       byte[] bytes0 = cobj.serialize();
 
-      PartitionManager.GlobalIndexCounts counts = PartitionManager.getIndexCounts("test", client);
+      PartitionUtils.GlobalIndexCounts counts = PartitionUtils.getIndexCounts("test", client);
       ConcurrentHashMap<Integer, Long> count = counts.getTables().get("table1").getIndices().get("_primarykey").getCounts();
       assertEquals((long)count.get(0), 10);
       System.out.println("test");

@@ -10,7 +10,7 @@ import net.sf.jsqlparser.statement.truncate.Truncate;
 import java.sql.SQLException;
 import java.util.Random;
 
-public class TruncateStatementHandler extends StatementHandler {
+public class TruncateStatementHandler implements StatementHandler {
   private final DatabaseClient client;
 
   public TruncateStatementHandler(DatabaseClient client) {
@@ -33,21 +33,21 @@ public class TruncateStatementHandler extends StatementHandler {
   public static void doTruncateTable(DatabaseClient client, String dbName, String table, int schemaRetryCount) {
 
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.dbName, dbName);
+    cobj.put(ComObject.Tag.DB_NAME, dbName);
     if (schemaRetryCount < 2) {
-      cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+      cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
     }
-    cobj.put(ComObject.Tag.method, "UpdateManager:truncateTable");
-    cobj.put(ComObject.Tag.tableName, table);
-    cobj.put(ComObject.Tag.phase, "secondary");
+    cobj.put(ComObject.Tag.METHOD, "UpdateManager:truncateTable");
+    cobj.put(ComObject.Tag.TABLE_NAME, table);
+    cobj.put(ComObject.Tag.PHASE, "secondary");
 
     Random rand = new Random(System.currentTimeMillis());
-    client.sendToAllShards(null, rand.nextLong(), cobj, DatabaseClient.Replica.def);
+    client.sendToAllShards(null, rand.nextLong(), cobj, DatabaseClient.Replica.DEF);
 
-    cobj.put(ComObject.Tag.phase, "primary");
+    cobj.put(ComObject.Tag.PHASE, "primary");
 
     rand = new Random(System.currentTimeMillis());
-    client.sendToAllShards(null, rand.nextLong(), cobj, DatabaseClient.Replica.def);
+    client.sendToAllShards(null, rand.nextLong(), cobj, DatabaseClient.Replica.DEF);
   }
 
 }

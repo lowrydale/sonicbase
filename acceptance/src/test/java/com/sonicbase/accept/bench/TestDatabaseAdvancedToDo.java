@@ -56,9 +56,8 @@ public class TestDatabaseAdvancedToDo {
           String role = "primaryMaster";
 
           dbServers[shard] = new DatabaseServer();
-          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true), null, true);
+          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true), null);
           dbServers[shard].setRole(role);
-          dbServers[shard].disableLogProcessor();
           return null;
         }
       }));
@@ -147,7 +146,7 @@ public class TestDatabaseAdvancedToDo {
       ids.add((long) (i + 100));
     }
 
-    client.beginRebalance("test", "persons", "_1__primarykey");
+    client.beginRebalance("test");
 
     while (true) {
       if (client.isRepartitioningComplete("test")) {

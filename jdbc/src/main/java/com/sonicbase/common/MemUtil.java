@@ -1,20 +1,20 @@
 package com.sonicbase.common;
 
-/**
- * Created by lowryda on 7/28/17.
- */
 public class MemUtil {
 
+  private MemUtil() {
+  }
+
   public static double getMemValue(String memStr) {
-    int qualifierPos = memStr.toLowerCase().indexOf("m");
+    int qualifierPos = memStr.toLowerCase().indexOf('m');
     if (qualifierPos == -1) {
-      qualifierPos = memStr.toLowerCase().indexOf("g");
+      qualifierPos = memStr.toLowerCase().indexOf('g');
       if (qualifierPos == -1) {
-        qualifierPos = memStr.toLowerCase().indexOf("t");
+        qualifierPos = memStr.toLowerCase().indexOf('t');
         if (qualifierPos == -1) {
-          qualifierPos = memStr.toLowerCase().indexOf("k");
+          qualifierPos = memStr.toLowerCase().indexOf('k');
           if (qualifierPos == -1) {
-            qualifierPos = memStr.toLowerCase().indexOf("b");
+            qualifierPos = memStr.toLowerCase().indexOf('b');
           }
         }
       }

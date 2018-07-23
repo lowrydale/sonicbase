@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.query.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -13,7 +12,6 @@ import com.sonicbase.common.ServersConfig;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.BinaryExpression;
-import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.Expression;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
@@ -80,7 +78,7 @@ public class ResultSetImplTest {
         "      ]\n" +
         "    }\n" +
         "  ]}\n");
-    serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), 1, true, true);
+    serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), true, true);
     //when(common.getServersConfig()).thenReturn(serversConfig);
     common.setServersConfig(serversConfig);
     when(client.getCommon()).thenReturn(common);
@@ -135,7 +133,7 @@ public class ResultSetImplTest {
           public SelectContextImpl lookup(ExpressionImpl expression, Expression topLevelExpression) {
             assertEquals(getCount(), 1000);
             assertEquals(getIndexName(), "_primarykey");
-            assertEquals(getLeftOp(), Operator.equal);
+            assertEquals(getLeftOp(), Operator.EQUAL);
             assertEquals(getRightOp(), null);
             assertEquals(getLeftKey(), null);
             assertEquals(getRightKey(), null);
@@ -148,13 +146,8 @@ public class ResultSetImplTest {
               retKeys[i] = new Object[][]{keys.get(i)};
             }
 
-            try {
-              return new SelectContextImpl("table1", "_primary", Operator.lessEqual, 0, null,
-                  retKeys, expression.getRecordCache(), 0, true);
-            }
-            catch (IOException e) {
-              throw new DatabaseException(e);
-            }
+            return new SelectContextImpl("table1", "_primary", Operator.LESS_EQUAL, 0, null,
+                retKeys, expression.getRecordCache(), 0, true);
           }
         };
         return ret;
@@ -188,7 +181,7 @@ public class ResultSetImplTest {
     rightExpression.setValue(300L);
     rightExpression.setSqlType(DataType.Type.BIGINT.getValue());
     expression.setRightExpression(rightExpression);
-    expression.setOperator(BinaryExpression.Operator.equal);
+    expression.setOperator(BinaryExpression.Operator.EQUAL);
     expression.setClient(client);
     expression.setTableName("table1");
 
@@ -386,7 +379,7 @@ public class ResultSetImplTest {
     counter.addLong(100L);
     countersList[1] = counter;
 
-    when(client.send(eq("ReadManager:indexLookupExpression"), anyInt(), anyInt(), any(ComObject.class), eq(DatabaseClient.Replica.def))).thenAnswer(
+    when(client.send(eq("ReadManager:indexLookupExpression"), anyInt(), anyInt(), any(ComObject.class), eq(DatabaseClient.Replica.DEF))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             return new ComObject().serialize();

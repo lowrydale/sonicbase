@@ -2132,8 +2132,8 @@ to act on classes which have been obfuscated.
   <field class="DatabaseClient$Server" name="hostPort" map="C"/>
   <method class="DatabaseClient$Server" name="boolean access$502(DatabaseClient$Server, boolean)" map="A"/>
   <method class="DatabaseClient$Server" name="DatabaseSocketClient access$600(DatabaseClient$Server)" map="A"/>
-  <method class="DatabaseClient$Server" name="byte[] do_send(java.lang.String, java.lang.String, byte[])" map="A"/>
-  <method class="DatabaseClient$Server" name="byte[] do_send(java.lang.String, java.lang.String, ComObject)" map="A"/>
+  <method class="DatabaseClient$Server" name="byte[] doSend(java.lang.String, java.lang.String, byte[])" map="A"/>
+  <method class="DatabaseClient$Server" name="byte[] doSend(java.lang.String, java.lang.String, ComObject)" map="A"/>
   <method class="DatabaseClient$Server" name="DatabaseSocketClient getSocketClient()" map="A"/>
   <method class="DatabaseClient$Server" name="boolean access$500(DatabaseClient$Server)" map="B"/>
   <method class="DatabaseClient$Server" name="java.lang.String access$000(DatabaseClient$Server)" map="C"/>
@@ -2280,7 +2280,7 @@ to act on classes which have been obfuscated.
   <method class="DatabaseClient" name="void setCommon(DatabaseCommon)" map="A"/>
   <method class="DatabaseClient" name="java.lang.Object doAlter(java.lang.String, ParameterHandler, net.sf.jsqlparser.statement.alter.Alter)" map="A"/>
   <method class="DatabaseClient" name="void doCreateIndex(java.lang.String, CreateIndexStatementImpl)" map="A"/>
-  <method class="DatabaseClient" name="byte[] do_send(java.util.List)" map="A"/>
+  <method class="DatabaseClient" name="byte[] doSend(java.util.List)" map="A"/>
   <method class="DatabaseClient" name="ResultSet describeServerHeath(java.lang.String)" map="D"/>
   <method class="DatabaseClient" name="void syncSchema()" map="D"/>
   <method class="DatabaseClient" name="ResultSetImpl describeServerStats(java.lang.String)" map="E"/>
@@ -5522,7 +5522,7 @@ to act on classes which have been obfuscated.
   <field class="DatabaseSocketClient" name="ENABLE_BATCH" map="L"/>
   <field class="DatabaseSocketClient" name="requestQueues" map="M"/>
   <field class="DatabaseSocketClient" name="logger" map="N"/>
-  <method class="DatabaseSocketClient" name="byte[] do_send(java.util.List)" map="A"/>
+  <method class="DatabaseSocketClient" name="byte[] doSend(java.util.List)" map="A"/>
   <method class="DatabaseSocketClient" name="void shutdown()" map="A"/>
   <method class="DatabaseSocketClient" name="java.util.concurrent.atomic.AtomicLong access$700()" map="B"/>
   <method class="DatabaseSocketClient" name="DatabaseSocketClient$Connection borrow_connection(java.lang.String, int)" map="A"/>
@@ -5530,7 +5530,7 @@ to act on classes which have been obfuscated.
   <method class="DatabaseSocketClient" name="void access$400(java.lang.String, int, java.util.List)" map="A"/>
   <method class="DatabaseSocketClient" name="org.apache.log4j.Logger access$900()" map="C"/>
   <method class="DatabaseSocketClient" name="void serializeSingleRequest(java.io.ByteArrayOutputStream, java.lang.String, byte[])" map="A"/>
-  <method class="DatabaseSocketClient" name="byte[] do_send(java.lang.String, java.lang.String, byte[], java.lang.String)" map="A"/>
+  <method class="DatabaseSocketClient" name="byte[] doSend(java.lang.String, java.lang.String, byte[], java.lang.String)" map="A"/>
   <method class="DatabaseSocketClient" name="void return_connection(DatabaseSocketClient$Connection, java.lang.String, int)" map="A"/>
   <method class="DatabaseSocketClient" name="io.netty.channel.EventLoopGroup access$100()" map="D"/>
   <method class="DatabaseSocketClient" name="java.util.List getBatchThreads()" map="E"/>

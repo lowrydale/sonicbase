@@ -2,8 +2,6 @@
 package com.sonicbase.accept.database;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.DatabaseCommon;
@@ -56,10 +54,6 @@ public class TestPartitionManagerConsistencyIdentity {
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
-      ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
-      array.add(DatabaseServer.FOUR_SERVER_LICENSE);
-      config.put("licenseKeys", array);
-
       DatabaseClient.getServers().clear();
 
 
@@ -68,10 +62,8 @@ public class TestPartitionManagerConsistencyIdentity {
       for (int i = 0; i < dbServers.length; i++) {
         final int shard = i;
         dbServers[shard] = new DatabaseServer();
-        dbServers[shard].setConfig(config, "16-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true),new AtomicBoolean(true), null, true);
+        dbServers[shard].setConfig(config, "16-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true),new AtomicBoolean(true), null);
         dbServers[shard].setRole(role);
-        dbServers[shard].disableLogProcessor();
-        dbServers[shard].setMinSizeForRepartition(0);
       }
       dbServers[0].getMasterManager().promoteToMaster(null, false);
 
@@ -185,7 +177,7 @@ public class TestPartitionManagerConsistencyIdentity {
                       dbServersByShard.put(dbServers[j].getShard(), dbServers[j]);
                     }
                   }
-                  IndexSchema schema = dbServers[0].getCommon().getTables("test").get("persons").getIndexes().get("_1__primarykey");
+                  IndexSchema schema = dbServers[0].getCommon().getTables("test").get("persons").getIndices().get("_1__primarykey");
                   Index index0 = dbServers[0].getIndices().get("test").getIndices().get("persons").get("_1__primarykey");
                   Index index1 = dbServers[2].getIndices().get("test").getIndices().get("persons").get("_1__primarykey");
                   Index index0_1 = dbServers[1].getIndices().get("test").getIndices().get("persons").get("_1__primarykey");
@@ -212,13 +204,13 @@ public class TestPartitionManagerConsistencyIdentity {
                   for (int j = 0; j < partitions.length; j++) {
                     appendUpperKey(j, partitions, curr);
                   }
-                  synchronized (PartitionManager.previousPartitions) {
-                    List<PartitionManager.PartitionEntry> list = PartitionManager.previousPartitions.get("persons:_1__primarykey");
+                  synchronized (PartitionManager.getPreviousPartitions()) {
+                    List<PartitionManager.PartitionEntry> list = PartitionManager.getPreviousPartitions().get("persons:_1__primarykey");
                     for (int j = Math.min(4, list.size() - 1); j >= 0; j--) {
                       last.append("last(" + j + ")");
                       PartitionManager.PartitionEntry entry = list.get(j);
-                      for (int k = 0; k < entry.partitions.length; k++) {
-                        appendUpperKey(k, entry.partitions, last);
+                      for (int k = 0; k < entry.getPartitions().length; k++) {
+                        appendUpperKey(k, entry.getPartitions(), last);
                       }
                     }
                   }
@@ -239,12 +231,12 @@ public class TestPartitionManagerConsistencyIdentity {
                   }
 
                   boolean currPartitions = false;
-                  List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(false, true, fieldOffsets, dbServers[0].getCommon(), tableSchema,
-                      "_1__primarykey", null, BinaryExpression.Operator.equal, null, new Object[]{i},
+                  List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(false, true, tableSchema,
+                      "_1__primarykey", null, BinaryExpression.Operator.EQUAL, null, new Object[]{i},
                       null);
                   if (selectedShards.size() == 0) {
-                    selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, fieldOffsets, dbServers[0].getCommon(), tableSchema,
-                        indexSchema.getName(), null, BinaryExpression.Operator.equal, null, new Object[]{i}, null);
+                    selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, tableSchema,
+                        indexSchema.getName(), null, BinaryExpression.Operator.EQUAL, null, new Object[]{i}, null);
                     currPartitions = true;
                   }
 

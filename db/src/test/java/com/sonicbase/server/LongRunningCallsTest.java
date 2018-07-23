@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,7 +24,7 @@ public class LongRunningCallsTest {
     String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.json"), "utf-8");
     ObjectNode config = (ObjectNode) new ObjectMapper().readTree(configStr);
     DatabaseServer server = new DatabaseServer();
-    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", true);
+    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log");
     server.setRecovered(true);
 
     DatabaseClient client = mock(DatabaseClient.class);
@@ -33,8 +32,8 @@ public class LongRunningCallsTest {
 
     LongRunningCalls calls = server.getLongRunningCommands();
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.method, "echo");
-    cobj.put(ComObject.Tag.count, 1);
+    cobj.put(ComObject.Tag.METHOD, "echo");
+    cobj.put(ComObject.Tag.COUNT, 1);
     calls.addCommand(calls.createSingleCommand(cobj.serialize()));
 
     assertEquals(calls.getCommandCount(), 1);

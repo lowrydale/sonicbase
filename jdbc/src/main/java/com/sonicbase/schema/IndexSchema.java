@@ -19,8 +19,6 @@ public class IndexSchema {
   private TableSchema.Partition[] currPartitions;
   private int[] fieldOffsets;
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
-  @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public IndexSchema(String name, int indexId, boolean isUnique, String[] fields, Comparator[] comparators,
                      TableSchema.Partition[] partitions, boolean isPrimaryKey, boolean isPrimaryKeyGroup, TableSchema tableSchema) {
     this.name = name;

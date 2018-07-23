@@ -18,20 +18,20 @@ public class TestComObject {
 
     ComObject cobj = new ComObject();
 
-    cobj.put(ComObject.Tag.serializationVersion, (short)554);
-    cobj.put(ComObject.Tag.tableName, "myTable");
-    cobj.put(ComObject.Tag.isExcpliciteTrans, true);
-    cobj.put(ComObject.Tag.recordLength, 999);
-    cobj.put(ComObject.Tag.keyBytes, new byte[]{1, 2, 3});
+    cobj.put(ComObject.Tag.SERIALIZATION_VERSION, (short)554);
+    cobj.put(ComObject.Tag.TABLE_NAME, "myTable");
+    cobj.put(ComObject.Tag.IS_EXCPLICITE_TRANS, true);
+    cobj.put(ComObject.Tag.RECORD_LENGTH, 999);
+    cobj.put(ComObject.Tag.KEY_BYTES, new byte[]{1, 2, 3});
 
     byte[] bytes = cobj.serialize();
 
     cobj = new ComObject();
     cobj.deserialize(bytes);
-    assertEquals((short)cobj.getShort(ComObject.Tag.serializationVersion), 554);
-    assertEquals(cobj.getString(ComObject.Tag.tableName), "myTable");
-    assertEquals((boolean)cobj.getBoolean(ComObject.Tag.isExcpliciteTrans), true);
-    assertEquals((int)cobj.getInt(ComObject.Tag.recordLength), 999);
-    assertTrue(Arrays.equals(cobj.getByteArray(ComObject.Tag.keyBytes), new byte[]{1, 2, 3}));
+    assertEquals((short)cobj.getShort(ComObject.Tag.SERIALIZATION_VERSION), 554);
+    assertEquals(cobj.getString(ComObject.Tag.TABLE_NAME), "myTable");
+    assertEquals((boolean)cobj.getBoolean(ComObject.Tag.IS_EXCPLICITE_TRANS), true);
+    assertEquals((int)cobj.getInt(ComObject.Tag.RECORD_LENGTH), 999);
+    assertTrue(Arrays.equals(cobj.getByteArray(ComObject.Tag.KEY_BYTES), new byte[]{1, 2, 3}));
   }
 }

@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
 import com.sonicbase.common.DatabaseCommon;
@@ -59,7 +58,7 @@ public class IndexLookupOneKeyTest {
 
     indexLookup.setOriginalLeftKey(new Object[]{400L});
     indexLookup.setLeftKey(null);
-    indexLookup.setLeftOperator(BinaryExpression.Operator.less);
+    indexLookup.setLeftOperator(BinaryExpression.Operator.LESS);
     indexLookup.count = 100;
 
     indexLookup.lookup();

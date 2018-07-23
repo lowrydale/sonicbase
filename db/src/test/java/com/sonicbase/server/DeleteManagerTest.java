@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -68,7 +67,7 @@ public class DeleteManagerTest {
         "      ]\n" +
         "    }\n" +
         "  ]}\n");
-    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), 1, true, true);
+    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), true, true);
     //when(common.getServersConfig()).thenReturn(serversConfig);
     common.setServersConfig(serversConfig);
     when(server.getCommon()).thenReturn(common);
@@ -106,8 +105,8 @@ public class DeleteManagerTest {
          1000, 1000, requests);
 
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.dbName, "test");
-    cobj.put(ComObject.Tag.schemaVersion, 1000);
+    cobj.put(ComObject.Tag.DB_NAME, "test");
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
     deleteManager.forceDeletes(cobj, false);
 
     for (int j = 0; j < keys.size(); j++) {

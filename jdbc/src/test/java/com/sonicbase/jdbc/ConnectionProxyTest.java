@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.jdbc;
 
 import com.sonicbase.client.DatabaseClient;
@@ -87,11 +86,11 @@ public class ConnectionProxyTest {
     assertEquals(conn.getSchemaVersion(), 100);
 
 
-    assertEquals(connWithClient.send(null, 0, 0, null, ConnectionProxy.Replica.def), new byte[]{123});
-    assertEquals(conn.send(null, 0, 0, null, ConnectionProxy.Replica.def), new byte[]{124});
+    assertEquals(connWithClient.send(null, 0, 0, null, ConnectionProxy.Replica.DEF), new byte[]{123});
+    assertEquals(conn.send(null, 0, 0, null, ConnectionProxy.Replica.DEF), new byte[]{124});
 
-    assertEquals(connWithClient.send(null, 0, 0, null, ConnectionProxy.Replica.def, true), new byte[]{125});
-    assertEquals(conn.send(null, 0, 0, null, ConnectionProxy.Replica.def, true), new byte[]{126});
+    assertEquals(connWithClient.send(null, 0, 0, null, ConnectionProxy.Replica.DEF, true), new byte[]{125});
+    assertEquals(conn.send(null, 0, 0, null, ConnectionProxy.Replica.DEF, true), new byte[]{126});
 
     assertEquals(connWithClient.getTables("test").get("table1").getName(), "table1");
     assertEquals(conn.getTables("test").get("table1").getName(), "table1");

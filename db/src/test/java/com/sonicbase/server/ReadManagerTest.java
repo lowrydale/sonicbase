@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -83,7 +82,7 @@ public class ReadManagerTest {
     rightExpression.setValue(300L);
     rightExpression.setSqlType(DataType.Type.BIGINT.getValue());
     expression.setRightExpression(rightExpression);
-    expression.setOperator(BinaryExpression.Operator.equal);
+    expression.setOperator(BinaryExpression.Operator.EQUAL);
 
 
     OrderByExpressionImpl orderByExpression = new OrderByExpressionImpl();
@@ -91,37 +90,37 @@ public class ReadManagerTest {
     orderByExpression.setColumnName("field1");
 
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.tableId, tableSchema.getTableId());
-    cobj.put(ComObject.Tag.legacyExpression, ExpressionImpl.serializeExpression(expression));
-    ComArray array = cobj.putArray(ComObject.Tag.orderByExpressions, ComObject.Type.byteArrayType);
+    cobj.put(ComObject.Tag.TABLE_ID, tableSchema.getTableId());
+    cobj.put(ComObject.Tag.LEGACY_EXPRESSION, ExpressionImpl.serializeExpression(expression));
+    ComArray array = cobj.putArray(ComObject.Tag.ORDER_BY_EXPRESSIONS, ComObject.Type.BYTE_ARRAY_TYPE);
     array.add(orderByExpression.serialize());
 
-    cobj.put(ComObject.Tag.rightKey, DatabaseCommon.serializeTypedKey(new Object[]{500L}));
-    cobj.put(ComObject.Tag.rightOperator, BinaryExpression.Operator.less.getId());
+    cobj.put(ComObject.Tag.RIGHT_KEY, DatabaseCommon.serializeTypedKey(new Object[]{500L}));
+    cobj.put(ComObject.Tag.RIGHT_OPERATOR, BinaryExpression.Operator.LESS.getId());
 
 
-    cobj.put(ComObject.Tag.currOffset,0L);
-    cobj.put(ComObject.Tag.limitLong, 500L);
-    cobj.put(ComObject.Tag.offsetLong, 0L);
+    cobj.put(ComObject.Tag.CURR_OFFSET,0L);
+    cobj.put(ComObject.Tag.LIMIT_LONG, 500L);
+    cobj.put(ComObject.Tag.OFFSET_LONG, 0L);
 
     List<ColumnImpl> columns = new ArrayList<>();
     columns.add(new ColumnImpl(null, null, tableSchema.getName(), "field1", null));
 
-    ComArray columnArray = cobj.putArray(ComObject.Tag.columnOffsets, ComObject.Type.intType);
+    ComArray columnArray = cobj.putArray(ComObject.Tag.COLUMN_OFFSETS, ComObject.Type.INT_TYPE);
     ExpressionImpl.writeColumns(tableSchema, columns, columnArray);
 
 
-    cobj.put(ComObject.Tag.isProbe, false);
-    cobj.put(ComObject.Tag.viewVersion, (long)1);
-    cobj.put(ComObject.Tag.count, 100);
-    cobj.put(ComObject.Tag.dbName, "test");
-    cobj.put(ComObject.Tag.schemaVersion, common.getSchemaVersion());
+    cobj.put(ComObject.Tag.IS_PROBE, false);
+    cobj.put(ComObject.Tag.VIEW_VERSION, (long)1);
+    cobj.put(ComObject.Tag.COUNT, 100);
+    cobj.put(ComObject.Tag.DB_NAME, "test");
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
 
     ReadManager readManager = new ReadManager(server);
 
     ComObject retObj = readManager.indexLookupExpression(cobj, false);
 
-    ComArray retArray = retObj.getArray(ComObject.Tag.records);
+    ComArray retArray = retObj.getArray(ComObject.Tag.RECORDS);
     assertEquals(retArray.getArray().get(0), records[1]);
     assertEquals(retArray.getArray().size(), 1);
 
@@ -160,50 +159,50 @@ public class ReadManagerTest {
 
     ComObject cobj = new ComObject();
 
-    cobj.put(ComObject.Tag.dbName, "test");
-    cobj.put(ComObject.Tag.schemaVersion, 1000);
-    cobj.put(ComObject.Tag.count, 100);
+    cobj.put(ComObject.Tag.DB_NAME, "test");
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
+    cobj.put(ComObject.Tag.COUNT, 100);
 
-    cobj.put(ComObject.Tag.isExcpliciteTrans, false);
-    cobj.put(ComObject.Tag.isCommitting, false);
-    cobj.put(ComObject.Tag.viewVersion, (long)1);
+    cobj.put(ComObject.Tag.IS_EXCPLICITE_TRANS, false);
+    cobj.put(ComObject.Tag.IS_COMMITTING, false);
+    cobj.put(ComObject.Tag.VIEW_VERSION, (long)1);
 
-    cobj.put(ComObject.Tag.isProbe, false);
+    cobj.put(ComObject.Tag.IS_PROBE, false);
 
-    cobj.put(ComObject.Tag.currOffset, 0L);
-    cobj.put(ComObject.Tag.countReturned, 0L);
-    cobj.put(ComObject.Tag.limitLong, 500L);
-    cobj.put(ComObject.Tag.offsetLong, 0L);
+    cobj.put(ComObject.Tag.CURR_OFFSET, 0L);
+    cobj.put(ComObject.Tag.COUNT_RETURNED, 0L);
+    cobj.put(ComObject.Tag.LIMIT_LONG, 500L);
+    cobj.put(ComObject.Tag.OFFSET_LONG, 0L);
 
-    cobj.put(ComObject.Tag.tableId, tableSchema.getTableId());
-    cobj.put(ComObject.Tag.indexId, indexSchema.getIndexId());
-    cobj.put(ComObject.Tag.forceSelectOnServer, false);
+    cobj.put(ComObject.Tag.TABLE_ID, tableSchema.getTableId());
+    cobj.put(ComObject.Tag.INDEX_ID, indexSchema.getIndexId());
+    cobj.put(ComObject.Tag.FORCE_SELECT_ON_SERVER, false);
 
-    cobj.put(ComObject.Tag.evaluateExpression, false);
+    cobj.put(ComObject.Tag.EVALUATE_EXPRESSION, false);
 
     OrderByExpressionImpl orderByExpression = new OrderByExpressionImpl();
     orderByExpression.setAscending(true);
     orderByExpression.setColumnName("field1");
-    ComArray array = cobj.putArray(ComObject.Tag.orderByExpressions, ComObject.Type.byteArrayType);
+    ComArray array = cobj.putArray(ComObject.Tag.ORDER_BY_EXPRESSIONS, ComObject.Type.BYTE_ARRAY_TYPE);
     byte[] bytes = orderByExpression.serialize();
     array.add(bytes);
 
-    cobj.put(ComObject.Tag.originalLeftKey, DatabaseCommon.serializeTypedKey(new Object[]{500L}));
-    cobj.put(ComObject.Tag.leftOperator, BinaryExpression.Operator.greater.getId());
-    cobj.put(ComObject.Tag.originalRightKey, DatabaseCommon.serializeTypedKey(new Object[]{700L}));
-    cobj.put(ComObject.Tag.rightOperator, BinaryExpression.Operator.less.getId());
+    cobj.put(ComObject.Tag.ORIGINAL_LEFT_KEY, DatabaseCommon.serializeTypedKey(new Object[]{500L}));
+    cobj.put(ComObject.Tag.LEFT_OPERATOR, BinaryExpression.Operator.GREATER.getId());
+    cobj.put(ComObject.Tag.ORIGINAL_RIGHT_KEY, DatabaseCommon.serializeTypedKey(new Object[]{700L}));
+    cobj.put(ComObject.Tag.RIGHT_OPERATOR, BinaryExpression.Operator.LESS.getId());
 
 
     List<ColumnImpl> columns = new ArrayList<>();
     columns.add(new ColumnImpl(null, null, tableSchema.getName(), "field1", null));
-    ComArray columnArray = cobj.putArray(ComObject.Tag.columnOffsets, ComObject.Type.intType);
+    ComArray columnArray = cobj.putArray(ComObject.Tag.COLUMN_OFFSETS, ComObject.Type.INT_TYPE);
     ExpressionImpl.writeColumns(tableSchema, columns, columnArray);
 
     ReadManager readManager = new ReadManager(server);
 
     ComObject retObj = readManager.indexLookup(cobj, false);
 
-    ComArray retArray = retObj.getArray(ComObject.Tag.records);
+    ComArray retArray = retObj.getArray(ComObject.Tag.RECORDS);
     assertEquals(retArray.getArray().get(0), records[4]);
     assertEquals(retArray.getArray().size(), 1);
   }
@@ -248,28 +247,28 @@ public class ReadManagerTest {
     rightExpression.setValue(300L);
     rightExpression.setSqlType(DataType.Type.BIGINT.getValue());
     expression.setRightExpression(rightExpression);
-    expression.setOperator(BinaryExpression.Operator.equal);
+    expression.setOperator(BinaryExpression.Operator.EQUAL);
 
 
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.serializationVersion, DatabaseClient.SERIALIZATION_VERSION);
+    cobj.put(ComObject.Tag.SERIALIZATION_VERSION, DatabaseClient.SERIALIZATION_VERSION);
 
-    cobj.put(ComObject.Tag.legacyExpression, ExpressionImpl.serializeExpression(expression));
+    cobj.put(ComObject.Tag.LEGACY_EXPRESSION, ExpressionImpl.serializeExpression(expression));
 
 
-    cobj.put(ComObject.Tag.countTableName, tableSchema.getName());
+    cobj.put(ComObject.Tag.COUNT_TABLE_NAME, tableSchema.getName());
 
-    cobj.put(ComObject.Tag.countColumn, "field1");
+    cobj.put(ComObject.Tag.COUNT_COLUMN, "field1");
 
-    cobj.put(ComObject.Tag.dbName, "test");
-    cobj.put(ComObject.Tag.schemaVersion, 1000);
-    cobj.put(ComObject.Tag.tableName, tableSchema.getName());
+    cobj.put(ComObject.Tag.DB_NAME, "test");
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
+    cobj.put(ComObject.Tag.TABLE_NAME, tableSchema.getName());
 
     ReadManager readManager = new ReadManager(server);
 
     ComObject retObj = readManager.countRecords(cobj, false);
 
-    assertEquals((long)retObj.getLong(ComObject.Tag.countLong), 1L);
+    assertEquals((long)retObj.getLong(ComObject.Tag.COUNT_LONG), 1L);
   }
 
   @Test
@@ -303,39 +302,39 @@ public class ReadManagerTest {
       i++;
     }
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.tableName, tableSchema.getName());
-    cobj.put(ComObject.Tag.indexName, indexSchema.getName());
-    cobj.put(ComObject.Tag.leftOperator, BinaryExpression.Operator.equal.getId());
+    cobj.put(ComObject.Tag.TABLE_NAME, tableSchema.getName());
+    cobj.put(ComObject.Tag.INDEX_NAME, indexSchema.getName());
+    cobj.put(ComObject.Tag.LEFT_OPERATOR, BinaryExpression.Operator.EQUAL.getId());
 
     List<ColumnImpl> columns = new ArrayList<>();
     columns.add(new ColumnImpl(null, null, tableSchema.getName(), "field1", null));
-    ComArray columnArray = cobj.putArray(ComObject.Tag.columnOffsets, ComObject.Type.intType);
+    ComArray columnArray = cobj.putArray(ComObject.Tag.COLUMN_OFFSETS, ComObject.Type.INT_TYPE);
     ExpressionImpl.writeColumns(tableSchema, columns, columnArray);
 
-    cobj.put(ComObject.Tag.singleValue, false);
+    cobj.put(ComObject.Tag.SINGLE_VALUE, false);
 
 
-    ComArray keyArray = cobj.putArray(ComObject.Tag.keys, ComObject.Type.objectType);
+    ComArray keyArray = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.OBJECT_TYPE);
     int k = 0; ///(offset * srcValues.size() / threadCount);
     for (; k < keys.size(); k++) {
       ComObject key = new ComObject();
       keyArray.add(key);
-      key.put(ComObject.Tag.offset, k);
-      key.put(ComObject.Tag.keyBytes, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(k)));
+      key.put(ComObject.Tag.OFFSET, k);
+      key.put(ComObject.Tag.KEY_BYTES, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(k)));
     }
 
-    cobj.put(ComObject.Tag.dbName, "test");
-    cobj.put(ComObject.Tag.schemaVersion, 1000);
-    cobj.put(ComObject.Tag.count, 100);
+    cobj.put(ComObject.Tag.DB_NAME, "test");
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
+    cobj.put(ComObject.Tag.COUNT, 100);
 
 
     ReadManager readManager = new ReadManager(server);
 
     ComObject retObj = readManager.batchIndexLookup(cobj, false);
-    ComArray retArray = retObj.getArray(ComObject.Tag.retKeys);
+    ComArray retArray = retObj.getArray(ComObject.Tag.RET_KEYS);
     for (int j = 0; j < keys.size(); j++) {
       ComObject obj = (ComObject) retArray.getArray().get(j);
-      ComArray recordArray = obj.getArray(ComObject.Tag.records);
+      ComArray recordArray = obj.getArray(ComObject.Tag.RECORDS);
       assertEquals((byte[])recordArray.getArray().get(0), records[j]);
     }
     assertEquals(retArray.getArray().size(), keys.size());
@@ -366,7 +365,7 @@ public class ReadManagerTest {
         "      ]\n" +
         "    }\n" +
         "  ]}\n");
-    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), 1, true, true);
+    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), true, true);
     common.setServersConfig(serversConfig);
     when(server.getCommon()).thenReturn(common);
 
@@ -394,7 +393,7 @@ public class ReadManagerTest {
     rightExpression.setValue(300L);
     rightExpression.setSqlType(DataType.Type.BIGINT.getValue());
     expression.setRightExpression(rightExpression);
-    expression.setOperator(BinaryExpression.Operator.equal);
+    expression.setOperator(BinaryExpression.Operator.EQUAL);
 
     DatabaseClient client = mock(DatabaseClient.class);
     when(client.getCommon()).thenReturn(common);
@@ -402,14 +401,14 @@ public class ReadManagerTest {
 
     ComObject retObj = new ComObject();
 
-    ComArray array = retObj.putArray(ComObject.Tag.records, ComObject.Type.byteArrayType);
+    ComArray array = retObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
     for (int j = 0; j < records.length; j++) {
       array.add(records[j]);
     }
-    retObj.put(ComObject.Tag.currOffset, (long)records.length);
-    retObj.put(ComObject.Tag.countReturned, (long)records.length);
+    retObj.put(ComObject.Tag.CURR_OFFSET, (long)records.length);
+    retObj.put(ComObject.Tag.COUNT_RETURNED, (long)records.length);
 
-    when(client.send(   anyString(), anyInt(), anyInt(), (ComObject) anyObject(), eq(DatabaseClient.Replica.def))).thenReturn(
+    when(client.send(   anyString(), anyInt(), anyInt(), (ComObject) anyObject(), eq(DatabaseClient.Replica.DEF))).thenReturn(
         retObj.serialize()
     );
     SelectStatementImpl select = new SelectStatementImpl(client);
@@ -426,17 +425,17 @@ public class ReadManagerTest {
 
     select.setOrderByExpressions(orderByExpressions);
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.legacySelectStatement, select.serialize());
-    cobj.put(ComObject.Tag.schemaVersion, 1000);
-    cobj.put(ComObject.Tag.count, 100);
-    cobj.put(ComObject.Tag.dbName, "test");
-    cobj.put(ComObject.Tag.currOffset, 0L);
-    cobj.put(ComObject.Tag.countReturned, 0L);
+    cobj.put(ComObject.Tag.LEGACY_SELECT_STATEMENT, select.serialize());
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
+    cobj.put(ComObject.Tag.COUNT, 100);
+    cobj.put(ComObject.Tag.DB_NAME, "test");
+    cobj.put(ComObject.Tag.CURR_OFFSET, 0L);
+    cobj.put(ComObject.Tag.COUNT_RETURNED, 0L);
 
     ReadManager readManager = new ReadManager(server);
 
     retObj = readManager.serverSelect(cobj,  false);
-    ComArray retArray = retObj.getArray(ComObject.Tag.tableRecords);
+    ComArray retArray = retObj.getArray(ComObject.Tag.TABLE_RECORDS);
     for (int j = 0; j < records.length; j++) {
       ComArray recordArray = (ComArray) retArray.getArray().get(j);
       assertEquals(recordArray.getArray().get(0), records[j]);
@@ -470,7 +469,7 @@ public class ReadManagerTest {
         "      ]\n" +
         "    }\n" +
         "  ]}\n");
-    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), 1, true, true);
+    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), true, true);
     common.setServersConfig(serversConfig);
     when(server.getCommon()).thenReturn(common);
 
@@ -494,14 +493,14 @@ public class ReadManagerTest {
     when(server.getClient()).thenReturn(client);
 
     ComObject retObj = new ComObject();
-    ComArray array = retObj.putArray(ComObject.Tag.records, ComObject.Type.byteArrayType);
+    ComArray array = retObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
     for (int j = 0; j < records.length; j++) {
       array.add(records[j]);
     }
-    retObj.put(ComObject.Tag.currOffset, (long)records.length);
-    retObj.put(ComObject.Tag.countReturned, (long)records.length);
+    retObj.put(ComObject.Tag.CURR_OFFSET, (long)records.length);
+    retObj.put(ComObject.Tag.COUNT_RETURNED, (long)records.length);
 
-    when(client.send(   anyString(), anyInt(), anyInt(), (ComObject) anyObject(), eq(DatabaseClient.Replica.def))).thenReturn(
+    when(client.send(   anyString(), anyInt(), anyInt(), (ComObject) anyObject(), eq(DatabaseClient.Replica.DEF))).thenReturn(
         retObj.serialize()
     );
 
@@ -538,42 +537,42 @@ public class ReadManagerTest {
       }
     }
     SelectStatementHandler.SetOperation setOperation = new SelectStatementHandler.SetOperation();
-    setOperation.selectStatements = statements;
-    setOperation.operations = operations;
-    setOperation.orderBy = orderBy;
+    setOperation.setSelectStatements(statements);
+    setOperation.setOperations(operations);
+    setOperation.setOrderBy(orderBy);
 
     ComObject cobj = new ComObject();
-    array = cobj.putArray(ComObject.Tag.selectStatements, ComObject.Type.byteArrayType);
-    for (int i = 0; i < setOperation.selectStatements.length; i++) {
-      setOperation.selectStatements[i].setTableNames(new String[]{setOperation.selectStatements[i].getFromTable()});
-      array.add(setOperation.selectStatements[i].serialize());
+    array = cobj.putArray(ComObject.Tag.SELECT_STATEMENTS, ComObject.Type.BYTE_ARRAY_TYPE);
+    for (int i = 0; i < setOperation.getSelectStatements().length; i++) {
+      setOperation.getSelectStatements()[i].setTableNames(new String[]{setOperation.getSelectStatements()[i].getFromTable()});
+      array.add(setOperation.getSelectStatements()[i].serialize());
     }
-    if (setOperation.orderBy != null) {
-      ComArray orderByArray = cobj.putArray(ComObject.Tag.orderByExpressions, ComObject.Type.byteArrayType);
-      for (int i = 0; i < setOperation.orderBy.length; i++) {
-        orderByArray.add(setOperation.orderBy[i].serialize());
+    if (setOperation.getOrderBy() != null) {
+      ComArray orderByArray = cobj.putArray(ComObject.Tag.ORDER_BY_EXPRESSIONS, ComObject.Type.BYTE_ARRAY_TYPE);
+      for (int i = 0; i < setOperation.getOrderBy().length; i++) {
+        orderByArray.add(setOperation.getOrderBy()[i].serialize());
       }
     }
-    ComArray tablesArray = cobj.putArray(ComObject.Tag.tables, ComObject.Type.stringType);
+    ComArray tablesArray = cobj.putArray(ComObject.Tag.TABLES, ComObject.Type.STRING_TYPE);
     for (int i = 0; i < tableNames.length; i++) {
       tablesArray.add(tableNames[i]);
     }
-    ComArray strArray = cobj.putArray(ComObject.Tag.operations, ComObject.Type.stringType);
-    for (int i = 0; i < setOperation.operations.length; i++) {
-      strArray.add(setOperation.operations[i]);
+    ComArray strArray = cobj.putArray(ComObject.Tag.OPERATIONS, ComObject.Type.STRING_TYPE);
+    for (int i = 0; i < setOperation.getOperations().length; i++) {
+      strArray.add(setOperation.getOperations()[i]);
     }
-    cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-    cobj.put(ComObject.Tag.count, DatabaseClient.SELECT_PAGE_SIZE);
-    cobj.put(ComObject.Tag.method, "ReadManager:serverSetSelect");
-    cobj.put(ComObject.Tag.dbName, "test");
-    cobj.put(ComObject.Tag.serverSelectPageNumber, setOperation.serverSelectPageNumber);
-    cobj.put(ComObject.Tag.resultSetId, setOperation.resultSetId);
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
+    cobj.put(ComObject.Tag.COUNT, DatabaseClient.SELECT_PAGE_SIZE);
+    cobj.put(ComObject.Tag.METHOD, "ReadManager:serverSetSelect");
+    cobj.put(ComObject.Tag.DB_NAME, "test");
+    cobj.put(ComObject.Tag.SERVER_SELECT_PAGE_NUMBER, setOperation.getServerSelectPageNumber());
+    cobj.put(ComObject.Tag.RESULT_SET_ID, setOperation.getResultSetId());
 
     ReadManager readManager = new ReadManager(server);
 
     retObj = readManager.serverSetSelect(cobj, false);
 
-    ComArray retArray = retObj.getArray(ComObject.Tag.tableRecords);
+    ComArray retArray = retObj.getArray(ComObject.Tag.TABLE_RECORDS);
     for (int j = 0; j < 1000; j++) {
       ComArray recordArray = (ComArray) retArray.getArray().get(j);
       assertEquals(recordArray.getArray().get(0), records[j]);

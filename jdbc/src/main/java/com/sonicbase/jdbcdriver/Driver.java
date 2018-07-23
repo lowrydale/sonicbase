@@ -3,26 +3,19 @@ package com.sonicbase.jdbcdriver;
 
 import com.sonicbase.query.DatabaseException;
 
-import java.io.IOException;
 import java.sql.*;
 import java.util.Properties;
 import java.util.logging.Logger;
 
-/**
- * Created by IntelliJ IDEA.
- * User: lowryda
- * Date: Oct 7, 2011
- * Time: 3:11:09 PM
- */
 public class Driver implements java.sql.Driver {
 
 
-  public static final String URL_PREFIX =  "jdbc:sonicbase";
+  private static final String URL_PREFIX =  "jdbc:sonicbase";
 
   private static Driver driver;
 
-  public static final int MAJOR_VERSION = 0;
-  public static final int MINOR_VERSION = 502;
+  private static final int MAJOR_VERSION = 0;
+  private static final int MINOR_VERSION = 502;
 
   static {
     try {
@@ -32,10 +25,6 @@ public class Driver implements java.sql.Driver {
     catch (Exception e) {
       throw new DatabaseException(e);
     }
-  }
-
-  public Driver() throws IOException {
-
   }
 
   public Connection connect(String url, Properties info) throws SQLException {

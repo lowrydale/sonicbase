@@ -82,7 +82,7 @@
     <dependencies>
         <dependency>
             <groupId>com.sonicbase</groupId>
-            <artifactId>sonicbase-core-unobfuscated</artifactId>
+            <artifactId>sonicbase-server</artifactId>
             <version>1.2.12</version>
         </dependency>
 

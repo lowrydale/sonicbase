@@ -21,7 +21,6 @@ import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.concurrent.Future;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -29,12 +28,14 @@ import java.util.concurrent.atomic.AtomicReference;
 /**
  * Responsible for
  */
+@SuppressWarnings("squid:S1168") // I prefer to return null instead of an empty array
 public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpression {
 
+  private static final String TABLE_SCAN_STR = "Table scan: ";
+  private static final String INVALID_OPERATOR_STR = "Invalid operator";
   private Object originalLeftValue;
   private Object originalRightValue;
   private String indexName;
-  private String columnName;
 
   private ExpressionImpl leftExpression;
   private ExpressionImpl rightExpression;
@@ -46,7 +47,6 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
   private boolean oneKeyLookup;
   private boolean isTableScan;
   private boolean isRightKey;
-  private boolean isLeftKey;
 
   public BinaryExpressionImpl(
       String columnName, BinaryExpression.Operator operator, DataType.Type type, Object value) {
@@ -64,30 +64,25 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
   public BinaryExpressionImpl() {
   }
 
+  @Override
   public void setRestrictToThisServer(boolean restrictToThisServer) {
     super.setRestrictToThisServer(restrictToThisServer);
     leftExpression.setRestrictToThisServer(restrictToThisServer);
     rightExpression.setRestrictToThisServer(restrictToThisServer);
   }
 
+  @Override
   public void setProcedureContext(StoredProcedureContextImpl procedureContext) {
     super.setProcedureContext(procedureContext);
     leftExpression.setProcedureContext(procedureContext);
     rightExpression.setProcedureContext(procedureContext);
   }
 
-  public boolean isTwoKeyLookup() {
-    return twoKeyLookup;
-  }
-
-  public boolean isOneKeyLookup() {
-    return oneKeyLookup;
-  }
-
   public String toString() {
     return leftExpression.toString() + " " + operator.getSymbol() + " " + rightExpression.toString();
   }
 
+  @Override
   public void setRecordCache(RecordCache recordCache) {
     super.setRecordCache(recordCache);
     leftExpression.setRecordCache(recordCache);
@@ -99,12 +94,14 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     this.operator = operator;
   }
 
+  @Override
   public void setReplica(Integer replica) {
     super.setReplica(replica);
     leftExpression.setReplica(replica);
     rightExpression.setReplica(replica);
   }
 
+  @Override
   public void reset() {
     setNextShard(-1);
     setNextKey(null);
@@ -113,42 +110,42 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     rightExpression.reset();
   }
 
+  @Override
   public void setDebug(boolean debug) {
     super.setDebug(debug);
     leftExpression.setDebug(debug);
     rightExpression.setDebug(debug);
   }
 
+  @Override
   public void setViewVersion(int viewVersion) {
     super.setViewVersion(viewVersion);
     leftExpression.setViewVersion(viewVersion);
     rightExpression.setViewVersion(viewVersion);
   }
 
+  @Override
   public void setCounters(Counter[] counters) {
     super.setCounters(counters);
     leftExpression.setCounters(counters);
     rightExpression.setCounters(counters);
   }
 
-  public void setLimit(Limit limit) {
-    super.setLimit(limit);
-    leftExpression.setLimit(limit);
-    rightExpression.setLimit(limit);
-  }
-
+  @Override
   public void setGroupByContext(GroupByContext groupByContext) {
     super.setGroupByContext(groupByContext);
     leftExpression.setGroupByContext(groupByContext);
     rightExpression.setGroupByContext(groupByContext);
   }
 
+  @Override
   public void setDbName(String dbName) {
     super.setDbName(dbName);
     leftExpression.setDbName(dbName);
     rightExpression.setDbName(dbName);
   }
 
+  @Override
   public void forceSelectOnServer(boolean forceSelectOnServer) {
     super.forceSelectOnServer(forceSelectOnServer);
     leftExpression.forceSelectOnServer(forceSelectOnServer);
@@ -166,20 +163,19 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
 
     AtomicReference<String> usedIndex = new AtomicReference<>();
 
-    if (BinaryExpression.Operator.or == operator) {
+    if (BinaryExpression.Operator.OR == operator) {
       return evaluateOrExpression(count, explain, currOffset, countReturned, limit, offset, analyze, schemaRetryCount);
     }
-    else if (BinaryExpression.Operator.and == operator) {
-      NextReturn ret = evaluateAndExpression(count, usedIndex, explain, currOffset, countReturned, limit, offset, analyze, evaluateExpression, schemaRetryCount);
-      return ret;
+    else if (BinaryExpression.Operator.AND == operator) {
+      return evaluateAndExpression(count, usedIndex, explain, currOffset, countReturned, limit, offset, analyze, evaluateExpression, schemaRetryCount);
     }
-    else if (BinaryExpression.Operator.less == operator ||
-        BinaryExpression.Operator.lessEqual == operator ||
-        BinaryExpression.Operator.equal == operator ||
-        BinaryExpression.Operator.notEqual == operator ||
-        BinaryExpression.Operator.greater == operator ||
-        BinaryExpression.Operator.greaterEqual == operator ||
-        BinaryExpression.Operator.like == operator) {
+    else if (BinaryExpression.Operator.LESS == operator ||
+        BinaryExpression.Operator.LESS_EQUAL == operator ||
+        BinaryExpression.Operator.EQUAL == operator ||
+        BinaryExpression.Operator.NOT_EQUAL == operator ||
+        BinaryExpression.Operator.GREATER == operator ||
+        BinaryExpression.Operator.GREATER_EQUAL == operator ||
+        BinaryExpression.Operator.LIKE == operator) {
 
       boolean canUseIndex = canUseIndex();
       Counter[] counters = getCounters();
@@ -187,22 +183,20 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
         outer:
         for (Counter counter : counters) {
           TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(counter.getTableName());
-          for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndexes().entrySet()) {
-            if (entry.getValue().isPrimaryKey()) {
-              if (!entry.getValue().getFields()[0].equals(counter.getColumnName())) {
-                canUseIndex = false;
-                break outer;
-              }
+          for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
+            if (entry.getValue().isPrimaryKey() && !entry.getValue().getFields()[0].equals(counter.getColumnName())) {
+              canUseIndex = false;
+              break outer;
             }
           }
         }
       }
 
-      if (!canUseIndex || operator == Operator.like ||
+      if (!canUseIndex || operator == Operator.LIKE ||
           (leftExpression instanceof ColumnImpl && rightExpression instanceof ColumnImpl)) {
         if (explain != null) {
           explain.appendSpaces();
-          explain.getBuilder().append("Table scan: " + getTopLevelExpression().toString() + "\n");
+          explain.getBuilder().append(TABLE_SCAN_STR + getTopLevelExpression().toString() + "\n");
         }
 
         if (analyze) {
@@ -224,9 +218,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
             return new NextReturn(context.getTableNames(), context.getCurrKeys());
           }
         }
-//         return tableScan(count, getClient(), (ExpressionImpl) getTopLevelExpression(), getParms(), getTableName());
       }
-
       return evaluateRelationalOp(count, usedIndex, explain, currOffset, countReturned, limit, offset,
           evaluateExpression, analyze, schemaRetryCount);
     }
@@ -236,17 +228,17 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
   private boolean expressionContainsMath(ExpressionImpl expression) {
     if (expression instanceof BinaryExpression) {
       BinaryExpressionImpl binaryExpression = (BinaryExpressionImpl) expression;
-      if (binaryExpression.operator == Operator.and || binaryExpression.operator == Operator.or) {
+      if (binaryExpression.operator == Operator.AND || binaryExpression.operator == Operator.OR) {
         return expressionContainsMath(leftExpression) || expressionContainsMath(rightExpression);
       }
-      else if (binaryExpression.operator == Operator.plus ||
-            binaryExpression.operator == Operator.minus ||
-            binaryExpression.operator == Operator.times ||
-            binaryExpression.operator == Operator.divide ||
-            binaryExpression.operator == Operator.bitwiseAnd ||
-            binaryExpression.operator == Operator.bitwiseOr ||
-            binaryExpression.operator == Operator.bitwiseXOr ||
-            binaryExpression.operator == Operator.modulo) {
+      else if (binaryExpression.operator == Operator.PLUS ||
+            binaryExpression.operator == Operator.MINUS ||
+            binaryExpression.operator == Operator.TIMES ||
+            binaryExpression.operator == Operator.DIVIDE ||
+            binaryExpression.operator == Operator.BITWISE_AND ||
+            binaryExpression.operator == Operator.BITWISE_OR ||
+            binaryExpression.operator == Operator.BITWISE_X_OR ||
+            binaryExpression.operator == Operator.MODULO) {
         return true;
       }
     }
@@ -254,12 +246,14 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     return false;
   }
 
+  @Override
   public void getColumnsInExpression(List<ColumnImpl> columns) {
     super.getColumnsInExpression(columns);
     leftExpression.getColumnsInExpression(columns);
     rightExpression.getColumnsInExpression(columns);
   }
 
+  @Override
   public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
     return next(DatabaseClient.SELECT_PAGE_SIZE, explain, currOffset, countReturned, limit, offset, false, false, schemaRetryCount);
   }
@@ -268,19 +262,19 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
                                           AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset,
                                           boolean evaluateExpression, boolean analyze, int schemaRetryCount) {
     try {
-      ExpressionImpl rightExpression = getRightExpression();
-      ExpressionImpl leftExpression = getLeftExpression();
-      if (leftExpression instanceof ColumnImpl) {
-        columnName = ((ColumnImpl) leftExpression).getColumnName();
+      ExpressionImpl localRightExpression = getRightExpression();
+      ExpressionImpl localLeftExpression = getLeftExpression();
+      if (localLeftExpression instanceof ColumnImpl) {
+        String columnName = ((ColumnImpl) localLeftExpression).getColumnName();
         Object[] leftValue = null;
         if (getNextKey() != null) {
           leftValue = getNextKey();
         }
         else {
-          Object currLeftValue = getValueFromExpression(getParms(), rightExpression);
+          Object currLeftValue = getValueFromExpression(getParms(), localRightExpression);
           if (currLeftValue == null) {
-            currLeftValue = getValueFromExpression(getParms(), leftExpression);
-            columnName = ((ColumnImpl) leftExpression).getColumnName();
+            currLeftValue = getValueFromExpression(getParms(), localLeftExpression);
+            columnName = ((ColumnImpl) localLeftExpression).getColumnName();
           }
           if (currLeftValue != null) {
             originalLeftValue = currLeftValue;
@@ -290,12 +284,10 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
         String[] preferredIndexColumns = null;
         for (Map.Entry<String, IndexSchema> entry : getClient().getCommon().getTables(dbName).get(getTableName()).getIndices().entrySet()) {
           String[] fields = entry.getValue().getFields();
-          if (fields[0].equals(columnName)) {
-            if (preferredIndexColumns == null || preferredIndexColumns.length > fields.length) {
-              preferredIndexColumns = fields;
-              indexName = entry.getKey();
-              indexSchema = entry.getValue();
-            }
+          if (fields[0].equals(columnName) && (preferredIndexColumns == null || preferredIndexColumns.length > fields.length)) {
+            preferredIndexColumns = fields;
+            indexName = entry.getKey();
+            indexSchema = entry.getValue();
           }
         }
         Object[] leftKey = null;
@@ -303,7 +295,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
           List<Object[]> leftValues = new ArrayList<>();
           leftValues.add(leftValue);
 
-          leftKey = leftValue;//ExpressionImpl.buildKey(leftValues, preferredIndexColumns);
+          leftKey = leftValue;
         }
 
         if (explain != null) {
@@ -315,7 +307,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
         GroupByContext groupByContext = getGroupByContext();
 
         if (groupByContext != null && !indexSchema.isPrimaryKey() ||
-            expressionContainsMath(leftExpression) || expressionContainsMath(rightExpression)) {
+            expressionContainsMath(localLeftExpression) || expressionContainsMath(localRightExpression)) {
           if (analyze) {
             isTableScan = true;
             return null;
@@ -422,7 +414,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     extractAndExpressions(mostUsedColumn, andExpressions, otherExpressions, leftExpression);
     extractAndExpressions(mostUsedColumn, andExpressions, otherExpressions, rightExpression);
 
-    if (otherExpressions.size() == 0 || andExpressions.size() == 0) {
+    if (otherExpressions.isEmpty() || andExpressions.isEmpty()) {
       return;
     }
     leftExpression = buildQueryTree(andExpressions);
@@ -439,7 +431,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
 
     BinaryExpressionImpl ret = new BinaryExpressionImpl();
 
-    ret.operator = Operator.and;
+    ret.operator = Operator.AND;
     ret.rewroteQuery = true;
     ret.rightExpression = expressions.remove(0);
     if (ret.rightExpression instanceof BinaryExpressionImpl) {
@@ -470,31 +462,30 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
   private void getMostUsedIndex(Map<String, Integer> mostUsed, ExpressionImpl expression) {
     if (expression instanceof BinaryExpressionImpl) {
       BinaryExpressionImpl binary = ((BinaryExpressionImpl) expression);
-      if (binary.getOperator() == Operator.and) {
-        //andExpressions.add(this);
+      if (binary.getOperator() == Operator.AND) {
         getMostUsedIndex(mostUsed, binary.getLeftExpression());
         getMostUsedIndex(mostUsed, binary.getRightExpression());
       }
       else {
         AtomicBoolean leftIsColumn = new AtomicBoolean();
-        String columnName = isIndexed(binary.leftExpression, leftIsColumn);
-        if (columnName != null) {
-          Integer value = mostUsed.get(columnName);
+        String localColumnName = isIndexed(binary.leftExpression, leftIsColumn);
+        if (localColumnName != null) {
+          Integer value = mostUsed.get(localColumnName);
           if (value == null) {
-            mostUsed.put(columnName, 1);
+            mostUsed.put(localColumnName, 1);
           }
           else {
-            mostUsed.put(columnName, value + 1);
+            mostUsed.put(localColumnName, value + 1);
           }
         }
-        columnName = isIndexed(binary.rightExpression, leftIsColumn);
-        if (columnName != null) {
-          Integer value = mostUsed.get(columnName);
+        localColumnName = isIndexed(binary.rightExpression, leftIsColumn);
+        if (localColumnName != null) {
+          Integer value = mostUsed.get(localColumnName);
           if (value == null) {
-            mostUsed.put(columnName, 1);
+            mostUsed.put(localColumnName, 1);
           }
           else {
-            mostUsed.put(columnName, value + 1);
+            mostUsed.put(localColumnName, value + 1);
           }
         }
 
@@ -506,8 +497,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
                                      List<ExpressionImpl> andExpressions, List<ExpressionImpl> otherExpressions, ExpressionImpl expression) {
     if (expression instanceof BinaryExpressionImpl) {
       BinaryExpressionImpl binary = ((BinaryExpressionImpl) expression);
-      if (binary.getOperator() == Operator.and) {
-        //andExpressions.add(this);
+      if (binary.getOperator() == Operator.AND) {
         extractAndExpressions(mostUsedColumn, andExpressions, otherExpressions, binary.getLeftExpression());
         extractAndExpressions(mostUsedColumn, andExpressions, otherExpressions, binary.getRightExpression());
       }
@@ -558,15 +548,16 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     return null;
   }
 
+  @Override
   public void queryRewrite() {
-    if (BinaryExpression.Operator.and == operator) {
+    if (BinaryExpression.Operator.AND == operator) {
       doQueryRewrite();
     }
   }
 
   @Override
   public ColumnImpl getPrimaryColumn() {
-    if (BinaryExpression.Operator.and == operator) {
+    if (BinaryExpression.Operator.AND == operator) {
       return leftExpression.getPrimaryColumn();
     }
     else if (getOperator().isRelationalOp()) {
@@ -590,17 +581,17 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     Object leftValue = null;
     Object rightValue = null;
 
-    ExpressionImpl leftExpression = getLeftExpression();
-    ExpressionImpl rightExpression = getRightExpression();
+    ExpressionImpl localLeftExpression = getLeftExpression();
+    ExpressionImpl localRightExpression = getRightExpression();
 
-    boolean isRightColumnCompare = isColumnCompare(leftExpression);
-    ExpressionImpl tmp = leftExpression;
-    leftExpression = rightExpression;
-    rightExpression = tmp;
-    boolean isLeftColumnCompare = isColumnCompare(leftExpression);
+    boolean isRightColumnCompare = isColumnCompare(localLeftExpression);
+    ExpressionImpl tmp = localLeftExpression;
+    localLeftExpression = localRightExpression;
+    localRightExpression = tmp;
+    boolean isLeftColumnCompare = isColumnCompare(localLeftExpression);
 
-    if (leftExpression instanceof BinaryExpressionImpl) {
-      BinaryExpressionImpl leftOpExpr = (BinaryExpressionImpl) leftExpression;
+    if (localLeftExpression instanceof BinaryExpressionImpl) {
+      BinaryExpressionImpl leftOpExpr = (BinaryExpressionImpl) localLeftExpression;
       leftOp = leftOpExpr.getOperator();
       if (leftOp.isRelationalOp()) {
         if (leftOpExpr.getLeftExpression() instanceof ColumnImpl) {
@@ -609,8 +600,8 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
         originalLeftValue = getValueFromExpression(getParms(), leftOpExpr.getRightExpression());
       }
     }
-    if (rightExpression instanceof BinaryExpressionImpl) {
-      BinaryExpressionImpl rightOpExpr = (BinaryExpressionImpl) rightExpression;
+    if (localRightExpression instanceof BinaryExpressionImpl) {
+      BinaryExpressionImpl rightOpExpr = (BinaryExpressionImpl) localRightExpression;
       rightOp = rightOpExpr.getOperator();
       if (rightOp.isRelationalOp()) {
         if (rightOpExpr.getLeftExpression() instanceof ColumnImpl) {
@@ -647,38 +638,35 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     String[] preferredIndexColumns = null;
     for (Map.Entry<String, IndexSchema> indexSchema : getClient().getCommon().getTables(dbName).get(getTableName()).getIndices().entrySet()) {
       String[] fields = indexSchema.getValue().getFields();
-      //if (fields[0].equals(leftColumn == null ? rightColumn : leftColumn)) {
-      if ((leftColumn != null && fields[0].equals(leftColumn)) || (rightColumn != null && fields[0].equals(rightColumn))) {
-        if (preferredIndexColumns == null || preferredIndexColumns.length > fields.length) {
-          preferredIndexColumns = fields;
-          indexName = indexSchema.getKey();
-        }
+      if (((leftColumn != null && fields[0].equals(leftColumn)) || (rightColumn != null && fields[0].equals(rightColumn))) && (preferredIndexColumns == null || preferredIndexColumns.length > fields.length)) {
+        preferredIndexColumns = fields;
+        indexName = indexSchema.getKey();
       }
     }
 
     Operator leftEffectiveOp = leftOp;
-    if (leftOp == Operator.lessEqual) {
-      leftEffectiveOp = Operator.less;
+    if (leftOp == Operator.LESS_EQUAL) {
+      leftEffectiveOp = Operator.LESS;
     }
-    else if (leftOp == Operator.greaterEqual) {
-      leftEffectiveOp = Operator.greater;
+    else if (leftOp == Operator.GREATER_EQUAL) {
+      leftEffectiveOp = Operator.GREATER;
     }
     Operator rightEffectiveOp = rightOp;
-    if (rightOp == Operator.lessEqual) {
-      rightEffectiveOp = Operator.less;
+    if (rightOp == Operator.LESS_EQUAL) {
+      rightEffectiveOp = Operator.LESS;
     }
-    else if (rightOp == Operator.greaterEqual) {
-      rightEffectiveOp = Operator.greater;
+    else if (rightOp == Operator.GREATER_EQUAL) {
+      rightEffectiveOp = Operator.GREATER;
     }
-    if (leftOp == Operator.equal) {
+    if (leftOp == Operator.EQUAL) {
       leftEffectiveOp = rightEffectiveOp;
     }
-    if (rightOp == Operator.equal) {
+    if (rightOp == Operator.EQUAL) {
       rightEffectiveOp = leftEffectiveOp;
     }
 
     Object[] singleKey = null;
-    if (leftValues.size() != 0) {
+    if (!leftValues.isEmpty()) {
       singleKey = makeSingleKeyExpression(indexName, leftColumn, leftValues, leftOp, rightColumn, rightValues, rightOp);
     }
     Object[] originalSingleKey = makeSingleKeyExpression(indexName, leftColumn, originalLeftValues, leftOp, rightColumn, originalRightValues, rightOp);
@@ -690,7 +678,6 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
       }
       else {
         if (analyze) {
-          //oneKeyLookup = true;
           return null;
         }
         else {
@@ -723,10 +710,10 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
         }
       }
     }
-    else if (leftExpression instanceof ColumnImpl && rightExpression instanceof ColumnImpl) {
+    else if (localLeftExpression instanceof ColumnImpl && localRightExpression instanceof ColumnImpl) {
       if (explain != null) {
         explain.appendSpaces();
-        explain.getBuilder().append("Table scan: " + getTopLevelExpression().toString() + "\n");
+        explain.getBuilder().append(TABLE_SCAN_STR + getTopLevelExpression().toString() + "\n");
       }
       else {
         if (analyze) {
@@ -749,7 +736,6 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
           }
         }
       }
-      //return tableScan(count, getClient(), (ExpressionImpl) getTopLevelExpression(), getParms(), getTableName());
     }
     else if (leftEffectiveOp != rightEffectiveOp && !isLeftColumnCompare && !isRightColumnCompare && leftColumn != null &&
         rightColumn != null && leftColumn.equals(rightColumn)) {
@@ -777,11 +763,11 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
       else {
         String[] indexFields = getClient().getCommon().getTables(dbName).get(getTableName()).getIndices().get(indexName).getFields();
         Object[] leftKey = null;
-        if (leftValues.size() != 0) {
+        if (!leftValues.isEmpty()) {
           leftKey = buildKey(leftValues, indexFields);
         }
         Object[] rightKey = null;
-        if (rightValues.size() != 0) {
+        if (!rightValues.isEmpty()) {
           rightKey = buildKey(rightValues, indexFields);
         }
 
@@ -860,10 +846,10 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
       }
     }
     else {
-      if (isLeftColumnCompare || (!leftExpression.canUseIndex() && !rightExpression.canUseIndex())) {
+      if (isLeftColumnCompare || (!localLeftExpression.canUseIndex() && !localRightExpression.canUseIndex())) {
         if (explain != null) {
           explain.appendSpaces();
-          explain.getBuilder().append("Table scan: " + getTopLevelExpression().toString() + "\n");
+          explain.getBuilder().append(TABLE_SCAN_STR + getTopLevelExpression().toString() + "\n");
         }
         if (analyze) {
           isTableScan = true;
@@ -885,7 +871,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
           }
         }
       }
-      return evaluateOneSidedIndex(new String[]{getTableName()}, count, leftExpression, rightExpression, leftColumn, leftOp,
+      return evaluateOneSidedIndex(new String[]{getTableName()}, count, localLeftExpression, localRightExpression, leftColumn, leftOp,
           leftValue, rightColumn, rightOp, rightValue, explain, currOffset, countReturned, limit, offset, analyze, schemaRetryCount);
     }
     return null;
@@ -906,7 +892,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     }
 
     Object[] key = new Object[indexFields.length];
-    if (leftOp == Operator.equal && rightOp == Operator.equal) {
+    if (leftOp == Operator.EQUAL && rightOp == Operator.EQUAL) {
       if (indexFields[0].equals(leftColumn)) {
         key[0] = leftValues.get(0);
         if (indexFields[1].equals(rightColumn)) {
@@ -930,21 +916,16 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     if (!(expression instanceof BinaryExpressionImpl)) {
       return false;
     }
-    Expression leftExpression = ((BinaryExpressionImpl) expression).getLeftExpression();
-    Expression rightExpression = ((BinaryExpressionImpl) expression).getRightExpression();
-    if (leftExpression instanceof ColumnImpl && rightExpression instanceof ColumnImpl) {
-      return true;
-    }
-    return false;
+    Expression localLeftExpression = ((BinaryExpressionImpl) expression).getLeftExpression();
+    Expression localRightExpression = ((BinaryExpressionImpl) expression).getRightExpression();
+    return localLeftExpression instanceof ColumnImpl && localRightExpression instanceof ColumnImpl;
   }
 
   private int getAndOrCount(ExpressionImpl expression) {
     int count = 0;
     if (expression instanceof BinaryExpressionImpl) {
-      if (((BinaryExpressionImpl) expression).getOperator() == Operator.and) {
-        count++;
-      }
-      else if (((BinaryExpressionImpl) expression).getOperator() == Operator.or) {
+      if (((BinaryExpressionImpl) expression).getOperator() == Operator.AND ||
+          ((BinaryExpressionImpl) expression).getOperator() == Operator.OR) {
         count++;
       }
       count += getAndOrCount(((BinaryExpressionImpl) expression).getLeftExpression());
@@ -1007,7 +988,6 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
       explain.indent();
     }
     if (leftExpression instanceof InExpressionImpl) {
-      ExpressionImpl tmp = leftExpression;
       leftExpression = rightExpression;
       rightExpression = leftExpression;
     }
@@ -1017,79 +997,48 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
       explain.getBuilder().append(" AND \n");
     }
 
-    //todo: loop while less than 200
     final TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(tableNames[0]);
-    if (true || !rightExpression.canUseIndex()) {
-      if (explain != null) {
-        explain.appendSpaces();
-        explain.getBuilder().append("Read record evaluation: " + rightExpression.toString() + "\n");
-      }
-      try {
-        if (leftIds != null && leftIds.getIds() != null) {
-          ThreadPoolExecutor executor = getClient().getExecutor();
-          List<Object[][]> batch = new ArrayList<>();
-          List<Future> futures = new ArrayList<>();
-          for (Object[][] id : leftIds.getKeys()) {
-            batch.add(id);
-            if (batch.size() >= 250) {
-              final List<Object[][]> currBatch = batch;
-              batch = new ArrayList<>();
 
-              //todo: doing async gets results out of order
+    if (explain != null) {
+      explain.appendSpaces();
+      explain.getBuilder().append("Read record evaluation: " + rightExpression.toString() + "\n");
+    }
+    try {
+      if (leftIds != null && leftIds.getIds() != null) {
+        List<Object[][]> batch = new ArrayList<>();
+        List<Future> futures = new ArrayList<>();
+        for (Object[][] id : leftIds.getKeys()) {
+          batch.add(id);
+          if (batch.size() >= 250) {
+            final List<Object[][]> currBatch = batch;
+            batch = new ArrayList<>();
 
-              processBatch(currBatch, tableNames[0], tableSchema, retIds, schemaRetryCount);
-            }
+            processBatch(currBatch, tableNames[0], tableSchema, retIds, schemaRetryCount);
           }
-          processBatch(batch, tableNames[0], tableSchema, retIds, schemaRetryCount);
-
-          for (Future future : futures) {
-            try {
-              future.get();
-            }
-            catch (Exception e) {
-              throw new DatabaseException(e);
-            }
-          }
-          Object[][][] ids = new Object[retIds.size()][][];
-          int i = 0;
-          for (Object[] id : retIds) {
-            ids[i++] = new Object[][]{id};
-          }
-
-          return new NextReturn(tableNames, ids);
         }
-      }
-      finally {
-        if (explain != null) {
-          explain.outdent();
+        processBatch(batch, tableNames[0], tableSchema, retIds, schemaRetryCount);
+
+        for (Future future : futures) {
+          try {
+            future.get();
+          }
+          catch (Exception e) {
+            throw new DatabaseException(e);
+          }
         }
+        Object[][][] ids = new Object[retIds.size()][][];
+        int i = 0;
+        for (Object[] id : retIds) {
+          ids[i++] = new Object[][]{id};
+        }
+
+        return new NextReturn(tableNames, ids);
       }
     }
-    else {
-      //todo: loop while less than 200
-      NextReturn rightIds = rightExpression.next(explain, currOffset, countReturned, limit, offset, schemaRetryCount);
-
-      if (rightIds != null && rightIds.getIds() != null) {
-        String[] columns = null;
-        for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
-          if (entry.getValue().isPrimaryKey()) {
-            columns = entry.getValue().getFields();
-            break;
-          }
-        }
-
-        List<IdEntry> keysToRead = new ArrayList<>();
-        for (int i = 0; i < rightIds.getIds().length; i++) {
-          Object[][] id = rightIds.getIds()[i];
-
-          if (!getRecordCache().containsKey(tableSchema.getName(), id[0])) {
-            keysToRead.add(new ExpressionImpl.IdEntry(i, id[0]));
-          }
-        }
-        doReadRecords(dbName, getClient(), count, isForceSelectOnServer(), tableSchema, keysToRead,
-            columns, this.getColumns(), getRecordCache(), getViewVersion(), isRestrictToThisServer(), getProcedureContext(), schemaRetryCount);
+    finally {
+      if (explain != null) {
+        explain.outdent();
       }
-      return rightIds;
     }
     return null;
   }
@@ -1110,7 +1059,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
       }
       else {
         record = doReadRecord(dbName, getClient(), isForceSelectOnServer(), getRecordCache(), id[0],
-            getTableName(), getColumns(), getTopLevelExpression(), getParms(), getViewVersion(), debug, isRestrictToThisServer(),
+            getTableName(), getColumns(), getTopLevelExpression(), getParms(), getViewVersion(), isRestrictToThisServer(),
             getProcedureContext(), schemaRetryCount);
         if (record != null) {
           retIds.add(id[0]);
@@ -1141,7 +1090,6 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
           return new NextReturn(context.getTableNames(), context.getCurrKeys());
         }
       }
-      //return tableScan(count, getClient(), (ExpressionImpl) getTopLevelExpression(), getParms(), getTableName());
     }
     if (explain != null) {
       explain.indent();
@@ -1187,16 +1135,13 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
       return true;
     }
     if (leftExpression instanceof ColumnImpl) {
-      if (operator == Operator.notEqual) {
+      if (operator == Operator.NOT_EQUAL) {
         return false;
       }
-      String columnName = ((ColumnImpl) leftExpression).getColumnName();
+      String localColumnName = ((ColumnImpl) leftExpression).getColumnName();
 
-//      if (operator == Operator.notEqual) {
-//        return false;
-//      }
       for (Map.Entry<String, IndexSchema> entry : getClient().getCommon().getTables(dbName).get(getTableName()).getIndices().entrySet()) {
-        if (entry.getValue().getFields()[0].equals(columnName)) {
+        if (entry.getValue().getFields()[0].equals(localColumnName)) {
           return true;
         }
       }
@@ -1209,17 +1154,20 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     return false;
   }
 
+  @Override
   public void getColumns(Set<ColumnImpl> columns) {
     leftExpression.getColumns(columns);
     rightExpression.getColumns(columns);
   }
 
+  @Override
   public void setColumns(List<ColumnImpl> columns) {
     super.setColumns(columns);
     leftExpression.setColumns(columns);
     rightExpression.setColumns(columns);
   }
 
+  @Override
   public void setProbe(boolean probe) {
     super.setProbe(probe);
     leftExpression.setProbe(probe);
@@ -1227,30 +1175,35 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
   }
 
 
+  @Override
   public void setTopLevelExpression(Expression topLevelExpression) {
     super.setTopLevelExpression(topLevelExpression);
     leftExpression.setTopLevelExpression(topLevelExpression);
     rightExpression.setTopLevelExpression(topLevelExpression);
   }
 
+  @Override
   public void setOrderByExpressions(List<OrderByExpressionImpl> orderByExpressions) {
     super.setOrderByExpressions(orderByExpressions);
     leftExpression.setOrderByExpressions(orderByExpressions);
     rightExpression.setOrderByExpressions(orderByExpressions);
   }
 
+  @Override
   public void setTableName(String tableName) {
     super.setTableName(tableName);
     leftExpression.setTableName(tableName);
     rightExpression.setTableName(tableName);
   }
 
+  @Override
   public void setClient(DatabaseClient client) {
     super.setClient(client);
     leftExpression.setClient(client);
     rightExpression.setClient(client);
   }
 
+  @Override
   public void setParms(ParameterHandler parms) {
     super.setParms(parms);
     leftExpression.setParms(parms);
@@ -1286,6 +1239,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
    * DON"T MODIFY THIS SERIALIZATION
    * ###############################
    */
+  @Override
   public void deserialize(short serializationVersion, DataInputStream in) {
     try {
       super.deserialize(serializationVersion, in);
@@ -1314,6 +1268,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
    * DON"T MODIFY THIS SERIALIZATION
    * ###############################
    */
+  @Override
   public void serialize(short serializationVersion, DataOutputStream out) {
     try {
       super.serialize(serializationVersion, out);
@@ -1371,7 +1326,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
       TableSchema[] tableSchemas, Record[] records,
       ParameterHandler parms) {
     try {
-      BinaryExpression.Operator operator = getOperator();
+      BinaryExpression.Operator localOperator = getOperator();
       Object lhsValue = leftExpression.evaluateSingleRecord(tableSchemas, records, parms);
       Object rhsValue = rightExpression.evaluateSingleRecord(tableSchemas, records, parms);
       Comparator comparator = DataType.Type.getComparatorForValue(lhsValue);
@@ -1382,7 +1337,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
           lhsValue instanceof Float || rhsValue instanceof Float) {
         comparator = DataType.getDoubleComparator();
       }
-      if (operator == BinaryExpression.Operator.equal) {
+      if (localOperator == BinaryExpression.Operator.EQUAL) {
         if (lhsValue == null && rhsValue == null) {
           return true;
         }
@@ -1390,17 +1345,11 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
           return false;
         }
         if (comparator.compare(lhsValue, rhsValue) == 0) {
-          if (isNot) {
-            return false;
-          }
-          return true;
+          return !isNot;
         }
-        if (isNot) {
-          return true;
-        }
-        return false;
+        return isNot;
       }
-      else if (operator == BinaryExpression.Operator.like) {
+      else if (localOperator == BinaryExpression.Operator.LIKE) {
         if (lhsValue == null && rhsValue == null) {
           return true;
         }
@@ -1410,17 +1359,11 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
         String lhsStr = new String((byte[]) lhsValue, "utf-8");
         String rhsStr = new String((byte[]) rhsValue, "utf-8");
         if (like(lhsStr, rhsStr)) {
-          if (isNot) {
-            return false;
-          }
-          return true;
+          return !isNot;
         }
-        if (isNot) {
-          return true;
-        }
-        return false;
+        return isNot;
       }
-      else if (operator == BinaryExpression.Operator.notEqual) {
+      else if (localOperator == BinaryExpression.Operator.NOT_EQUAL) {
         if (lhsValue == null && rhsValue == null) {
           return false;
         }
@@ -1428,77 +1371,47 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
           return true;
         }
         if (comparator.compare(lhsValue, rhsValue) == 0) {
-          if (isNot) {
-            return true;
-          }
-          return false;
+          return isNot;
         }
-        if (isNot) {
-          return false;
-        }
-        return true;
+        return !isNot;
       }
-      else if (operator == BinaryExpression.Operator.less) {
+      else if (localOperator == BinaryExpression.Operator.LESS) {
         if (lhsValue == null || rhsValue == null) {
           return false;
         }
         if (comparator.compare(lhsValue, rhsValue) < 0) {
-          if (isNot) {
-            return false;
-          }
-          return true;
+          return !isNot;
         }
-        if (isNot) {
-          return true;
-        }
-        return false;
+        return isNot;
       }
-      else if (operator == BinaryExpression.Operator.lessEqual) {
+      else if (localOperator == BinaryExpression.Operator.LESS_EQUAL) {
         if (lhsValue == null || rhsValue == null) {
           return false;
         }
         if (comparator.compare(lhsValue, rhsValue) <= 0) {
-          if (isNot) {
-            return false;
-          }
-          return true;
+          return !isNot;
         }
-        if (isNot) {
-          return true;
-        }
-        return false;
+        return isNot;
       }
-      else if (operator == BinaryExpression.Operator.greater) {
+      else if (localOperator == BinaryExpression.Operator.GREATER) {
         if (lhsValue == null || rhsValue == null) {
           return false;
         }
         if (comparator.compare(lhsValue, rhsValue) > 0) {
-          if (isNot) {
-            return false;
-          }
-          return true;
+          return !isNot;
         }
-        if (isNot) {
-          return true;
-        }
-        return false;
+        return isNot;
       }
-      else if (operator == BinaryExpression.Operator.greaterEqual) {
+      else if (localOperator == BinaryExpression.Operator.GREATER_EQUAL) {
         if (lhsValue == null || rhsValue == null) {
           return false;
         }
         if (comparator.compare(lhsValue, rhsValue) >= 0) {
-          if (isNot) {
-            return false;
-          }
-          return true;
+          return !isNot;
         }
-        if (isNot) {
-          return true;
-        }
-        return false;
+        return isNot;
       }
-      else if (operator == BinaryExpression.Operator.and) {
+      else if (localOperator == BinaryExpression.Operator.AND) {
         if (lhsValue == null || rhsValue == null) {
           return false;
         }
@@ -1507,7 +1420,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
         }
         return (Boolean) lhsValue && (Boolean) rhsValue;
       }
-      else if (operator == BinaryExpression.Operator.or) {
+      else if (localOperator == BinaryExpression.Operator.OR) {
         if (lhsValue == null || rhsValue == null) {
           return false;
         }
@@ -1516,66 +1429,66 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
         }
         return (Boolean) lhsValue || (Boolean) rhsValue;
       }
-      else if (operator == BinaryExpression.Operator.plus ||
-          operator == BinaryExpression.Operator.minus ||
-          operator == BinaryExpression.Operator.times ||
-          operator == Operator.divide ||
-          operator == Operator.bitwiseAnd ||
-          operator == Operator.bitwiseOr ||
-          operator == Operator.bitwiseXOr ||
-          operator == Operator.modulo) {
+      else if (localOperator == BinaryExpression.Operator.PLUS ||
+          localOperator == BinaryExpression.Operator.MINUS ||
+          localOperator == BinaryExpression.Operator.TIMES ||
+          localOperator == Operator.DIVIDE ||
+          localOperator == Operator.BITWISE_AND ||
+          localOperator == Operator.BITWISE_OR ||
+          localOperator == Operator.BITWISE_X_OR ||
+          localOperator == Operator.MODULO) {
         if (lhsValue == null || rhsValue == null) {
           return null;
         }
         if (lhsValue instanceof BigDecimal || rhsValue instanceof BigDecimal) {
           BigDecimal lhs = (BigDecimal) DataType.getBigDecimalConverter().convert(lhsValue);
           BigDecimal rhs = (BigDecimal) DataType.getBigDecimalConverter().convert(rhsValue);
-          if (operator == Operator.plus) {
+          if (localOperator == Operator.PLUS) {
             return lhs.add(rhs);
           }
-          else if (operator == Operator.minus) {
+          else if (localOperator == Operator.MINUS) {
             return lhs.subtract(rhs);
           }
-          else if (operator == Operator.times) {
+          else if (localOperator == Operator.TIMES) {
             return lhs.multiply(rhs);
           }
-          else if (operator == Operator.divide) {
+          else if (localOperator == Operator.DIVIDE) {
             return lhs.divide(rhs);
           }
-          else if (operator == Operator.bitwiseAnd ||
-              operator == Operator.bitwiseOr ||
-              operator == Operator.bitwiseXOr ||
-              operator == Operator.modulo) {
-            throw new DatabaseException("Invalid operator");
+          else if (localOperator == Operator.BITWISE_AND ||
+              localOperator == Operator.BITWISE_OR ||
+              localOperator == Operator.BITWISE_X_OR ||
+              localOperator == Operator.MODULO) {
+            throw new DatabaseException(INVALID_OPERATOR_STR);
           }
           else {
-            throw new DatabaseException("Invalid operator");
+            throw new DatabaseException(INVALID_OPERATOR_STR);
           }
         }
         else if (lhsValue instanceof Double || rhsValue instanceof Double ||
             lhsValue instanceof Float || rhsValue instanceof Float) {
           Double lhs = (Double) DataType.getDoubleConverter().convert(lhsValue);
           Double rhs = (Double) DataType.getDoubleConverter().convert(rhsValue);
-          if (operator == Operator.plus) {
+          if (localOperator == Operator.PLUS) {
             return lhs + rhs;
           }
-          else if (operator == Operator.minus) {
+          else if (localOperator == Operator.MINUS) {
             return lhs - rhs;
           }
-          else if (operator == Operator.times) {
+          else if (localOperator == Operator.TIMES) {
             return lhs * rhs;
           }
-          else if (operator == Operator.divide) {
+          else if (localOperator == Operator.DIVIDE) {
             return lhs / rhs;
           }
-          else if (operator == Operator.bitwiseAnd ||
-              operator == Operator.bitwiseOr ||
-              operator == Operator.bitwiseXOr ||
-              operator == Operator.modulo) {
-            throw new DatabaseException("Invalid operator");
+          else if (localOperator == Operator.BITWISE_AND ||
+              localOperator == Operator.BITWISE_OR ||
+              localOperator == Operator.BITWISE_X_OR ||
+              localOperator == Operator.MODULO) {
+            throw new DatabaseException(INVALID_OPERATOR_STR);
           }
           else {
-            throw new DatabaseException("Invalid operator");
+            throw new DatabaseException(INVALID_OPERATOR_STR);
           }
         }
         else if (lhsValue instanceof Long || rhsValue instanceof Long ||
@@ -1584,32 +1497,32 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
             lhsValue instanceof Byte || rhsValue instanceof Byte) {
           Long lhs = (Long) DataType.getLongConverter().convert(lhsValue);
           Long rhs = (Long) DataType.getLongConverter().convert(rhsValue);
-          if (operator == Operator.plus) {
+          if (localOperator == Operator.PLUS) {
             return lhs + rhs;
           }
-          else if (operator == Operator.minus) {
+          else if (localOperator == Operator.MINUS) {
             return lhs - rhs;
           }
-          else if (operator == Operator.times) {
+          else if (localOperator == Operator.TIMES) {
             return lhs * rhs;
           }
-          else if (operator == Operator.divide) {
+          else if (localOperator == Operator.DIVIDE) {
             return lhs / rhs;
           }
-          else if (operator == Operator.bitwiseAnd) {
+          else if (localOperator == Operator.BITWISE_AND) {
             return lhs & rhs;
           }
-          else if (operator == Operator.bitwiseOr) {
+          else if (localOperator == Operator.BITWISE_OR) {
             return lhs | rhs;
           }
-          else if (operator == Operator.bitwiseXOr) {
+          else if (localOperator == Operator.BITWISE_X_OR) {
             return lhs ^ rhs;
           }
-          else if (operator == Operator.modulo) {
+          else if (localOperator == Operator.MODULO) {
             return lhs % rhs;
           }
           else {
-            throw new DatabaseException("Invalid operator");
+            throw new DatabaseException(INVALID_OPERATOR_STR);
           }
         }
         else {
@@ -1629,7 +1542,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
 
   @Override
   public ExpressionImpl.Type getType() {
-    return ExpressionImpl.Type.binaryOp;
+    return ExpressionImpl.Type.BINARY_OP;
   }
 
   public void setOperator(BinaryExpression.Operator operator) {
@@ -1640,12 +1553,14 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     return operator;
   }
 
+  @Override
   public void setLastShard(int lastShard) {
     super.setLastShard(lastShard);
     leftExpression.setLastShard(lastShard);
     rightExpression.setLastShard(lastShard);
   }
 
+  @Override
   public void setIsCurrPartitions(boolean isCurrPartitions) {
     super.setIsCurrPartitions(isCurrPartitions);
     leftExpression.setIsCurrPartitions(isCurrPartitions);
@@ -1660,9 +1575,6 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     this.isRightKey = isRightKey;
   }
 
-  public void setIsLeftKey(boolean isLeftKey) {
-    this.isLeftKey = isLeftKey;
-  }
 
   public boolean isRighKey() {
     return isRightKey;

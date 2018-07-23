@@ -23,6 +23,8 @@ import java.util.Map;
 public class DataType {
 
 
+  public static final String UTF_8_STR = "utf-8";
+
   public static interface Converter {
     public Object convert(Object value);
   }
@@ -55,11 +57,11 @@ public class DataType {
       }
       else if (value instanceof byte[]) {
         try {
-          ret = (long) Long.valueOf(new String((byte[]) value, "utf-8"));
+          ret = (long) Long.valueOf(new String((byte[]) value, UTF_8_STR));
         }
         catch (NumberFormatException e) {
           try {
-            ret = (long) (double)Double.valueOf(new String((byte[]) value, "utf-8"));
+            ret = (long) (double)Double.valueOf(new String((byte[]) value, UTF_8_STR));
           }
           catch (UnsupportedEncodingException e1) {
             throw new DatabaseException(e1);
@@ -97,58 +99,52 @@ public class DataType {
     return stringConverter;
   }
 
-  private static Converter stringConverter = new Converter() {
-    @Override
-    public Object convert(Object value) {
-      if (value == null) {
-        return null;
-      }
-      if (value instanceof String) {
-        return value;
-      }
-      if (value instanceof byte[]) {
-        try {
-          return new String((byte[])value, "utf-8");
-        }
-        catch (UnsupportedEncodingException e) {
-          throw new DatabaseException(e);
-        }
-      }
-      if (value instanceof Date) {
-        Calendar cal = Calendar.getInstance();
-        cal.setTime((Date)value);
-        return DateUtils.toDbString(cal);
-      }
-      if (value instanceof Time) {
-        return DateUtils.toDbTimeString((Time)value);
-      }
-      if (value instanceof Timestamp) {
-        return DateUtils.toDbTimestampString((Timestamp)value);
-      }
-      return String.valueOf(value);
+  private static Converter stringConverter = value -> {
+    if (value == null) {
+      return null;
     }
+    if (value instanceof String) {
+      return value;
+    }
+    if (value instanceof byte[]) {
+      try {
+        return new String((byte[])value, UTF_8_STR);
+      }
+      catch (UnsupportedEncodingException e) {
+        throw new DatabaseException(e);
+      }
+    }
+    if (value instanceof Date) {
+      Calendar cal = Calendar.getInstance();
+      cal.setTime((Date)value);
+      return DateUtils.toDbString(cal);
+    }
+    if (value instanceof Time) {
+      return DateUtils.toDbTimeString((Time)value);
+    }
+    if (value instanceof Timestamp) {
+      return DateUtils.toDbTimestampString((Timestamp)value);
+    }
+    return String.valueOf(value);
   };
 
   public static Converter getUtf8Converter() {
     return utf8Converter;
   }
 
-  private static Converter utf8Converter = new Converter() {
-    @Override
-    public Object convert(Object value) {
-      if (value == null) {
-        return null;
-      }
-      if (value instanceof byte[]) {
-        return value;
-      }
-      String ret = (String)stringConverter.convert(value);
-      try {
-        return ret.getBytes("utf-8");
-      }
-      catch (UnsupportedEncodingException e) {
-        throw new DatabaseException(e);
-      }
+  private static Converter utf8Converter = value -> {
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof byte[]) {
+      return value;
+    }
+    String ret = (String)stringConverter.convert(value);
+    try {
+      return ret.getBytes(UTF_8_STR);
+    }
+    catch (UnsupportedEncodingException e) {
+      throw new DatabaseException(e);
     }
   };
 
@@ -156,17 +152,14 @@ public class DataType {
     return byteArrayConverter;
   }
 
-  private static Converter byteArrayConverter = new Converter() {
-    @Override
-    public Object convert(Object value) {
-      if (value == null) {
-        return null;
-      }
-      if (value instanceof byte[]) {
-        return value;
-      }
+  private static Converter byteArrayConverter = value -> {
+    if (value == null) {
       return null;
     }
+    if (value instanceof byte[]) {
+      return value;
+    }
+    return null;
   };
 
   public static Converter getBlobConverter() {
@@ -222,7 +215,7 @@ public class DataType {
       }
       else if (value instanceof byte[]) {
         try {
-          ret = Double.valueOf(new String((byte[]) value, "utf-8"));
+          ret = Double.valueOf(new String((byte[]) value, UTF_8_STR));
         }
         catch (UnsupportedEncodingException e) {
           throw new DatabaseException(e);
@@ -258,96 +251,81 @@ public class DataType {
     return intConverter;
   }
 
-  private static Converter intConverter = new Converter() {
-    @Override
-    public Object convert(Object value) {
-      if (value == null) {
-        return null;
-      }
-      if (value instanceof Integer) {
-        return value;
-      }
-      long ret = (Long) longConverter.convert(value);
-      return (int) ret;
+  private static Converter intConverter = value -> {
+    if (value == null) {
+      return null;
     }
+    if (value instanceof Integer) {
+      return value;
+    }
+    long ret = (Long) longConverter.convert(value);
+    return (int) ret;
   };
 
   public static Converter getShortConverter() {
     return shortConverter;
   }
 
-  private static Converter shortConverter = new Converter() {
-    @Override
-    public Object convert(Object value) {
-      if (value == null) {
-        return null;
-      }
-      if (value instanceof Short) {
-        return value;
-      }
-      long ret = (Long) longConverter.convert(value);
-      return (short) ret;
+  private static Converter shortConverter = value -> {
+    if (value == null) {
+      return null;
     }
+    if (value instanceof Short) {
+      return value;
+    }
+    long ret = (Long) longConverter.convert(value);
+    return (short) ret;
   };
 
   public static Converter getBooleanConverter() {
     return booleanConverter;
   }
 
-  private static Converter booleanConverter = new Converter() {
-    @Override
-    public Object convert(Object value) {
-      if (value == null) {
-        return null;
-      }
-      if (value instanceof Boolean) {
-        return value;
-      }
-      if (value instanceof byte[]) {
-        return new String((byte[])value).equalsIgnoreCase("true");
-      }
-      if (value instanceof String) {
-        return ((String)value).equalsIgnoreCase("true");
-      }
-      long ret = (Long) longConverter.convert(value);
-      return ret == 1;
+  private static Converter booleanConverter = value -> {
+    if (value == null) {
+      return null;
     }
+    if (value instanceof Boolean) {
+      return value;
+    }
+    if (value instanceof byte[]) {
+      return new String((byte[])value).equalsIgnoreCase("true");
+    }
+    if (value instanceof String) {
+      return ((String)value).equalsIgnoreCase("true");
+    }
+    long ret = (Long) longConverter.convert(value);
+    return ret == 1;
   };
 
   public static Converter getByteConverter() {
     return byteConverter;
   }
 
-  private static Converter byteConverter = new Converter() {
-    @Override
-    public Object convert(Object value) {
-      if (value == null) {
-        return null;
-      }
-      if (value instanceof Byte) {
-        return value;
-      }
-      long ret = (Long) longConverter.convert(value);
-      return (byte) ret;
+  private static Converter byteConverter = value -> {
+    if (value == null) {
+      return null;
     }
+    if (value instanceof Byte) {
+      return value;
+    }
+    long ret = (Long) longConverter.convert(value);
+    return (byte) ret;
   };
 
   public static Converter getFloatConverter() {
     return floatConverter;
   }
 
-  private static Converter floatConverter = new Converter() {
-    @Override
-    public Object convert(Object value) {
-      if (value == null) {
-        return null;
-      }
-      if (value instanceof Float) {
-        return value;
-      }
-      double ret = (Double) doubleConverter.convert(value);
-      return (float) ret;
+  private static Converter floatConverter = value -> {
+    if (value == null) {
+      return null;
     }
+    if (value instanceof Float) {
+      return value;
+    }
+    double ret = (Double) doubleConverter.convert(value);
+    return (float) ret;
   };
 
   public static Converter getBigDecimalConverter() {
@@ -367,7 +345,7 @@ public class DataType {
       }
       else if (value instanceof byte[]) {
         try {
-          ret = BigDecimal.valueOf(Double.valueOf(new String((byte[]) value, "utf-8")));
+          ret = BigDecimal.valueOf(Double.valueOf(new String((byte[]) value, UTF_8_STR)));
         }
         catch (UnsupportedEncodingException e) {
           throw new DatabaseException(e);
@@ -424,7 +402,7 @@ public class DataType {
       }
       else if (value instanceof byte[]) {
         try {
-          String str = new String((byte[]) value, "utf-8");
+          String str = new String((byte[]) value, UTF_8_STR);
           Calendar cal = DateUtils.fromDbCalString(str);
           ret = new Date(cal.getTimeInMillis());
         }
@@ -473,7 +451,7 @@ public class DataType {
       }
       else if (value instanceof byte[]) {
         try {
-          String str = new String((byte[]) value, "utf-8");
+          String str = new String((byte[]) value, UTF_8_STR);
           Calendar cal = DateUtils.fromDbTimeString(str);
           ret = new Time(cal.getTimeInMillis());
         }
@@ -523,7 +501,7 @@ public class DataType {
       }
       else if (value instanceof byte[]) {
         try {
-          String str = new String((byte[]) value, "utf-8");
+          String str = new String((byte[]) value, UTF_8_STR);
           Calendar cal = DateUtils.fromDbCalString(str);
           ret = new Timestamp(cal.getTimeInMillis());
         }
@@ -553,29 +531,26 @@ public class DataType {
     return booleanComparator;
   }
 
-  private static Comparator booleanComparator = new Comparator() {
-    @Override
-    public int compare(Object o1, Object o2) {
-      if (o1 == null && o2 == null) {
-        return 0;
-      }
-      if (o1 == null) {
-        return -1;
-      }
-      if (o2 == null) {
-        return 1;
-      }
-      if (!(o1 instanceof Boolean)) {
-        o1 = booleanConverter.convert(o1);
-      }
-      if (!(o2 instanceof Boolean)) {
-        o2 = booleanConverter.convert(o2);
-      }
-      if (!(o1 instanceof Boolean) || !(o2 instanceof Boolean)) {
-        throw new DatabaseException("Incompatible datatypes: lhs=" + o1.getClass().getName() + ", rhs=" + o2.getClass());
-      }
-      return ((Boolean) o1).compareTo((Boolean) o2);
+  private static Comparator booleanComparator = (o1, o2) -> {
+    if (o1 == null && o2 == null) {
+      return 0;
     }
+    if (o1 == null) {
+      return -1;
+    }
+    if (o2 == null) {
+      return 1;
+    }
+    if (!(o1 instanceof Boolean)) {
+      o1 = booleanConverter.convert(o1);
+    }
+    if (!(o2 instanceof Boolean)) {
+      o2 = booleanConverter.convert(o2);
+    }
+    if (!(o1 instanceof Boolean) || !(o2 instanceof Boolean)) {
+      throw new DatabaseException("Incompatible datatypes: lhs=" + o1.getClass().getName() + ", rhs=" + o2.getClass());
+    }
+    return ((Boolean) o1).compareTo((Boolean) o2);
   };
 
   public static Comparator getLongComparator() {
@@ -589,7 +564,12 @@ public class DataType {
       if (o1 instanceof Long && o2 instanceof Long) {
         long l1 = (Long) o1;
         long l2 = (Long) o2;
-        return l1 < l2 ? -1 : l1 > l2 ? 1 : 0;
+        if (l1 < l2) {
+          return -1;
+        }
+        else {
+          return l1 > l2 ? 1 : 0;
+        }
       }
       Integer ret = compareNumerics(o1, o2);
       if (ret == null) {
@@ -612,130 +592,158 @@ public class DataType {
       return 1;
     }
     if (o1 instanceof Double) {
-      Double lhs = (Double) o1;
-      if (o2 instanceof Double) {
-        return lhs < (Double) o2 ? -1 : lhs > (Double) o2 ? 1 : 0;
-      }
-      if (o2 instanceof Float) {
-        return lhs < (Float) o2 ? -1 : lhs > (Float) o2 ? 1 : 0;
-      }
-      if (o2 instanceof Short) {
-        return lhs < (Short) o2 ? -1 : lhs > (Short) o2 ? 1 : 0;
-      }
-      if (o2 instanceof Byte) {
-        return lhs < (Byte) o2 ? -1 : lhs > (Byte) o2 ? 1 : 0;
-      }
-      if (o2 instanceof Integer) {
-        return lhs < (Integer) o2 ? -1 : lhs > (Integer) o2 ? 1 : 0;
-      }
-      if (o2 instanceof Long) {
-        return lhs < (Long) o2 ? -1 : lhs > (Long) o2 ? 1 : 0;
+      Integer lhs = compareLhsDouble((Double) o1, o2);
+      if (lhs != null) {
+        return lhs;
       }
     }
     if (o1 instanceof Float) {
-      Float lhs = (Float) o1;
-      if (o2 instanceof Double) {
-        return lhs < (Double) o2 ? -1 : lhs > (Double) o2 ? 1 : 0;
-      }
-      if (o2 instanceof Float) {
-        return lhs < (Float) o2 ? -1 : lhs > (Float) o2 ? 1 : 0;
-      }
-      if (o2 instanceof Short) {
-        return lhs < (Short) o2 ? -1 : lhs > (Short) o2 ? 1 : 0;
-      }
-      if (o2 instanceof Byte) {
-        return lhs < (Byte) o2 ? -1 : lhs > (Byte) o2 ? 1 : 0;
-      }
-      if (o2 instanceof Long) {
-        return lhs < (Long) o2 ? -1 : lhs > (Long) o2 ? 1 : 0;
-      }
-      if (o2 instanceof Integer) {
-        return lhs < (Integer) o2 ? -1 : lhs > (Integer) o2 ? 1 : 0;
+      Integer x = compareLhsDouble((double)(Float) o1, o2);
+      if (x != null) {
+        return x;
       }
     }
     if (o1 instanceof Short) {
-      Short lhs = (Short) o1;
-      if (o2 instanceof Double) {
-        return lhs < (Double) o2 ? -1 : lhs > (Double) o2 ? 1 : 0;
-      }
-      if (o2 instanceof Float) {
-        return lhs < (Float) o2 ? -1 : lhs > (Float) o2 ? 1 : 0;
-      }
-      if (o2 instanceof Short) {
-        return lhs < (Short) o2 ? -1 : lhs > (Short) o2 ? 1 : 0;
-      }
-      if (o2 instanceof Byte) {
-        return lhs < (Byte) o2 ? -1 : lhs > (Byte) o2 ? 1 : 0;
-      }
-      if (o2 instanceof Long) {
-        return lhs < (Long) o2 ? -1 : lhs > (Long) o2 ? 1 : 0;
-      }
-      if (o2 instanceof Integer) {
-        return lhs < (Integer) o2 ? -1 : lhs > (Integer) o2 ? 1 : 0;
+      Integer x = compareLhsLong((long)(Short) o1, o2);
+      if (x != null) {
+        return x;
       }
     }
     if (o1 instanceof Byte) {
-      Byte lhs = (Byte) o1;
-      if (o2 instanceof Double) {
-        return lhs < (Double) o2 ? -1 : lhs > (Double) o2 ? 1 : 0;
-      }
-      if (o2 instanceof Float) {
-        return lhs < (Float) o2 ? -1 : lhs > (Float) o2 ? 1 : 0;
-      }
-      if (o2 instanceof Short) {
-        return lhs < (Short) o2 ? -1 : lhs > (Short) o2 ? 1 : 0;
-      }
-      if (o2 instanceof Byte) {
-        return lhs < (Byte) o2 ? -1 : lhs > (Byte) o2 ? 1 : 0;
-      }
-      if (o2 instanceof Long) {
-        return lhs < (Long) o2 ? -1 : lhs > (Long) o2 ? 1 : 0;
-      }
-      if (o2 instanceof Integer) {
-        return lhs < (Integer) o2 ? -1 : lhs > (Integer) o2 ? 1 : 0;
+      Integer x = compareLhsLong((long)(Byte) o1, o2);
+      if (x != null) {
+        return x;
       }
     }
     if (o1 instanceof Integer) {
-      Integer lhs = (Integer) o1;
-      if (o2 instanceof Double) {
-        return lhs < (Double) o2 ? -1 : lhs > (Double) o2 ? 1 : 0;
-      }
-      if (o2 instanceof Float) {
-        return lhs < (Float) o2 ? -1 : lhs > (Float) o2 ? 1 : 0;
-      }
-      if (o2 instanceof Short) {
-        return lhs < (Short) o2 ? -1 : lhs > (Short) o2 ? 1 : 0;
-      }
-      if (o2 instanceof Byte) {
-        return lhs < (Byte) o2 ? -1 : lhs > (Byte) o2 ? 1 : 0;
-      }
-      if (o2 instanceof Long) {
-        return lhs < (Long) o2 ? -1 : lhs > (Long) o2 ? 1 : 0;
-      }
-      if (o2 instanceof Integer) {
-        return lhs < (Integer) o2 ? -1 : lhs > (Integer) o2 ? 1 : 0;
+      Integer x = compareLhsLong((long)(Integer) o1, o2);
+      if (x != null) {
+        return x;
       }
     }
     if (o1 instanceof Long) {
-      Long lhs = (Long) o1;
-      if (o2 instanceof Double) {
-        return lhs < (Double) o2 ? -1 : lhs > (Double) o2 ? 1 : 0;
+      Integer x = compareLhsLong((Long) o1, o2);
+      if (x != null) {
+        return x;
       }
-      if (o2 instanceof Float) {
-        return lhs < (Float) o2 ? -1 : lhs > (Float) o2 ? 1 : 0;
+    }
+    return null;
+  }
+
+  private static Integer compareLhsLong(Long o1, Object o2) {
+    Long lhs = o1;
+    if (o2 instanceof Double) {
+      if (lhs > (Double) o2) {
+        return 1;
       }
-      if (o2 instanceof Short) {
-        return lhs < (Short) o2 ? -1 : lhs > (Short) o2 ? 1 : 0;
+      else if (lhs < (Double) o2) {
+        return -1;
       }
-      if (o2 instanceof Byte) {
-        return lhs < (Byte) o2 ? -1 : lhs > (Byte) o2 ? 1 : 0;
+      return 0;
+    }
+    if (o2 instanceof Float) {
+      if (lhs > (Float) o2) {
+        return 1;
       }
-      if (o2 instanceof Long) {
-        return lhs < (Long) o2 ? -1 : lhs > (Long) o2 ? 1 : 0;
+      else if (lhs < (Float) o2) {
+        return -1;
       }
-      if (o2 instanceof Integer) {
-        return lhs < (Integer) o2 ? -1 : lhs > (Integer) o2 ? 1 : 0;
+      return 0;
+    }
+    if (o2 instanceof Short) {
+      if (lhs > (Short) o2) {
+        return 1;
       }
+      else if (lhs < (Short) o2) {
+        return -1;
+      }
+      return 0;
+    }
+    if (o2 instanceof Byte) {
+      if (lhs > (Byte) o2) {
+        return 1;
+      }
+      else if (lhs < (Byte) o2) {
+        return -1;
+      }
+      return 0;
+    }
+    if (o2 instanceof Long) {
+      if (lhs > (Long) o2) {
+        return 1;
+      }
+      else if (lhs < (Long) o2) {
+        return -1;
+      }
+      return 0;
+    }
+    if (o2 instanceof Integer) {
+      if (lhs > (Integer) o2) {
+        return 1;
+      }
+      else if (lhs < (Integer) o2) {
+        return -1;
+      }
+      return 0;
+    }
+    return null;
+  }
+
+  private static Integer compareLhsDouble(Double o1, Object o2) {
+    Double lhs = o1;
+    if (o2 instanceof Double) {
+      if (lhs > (Double) o2) {
+        return 1;
+      }
+      else if (lhs < (Double) o2) {
+        return -1;
+      }
+      return 0;
+    }
+    if (o2 instanceof Float) {
+      if (lhs > (Float) o2) {
+        return 1;
+      }
+      else if (lhs < (Float) o2) {
+        return -1;
+      }
+      return 0;
+    }
+    if (o2 instanceof Short) {
+      if (lhs > (Short) o2) {
+        return 1;
+      }
+      else if (lhs < (Short) o2) {
+        return -1;
+      }
+      return 0;
+    }
+    if (o2 instanceof Byte) {
+      if (lhs > (Byte) o2) {
+        return 1;
+      }
+      else if (lhs < (Byte) o2) {
+        return -1;
+      }
+      return 0;
+    }
+    if (o2 instanceof Long) {
+      if (lhs > (Long) o2) {
+        return 1;
+      }
+      else if (lhs < (Long) o2) {
+        return -1;
+      }
+      return 0;
+    }
+    if (o2 instanceof Integer) {
+      if (lhs > (Integer) o2) {
+        return 1;
+      }
+      else if (lhs < (Integer) o2) {
+        return -1;
+      }
+      return 0;
     }
     return null;
   }
@@ -746,26 +754,60 @@ public class DataType {
     return intComparator;
   }
 
-  private static Comparator intComparator = new Comparator() {
-    @Override
-    public int compare(Object o1, Object o2) {
-      Integer ret = compareNumerics(o1, o2);
-      if (ret == null) {
-        Integer lhs = (Integer) intConverter.convert(o1);
-        Integer rhs = (Integer) intConverter.convert(o2);
-        return lhs.compareTo(rhs);
-      }
-      return ret;
+  private static Comparator intComparator = (o1, o2) -> {
+    Integer ret = compareNumerics(o1, o2);
+    if (ret == null) {
+      Integer lhs = (Integer) intConverter.convert(o1);
+      Integer rhs = (Integer) intConverter.convert(o2);
+      return lhs.compareTo(rhs);
     }
+    return ret;
   };
 
   public static Comparator getDoubleComparator() {
     return doubleComparator;
   }
 
-  private static Comparator doubleComparator = new Comparator() {
-    @Override
-    public int compare(Object o1, Object o2) {
+  private static Comparator doubleComparator = (o1, o2) -> {
+    if (o1 == null && o2 == null) {
+      return 0;
+    }
+    if (o1 == null) {
+      return -1;
+    }
+    if (o2 == null) {
+      return 1;
+    }
+
+    Integer ret = compareNumerics(o1, o2);
+    if (ret == null) {
+      Double lhs = (Double) doubleConverter.convert(o1);
+      Double rhs = (Double) doubleConverter.convert(o2);
+      return lhs.compareTo(rhs);
+    }
+    return ret;
+  };
+
+  public static Comparator getFloatComparator() {
+    return floatComparator;
+  }
+
+  private static Comparator floatComparator = (o1, o2) -> {
+    Integer ret = compareNumerics(o1, o2);
+    if (ret == null) {
+      Float lhs = (Float) floatConverter.convert(o1);
+      Float rhs = (Float) floatConverter.convert(o2);
+      return lhs.compareTo(rhs);
+    }
+    return ret;
+  };
+
+  public static Comparator getStringComparator() {
+    return stringComparator;
+  }
+
+  private static Comparator stringComparator = (o1, o2) -> {
+    try {
       if (o1 == null && o2 == null) {
         return 0;
       }
@@ -776,58 +818,12 @@ public class DataType {
         return 1;
       }
 
-      Integer ret = compareNumerics(o1, o2);
-      if (ret == null) {
-        Double lhs = (Double) doubleConverter.convert(o1);
-        Double rhs = (Double) doubleConverter.convert(o2);
-        return lhs.compareTo(rhs);
-      }
-      return ret;
+      o1 = stringConverter.convert(o1);
+      o2 = stringConverter.convert(o2);
+      return ((String) o1).compareTo((String) o2);
     }
-  };
-
-  public static Comparator getFloatComparator() {
-    return floatComparator;
-  }
-
-  private static Comparator floatComparator = new Comparator() {
-    @Override
-    public int compare(Object o1, Object o2) {
-      Integer ret = compareNumerics(o1, o2);
-      if (ret == null) {
-        Float lhs = (Float) floatConverter.convert(o1);
-        Float rhs = (Float) floatConverter.convert(o2);
-        return lhs.compareTo(rhs);
-      }
-      return ret;
-    }
-  };
-
-  public static Comparator getStringComparator() {
-    return stringComparator;
-  }
-
-  private static Comparator stringComparator = new Comparator() {
-    @Override
-    public int compare(Object o1, Object o2) {
-      try {
-        if (o1 == null && o2 == null) {
-          return 0;
-        }
-        if (o1 == null) {
-          return -1;
-        }
-        if (o2 == null) {
-          return 1;
-        }
-
-        o1 = stringConverter.convert(o1);
-        o2 = stringConverter.convert(o2);
-        return ((String) o1).compareTo((String) o2);
-      }
-      catch (Exception e) {
-        throw new DatabaseException(e);
-      }
+    catch (Exception e) {
+      throw new DatabaseException(e);
     }
   };
 
@@ -852,7 +848,7 @@ public class DataType {
 
         o1 = utf8Converter.convert(o1);
         o2 = utf8Converter.convert(o2);
-        return (new String((byte[])o1, "utf-8")).compareTo(new String((byte[])o2, "utf-8"));
+        return (new String((byte[])o1, UTF_8_STR)).compareTo(new String((byte[])o2, UTF_8_STR));
       }
       catch (Exception e) {
         throw new DatabaseException(e);
@@ -866,128 +862,109 @@ public class DataType {
     return byteComparator;
   }
 
-  private static Comparator byteComparator = new Comparator() {
-    @Override
-    public int compare(Object o1, Object o2) {
-      Integer ret = compareNumerics(o1, o2);
-      if (ret == null) {
-        Byte lhs = (Byte) byteConverter.convert(o1);
-        Byte rhs = (Byte) byteConverter.convert(o2);
-        return lhs.compareTo(rhs);
-      }
-      return ret;
+  private static Comparator byteComparator = (o1, o2) -> {
+    Integer ret = compareNumerics(o1, o2);
+    if (ret == null) {
+      Byte lhs = (Byte) byteConverter.convert(o1);
+      Byte rhs = (Byte) byteConverter.convert(o2);
+      return lhs.compareTo(rhs);
     }
+    return ret;
   };
 
   public static Comparator getShortComparator() {
     return shortComparator;
   }
 
-  private static Comparator shortComparator = new Comparator() {
-    @Override
-    public int compare(Object o1, Object o2) {
-      Integer ret = compareNumerics(o1, o2);
-      if (ret == null) {
-        Short lhs = (Short) shortConverter.convert(o1);
-        Short rhs = (Short) shortConverter.convert(o2);
-        return lhs.compareTo(rhs);
-      }
-      return ret;
+  private static Comparator shortComparator = (o1, o2) -> {
+    Integer ret = compareNumerics(o1, o2);
+    if (ret == null) {
+      Short lhs = (Short) shortConverter.convert(o1);
+      Short rhs = (Short) shortConverter.convert(o2);
+      return lhs.compareTo(rhs);
     }
+    return ret;
   };
 
   public static Comparator getBigDecimalComparator() {
     return bigDecimalComparator;
   }
 
-  private static Comparator bigDecimalComparator = new Comparator() {
-    @Override
-    public int compare(Object o1, Object o2) {
-      if (o1 == null && o2 == null) {
-        return 0;
-      }
-      if (o1 == null) {
-        return -1;
-      }
-      if (o2 == null) {
-        return 1;
-      }
-      BigDecimal lhs = (BigDecimal) bigDecimalConverter.convert(o1);
-      BigDecimal rhs = (BigDecimal) bigDecimalConverter.convert(o2);
-      return lhs.compareTo(rhs);
+  private static Comparator bigDecimalComparator = (o1, o2) -> {
+    if (o1 == null && o2 == null) {
+      return 0;
     }
+    if (o1 == null) {
+      return -1;
+    }
+    if (o2 == null) {
+      return 1;
+    }
+    BigDecimal lhs = (BigDecimal) bigDecimalConverter.convert(o1);
+    BigDecimal rhs = (BigDecimal) bigDecimalConverter.convert(o2);
+    return lhs.compareTo(rhs);
   };
 
   public static Comparator getDateComparator() {
     return dateComparator;
   }
 
-  private static Comparator dateComparator = new Comparator() {
-    @Override
-    public int compare(Object o1, Object o2) {
-      if (o1 == null && o2 == null) {
-        return 0;
-      }
-      if (o1 == null) {
-        return -1;
-      }
-      if (o2 == null) {
-        return 1;
-      }
-      Date lhs = (Date) dateConverter.convert(o1);
-      Date rhs = (Date) dateConverter.convert(o2);
-      String l = lhs.toString();
-      String r = rhs.toString();
-
-      return l.compareTo(r);
+  private static Comparator dateComparator = (o1, o2) -> {
+    if (o1 == null && o2 == null) {
+      return 0;
     }
+    if (o1 == null) {
+      return -1;
+    }
+    if (o2 == null) {
+      return 1;
+    }
+    Date lhs = (Date) dateConverter.convert(o1);
+    Date rhs = (Date) dateConverter.convert(o2);
+    String l = lhs.toString();
+    String r = rhs.toString();
+
+    return l.compareTo(r);
   };
 
   public static Comparator getTimeComparator() {
     return timeComparator;
   }
 
-  private static Comparator timeComparator = new Comparator() {
-    @Override
-    public int compare(Object o1, Object o2) {
-      if (o1 == null && o2 == null) {
-        return 0;
-      }
-      if (o1 == null) {
-        return -1;
-      }
-      if (o2 == null) {
-        return 1;
-      }
-      Time lhs = (Time) timeConverter.convert(o1);
-      Time rhs = (Time) timeConverter.convert(o2);
-      String l = lhs.toString();
-      String r = rhs.toString();
-      return l.compareTo(r);
+  private static Comparator timeComparator = (o1, o2) -> {
+    if (o1 == null && o2 == null) {
+      return 0;
     }
+    if (o1 == null) {
+      return -1;
+    }
+    if (o2 == null) {
+      return 1;
+    }
+    Time lhs = (Time) timeConverter.convert(o1);
+    Time rhs = (Time) timeConverter.convert(o2);
+    String l = lhs.toString();
+    String r = rhs.toString();
+    return l.compareTo(r);
   };
 
   public static Comparator getTimestampComparator() {
     return timestampComparator;
   }
 
-  private static Comparator timestampComparator = new Comparator() {
-    @Override
-    public int compare(Object o1, Object o2) {
-      if (o1 == null && o2 == null) {
-        return 0;
-      }
-      if (o1 == null) {
-        return -1;
-      }
-      if (o2 == null) {
-        return 1;
-      }
-      Timestamp lhs = (Timestamp) timestampConverter.convert(o1);
-      Timestamp rhs = (Timestamp) timestampConverter.convert(o2);
-      int ret = lhs.compareTo(rhs);
-      return ret;
+  private static Comparator timestampComparator = (o1, o2) -> {
+    if (o1 == null && o2 == null) {
+      return 0;
     }
+    if (o1 == null) {
+      return -1;
+    }
+    if (o2 == null) {
+      return 1;
+    }
+    Timestamp lhs = (Timestamp) timestampConverter.convert(o1);
+    Timestamp rhs = (Timestamp) timestampConverter.convert(o2);
+    return lhs.compareTo(rhs);
   };
 
   public static Comparator getByteArrayComparator() {
@@ -1028,34 +1005,31 @@ public class DataType {
     return blobComparator;
   }
 
-  private static Comparator blobComparator = new Comparator() {
-    @Override
-    public int compare(Object o1, Object o2) {
-      if (o1 == null && o2 == null) {
-        return 0;
-      }
-      if (o1 == null) {
-        return -1;
-      }
-      if (o2 == null) {
-        return 1;
-      }
-      if (!(o1 instanceof byte[]) || !(o2 instanceof byte[])) {
-        throw new DatabaseException("Datatype mismatch - expecting byte[]: found=" + o1.getClass().getName() + ", found=" + o2.getClass().getName());
-      }
-      byte[] lhs = (byte[]) o1;
-      byte[] rhs = (byte[]) o2;
-
-      for (int i = 0; i < Math.min(lhs.length, rhs.length); i++) {
-        if (lhs[i] < rhs[i]) {
-          return -1;
-        }
-        if (lhs[i] > rhs[i]) {
-          return 1;
-        }
-      }
+  private static Comparator blobComparator = (o1, o2) -> {
+    if (o1 == null && o2 == null) {
       return 0;
     }
+    if (o1 == null) {
+      return -1;
+    }
+    if (o2 == null) {
+      return 1;
+    }
+    if (!(o1 instanceof byte[]) || !(o2 instanceof byte[])) {
+      throw new DatabaseException("Datatype mismatch - expecting byte[]: found=" + o1.getClass().getName() + ", found=" + o2.getClass().getName());
+    }
+    byte[] lhs = (byte[]) o1;
+    byte[] rhs = (byte[]) o2;
+
+    for (int i = 0; i < Math.min(lhs.length, rhs.length); i++) {
+      if (lhs[i] < rhs[i]) {
+        return -1;
+      }
+      if (lhs[i] > rhs[i]) {
+        return 1;
+      }
+    }
+    return 0;
   };
 
   public static interface Incrementer {
@@ -1066,34 +1040,19 @@ public class DataType {
     return intIncrementer;
   }
 
-  private static Incrementer intIncrementer = new Incrementer() {
-    @Override
-    public Object increment(Object value) {
-      return ((Integer) value) + 1;
-    }
-  };
+  private static Incrementer intIncrementer = value -> ((Integer) value) + 1;
 
   public static Incrementer getLongIncrementer() {
     return longIncrementer;
   }
 
-  private static Incrementer longIncrementer = new Incrementer() {
-    @Override
-    public Object increment(Object value) {
-      return ((Long) value) + 1;
-    }
-  };
+  private static Incrementer longIncrementer = value -> ((Long) value) + 1;
 
   public static Incrementer getBigDecimalIncrementer() {
     return bigDecimalIncrementer;
   }
 
-  private static Incrementer bigDecimalIncrementer = new Incrementer() {
-    @Override
-    public Object increment(Object value) {
-      return ((BigDecimal) value).add(new BigDecimal(1));
-    }
-  };
+  private static Incrementer bigDecimalIncrementer = value -> ((BigDecimal) value).add(new BigDecimal(1));
 
 
 
@@ -1103,8 +1062,8 @@ public class DataType {
     BIT(Types.BIT, booleanComparator, booleanConverter, null, null),
     TINYINT(Types.TINYINT, byteComparator, byteConverter, null, null),
     SMALLINT(Types.SMALLINT, shortComparator, shortConverter, null, null),
-    INTEGER(Types.INTEGER, intComparator, intConverter, new Integer(0), intIncrementer),
-    BIGINT(Types.BIGINT, longComparator, longConverter, new Long(0), longIncrementer),
+    INTEGER(Types.INTEGER, intComparator, intConverter, 0, intIncrementer),
+    BIGINT(Types.BIGINT, longComparator, longConverter, 0L, longIncrementer),
     FLOAT(Types.FLOAT, doubleComparator, doubleConverter, null, null),
     REAL(Types.REAL, floatComparator, floatConverter, null, null),
     DOUBLE(Types.DOUBLE, doubleComparator, doubleConverter, null, null),
@@ -1140,7 +1099,7 @@ public class DataType {
     //TIME_WITH_TIMEZONE(Types.TIME_WITH_TIMEZONE, null, null, null),
     //TIMESTAMP_WITH_TIMEZONE(Types.TIMESTAMP_WITH_TIMEZONE, null, null, null),
     PARAMETER(-999999999, null, null, null, null);
-    ;
+
     private final int value;
     private final Comparator comparator;
     private final Incrementer incrementer;
@@ -1223,10 +1182,7 @@ public class DataType {
     }
 
     public static int getTypeForValue(Object lhsValue) {
-      if (lhsValue instanceof String) {
-        return LONGVARCHAR.getValue();
-      }
-      else if (lhsValue instanceof byte[]) {
+      if (lhsValue instanceof String || lhsValue instanceof byte[]) {
         return LONGVARCHAR.getValue();
       }
       if (lhsValue instanceof Long) {

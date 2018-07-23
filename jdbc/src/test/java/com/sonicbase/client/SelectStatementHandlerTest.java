@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -89,7 +88,7 @@ public class SelectStatementHandlerTest {
         "      ]\n" +
         "    }\n" +
         "  ]}\n");
-    serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode) node).withArray("shards"), 1, true, true);
+    serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode) node).withArray("shards"), true, true);
     common.setServersConfig(serversConfig);
 
     final AtomicInteger callCount = new AtomicInteger();
@@ -100,7 +99,7 @@ public class SelectStatementHandlerTest {
       }
 
       public byte[] send(String method,
-                         int shard, long auth_user, ComObject body, Replica replica) {
+                         int shard, long authUser, ComObject body, Replica replica) {
         if (method.equals("DatabaseServer:getConfig")) {
           callCount.incrementAndGet();
         }
@@ -110,29 +109,29 @@ public class SelectStatementHandlerTest {
         }
         else if (method.equals("ReadManager:indexLookup")) {
           ComObject retObj = new ComObject();
-          ComArray array = retObj.putArray(ComObject.Tag.keys, ComObject.Type.byteArrayType);
-          array = retObj.putArray(ComObject.Tag.keyRecords, ComObject.Type.byteArrayType);
-          array = retObj.putArray(ComObject.Tag.records, ComObject.Type.byteArrayType);
+          ComArray array = retObj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
+          array = retObj.putArray(ComObject.Tag.KEY_RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
+          array = retObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
 
           for (int i = 0; i < records.length; i++) {
             byte[] bytes = records[i];
             array.add(bytes);
           }
 
-          retObj.put(ComObject.Tag.currOffset, records.length);
-          retObj.put(ComObject.Tag.countReturned, records.length);
+          retObj.put(ComObject.Tag.CURR_OFFSET, records.length);
+          retObj.put(ComObject.Tag.COUNT_RETURNED, records.length);
 
           return retObj.serialize();
         }
         else if (method.equals("ReadManager:batchIndexLookup")) {
           ComObject retObj = new ComObject();
-          ComArray retKeysArray = retObj.putArray(ComObject.Tag.retKeys, ComObject.Type.objectType);
+          ComArray retKeysArray = retObj.putArray(ComObject.Tag.RET_KEYS, ComObject.Type.OBJECT_TYPE);
 
-          ComArray keys = body.getArray(ComObject.Tag.keys);
+          ComArray keys = body.getArray(ComObject.Tag.KEYS);
           for (Object keyObj : keys.getArray()) {
             ComObject key = (ComObject) keyObj;
 
-            Object[] leftKey = new Object[]{key.getLong(ComObject.Tag.longKey)};
+            Object[] leftKey = new Object[]{key.getLong(ComObject.Tag.LONG_KEY)};
 
             for (int i = 0; i < records.length; i++) {
               Record record = new Record("test", common, records[i]);
@@ -140,12 +139,12 @@ public class SelectStatementHandlerTest {
                 ComObject retEntry = new ComObject();
                 retKeysArray.add(retEntry);
 
-                retEntry.put(ComObject.Tag.offset, i);
-                retEntry.put(ComObject.Tag.keyCount, 0);
+                retEntry.put(ComObject.Tag.OFFSET, i);
+                retEntry.put(ComObject.Tag.KEY_COUNT, 0);
 
-                ComArray keysArray = retEntry.putArray(ComObject.Tag.keyRecords, ComObject.Type.byteArrayType);
-                keysArray = retEntry.putArray(ComObject.Tag.keys, ComObject.Type.byteArrayType);
-                ComArray retRecordsArray = retEntry.putArray(ComObject.Tag.records, ComObject.Type.byteArrayType);
+                ComArray keysArray = retEntry.putArray(ComObject.Tag.KEY_RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
+                keysArray = retEntry.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
+                ComArray retRecordsArray = retEntry.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
                 byte[] bytes = records[i];
                 retRecordsArray.add(bytes);
               }
@@ -156,12 +155,12 @@ public class SelectStatementHandlerTest {
         else if (method.equals("ReadManager:serverSelect")) {
 
           ComObject retObj = new ComObject();
-          retObj.put(ComObject.Tag.legacySelectStatement, body.getByteArray(ComObject.Tag.legacySelectStatement));
+          retObj.put(ComObject.Tag.LEGACY_SELECT_STATEMENT, body.getByteArray(ComObject.Tag.LEGACY_SELECT_STATEMENT));
 
-          ComArray tableArray = retObj.putArray(ComObject.Tag.tableRecords, ComObject.Type.arrayType);
+          ComArray tableArray = retObj.putArray(ComObject.Tag.TABLE_RECORDS, ComObject.Type.ARRAY_TYPE);
           outer:
           for (byte[] record : records) {
-            ComArray recordArray = tableArray.addArray(ComObject.Tag.records, ComObject.Type.byteArrayType);
+            ComArray recordArray = tableArray.addArray(ComObject.Type.BYTE_ARRAY_TYPE);
             recordArray.add(record);
           }
           return retObj.serialize();
@@ -209,8 +208,8 @@ public class SelectStatementHandlerTest {
     SelectStatementImpl selectStatement = SelectStatementHandler.parseSelectStatement(client, new ParameterHandler(), (PlainSelect) selectBody, new AtomicInteger(0));
     assertEquals(selectStatement.getFromTable(), "table1");
     BinaryExpressionImpl where = (BinaryExpressionImpl) selectStatement.getWhereClause();
-    assertEquals(((BinaryExpressionImpl) where.getLeftExpression()).getOperator(), BinaryExpression.Operator.less);
-    assertEquals(((BinaryExpressionImpl) where.getRightExpression()).getOperator(), BinaryExpression.Operator.greater);
+    assertEquals(((BinaryExpressionImpl) where.getLeftExpression()).getOperator(), BinaryExpression.Operator.LESS);
+    assertEquals(((BinaryExpressionImpl) where.getRightExpression()).getOperator(), BinaryExpression.Operator.GREATER);
   }
 
   @Test
@@ -225,7 +224,7 @@ public class SelectStatementHandlerTest {
     SelectStatementImpl selectStatement = SelectStatementHandler.parseSelectStatement(client, new ParameterHandler(), (PlainSelect) selectBody, new AtomicInteger(0));
     assertEquals(selectStatement.getFromTable(), "table1");
     BinaryExpressionImpl where = (BinaryExpressionImpl) selectStatement.getWhereClause();
-    assertEquals(where.getOperator(), BinaryExpression.Operator.or);
+    assertEquals(where.getOperator(), BinaryExpression.Operator.OR);
 
   }
 
@@ -258,9 +257,9 @@ public class SelectStatementHandlerTest {
     SelectStatementImpl selectStatement = SelectStatementHandler.parseSelectStatement(client, new ParameterHandler(), (PlainSelect) selectBody, new AtomicInteger(0));
     assertEquals(selectStatement.getFromTable(), "table1");
     BinaryExpressionImpl where = (BinaryExpressionImpl) selectStatement.getWhereClause();
-    assertEquals(((BinaryExpressionImpl) where.getLeftExpression()).getOperator(), BinaryExpression.Operator.greaterEqual);
-    assertEquals(((BinaryExpressionImpl) where.getRightExpression()).getOperator(), BinaryExpression.Operator.lessEqual);
-    assertEquals(where.getOperator(), BinaryExpression.Operator.and);
+    assertEquals(((BinaryExpressionImpl) where.getLeftExpression()).getOperator(), BinaryExpression.Operator.GREATER_EQUAL);
+    assertEquals(((BinaryExpressionImpl) where.getRightExpression()).getOperator(), BinaryExpression.Operator.LESS_EQUAL);
+    assertEquals(where.getOperator(), BinaryExpression.Operator.AND);
   }
 
   @Test
@@ -387,15 +386,15 @@ public class SelectStatementHandlerTest {
     SelectStatementImpl selectStatement = SelectStatementHandler.parseSelectStatement(client, new ParameterHandler(), (PlainSelect) selectBody, new AtomicInteger(0));
     selectStatement.setTableNames(new String[]{"table2"});
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.legacySelectStatement, selectStatement.serialize());
-    cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-    cobj.put(ComObject.Tag.count, 100);
-    cobj.put(ComObject.Tag.dbName, "test");
-    cobj.put(ComObject.Tag.currOffset, 0L);
-    cobj.put(ComObject.Tag.countReturned, 0L);
+    cobj.put(ComObject.Tag.LEGACY_SELECT_STATEMENT, selectStatement.serialize());
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
+    cobj.put(ComObject.Tag.COUNT, 100);
+    cobj.put(ComObject.Tag.DB_NAME, "test");
+    cobj.put(ComObject.Tag.CURR_OFFSET, 0L);
+    cobj.put(ComObject.Tag.COUNT_RETURNED, 0L);
 
     Set<SelectStatementImpl.DistinctRecord> uniqueRecords = new HashSet<SelectStatementImpl.DistinctRecord>();
-    ExpressionImpl.NextReturn ids = selectStatement.serverSelect("test", false, new String[]{"table2"}, false, null);
+    ExpressionImpl.NextReturn ids = selectStatement.serverSelect("test",  new String[]{"table2"}, false, null);
     selectStatement.applyDistinct("test", new String[]{"table2"}, ids, uniqueRecords);
     ResultSet ret = new ResultSetImpl("test", sql, client, selectStatement, new ParameterHandler(), uniqueRecords,
         new SelectContextImpl(ids, false, new String[]{"table2"}, 0, null,

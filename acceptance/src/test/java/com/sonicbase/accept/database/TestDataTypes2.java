@@ -1,8 +1,6 @@
 package com.sonicbase.accept.database;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
@@ -55,10 +53,6 @@ public class TestDataTypes2 {
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
-    ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
-    array.add(DatabaseServer.FOUR_SERVER_LICENSE);
-    config.put("licenseKeys", array);
-
     DatabaseClient.getServers().clear();
 
     dbServers = new DatabaseServer[4];
@@ -70,10 +64,8 @@ public class TestDataTypes2 {
     for (int i = 0; i < dbServers.length; i++) {
       final int shard = i;
       dbServers[shard] = new DatabaseServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
+      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
       dbServers[shard].setRole(role);
-      dbServers[shard].disableLogProcessor();
-      dbServers[shard].setMinSizeForRepartition(0);
     }
     for (Future future : futures) {
       future.get();
@@ -120,7 +112,7 @@ public class TestDataTypes2 {
 
     client = new DatabaseClient("localhost", 9010, -1, -1, true);
 
-    client.beginRebalance("test", "persons", "_primarykey");
+    client.beginRebalance("test");
 
     while (true) {
       if (client.isRepartitioningComplete("test")) {
@@ -153,16 +145,16 @@ public class TestDataTypes2 {
   public void testComObject() {
     ComObject cobj = new ComObject();
     long duration = 40404022;
-    cobj.put(ComObject.Tag.dbName,"db");
-    cobj.put(ComObject.Tag.id, 100);
-    cobj.put(ComObject.Tag.duration, duration);
+    cobj.put(ComObject.Tag.DB_NAME,"db");
+    cobj.put(ComObject.Tag.ID, 100);
+    cobj.put(ComObject.Tag.DURATION, duration);
 
     byte[] bytes = cobj.serialize();
     cobj = new ComObject(bytes);
-    assertEquals(cobj.getString(ComObject.Tag.dbName), "db");
-    assertEquals((long)cobj.getLong(ComObject.Tag.id), 100);
+    assertEquals(cobj.getString(ComObject.Tag.DB_NAME), "db");
+    assertEquals((long)cobj.getLong(ComObject.Tag.ID), 100);
 
-    assertEquals((long)cobj.getLong(ComObject.Tag.duration), duration);
+    assertEquals((long)cobj.getLong(ComObject.Tag.DURATION), duration);
   }
 }
 

@@ -21,7 +21,6 @@ import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
@@ -160,18 +159,17 @@ public class IndexLookup {
     Timer.Context ctx = DatabaseClient.INDEX_LOOKUP_STATS.time();
     while (true) {
       try {
-        //todo: do we really want to change the view version?
         if (viewVersion == 0) {
           viewVersion = common.getSchemaVersion();
         }
 
         TableSchema tableSchema = common.getTables(expression.dbName).get(expression.getTableName());
-        IndexSchema indexSchema = tableSchema.getIndexes().get(indexName);
+        IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
         int lastShard = -1;
-        boolean currPartitions = false;
-        List<Integer> selectedShards = null;
+        boolean currPartitions;
+        List<Integer> selectedShards;
         int currShardOffset = 0;
-        KeyRecord[][] retKeyRecords = null;
+        KeyRecord[][] retKeyRecords;
         Object[][][] retKeys;
         Record[] recordRet = null;
         AtomicReference<Object[]> nextKey = new AtomicReference<>();
@@ -200,15 +198,14 @@ public class IndexLookup {
           for (int k = 0; k < indexFields.length; k++) {
             fieldOffsets[k] = tableSchema.getFieldOffset(indexFields[k]);
           }
-          Comparator[] comparators = indexSchema.getComparators();
 
           if (nextShard == -2) {
             return new SelectContextImpl();
           }
 
           currPartitions = false;
-          SelectShard selectShard = new SelectShard(common, expression.getOrderByExpressions(), tableSchema, indexSchema,
-              currPartitions, currShardOffset, nextShard, localShard, fieldOffsets).invoke();
+          SelectShard selectShard = new SelectShard(expression.getOrderByExpressions(), tableSchema, indexSchema,
+              currPartitions, currShardOffset, nextShard, localShard).invoke();
           currPartitions = selectShard.isCurrPartitions();
           selectedShards = selectShard.getSelectedShards();
           nextShard = selectShard.getNextShard();
@@ -222,34 +219,7 @@ public class IndexLookup {
             keyOffsets[i] = tableSchema.getFieldOffset(cfields[i]);
           }
 
-          boolean keyContainsColumns = true;
-          if (true || expression.getColumns() == null || expression.getColumns().size() == 0 || expression.getCounters() != null) {
-            keyContainsColumns = false;
-          }
-          else {
-            List<Integer> array = new ArrayList<>();
-            for (ColumnImpl column : expression.getColumns()) {
-              if (column.getTableName() == null || column.getTableName().equals(tableSchema.getName())) {
-                Integer o = tableSchema.getFieldOffset(column.getColumnName());
-                if (o == null) {
-                  continue;
-                }
-                array.add(o);
-              }
-            }
-            for (Integer columnOffset : array) {
-              boolean cfound = false;
-              for (int i = 0; i < keyOffsets.length; i++) {
-                if (columnOffset == keyOffsets[i]) {
-                  cfound = true;
-                }
-              }
-              if (!cfound) {
-                keyContainsColumns = false;
-                break;
-              }
-            }
-          }
+          boolean keyContainsColumns = false;
 
           while (true) {
             lastShard = nextShard;
@@ -257,12 +227,12 @@ public class IndexLookup {
 
             ComObject cobj = buildRequest(expression, topLevelExpression, localLeftValue);
 
-            ComObject retObj = null;
+            ComObject retObj;
             if (expression.isRestrictToThisServer()) {
               retObj = DatabaseServerProxy.indexLookup(client.getDatabaseServer(), cobj, expression.getProcedureContext());
             }
             else {
-              byte[] lookupRet = client.send("ReadManager:indexLookup", localShard, 0, cobj, DatabaseClient.Replica.def);
+              byte[] lookupRet = client.send("ReadManager:indexLookup", localShard, 0, cobj, DatabaseClient.Replica.DEF);
               retObj = new ComObject(lookupRet);
             }
 
@@ -378,47 +348,47 @@ public class IndexLookup {
   private ComObject buildRequest(ExpressionImpl expression, Expression topLevelExpression, Object[] localLeftValue) throws IOException {
     ComObject cobj = new ComObject();
     DatabaseClient client = expression.getClient();
-    cobj.put(ComObject.Tag.dbName, expression.dbName);
+    cobj.put(ComObject.Tag.DB_NAME, expression.dbName);
     if (schemaRetryCount < 2) {
-      cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+      cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
     }
 
-    cobj.put(ComObject.Tag.count, count);
+    cobj.put(ComObject.Tag.COUNT, count);
 
-    cobj.put(ComObject.Tag.isExcpliciteTrans, client.isExplicitTrans());
-    cobj.put(ComObject.Tag.isCommitting, client.isCommitting());
-    cobj.put(ComObject.Tag.transactionId, client.getTransactionId());
-    cobj.put(ComObject.Tag.viewVersion, (long)expression.getViewVersion());
+    cobj.put(ComObject.Tag.IS_EXCPLICITE_TRANS, client.isExplicitTrans());
+    cobj.put(ComObject.Tag.IS_COMMITTING, client.isCommitting());
+    cobj.put(ComObject.Tag.TRANSACTION_ID, client.getTransactionId());
+    cobj.put(ComObject.Tag.VIEW_VERSION, (long)expression.getViewVersion());
 
-    cobj.put(ComObject.Tag.isProbe, expression.isProbe());
+    cobj.put(ComObject.Tag.IS_PROBE, expression.isProbe());
 
-    cobj.put(ComObject.Tag.currOffset, currOffset.get());
-    cobj.put(ComObject.Tag.countReturned, countReturned.get());
+    cobj.put(ComObject.Tag.CURR_OFFSET, currOffset.get());
+    cobj.put(ComObject.Tag.COUNT_RETURNED, countReturned.get());
     if (limit != null) {
-      cobj.put(ComObject.Tag.limitLong, limit.getRowCount());
+      cobj.put(ComObject.Tag.LIMIT_LONG, limit.getRowCount());
     }
     if (offset != null) {
-      cobj.put(ComObject.Tag.offsetLong, offset.getOffset());
+      cobj.put(ComObject.Tag.OFFSET_LONG, offset.getOffset());
     }
     TableSchema tableSchema = client.getCommon().getTables(expression.dbName).get(expression.getTableName());
-    IndexSchema indexSchema = tableSchema.getIndexes().get(indexName);
+    IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
 
-    cobj.put(ComObject.Tag.tableId, tableSchema.getTableId());
-    cobj.put(ComObject.Tag.indexId, indexSchema.getIndexId());
-    cobj.put(ComObject.Tag.forceSelectOnServer, expression.isForceSelectOnServer());
+    cobj.put(ComObject.Tag.TABLE_ID, tableSchema.getTableId());
+    cobj.put(ComObject.Tag.INDEX_ID, indexSchema.getIndexId());
+    cobj.put(ComObject.Tag.FORCE_SELECT_ON_SERVER, expression.isForceSelectOnServer());
 
     if (expression.getParms() != null) {
       byte[] bytes = expression.getParms().serialize();
-      cobj.put(ComObject.Tag.parms, bytes);
+      cobj.put(ComObject.Tag.PARMS, bytes);
     }
 
-    cobj.put(ComObject.Tag.evaluateExpression, evaluateExpression);
+    cobj.put(ComObject.Tag.EVALUATE_EXPRESSION, evaluateExpression);
     if (topLevelExpression != null) {
       byte[] bytes = ExpressionImpl.serializeExpression((ExpressionImpl) topLevelExpression);
-      cobj.put(ComObject.Tag.legacyExpression, bytes);
+      cobj.put(ComObject.Tag.LEGACY_EXPRESSION, bytes);
     }
     if (expression.getOrderByExpressions() != null) {
-      ComArray array = cobj.putArray(ComObject.Tag.orderByExpressions, ComObject.Type.byteArrayType);
+      ComArray array = cobj.putArray(ComObject.Tag.ORDER_BY_EXPRESSIONS, ComObject.Type.BYTE_ARRAY_TYPE);
       for (int j = 0; j < expression.getOrderByExpressions().size(); j++) {
         OrderByExpressionImpl orderByExpression = expression.getOrderByExpressions().get(j);
         byte[] bytes = orderByExpression.serialize();
@@ -427,43 +397,42 @@ public class IndexLookup {
     }
 
     if (localLeftValue != null) {
-      cobj.put(ComObject.Tag.leftKey, DatabaseCommon.serializeTypedKey(localLeftValue));
+      cobj.put(ComObject.Tag.LEFT_KEY, DatabaseCommon.serializeTypedKey(localLeftValue));
     }
     if (leftOriginalKey != null) {
-      cobj.put(ComObject.Tag.originalLeftKey, DatabaseCommon.serializeTypedKey(leftOriginalKey));
+      cobj.put(ComObject.Tag.ORIGINAL_LEFT_KEY, DatabaseCommon.serializeTypedKey(leftOriginalKey));
     }
-    cobj.put(ComObject.Tag.leftOperator, leftOp.getId());
+    cobj.put(ComObject.Tag.LEFT_OPERATOR, leftOp.getId());
 
     if (rightOp != null) {
       if (rightKey != null) {
-        cobj.put(ComObject.Tag.rightKey, DatabaseCommon.serializeTypedKey(rightKey));
+        cobj.put(ComObject.Tag.RIGHT_KEY, DatabaseCommon.serializeTypedKey(rightKey));
       }
 
       if (rightOriginalKey != null) {
-        cobj.put(ComObject.Tag.originalRightKey, DatabaseCommon.serializeTypedKey(rightOriginalKey));
+        cobj.put(ComObject.Tag.ORIGINAL_RIGHT_KEY, DatabaseCommon.serializeTypedKey(rightOriginalKey));
       }
 
-      //out.writeInt(rightOperator.getId());
-      cobj.put(ComObject.Tag.rightOperator, rightOp.getId());
+      cobj.put(ComObject.Tag.RIGHT_OPERATOR, rightOp.getId());
     }
 
-    ComArray columnArray = cobj.putArray(ComObject.Tag.columnOffsets, ComObject.Type.intType);
+    ComArray columnArray = cobj.putArray(ComObject.Tag.COLUMN_OFFSETS, ComObject.Type.INT_TYPE);
     ExpressionImpl.writeColumns(tableSchema, expression.getColumns(), columnArray);
 
     if (expression.getCounters() != null) {
-      ComArray array = cobj.putArray(ComObject.Tag.counters, ComObject.Type.byteArrayType);
+      ComArray array = cobj.putArray(ComObject.Tag.COUNTERS, ComObject.Type.BYTE_ARRAY_TYPE);
       for (int i = 0; i < expression.getCounters().length; i++) {
         array.add(expression.getCounters()[i].serialize());
       }
     }
 
     if (expression.getGroupByContext() != null) {
-      cobj.put(ComObject.Tag.legacyGroupContext, expression.getGroupByContext().serialize(client.getCommon()));
+      cobj.put(ComObject.Tag.LEGACY_GROUP_CONTEXT, expression.getGroupByContext().serialize(client.getCommon()));
     }
 
-    cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-    cobj.put(ComObject.Tag.dbName, expression.dbName);
-    cobj.put(ComObject.Tag.method, "ReadManager:indexLookup");
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
+    cobj.put(ComObject.Tag.DB_NAME, expression.dbName);
+    cobj.put(ComObject.Tag.METHOD, "ReadManager:indexLookup");
     return cobj;
   }
 
@@ -491,25 +460,24 @@ public class IndexLookup {
     public ProcessResponseKeys invoke() throws IOException {
       byte[] keyBytes;
       currRetKeys = null;
-      ComArray keys = retObj.getArray(ComObject.Tag.keys);
-      if (keys != null && keys.getArray().size() != 0) {
+      ComArray keys = retObj.getArray(ComObject.Tag.KEYS);
+      if (keys != null && !keys.getArray().isEmpty()) {
         currRetKeys = new Object[keys.getArray().size()][][];
         DataType.Type[] types = DatabaseCommon.deserializeKeyPrep(tableSchema, (byte[])keys.getArray().get(0));
 
         for (int k = 0; k < keys.getArray().size(); k++) {
           keyBytes = (byte[])keys.getArray().get(k);
-          //Object[] key = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
-          Object[] key = DatabaseCommon.deserializeKey(tableSchema, types,  new DataInputStream(new ByteArrayInputStream(keyBytes)));
+          Object[] key = DatabaseCommon.deserializeKey(types,  new DataInputStream(new ByteArrayInputStream(keyBytes)));
           currRetKeys[k] = new Object[][]{key};
         }
-        if (/*nextKey == null && */currRetKeys.length != 0) {
+        if (currRetKeys.length != 0) {
           nextKey.set(currRetKeys[currRetKeys.length - 1][0]);
         }
       }
 
       currRetKeyRecords = null;
-      ComArray keyRecords = retObj.getArray(ComObject.Tag.keyRecords);
-      if (keyRecords != null && keyRecords.getArray().size() != 0) {
+      ComArray keyRecords = retObj.getArray(ComObject.Tag.KEY_RECORDS);
+      if (keyRecords != null && !keyRecords.getArray().isEmpty()) {
         currRetKeyRecords = new KeyRecord[keyRecords.getArray().size()][];
         currRetKeys = new Object[keyRecords.getArray().size()][][];
 
@@ -566,16 +534,12 @@ public class IndexLookup {
           if (localShard == selectedShards.get(i)) {
             if (nextKey.get() == null && i >= selectedShards.size() - 1) {
               localShard = nextShard = -2;
-              //System.out.println("nextKey == null && > shards");
               break;
             }
             else {
               if (nextKey.get() == null) {
                 localShard = nextShard = selectedShards.get(i + 1);
-                //                    nextKey = indexSchema.getCurrPartitions()[localShard - 1].getUpperKey();
-
                 switchedShards = true;
-                //System.out.println("nextKey == null, nextShard=" + localShard);
               }
               break;
             }
@@ -587,7 +551,6 @@ public class IndexLookup {
   }
 
   private class SelectShard {
-    private DatabaseCommon common;
     private List<OrderByExpressionImpl> orderByExpressions;
     private TableSchema tableSchema;
     private IndexSchema indexSchema;
@@ -595,11 +558,11 @@ public class IndexLookup {
     private int currShardOffset;
     private int nextShard;
     private int localShard;
-    private int[] fieldOffsets;
     private List<Integer> selectedShards;
 
-    public SelectShard(DatabaseCommon common, List<OrderByExpressionImpl> orderByExpressions, TableSchema tableSchema, IndexSchema indexSchema, boolean currPartitions, int currShardOffset, int nextShard, int localShard, int... fieldOffsets) {
-      this.common = common;
+    public SelectShard(List<OrderByExpressionImpl> orderByExpressions, TableSchema tableSchema, IndexSchema indexSchema,
+                       boolean currPartitions, int currShardOffset, int nextShard, int localShard) {
+
       this.orderByExpressions = orderByExpressions;
       this.tableSchema = tableSchema;
       this.indexSchema = indexSchema;
@@ -607,7 +570,6 @@ public class IndexLookup {
       this.currShardOffset = currShardOffset;
       this.nextShard = nextShard;
       this.localShard = localShard;
-      this.fieldOffsets = fieldOffsets;
     }
 
     public boolean isCurrPartitions() {
@@ -627,18 +589,11 @@ public class IndexLookup {
     }
 
     public SelectShard invoke() {
-      int lastShard;
-//      selectedShards = PartitionUtils.findOrderedPartitionForRecord(false, true, fieldOffsets, common, tableSchema,
-//          indexSchema.getName(), orderByExpressions, leftOp, rightOp, leftOriginalKey, rightOriginalKey);
-//      if (selectedShards.size() == 0) {
         currPartitions = true;
-        selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, fieldOffsets, common, tableSchema,
+        selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, tableSchema,
             indexSchema.getName(), orderByExpressions, leftOp, rightOp, leftOriginalKey, rightOriginalKey);
-//      }
-
       if (localShard == -1) {
         localShard = nextShard = selectedShards.get(currShardOffset);
-        lastShard = localShard;
       }
 
       boolean found = false;
@@ -649,7 +604,6 @@ public class IndexLookup {
       }
       if (!found) {
         localShard = nextShard = selectedShards.get(currShardOffset);
-        lastShard = localShard;
       }
       return this;
     }
@@ -716,7 +670,7 @@ public class IndexLookup {
     }
 
     public ProcessResponse invoke() throws IOException {
-      byte[] keyBytes = retObj.getByteArray(ComObject.Tag.keyBytes);
+      byte[] keyBytes = retObj.getByteArray(ComObject.Tag.KEY_BYTES);
       if (keyBytes != null) {
         Object[] retKey = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
         nextKey.set(retKey);
@@ -724,11 +678,11 @@ public class IndexLookup {
       else {
         nextKey.set(null);
       }
-      Long retOffset = retObj.getLong(ComObject.Tag.currOffset);
+      Long retOffset = retObj.getLong(ComObject.Tag.CURR_OFFSET);
       if (retOffset != null) {
         currOffset.set(retOffset);
       }
-      Long retCountReturned = retObj.getLong(ComObject.Tag.countReturned);
+      Long retCountReturned = retObj.getLong(ComObject.Tag.COUNT_RETURNED);
       if (retCountReturned != null) {
         countReturned.set(retCountReturned);
       }
@@ -752,14 +706,13 @@ public class IndexLookup {
       }
 
       if (switchedShards && logger.isDebugEnabled()) {
-        //long id = (Long) currRetRecords[currRetRecords.length - 1].getFields()[tableSchema.getFieldOffset("id")];
         logger.debug("Switched shards: id=" + (nextKey.get() == null ? "null" : (long)nextKey.get()[0]) +
             ", retLen=" + (recordRet == null ? 0 : recordRet.length) + ", count=" + count + ", nextShard=" + nextShard);
       }
 
       processRetCounters(expression.getCounters(), retObj);
 
-      processRetGroupBy(expression.dbName, client, expression.getGroupByContext(), retObj);
+      processRetGroupBy(client, expression.getGroupByContext(), retObj);
 
       if (switchedShards && logger.isDebugEnabled()) {
         long id = currRetRecords.length == 0 ? -1 : (Long) currRetRecords[currRetRecords.length - 1].getFields()[tableSchema.getFieldOffset("id")];
@@ -786,7 +739,7 @@ public class IndexLookup {
     }
 
     private Record[] processRetRecords(String dbName, DatabaseClient client, TableSchema tableSchema, AtomicReference<Object[]> nextKey, ComObject retObj) {
-      ComArray records = retObj.getArray(ComObject.Tag.records);
+      ComArray records = retObj.getArray(ComObject.Tag.RECORDS);
       Record[] currRetRecords = new Record[records == null ? 0 : records.getArray().size()];
       if (currRetRecords.length > 0) {
         String[] primaryKeyFields = null;
@@ -801,6 +754,9 @@ public class IndexLookup {
             break;
           }
         }
+        if (primaryKeyFields == null) {
+          throw new DatabaseException("primary index not found: table=" + tableSchema.getName());
+        }
 
         for (int k = 0; k < currRetRecords.length; k++) {
           byte[] recordBytes = (byte[])records.getArray().get(k);
@@ -808,7 +764,7 @@ public class IndexLookup {
             currRetRecords[k] = new Record(dbName, client.getCommon(), recordBytes, null, false);
           }
           catch (Exception e) {
-            throw e;
+            throw new DatabaseException(e);
           }
         }
         if (/*nextKey == null &&*/ currRetRecords.length != 0) {
@@ -824,7 +780,7 @@ public class IndexLookup {
 
     private void processRetCounters(Counter[] counters, ComObject retObj) throws IOException {
       Counter[] retCounters = null;
-      ComArray countersArray = retObj.getArray(ComObject.Tag.counters);
+      ComArray countersArray = retObj.getArray(ComObject.Tag.COUNTERS);
       if (countersArray != null) {
         retCounters = new Counter[countersArray.getArray().size()];
         for (int i = 0; i < retCounters.length; i++) {
@@ -835,10 +791,10 @@ public class IndexLookup {
       }
     }
 
-    private void processRetGroupBy(String dbName, DatabaseClient client, GroupByContext groupByContext, ComObject retObj) throws IOException {
-      byte[] groupBytes = retObj.getByteArray(ComObject.Tag.legacyGroupContext);
+    private void processRetGroupBy(DatabaseClient client, GroupByContext groupByContext, ComObject retObj) throws IOException {
+      byte[] groupBytes = retObj.getByteArray(ComObject.Tag.LEGACY_GROUP_CONTEXT);
       if (groupBytes != null) {
-        groupByContext.deserialize(groupBytes, client.getCommon(), dbName);
+        groupByContext.deserialize(groupBytes, client.getCommon());
       }
     }
   }

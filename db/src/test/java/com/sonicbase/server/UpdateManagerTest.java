@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -26,7 +25,6 @@ import net.sf.jsqlparser.statement.select.PlainSelect;
 import net.sf.jsqlparser.statement.select.Select;
 import net.sf.jsqlparser.statement.select.SelectBody;
 import org.apache.commons.io.IOUtils;
-import org.jetbrains.annotations.NotNull;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.testng.annotations.*;
@@ -115,7 +113,7 @@ public class UpdateManagerTest {
         "      ]\n" +
         "    }\n" +
         "  ]}\n");
-    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), 1, true, true);
+    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), true, true);
     //when(common.getServersConfig()).thenReturn(serversConfig);
     common.setServersConfig(serversConfig);
     when(server.getCommon()).thenReturn(common);
@@ -138,6 +136,7 @@ public class UpdateManagerTest {
     keys = TestUtils.createKeys(10);
 
     updateManager = new UpdateManager(server);
+    updateManager.initStreamManager();
 
     client = mock(DatabaseClient.class);
     when(client.getCommon()).thenReturn(common);
@@ -145,18 +144,13 @@ public class UpdateManagerTest {
     when(client.getExecutor()).thenReturn(executor);
     transId = new AtomicLong();
     when(client.allocateId(anyString())).thenAnswer(
-        new Answer() {
-          public Object answer(InvocationOnMock invocation) {
-            return transId.incrementAndGet();
-          }
-        });
+        (Answer) invocation -> transId.incrementAndGet());
 
     when(server.getClient()).thenReturn(client);
   }
 
   @AfterMethod
   public void afterMethod() {
-    updateManager.shutdown();
   }
 
   @Test
@@ -164,7 +158,7 @@ public class UpdateManagerTest {
 
     for (int j = 0; j < keys.size(); j++) {
       int tableId = common.getTables("test").get("table1").getTableId();
-      int indexId = common.getTables("test").get("table1").getIndexes().get(indexSchema.getName()).getIndexId();
+      int indexId = common.getTables("test").get("table1").getIndices().get(indexSchema.getName()).getIndexId();
 
       InsertStatementHandler.KeyInfo keyInfo = new InsertStatementHandler.KeyInfo();
       keyInfo.setIndexSchema(indexSchema);
@@ -180,15 +174,15 @@ public class UpdateManagerTest {
           keys.get(j), keyRecord, false);
 
       byte[] keyRecordBytes = keyRecord.serialize(SERIALIZATION_VERSION);
-      cobj.put(ComObject.Tag.keyRecordBytes, keyRecordBytes);
+      cobj.put(ComObject.Tag.KEY_RECORD_BYTES, keyRecordBytes);
 
-      cobj.put(ComObject.Tag.dbName, "test");
-      cobj.put(ComObject.Tag.schemaVersion, 1000);
-      cobj.put(ComObject.Tag.isExcpliciteTrans, false);
-      cobj.put(ComObject.Tag.isCommitting, false);
-      cobj.put(ComObject.Tag.transactionId, 0L);
-      cobj.put(ComObject.Tag.sequence0, 1000L);
-      cobj.put(ComObject.Tag.sequence1, 1000L);
+      cobj.put(ComObject.Tag.DB_NAME, "test");
+      cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
+      cobj.put(ComObject.Tag.IS_EXCPLICITE_TRANS, false);
+      cobj.put(ComObject.Tag.IS_COMMITTING, false);
+      cobj.put(ComObject.Tag.TRANSACTION_ID, 0L);
+      cobj.put(ComObject.Tag.SEQUENCE_0, 1000L);
+      cobj.put(ComObject.Tag.SEQUENCE_1, 1000L);
 
       updateManager.insertIndexEntryByKey(cobj, false);
     }
@@ -203,7 +197,7 @@ public class UpdateManagerTest {
 
     for (int j = 0; j < keys.size(); j++) {
       int tableId = common.getTables("test").get("table1").getTableId();
-      int indexId = common.getTables("test").get("table1").getIndexes().get(indexSchema.getName()).getIndexId();
+      int indexId = common.getTables("test").get("table1").getIndices().get(indexSchema.getName()).getIndexId();
 
       InsertStatementHandler.KeyInfo keyInfo = new InsertStatementHandler.KeyInfo();
       keyInfo.setIndexSchema(indexSchema);
@@ -212,20 +206,20 @@ public class UpdateManagerTest {
       byte[] primaryKeyBytes = DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(j));
 
       ComObject cobj = new ComObject();
-      cobj.put(ComObject.Tag.recordBytes, records[j]);
-      cobj.put(ComObject.Tag.keyBytes, primaryKeyBytes);
+      cobj.put(ComObject.Tag.RECORD_BYTES, records[j]);
+      cobj.put(ComObject.Tag.KEY_BYTES, primaryKeyBytes);
 
-      cobj.put(ComObject.Tag.tableId, tableId);
-      cobj.put(ComObject.Tag.indexId, indexId);
-      cobj.put(ComObject.Tag.originalOffset, j);
-      cobj.put(ComObject.Tag.originalIgnore, false);
-      cobj.put(ComObject.Tag.dbName, "test");
-      cobj.put(ComObject.Tag.schemaVersion, 1000);
-      cobj.put(ComObject.Tag.isExcpliciteTrans, false);
-      cobj.put(ComObject.Tag.isCommitting, false);
-      cobj.put(ComObject.Tag.transactionId, 0L);
-      cobj.put(ComObject.Tag.sequence0, 1000L);
-      cobj.put(ComObject.Tag.sequence1, 1000L);
+      cobj.put(ComObject.Tag.TABLE_ID, tableId);
+      cobj.put(ComObject.Tag.INDEX_ID, indexId);
+      cobj.put(ComObject.Tag.ORIGINAL_OFFSET, j);
+      cobj.put(ComObject.Tag.ORIGINAL_IGNORE, false);
+      cobj.put(ComObject.Tag.DB_NAME, "test");
+      cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
+      cobj.put(ComObject.Tag.IS_EXCPLICITE_TRANS, false);
+      cobj.put(ComObject.Tag.IS_COMMITTING, false);
+      cobj.put(ComObject.Tag.TRANSACTION_ID, 0L);
+      cobj.put(ComObject.Tag.SEQUENCE_0, 1000L);
+      cobj.put(ComObject.Tag.SEQUENCE_1, 1000L);
 
       updateManager.insertIndexEntryByKeyWithRecord(cobj, false);
     }
@@ -236,17 +230,17 @@ public class UpdateManagerTest {
     //test delete
     for (int j = 0; j < 4; j++) {
       ComObject cobj = new ComObject();
-      cobj.put(ComObject.Tag.serializationVersion, DatabaseClient.SERIALIZATION_VERSION);
-      cobj.put(ComObject.Tag.keyBytes, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(j)));
-      cobj.put(ComObject.Tag.schemaVersion, 1000);
-      cobj.put(ComObject.Tag.dbName, "test");
-      cobj.put(ComObject.Tag.tableName, tableSchema.getName());
-      cobj.put(ComObject.Tag.indexName, indexSchema.getName());
-      cobj.put(ComObject.Tag.isExcpliciteTrans, false);
-      cobj.put(ComObject.Tag.isCommitting, false);
-      cobj.put(ComObject.Tag.transactionId, 0L);
-      cobj.put(ComObject.Tag.sequence0, 1000L);
-      cobj.put(ComObject.Tag.sequence1, 1000L);
+      cobj.put(ComObject.Tag.SERIALIZATION_VERSION, DatabaseClient.SERIALIZATION_VERSION);
+      cobj.put(ComObject.Tag.KEY_BYTES, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(j)));
+      cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
+      cobj.put(ComObject.Tag.DB_NAME, "test");
+      cobj.put(ComObject.Tag.TABLE_NAME, tableSchema.getName());
+      cobj.put(ComObject.Tag.INDEX_NAME, indexSchema.getName());
+      cobj.put(ComObject.Tag.IS_EXCPLICITE_TRANS, false);
+      cobj.put(ComObject.Tag.IS_COMMITTING, false);
+      cobj.put(ComObject.Tag.TRANSACTION_ID, 0L);
+      cobj.put(ComObject.Tag.SEQUENCE_0, 1000L);
+      cobj.put(ComObject.Tag.SEQUENCE_1, 1000L);
       updateManager.deleteRecord(cobj, false);
 
       index.remove(keys.get(j));
@@ -263,7 +257,7 @@ public class UpdateManagerTest {
     //test upsert
     for (int j = 0; j < keys.size(); j++) {
       int tableId = common.getTables("test").get("table1").getTableId();
-      int indexId = common.getTables("test").get("table1").getIndexes().get(indexSchema.getName()).getIndexId();
+      int indexId = common.getTables("test").get("table1").getIndices().get(indexSchema.getName()).getIndexId();
 
       InsertStatementHandler.KeyInfo keyInfo = new InsertStatementHandler.KeyInfo();
       keyInfo.setIndexSchema(indexSchema);
@@ -272,20 +266,20 @@ public class UpdateManagerTest {
       byte[] primaryKeyBytes = DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(j));
 
       ComObject cobj = new ComObject();
-      cobj.put(ComObject.Tag.recordBytes, records[j]);
-      cobj.put(ComObject.Tag.keyBytes, primaryKeyBytes);
+      cobj.put(ComObject.Tag.RECORD_BYTES, records[j]);
+      cobj.put(ComObject.Tag.KEY_BYTES, primaryKeyBytes);
 
-      cobj.put(ComObject.Tag.tableId, tableId);
-      cobj.put(ComObject.Tag.indexId, indexId);
-      cobj.put(ComObject.Tag.originalOffset, j);
-      cobj.put(ComObject.Tag.originalIgnore, true);
-      cobj.put(ComObject.Tag.dbName, "test");
-      cobj.put(ComObject.Tag.schemaVersion, 1000);
-      cobj.put(ComObject.Tag.isExcpliciteTrans, false);
-      cobj.put(ComObject.Tag.isCommitting, false);
-      cobj.put(ComObject.Tag.transactionId, 0L);
-      cobj.put(ComObject.Tag.sequence0, 1000L);
-      cobj.put(ComObject.Tag.sequence1, 1000L);
+      cobj.put(ComObject.Tag.TABLE_ID, tableId);
+      cobj.put(ComObject.Tag.INDEX_ID, indexId);
+      cobj.put(ComObject.Tag.ORIGINAL_OFFSET, j);
+      cobj.put(ComObject.Tag.ORIGINAL_IGNORE, true);
+      cobj.put(ComObject.Tag.DB_NAME, "test");
+      cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
+      cobj.put(ComObject.Tag.IS_EXCPLICITE_TRANS, false);
+      cobj.put(ComObject.Tag.IS_COMMITTING, false);
+      cobj.put(ComObject.Tag.TRANSACTION_ID, 0L);
+      cobj.put(ComObject.Tag.SEQUENCE_0, 1000L);
+      cobj.put(ComObject.Tag.SEQUENCE_1, 1000L);
 
       updateManager.insertIndexEntryByKeyWithRecord(cobj, false);
     }
@@ -296,21 +290,21 @@ public class UpdateManagerTest {
 
     for (int j = 0; j < 4; j++) {
       ComObject cobj = new ComObject();
-      cobj.put(ComObject.Tag.dbName, "test");
-      cobj.put(ComObject.Tag.schemaVersion, 1000);
+      cobj.put(ComObject.Tag.DB_NAME, "test");
+      cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
 
-      cobj.put(ComObject.Tag.tableName, tableSchema.getName());
-      cobj.put(ComObject.Tag.indexName, indexSchema.getName());
-      cobj.put(ComObject.Tag.primaryKeyIndexName, indexSchema.getName());
-      cobj.put(ComObject.Tag.isExcpliciteTrans, false);
-      cobj.put(ComObject.Tag.isCommitting, false);
-      cobj.put(ComObject.Tag.transactionId, 0L);
+      cobj.put(ComObject.Tag.TABLE_NAME, tableSchema.getName());
+      cobj.put(ComObject.Tag.INDEX_NAME, indexSchema.getName());
+      cobj.put(ComObject.Tag.PRIMARY_KEY_INDEX_NAME, indexSchema.getName());
+      cobj.put(ComObject.Tag.IS_EXCPLICITE_TRANS, false);
+      cobj.put(ComObject.Tag.IS_COMMITTING, false);
+      cobj.put(ComObject.Tag.TRANSACTION_ID, 0L);
 
       byte[] keyBytes = DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(j));
-      cobj.put(ComObject.Tag.keyBytes, keyBytes);
-      cobj.put(ComObject.Tag.primaryKeyBytes, keyBytes);
-      cobj.put(ComObject.Tag.sequence0, 1000L);
-      cobj.put(ComObject.Tag.sequence1, 1000L);
+      cobj.put(ComObject.Tag.KEY_BYTES, keyBytes);
+      cobj.put(ComObject.Tag.PRIMARY_KEY_BYTES, keyBytes);
+      cobj.put(ComObject.Tag.SEQUENCE_0, 1000L);
+      cobj.put(ComObject.Tag.SEQUENCE_1, 1000L);
 
       updateManager.deleteIndexEntryByKey(cobj, false);
     }
@@ -326,14 +320,14 @@ public class UpdateManagerTest {
 
     //test truncate
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.dbName, "test");
-    cobj.put(ComObject.Tag.schemaVersion, 1000);
-    cobj.put(ComObject.Tag.tableName, tableSchema.getName());
-    cobj.put(ComObject.Tag.phase, "secondary");
+    cobj.put(ComObject.Tag.DB_NAME, "test");
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
+    cobj.put(ComObject.Tag.TABLE_NAME, tableSchema.getName());
+    cobj.put(ComObject.Tag.PHASE, "secondary");
 
     updateManager.truncateTable(cobj, false);
 
-    cobj.put(ComObject.Tag.phase, "primary");
+    cobj.put(ComObject.Tag.PHASE, "primary");
 
     updateManager.truncateTable(cobj, false);
 
@@ -346,7 +340,7 @@ public class UpdateManagerTest {
   public void testBatchInsert() throws SQLException, UnsupportedEncodingException {
 
     InsertStatementHandler handler = new InsertStatementHandler(client);
-    InsertStatementHandler.batch.set(new ArrayList<InsertStatementHandler.InsertRequest>());
+    InsertStatementHandler.getBatch().set(new ArrayList<InsertStatementHandler.InsertRequest>());
 
 
 
@@ -359,18 +353,18 @@ public class UpdateManagerTest {
       insertStatement.setColumns(columns);
       insertStatement.addValue("field1", keys.get(i)[0]);
 
-      handler.doInsert("test", insertStatement, null, 0);
+      handler.doInsert("test", insertStatement, 0);
     }
 
-    when(client.send(eq("UpdateManager:batchInsertIndexEntryByKeyWithRecord"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.def))).thenAnswer(
+    when(client.send(eq("UpdateManager:batchInsertIndexEntryByKeyWithRecord"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.DEF))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
             ComObject cobj = (ComObject) args[3];
-            cobj.put(ComObject.Tag.sequence0, 1000L);
-            cobj.put(ComObject.Tag.sequence1, 1000L);
+            cobj.put(ComObject.Tag.SEQUENCE_0, 1000L);
+            cobj.put(ComObject.Tag.SEQUENCE_1, 1000L);
             ComObject ret = updateManager.batchInsertIndexEntryByKeyWithRecord(cobj, false);
-            ret.put(ComObject.Tag.count, 1);
+            ret.put(ComObject.Tag.COUNT, 1);
             return ret.serialize();
           }
         });
@@ -398,33 +392,33 @@ public class UpdateManagerTest {
       insertStatement.addValue("field2", String.valueOf(keys.get(0)[0]).getBytes("utf-8"));
     //}
 
-    InsertStatementHandler.batch.set(new ArrayList<InsertStatementHandler.InsertRequest>());
+    InsertStatementHandler.getBatch().set(new ArrayList<InsertStatementHandler.InsertRequest>());
 
-    handler.doInsert("test", insertStatement, null, 0);
+    handler.doInsert("test", insertStatement, 0);
 
     final AtomicLong sequence = new AtomicLong(1000);
-    when(client.send(eq("UpdateManager:batchInsertIndexEntryByKeyWithRecord"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.def))).thenAnswer(
+    when(client.send(eq("UpdateManager:batchInsertIndexEntryByKeyWithRecord"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.DEF))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
             ComObject cobj = (ComObject) args[3];
-            cobj.put(ComObject.Tag.sequence0, sequence.incrementAndGet());
-            cobj.put(ComObject.Tag.sequence1, sequence.incrementAndGet());
+            cobj.put(ComObject.Tag.SEQUENCE_0, sequence.incrementAndGet());
+            cobj.put(ComObject.Tag.SEQUENCE_1, sequence.incrementAndGet());
             ComObject ret = updateManager.batchInsertIndexEntryByKeyWithRecord(cobj, false);
-            ret.put(ComObject.Tag.count, 1);
+            ret.put(ComObject.Tag.COUNT, 1);
             return ret.serialize();
           }
         });
 
-    when(client.send(eq("UpdateManager:batchInsertIndexEntryByKey"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.def))).thenAnswer(
+    when(client.send(eq("UpdateManager:batchInsertIndexEntryByKey"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.DEF))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
             ComObject cobj = (ComObject) args[3];
-            cobj.put(ComObject.Tag.sequence0, sequence.incrementAndGet());
-            cobj.put(ComObject.Tag.sequence1, sequence.incrementAndGet());
+            cobj.put(ComObject.Tag.SEQUENCE_0, sequence.incrementAndGet());
+            cobj.put(ComObject.Tag.SEQUENCE_1, sequence.incrementAndGet());
             ComObject ret = updateManager.batchInsertIndexEntryByKey(cobj, false);
-            ret.put(ComObject.Tag.count, 1);
+            ret.put(ComObject.Tag.COUNT, 1);
             return ret.serialize();
           }
         });
@@ -443,9 +437,9 @@ public class UpdateManagerTest {
           new Record("test", common, records[j]).getFields()[1]);
     }
 
-    InsertStatementHandler.batch.set(new ArrayList<InsertStatementHandler.InsertRequest>());
+    InsertStatementHandler.getBatch().set(new ArrayList<InsertStatementHandler.InsertRequest>());
 
-    handler.doInsert("test", insertStatement, null, 0);
+    handler.doInsert("test", insertStatement, 0);
 
     ret = handler.executeBatch();
     assertEquals(ret[0], BATCH_STATUS_FAILED);
@@ -457,9 +451,9 @@ public class UpdateManagerTest {
 
     InsertStatementHandler handler = new InsertStatementHandler(client);
     InsertStatementImpl insertStatement = new InsertStatementImpl(client);
-    for (Map.Entry<String, IndexSchema> schema : tableSchema.getIndexes().entrySet()) {
+    for (Map.Entry<String, IndexSchema> schema : tableSchema.getIndices().entrySet()) {
       if (schema.getValue().getName().equals("stringIndex")) {
-        tableSchema.getIndexes().remove(schema.getKey());
+        tableSchema.getIndices().remove(schema.getKey());
         break;
       }
     }
@@ -480,33 +474,33 @@ public class UpdateManagerTest {
       insertStatement.addValue("field2", String.valueOf(keys.get(i)[0]).getBytes("utf-8"));
     }
 
-    InsertStatementHandler.batch.set(new ArrayList<InsertStatementHandler.InsertRequest>());
+    InsertStatementHandler.getBatch().set(new ArrayList<InsertStatementHandler.InsertRequest>());
 
-    handler.doInsert("test", insertStatement, null, 0);
+    handler.doInsert("test", insertStatement, 0);
 
     final AtomicLong sequence = new AtomicLong(1000);
-    when(client.send(eq("UpdateManager:batchInsertIndexEntryByKeyWithRecord"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.def))).thenAnswer(
+    when(client.send(eq("UpdateManager:batchInsertIndexEntryByKeyWithRecord"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.DEF))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
             ComObject cobj = (ComObject) args[3];
-            cobj.put(ComObject.Tag.sequence0, sequence.incrementAndGet());
-            cobj.put(ComObject.Tag.sequence1, sequence.incrementAndGet());
+            cobj.put(ComObject.Tag.SEQUENCE_0, sequence.incrementAndGet());
+            cobj.put(ComObject.Tag.SEQUENCE_1, sequence.incrementAndGet());
             ComObject ret = updateManager.batchInsertIndexEntryByKeyWithRecord(cobj, false);
-            ret.put(ComObject.Tag.count, 1);
+            ret.put(ComObject.Tag.COUNT, 1);
             return ret.serialize();
           }
         });
 
-    when(client.send(eq("UpdateManager:batchInsertIndexEntryByKey"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.def))).thenAnswer(
+    when(client.send(eq("UpdateManager:batchInsertIndexEntryByKey"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.DEF))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
             ComObject cobj = (ComObject) args[3];
-            cobj.put(ComObject.Tag.sequence0, sequence.incrementAndGet());
-            cobj.put(ComObject.Tag.sequence1, sequence.incrementAndGet());
+            cobj.put(ComObject.Tag.SEQUENCE_0, sequence.incrementAndGet());
+            cobj.put(ComObject.Tag.SEQUENCE_1, sequence.incrementAndGet());
             ComObject ret = updateManager.batchInsertIndexEntryByKey(cobj, false);
-            ret.put(ComObject.Tag.count, 1);
+            ret.put(ComObject.Tag.COUNT, 1);
             return ret.serialize();
           }
         });
@@ -523,18 +517,18 @@ public class UpdateManagerTest {
     TestUtils.createStringIndexSchema(tableSchema);
 
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.dbName, "test");
-    cobj.put(ComObject.Tag.tableName, "table1");
-    cobj.put(ComObject.Tag.indexName, "stringIndex");
+    cobj.put(ComObject.Tag.DB_NAME, "test");
+    cobj.put(ComObject.Tag.TABLE_NAME, "table1");
+    cobj.put(ComObject.Tag.INDEX_NAME, "stringIndex");
 
 
-    when(client.send(eq("UpdateManager:insertIndexEntryByKey"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.def))).thenAnswer(
+    when(client.send(eq("UpdateManager:insertIndexEntryByKey"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.DEF))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
             ComObject cobj = (ComObject) args[3];
-            cobj.put(ComObject.Tag.sequence0, 1000L);
-            cobj.put(ComObject.Tag.sequence1, 1000L);
+            cobj.put(ComObject.Tag.SEQUENCE_0, 1000L);
+            cobj.put(ComObject.Tag.SEQUENCE_1, 1000L);
             updateManager.insertIndexEntryByKey(cobj, false);
             return null;
           }
@@ -568,33 +562,33 @@ public class UpdateManagerTest {
           record.getFields()[2]);
     }
 
-    InsertStatementHandler.batch.set(new ArrayList<InsertStatementHandler.InsertRequest>());
+    InsertStatementHandler.getBatch().set(new ArrayList<InsertStatementHandler.InsertRequest>());
 
-    handler.doInsert("test", insertStatement, null, 0);
+    handler.doInsert("test", insertStatement, 0);
 
     final AtomicLong sequence = new AtomicLong(1000);
-    when(client.send(eq("UpdateManager:batchInsertIndexEntryByKeyWithRecord"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.def))).thenAnswer(
+    when(client.send(eq("UpdateManager:batchInsertIndexEntryByKeyWithRecord"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.DEF))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
             ComObject cobj = (ComObject) args[3];
-            cobj.put(ComObject.Tag.sequence0, sequence.incrementAndGet());
-            cobj.put(ComObject.Tag.sequence1, sequence.incrementAndGet());
+            cobj.put(ComObject.Tag.SEQUENCE_0, sequence.incrementAndGet());
+            cobj.put(ComObject.Tag.SEQUENCE_1, sequence.incrementAndGet());
             ComObject ret = updateManager.batchInsertIndexEntryByKeyWithRecord(cobj, false);
-            ret.put(ComObject.Tag.count, 1);
+            ret.put(ComObject.Tag.COUNT, 1);
             return ret.serialize();
           }
         });
 
-    when(client.send(eq("UpdateManager:batchInsertIndexEntryByKey"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.def))).thenAnswer(
+    when(client.send(eq("UpdateManager:batchInsertIndexEntryByKey"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.DEF))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
             ComObject cobj = (ComObject) args[3];
-            cobj.put(ComObject.Tag.sequence0, sequence.incrementAndGet());
-            cobj.put(ComObject.Tag.sequence1, sequence.incrementAndGet());
+            cobj.put(ComObject.Tag.SEQUENCE_0, sequence.incrementAndGet());
+            cobj.put(ComObject.Tag.SEQUENCE_1, sequence.incrementAndGet());
             ComObject ret = updateManager.batchInsertIndexEntryByKey(cobj, false);
-            ret.put(ComObject.Tag.count, 1);
+            ret.put(ComObject.Tag.COUNT, 1);
             return ret.serialize();
           }
         });
@@ -609,35 +603,35 @@ public class UpdateManagerTest {
     assertEquals(stringIndex.size(), 1);
 
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.dbName, "test");
-    cobj.put(ComObject.Tag.tableName, "table1");
-    cobj.put(ComObject.Tag.indexName, "stringIndex");
+    cobj.put(ComObject.Tag.DB_NAME, "test");
+    cobj.put(ComObject.Tag.TABLE_NAME, "table1");
+    cobj.put(ComObject.Tag.INDEX_NAME, "stringIndex");
 
 
-    when(client.send(eq("UpdateManager:insertIndexEntryByKey"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.def))).thenAnswer(
+    when(client.send(eq("UpdateManager:insertIndexEntryByKey"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.DEF))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
             ComObject cobj = (ComObject) args[3];
-            cobj.put(ComObject.Tag.sequence0, 1000L);
-            cobj.put(ComObject.Tag.sequence1, 1000L);
+            cobj.put(ComObject.Tag.SEQUENCE_0, 1000L);
+            cobj.put(ComObject.Tag.SEQUENCE_1, 1000L);
             updateManager.insertIndexEntryByKey(cobj, false);
             return null;
           }
         });
 
     cobj = new ComObject();
-    cobj.put(ComObject.Tag.dbName, "test");
-    cobj.put(ComObject.Tag.schemaVersion, 1000);
-    cobj.put(ComObject.Tag.primaryKeyBytes, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
-    cobj.put(ComObject.Tag.tableName, "table1");
-    cobj.put(ComObject.Tag.isExcpliciteTrans, false);
-    cobj.put(ComObject.Tag.isCommitting, false);
-    cobj.put(ComObject.Tag.transactionId, 0L);
-    cobj.put(ComObject.Tag.sequence0, 1000L);
-    cobj.put(ComObject.Tag.sequence1, 1000L);
+    cobj.put(ComObject.Tag.DB_NAME, "test");
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
+    cobj.put(ComObject.Tag.PRIMARY_KEY_BYTES, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
+    cobj.put(ComObject.Tag.TABLE_NAME, "table1");
+    cobj.put(ComObject.Tag.IS_EXCPLICITE_TRANS, false);
+    cobj.put(ComObject.Tag.IS_COMMITTING, false);
+    cobj.put(ComObject.Tag.TRANSACTION_ID, 0L);
+    cobj.put(ComObject.Tag.SEQUENCE_0, 1000L);
+    cobj.put(ComObject.Tag.SEQUENCE_1, 1000L);
     byte[] bytes = records[0];
-    cobj.put(ComObject.Tag.recordBytes, bytes);
+    cobj.put(ComObject.Tag.RECORD_BYTES, bytes);
     updateManager.deleteIndexEntry(cobj, false);
 
     assertEquals(stringIndex.size(), 0);
@@ -663,33 +657,33 @@ public class UpdateManagerTest {
           record.getFields()[2]);
     }
 
-    InsertStatementHandler.batch.set(new ArrayList<InsertStatementHandler.InsertRequest>());
+    InsertStatementHandler.getBatch().set(new ArrayList<>());
 
-    handler.doInsert("test", insertStatement, null, 0);
+    handler.doInsert("test", insertStatement, 0);
 
     final AtomicLong sequence = new AtomicLong(1000);
-    when(client.send(eq("UpdateManager:batchInsertIndexEntryByKeyWithRecord"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.def))).thenAnswer(
+    when(client.send(eq("UpdateManager:batchInsertIndexEntryByKeyWithRecord"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.DEF))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
             ComObject cobj = (ComObject) args[3];
-            cobj.put(ComObject.Tag.sequence0, sequence.incrementAndGet());
-            cobj.put(ComObject.Tag.sequence1, sequence.incrementAndGet());
+            cobj.put(ComObject.Tag.SEQUENCE_0, sequence.incrementAndGet());
+            cobj.put(ComObject.Tag.SEQUENCE_1, sequence.incrementAndGet());
             ComObject ret = updateManager.batchInsertIndexEntryByKeyWithRecord(cobj, false);
-            ret.put(ComObject.Tag.count, 1);
+            ret.put(ComObject.Tag.COUNT, 1);
             return ret.serialize();
           }
         });
 
-    when(client.send(eq("UpdateManager:batchInsertIndexEntryByKey"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.def))).thenAnswer(
+    when(client.send(eq("UpdateManager:batchInsertIndexEntryByKey"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.DEF))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
             ComObject cobj = (ComObject) args[3];
-            cobj.put(ComObject.Tag.sequence0, sequence.incrementAndGet());
-            cobj.put(ComObject.Tag.sequence1, sequence.incrementAndGet());
+            cobj.put(ComObject.Tag.SEQUENCE_0, sequence.incrementAndGet());
+            cobj.put(ComObject.Tag.SEQUENCE_1, sequence.incrementAndGet());
             ComObject ret = updateManager.batchInsertIndexEntryByKey(cobj, false);
-            ret.put(ComObject.Tag.count, 1);
+            ret.put(ComObject.Tag.COUNT, 1);
             return ret.serialize();
           }
         });
@@ -704,37 +698,37 @@ public class UpdateManagerTest {
     assertEquals(stringIndex.size(), 1);
 
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.dbName, "test");
-    cobj.put(ComObject.Tag.tableName, "table1");
-    cobj.put(ComObject.Tag.indexName, "stringIndex");
+    cobj.put(ComObject.Tag.DB_NAME, "test");
+    cobj.put(ComObject.Tag.TABLE_NAME, "table1");
+    cobj.put(ComObject.Tag.INDEX_NAME, "stringIndex");
 
 
-    when(client.send(eq("UpdateManager:insertIndexEntryByKey"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.def))).thenAnswer(
+    when(client.send(eq("UpdateManager:insertIndexEntryByKey"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.DEF))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
             ComObject cobj = (ComObject) args[3];
-            cobj.put(ComObject.Tag.sequence0, 1000L);
-            cobj.put(ComObject.Tag.sequence1, 1000L);
+            cobj.put(ComObject.Tag.SEQUENCE_0, 1000L);
+            cobj.put(ComObject.Tag.SEQUENCE_1, 1000L);
             updateManager.insertIndexEntryByKey(cobj, false);
             return null;
           }
         });
 
     cobj = new ComObject();
-    cobj.put(ComObject.Tag.dbName, "test");
-    cobj.put(ComObject.Tag.schemaVersion, 1000);
-    cobj.put(ComObject.Tag.tableName, "table1");
-    cobj.put(ComObject.Tag.indexName, indexSchema.getName());
-    cobj.put(ComObject.Tag.isExcpliciteTrans, false);
-    cobj.put(ComObject.Tag.isCommitting, false);
-    cobj.put(ComObject.Tag.transactionId, 0L);
+    cobj.put(ComObject.Tag.DB_NAME, "test");
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
+    cobj.put(ComObject.Tag.TABLE_NAME, "table1");
+    cobj.put(ComObject.Tag.INDEX_NAME, indexSchema.getName());
+    cobj.put(ComObject.Tag.IS_EXCPLICITE_TRANS, false);
+    cobj.put(ComObject.Tag.IS_COMMITTING, false);
+    cobj.put(ComObject.Tag.TRANSACTION_ID, 0L);
     Object[] newPrimaryKey = keys.get(0);
-    cobj.put(ComObject.Tag.primaryKeyBytes, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), newPrimaryKey));
+    cobj.put(ComObject.Tag.PRIMARY_KEY_BYTES, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), newPrimaryKey));
     Record record = createNewRecord(common, tableSchema);
-    cobj.put(ComObject.Tag.bytes, record.serialize(client.getCommon(), SERIALIZATION_VERSION));
-    cobj.put(ComObject.Tag.sequence0, 1000L);
-    cobj.put(ComObject.Tag.sequence1, 1000L);
+    cobj.put(ComObject.Tag.BYTES, record.serialize(client.getCommon(), SERIALIZATION_VERSION));
+    cobj.put(ComObject.Tag.SEQUENCE_0, 1000L);
+    cobj.put(ComObject.Tag.SEQUENCE_1, 1000L);
 
     updateManager.updateRecord(cobj, false);
 
@@ -784,7 +778,7 @@ public class UpdateManagerTest {
   public void testTransactionsCommit() throws IOException, SQLException {
 
     int tableId = common.getTables("test").get("table1").getTableId();
-    int indexId = common.getTables("test").get("table1").getIndexes().get(indexSchema.getName()).getIndexId();
+    int indexId = common.getTables("test").get("table1").getIndices().get(indexSchema.getName()).getIndexId();
 
     InsertStatementHandler.KeyInfo keyInfo = new InsertStatementHandler.KeyInfo();
     keyInfo.setIndexSchema(indexSchema);
@@ -800,15 +794,15 @@ public class UpdateManagerTest {
         keys.get(9), keyRecord, false);
 
     byte[] keyRecordBytes = keyRecord.serialize(SERIALIZATION_VERSION);
-    cobj.put(ComObject.Tag.keyRecordBytes, keyRecordBytes);
+    cobj.put(ComObject.Tag.KEY_RECORD_BYTES, keyRecordBytes);
 
-    cobj.put(ComObject.Tag.dbName, "test");
-    cobj.put(ComObject.Tag.schemaVersion, 1000);
-    cobj.put(ComObject.Tag.isExcpliciteTrans, true);
-    cobj.put(ComObject.Tag.isCommitting, false);
-    cobj.put(ComObject.Tag.transactionId, 1L);
-    cobj.put(ComObject.Tag.sequence0, 1000L);
-    cobj.put(ComObject.Tag.sequence1, 1000L);
+    cobj.put(ComObject.Tag.DB_NAME, "test");
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
+    cobj.put(ComObject.Tag.IS_EXCPLICITE_TRANS, true);
+    cobj.put(ComObject.Tag.IS_COMMITTING, false);
+    cobj.put(ComObject.Tag.TRANSACTION_ID, 1L);
+    cobj.put(ComObject.Tag.SEQUENCE_0, 1000L);
+    cobj.put(ComObject.Tag.SEQUENCE_1, 1000L);
 
     updateManager.insertIndexEntryByKey(cobj, false);
 
@@ -830,39 +824,39 @@ public class UpdateManagerTest {
           record.getFields()[2]);
     }
 
-    InsertStatementHandler.batch.set(new ArrayList<InsertStatementHandler.InsertRequest>());
+    InsertStatementHandler.getBatch().set(new ArrayList<>());
 
-    handler.doInsert("test", insertStatement, null, 0);
+    handler.doInsert("test", insertStatement, 0);
 
     final AtomicLong sequence = new AtomicLong(1000);
-    when(client.send(eq("UpdateManager:batchInsertIndexEntryByKeyWithRecord"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.def))).thenAnswer(
+    when(client.send(eq("UpdateManager:batchInsertIndexEntryByKeyWithRecord"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.DEF))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
             ComObject cobj = (ComObject) args[3];
-            cobj.put(ComObject.Tag.isExcpliciteTrans, true);
-            cobj.put(ComObject.Tag.isCommitting, false);
-            cobj.put(ComObject.Tag.transactionId, 1L);
-            cobj.put(ComObject.Tag.sequence0, sequence.incrementAndGet());
-            cobj.put(ComObject.Tag.sequence1, sequence.incrementAndGet());
+            cobj.put(ComObject.Tag.IS_EXCPLICITE_TRANS, true);
+            cobj.put(ComObject.Tag.IS_COMMITTING, false);
+            cobj.put(ComObject.Tag.TRANSACTION_ID, 1L);
+            cobj.put(ComObject.Tag.SEQUENCE_0, sequence.incrementAndGet());
+            cobj.put(ComObject.Tag.SEQUENCE_1, sequence.incrementAndGet());
             ComObject ret = updateManager.batchInsertIndexEntryByKeyWithRecord(cobj, false);
-            ret.put(ComObject.Tag.count, 1);
+            ret.put(ComObject.Tag.COUNT, 1);
             return ret.serialize();
           }
         });
 
-    when(client.send(eq("UpdateManager:batchInsertIndexEntryByKey"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.def))).thenAnswer(
+    when(client.send(eq("UpdateManager:batchInsertIndexEntryByKey"), anyInt(), anyInt(), (ComObject)anyObject(), eq(DatabaseClient.Replica.DEF))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
             ComObject cobj = (ComObject) args[3];
-            cobj.put(ComObject.Tag.isExcpliciteTrans, true);
-            cobj.put(ComObject.Tag.isCommitting, false);
-            cobj.put(ComObject.Tag.transactionId, 1L);
-            cobj.put(ComObject.Tag.sequence0, sequence.incrementAndGet());
-            cobj.put(ComObject.Tag.sequence1, sequence.incrementAndGet());
+            cobj.put(ComObject.Tag.IS_EXCPLICITE_TRANS, true);
+            cobj.put(ComObject.Tag.IS_COMMITTING, false);
+            cobj.put(ComObject.Tag.TRANSACTION_ID, 1L);
+            cobj.put(ComObject.Tag.SEQUENCE_0, sequence.incrementAndGet());
+            cobj.put(ComObject.Tag.SEQUENCE_1, sequence.incrementAndGet());
             ComObject ret = updateManager.batchInsertIndexEntryByKey(cobj, false);
-            ret.put(ComObject.Tag.count, 1);
+            ret.put(ComObject.Tag.COUNT, 1);
             return ret.serialize();
           }
         });
@@ -874,11 +868,11 @@ public class UpdateManagerTest {
     }
 
     cobj = new ComObject();
-    cobj.put(ComObject.Tag.dbName, "test");
-    cobj.put(ComObject.Tag.schemaVersion, 1000);
-    cobj.put(ComObject.Tag.transactionId, 1L);
-    cobj.put(ComObject.Tag.sequence0, 1000L);
-    cobj.put(ComObject.Tag.sequence1, 1000L);
+    cobj.put(ComObject.Tag.DB_NAME, "test");
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
+    cobj.put(ComObject.Tag.TRANSACTION_ID, 1L);
+    cobj.put(ComObject.Tag.SEQUENCE_0, 1000L);
+    cobj.put(ComObject.Tag.SEQUENCE_1, 1000L);
 
     updateManager.commit(cobj, false);
 
@@ -897,7 +891,7 @@ public class UpdateManagerTest {
 
     for (int j = 0; j < keys.size(); j++) {
       int tableId = common.getTables("test").get("table1").getTableId();
-      int indexId = common.getTables("test").get("table1").getIndexes().get(indexSchema.getName()).getIndexId();
+      int indexId = common.getTables("test").get("table1").getIndices().get(indexSchema.getName()).getIndexId();
 
       InsertStatementHandler.KeyInfo keyInfo = new InsertStatementHandler.KeyInfo();
       keyInfo.setIndexSchema(indexSchema);
@@ -913,15 +907,15 @@ public class UpdateManagerTest {
           keys.get(j), keyRecord, false);
 
       byte[] keyRecordBytes = keyRecord.serialize(SERIALIZATION_VERSION);
-      cobj.put(ComObject.Tag.keyRecordBytes, keyRecordBytes);
+      cobj.put(ComObject.Tag.KEY_RECORD_BYTES, keyRecordBytes);
 
-      cobj.put(ComObject.Tag.dbName, "test");
-      cobj.put(ComObject.Tag.schemaVersion, 1000);
-      cobj.put(ComObject.Tag.isExcpliciteTrans, true);
-      cobj.put(ComObject.Tag.isCommitting, false);
-      cobj.put(ComObject.Tag.transactionId, 1L);
-      cobj.put(ComObject.Tag.sequence0, 1000L);
-      cobj.put(ComObject.Tag.sequence1, 1000L);
+      cobj.put(ComObject.Tag.DB_NAME, "test");
+      cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
+      cobj.put(ComObject.Tag.IS_EXCPLICITE_TRANS, true);
+      cobj.put(ComObject.Tag.IS_COMMITTING, false);
+      cobj.put(ComObject.Tag.TRANSACTION_ID, 1L);
+      cobj.put(ComObject.Tag.SEQUENCE_0, 1000L);
+      cobj.put(ComObject.Tag.SEQUENCE_1, 1000L);
 
       updateManager.insertIndexEntryByKey(cobj, false);
     }
@@ -931,11 +925,11 @@ public class UpdateManagerTest {
     }
 
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.dbName, "test");
-    cobj.put(ComObject.Tag.schemaVersion, 1000);
-    cobj.put(ComObject.Tag.transactionId, 1L);
-    cobj.put(ComObject.Tag.sequence0, 1000L);
-    cobj.put(ComObject.Tag.sequence1, 1000L);
+    cobj.put(ComObject.Tag.DB_NAME, "test");
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
+    cobj.put(ComObject.Tag.TRANSACTION_ID, 1L);
+    cobj.put(ComObject.Tag.SEQUENCE_0, 1000L);
+    cobj.put(ComObject.Tag.SEQUENCE_1, 1000L);
 
     updateManager.rollback(cobj, false);
 
@@ -947,7 +941,6 @@ public class UpdateManagerTest {
     assertNull(trans);
   }
 
-  @NotNull
   private ResultSet createResultSetMock() throws SQLException, UnsupportedEncodingException {
     ResultSet rs = mock(ResultSet.class);
     when(rs.getLong(eq("field1"))).thenReturn(200L);
@@ -970,17 +963,17 @@ public class UpdateManagerTest {
       @Override
       public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
         ComObject retObj = new ComObject();
-        ComArray array = retObj.putArray(ComObject.Tag.keys, ComObject.Type.byteArrayType);
-        array = retObj.putArray(ComObject.Tag.keyRecords, ComObject.Type.byteArrayType);
-        array = retObj.putArray(ComObject.Tag.records, ComObject.Type.byteArrayType);
+        ComArray array = retObj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
+        array = retObj.putArray(ComObject.Tag.KEY_RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
+        array = retObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
 
         for (int i = 0; i < records.length; i++) {
           byte[] bytes = records[i];
           array.add(bytes);
         }
 
-        retObj.put(ComObject.Tag.currOffset, records.length);
-        retObj.put(ComObject.Tag.countReturned, records.length);
+        retObj.put(ComObject.Tag.CURR_OFFSET, records.length);
+        retObj.put(ComObject.Tag.COUNT_RETURNED, records.length);
 
         return retObj.serialize();
       }
@@ -1001,9 +994,9 @@ public class UpdateManagerTest {
     }
 
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.dbName, "test");
-    cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-    cobj.put(ComObject.Tag.method, "UpdateManager:insertWithSelect");
+    cobj.put(ComObject.Tag.DB_NAME, "test");
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
+    cobj.put(ComObject.Tag.METHOD, "UpdateManager:insertWithSelect");
 
     SelectStatementImpl selectStatement = insertStatement.getSelect();
     if (select != null) {

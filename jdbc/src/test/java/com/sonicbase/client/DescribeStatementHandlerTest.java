@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.client;
 
 import com.fasterxml.jackson.databind.JsonNode;

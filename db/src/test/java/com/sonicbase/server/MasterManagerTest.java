@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,7 +33,7 @@ public class MasterManagerTest {
         return mockLogger;
       }
     };
-    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", true);
+    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log");
     DatabaseClient client = mock(DatabaseClient.class);
     server.setDatabaseClient(client);
     server.setReplicationFactor(2);

@@ -42,10 +42,6 @@ public class TestMisc {
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
-    ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
-    array.add(DatabaseServer.FOUR_SERVER_LICENSE);
-    config.put("licenseKeys", array);
-
     DatabaseClient.getServers().clear();
 
     final DatabaseServer[] dbServers = new DatabaseServer[4];
@@ -61,9 +57,8 @@ public class TestMisc {
 //          String role = "primaryMaster";
 
       dbServers[shard] = new DatabaseServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
+      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
       dbServers[shard].setRole(role);
-      dbServers[shard].disableLogProcessor();
 //          return null;
 //        }
 //      }));

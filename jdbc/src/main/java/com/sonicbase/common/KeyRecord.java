@@ -17,8 +17,8 @@ public class KeyRecord {
   private short sequence2;
   private int dbViewNumber;
   private short dbViewFlags;
-  public static short DB_VIEW_FLAG_DELETING = 0x1;
-  public static short DB_VIEW_FLAG_ADDING = 0x2;
+  public static final short DB_VIEW_FLAG_DELETING = 0x1;
+  public static final  short DB_VIEW_FLAG_ADDING = 0x2;
 
   public KeyRecord() {
 
@@ -32,7 +32,7 @@ public class KeyRecord {
     try {
 
       DataInputStream sin = new DataInputStream(new ByteArrayInputStream(bytes));
-      short serializationVersion = sin.readShort();
+      sin.readShort(); // serializationVersion
 
       sequence0 = sin.readLong();
       sequence1 = sin.readLong();

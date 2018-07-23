@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.query.impl;
 
 import com.sonicbase.client.DatabaseClient;
@@ -50,7 +49,6 @@ public class ParenthesisImplTest {
     parens.setCounters(null);
     parens.setDbName("test");
     parens.setDebug(false);
-    parens.setLimit(null);
     parens.setOrderByExpressions(null);
     parens.setParms(null);
     parens.setRecordCache(new ExpressionImpl.RecordCache());

@@ -7,8 +7,9 @@ import com.sonicbase.common.ComObject;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.ThreadUtil;
 import com.sonicbase.query.DatabaseException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Timer;
@@ -18,9 +19,12 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+@SuppressWarnings("squid:S1172") // all methods called from method invoker must have cobj and replayed command parms
 public class MasterManager {
 
-  private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
+  public static final String NONE_STR = "__none__";
+  private static Logger logger = LoggerFactory.getLogger(MasterManager.class);
+
   private final com.sonicbase.server.DatabaseServer server;
   private Timer fixSchemaTimer;
   private ArrayList<Thread> masterMonitorThreadsForShards;
@@ -72,22 +76,20 @@ public class MasterManager {
       if (server.getShard() != 0) {
         return;
       }
-      Thread thread = new Thread(new Runnable() {
-        @Override
-        public void run() {
-          while (!server.getShutdown()) {
+      Thread thread = new Thread(() -> {
+        while (!server.getShutdown()) {
+          try {
+            promoteToMaster(null, false);
+            break;
+          }
+          catch (Exception e) {
+            logger.error("Error promoting to master", e);
             try {
-              promoteToMaster(null, false);
-              break;
+              Thread.sleep(timeoutOverride == null ? 2000 : timeoutOverride);
             }
-            catch (Exception e) {
-              logger.error("Error promoting to master", e);
-              try {
-                Thread.sleep(timeoutOverride == null ? 2000 : timeoutOverride);
-              }
-              catch (InterruptedException e1) {
-                break;
-              }
+            catch (InterruptedException e1) {
+              Thread.currentThread().interrupt();
+              break;
             }
           }
         }
@@ -98,74 +100,65 @@ public class MasterManager {
 
     masterMonitorThreadsForShards = new ArrayList<>();
 
-    masterMonitorThread = ThreadUtil.createThread(new Runnable() {
-      @Override
-      public void run() {
-        final int[] monitorShards = {0, 0, 0};
-        final int[] monitorReplicas = {0, 1, 2};
+    masterMonitorThread = ThreadUtil.createThread(() -> {
+      final int[] monitorShards = {0, 0, 0};
+      final int[] monitorReplicas = {0, 1, 2};
 
-        ArrayNode shards = server.getConfig().withArray("shards");
-        ObjectNode replicasNode = (ObjectNode) shards.get(0);
-        ArrayNode replicas = replicasNode.withArray("replicas");
-        if (replicas.size() < 3) {
-          monitorShards[2] = 1;
-          monitorReplicas[2] = 0;
-        }
-        boolean shouldMonitor = false;
-        if (server.getShard() == 0 && (server.getReplica() == 0 || server.getReplica() == 1 || server.getReplica() == 3)) {
-          shouldMonitor = true;
-        }
-        else if (replicas.size() < 3 && server.getShard() == 1 && server.getReplica()== 0) {
-          shouldMonitor = true;
-        }
-        if (shouldMonitor) {
+      ArrayNode shards = server.getConfig().withArray("shards");
+      ObjectNode replicasNode = (ObjectNode) shards.get(0);
+      ArrayNode replicas = replicasNode.withArray("replicas");
+      if (replicas.size() < 3) {
+        monitorShards[2] = 1;
+        monitorReplicas[2] = 0;
+      }
+      boolean shouldMonitor = false;
+      if (server.getShard() == 0 && (server.getReplica() == 0 || server.getReplica() == 1 || server.getReplica() == 3) ||
+          (replicas.size() < 3 && server.getShard() == 1 && server.getReplica() == 0)) {
+        shouldMonitor = true;
+      }
+      if (shouldMonitor) {
+        for (int i = 0; i < server.getShardCount(); i++) {
+          final int shard = i;
+          Thread masterThreadForShard = ThreadUtil.createThread(() -> {
+            AtomicInteger nextMonitor = new AtomicInteger(-1);
+            while (!server.getShutdown() && nextMonitor.get() == -1) {
+              try {
+                Thread.sleep(timeoutOverride == null ? 2000 : timeoutOverride);
+                electNewMaster(shard, -1, monitorShards, monitorReplicas, nextMonitor);
+              }
+              catch (Exception e) {
+                logger.error("Error electing master: shard=" + shard, e);
+              }
+            }
+            while (!server.getShutdown()) {
+              try {
+                Thread.sleep(timeoutOverride == null ? (DatabaseServer.getDeathOverride() == null ? 2000 : 1000) : timeoutOverride);
 
-          for (int i = 0; i < server.getShardCount(); i++) {
-            final int shard = i;
-            Thread masterThreadForShard = ThreadUtil.createThread(new Runnable() {
-              @Override
-              public void run() {
-                AtomicInteger nextMonitor = new AtomicInteger(-1);
-                while (!server.getShutdown() && nextMonitor.get() == -1) {
-                  try {
-                    Thread.sleep(timeoutOverride == null ? 2000 : timeoutOverride);
-                    electNewMaster(shard, -1, monitorShards, monitorReplicas, nextMonitor);
-                  }
-                  catch (Exception e) {
-                    logger.error("Error electing master: shard=" + shard, e);
-                  }
+                final int masterReplica = server.getCommon().getServersConfig().getShards()[shard].getMasterReplica();
+                if (masterReplica == -1) {
+                  electNewMaster(shard, masterReplica, monitorShards, monitorReplicas, nextMonitor);
                 }
-                while (!server.getShutdown()) {
-                  try {
-                    Thread.sleep(timeoutOverride == null ? (server.getDeathOverride() == null ? 2000 : 1000) : timeoutOverride);
-
-                    final int masterReplica = server.getCommon().getServersConfig().getShards()[shard].getMasterReplica();
-                    if (masterReplica == -1) {
-                      electNewMaster(shard, masterReplica, monitorShards, monitorReplicas, nextMonitor);
-                    }
-                    else {
-                      final AtomicBoolean isHealthy = new AtomicBoolean(false);
-                      for (int i = 0; i < 5; i++) {
-                        server.checkHealthOfServer(shard, masterReplica, isHealthy, true);
-                        if (isHealthy.get()) {
-                          break;
-                        }
-                      }
-
-                      if (!isHealthy.get()) {
-                        electNewMaster(shard, masterReplica, monitorShards, monitorReplicas, nextMonitor);
-                      }
+                else {
+                  final AtomicBoolean isHealthy = new AtomicBoolean(false);
+                  for (int i1 = 0; i1 < 5; i1++) {
+                    server.checkHealthOfServer(shard, masterReplica, isHealthy);
+                    if (isHealthy.get()) {
+                      break;
                     }
                   }
-                  catch (Exception e) {
-                    logger.error("Error in master monitor: shard=" + shard, e);
+
+                  if (!isHealthy.get()) {
+                    electNewMaster(shard, masterReplica, monitorShards, monitorReplicas, nextMonitor);
                   }
                 }
               }
-            }, "SonicBase Master Monitor Thread for Shard: " + shard);
-            masterThreadForShard.start();
-            masterMonitorThreadsForShards.add(masterThreadForShard);
-          }
+              catch (Exception e) {
+                logger.error("Error in master monitor: shard=" + shard, e);
+              }
+            }
+          }, "SonicBase Master Monitor Thread for Shard: " + shard);
+          masterThreadForShard.start();
+          masterMonitorThreadsForShards.add(masterThreadForShard);
         }
       }
     }, "SonicBase Maste Monitor Thread");
@@ -173,18 +166,18 @@ public class MasterManager {
   }
 
   private boolean electNewMaster(int shard, int oldMasterReplica, int[] monitorShards, int[] monitorReplicas,
-                                 AtomicInteger nextMonitor) throws InterruptedException, IOException {
+                                 AtomicInteger nextMonitor) throws InterruptedException {
     int electedMaster = -1;
     boolean isFirst = false;
     nextMonitor.set(-1);
-    logger.info("electNewMaster - begin: shard=" + shard + ", oldMasterReplica=" + oldMasterReplica);
+    logger.info("electNewMaster - begin: shard={}, oldMasterReplica={}", shard, oldMasterReplica);
     for (int i = 0; i < monitorShards.length; i++) {
       if (monitorShards[i] == server.getShard() && monitorReplicas[i] == server.getReplica()) {
         isFirst = true;
         continue;
       }
       final AtomicBoolean isHealthy = new AtomicBoolean(false);
-      server.checkHealthOfServer(monitorShards[i], monitorReplicas[i], isHealthy, true);
+      server.checkHealthOfServer(monitorShards[i], monitorReplicas[i], isHealthy);
       if (!isHealthy.get()) {
         continue;
       }
@@ -192,50 +185,49 @@ public class MasterManager {
       break;
     }
     if (!isFirst) {
-      logger.info("ElectNewMaster shard=" + shard + ", !isFirst, nextMonitor=" + nextMonitor);
+      logger.info("ElectNewMaster shard={}, !isFirst, nextMonitor={}", shard, nextMonitor);
       return isFirst;
     }
     if (nextMonitor.get() == -1) {
-      logger.error("ElectNewMaster shard=" + shard + ", isFirst, nextMonitor==-1");
+      logger.error("ElectNewMaster shard={}, isFirst, nextMonitor==-1", shard);
       Thread.sleep(5000);
     }
     else {
-      logger.error("ElectNewMaster, shard=" + shard + ", checking candidates");
-      outer:
+      logger.error("ElectNewMaster, shard={}, checking candidates", shard);
       while (!server.getShutdown()) {
         for (int j = 0; j < server.getReplicationFactor(); j++) {
           if (j == oldMasterReplica) {
             continue;
           }
-          Thread.sleep(server.getDeathOverride() == null ? 2000 : 50);
+          Thread.sleep(DatabaseServer.getDeathOverride() == null ? 2000 : 50);
 
           AtomicBoolean isHealthy = new AtomicBoolean();
           if (shard == server.getShard() && j == server.getReplica()) {
             isHealthy.set(true);
           }
           else {
-            server.checkHealthOfServer(shard, j, isHealthy, false);
+            server.checkHealthOfServer(shard, j, isHealthy);
           }
           if (isHealthy.get()) {
             try {
-              logger.info("ElectNewMaster, electing new: nextMonitor=" + nextMonitor.get() + ", shard=" + shard + ", replica=" + j);
+              logger.info("ElectNewMaster, electing new: nextMonitor={}, shard={}, replica={}",
+                  nextMonitor.get(), shard, j);
               ComObject cobj = new ComObject();
-              cobj.put(ComObject.Tag.dbName, "__non__");
-              cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-              cobj.put(ComObject.Tag.method, "MasterManager:electNewMaster");
-              cobj.put(ComObject.Tag.requestedMasterShard, shard);
-              cobj.put(ComObject.Tag.requestedMasterReplica, j);
+              cobj.put(ComObject.Tag.DB_NAME, "__non__");
+              cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
+              cobj.put(ComObject.Tag.METHOD, "MasterManager:electNewMaster");
+              cobj.put(ComObject.Tag.REQUESTED_MASTER_SHARD, shard);
+              cobj.put(ComObject.Tag.REQUESTED_MASTER_REPLICA, j);
               byte[] bytes = server.getDatabaseClient().send(null, monitorShards[nextMonitor.get()], monitorReplicas[nextMonitor.get()],
-                  cobj, DatabaseClient.Replica.specified);
+                  cobj, DatabaseClient.Replica.SPECIFIED);
               ComObject retObj = new ComObject(bytes);
-              int otherServersElectedMaster = retObj.getInt(ComObject.Tag.selectedMasteReplica);
+              int otherServersElectedMaster = retObj.getInt(ComObject.Tag.SELECTED_MASTE_REPLICA);
               if (otherServersElectedMaster != j) {
-                logger.info("Other server elected different master: shard=" + shard + ", other=" + otherServersElectedMaster);
+                logger.info("Other server elected different master: shard={}, other={}", shard, otherServersElectedMaster);
                 Thread.sleep(2000);
-                continue;
               }
               else {
-                logger.info("Other server elected same master: shard=" + shard + ", master=" + otherServersElectedMaster);
+                logger.info("Other server elected same master: shard={}, master={}", shard, otherServersElectedMaster);
                 electedMaster = otherServersElectedMaster;
                 break;
               }
@@ -243,38 +235,33 @@ public class MasterManager {
             catch (Exception e) {
               logger.error("Error electing new master: shard=" + shard, e);
               Thread.sleep(2000);
-              continue;
             }
           }
         }
         try {
           if (electedMaster != -1) {
-            logger.info("Elected master: shard=" + shard + ", replica=" + electedMaster);
+            logger.info("Elected master: shard={}, replica={}", shard, electedMaster);
             ComObject cobj = new ComObject();
-            cobj.put(ComObject.Tag.dbName, "__none__");
-            cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-            cobj.put(ComObject.Tag.method, "DatabaseServer:promoteToMasterAndPushSchema");
-            cobj.put(ComObject.Tag.shard, shard);
-            cobj.put(ComObject.Tag.replica, electedMaster);
+            cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
+            cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
+            cobj.put(ComObject.Tag.SHARD, shard);
+            cobj.put(ComObject.Tag.REPLICA, electedMaster);
             server.getCommon().getServersConfig().getShards()[shard].setMasterReplica(electedMaster);
 
-            server.getDatabaseClient().sendToMaster(cobj);
-
+            server.getDatabaseClient().sendToMaster("DatabaseServer:promoteToMasterAndPushSchema", cobj);
 
             cobj = new ComObject();
-            cobj.put(ComObject.Tag.dbName, "__none__");
-            cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-            cobj.put(ComObject.Tag.method, "MasterManager:promoteToMaster");
-            cobj.put(ComObject.Tag.shard, shard);
-            cobj.put(ComObject.Tag.electedMaster, electedMaster);
+            cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
+            cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
+            cobj.put(ComObject.Tag.SHARD, shard);
+            cobj.put(ComObject.Tag.ELECTED_MASTER, electedMaster);
 
-            server.getDatabaseClient().send(null, shard, electedMaster, cobj, DatabaseClient.Replica.specified);
+            server.getDatabaseClient().send("MasterManager:promoteToMaster", shard, electedMaster, cobj, DatabaseClient.Replica.SPECIFIED);
             return true;
           }
         }
         catch (Exception e) {
           logger.error("Error promoting master: shard=" + shard + ", electedMaster=" + electedMaster, e);
-          continue;
         }
       }
     }
@@ -282,13 +269,13 @@ public class MasterManager {
   }
 
   public ComObject promoteEntireReplicaToMaster(ComObject cobj, boolean replayedCommand) {
-    final int newReplica = cobj.getInt(ComObject.Tag.replica);
+    final int newReplica = cobj.getInt(ComObject.Tag.REPLICA);
     for (int shard = 0; shard < server.getShardCount(); shard++) {
-      logger.info("promoting to master: shard=" + shard + ", replica=" + newReplica);
+      logger.info("promoting to master: shard={}, replica={}", shard, newReplica);
       server.getCommon().getServersConfig().getShards()[shard].setMasterReplica(newReplica);
     }
 
-    server.getCommon().saveSchema(server.getClient(), server.getDataDir());
+    server.getCommon().saveSchema(server.getDataDir());
     server.pushSchema();
 
     List<Future> futures = new ArrayList<>();
@@ -298,13 +285,13 @@ public class MasterManager {
         @Override
         public Object call() throws Exception {
           ComObject cobj = new ComObject();
-          cobj.put(ComObject.Tag.dbName, "__none__");
-          cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-          cobj.put(ComObject.Tag.method, "MasterManager:promoteToMaster");
-          cobj.put(ComObject.Tag.shard, localShard);
-          cobj.put(ComObject.Tag.electedMaster, newReplica);
+          cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
+          cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
+          cobj.put(ComObject.Tag.METHOD, "MasterManager:promoteToMaster");
+          cobj.put(ComObject.Tag.SHARD, localShard);
+          cobj.put(ComObject.Tag.ELECTED_MASTER, newReplica);
 
-          server.getDatabaseClient().send(null, localShard, newReplica, cobj, DatabaseClient.Replica.specified);
+          server.getDatabaseClient().send(null, localShard, newReplica, cobj, DatabaseClient.Replica.SPECIFIED);
           return null;
         }
       }));
@@ -322,21 +309,21 @@ public class MasterManager {
     return null;
   }
 
-  public ComObject electNewMaster(ComObject cobj, boolean replayedCommand) throws InterruptedException, IOException {
-    int requestedMasterShard = cobj.getInt(ComObject.Tag.requestedMasterShard);
-    int requestedMasterReplica = cobj.getInt(ComObject.Tag.requestedMasterReplica);
+  public ComObject electNewMaster(ComObject cobj, boolean replayedCommand) throws InterruptedException {
+    int requestedMasterShard = cobj.getInt(ComObject.Tag.REQUESTED_MASTER_SHARD);
+    int requestedMasterReplica = cobj.getInt(ComObject.Tag.REQUESTED_MASTER_REPLICA);
 
     final AtomicBoolean isHealthy = new AtomicBoolean(false);
-    server.checkHealthOfServer(requestedMasterShard, requestedMasterReplica, isHealthy, false);
+    server.checkHealthOfServer(requestedMasterShard, requestedMasterReplica, isHealthy);
     if (!isHealthy.get()) {
-      logger.info("candidate master is unhealthy, rejecting: shard=" + requestedMasterShard + ", replica=" + requestedMasterReplica);
+      logger.info("candidate master is unhealthy, rejecting: shard={}, replica={}", requestedMasterShard, requestedMasterReplica);
       requestedMasterReplica = -1;
     }
     else {
-      logger.info("candidate master is healthy, accepting: shard=" + requestedMasterShard + ", candidateMaster=" + requestedMasterReplica);
+      logger.info("candidate master is healthy, accepting: shard={}, candidateMaster={}", requestedMasterShard, requestedMasterReplica);
     }
     ComObject retObj = new ComObject();
-    retObj.put(ComObject.Tag.selectedMasteReplica, requestedMasterReplica);
+    retObj.put(ComObject.Tag.SELECTED_MASTE_REPLICA, requestedMasterReplica);
     return retObj;
   }
 
@@ -357,18 +344,18 @@ public class MasterManager {
     for (int i = 0; i < monitorShards.length; i++) {
       try {
         AtomicBoolean isHealthy = new AtomicBoolean();
-        server.checkHealthOfServer(monitorShards[i], monitorReplicas[i], isHealthy, true);
+        server.checkHealthOfServer(monitorShards[i], monitorReplicas[i], isHealthy);
 
         if (isHealthy.get()) {
           ComObject cobj = new ComObject();
-          cobj.put(ComObject.Tag.dbName, "__none__");
-          cobj.put(ComObject.Tag.schemaVersion, server.getCommon().getSchemaVersion());
-          cobj.put(ComObject.Tag.method, "DatabaseServer:getSchema");
+          cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
+          cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
+          cobj.put(ComObject.Tag.METHOD, "DatabaseServer:getSchema");
 
-          byte[] ret = server.getClient().send(null, monitorShards[i], monitorReplicas[i], cobj, DatabaseClient.Replica.specified, true);
+          byte[] ret = server.getClient().send(null, monitorShards[i], monitorReplicas[i], cobj, DatabaseClient.Replica.SPECIFIED, true);
           DatabaseCommon tempCommon = new DatabaseCommon();
           ComObject retObj = new ComObject(ret);
-          tempCommon.deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
+          tempCommon.deserializeSchema(retObj.getByteArray(ComObject.Tag.SCHEMA_BYTES));
           int masterReplica = tempCommon.getServersConfig().getShards()[0].getMasterReplica();
           if (masterReplica == server.getReplica()) {
             countAgree++;
@@ -387,15 +374,12 @@ public class MasterManager {
         }
       }
     }
-    if (countAgree < countDisagree) {
-      return true;
-    }
-    return false;
+    return countAgree < countDisagree;
   }
 
   public ComObject promoteToMaster(ComObject cobj, boolean replayedCommand) {
     try {
-      logger.info("Promoting to master: shard=" + server.getShard() + ", replica=" + server.getReplica());
+      logger.info("Promoting to master: shard={}, replica={}", server.getShard(), server.getReplica());
       server.getLogManager().skipToMaxSequenceNumber();
 
       if (server.getShard() == 0) {
@@ -406,7 +390,7 @@ public class MasterManager {
           public void run() {
             server.getSchemaManager().reconcileSchema();
           }
-        }, 5 * 60 * 1000, 5 * 60 * 1000);
+        }, 5 * 60 * 1000L, 5 * 60 * 1000L);
 
         server.startStreamsConsumerMonitor();
         server.startMasterLicenseValidator();

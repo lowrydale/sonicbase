@@ -58,10 +58,6 @@ public class TestLogManager {
     ObjectMapper mapper = new ObjectMapper();
     final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
 
-    ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
-    config.put("licenseKeys", array);
-    array.add(com.sonicbase.server.DatabaseServer.FOUR_SERVER_LICENSE);
-
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
     DatabaseClient.getServers().clear();
@@ -80,10 +76,9 @@ public class TestLogManager {
       //          String role = "primaryMaster";
 
       dbServers[shard] = new com.sonicbase.server.DatabaseServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
+      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
       dbServers[shard].setRole(role);
-      dbServers[shard].disableLogProcessor();
-      dbServers[shard].setMinSizeForRepartition(0);
+
       //          return null;
       //        }
       //      }));
@@ -153,7 +148,7 @@ public class TestLogManager {
     for (com.sonicbase.server.DatabaseServer server : dbServers) {
       server.shutdownRepartitioner();
     }
-    client.beginRebalance("test", "persons", "_primarykey");
+    client.beginRebalance("test");
 
 
     while (true) {
@@ -166,7 +161,7 @@ public class TestLogManager {
     for (com.sonicbase.server.DatabaseServer server : dbServers) {
       server.shutdownRepartitioner();
     }
-    client.beginRebalance("test", "persons", "_primarykey");
+    client.beginRebalance("test");
 
 
     while (true) {
@@ -179,7 +174,7 @@ public class TestLogManager {
     for (com.sonicbase.server.DatabaseServer server : dbServers) {
       server.shutdownRepartitioner();
     }
-    client.beginRebalance("test", "persons", "_primarykey");
+    client.beginRebalance("test");
 
 
     while (true) {
@@ -227,17 +222,17 @@ public class TestLogManager {
 
     }
 
-    for (com.sonicbase.server.DatabaseServer server : dbServers) {
-      System.out.println("count logged: shard=" + server.getShard() + ", replica=" + server.getReplica() + ", count=" + server.getLogManager().getCountLogged());
-    }
+//    for (com.sonicbase.server.DatabaseServer server : dbServers) {
+//      System.out.println("count logged: shard=" + server.getShard() + ", replica=" + server.getReplica() + ", count=" + server.getLogManager().getCountLogged());
+//    }
 
     for (com.sonicbase.server.DatabaseServer server : dbServers) {
       server.replayLogs();
     }
 
-    for (DatabaseServer server : dbServers) {
-      System.out.println("count replayed: shard=" + server.getShard() + ", replica=" + server.getReplica() + ", count=" + server.getLogManager().getCountReplayed());
-    }
+//    for (DatabaseServer server : dbServers) {
+//      System.out.println("count replayed: shard=" + server.getShard() + ", replica=" + server.getReplica() + ", count=" + server.getLogManager().getCountReplayed());
+//    }
 
     stmt = conn.prepareStatement("select count(*) from persons");
     ret = stmt.executeQuery();

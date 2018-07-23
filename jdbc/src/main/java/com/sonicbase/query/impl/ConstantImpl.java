@@ -73,6 +73,7 @@ public class ConstantImpl extends ExpressionImpl {
    * DON"T MODIFY THIS SERIALIZATION
    * ###############################
    */
+  @Override
   public void deserialize(short serializationVersion, DataInputStream in) {
     try {
       super.deserialize(serializationVersion, in);
@@ -200,9 +201,10 @@ public class ConstantImpl extends ExpressionImpl {
 
   @Override
   public ExpressionImpl.Type getType() {
-    return ExpressionImpl.Type.constant;
+    return ExpressionImpl.Type.CONSTANT;
   }
 
+  @Override
   public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
     return null;
   }

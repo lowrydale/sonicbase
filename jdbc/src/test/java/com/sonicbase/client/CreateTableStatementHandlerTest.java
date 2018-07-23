@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.client;
 
 import com.sonicbase.common.ComObject;
@@ -56,7 +55,7 @@ public class CreateTableStatementHandlerTest {
         invocationOnMock -> {
           called.set(true);
           ComObject ret = new ComObject();
-          ret.put(ComObject.Tag.schemaBytes, common.serializeSchema((short) 1000));
+          ret.put(ComObject.Tag.SCHEMA_BYTES, common.serializeSchema((short) 1000));
           return ret.serialize();
         });
     CreateTableStatementHandler handler = new CreateTableStatementHandler(client);

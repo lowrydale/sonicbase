@@ -23,7 +23,7 @@ public class TestSocket {
         NettyServer server = new NettyServer();
         String argsStr = "-host localhost -port 9010 -cluster 1-local -gclog gc.log -xmx 2G";
         String[] args = argsStr.split(" ");
-        server.startServer(args, null, true);
+        server.startServer(args);
       }
     });
     thread.start();
@@ -33,14 +33,14 @@ public class TestSocket {
       List<DatabaseSocketClient.Request> requests = new ArrayList<>();
       DatabaseSocketClient.Request request = new DatabaseSocketClient.Request();
       ComObject cobj = new ComObject();
-      cobj.put(ComObject.Tag.count, 10);
-      cobj.put(ComObject.Tag.method, "echo");
+      cobj.put(ComObject.Tag.COUNT, 10);
+      cobj.put(ComObject.Tag.METHOD, "echo");
       request.setBody(cobj.serialize());
       requests.add(request);
       DatabaseSocketClient.sendBatch("localhost", 9010, requests);
       byte[] response = requests.get(0).getResponse();
       ComObject retObj = new ComObject(response);
-      assertEquals((int) retObj.getInt(ComObject.Tag.count), 10);
+      assertEquals((int) retObj.getInt(ComObject.Tag.COUNT), 10);
     }
   }
 

@@ -4,6 +4,9 @@ import sun.misc.Unsafe;
 
 public class DataUtils {
 
+  private DataUtils() {
+  }
+
   public static int bytesToInt(byte[] bytes, int offset) {
     return bytes[0 + offset] << 24 |
         (bytes[1 + offset] & 0xFF) << 16 |

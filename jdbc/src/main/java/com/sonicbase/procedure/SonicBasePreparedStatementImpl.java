@@ -3,6 +3,7 @@ package com.sonicbase.procedure;
 import com.sonicbase.jdbcdriver.StatementProxy;
 
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.Reader;
 import java.math.BigDecimal;
 import java.net.URL;
@@ -13,10 +14,8 @@ public class SonicBasePreparedStatementImpl implements SonicBasePreparedStatemen
 
   private final PreparedStatement proxy;
   private final StoredProcedureContextImpl context;
-
   private boolean restrictToThisServer;
-  private RecordEvaluator evaluator;
-  private String evaluatorClassName;
+
 
   public SonicBasePreparedStatementImpl(StoredProcedureContext context, PreparedStatement preparedStatement) {
     this.proxy = preparedStatement;
@@ -36,7 +35,6 @@ public class SonicBasePreparedStatementImpl implements SonicBasePreparedStatemen
 
   @Override
   public ResultSet executeQueryWithEvaluator(RecordEvaluator evaluator) throws SQLException {
-    this.evaluator = evaluator;
     context.setRecordEvaluator(evaluator);
     ((StatementProxy)proxy).setProcedureContext(context);
     return proxy.executeQuery();
@@ -44,7 +42,6 @@ public class SonicBasePreparedStatementImpl implements SonicBasePreparedStatemen
 
   @Override
   public ResultSet executeQueryWithEvaluator(String evaluatorClassName) throws SQLException {
-    this.evaluatorClassName = evaluatorClassName;
     return proxy.executeQuery();
   }
 
@@ -136,7 +133,7 @@ public class SonicBasePreparedStatementImpl implements SonicBasePreparedStatemen
 
   @Override
   public void setUnicodeStream(int parameterIndex, InputStream x, int length) throws SQLException {
-    proxy.setUnicodeStream(parameterIndex, x, length);
+    proxy.setCharacterStream(parameterIndex, new InputStreamReader(x), length);
   }
 
   @Override

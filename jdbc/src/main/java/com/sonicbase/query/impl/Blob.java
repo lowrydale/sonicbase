@@ -9,6 +9,8 @@ import java.sql.SQLException;
  * Responsible for
  */
 public class Blob implements java.sql.Blob {
+  public static final String OUT_OF_BOUNDS_STR = "out of bounds";
+  public static final String NOT_SUPPORTED_STR = "not supported";
   private byte[] data;
 
   public Blob() {
@@ -43,12 +45,12 @@ public class Blob implements java.sql.Blob {
   @Override
   public byte[] getBytes(long pos, int length) throws SQLException {
     if (data == null) {
-      throw new SQLException("out of bounds");
+      throw new SQLException(OUT_OF_BOUNDS_STR);
     }
     if (pos + length > data.length) {
-      throw new SQLException("out of bounds");
+      throw new SQLException(OUT_OF_BOUNDS_STR);
     }
-    byte[] ret = new byte[(int)length - (int)pos];
+    byte[] ret = new byte[length - (int)pos];
     System.arraycopy(data, (int)pos, ret, 0, length);
     return ret;
   }
@@ -63,12 +65,12 @@ public class Blob implements java.sql.Blob {
 
   @Override
   public long position(byte[] pattern, long start) throws SQLException {
-    throw new SQLException("not supported");
+    throw new SQLException(NOT_SUPPORTED_STR);
   }
 
   @Override
   public long position(java.sql.Blob pattern, long start) throws SQLException {
-    throw new SQLException("not supported");
+    throw new SQLException(NOT_SUPPORTED_STR);
   }
 
   @Override
@@ -101,13 +103,13 @@ public class Blob implements java.sql.Blob {
 
   @Override
   public OutputStream setBinaryStream(long pos) throws SQLException {
-    throw new SQLException("not supported");
+    throw new SQLException(NOT_SUPPORTED_STR);
   }
 
   @Override
   public void truncate(long len) throws SQLException {
     if (data == null || len > data.length) {
-      throw new SQLException("out of bounds");
+      throw new SQLException(OUT_OF_BOUNDS_STR);
     }
     byte[] newBytes = new byte[(int)len];
     System.arraycopy(data, 0, newBytes, 0, (int)len);

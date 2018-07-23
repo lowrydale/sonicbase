@@ -183,8 +183,7 @@ public class ServersConfig {
     return cluster;
   }
 
-  public ServersConfig(String cluster, ArrayNode inShards, int replicationFactor, boolean clientIsInternal, boolean optimizedForThroughput) {
-    int currServerOffset = 0;
+  public ServersConfig(String cluster, ArrayNode inShards, boolean clientIsInternal, boolean optimizedForThroughput) {
     this.cluster = cluster;
     int shardCount = inShards.size();
     shards = new Shard[shardCount];
@@ -193,8 +192,7 @@ public class ServersConfig {
       Host[] hosts = new Host[replicas.size()];
       for (int j = 0; j < hosts.length; j++) {
         hosts[j] = new Host(replicas.get(j).get("publicAddress").asText(), replicas.get(j).get("privateAddress").asText(),
-            (int) (long) replicas.get(j).get("port").asLong());
-        currServerOffset++;
+            (int) replicas.get(j).get("port").asLong());
       }
       shards[i] = new Shard(hosts);
 

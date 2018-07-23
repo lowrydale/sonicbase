@@ -12,25 +12,13 @@ import java.sql.*;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Created by IntelliJ IDEA.
- * User: lowryda
- * Date: Nov 29, 2011
- * Time: 8:46:08 AM
- */
+@SuppressWarnings("squid:RedundantThrowsDeclarationCheck") //derivecd class throws SQLException
 public class ParameterHandler {
 
-  private HashMap<String, Parameter.ParameterBase> currParmsByName = new HashMap<String, Parameter.ParameterBase>();
-  private Map<Integer, Parameter.ParameterBase> currParmsByIndex = new HashMap<Integer, Parameter.ParameterBase>();
-  private int currentBatchOffset = 0;
-  private boolean boundParms = false;
-
+  private HashMap<String, Parameter.ParameterBase> currParmsByName = new HashMap<>();
+  private Map<Integer, Parameter.ParameterBase> currParmsByIndex = new HashMap<>();
 
   public ParameterHandler() {
-  }
-
-  public HashMap<String, Parameter.ParameterBase> getCurrParmsByName() {
-    return currParmsByName;
   }
 
   public Map<Integer, Parameter.ParameterBase> getCurrParmsByIndex() {
@@ -135,7 +123,7 @@ public class ParameterHandler {
   }
 
   public void setNull(int parameterIndex, int sqlType, String typeName) throws SQLException {
-    getCurrParmsByIndex().put(parameterIndex, new Parameter.Null(sqlType, typeName));
+    getCurrParmsByIndex().put(parameterIndex, new Parameter.Null(sqlType));
   }
 
   public ParameterMetaData getParameterMetaData() throws SQLException {
@@ -243,7 +231,7 @@ public class ParameterHandler {
   public void deserialize(DataInputStream in) {
 
     try {
-      short serializationVersion = (short)Varint.readSignedVarLong(in);
+      Varint.readSignedVarLong(in); // serializationVersion
       int count = in.readInt();
       for (int i = 0; i < count; i++) {
         int len = (int)Varint.readSignedVarLong(in);

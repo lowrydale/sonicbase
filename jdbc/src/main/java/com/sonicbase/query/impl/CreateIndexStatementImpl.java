@@ -7,14 +7,13 @@ import java.util.List;
 
 public class CreateIndexStatementImpl implements CreateIndexStatement {
 
-  private DatabaseClient client;
   private String name;
   private String tableName;
   private List<String> columns;
   private boolean isUnique;
 
   public CreateIndexStatementImpl(DatabaseClient client) {
-    this.client = client;
+
   }
 
   public String getName() {

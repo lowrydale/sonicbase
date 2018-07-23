@@ -7,10 +7,9 @@ import net.sf.jsqlparser.statement.Statement;
 
 import java.sql.SQLException;
 
-public abstract class StatementHandler {
+public interface StatementHandler {
 
-
-  public abstract Object execute(String dbName, ParameterHandler parms, String sqlToUse, Statement statement,
-                                 SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2, boolean restrictToThisServer,
-                                 StoredProcedureContextImpl procedureContext, int schemaRetryCount) throws SQLException;
+  Object execute(String dbName, ParameterHandler parms, String sqlToUse, Statement statement,
+                 SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2, boolean restrictToThisServer,
+                 StoredProcedureContextImpl procedureContext, int schemaRetryCount) throws SQLException;
 }

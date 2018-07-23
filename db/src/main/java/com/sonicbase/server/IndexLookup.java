@@ -11,7 +11,6 @@ import com.sonicbase.query.Expression;
 import com.sonicbase.query.impl.Counter;
 import com.sonicbase.query.impl.ExpressionImpl;
 import com.sonicbase.query.impl.GroupByContext;
-import com.sonicbase.query.impl.OrderByExpressionImpl;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 
@@ -23,40 +22,33 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class IndexLookup {
-  private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
-
-  protected BinaryExpression.Operator rightOperator;
+  BinaryExpression.Operator rightOperator;
   protected int count;
   private boolean isExplicitTrans;
   private boolean isCommiting;
   private Long transactionId;
-  protected long viewVersion;
-  protected boolean isProbe;
-  protected boolean forceSelectOnServer;
+  long viewVersion;
+  boolean isProbe;
   protected ParameterHandler parms;
-  protected boolean evaluateExpression;
+  boolean evaluateExpression;
   protected Expression expression;
   protected String dbName;
-  private String tableName;
   protected IndexSchema indexSchema;
-  private String indexName;
-  private List<OrderByExpressionImpl> orderByExpressions;
-  protected Object[] leftKey;
-  protected Object[] originalLeftKey;
-  protected BinaryExpression.Operator leftOperator;
-  protected Object[] rightKey;
-  protected Object[] originalRightKey;
-  protected Set<Integer> columnOffsets;
-  protected Counter[] counters;
-  protected GroupByContext groupContext;
-  protected AtomicLong countReturned;
+  Object[] leftKey;
+  Object[] originalLeftKey;
+  BinaryExpression.Operator leftOperator;
+  Object[] rightKey;
+  Object[] originalRightKey;
+  Set<Integer> columnOffsets;
+  Counter[] counters;
+  private GroupByContext groupContext;
+  AtomicLong countReturned;
   protected Index index;
-  protected Boolean ascending;
-  protected int[] keyOffsets;
-  protected List<byte[]> retKeyRecords;
-  protected List<Object[]> retKeys;
-  protected List<byte[]> retRecords;
-  protected List<Object[]> excludeKeys;
+  Boolean ascending;
+  List<byte[]> retKeyRecords;
+  private List<Object[]> retKeys;
+  List<byte[]> retRecords;
+  List<Object[]> excludeKeys;
   protected boolean keys;
   protected final DatabaseServer server;
   protected TableSchema tableSchema;
@@ -64,13 +56,13 @@ public abstract class IndexLookup {
   protected AtomicLong currOffset;
   protected Long offset;
   protected Long limit;
-  protected StoredProcedureContextImpl procedureContext;
+  StoredProcedureContextImpl procedureContext;
 
-  public IndexLookup(DatabaseServer server) {
+  IndexLookup(DatabaseServer server) {
     this.server = server;
   }
 
-  public void setRightOperator(BinaryExpression.Operator rightOperator) {
+  void setRightOperator(BinaryExpression.Operator rightOperator) {
     this.rightOperator = rightOperator;
   }
 
@@ -78,35 +70,31 @@ public abstract class IndexLookup {
     this.count = count;
   }
 
-  public void setIsExplicitTrans(Boolean isExplicitTrans) {
+  void setIsExplicitTrans(Boolean isExplicitTrans) {
     this.isExplicitTrans = isExplicitTrans;
   }
 
-  public void setIsCommiting(Boolean isCommiting) {
+  void setIsCommiting(Boolean isCommiting) {
     this.isCommiting = isCommiting;
   }
 
-  public void setTransactionId(Long transactionId) {
+  void setTransactionId(Long transactionId) {
     this.transactionId = transactionId;
   }
 
-  public void setViewVersion(Long viewVersion) {
+  void setViewVersion(Long viewVersion) {
     this.viewVersion = viewVersion;
   }
 
-  public void setIsProbe(Boolean isProbe) {
+  void setIsProbe(Boolean isProbe) {
     this.isProbe = isProbe;
-  }
-
-  public void setForceSelectOnServer(Boolean forceSelectOnServer) {
-    this.forceSelectOnServer = forceSelectOnServer;
   }
 
   public void setParms(ParameterHandler parms) {
     this.parms = parms;
   }
 
-  public void setEvaluateExpression(Boolean evaluateExpression) {
+  void setEvaluateExpression(Boolean evaluateExpression) {
     this.evaluateExpression = evaluateExpression;
   }
 
@@ -118,31 +106,19 @@ public abstract class IndexLookup {
     this.dbName = dbName;
   }
 
-  public void setTableName(String tableName) {
-    this.tableName = tableName;
-  }
-
   public void setIndexSchema(IndexSchema indexSchema) {
     this.indexSchema = indexSchema;
   }
 
-  public void setIndexName(String indexName) {
-    this.indexName = indexName;
-  }
-
-  public void setOrderByExpressions(List<OrderByExpressionImpl> orderByExpressions) {
-    this.orderByExpressions = orderByExpressions;
-  }
-
-  public void setLeftKey(Object[] leftKey) {
+  void setLeftKey(Object[] leftKey) {
     this.leftKey = leftKey;
   }
 
-  public void setOriginalLeftKey(Object[] originalLeftKey) {
+  void setOriginalLeftKey(Object[] originalLeftKey) {
     this.originalLeftKey = originalLeftKey;
   }
 
-  public void setLeftOperator(BinaryExpression.Operator leftOperator) {
+  void setLeftOperator(BinaryExpression.Operator leftOperator) {
     this.leftOperator = leftOperator;
   }
 
@@ -150,27 +126,27 @@ public abstract class IndexLookup {
     this.tableSchema = tableSchema;
   }
 
-  public void setRightKey(Object[] rightKey) {
+  void setRightKey(Object[] rightKey) {
     this.rightKey = rightKey;
   }
 
-  public void setOriginalRightKey(Object[] originalRightKey) {
+  void setOriginalRightKey(Object[] originalRightKey) {
     this.originalRightKey = originalRightKey;
   }
 
-  public void setColumnOffsets(Set<Integer> columnOffsets) {
+  void setColumnOffsets(Set<Integer> columnOffsets) {
     this.columnOffsets = columnOffsets;
   }
 
-  public void setCounters(Counter[] counters) {
+  void setCounters(Counter[] counters) {
     this.counters = counters;
   }
 
-  public void setGroupContext(GroupByContext groupContext) {
+  void setGroupContext(GroupByContext groupContext) {
     this.groupContext = groupContext;
   }
 
-  public void setCountReturned(AtomicLong countReturned) {
+  void setCountReturned(AtomicLong countReturned) {
     this.countReturned = countReturned;
   }
 
@@ -178,7 +154,7 @@ public abstract class IndexLookup {
     this.index = index;
   }
 
-  public void setAscending(Boolean ascending) {
+  void setAscending(Boolean ascending) {
     this.ascending = ascending;
   }
 
@@ -199,39 +175,35 @@ public abstract class IndexLookup {
     this.limit = limit;
   }
 
-  public void setProcedureContext(StoredProcedureContextImpl procedureContext) {
+  void setProcedureContext(StoredProcedureContextImpl procedureContext) {
     this.procedureContext = procedureContext;
   }
 
-  public boolean isExplicitTrans() {
+  boolean isExplicitTrans() {
     return isExplicitTrans;
   }
 
-  public boolean isCommitting() {
+  boolean isCommitting() {
     return isCommiting;
   }
 
-  public Long getTransactionId() {
+  Long getTransactionId() {
     return transactionId;
   }
 
-  public void setKeyOffsets(int[] keyOffsets) {
-    this.keyOffsets = keyOffsets;
-  }
-
-  public void setRetKeyRecords(List<byte[]> retKeyRecords) {
+  void setRetKeyRecords(List<byte[]> retKeyRecords) {
     this.retKeyRecords = retKeyRecords;
   }
 
-  public void setRetKeys(List<Object[]> retKeys) {
+  void setRetKeys(List<Object[]> retKeys) {
     this.retKeys = retKeys;
   }
 
-  public void setRetRecords(List<byte[]> retRecords) {
+  void setRetRecords(List<byte[]> retRecords) {
     this.retRecords = retRecords;
   }
 
-  public void setExcludeKeys(List<Object[]> excludeKeys) {
+  void setExcludeKeys(List<Object[]> excludeKeys) {
     this.excludeKeys = excludeKeys;
   }
 
@@ -241,13 +213,13 @@ public abstract class IndexLookup {
 
   public abstract Map.Entry<Object[], Object> lookup();
 
-  protected byte[][] processViewFlags(long viewVersion, byte[][] records) {
+  byte[][] processViewFlags(long viewVersion, byte[][] records) {
     List<byte[]> remaining = new ArrayList<>();
     if (records != null) {
       for (byte[] bytes : records) {
         processViewFlags(viewVersion, remaining, bytes);
       }
-      if (remaining.size() == 0) {
+      if (remaining.isEmpty()) {
         records = null;
       }
       else {
@@ -283,8 +255,8 @@ public abstract class IndexLookup {
     }
   }
 
-  protected byte[][] evaluateCounters(Set<Integer> columnOffsets, byte[][] records) {
-    if (columnOffsets == null || columnOffsets.size() == 0) {
+  byte[][] evaluateCounters(Set<Integer> columnOffsets, byte[][] records) {
+    if (columnOffsets == null || columnOffsets.isEmpty()) {
       columnOffsets = null;
     }
     byte[][] ret = new byte[records.length][];
@@ -331,9 +303,9 @@ public abstract class IndexLookup {
     return ret;
   }
 
-  protected void handleRecord(long viewVersion, Object[] key,  boolean evaluateExpresion,
-                               byte[][] records, byte[][] currKeyRecords,
-                               AtomicBoolean done) {
+  void handleRecord(long viewVersion, Object[] key, boolean evaluateExpresion,
+                    byte[][] records, byte[][] currKeyRecords,
+                    AtomicBoolean done) {
     if (keys) {
       handleRecordForKeys(viewVersion, key, currKeyRecords, done);
     }
@@ -372,29 +344,21 @@ public abstract class IndexLookup {
             }
           }
         }
-        if (pass) {
-          if (counters == null) {
-            for (byte[] currBytes : ret) {
-              done.set(false);
-              boolean include = true;
-              currOffset.incrementAndGet();
-              if (offset != null) {
-                if (currOffset.get() < offset) {
-                  include = false;
-                }
-              }
-              if (include) {
-                if (limit != null) {
-                  if (countReturned.get() >= limit) {
-                    include = false;
-                    done.set(true);
-                  }
-                }
-              }
-              if (include) {
-                countReturned.incrementAndGet();
-                retRecords.add(currBytes);
-              }
+        if (pass && counters == null) {
+          for (byte[] currBytes : ret) {
+            done.set(false);
+            boolean include = true;
+            currOffset.incrementAndGet();
+            if (offset != null && currOffset.get() < offset) {
+              include = false;
+            }
+            if (include && limit != null && countReturned.get() >= limit) {
+              include = false;
+              done.set(true);
+            }
+            if (include) {
+              countReturned.incrementAndGet();
+              retRecords.add(currBytes);
             }
           }
         }
@@ -402,7 +366,7 @@ public abstract class IndexLookup {
     }
   }
 
-  protected void handleRecordEvaluateExpression(byte[][] records, AtomicBoolean done) {
+  void handleRecordEvaluateExpression(byte[][] records, AtomicBoolean done) {
     for (byte[] bytes : records) {
       Record record = new Record(tableSchema);
       record.deserialize(dbName, server.getCommon(), bytes, null, true);
@@ -432,18 +396,12 @@ public abstract class IndexLookup {
               done.set(false);
               boolean include = true;
               currOffset.incrementAndGet();
-              if (offset != null) {
-                if (currOffset.get() < offset) {
-                  include = false;
-                }
+              if (offset != null && currOffset.get() < offset) {
+                include = false;
               }
-              if (include) {
-                if (limit != null) {
-                  if (countReturned.get() >= limit) {
-                    include = false;
-                    done.set(true);
-                  }
-                }
+              if (include && limit != null && countReturned.get() >= limit) {
+                include = false;
+                done.set(true);
               }
               if (include) {
                 countReturned.incrementAndGet();
@@ -462,30 +420,20 @@ public abstract class IndexLookup {
         done.set(false);
         boolean include = true;
         currOffset.incrementAndGet();
-        if (offset != null) {
-          if (currOffset.get() < offset) {
-            include = false;
-          }
+        if (offset != null && currOffset.get() < offset) {
+          include = false;
         }
-        if (include) {
-          if (limit != null) {
-            if (countReturned.get() >= limit) {
-              include = false;
-              done.set(true);
-            }
-          }
+        if (include && limit != null && countReturned.get() >= limit) {
+          include = false;
+          done.set(true);
         }
         if (include) {
           boolean passesFlags = false;
           long dbViewNum = KeyRecord.getDbViewNumber(currKeyRecord);
           long dbViewFlags = KeyRecord.getDbViewFlags(currKeyRecord);
-          if ((dbViewNum <= viewVersion - 1) && (dbViewFlags & Record.DB_VIEW_FLAG_ADDING) != 0) {
-            passesFlags = true;
-          }
-          else if ((dbViewNum == viewVersion || dbViewNum == viewVersion - 1) && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
-            passesFlags = true;
-          }
-          else if ((dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
+          if ((dbViewNum <= viewVersion - 1) && (dbViewFlags & Record.DB_VIEW_FLAG_ADDING) != 0 ||
+              (dbViewNum == viewVersion || dbViewNum == viewVersion - 1) && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0 ||
+              (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
             passesFlags = true;
           }
           if (passesFlags) {

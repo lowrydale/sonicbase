@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.client;
 
 import com.sonicbase.common.ComObject;
@@ -40,14 +39,14 @@ public class InsertStatementHandlerTest {
     when(client.send(eq("UpdateManager:insertIndexEntryByKeyWithRecord"), anyInt(), anyInt(), anyObject(), anyObject())).thenAnswer(
         (Answer) invocationOnMock ->{ calledWithRecord.set(true);
         ComObject ret = new ComObject();
-        ret.put(ComObject.Tag.count, 1);
+        ret.put(ComObject.Tag.COUNT, 1);
         return ret.serialize();});
 
     AtomicBoolean calledWithoutRecord = new AtomicBoolean();
     when(client.send(eq("UpdateManager:insertIndexEntryByKey"), anyInt(), anyInt(), anyObject(), anyObject())).thenAnswer(
         (Answer) invocationOnMock ->{ calledWithoutRecord.set(true);
           ComObject ret = new ComObject();
-          ret.put(ComObject.Tag.count, 1);
+          ret.put(ComObject.Tag.COUNT, 1);
           return ret.serialize();});
 
     CCJSqlParserManager parser = new CCJSqlParserManager();
@@ -72,11 +71,11 @@ public class InsertStatementHandlerTest {
     common.getTablesById("test").put(tableSchema.getTableId(), tableSchema);
 
     final AtomicBoolean called = new AtomicBoolean();
-    when(client.executeQuery(anyString(), anyObject(), anyString(), anyObject(), anyBoolean(),
+    when(client.executeQuery(anyString(), anyString(), anyObject(),
         eq(null), eq(null), eq(null), eq(false), eq(null), eq(true))).thenAnswer(
         (Answer) invocationOnMock ->{
           Object[] args = invocationOnMock.getArguments();
-          called.set(true); assertEquals((String)args[2], "update table1 set field1=? , field2=?  where field1=? ");
+          called.set(true); assertEquals((String)args[1], "update table1 set field1=? , field2=?  where field1=? ");
           return 1;});
 
     InsertStatementImpl statement = new InsertStatementImpl(client);

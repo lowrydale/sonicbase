@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.zip.CRC32;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -41,8 +40,22 @@ import java.util.zip.GZIPOutputStream;
  * Date: 12/25/13
  * Time: 4:55 PM
  */
+@SuppressWarnings("squid:S1168") // I prefer to return null instead of an empty array
 public class NettyServer {
 
+  public static final String USER_HOME = System.getProperty("user.home");
+  public static final String EXCEPTION_STR = "exception: ";
+  public static final String MPORT_STR = "mport";
+  public static final String CLUSTER_STR = "cluster";
+  public static final String GCLOG_STR = "gclog";
+  public static final String SHARD_STR = "shard";
+  public static final String MHOST_STR = "mhost";
+  public static final String REPLICA_STR = "replica";
+  public static final String XMX_STR = "xmx";
+  public static final String JSON_STR = ".json";
+  public static final String STARTUP_ERROR_TXT_STR = "startupError.txt";
+  public static final String ERROR_STARTING_SERVER_STR = "Error starting server";
+  public static final String USER_DIR = System.getProperty("user.dir");
   private static Logger logger = LoggerFactory.getLogger(NettyServer.class);
 
   public static final boolean ENABLE_COMPRESSION = false;
@@ -54,12 +67,10 @@ public class NettyServer {
   final AtomicBoolean isRunning = new AtomicBoolean(false);
   final AtomicBoolean isRecovered = new AtomicBoolean(false);
   private int port;
-  private String cluster;
   private DatabaseServer databaseServer = null;
   private ChannelFuture f;
   private EventLoopGroup bossGroup;
   private EventLoopGroup workerGroup;
-  private ServerBootstrap bootstrap;
   private AtomicLong totalRequestSize = new AtomicLong();
   private AtomicLong totalResponseSize = new AtomicLong();
   private AtomicLong totalTimeProcessing = new AtomicLong();
@@ -97,8 +108,6 @@ public class NettyServer {
 
   public static class Request {
     private byte[] body;
-    public CountDownLatch latch = new CountDownLatch(1);
-    private byte[] response;
     private long sequence0;
     private long sequence1;
 
@@ -164,16 +173,14 @@ public class NettyServer {
     }
   }
 
-
   public enum ReadState {
-    size,
-    bytes,
-    dlqSize,
-    dlqBytes
+    SIZE,
+    BYTES,
+    DLQ_SIZE,
+    DLQ_BYTES
   }
 
-  public static byte[] writeResponse(byte[] intBuff, OutputStream to, byte[] body, int requestCount, ArrayList<byte[]> retBytes, ByteArrayOutputStream out) throws IOException {
-    CRC32 checksum;
+  public static byte[] writeResponse(byte[] intBuff, OutputStream to, int requestCount, List<byte[]> retBytes, ByteArrayOutputStream out) throws IOException {
     long checksumValue;
     Util.writeRawLittleEndian32(requestCount, intBuff);
     out.write(intBuff);
@@ -181,7 +188,7 @@ public class NettyServer {
       out.write(bytes);
     }
     out.close();
-    body = out.toByteArray();
+    byte[] body = out.toByteArray();
     int uncompressedSize = body.length;
     if (DatabaseSocketClient.COMPRESS) {
       if (DatabaseSocketClient.LZO_COMPRESSION) {
@@ -214,9 +221,7 @@ public class NettyServer {
       to.write(intBuff);
     }
 
-//        checksum = new CRC32();
-//        checksum.update(body, 0, body.length);
-    checksumValue = 0;//checksum.getValue();
+    checksumValue = 0;
 
     byte[] longBuff = new byte[8];
     Util.writeRawLittleEndian64(checksumValue, longBuff);
@@ -266,21 +271,16 @@ public class NettyServer {
     private ByteBufAllocator alloc = PooledByteBufAllocator.DEFAULT;
     private int len;
     private int bodyLen;
-
-    private ReadState readState = ReadState.size;
+    private ReadState readState = ReadState.SIZE;
     private ByteBuf destBuff = alloc.directBuffer(1024);
     private ByteBuf respBuffer = alloc.directBuffer(1024);
     private byte[] intBuff = new byte[4];
     private List<ByteBuf> buffers = new ArrayList<>();
 
-    public ServerHandler() {
-    }
-
     public void handlerAdded(ChannelHandlerContext ctx) {
-
       destBuff.clear();
       destBuff.retain();
-      readState = ReadState.size;
+      readState = ReadState.SIZE;
     }
 
     public void handlerRemoved(ChannelHandlerContext ctx) {
@@ -306,32 +306,30 @@ public class NettyServer {
       else {
         readable = m.readableBytes();
       }
-      if (readState == ReadState.size) {
-        if (readable >= 4) {
-          readState = ReadState.bytes;
+      if (readState == ReadState.SIZE && readable >= 4) {
+        readState = ReadState.BYTES;
 
-          if (oldWay) {
-            byte[] intBuff = new byte[4];
-            destBuff.resetReaderIndex();
-            destBuff.readBytes(intBuff);
-            bodyLen = (((int) intBuff[0] & 0xff)) |
-                (((int) intBuff[1] & 0xff) << 8) |
-                (((int) intBuff[2] & 0xff) << 16) |
-                (((int) intBuff[3] & 0xff) << 24);
-          }
-          else {
-            byte[] intBuff = new byte[4];
-            m.resetReaderIndex();
-            m.readBytes(intBuff);
-            bodyLen = (((int) intBuff[0] & 0xff)) |
-                (((int) intBuff[1] & 0xff) << 8) |
-                (((int) intBuff[2] & 0xff) << 16) |
-                (((int) intBuff[3] & 0xff) << 24);
-          }
+        if (oldWay) {
+          byte[] localIntBuff = new byte[4];
+          destBuff.resetReaderIndex();
+          destBuff.readBytes(localIntBuff);
+          bodyLen = ((int) localIntBuff[0] & 0xff) |
+              ((int) localIntBuff[1] & 0xff) << 8 |
+              ((int) localIntBuff[2] & 0xff) << 16 |
+              ((int) localIntBuff[3] & 0xff) << 24;
+        }
+        else {
+          byte[] localIntBuff = new byte[4];
+          m.resetReaderIndex();
+          m.readBytes(localIntBuff);
+          bodyLen = ((int) localIntBuff[0] & 0xff) |
+              ((int) localIntBuff[1] & 0xff) << 8 |
+              ((int) localIntBuff[2] & 0xff) << 16 |
+              ((int) localIntBuff[3] & 0xff) << 24;
         }
       }
 
-      if (readState == ReadState.bytes) {
+      if (readState == ReadState.BYTES) {
         if (oldWay) {
           readable = destBuff.readableBytes();
         }
@@ -343,7 +341,7 @@ public class NettyServer {
           }
         }
         if (readable >= len + bodyLen) {
-          readState = ReadState.size;
+          readState = ReadState.SIZE;
 
           byte[] body = new byte[bodyLen];
           if (oldWay) {
@@ -352,10 +350,10 @@ public class NettyServer {
           else {
             int bodyOffset = 0;
             for (ByteBuf currBuf : buffers) {
-              int len = currBuf.readableBytes();
-              if (len > 0) {
-                currBuf.readBytes(body, bodyOffset, len);
-                bodyOffset += len;
+              int localLen = currBuf.readableBytes();
+              if (localLen > 0) {
+                currBuf.readBytes(body, bodyOffset, localLen);
+                bodyOffset += localLen;
               }
               currBuf.release();
             }
@@ -368,9 +366,7 @@ public class NettyServer {
             offset += 4;
           }
 
-          long sentChecksum = Util.readRawLittleEndian64(body, offset);
-          offset += 8;
-          offset = 0;
+          Util.readRawLittleEndian64(body, offset); //sentChecksum
           if (DatabaseSocketClient.COMPRESS) {
             offset = 12;
           }
@@ -398,17 +394,13 @@ public class NettyServer {
       return null;
     }
 
-    public void channelRead(ChannelHandlerContext ctx, Object msg) { // (2)
-
-      long begin = System.currentTimeMillis();
-
+    @Override
+    public void channelRead(ChannelHandlerContext ctx, Object msg) {
       totalCallCount.incrementAndGet();
 
       int requestSize = 0;
       int responseSize = 0;
-
       ByteBuf m = null;
-      String respStr = "";
       try {
         m = (ByteBuf) msg;
 
@@ -417,7 +409,6 @@ public class NettyServer {
         requestDuration.addAndGet(System.nanoTime() - requestBegin);
         if (body != null) {
           try {
-
             requestSize = body.length;
             ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
 
@@ -427,13 +418,13 @@ public class NettyServer {
               batchSize = Util.readRawLittleEndian32(intBuff);
             }
 
-            List<Request> requests = new ArrayList<Request>();
+            List<Request> requests = new ArrayList<>();
             for (int i = 0; i < batchSize; i++) {
               Request request = deserializeRequest(bytesIn, intBuff);
               requests.add(request);
             }
 
-            ArrayList<byte[]> retBytes = new ArrayList<byte[]>();
+            ArrayList<byte[]> retBytes = new ArrayList<>();
             try {
               List<LogManager.LogRequest> logRequests = new ArrayList<>();
 
@@ -448,7 +439,7 @@ public class NettyServer {
               ByteArrayOutputStream to = new ByteArrayOutputStream();
 
               long responseBegin = System.nanoTime();
-              writeResponse(intBuff, to, body, batchSize, retBytes, out);
+              writeResponse(intBuff, to, batchSize, retBytes, out);
               responseDuration.addAndGet(System.nanoTime() - responseBegin);
 
               respBuffer.clear();
@@ -470,13 +461,13 @@ public class NettyServer {
               logger.error("Transport error", t);
 
               ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-              retBytes = new ArrayList<byte[]>();
+              retBytes = new ArrayList<>();
               for (int i = 0; i < batchSize; i++) {
-                byte[] currRetBytes = returnException("exception: " + t.getMessage(), t);
+                byte[] currRetBytes = returnException(EXCEPTION_STR + t.getMessage(), t);
                 retBytes.add(currRetBytes);
               }
               ByteArrayOutputStream to = new ByteArrayOutputStream();
-              writeResponse(intBuff, to, body, batchSize, retBytes, bytesOut);
+              writeResponse(intBuff, to, batchSize, retBytes, bytesOut);
 
               respBuffer.clear();
               respBuffer.retain();
@@ -488,8 +479,7 @@ public class NettyServer {
           }
           catch (Exception t) {
             logger.error("Error processing request", t);
-            t.printStackTrace();
-            readState = ReadState.size;
+            readState = ReadState.SIZE;
             buffers.clear();
             if (oldWay) {
               destBuff.clear();
@@ -510,12 +500,12 @@ public class NettyServer {
           }
           if (shouldLog) {
             logger.info("SocketServer stats: callCount=" + totalCallCount.get() + ", requestDuration=" +
-                (requestDuration.get() / callCount.get() / 1000000d) + ", responseDuration=" +
-                (responseDuration.get() / callCount.get() / 1000000d) + ", avgRequestSize=" + (totalRequestSize.get() / callCount.get()) +
+                ((double)requestDuration.get() / callCount.get() / 1000000d) + ", responseDuration=" +
+                ((double)responseDuration.get() / callCount.get() / 1000000d) + ", avgRequestSize=" + (totalRequestSize.get() / callCount.get()) +
                 ", avgResponseSize=" + (totalResponseSize.get() / callCount.get()) + ", avgTimeProcessing=" +
-                (totalTimeProcessing.get() / callCount.get() / 1000000d) +
-                ", avgTimeLogging=" + (timeLogging.get() / callCount.get() / 1000000d) +
-                ", avgTimeHandling=" + (handlerTime.get() / callCount.get() / 1000000d));
+                ((double)totalTimeProcessing.get() / callCount.get() / 1000000d) +
+                ", avgTimeLogging=" + ((double)timeLogging.get() / callCount.get() / 1000000d) +
+                ", avgTimeHandling=" + ((double)handlerTime.get() / callCount.get() / 1000000d));
             synchronized (lastLogReset) {
               if (System.currentTimeMillis() - lastLogReset.get() > 4 * 60 * 1000) {
                 requestDuration.set(0);
@@ -537,21 +527,17 @@ public class NettyServer {
       }
       catch (Exception e) {
         logger.error("Error: " + e.getMessage(), e);
-        readState = ReadState.size;
-        e.printStackTrace();
+        readState = ReadState.SIZE;
         if (oldWay) {
           destBuff.clear();
           m.clear();
         }
       }
       finally {
-        if (oldWay) {
-          if (m != null) {
-            m.release();
-          }
+        if (oldWay && m != null) {
+          m.release();
         }
       }
-      //       ((ByteBuf)msg).release(); // (3)
     }
 
     List<byte[]> doProcessRequests(List<Request> requests, AtomicLong timeLogging, AtomicLong handlerTime) {
@@ -560,7 +546,7 @@ public class NettyServer {
         List<Response> ret = processRequests(requests, timeLogging, handlerTime);
         for (Response response : ret) {
           if (response.getException() != null) {
-            finalRet.add(returnException("exception: " + response.getException().getMessage(), response.getException()));
+            finalRet.add(returnException(EXCEPTION_STR + response.getException().getMessage(), response.getException()));
           }
           else {
             byte[] bytes = response.getBytes();
@@ -568,11 +554,11 @@ public class NettyServer {
             if (bytes != null) {
               size = bytes.length;
             }
-            byte[] intBuff = new byte[4];
-            Util.writeRawLittleEndian32(size, intBuff);
+            byte[] localIntBuff = new byte[4];
+            Util.writeRawLittleEndian32(size, localIntBuff);
             ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
             bytesOut.write(1);
-            bytesOut.write(intBuff);
+            bytesOut.write(localIntBuff);
             if (bytes != null) {
               bytesOut.write(bytes);
             }
@@ -583,28 +569,22 @@ public class NettyServer {
       }
       catch (Exception e) {
         finalRet.clear();
-        for (Request request : requests) {
-          finalRet.add(returnException("exception: " + e.getMessage(), e));
+        for (int i = 0; i < requests.size(); i++) {
+          finalRet.add(returnException(EXCEPTION_STR + e.getMessage(), e));
         }
       }
       return finalRet;
     }
 
-    private List<Response> processRequests(List<Request> requests, AtomicLong timeLogging, AtomicLong handlerTime) throws IOException {
+    private List<Response> processRequests(List<Request> requests, AtomicLong timeLogging, AtomicLong handlerTime) {
       List<Response> ret = new ArrayList<>();
-      if (requests.size() > 1) {
-        ;
-      }
       for (Request request : requests) {
-        byte[] retBody = getDatabaseServer().invokeMethod(request.body, -1L, (short) -1L, false, true, timeLogging, handlerTime);
+        byte[] retBody = getDatabaseServer().invokeMethod(request.body, -1L, (short) -1L,
+            false, true, timeLogging, handlerTime);
         Response response = new Response(retBody);
         ret.add(response);
       }
       return ret;
-    }
-
-    private byte[] processRequest(byte[] body) {
-      return getDatabaseServer().invokeMethod(body, -1L, (short) -1L, false, true, timeLogging, handlerTime);
     }
 
     private byte[] returnException(String respStr, Throwable t) {
@@ -619,9 +599,9 @@ public class NettyServer {
         byte[] retBytes = errorResponse.toString().getBytes(UTF8_STR);
         ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
         bytesOut.write(0);
-        byte[] intBuff = new byte[4];
-        Util.writeRawLittleEndian32(retBytes.length, intBuff);
-        bytesOut.write(intBuff);
+        byte[] localIntBuff = new byte[4];
+        Util.writeRawLittleEndian32(retBytes.length, localIntBuff);
+        bytesOut.write(localIntBuff);
         bytesOut.write(retBytes);
         bytesOut.close();
         return bytesOut.toByteArray();
@@ -631,6 +611,7 @@ public class NettyServer {
       }
     }
 
+    @Override
     public void channelReadComplete(ChannelHandlerContext ctx) {
     }
 
@@ -664,7 +645,7 @@ public class NettyServer {
     workerGroup = new NioEventLoopGroup(threadCount);
     try {
 
-      bootstrap = new ServerBootstrap(); // (2)
+      ServerBootstrap bootstrap = new ServerBootstrap(); // (2)
       logger.info("creating group");
       bootstrap.group(bossGroup, workerGroup)
           .channel(NioServerSocketChannel.class) // (3)
@@ -673,7 +654,7 @@ public class NettyServer {
           .option(ChannelOption.TCP_NODELAY, true)
           .option(ChannelOption.SO_LINGER, 1000)
           .childOption(ChannelOption.SO_KEEPALIVE, true); // (6)
-      ;
+
       // Bind and start to accept incoming connections.
       logger.info("binding port");
       f = bootstrap.bind(port).sync(); // (7)
@@ -686,32 +667,33 @@ public class NettyServer {
       logger.info("exiting netty server");
     }
     catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
       throw new DatabaseException(e);
     }
   }
 
   public static void main(String[] args) {
-    System.out.println("Starting server: workingDir=" + System.getProperty("user.dir"));
+    logger.info("Starting server: workingDir={}", USER_DIR);
     NettyServer server = new NettyServer();
-    server.startServer(args, null, false);
+    server.startServer(args);
   }
 
-  public void startServer(String[] args, String configPathPre, boolean skipLicense) {
+  public void startServer(String[] args) {
     for (String arg : args) {
-      System.out.println("arg: " + arg);
+      logger.info("arg: {}", arg);
     }
 
     try {
       Options options = new Options();
       options.addOption(OptionBuilder.withArgName(PORT_STR).hasArg().create(PORT_STR));
-      options.addOption(OptionBuilder.withArgName("shard").hasArg().create("shard"));
+      options.addOption(OptionBuilder.withArgName(SHARD_STR).hasArg().create(SHARD_STR));
       options.addOption(OptionBuilder.withArgName(HOST_STR).hasArg().create(HOST_STR));
-      options.addOption(OptionBuilder.withArgName("mhost").hasArg().create("mhost"));
-      options.addOption(OptionBuilder.withArgName("mport").hasArg().create("mport"));
-      options.addOption(OptionBuilder.withArgName("replica").hasArg().create("replica"));
-      options.addOption(OptionBuilder.withArgName("cluster").hasArg().create("cluster"));
-      options.addOption(OptionBuilder.withArgName("gclog").hasArg().create("gclog"));
-      options.addOption(OptionBuilder.withArgName("xmx").hasArg().create("xmx"));
+      options.addOption(OptionBuilder.withArgName(MHOST_STR).hasArg().create(MHOST_STR));
+      options.addOption(OptionBuilder.withArgName(MPORT_STR).hasArg().create(MPORT_STR));
+      options.addOption(OptionBuilder.withArgName(REPLICA_STR).hasArg().create(REPLICA_STR));
+      options.addOption(OptionBuilder.withArgName(CLUSTER_STR).hasArg().create(CLUSTER_STR));
+      options.addOption(OptionBuilder.withArgName(GCLOG_STR).hasArg().create(GCLOG_STR));
+      options.addOption(OptionBuilder.withArgName(XMX_STR).hasArg().create(XMX_STR));
 
       CommandLineParser parser = new DefaultParser();
       // parse the command line arguments
@@ -720,128 +702,93 @@ public class NettyServer {
 
       String portStr = line.getOptionValue(PORT_STR);
       String host = line.getOptionValue(HOST_STR);
-      String masterPort = line.getOptionValue("mport");
-      String masterHost = line.getOptionValue("mhost");
-      this.cluster = line.getOptionValue("cluster");
+      String cluster = line.getOptionValue(CLUSTER_STR);
       this.port = Integer.valueOf(portStr);
-      String gclog = line.getOptionValue("gclog");
-      String xmx = line.getOptionValue("xmx");
+      String gclog = line.getOptionValue(GCLOG_STR);
+      String xmx = line.getOptionValue(XMX_STR);
 
-      String configStr = null;
-      InputStream in = NettyServer.class.getResourceAsStream("/config/config-" + cluster + ".json");
+      String configStr;
+      InputStream in = NettyServer.class.getResourceAsStream("/config/config-" + cluster + JSON_STR);
       if (in != null) {
-        configStr = IOUtils.toString(new BufferedInputStream(in), "utf-8");
+        configStr = IOUtils.toString(new BufferedInputStream(in), UTF8_STR);
       }
       else {
-        File file = new File(System.getProperty("user.dir"), "config/config-" + cluster + ".json");
+        File file = new File(USER_DIR, "config/config-" + cluster + JSON_STR);
         if (!file.exists()) {
-          file = new File(System.getProperty("user.dir"), "db/src/main/resources/config/config-" + cluster + ".json");
+          file = new File(USER_DIR, "db/src/main/resources/config/config-" + cluster + JSON_STR);
         }
-        configStr = IOUtils.toString(new BufferedInputStream(new FileInputStream(file)), "utf-8");
+        configStr = IOUtils.toString(new BufferedInputStream(new FileInputStream(file)), UTF8_STR);
       }
       ObjectMapper mapper = new ObjectMapper();
       ObjectNode config = (ObjectNode) mapper.readTree(configStr);
       String role = line.getOptionValue("role");
 
 
-      int port = Integer.valueOf(portStr);
+      int localPort = Integer.parseInt(portStr);
       try {
 
-        final DatabaseServer databaseServer = new DatabaseServer();
+        final DatabaseServer localDatabaseServer = new DatabaseServer();
 
-        databaseServer.setConfig(config, cluster, host, port, isRunning, isRecovered, gclog, xmx, skipLicense);
-        databaseServer.setRole(role);
+        localDatabaseServer.setConfig(config, cluster, host, localPort, isRunning, isRecovered, gclog, xmx);
+        localDatabaseServer.setRole(role);
 
-        setDatabaseServer(databaseServer);
+        setDatabaseServer(localDatabaseServer);
 
-        nettyThread = new Thread(new Runnable() {
-          @Override
-          public void run() {
-            try {
-              logger.info("starting netty server");
-              NettyServer.this.run();
+        nettyThread = new Thread(() -> {
+          try {
+            logger.info("starting netty server");
+            NettyServer.this.run();
+          }
+          catch (Exception e) {
+            File file = new File(USER_HOME, STARTUP_ERROR_TXT_STR);
+            try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
+              writer.write(ExceptionUtils.getFullStackTrace(e));
             }
-            catch (Exception e) {
-              File file = new File(System.getProperty("user.home"), "startupError.txt");
-              try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
-                e.printStackTrace();
-                writer.write(ExceptionUtils.getFullStackTrace(e));
-              }
-              catch (IOException e1) {
-                e1.printStackTrace();
-              }
-              logger.error("Error starting netty server", e);
+            catch (IOException e1) {
+              logger.error("Error starting netty server", e1);
             }
+            logger.error("Error starting netty server", e);
           }
         });
         nettyThread.start();
 
-        serverThread = new Thread(new Runnable() {
-          @Override
-          public void run() {
-            try {
-              isRunning.set(true);
+        serverThread = new Thread(() -> {
+          try {
+            isRunning.set(true);
 
-              Thread thread = ThreadUtil.createThread(new Runnable(){
-                @Override
-                public void run() {
-                  //databaseServer.setWaitingForServersToStart(true);
-                  waitForServersToStart();
-                  //databaseServer.setWaitingForServersToStart(false);
+            Thread thread = ThreadUtil.createThread(() -> {
+              waitForServersToStart();
 
-                  databaseServer.getSchemaManager().reconcileSchema();
+              localDatabaseServer.getSchemaManager().reconcileSchema();
 
-                }
-              }, "SonicBase Reconcile Thread");
-              thread.start();
+            }, "SonicBase Reconcile Thread");
+            thread.start();
 
-              databaseServer.recoverFromSnapshot();
+            localDatabaseServer.recoverFromSnapshot();
 
-              logger.info("applying queues");
-              databaseServer.getLogManager().applyLogs();
+            logger.info("applying queues");
+            localDatabaseServer.getLogManager().applyLogs();
 
-              databaseServer.getDeleteManager().forceDeletes(null,  false);
-              databaseServer.getDeleteManager().start();
+            localDatabaseServer.getDeleteManager().forceDeletes(null,  false);
+            localDatabaseServer.getDeleteManager().start();
 
-              databaseServer.getMasterManager().startMasterMonitor();
+            localDatabaseServer.getMasterManager().startMasterMonitor();
 
-              logger.info("running snapshot loop");
-              databaseServer.getSnapshotManager().runSnapshotLoop();
-//              databaseServer.getSnapshotManager().runSnapshotLoop();
+            logger.info("running snapshot loop");
+            localDatabaseServer.getSnapshotManager().runSnapshotLoop();
 
-              isRecovered.set(true);
-            }
-            catch (Exception e) {
-              logger.error("Error starting server", e);
-              File file = new File(System.getProperty("user.home"), "startupError.txt");
-              try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
-                e.printStackTrace();
-                writer.write(ExceptionUtils.getFullStackTrace(e));
-              }
-              catch (IOException e1) {
-                e1.printStackTrace();
-              }
-            }
+            isRecovered.set(true);
+          }
+          catch (Exception e) {
+            logger.error(ERROR_STARTING_SERVER_STR, e);
+            writeError(e);
           }
         });
         serverThread.start();
       }
       catch (Exception e) {
-        File file = new File(System.getProperty("user.home"), "startupError.txt");
-        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
-          e.printStackTrace();
-          writer.write(ExceptionUtils.getFullStackTrace(e));
-        }
-        catch (IOException e1) {
-          e1.printStackTrace();
-        }
-        if (logger == null) {
-          System.out.println("Error starting server");
-          e.printStackTrace();
-        }
-        else {
-          logger.error("Error recovering snapshot", e);
-        }
+        writeError(e);
+        logger.error("Error recovering snapshot", e);
         System.exit(1);
       }
 
@@ -850,29 +797,34 @@ public class NettyServer {
       logger.info("joined netty thread");
     }
     catch (Exception e) {
-      File file = new File(System.getProperty("user.home"), "startupError.txt");
+      File file = new File(USER_HOME, STARTUP_ERROR_TXT_STR);
       try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
-        e.printStackTrace();
         writer.write(ExceptionUtils.getFullStackTrace(e));
       }
       catch (IOException e1) {
-        e1.printStackTrace();
+        logger.error(ERROR_STARTING_SERVER_STR, e1);
       }
-      if (logger == null) {
-        System.out.println("Error starting server");
-        e.printStackTrace();
-      }
-      else {
-        logger.error("Error starting server", e);
-      }
+      logger.error(ERROR_STARTING_SERVER_STR, e);
+
       throw new DatabaseException(e);
     }
     logger.info("exiting netty server");
   }
 
+  private void writeError(Exception e) {
+    File file = new File(USER_HOME, STARTUP_ERROR_TXT_STR);
+    try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
+      logger.error("Error", e);
+      writer.write(ExceptionUtils.getFullStackTrace(e));
+    }
+    catch (IOException e1) {
+      logger.error("Error", e1);
+    }
+  }
+
   private void waitForServersToStart() {
-    int threadCount = databaseServer.getShardCount() * databaseServer.getReplicationFactor();
-    ThreadPoolExecutor executor = new ThreadPoolExecutor(threadCount, threadCount, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+    int localThreadCount = databaseServer.getShardCount() * databaseServer.getReplicationFactor();
+    ThreadPoolExecutor executor = new ThreadPoolExecutor(localThreadCount, localThreadCount, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
     try {
       List<Future> futures = new ArrayList<>();
       for (int i = 0; i < databaseServer.getShardCount(); i++) {
@@ -889,11 +841,11 @@ public class NettyServer {
                     break;
                   }
                   ComObject cobj = new ComObject();
-                  cobj.put(ComObject.Tag.method, "DatabaseServer:healthCheckPriority");
-                  byte[] ret = databaseServer.getDatabaseClient().send(null, shard, replica, cobj, DatabaseClient.Replica.specified);
+                  cobj.put(ComObject.Tag.METHOD, "DatabaseServer:healthCheckPriority");
+                  byte[] ret = databaseServer.getDatabaseClient().send(null, shard, replica, cobj, DatabaseClient.Replica.SPECIFIED);
                   if (ret != null) {
                     ComObject retObj = new ComObject(ret);
-                    String status = retObj.getString(ComObject.Tag.status);
+                    String status = retObj.getString(ComObject.Tag.STATUS);
                     if (status.equals("{\"status\" : \"ok\"}")) {
                       break;
                     }
@@ -901,13 +853,14 @@ public class NettyServer {
                   Thread.sleep(1_000);
                 }
                 catch (InterruptedException e) {
+                  Thread.currentThread().interrupt();
                   return null;
                 }
                 catch (Exception e) {
-                  logger.error("Error checking if server is healthy: shard=" + shard + ", replica=" + replica);
+                  logger.error("Error checking if server is healthy: shard={}, replica={}", shard, replica);
                 }
                 if (System.currentTimeMillis() - beginTime > 2 * 60 * 1000) {
-                  logger.error("Server appears to be dead, skipping: shard=" + shard + ", replica=" + replica);
+                  logger.error("Server appears to be dead, skipping: shard={}, replica={}", shard, replica);
                   break;
                 }
               }

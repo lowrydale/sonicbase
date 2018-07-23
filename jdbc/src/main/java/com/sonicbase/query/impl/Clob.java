@@ -9,6 +9,7 @@ import java.sql.SQLException;
  * Responsible for
  */
 public class Clob implements java.sql.Clob {
+  public static final String NULL_DATA_STR = "null data";
   private String data;
 
   public Clob() {
@@ -38,7 +39,7 @@ public class Clob implements java.sql.Clob {
   @Override
   public Reader getCharacterStream() throws SQLException {
     if (data == null) {
-      throw new SQLException("null data");
+      throw new SQLException(NULL_DATA_STR);
     }
     return new StringReader(data);
   }
@@ -46,7 +47,7 @@ public class Clob implements java.sql.Clob {
   @Override
   public InputStream getAsciiStream() throws SQLException {
     if (data == null) {
-      throw new SQLException("null data");
+      throw new SQLException(NULL_DATA_STR);
     }
     try {
       return new ByteArrayInputStream(data.getBytes("utf-8"));
@@ -87,7 +88,7 @@ public class Clob implements java.sql.Clob {
   public int setString(long pos, String str, int offset, int len) throws SQLException {
     if (data == null) {
       if (pos != 0) {
-        throw new SQLException("null data");
+        throw new SQLException(NULL_DATA_STR);
       }
       data = str.substring(offset, len);
       return len;
@@ -95,7 +96,7 @@ public class Clob implements java.sql.Clob {
     String str0 = data.substring(0, (int)pos);
     str0 += str.substring(offset, len);
     if (data.length() > pos + len) {
-      str0 += data.substring((int)pos + (int)len);
+      str0 += data.substring((int)pos + len);
     }
     data = str0;
     return len;
@@ -127,7 +128,7 @@ public class Clob implements java.sql.Clob {
   @Override
   public Reader getCharacterStream(long pos, long length) throws SQLException {
     if (data == null) {
-      throw new SQLException("null data");
+      throw new SQLException(NULL_DATA_STR);
     }
     String ret = data.substring((int)pos, (int)(pos + length));
     return new StringReader(ret);

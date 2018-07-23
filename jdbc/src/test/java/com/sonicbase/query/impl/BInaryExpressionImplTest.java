@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.query.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -63,7 +62,7 @@ public class BInaryExpressionImplTest {
         "      ]\n" +
         "    }\n" +
         "  ]}\n");
-    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), 1, true, true);
+    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), true, true);
     //when(common.getServersConfig()).thenReturn(serversConfig);
     common.setServersConfig(serversConfig);
     when(client.getCommon()).thenReturn(common);
@@ -95,8 +94,8 @@ public class BInaryExpressionImplTest {
           public SelectContextImpl lookup(ExpressionImpl expression, Expression topLevelExpression) {
             assertEquals(getCount(), 100);
             assertEquals(getIndexName(), "_primarykey");
-            assertEquals(getLeftOp(), Operator.lessEqual);
-            assertEquals(getRightOp(), Operator.greaterEqual);
+            assertEquals(getLeftOp(), Operator.LESS_EQUAL);
+            assertEquals(getRightOp(), Operator.GREATER_EQUAL);
             assertEquals(getLeftKey(), null);
             assertEquals(getRightKey(), null);
             assertEquals(getLeftOriginalKey()[0], 500L);
@@ -108,13 +107,9 @@ public class BInaryExpressionImplTest {
               retKeys[i] = new Object[][]{keys.get(i)};
             }
 
-            try {
-              return new SelectContextImpl("table1", "_primary", Operator.lessEqual, 0, null,
-                  retKeys, expression.getRecordCache(), 0, true);
-            }
-            catch (IOException e) {
-              throw new DatabaseException(e);
-            }
+            return new SelectContextImpl("table1", "_primary", Operator.LESS_EQUAL, 0, null,
+                retKeys, expression.getRecordCache(), 0, true);
+
           }
         };
         return ret;
@@ -150,7 +145,7 @@ public class BInaryExpressionImplTest {
     constant.setSqlType(BIGINT);
     constant.setValue(200L);
     leftExp.setRightExpression(constant);
-    leftExp.setOperator(BinaryExpression.Operator.greaterEqual);
+    leftExp.setOperator(BinaryExpression.Operator.GREATER_EQUAL);
     leftExp.setDbName("test");
     leftExp.setTableName("table1");
     leftExp.setClient(client);
@@ -164,13 +159,13 @@ public class BInaryExpressionImplTest {
     constant.setSqlType(BIGINT);
     constant.setValue(500L);
     rightExp.setRightExpression(constant);
-    rightExp.setOperator(BinaryExpression.Operator.lessEqual);
+    rightExp.setOperator(BinaryExpression.Operator.LESS_EQUAL);
     rightExp.setDbName("test");
     rightExp.setTableName("table1");
     rightExp.setClient(client);
 
     expression.setLeftExpression(leftExp);
-    expression.setOperator(BinaryExpression.Operator.and);
+    expression.setOperator(BinaryExpression.Operator.AND);
     expression.setRightExpression(rightExp);
 
     expression.setDbName("test");
@@ -210,7 +205,7 @@ public class BInaryExpressionImplTest {
     constant.setSqlType(BIGINT);
     constant.setValue(200L);
     leftExp.setRightExpression(constant);
-    leftExp.setOperator(BinaryExpression.Operator.greaterEqual);
+    leftExp.setOperator(BinaryExpression.Operator.GREATER_EQUAL);
     leftExp.setDbName("test");
     leftExp.setTableName("table1");
     leftExp.setClient(client);
@@ -224,14 +219,14 @@ public class BInaryExpressionImplTest {
     constant.setSqlType(BIGINT);
     constant.setValue(500L);
     rightExp.setRightExpression(constant);
-    rightExp.setOperator(BinaryExpression.Operator.lessEqual);
+    rightExp.setOperator(BinaryExpression.Operator.LESS_EQUAL);
     rightExp.setDbName("test");
     rightExp.setTableName("table1");
     rightExp.setClient(client);
 
     BinaryExpressionImpl expression = new BinaryExpressionImpl();
     expression.setLeftExpression(leftExp);
-    expression.setOperator(BinaryExpression.Operator.and);
+    expression.setOperator(BinaryExpression.Operator.AND);
     expression.setRightExpression(rightExp);
 
     expression.setDbName("test");
@@ -246,28 +241,28 @@ public class BInaryExpressionImplTest {
 
     column.setColumnName("field1");
     rightExp.setNot(true);
-    rightExp.setOperator(BinaryExpression.Operator.lessEqual);
+    rightExp.setOperator(BinaryExpression.Operator.LESS_EQUAL);
     constant.setValue(500L);
 
     assertFalse((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
 
     column.setColumnName("field1");
     rightExp.setNot(true);
-    rightExp.setOperator(BinaryExpression.Operator.greaterEqual);
+    rightExp.setOperator(BinaryExpression.Operator.GREATER_EQUAL);
     constant.setValue(100L);
 
     assertFalse((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
 
     column.setColumnName("field2");
     rightExp.setNot(false);
-    rightExp.setOperator(BinaryExpression.Operator.like);
+    rightExp.setOperator(BinaryExpression.Operator.LIKE);
     constant.setValue("%value%".getBytes("utf-8"));
 
     assertTrue((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
 
     column.setColumnName("field2");
     rightExp.setNot(true);
-    rightExp.setOperator(BinaryExpression.Operator.like);
+    rightExp.setOperator(BinaryExpression.Operator.LIKE);
     constant.setValue("%value%".getBytes("utf-8"));
 
     assertFalse((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
@@ -275,41 +270,41 @@ public class BInaryExpressionImplTest {
 
     column.setColumnName("field1");
     rightExp.setNot(false);
-    rightExp.setOperator(BinaryExpression.Operator.notEqual);
+    rightExp.setOperator(BinaryExpression.Operator.NOT_EQUAL);
     constant.setValue(700L);
 
     assertTrue((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
 
     column.setColumnName("field1");
     rightExp.setNot(true);
-    rightExp.setOperator(BinaryExpression.Operator.notEqual);
+    rightExp.setOperator(BinaryExpression.Operator.NOT_EQUAL);
     constant.setValue(700L);
 
     assertFalse((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
     column.setColumnName("field1");
     rightExp.setNot(false);
-    rightExp.setOperator(BinaryExpression.Operator.less);
+    rightExp.setOperator(BinaryExpression.Operator.LESS);
     constant.setValue(700L);
 
     assertTrue((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
 
     column.setColumnName("field1");
     rightExp.setNot(true);
-    rightExp.setOperator(BinaryExpression.Operator.less);
+    rightExp.setOperator(BinaryExpression.Operator.LESS);
     constant.setValue(700L);
 
     assertFalse((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
 
     column.setColumnName("field1");
     rightExp.setNot(false);
-    rightExp.setOperator(BinaryExpression.Operator.greater);
+    rightExp.setOperator(BinaryExpression.Operator.GREATER);
     constant.setValue(0L);
 
     assertTrue((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
 
     column.setColumnName("field1");
     rightExp.setNot(true);
-    rightExp.setOperator(BinaryExpression.Operator.greater);
+    rightExp.setOperator(BinaryExpression.Operator.GREATER);
     constant.setValue(0L);
 
     assertFalse((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
@@ -330,14 +325,14 @@ public class BInaryExpressionImplTest {
     constant.setSqlType(BIGINT);
     constant.setValue(-1000L);
     rightExp.setRightExpression(constant);
-    rightExp.setOperator(BinaryExpression.Operator.plus);
+    rightExp.setOperator(BinaryExpression.Operator.PLUS);
     rightExp.setDbName("test");
     rightExp.setTableName("table1");
     rightExp.setClient(client);
 
     BinaryExpressionImpl expression = new BinaryExpressionImpl();
     expression.setLeftExpression(column1);
-    expression.setOperator(BinaryExpression.Operator.equal);
+    expression.setOperator(BinaryExpression.Operator.EQUAL);
     expression.setRightExpression(rightExp);
 
     expression.setDbName("test");
@@ -355,7 +350,7 @@ public class BInaryExpressionImplTest {
     column2.setColumnName("field1");
     constant.setValue(1000L);
     rightExp.setRightExpression(constant);
-    rightExp.setOperator(BinaryExpression.Operator.plus);
+    rightExp.setOperator(BinaryExpression.Operator.PLUS);
 
     assertTrue((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
 
@@ -365,7 +360,7 @@ public class BInaryExpressionImplTest {
     column2.setColumnName("field1");
     constant.setValue(6L);
     rightExp.setRightExpression(constant);
-    rightExp.setOperator(BinaryExpression.Operator.times);
+    rightExp.setOperator(BinaryExpression.Operator.TIMES);
 
     assertTrue((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
 
@@ -374,7 +369,7 @@ public class BInaryExpressionImplTest {
     column2.setColumnName("field4");
     constant.setValue(6L);
     rightExp.setRightExpression(constant);
-    rightExp.setOperator(BinaryExpression.Operator.divide);
+    rightExp.setOperator(BinaryExpression.Operator.DIVIDE);
 
     assertTrue((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
   }
@@ -397,7 +392,7 @@ public class BInaryExpressionImplTest {
 
     BinaryExpressionImpl expression = new BinaryExpressionImpl();
     expression.setLeftExpression(constant1);
-    expression.setOperator(BinaryExpression.Operator.equal);
+    expression.setOperator(BinaryExpression.Operator.EQUAL);
     expression.setRightExpression(rightExp);
 
     expression.setDbName("test");
@@ -415,19 +410,19 @@ public class BInaryExpressionImplTest {
     constant1.setValue((long)(2 | 4));
     constant2.setValue(2L);
     constant3.setValue(4L);
-    rightExp.setOperator(BinaryExpression.Operator.bitwiseOr);
+    rightExp.setOperator(BinaryExpression.Operator.BITWISE_OR);
     assertTrue((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
 
     constant1.setValue((long)(2 & 3));
     constant2.setValue(2L);
     constant3.setValue(3L);
-    rightExp.setOperator(BinaryExpression.Operator.bitwiseAnd);
+    rightExp.setOperator(BinaryExpression.Operator.BITWISE_AND);
     assertTrue((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
 
     constant1.setValue((long)(2 ^ 3));
     constant2.setValue(2L);
     constant3.setValue(3L);
-    rightExp.setOperator(BinaryExpression.Operator.bitwiseXOr);
+    rightExp.setOperator(BinaryExpression.Operator.BITWISE_X_OR);
     assertTrue((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
 
 
@@ -437,25 +432,25 @@ public class BInaryExpressionImplTest {
     constant1.setValue(new BigDecimal(4));
     constant2.setValue(new BigDecimal(2));
     constant3.setValue(new BigDecimal(2));
-    rightExp.setOperator(BinaryExpression.Operator.plus);
+    rightExp.setOperator(BinaryExpression.Operator.PLUS);
     assertTrue((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
 
     constant1.setValue(new BigDecimal(4));
     constant2.setValue(new BigDecimal(6));
     constant3.setValue(new BigDecimal(2));
-    rightExp.setOperator(BinaryExpression.Operator.minus);
+    rightExp.setOperator(BinaryExpression.Operator.MINUS);
     assertTrue((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
 
     constant1.setValue(new BigDecimal(8));
     constant2.setValue(new BigDecimal(2));
     constant3.setValue(new BigDecimal(4));
-    rightExp.setOperator(BinaryExpression.Operator.times);
+    rightExp.setOperator(BinaryExpression.Operator.TIMES);
     assertTrue((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
 
     constant1.setValue(new BigDecimal(2));
     constant2.setValue(new BigDecimal(8));
     constant3.setValue(new BigDecimal(4));
-    rightExp.setOperator(BinaryExpression.Operator.divide);
+    rightExp.setOperator(BinaryExpression.Operator.DIVIDE);
     assertTrue((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
 
     constant1.setSqlType(DOUBLE);
@@ -464,25 +459,25 @@ public class BInaryExpressionImplTest {
     constant1.setValue(4d);
     constant2.setValue(2d);
     constant3.setValue(2d);
-    rightExp.setOperator(BinaryExpression.Operator.plus);
+    rightExp.setOperator(BinaryExpression.Operator.PLUS);
     assertTrue((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
 
     constant1.setValue(4d);
     constant2.setValue(6d);
     constant3.setValue(2d);
-    rightExp.setOperator(BinaryExpression.Operator.minus);
+    rightExp.setOperator(BinaryExpression.Operator.MINUS);
     assertTrue((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
 
     constant1.setValue(8d);
     constant2.setValue(2d);
     constant3.setValue(4d);
-    rightExp.setOperator(BinaryExpression.Operator.times);
+    rightExp.setOperator(BinaryExpression.Operator.TIMES);
     assertTrue((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
 
     constant1.setValue(2d);
     constant2.setValue(8d);
     constant3.setValue(4d);
-    rightExp.setOperator(BinaryExpression.Operator.divide);
+    rightExp.setOperator(BinaryExpression.Operator.DIVIDE);
     assertTrue((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
 
   }
@@ -499,7 +494,7 @@ public class BInaryExpressionImplTest {
     constant.setSqlType(BIGINT);
     constant.setValue(500L);
     expression.setRightExpression(constant);
-    expression.setOperator(BinaryExpression.Operator.lessEqual);
+    expression.setOperator(BinaryExpression.Operator.LESS_EQUAL);
     expression.setDbName("test");
     expression.setTableName("table1");
     expression.setClient(client);

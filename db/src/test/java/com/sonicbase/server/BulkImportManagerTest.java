@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -15,7 +14,6 @@ import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.TestUtils;
 import org.apache.commons.io.IOUtils;
-import org.jetbrains.annotations.NotNull;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.testng.annotations.*;
@@ -104,7 +102,7 @@ public class BulkImportManagerTest {
         "      ]\n" +
         "    }\n" +
         "  ]}\n");
-    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), 1, true, true);
+    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), true, true);
     //when(common.getServersConfig()).thenReturn(serversConfig);
     common.setServersConfig(serversConfig);
     when(server.getCommon()).thenReturn(common);
@@ -145,7 +143,7 @@ public class BulkImportManagerTest {
 
   @AfterMethod
   public void afterMethod() {
-    updateManager.shutdown();
+
   }
 
   @Test
@@ -161,7 +159,6 @@ public class BulkImportManagerTest {
     assertEquals(record, dbFields);
   }
 
-  @NotNull
   private ResultSet createResultSetMock() throws SQLException, UnsupportedEncodingException {
     ResultSet rs = mock(ResultSet.class);
     when(rs.getLong(eq("field1"))).thenReturn(200L);
@@ -194,7 +191,6 @@ public class BulkImportManagerTest {
     return rs;
   }
 
-  @NotNull
   private Object[] getDbFields(Object[] record) throws UnsupportedEncodingException {
     Record dbRecord = new Record("test", common, records[0]);
     Object[] origDbFields = dbRecord.getFields();
@@ -629,26 +625,26 @@ public class BulkImportManagerTest {
     when(server.getConfig()).thenReturn(config);
 
     ComObject cobj = new ComObject();
-    ComArray keyArray = cobj.putArray(ComObject.Tag.keys, ComObject.Type.byteArrayType);
-    cobj.put(ComObject.Tag.lowerKey, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
+    ComArray keyArray = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
+    cobj.put(ComObject.Tag.LOWER_KEY, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
     keyArray.add(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
 
 
-    cobj.put(ComObject.Tag.expectedCount, 1L);
-    cobj.put(ComObject.Tag.shouldProcess, true);
-    cobj.put(ComObject.Tag.dbName, "test");
-    cobj.put(ComObject.Tag.tableName, "table1");
+    cobj.put(ComObject.Tag.EXPECTED_COUNT, 1L);
+    cobj.put(ComObject.Tag.SHOULD_PROCESS, true);
+    cobj.put(ComObject.Tag.DB_NAME, "test");
+    cobj.put(ComObject.Tag.TABLE_NAME, "table1");
 
     ComObject ret = bim.startBulkImportOnServer(cobj, false);
 
     while (true) {
       ComObject progress = bim.getBulkImportProgressOnServer(cobj, false);
-      ComArray array = progress.getArray(ComObject.Tag.statuses);
+      ComArray array = progress.getArray(ComObject.Tag.STATUSES);
       progress = (ComObject) array.getArray().get(0);
-      if (progress.getBoolean(ComObject.Tag.finished)) {
+      if (progress.getBoolean(ComObject.Tag.FINISHED)) {
         break;
       }
-      String e = progress.getString(ComObject.Tag.exception);
+      String e = progress.getString(ComObject.Tag.EXCEPTION);
       if (e != null) {
         throw new DatabaseException(e);
       }
@@ -701,17 +697,17 @@ public class BulkImportManagerTest {
     when(server.getConfig()).thenReturn(config);
 
     ComObject cobj = new ComObject();
-    ComArray keyArray = cobj.putArray(ComObject.Tag.keys, ComObject.Type.byteArrayType);
-    cobj.put(ComObject.Tag.lowerKey, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
+    ComArray keyArray = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
+    cobj.put(ComObject.Tag.LOWER_KEY, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
     keyArray.add(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
 
-    cobj.put(ComObject.Tag.dbName, "test");
-    cobj.put(ComObject.Tag.tableName, "table1");
-    cobj.put(ComObject.Tag.shouldProcess, true);
-    cobj.put(ComObject.Tag.driverName, "com.sonicbase.jdbcdriver.Driver");
-    cobj.put(ComObject.Tag.user, "user");
-    cobj.put(ComObject.Tag.password, "password");
-    cobj.put(ComObject.Tag.connectString, "jdbc:sonicbase:localhost:9010");
+    cobj.put(ComObject.Tag.DB_NAME, "test");
+    cobj.put(ComObject.Tag.TABLE_NAME, "table1");
+    cobj.put(ComObject.Tag.SHOULD_PROCESS, true);
+    cobj.put(ComObject.Tag.DRIVER_NAME, "com.sonicbase.jdbcdriver.Driver");
+    cobj.put(ComObject.Tag.USER, "user");
+    cobj.put(ComObject.Tag.PASSWORD, "password");
+    cobj.put(ComObject.Tag.CONNECT_STRING, "jdbc:sonicbase:localhost:9010");
 
     ComObject ret = bim.coordinateBulkImportForTable(cobj, false);
 //    while (bim.getCountCoordinating() == 0) {
@@ -768,18 +764,18 @@ public class BulkImportManagerTest {
     when(server.getConfig()).thenReturn(config);
 
     ComObject cobj = new ComObject();
-    ComArray keyArray = cobj.putArray(ComObject.Tag.keys, ComObject.Type.byteArrayType);
-    cobj.put(ComObject.Tag.lowerKey, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
+    ComArray keyArray = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
+    cobj.put(ComObject.Tag.LOWER_KEY, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
     keyArray.add(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
 
-    cobj.put(ComObject.Tag.dbName, "test");
-    cobj.put(ComObject.Tag.tableName, "table2");
-    cobj.put(ComObject.Tag.shouldProcess, true);
-    cobj.put(ComObject.Tag.driverName, "com.sonicbase.jdbcdriver.Driver");
-    cobj.put(ComObject.Tag.user, "user");
-    cobj.put(ComObject.Tag.password, "password");
-    cobj.put(ComObject.Tag.expectedCount, 100L);
-    cobj.put(ComObject.Tag.connectString, "jdbc:sonicbase:localhost:9010");
+    cobj.put(ComObject.Tag.DB_NAME, "test");
+    cobj.put(ComObject.Tag.TABLE_NAME, "table2");
+    cobj.put(ComObject.Tag.SHOULD_PROCESS, true);
+    cobj.put(ComObject.Tag.DRIVER_NAME, "com.sonicbase.jdbcdriver.Driver");
+    cobj.put(ComObject.Tag.USER, "user");
+    cobj.put(ComObject.Tag.PASSWORD, "password");
+    cobj.put(ComObject.Tag.EXPECTED_COUNT, 100L);
+    cobj.put(ComObject.Tag.CONNECT_STRING, "jdbc:sonicbase:localhost:9010");
 
     ComObject ret = bim.coordinateBulkImportForTable(cobj, false);
 //    while (bim.getCountCoordinating() == 0) {

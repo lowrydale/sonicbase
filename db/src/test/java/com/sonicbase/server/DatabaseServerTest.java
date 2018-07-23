@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -49,18 +48,18 @@ public class DatabaseServerTest {
     server.setDatabaseClient(client);
 
     when(client.send(eq("DatabaseServer:healthCheck"), anyInt(), eq((long) 0), any(ComObject.class),
-        eq(DatabaseClient.Replica.specified))).thenAnswer(
+        eq(DatabaseClient.Replica.SPECIFIED))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
             ComObject retObj = (ComObject) args[3];
-            retObj.put(ComObject.Tag.status, "{\"status\" : \"ok\"}");
+            retObj.put(ComObject.Tag.STATUS, "{\"status\" : \"ok\"}");
             return retObj.serialize();
           }
         });
 
 
-    server.checkHealthOfServer(0, 0, isHealthy, false);
+    server.checkHealthOfServer(0, 0, isHealthy);
 
     assertTrue(isHealthy.get());
   }
@@ -83,7 +82,7 @@ public class DatabaseServerTest {
         return mockLogger;
       }
     };
-    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", true);
+    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log");
     DatabaseClient client = mock(DatabaseClient.class);
     server.setDatabaseClient(client);
 
@@ -95,8 +94,8 @@ public class DatabaseServerTest {
     file.mkdirs();
 
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.method, "echo");
-    cobj.put(ComObject.Tag.count, 1);
+    cobj.put(ComObject.Tag.METHOD, "echo");
+    cobj.put(ComObject.Tag.COUNT, 1);
     server.getMethodInvoker().invokeMethod(cobj.serialize(), 0, 0, false, true, new AtomicLong(), new AtomicLong());
     assertEquals(server.getMethodInvoker().getEchoCount(), 1);
 
@@ -126,9 +125,9 @@ public class DatabaseServerTest {
 
     assertNull(server.getIndices("test").getIndices().get(tableSchema.getName()).get(indexSchema.getName()));
 
-    cobj.put(ComObject.Tag.method, "getDbNames");
+    cobj.put(ComObject.Tag.METHOD, "getDbNames");
     ComObject retObj = server.getDbNames(cobj, false);
-    ComArray array = retObj.getArray(ComObject.Tag.dbNames);
+    ComArray array = retObj.getArray(ComObject.Tag.DB_NAMES);
     Set<String> dbs = new HashSet<>();
     for (int i = 0; i < array.getArray().size(); i++) {
       dbs.add((String) array.getArray().get(i));
@@ -143,11 +142,11 @@ public class DatabaseServerTest {
     assertNotNull(server.getPartitionManager());
     assertNotNull(server.getDeleteManager());
 
-    cobj.put(ComObject.Tag.isClient, false);
-    cobj.put(ComObject.Tag.host, "localhost");
-    cobj.put(ComObject.Tag.message, "message");
-    cobj.put(ComObject.Tag.exception, "exception");
-    cobj.put(ComObject.Tag.method, "logError");
+    cobj.put(ComObject.Tag.IS_CLIENT, false);
+    cobj.put(ComObject.Tag.HOST, "localhost");
+    cobj.put(ComObject.Tag.MESSAGE, "message");
+    cobj.put(ComObject.Tag.EXCEPTION, "exception");
+    cobj.put(ComObject.Tag.METHOD, "logError");
     server.logError(cobj, false);
 
     assertTrue(calledErrorLogger.get());
@@ -163,7 +162,7 @@ public class DatabaseServerTest {
     server.setReplica(1);
     server.setReplicationFactor(2);
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.maxId, 100L);
+    cobj.put(ComObject.Tag.MAX_ID, 100L);
     server.setMaxRecordId(cobj, false);
 
     File file = new File(server.getDataDir(), "nextRecordId/1/0/nextRecorId.txt");
@@ -171,11 +170,11 @@ public class DatabaseServerTest {
     assertEquals(str, "100");
 
     final AtomicBoolean calledPush = new AtomicBoolean();
-    when(client.send(eq("DatabaseServer:setMaxRecordId"), anyInt(), anyInt(), anyObject(), eq(DatabaseClient.Replica.specified), eq(true))).thenAnswer(
+    when(client.send(eq("DatabaseServer:setMaxRecordId"), anyInt(), anyInt(), anyObject(), eq(DatabaseClient.Replica.SPECIFIED), eq(true))).thenAnswer(
         invocationOnMock -> {
           Object[] args = invocationOnMock.getArguments();
           calledPush.set(true);
-          assertEquals((long) ((ComObject) args[0]).getLong(ComObject.Tag.maxId), 100L);
+          assertEquals((long) ((ComObject) args[0]).getLong(ComObject.Tag.MAX_ID), 100L);
           return null;
         });
     server.pushMaxRecordId(cobj, false);
@@ -193,10 +192,10 @@ public class DatabaseServerTest {
 
     doAnswer(invocationOnMock -> { if (syncCalled.incrementAndGet() == 1) {
       server.getCommon().getTables("test").put(tableSchema.getName(), tableSchema);
-      tableSchema.getIndexes().clear();
+      tableSchema.getIndices().clear();
     }
     else if (syncCalled.get() == 2) {
-      tableSchema.getIndexes().put(indexSchema.getName(), indexSchema);
+      tableSchema.getIndices().put(indexSchema.getName(), indexSchema);
     }
     return null;}).when(client).syncSchema();
 
@@ -210,17 +209,17 @@ public class DatabaseServerTest {
     String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.json"), "utf-8");
     ObjectNode config = (ObjectNode) new ObjectMapper().readTree(configStr);
     DatabaseServer server = new DatabaseServer();
-    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", true);
+    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log");
 
     DatabaseClient client = mock(DatabaseClient.class);
     server.setDatabaseClient(client);
 
     final AtomicBoolean calledExecute = new AtomicBoolean();
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.sql, "execute procedure 'com.sonicbase.server.MyStoredProcedure', 100000");
-    cobj.put(ComObject.Tag.dbName, "test");
+    cobj.put(ComObject.Tag.SQL, "execute procedure 'com.sonicbase.server.MyStoredProcedure', 100000");
+    cobj.put(ComObject.Tag.DB_NAME, "test");
 
-    when(client.send(eq("DatabaseServer:executeProcedure"), anyInt(), anyInt(), anyObject(), eq(DatabaseClient.Replica.def))).
+    when(client.send(eq("DatabaseServer:executeProcedure"), anyInt(), anyInt(), anyObject(), eq(DatabaseClient.Replica.DEF))).
         thenAnswer((Answer) invocationOnMock -> {calledExecute.set(true); return null;});
 
     server.executeProcedurePrimary(cobj, false);
@@ -243,9 +242,9 @@ public class DatabaseServerTest {
     when(client.getCommon()).thenReturn(server.getCommon());
 
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.sql, "execute procedure 'com.sonicbase.server.MyStoredProcedure', 100000");
-    cobj.put(ComObject.Tag.dbName, "test");
-    cobj.put(ComObject.Tag.id, 100L);
+    cobj.put(ComObject.Tag.SQL, "execute procedure 'com.sonicbase.server.MyStoredProcedure', 100000");
+    cobj.put(ComObject.Tag.DB_NAME, "test");
+    cobj.put(ComObject.Tag.ID, 100L);
     server.executeProcedure(cobj, false);
 
     assertTrue(MyStoredProcedure.called);
@@ -263,13 +262,13 @@ public class DatabaseServerTest {
     ComObject cobj = new ComObject();
     ComObject retObj = server.allocateRecordIds(cobj, false);
 
-    assertEquals((long)retObj.getLong(ComObject.Tag.nextId), 1L);
-    assertEquals((long)retObj.getLong(ComObject.Tag.maxId), 100000L);
+    assertEquals((long)retObj.getLong(ComObject.Tag.NEXT_ID), 1L);
+    assertEquals((long)retObj.getLong(ComObject.Tag.MAX_ID), 100000L);
 
     retObj = server.allocateRecordIds(cobj, false);
 
-    assertEquals((long)retObj.getLong(ComObject.Tag.nextId), 100001L);
-    assertEquals((long)retObj.getLong(ComObject.Tag.maxId), 200000L);
+    assertEquals((long)retObj.getLong(ComObject.Tag.NEXT_ID), 100001L);
+    assertEquals((long)retObj.getLong(ComObject.Tag.MAX_ID), 200000L);
   }
 
   @Test
@@ -282,7 +281,7 @@ public class DatabaseServerTest {
         calledPush.set(true);
       }
     };
-    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", true);
+    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log");
 
     ((ObjectNode)config.withArray("shards").get(0).withArray("replicas").get(0)).put("port", 50);
 
@@ -305,17 +304,17 @@ public class DatabaseServerTest {
     String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.json"), "utf-8");
     ObjectNode config = (ObjectNode) new ObjectMapper().readTree(configStr);
     DatabaseServer server = new DatabaseServer();
-    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", true);
+    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log");
 
     DatabaseClient client = mock(DatabaseClient.class);
     server.setDatabaseClient(client);
 
     FileUtils.deleteDirectory(new File(server.getDataDir()));
 
-    when(client.send(eq("DatabaseServer:getDbNames"), anyInt(), anyInt(), anyObject(), eq(DatabaseClient.Replica.master), eq(true))).
+    when(client.send(eq("DatabaseServer:getDbNames"), anyInt(), anyInt(), anyObject(), eq(DatabaseClient.Replica.MASTER), eq(true))).
         thenAnswer((Answer) invocationOnMock -> {
           ComObject ret = new ComObject();
-          ComArray array = ret.putArray(ComObject.Tag.dbNames, ComObject.Type.stringType);
+          ComArray array = ret.putArray(ComObject.Tag.DB_NAMES, ComObject.Type.STRING_TYPE);
           array.add("my-db"); return ret.serialize();});
 
     server.syncDbNames();
@@ -331,13 +330,13 @@ public class DatabaseServerTest {
     String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.json"), "utf-8");
     ObjectNode config = (ObjectNode) new ObjectMapper().readTree(configStr);
     DatabaseServer server = new DatabaseServer();
-    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", true);
+    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log");
 
     DatabaseClient client = mock(DatabaseClient.class);
     server.setDatabaseClient(client);
 
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.replica, 0);
+    cobj.put(ComObject.Tag.REPLICA, 0);
     server.markReplicaDead(cobj, false);
 
     ServersConfig.Shard[] shards = server.getCommon().getServersConfig().getShards();
@@ -364,14 +363,14 @@ public class DatabaseServerTest {
         }
       }
     };
-    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", true);
+    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log");
     server.setShard(1);
     server.setReplica(1);
     DatabaseClient client = mock(DatabaseClient.class);
     server.setDatabaseClient(client);
 
     server.startDeathMonitor(5L);
-    Thread.sleep(500);
+    Thread.sleep(1_000);
 
     assertTrue(server.getCommon().getServersConfig().getShards()[0].getReplicas()[0].isDead());
   }

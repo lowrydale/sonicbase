@@ -69,9 +69,6 @@ public class TestIndex {
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
-    ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
-    array.add(DatabaseServer.FOUR_SERVER_LICENSE);
-    config.put("licenseKeys", array);
 
         DatabaseClient.getServers().clear();
 
@@ -86,10 +83,8 @@ public class TestIndex {
     //          String role = "primaryMaster";
 
           dbServers[shard] = new DatabaseServer();
-          dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
+          dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
           dbServers[shard].setRole(role);
-          dbServers[shard].disableLogProcessor();
-          dbServers[shard].setMinSizeForRepartition(0);
           //          return null;
     //        }
     //      }));
@@ -155,7 +150,7 @@ public class TestIndex {
 
     Schema schema = client.getSchema("test");
     TableSchema tableSchema = schema.getTables().get("memberships");
-    IndexSchema indexSchema = tableSchema.getIndexes().get("_primarykey");
+    IndexSchema indexSchema = tableSchema.getIndices().get("_primarykey");
     Index index = new Index(tableSchema, indexSchema.getName(), indexSchema.getComparators());
 
     for (int i = 0; i < 10; i++) {
@@ -205,7 +200,7 @@ public class TestIndex {
 
     Schema schema = client.getSchema("test");
     TableSchema tableSchema = schema.getTables().get("persons");
-    IndexSchema indexSchema = tableSchema.getIndexes().get("_primarykey");
+    IndexSchema indexSchema = tableSchema.getIndices().get("_primarykey");
     Index index = new Index(tableSchema, indexSchema.getName(), indexSchema.getComparators());
 
     for (int i = 0; i < 10; i++) {
@@ -246,7 +241,7 @@ public class TestIndex {
 
     Schema schema = client.getSchema("test");
     TableSchema tableSchema = schema.getTables().get("persons");
-    IndexSchema indexSchema = tableSchema.getIndexes().get("_primarykey");
+    IndexSchema indexSchema = tableSchema.getIndices().get("_primarykey");
     Index index = new Index(tableSchema, indexSchema.getName(), indexSchema.getComparators());
 
     for (int i = 0; i < 10021; i++) {
@@ -269,7 +264,7 @@ public class TestIndex {
 
     Schema schema = client.getSchema("test");
     TableSchema tableSchema = schema.getTables().get("persons");
-    IndexSchema indexSchema = tableSchema.getIndexes().get("_primarykey");
+    IndexSchema indexSchema = tableSchema.getIndices().get("_primarykey");
     Index index = new Index(tableSchema, indexSchema.getName(), indexSchema.getComparators());
 
     for (int i = 0; i < 10000; i++) {
@@ -292,7 +287,7 @@ public class TestIndex {
 
     Schema schema = client.getSchema("test");
     TableSchema tableSchema = schema.getTables().get("persons");
-    IndexSchema indexSchema = tableSchema.getIndexes().get("_primarykey");
+    IndexSchema indexSchema = tableSchema.getIndices().get("_primarykey");
     Index index = new Index(tableSchema, indexSchema.getName(), indexSchema.getComparators());
 
     for (int i = 0; i < 1000; i++) {
@@ -351,7 +346,7 @@ public class TestIndex {
 
     Schema schema = client.getSchema("test");
     TableSchema tableSchema = schema.getTables().get("persons");
-    IndexSchema indexSchema = tableSchema.getIndexes().get("_primarykey");
+    IndexSchema indexSchema = tableSchema.getIndices().get("_primarykey");
     Index index = new Index(tableSchema, indexSchema.getName(), indexSchema.getComparators());
 
     for (int i = 0; i < 100000; i++) {

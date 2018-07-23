@@ -8,15 +8,14 @@ import java.io.*;
 import java.sql.SQLException;
 import java.sql.Types;
 
-/**
- * Created by IntelliJ IDEA.
- * User: lowryda
- * Date: Nov 9, 2011
- * Time: 2:33:41 PM
- */
 public class Parameter {
 
-  public static abstract class ParameterBase<Q> {
+  public static final java.lang.String UTF_8_STR = "utf-8";
+
+  private Parameter() {
+  }
+
+  public abstract static class ParameterBase<Q> {
     private Q value;
 
     public Q getValue() {
@@ -46,13 +45,13 @@ public class Parameter {
 
     public NClobReader(Reader value) throws IOException {
       super(null);
-      setValue(IOUtils.toByteArray(value, "utf-8"));
+      setValue(IOUtils.toByteArray(value, UTF_8_STR));
       length = getValue().length;
     }
 
     public NClobReader(Reader value, long length) throws IOException {
       super(null);
-      setValue(IOUtils.toByteArray(value, "utf-8"));
+      setValue(IOUtils.toByteArray(value, UTF_8_STR));
       this.length = length;
     }
 
@@ -61,6 +60,7 @@ public class Parameter {
       length = bytes.length;
     }
 
+    @Override
     public void serialize(DataOutputStream out, boolean writeType) throws IOException {
       super.serialize(out, writeType);
       byte[] bytes = getValue();
@@ -87,13 +87,13 @@ public class Parameter {
 
     public ClobReader(Reader value) throws IOException {
       super(null);
-      setValue(IOUtils.toByteArray(value, "utf-8"));
+      setValue(IOUtils.toByteArray(value, UTF_8_STR));
       length = getValue().length;
     }
 
     public ClobReader(Reader value, long length) throws IOException {
       super(null);
-      setValue(IOUtils.toByteArray(value, "utf-8"));
+      setValue(IOUtils.toByteArray(value, UTF_8_STR));
       this.length = length;
     }
 
@@ -102,6 +102,7 @@ public class Parameter {
       length = bytes.length;
     }
 
+    @Override
     public void serialize(DataOutputStream out, boolean writeType) throws IOException {
       super.serialize(out, writeType);
       byte[] bytes = getValue();
@@ -126,17 +127,18 @@ public class Parameter {
 
   public static class CharacterStream extends ParameterBase<byte[]> {
     public CharacterStream(Reader value) throws IOException {
-      super(IOUtils.toString(value).getBytes("utf-8"));
+      super(IOUtils.toString(value).getBytes(UTF_8_STR));
     }
 
     public CharacterStream(Reader value, long length) throws IOException {
-      super(IOUtils.toString(value).substring(0, (int)length).getBytes("utf-8"));
+      super(IOUtils.toString(value).substring(0, (int)length).getBytes(UTF_8_STR));
     }
 
     public CharacterStream(byte[] bytes) {
       super(bytes);
     }
 
+    @Override
     public void serialize(DataOutputStream out, boolean writeType) throws IOException {
       super.serialize(out, writeType);
       byte[] bytes = getValue();
@@ -160,13 +162,13 @@ public class Parameter {
   public static class NCharacterStream extends ParameterBase<byte[]> {
     public NCharacterStream(Reader value) throws IOException {
       super(null);
-      setValue(IOUtils.toByteArray(value, "utf-8"));
+      setValue(IOUtils.toByteArray(value, UTF_8_STR));
     }
 
     public NCharacterStream(Reader value, long length) {
       super(null);
       try {
-        setValue(IOUtils.toString(value).substring(0, (int)length).getBytes("utf-8"));
+        setValue(IOUtils.toString(value).substring(0, (int)length).getBytes(UTF_8_STR));
       }
       catch (IOException e) {
         throw new DatabaseException(e);
@@ -177,6 +179,7 @@ public class Parameter {
       super(bytes);
     }
 
+    @Override
     public void serialize(DataOutputStream out, boolean writeType) throws IOException {
       super.serialize(out, writeType);
       byte[] bytes = getValue();
@@ -215,6 +218,7 @@ public class Parameter {
       return Types.VARBINARY;
     }
 
+    @Override
     public void serialize(DataOutputStream out, boolean writeType) throws IOException {
       super.serialize(out, writeType);
       byte[] buffer = getValue();
@@ -238,13 +242,14 @@ public class Parameter {
 
     public AsciiStream(InputStream value, long length) throws IOException {
       super(null);
-      setValue(IOUtils.toString(value, "utf-8").substring(0, (int)length).getBytes("utf-8"));
+      setValue(IOUtils.toString(value, UTF_8_STR).substring(0, (int)length).getBytes(UTF_8_STR));
     }
 
     public AsciiStream(byte[] bytes) {
       super(bytes);
     }
 
+    @Override
     public void serialize(DataOutputStream out, boolean writeType) throws IOException {
       super.serialize(out, writeType);
       byte[] bytes = getValue();
@@ -269,13 +274,14 @@ public class Parameter {
 
   public static class NClob extends ParameterBase<byte[]> {
     public NClob(java.sql.NClob value) throws UnsupportedEncodingException {
-      super(((com.sonicbase.query.impl.NClob)value).getString().getBytes("utf-8"));
+      super(((com.sonicbase.query.impl.NClob)value).getString().getBytes(UTF_8_STR));
     }
 
     public NClob(byte[] bytes) {
       super(bytes);
     }
 
+    @Override
     public void serialize(DataOutputStream out, boolean writeType) throws IOException {
        super.serialize(out, writeType);
        byte[] bytes = getValue();
@@ -298,9 +304,10 @@ public class Parameter {
   public static class NString extends ParameterBase<byte[]> {
     public NString(java.lang.String value) throws UnsupportedEncodingException {
       super(null);
-      setValue(value.getBytes("utf-8"));
+      setValue(value.getBytes(UTF_8_STR));
     }
 
+    @Override
     public void serialize(DataOutputStream out, boolean b) throws IOException {
       super.serialize(out, b);
       byte[] bytes = getValue();
@@ -312,7 +319,7 @@ public class Parameter {
       int len = in.readInt();
       byte[] bytes = new byte[len];
       in.readFully(bytes);
-      return new Parameter.NString(new java.lang.String(bytes, "utf-8"));
+      return new Parameter.NString(new java.lang.String(bytes, UTF_8_STR));
     }
 
     @Override
@@ -322,27 +329,15 @@ public class Parameter {
   }
 
   public static class Null extends ParameterBase<Integer> {
-    private java.lang.String typeName;
     private int sqlType;
-
-    public Null(int sqlType, java.lang.String typeName) {
-      super(null);
-      this.sqlType = sqlType;
-      this.typeName = typeName;
-    }
 
     public Null(int sqlType) {
       super(null);
       this.sqlType = sqlType;
-      typeName = null;
     }
 
     @Override
     public int getSqlType() {
-      return Types.NULL;
-    }
-
-    public int getSqlTypeWrapping() {
       return sqlType;
     }
   }
@@ -352,6 +347,7 @@ public class Parameter {
       super(x);
     }
 
+    @Override
     public void serialize(DataOutputStream out, boolean b) throws IOException {
       super.serialize(out, b);
       out.writeLong(getValue().getTime());
@@ -373,6 +369,7 @@ public class Parameter {
       super(x);
     }
 
+    @Override
     public void serialize(DataOutputStream out, boolean b) throws IOException {
       super.serialize(out, b);
       out.writeLong(getValue().getTime());
@@ -394,6 +391,7 @@ public class Parameter {
       super(x);
     }
 
+    @Override
     public void serialize(DataOutputStream out, boolean b) throws IOException {
       super.serialize(out, b);
       out.writeLong(getValue().getTime());
@@ -412,13 +410,14 @@ public class Parameter {
 
   public static class Clob extends ParameterBase<byte[]> {
     public Clob(java.sql.Clob x) throws UnsupportedEncodingException {
-      super(((com.sonicbase.query.impl.Clob)x).getString().getBytes("utf-8"));
+      super(((com.sonicbase.query.impl.Clob)x).getString().getBytes(UTF_8_STR));
     }
 
     public Clob(byte[] bytes) {
       super(bytes);
     }
 
+    @Override
     public void serialize(DataOutputStream out, boolean writeType) throws IOException {
        super.serialize(out, writeType);
        byte[] bytes = getValue();
@@ -457,6 +456,7 @@ public class Parameter {
       super(x);
     }
 
+    @Override
     public void serialize(DataOutputStream out, boolean writeType) throws IOException {
       super.serialize(out, writeType);
       byte[] buffer = getValue();
@@ -480,13 +480,14 @@ public class Parameter {
   public static class UnicodeStream extends ParameterBase<byte[]> {
     public UnicodeStream(InputStream x, int length) throws IOException {
       super(null);
-      setValue(IOUtils.toString(x, "utf-8").substring(0, length).getBytes("utf-8"));
+      setValue(IOUtils.toString(x, UTF_8_STR).substring(0, length).getBytes(UTF_8_STR));
     }
 
     public UnicodeStream(byte[] bytes) {
       super(bytes);
     }
 
+    @Override
     public void serialize(DataOutputStream out, boolean writeType) throws IOException {
       super.serialize(out, writeType);
       byte[] bytes = getValue();
@@ -513,6 +514,7 @@ public class Parameter {
       super(x);
     }
 
+    @Override
     public void serialize(DataOutputStream out, boolean writeType) throws IOException {
       super.serialize(out, writeType);
       byte[] buffer = getValue();
@@ -538,7 +540,8 @@ public class Parameter {
       super(x);
     }
 
-     public void serialize(DataOutputStream out, boolean writeType) throws IOException {
+    @Override
+    public void serialize(DataOutputStream out, boolean writeType) throws IOException {
       super.serialize(out, writeType);
       byte[] bytes = getValue();
       out.writeInt(bytes.length);
@@ -572,14 +575,15 @@ public class Parameter {
       int len = (int) Varint.readSignedVarLong(in);
       byte[] buffer = new byte[len];
       in.readFully(buffer);
-      java.lang.String str = new java.lang.String(buffer, "utf-8");
+      java.lang.String str = new java.lang.String(buffer, UTF_8_STR);
       return new Parameter.BigDecimal(new java.math.BigDecimal(str));
     }
 
+    @Override
     public void serialize(DataOutputStream out, boolean b) throws IOException {
       super.serialize(out, b);
       java.lang.String strValue = getValue().toPlainString();
-      byte[] bytes = strValue.getBytes("utf-8");
+      byte[] bytes = strValue.getBytes(UTF_8_STR);
       Varint.writeSignedVarLong(bytes.length, out);
       out.write(bytes);
     }
@@ -590,6 +594,7 @@ public class Parameter {
       super(x);
     }
 
+    @Override
     public void serialize(DataOutputStream out, boolean b) throws IOException {
       super.serialize(out, b);
       out.writeDouble(getValue());
@@ -610,6 +615,7 @@ public class Parameter {
       super(x);
     }
 
+    @Override
     public void serialize(DataOutputStream out, boolean b) throws IOException {
       super.serialize(out, b);
       out.writeFloat(getValue());
@@ -630,6 +636,7 @@ public class Parameter {
       super(x);
     }
 
+    @Override
     public void serialize(DataOutputStream out, boolean b) throws IOException {
       super.serialize(out, b);
       out.writeLong(getValue());
@@ -650,6 +657,7 @@ public class Parameter {
       super(x);
     }
 
+    @Override
     public void serialize(DataOutputStream out, boolean b) throws IOException {
       super.serialize(out, b);
       out.writeInt(getValue());
@@ -670,6 +678,7 @@ public class Parameter {
       super(x);
     }
 
+    @Override
     public void serialize(DataOutputStream out, boolean b) throws IOException {
       super.serialize(out, b);
       out.writeShort(getValue());
@@ -695,6 +704,7 @@ public class Parameter {
       return Types.TINYINT;
     }
 
+    @Override
     public void serialize(DataOutputStream out, boolean b) throws IOException {
        super.serialize(out, b);
        out.write(getValue());
@@ -712,6 +722,7 @@ public class Parameter {
       super(x);
     }
 
+    @Override
     public void serialize(DataOutputStream out, boolean b) throws IOException {
       super.serialize(out, b);
       out.writeBoolean(getValue());

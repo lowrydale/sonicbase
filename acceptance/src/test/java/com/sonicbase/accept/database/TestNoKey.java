@@ -2,8 +2,6 @@
 package com.sonicbase.accept.database;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
@@ -48,10 +46,6 @@ public class TestNoKey {
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
-      ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
-      array.add(DatabaseServer.FOUR_SERVER_LICENSE);
-      config.put("licenseKeys", array);
-
       DatabaseClient.getServers().clear();
 
       final DatabaseServer[] dbServers = new DatabaseServer[4];
@@ -68,10 +62,9 @@ public class TestNoKey {
         //          String role = "primaryMaster";
 
         dbServers[shard] = new DatabaseServer();
-        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
+        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
         dbServers[shard].setRole(role);
-        dbServers[shard].disableLogProcessor();
-        dbServers[shard].setMinSizeForRepartition(0);
+
         //          return null;
         //        }
         //      }));
@@ -129,17 +122,17 @@ public class TestNoKey {
 
       while (true) {
         ComObject cobj = new ComObject();
-        cobj.put(ComObject.Tag.method, "DatabaseServer:areAllLongRunningCommandsComplete");
+        cobj.put(ComObject.Tag.METHOD, "DatabaseServer:areAllLongRunningCommandsComplete");
         byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().sendToMaster(cobj);
         ComObject retObj = new ComObject(bytes);
-        if (retObj.getBoolean(ComObject.Tag.isComplete)) {
+        if (retObj.getBoolean(ComObject.Tag.IS_COMPLETE)) {
           break;
         }
         Thread.sleep(1000);
       }
 
 
-      client.beginRebalance("test", "persons", "_primarykey");
+      client.beginRebalance("test");
 
 
       while (true) {
@@ -160,7 +153,7 @@ public class TestNoKey {
       count = client.getPartitionSize("test", 1, "nokeysecondaryindex", "id");
       assertEquals(count, 6);
 
-      long commandCount = dbServers[1].getCommandCount();
+      //long commandCount = dbServers[1].getCommandCount();
 //      dbServers[2].purgeMemory();
 //      dbServers[2].recoverFromSnapshot();
 //      dbServers[2].replayLogs();
@@ -187,7 +180,7 @@ public class TestNoKey {
 //      cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
 //      cobj.put(ComObject.Tag.method, "forceDeletes");
 //      String command = "DatabaseServer:ComObject:forceDeletes:";
-//      client.sendToAllShards(null, 0, command, cobj, DatabaseClient.Replica.all);
+//      client.sendToAllShards(null, 0, command, cobj, DatabaseClient.Replica.ALL);
 
       // Thread.sleep(10000);
       executor.shutdownNow();

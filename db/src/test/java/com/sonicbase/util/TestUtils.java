@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.util;
 
 import com.sonicbase.client.DatabaseClient;
@@ -8,7 +7,6 @@ import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
@@ -29,7 +27,6 @@ public class TestUtils {
     return ret;
   }
 
-  @NotNull
   public static DatabaseCommon createCommon(TableSchema tableSchema) {
     DatabaseCommon common = new DatabaseCommon();
     common.addDatabase("test");

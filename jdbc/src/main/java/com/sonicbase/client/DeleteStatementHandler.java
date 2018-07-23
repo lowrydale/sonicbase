@@ -12,7 +12,7 @@ import net.sf.jsqlparser.statement.delete.Delete;
 import java.sql.SQLException;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class DeleteStatementHandler extends StatementHandler {
+public class DeleteStatementHandler implements StatementHandler {
   private final DatabaseClient client;
 
   public DeleteStatementHandler(DatabaseClient client) {

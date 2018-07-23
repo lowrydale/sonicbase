@@ -27,7 +27,7 @@ public class TestServers {
       public Object call() throws Exception {
         try {
           dbServers[0].startServer(new String[]{"-port", String.valueOf(9010 + (50 * 0)), "-host", "localhost",
-              "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "4-bench", "-shard", String.valueOf(0)}, "db/src/main/resources/config/config-4-bench.json", true);
+              "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "4-bench", "-shard", String.valueOf(0)});
           //dbServers[0].getDatabaseServer().shutdownRepartitioner();
         }
         catch (Exception e) {
@@ -53,7 +53,7 @@ public class TestServers {
           try {
             dbServers[shard].startServer(new String[]{"-port", String.valueOf(9010 + (50 * shard)), "-host", "localhost",
                 "-mport", String.valueOf(9010), "-mhost", "localhost",
-                "-shard", String.valueOf(shard), "-cluster", "4-bench"}, "db/src/main/resources/config/config-4-bench.json", true);
+                "-shard", String.valueOf(shard), "-cluster", "4-bench"});
             //dbServers[shard].getDatabaseServer().shutdownRepartitioner();
           }
           catch (Exception e) {

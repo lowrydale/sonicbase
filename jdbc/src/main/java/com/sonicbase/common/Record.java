@@ -1,12 +1,10 @@
 package com.sonicbase.common;
 
 import com.sonicbase.query.DatabaseException;
-import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.TableSchema;
 import org.apache.giraph.utils.Varint;
 
 import java.io.*;
-import java.util.List;
 import java.util.Set;
 
 /**
@@ -24,8 +22,8 @@ public class Record {
   private long sequence1;
   private short sequence2;
 
-  public static short DB_VIEW_FLAG_DELETING = 0x1;
-  public static short DB_VIEW_FLAG_ADDING = 0x2;
+  public static final short DB_VIEW_FLAG_DELETING = 0x1;
+  public static final short DB_VIEW_FLAG_ADDING = 0x2;
 
   public Record(TableSchema tableSchema) {
     this.tableSchema = tableSchema;
@@ -42,10 +40,8 @@ public class Record {
   public void recoverFromSnapshot(String dbName, DatabaseCommon common, byte[] bytes, Set<Integer> columns, boolean readHeader) {
     try {
       DataInputStream sin = new DataInputStream(new ByteArrayInputStream(bytes, !readHeader ? 26 : 0, !readHeader ? bytes.length - 26 : bytes.length));
-      if (!readHeader) {
-      }
-      else {
-        short serializationVersion = sin.readShort();
+      if (readHeader) {
+        sin.readShort(); // serializationVersion
         sequence0 = sin.readLong();
         sequence1 = sin.readLong();
         sequence2 = sin.readShort();
@@ -56,9 +52,9 @@ public class Record {
       transId = Varint.readSignedVarLong(sin);
       this.tableSchema = common.getTablesById(dbName).get((int) Varint.readSignedVarLong(sin));
 
-      int len = (int)Varint.readSignedVarLong(sin);
-      fields = DatabaseCommon.deserializeFields(dbName, common, sin, tableSchema,
-          common.getSchemaVersion(), dbViewNumber, columns, true);
+      Varint.readSignedVarLong(sin); //len
+      fields = DatabaseCommon.deserializeFields(sin, tableSchema,
+          common.getSchemaVersion(), columns);
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -140,10 +136,6 @@ public class Record {
     return DataUtils.bytesToShort(bytes, offset);
   }
 
-  public long getUpdateTime() {
-    return sequence0;
-  }
-
   public short getDbViewFlags() {
     return dbViewFlags;
   }
@@ -207,29 +199,16 @@ public class Record {
 
     headerOut.close();
     byte[] bytes = bytesOut.toByteArray();
-    //Varint.writeSignedVarLong(out, bytes.length);
+
     out.write(bytes);
     Varint.writeSignedVarLong(tableSchema.getTableId(), out);
-    DatabaseCommon.serializeFields(fields, out, tableSchema, common.getSchemaVersion(), true);
+    DatabaseCommon.serializeFields(fields, out, tableSchema, common.getSchemaVersion());
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
-  @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public void setFields(Object[] fields) {
     this.fields = fields;
   }
 
-  public Object getField(String columnName) {
-    List<FieldSchema> fieldSchema = tableSchema.getFields();
-    for (int i = 0; i < fieldSchema.size(); i++) {
-      if (columnName.toLowerCase().equals(fieldSchema.get(i).getName().toLowerCase())) {
-        return fields[i];
-      }
-    }
-    return null;
-  }
-
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP", justification="copying the returned data is too slow")
   public Object[] getFields() {
     return fields;
   }

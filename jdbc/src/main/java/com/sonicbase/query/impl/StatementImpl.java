@@ -26,7 +26,7 @@ public abstract class StatementImpl implements Statement {
   }
 
   public Object execute(String dbName, String sqlToUse, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1,
-                        Short sequence2, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) throws DatabaseException {
+                        Short sequence2, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) {
     throw new DatabaseException("Not supported");
   }
 

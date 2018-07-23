@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.client;
 
 import com.sonicbase.common.ComObject;
@@ -6,7 +5,6 @@ import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.DatabaseException;
 
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 public class DatabaseServerProxy {
@@ -35,6 +33,10 @@ public class DatabaseServerProxy {
     catch (Exception e) {
       throw new DatabaseException(e);
     }
+  }
+
+  private DatabaseServerProxy() {
+
   }
 
   public static ComObject serverSelect(Object server, ComObject cobj, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) {

@@ -42,7 +42,7 @@ public class ParameterImpl extends ExpressionImpl {
   }
 
   public String toString() {
-    return "parm(" + String.valueOf(parmOffset) + ")";
+    return "parm(" + parmOffset + ")";
   }
 
   /**
@@ -66,6 +66,7 @@ public class ParameterImpl extends ExpressionImpl {
    * DON"T MODIFY THIS SERIALIZATION
    * ###############################
    */
+  @Override
   public void deserialize(short serializationVersion, DataInputStream in) {
     try {
       super.deserialize(serializationVersion, in);
@@ -83,9 +84,10 @@ public class ParameterImpl extends ExpressionImpl {
 
   @Override
   public ExpressionImpl.Type getType() {
-    return ExpressionImpl.Type.parameter;
+    return ExpressionImpl.Type.PARAMETER;
   }
 
+  @Override
   public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
     return null;
   }

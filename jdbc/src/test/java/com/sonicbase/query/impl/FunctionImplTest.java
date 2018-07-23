@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.query.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -54,7 +53,7 @@ public class FunctionImplTest {
         "      ]\n" +
         "    }\n" +
         "  ]}\n");
-    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), 1, true, true);
+    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), true, true);
     common.setServersConfig(serversConfig);
     when(client.getCommon()).thenReturn(common);
 

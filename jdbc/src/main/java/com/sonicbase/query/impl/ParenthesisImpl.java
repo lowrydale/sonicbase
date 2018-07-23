@@ -53,8 +53,6 @@ public class ParenthesisImpl extends ExpressionImpl {
     try {
       super.serialize(serializationVersion, out);
       serializeExpression(expression, out);
-//      out.writeInt(expression.getType().getId());
-//      expression.serialize(out);
       out.writeBoolean(isNot);
     }
     catch (IOException e) {
@@ -64,7 +62,7 @@ public class ParenthesisImpl extends ExpressionImpl {
 
   @Override
   public ExpressionImpl.Type getType() {
-    return ExpressionImpl.Type.parenthesis;
+    return ExpressionImpl.Type.PARENTHESIS;
   }
 
   /**
@@ -96,30 +94,29 @@ public class ParenthesisImpl extends ExpressionImpl {
   @Override
   public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
                          Limit limit, Offset offset, boolean b, boolean analyze, int schemaRetryCount) {
-    return doNext(explain, count, currOffset, countReturned, limit, offset, schemaRetryCount);
-//    return expression.next(count, eplain, currOffset, limit, offset, b);
+    return doNext(count, currOffset, countReturned, limit, offset, schemaRetryCount);
   }
 
-  private NextReturn doNext(SelectStatementImpl.Explain explain, int count, AtomicLong currOffset,
+  private NextReturn doNext(int count, AtomicLong currOffset,
                             AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
     if (isNot) {
       TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(getTableName());
       IndexSchema indexSchema = null;
-      for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndexes().entrySet()) {
+      for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
         if (entry.getValue().isPrimaryKey()) {
           indexSchema = entry.getValue();
         }
       }
+      if (indexSchema == null) {
+        throw new DatabaseException("primary index not found: table=" + getTableName());
+      }
       boolean ascending = true;
       List<OrderByExpressionImpl> orderByExpressions = getOrderByExpressions();
-      if (orderByExpressions != null && orderByExpressions.size() != 0) {
-        OrderByExpressionImpl expression = orderByExpressions.get(0);
-        String columnName = expression.getColumnName();
-        //if (columnName.equals(tableSchema.getIndices().get(indexSchema.getName()).getFields()[0])) {
-        ascending = expression.isAscending();
-        //}
+      if (orderByExpressions != null && !orderByExpressions.isEmpty()) {
+        OrderByExpressionImpl localExpression = orderByExpressions.get(0);
+        ascending = localExpression.isAscending();
       }
-      BinaryExpression.Operator op = ascending ? BinaryExpression.Operator.greater : BinaryExpression.Operator.less;
+      BinaryExpression.Operator op = ascending ? BinaryExpression.Operator.GREATER : BinaryExpression.Operator.LESS;
       AtomicReference<String> usedIndex = new AtomicReference<>();
 
       IndexLookup indexLookup = new IndexLookup();
@@ -146,102 +143,112 @@ public class ParenthesisImpl extends ExpressionImpl {
       return ret;
     }
     else {
-      return null;//return expression.next(explain, currOffset, limit, offset);
+      return null;
     }
-//    return null;
   }
 
-
+  @Override
   public NextReturn next(SelectStatementImpl.Explain explainBuilder, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
-    NextReturn ret = doNext(null,1000, currOffset, countReturned, limit, offset, schemaRetryCount);
-    return ret;
+    return doNext(1000, currOffset, countReturned, limit, offset, schemaRetryCount);
   }
 
+  @Override
   public void setTableName(String tableName) {
     super.setTableName(tableName);
     expression.setTableName(tableName);
   }
 
+  @Override
   public void setClient(DatabaseClient client) {
     super.setClient(client);
     expression.setClient(client);
   }
 
+  @Override
   public void setParms(ParameterHandler parms) {
     super.setParms(parms);
     expression.setParms(parms);
   }
 
+  @Override
   public void getColumns(Set<ColumnImpl> columns) {
     expression.getColumns(columns);
   }
 
+  @Override
   public void setColumns(List<ColumnImpl> columns) {
     super.setColumns(columns);
     expression.setColumns(columns);
   }
 
+  @Override
   public void setTopLevelExpression(Expression topLevelExpression) {
     super.setTopLevelExpression(topLevelExpression);
     expression.setTopLevelExpression(topLevelExpression);
   }
 
+  @Override
   public void setOrderByExpressions(List<OrderByExpressionImpl> orderByExpressions) {
     super.setOrderByExpressions(orderByExpressions);
     expression.setOrderByExpressions(orderByExpressions);
   }
 
+  @Override
   public void setDebug(boolean debug) {
     super.setDebug(debug);
     expression.setDebug(debug);
   }
 
+  @Override
   public void setViewVersion(int viewVersion) {
     super.setViewVersion(viewVersion);
     expression.setViewVersion(viewVersion);
   }
 
+  @Override
   public void setCounters(Counter[] counters) {
     super.setCounters(counters);
     expression.setCounters(counters);
   }
 
+  @Override
   public void setProbe(boolean probe) {
     super.setProbe(probe);
     expression.setProbe(probe);
   }
 
-  public void setLimit(Limit limit) {
-    super.setLimit(limit);
-    expression.setLimit(limit);
-  }
-
+  @Override
   public void setGroupByContext(GroupByContext groupByContext) {
     super.setGroupByContext(groupByContext);
     expression.setGroupByContext(groupByContext);
   }
 
+  @Override
   public void setDbName(String dbName) {
     super.setDbName(dbName);
     expression.setDbName(dbName);
   }
 
+  @Override
   public void forceSelectOnServer(boolean forceSelectOnServer) {
     super.forceSelectOnServer(forceSelectOnServer);
     expression.forceSelectOnServer(forceSelectOnServer);
   }
 
+  @Override
   public void reset() {
     setNextShard(-1);
     setNextKey(null);
     expression.reset();
   }
 
+  @Override
   public void setRecordCache(RecordCache recordCache) {
     super.setRecordCache(recordCache);
     expression.setRecordCache(recordCache);
   }
 
+  @Override
   public void setReplica(Integer replica) {
     super.setReplica(replica);
     expression.setReplica(replica);
@@ -259,7 +266,6 @@ public class ParenthesisImpl extends ExpressionImpl {
 
   @Override
   public void queryRewrite() {
-    //expression.queryRewrite();
   }
 
   @Override

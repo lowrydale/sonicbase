@@ -1,8 +1,6 @@
 package com.sonicbase.accept.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
@@ -40,7 +38,7 @@ public class TestLongManagerLostEntries {
           System.out.println("count=" + countPlayed.get());
         }
         ComObject cobj = new ComObject(body);
-        long value = cobj.getInt(ComObject.Tag.count);
+        long value = cobj.getInt(ComObject.Tag.COUNT);
         if (null != foundIds.put(value, value)) {
           System.out.println("Value already set");
         }
@@ -86,10 +84,6 @@ public class TestLongManagerLostEntries {
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
-    ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
-    array.add(com.sonicbase.server.DatabaseServer.FOUR_SERVER_LICENSE);
-    config.put("licenseKeys", array);
-
     DatabaseClient.getServers().clear();
 
     final com.sonicbase.server.DatabaseServer[] dbServers = new com.sonicbase.server.DatabaseServer[4];
@@ -99,10 +93,8 @@ public class TestLongManagerLostEntries {
     for (int i = 0; i < dbServers.length; i++) {
       final int shard = i;
       dbServers[shard] = new MonitorServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
+      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
       dbServers[shard].setRole(role);
-      dbServers[shard].disableLogProcessor();
-      dbServers[shard].setMinSizeForRepartition(0);
     }
 
     try {
@@ -132,8 +124,8 @@ public class TestLongManagerLostEntries {
           System.out.println("upsert progress: count=" + i);
         }
         ComObject cobj = new ComObject();
-        cobj.put(ComObject.Tag.count, i);
-        cobj.put(ComObject.Tag.method, "echoWrite");
+        cobj.put(ComObject.Tag.COUNT, i);
+        cobj.put(ComObject.Tag.METHOD, "echoWrite");
         requests.add(logManager.logRequest(cobj.serialize(), true, "echoWrite", (long) i, (long) i, timeLogging));
       }
 
@@ -141,7 +133,7 @@ public class TestLongManagerLostEntries {
         request.getLatch().await();
       }
 
-      System.out.println("count logged: " + logManager.getCountLogged());
+      //System.out.println("count logged: " + logManager.getCountLogged());
       countPlayed.set(0);
       logManager.applyLogs();
 

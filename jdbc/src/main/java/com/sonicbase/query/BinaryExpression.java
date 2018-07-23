@@ -7,26 +7,26 @@ import java.util.Map;
  * Responsible for
  */
 public interface BinaryExpression extends Expression {
-  Map<Integer, Operator> idToOperator = new HashMap<Integer, Operator>();
+  Map<Integer, Operator> idToOperator = new HashMap<>();
 
   enum Operator {
-    equal(0, "="),
-    less(1, "<"),
-    greater(2, ">"),
-    lessEqual(3, "<="),
-    greaterEqual(4, ">="),
-    and(5, "and"),
-    or(6, "or"),
-    notEqual(7, "!="),
-    like(8, "like"),
-    plus(9, "+"),
-    minus(10, "-"),
-    times(11, "*"),
-    divide(12, "/"),
-    bitwiseAnd(13, "&"),
-    bitwiseOr(14, "|"),
-    bitwiseXOr(15, "^"),
-    modulo(16, "%");
+    EQUAL(0, "="),
+    LESS(1, "<"),
+    GREATER(2, ">"),
+    LESS_EQUAL(3, "<="),
+    GREATER_EQUAL(4, ">="),
+    AND(5, "and"),
+    OR(6, "or"),
+    NOT_EQUAL(7, "!="),
+    LIKE(8, "like"),
+    PLUS(9, "+"),
+    MINUS(10, "-"),
+    TIMES(11, "*"),
+    DIVIDE(12, "/"),
+    BITWISE_AND(13, "&"),
+    BITWISE_OR(14, "|"),
+    BITWISE_X_OR(15, "^"),
+    MODULO(16, "%");
 
     private final int id;
     private final String symbol;
@@ -50,7 +50,7 @@ public interface BinaryExpression extends Expression {
     }
 
     public boolean isRelationalOp() {
-      return this == equal || this == less || this == greater || this == lessEqual || this == greaterEqual || this == notEqual;
+      return this == EQUAL || this == LESS || this == GREATER || this == LESS_EQUAL || this == GREATER_EQUAL || this == NOT_EQUAL;
     }
   }
 

@@ -1,8 +1,6 @@
 package com.sonicbase.accept.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComArray;
@@ -70,10 +68,6 @@ public class TestBulkImport {
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
-      ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
-      array.add(com.sonicbase.server.DatabaseServer.FOUR_SERVER_LICENSE);
-      config.put("licenseKeys", array);
-
       DatabaseClient.getServers().clear();
 
       dbServers = new com.sonicbase.server.DatabaseServer[4];
@@ -87,7 +81,7 @@ public class TestBulkImport {
         @Override
         public void run() {
           serverA1.startServer(new String[]{"-port", String.valueOf(9010), "-host", "localhost",
-              "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(0)}, "db/src/main/resources/config/config-2-servers-a.json", true);
+              "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(0)});
           latch.countDown();
         }
       });
@@ -104,7 +98,7 @@ public class TestBulkImport {
         @Override
         public void run() {
           serverA2.startServer(new String[]{"-port", String.valueOf(9060), "-host", "localhost",
-              "-mport", String.valueOf(9060), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(1)}, "db/src/main/resources/config/config-2-servers-a.json", true);
+              "-mport", String.valueOf(9060), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(1)});
           latch.countDown();
         }
       });
@@ -121,7 +115,7 @@ public class TestBulkImport {
         @Override
         public void run() {
           serverB1.startServer(new String[]{"-port", String.valueOf(9110), "-host", "localhost",
-              "-mport", String.valueOf(9110), "-mhost", "localhost", "-cluster", "2-servers-b", "-shard", String.valueOf(0)}, "db/src/main/resources/config/config-2-servers-b.json", true);
+              "-mport", String.valueOf(9110), "-mhost", "localhost", "-cluster", "2-servers-b", "-shard", String.valueOf(0)});
           latch.countDown();
         }
       });
@@ -138,7 +132,7 @@ public class TestBulkImport {
         @Override
         public void run() {
           serverB2.startServer(new String[]{"-port", String.valueOf(9160), "-host", "localhost",
-              "-mport", String.valueOf(9160), "-mhost", "localhost", "-cluster", "2-servers-b", "-shard", String.valueOf(1)}, "db/src/main/resources/config/config-2-servers-b.json", true);
+              "-mport", String.valueOf(9160), "-mhost", "localhost", "-cluster", "2-servers-b", "-shard", String.valueOf(1)});
           latch.countDown();
         }
       });
@@ -219,7 +213,7 @@ public class TestBulkImport {
 //      long size = client.getPartitionSize("test", 0, "children", "_1_socialsecuritynumber");
 //      assertEquals(size, 10);
 
-      clientA.beginRebalance("test", "persons", "_primarykey");
+      clientA.beginRebalance("test");
 
 
       while (true) {
@@ -233,7 +227,7 @@ public class TestBulkImport {
         server.shutdownRepartitioner();
       }
 
-      clientA.beginRebalance("test", "persons", "_primarykey");
+      clientA.beginRebalance("test");
 
 
       while (true) {
@@ -386,32 +380,32 @@ public class TestBulkImport {
 
   public String bulkImportStatus(ConnectionProxy conn) throws Exception {
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.method, "BulkImportManager:getBulkImportProgress");
-    cobj.put(ComObject.Tag.dbName, "test");
+    cobj.put(ComObject.Tag.METHOD, "BulkImportManager:getBulkImportProgress");
+    cobj.put(ComObject.Tag.DB_NAME, "test");
     byte[] bytes = conn.sendToMaster(cobj);
     ComObject retObj = new ComObject(bytes);
 
-    ComArray array = retObj.getArray(ComObject.Tag.progressArray);
+    ComArray array = retObj.getArray(ComObject.Tag.PROGRESS_ARRAY);
     for (int i = 0; i < array.getArray().size(); i++) {
       ComObject tableObj = (ComObject) array.getArray().get(i);
-      String tableName = tableObj.getString(ComObject.Tag.tableName);
-      long countProcessed = tableObj.getLong(ComObject.Tag.countLong);
-      long expectedCount = tableObj.getLong(ComObject.Tag.expectedCount);
-      boolean finished = tableObj.getBoolean(ComObject.Tag.finished);
-      long preProcessCountProcessed = tableObj.getLong(ComObject.Tag.prePocessCountProcessed);
-      long preProcessExpectedCount = tableObj.getLong(ComObject.Tag.preProcessExpectedCount);
-      boolean preProcessFinished = tableObj.getBoolean(ComObject.Tag.preProcessFinished);
+      String tableName = tableObj.getString(ComObject.Tag.TABLE_NAME);
+      long countProcessed = tableObj.getLong(ComObject.Tag.COUNT_LONG);
+      long expectedCount = tableObj.getLong(ComObject.Tag.EXPECTED_COUNT);
+      boolean finished = tableObj.getBoolean(ComObject.Tag.FINISHED);
+      long preProcessCountProcessed = tableObj.getLong(ComObject.Tag.PRE_POCESS_COUNT_PROCESSED);
+      long preProcessExpectedCount = tableObj.getLong(ComObject.Tag.PRE_PROCESS_EXPECTED_COUNT);
+      boolean preProcessFinished = tableObj.getBoolean(ComObject.Tag.PRE_PROCESS_FINISHED);
       if (!preProcessFinished) {
-        if (tableObj.getString(ComObject.Tag.preProcessException) != null) {
-          throw new Exception(tableObj.getString(ComObject.Tag.preProcessException));
+        if (tableObj.getString(ComObject.Tag.PRE_PROCESS_EXCEPTION) != null) {
+          throw new Exception(tableObj.getString(ComObject.Tag.PRE_PROCESS_EXCEPTION));
         }
         return String.format("preprocessing table=%s, countFinished=%s, percentComplete=%.2f, finished=%b",
             tableName, NumberFormat.getIntegerInstance().format(preProcessCountProcessed),
             (double) preProcessCountProcessed / (double) preProcessExpectedCount * 100d, preProcessFinished);
       }
       else {
-        if (tableObj.getString(ComObject.Tag.exception) != null) {
-          throw new Exception(tableObj.getString(ComObject.Tag.exception));
+        if (tableObj.getString(ComObject.Tag.EXCEPTION) != null) {
+          throw new Exception(tableObj.getString(ComObject.Tag.EXCEPTION));
         }
         return String.format("processing table=%s, countFinished=%s, percentComplete=%.2f, finished=%b",
             tableName, NumberFormat.getIntegerInstance().format(countProcessed),
@@ -425,19 +419,19 @@ public class TestBulkImport {
 
   public void startBulkImport(ConnectionProxy conn, String command) {
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.dbName, "test");
+    cobj.put(ComObject.Tag.DB_NAME, "test");
     int pos = command.indexOf("from");
     int pos1 = command.indexOf("(", pos);
     String tableNames = command.substring(pos + "from".length(), pos1).trim();
-    cobj.put(ComObject.Tag.tableName, tableNames);
+    cobj.put(ComObject.Tag.TABLE_NAME, tableNames);
 
     pos = command.indexOf(", ", pos1);
     String driverName = command.substring(pos1 + 1, pos).trim();
-    cobj.put(ComObject.Tag.driverName, driverName);
+    cobj.put(ComObject.Tag.DRIVER_NAME, driverName);
     pos1 = command.indexOf(", ", pos + 1);
     int pos2 = command.indexOf(")", pos1);
     String jdbcUrl = command.substring(pos + 1, pos1 == -1 ? pos2 : pos1).trim();
-    cobj.put(ComObject.Tag.connectString, jdbcUrl);
+    cobj.put(ComObject.Tag.CONNECT_STRING, jdbcUrl);
     String user = null;
     String password = null;
     int endParenPos = pos2;
@@ -447,18 +441,18 @@ public class TestBulkImport {
       user = command.substring(pos1 + 1, pos).trim();
       endParenPos = command.indexOf(")", pos);
       password = command.substring(pos + 1, endParenPos).trim();
-      cobj.put(ComObject.Tag.user, user);
-      cobj.put(ComObject.Tag.password, password);
+      cobj.put(ComObject.Tag.USER, user);
+      cobj.put(ComObject.Tag.PASSWORD, password);
     }
     String whereClause = command.substring(endParenPos + 1).trim();
     if (whereClause.length() != 0) {
       if (tableNames.contains(",")) {
         throw new DatabaseException("You cannot have a where clause with multiple tables");
       }
-      cobj.put(ComObject.Tag.whereClause, whereClause);
+      cobj.put(ComObject.Tag.WHERE_CLAUSE, whereClause);
     }
 
-    cobj.put(ComObject.Tag.method, "BulkImportManager:startBulkImport");
+    cobj.put(ComObject.Tag.METHOD, "BulkImportManager:startBulkImport");
 
     conn.sendToMaster(cobj);
 

@@ -328,7 +328,7 @@ DatabaseClient -> com.sonicbase.client.a:
     978:978:java.lang.Object getDatabaseServer() -> y
     982:983:void setDatabaseServer(com.sonicbase.server.DatabaseServer) -> a
     986:986:java.lang.String getAllocatedStack() -> z
-    1024:1024:byte[] do_send(java.util.List) -> a
+    1024:1024:byte[] doSend(java.util.List) -> a
     1028:1044:void configureServers() -> A
     1048:1112:void syncConfig() -> L
     1116:1139:void initDb(java.lang.String) -> f
@@ -598,8 +598,8 @@ DatabaseClient$Server -> com.sonicbase.client.a$l:
     com.sonicbase.socket.DatabaseSocketClient socketClient -> c
     1003:1008:void <init>(java.lang.String,int) -> <init>
     1011:1011:com.sonicbase.socket.DatabaseSocketClient getSocketClient() -> a
-    1015:1015:byte[] do_send(java.lang.String,ComObject) -> a
-    1019:1019:byte[] do_send(java.lang.String,byte[]) -> a
+    1015:1015:byte[] doSend(java.lang.String,ComObject) -> a
+    1019:1019:byte[] doSend(java.lang.String,byte[]) -> a
     999:999:java.lang.String access$000(DatabaseClient$Server) -> a
     999:999:boolean access$500(DatabaseClient$Server) -> b
     999:999:com.sonicbase.socket.DatabaseSocketClient access$600(DatabaseClient$Server) -> c
@@ -7552,8 +7552,8 @@ com.sonicbase.socket.DatabaseSocketClient -> com.sonicbase.b.a:
     656:657:void writeRequest(com.sonicbase.socket.DatabaseSocketClient$Connection,java.nio.ByteBuffer) -> a
     663:698:void processResponse(java.io.InputStream,com.sonicbase.socket.DatabaseSocketClient$Request) -> a
     701:705:void serializeSingleRequest(java.io.ByteArrayOutputStream,byte[]) -> a
-    714:748:byte[] do_send(java.lang.String,byte[],java.lang.String) -> a
-    755:774:byte[] do_send(java.util.List) -> a
+    714:748:byte[] doSend(java.lang.String,byte[],java.lang.String) -> a
+    755:774:byte[] doSend(java.util.List) -> a
     36:36:java.util.concurrent.ConcurrentLinkedQueue access$000() -> c
     36:36:org.apache.log4j.Logger access$100() -> d
     36:36:io.netty.channel.EventLoopGroup access$500() -> e

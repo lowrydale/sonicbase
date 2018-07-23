@@ -1,7 +1,5 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
-import com.sonicbase.common.ComObject;
 import com.sonicbase.query.DatabaseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

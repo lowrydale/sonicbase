@@ -37,10 +37,6 @@ public class TestSnapshotManager {
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
-      ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
-      array.add(com.sonicbase.server.DatabaseServer.FOUR_SERVER_LICENSE);
-      config.put("licenseKeys", array);
-
       DatabaseClient.getServers().clear();
 
       ThreadPoolExecutor executor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
@@ -56,10 +52,9 @@ public class TestSnapshotManager {
         //          String role = "primaryMaster";
 
         dbServers[shard] = new com.sonicbase.server.DatabaseServer();
-        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true), null, true);
+        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true), null);
         dbServers[shard].setRole(role);
-        dbServers[shard].disableLogProcessor();
-        dbServers[shard].setMinSizeForRepartition(0);
+
         //          return null;
         //        }
         //      }));
@@ -282,10 +277,6 @@ public class TestSnapshotManager {
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
-      ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
-      array.add(com.sonicbase.server.DatabaseServer.FOUR_SERVER_LICENSE);
-      config.put("licenseKeys", array);
-
       DatabaseClient.getServers().clear();
 
       ThreadPoolExecutor executor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
@@ -301,11 +292,8 @@ public class TestSnapshotManager {
         //          String role = "primaryMaster";
 
         dbServers[shard] = new com.sonicbase.server.DatabaseServer();
-        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
+        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
         dbServers[shard].setRole(role);
-        dbServers[shard].disableLogProcessor();
-        dbServers[shard].setMinSizeForRepartition(0);
-        //          return null;
         //        }
         //      }));
       }
@@ -395,10 +383,6 @@ public class TestSnapshotManager {
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
-      ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
-      array.add(com.sonicbase.server.DatabaseServer.FOUR_SERVER_LICENSE);
-      config.put("licenseKeys", array);
-
       DatabaseClient.getServers().clear();
 
       ThreadPoolExecutor executor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
@@ -414,10 +398,8 @@ public class TestSnapshotManager {
         //          String role = "primaryMaster";
 
         dbServers[shard] = new com.sonicbase.server.DatabaseServer();
-        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
+        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
         dbServers[shard].setRole(role);
-        dbServers[shard].disableLogProcessor();
-        dbServers[shard].setMinSizeForRepartition(0);
         //          return null;
         //        }
         //      }));
@@ -617,10 +599,6 @@ public class TestSnapshotManager {
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
-      ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
-      array.add(com.sonicbase.server.DatabaseServer.FOUR_SERVER_LICENSE);
-      config.put("licenseKeys", array);
-
       DatabaseClient.getServers().clear();
 
       ThreadPoolExecutor executor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
@@ -636,10 +614,8 @@ public class TestSnapshotManager {
         //          String role = "primaryMaster";
 
         dbServers[shard] = new com.sonicbase.server.DatabaseServer();
-        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true),new AtomicBoolean(true), null, true);
+        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true),new AtomicBoolean(true), null);
         dbServers[shard].setRole(role);
-        dbServers[shard].disableLogProcessor();
-        dbServers[shard].setMinSizeForRepartition(0);
         //          return null;
         //        }
         //      }));

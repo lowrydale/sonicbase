@@ -2,13 +2,10 @@
 package com.sonicbase.accept.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
-import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.FileUtils;
 import org.testng.annotations.AfterClass;
@@ -63,12 +60,8 @@ public class TestSecondaryIndex {
       ObjectMapper mapper = new ObjectMapper();
       final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
 
-          FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+      FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
       FileUtils.deleteDirectory(new File("/data/db-backup"));
-
-      ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
-      array.add(com.sonicbase.server.DatabaseServer.FOUR_SERVER_LICENSE);
-      config.put("licenseKeys", array);
 
       DatabaseClient.getServers().clear();
 
@@ -86,10 +79,11 @@ public class TestSecondaryIndex {
         //          String role = "primaryMaster";
 
         dbServers[shard] = new com.sonicbase.server.DatabaseServer();
-        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
+        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true,
+            new AtomicBoolean(true), new AtomicBoolean(true),null);
         dbServers[shard].setRole(role);
-        dbServers[shard].disableLogProcessor();
-        dbServers[shard].setMinSizeForRepartition(0);
+//        dbServers[shard].disableLogProcessor();
+//        dbServers[shard].setMinSizeForRepartition(0);
         //          return null;
         //        }
         //      }));
@@ -147,17 +141,17 @@ public class TestSecondaryIndex {
 
       while (true) {
         ComObject cobj = new ComObject();
-        cobj.put(ComObject.Tag.method, "DatabaseServer:areAllLongRunningCommandsComplete");
+        cobj.put(ComObject.Tag.METHOD, "DatabaseServer:areAllLongRunningCommandsComplete");
         byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().sendToMaster(cobj);
         ComObject retObj = new ComObject(bytes);
-        if (retObj.getBoolean(ComObject.Tag.isComplete)) {
+        if (retObj.getBoolean(ComObject.Tag.IS_COMPLETE)) {
           break;
         }
         Thread.sleep(1000);
       }
 
 
-      client.beginRebalance("test", "persons", "_primarykey");
+      client.beginRebalance("test");
 
 
       while (true) {
@@ -187,49 +181,6 @@ public class TestSecondaryIndex {
 //      dbServers[3].replayLogs();
 
 //      Thread.sleep(10000);
-
-      ObjectNode backupConfig = (ObjectNode) mapper.readTree("{\n" +
-          "    \"type\" : \"fileSystem\",\n" +
-          "    \"directory\": \"/data/db-backup\",\n" +
-          "    \"period\": \"daily\",\n" +
-          "    \"time\": \"23:00\",\n" +
-          "    \"maxBackupCount\": 10,\n" +
-          "    \"sharedDirectory\": true\n" +
-          "  }");
-
-      for (DatabaseServer dbServer : dbServers) {
-        dbServer.setBackupConfig(backupConfig);
-      }
-
-//      client.startBackup();
-//      while (true) {
-//        Thread.sleep(1000);
-//        if (client.isBackupComplete()) {
-//          break;
-//        }
-//      }
-//
-//      Thread.sleep(5000);
-//
-//      File file = new File("/data/db-backup");
-//      File[] dirs = file.listFiles();
-//
-//      client.startRestore(dirs[0].getName());
-//      while (true) {
-//        Thread.sleep(1000);
-//        if (client.isRestoreComplete()) {
-//          break;
-//        }
-//      }
-//
-//      Thread.sleep(10000);
-
-//      ComObject cobj = new ComObject();
-//      cobj.put(ComObject.Tag.dbName, "test");
-//      cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-//      cobj.put(ComObject.Tag.method, "forceDeletes");
-//      String command = "DatabaseServer:ComObject:forceDeletes:";
-//      client.sendToAllShards(null, 0, command, cobj, DatabaseClient.Replica.all);
 
       // Thread.sleep(10000);
       executor.shutdownNow();

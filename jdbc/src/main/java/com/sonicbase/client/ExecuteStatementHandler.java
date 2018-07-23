@@ -7,14 +7,13 @@ import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.ResultSetImpl;
 import com.sonicbase.query.impl.SelectStatementImpl;
-import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.execute.Execute;
 
 import java.sql.SQLException;
 import java.util.concurrent.ThreadLocalRandom;
 
-public class ExecuteStatementHandler extends StatementHandler {
+public class ExecuteStatementHandler implements StatementHandler {
   private final DatabaseClient client;
 
   public ExecuteStatementHandler(DatabaseClient client) {
@@ -26,21 +25,19 @@ public class ExecuteStatementHandler extends StatementHandler {
                         SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
                         boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) throws SQLException {
     Execute execute = (Execute) statement;
-    ExpressionList expressions = execute.getExprList();
     if (!"procedure".equalsIgnoreCase((execute.getName()))) {
       throw new DatabaseException("invalid execute parameter: parm=" + execute.getName());
     }
 
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.sql, sqlToUse);
-    cobj.put(ComObject.Tag.dbName, dbName);
+    cobj.put(ComObject.Tag.SQL, sqlToUse);
+    cobj.put(ComObject.Tag.DB_NAME, dbName);
 
-    byte[] ret = client.send("DatabaseServer:executeProcedurePrimary", ThreadLocalRandom.current().nextInt(0, client.getShardCount()), 0, cobj, DatabaseClient.Replica.def);
+    byte[] ret = client.send("DatabaseServer:executeProcedurePrimary", ThreadLocalRandom.current().nextInt(0, client.getShardCount()), 0, cobj, DatabaseClient.Replica.DEF);
     if (ret != null) {
 
       ComObject retObj = new ComObject(ret);
-      ResultSetImpl rs = new ResultSetImpl(client, retObj.getArray(ComObject.Tag.records));
-      return rs;
+      return new ResultSetImpl(client, retObj.getArray(ComObject.Tag.RECORDS));
     }
     return new ResultSetImpl(client, (ComArray) null);
 

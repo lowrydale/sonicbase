@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class UpdateStatementHandler extends StatementHandler {
+public class UpdateStatementHandler implements StatementHandler {
   private final DatabaseClient client;
 
   public UpdateStatementHandler(DatabaseClient client) {

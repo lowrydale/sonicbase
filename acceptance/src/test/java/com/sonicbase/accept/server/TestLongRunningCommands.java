@@ -1,8 +1,6 @@
 package com.sonicbase.accept.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
@@ -33,21 +31,16 @@ public class TestLongRunningCommands {
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
-    ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
-    array.add(com.sonicbase.server.DatabaseServer.FOUR_SERVER_LICENSE);
-    config.put("licenseKeys", array);
-
     DatabaseClient.getServers().clear();
 
     com.sonicbase.server.DatabaseServer server = new com.sonicbase.server.DatabaseServer();
     try {
-      server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true), new AtomicBoolean(true), null, true);
-      server.disableLogProcessor();
+      server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true), new AtomicBoolean(true), null);
       server.shutdownRepartitioner();
 
       ComObject cobj = new ComObject();
-      cobj.put(ComObject.Tag.method, "echo");
-      cobj.put(ComObject.Tag.count, 10);
+      cobj.put(ComObject.Tag.METHOD, "echo");
+      cobj.put(ComObject.Tag.COUNT, 10);
       LongRunningCalls.SingleCommand command = server.getLongRunningCommands().createSingleCommand(cobj.serialize());
       //LongRunningCalls.SingleCommand command2 = server.getLongRunningCommands().createSingleCommand("DatabaseServer:echo2:1:1:test:10", null);
       server.getLongRunningCommands().addCommand(command);
@@ -62,7 +55,7 @@ public class TestLongRunningCommands {
       }
       Thread.sleep(1000);
 
-      cobj.put(ComObject.Tag.count, 11);
+      cobj.put(ComObject.Tag.COUNT, 11);
       server.getLongRunningCommands().addCommand(server.getLongRunningCommands().createSingleCommand(cobj.serialize()));
 
       while (true) {
@@ -89,9 +82,9 @@ public class TestLongRunningCommands {
       assertEquals(server.getLongRunningCommands().getCommandCount(), 0);
 
       cobj = new ComObject();
-      cobj.put(ComObject.Tag.dbName, "__none__");
-      cobj.put(ComObject.Tag.schemaVersion, 1L);
-      cobj.put(ComObject.Tag.method, "block");
+      cobj.put(ComObject.Tag.DB_NAME, "__none__");
+      cobj.put(ComObject.Tag.SCHEMA_VERSION, 1L);
+      cobj.put(ComObject.Tag.METHOD, "block");
       server.getLongRunningCommands().addCommand(server.getLongRunningCommands().createSingleCommand(cobj.serialize()));
 
       Thread.sleep(1000);
@@ -105,8 +98,7 @@ public class TestLongRunningCommands {
 
     try {
       server = new DatabaseServer();
-      server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true), new AtomicBoolean(true), null, true);
-      server.disableLogProcessor();
+      server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true), new AtomicBoolean(true), null);
       server.shutdownRepartitioner();
 
       Thread.sleep(1000);

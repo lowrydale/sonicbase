@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.schema;
 
 import org.testng.annotations.Test;
@@ -13,6 +12,7 @@ import java.util.Comparator;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 public class DataTypeTest {
 

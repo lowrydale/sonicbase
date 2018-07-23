@@ -66,7 +66,6 @@ public class Schema {
       short serializationVersion = in.readShort();
       synchronized (schemaMutex) {
         int tableCount = in.readInt();
-        //tables.clear();
         Map<String, TableSchema> newTables = new HashMap<>();
         Map<Integer, TableSchema> newTablesById = new HashMap<>();
         for (int i = 0; i < tableCount; i++) {
@@ -77,7 +76,6 @@ public class Schema {
         }
         this.tables = newTables;
         this.tablesById = newTablesById;
-        //System.out.println("tables=" + newTables.size() + ", tablesById=" + newTablesById.size() + ", thisTablesById=" + this.tablesById.size());
 
         int partitionCount = in.readInt();
         RecordIndexPartition[] newRecordIndexPartitions = new RecordIndexPartition[partitionCount];
@@ -88,12 +86,12 @@ public class Schema {
 
         partitionCount = in.readInt();
         if (partitionCount != 0) {
-          RecordIndexPartition[] lastRecordIndexPartitions = new RecordIndexPartition[partitionCount];
-          for (int i = 0; i < lastRecordIndexPartitions.length; i++) {
-            lastRecordIndexPartitions[i] = new RecordIndexPartition();
-            lastRecordIndexPartitions[i].setShardOwning(in.readInt());
+          RecordIndexPartition[] localLastRecordIndexPartitions = new RecordIndexPartition[partitionCount];
+          for (int i = 0; i < localLastRecordIndexPartitions.length; i++) {
+            localLastRecordIndexPartitions[i] = new RecordIndexPartition();
+            localLastRecordIndexPartitions[i].setShardOwning(in.readInt());
           }
-          this.lastRecordIndexPartitions = lastRecordIndexPartitions;
+          this.lastRecordIndexPartitions = localLastRecordIndexPartitions;
         }
         this.currRecordIndexPartitions = newRecordIndexPartitions;
       }

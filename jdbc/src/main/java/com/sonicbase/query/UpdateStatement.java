@@ -13,6 +13,6 @@ public interface UpdateStatement extends Statement {
   void addSetExpression(Expression expression);
 
   Object execute(String dbName, String sqlToUse, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1,
-                 Short sequence2, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) throws DatabaseException;
+                 Short sequence2, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount);
 
 }

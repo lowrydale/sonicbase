@@ -204,10 +204,6 @@ public class TestPerformance {
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
-      ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
-      array.add(DatabaseServer.FOUR_SERVER_LICENSE);
-      config.put("licenseKeys", array);
-
       DatabaseClient.getServers().clear();
 
       dbServers = new DatabaseServer[2];
@@ -222,7 +218,7 @@ public class TestPerformance {
           @Override
           public void run() {
             server0_0.startServer(new String[]{"-port", String.valueOf(9010), "-host", "localhost",
-                "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(0)}, "db/src/main/resources/config/config-2-servers-a.json", true);
+                "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(0)});
             latch.countDown();
           }
         });
@@ -241,7 +237,7 @@ public class TestPerformance {
           @Override
           public void run() {
             server0_1.startServer(new String[]{"-port", String.valueOf(9060), "-host", "localhost",
-                "-mport", String.valueOf(9060), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(0)}, "db/src/main/resources/config/config-2-servers-a.json", true);
+                "-mport", String.valueOf(9060), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(0)});
             latch.countDown();
           }
         });
@@ -497,7 +493,7 @@ public class TestPerformance {
         //      assertEquals(size, 10);
 
         if (client != null) {
-          client.beginRebalance("test", "persons", "_1__primarykey");
+          client.beginRebalance("test");
 
           while (true) {
             if (client.isRepartitioningComplete("test")) {
@@ -512,7 +508,7 @@ public class TestPerformance {
             }
           }
 
-          client.beginRebalance("test", "persons", "_1__primarykey");
+          client.beginRebalance("test");
 
           while (true) {
             if (client.isRepartitioningComplete("test")) {
@@ -814,7 +810,7 @@ public class TestPerformance {
     }
     assertFalse(rs.next());
     long end = System.nanoTime();
-    registerResults("range secondary key single", end-begin, count);
+    registerResults("range secondary key SINGLE", end-begin, count);
     //assertTrue((end - begin) < (3200 * 1_000_000L), String.valueOf(end-begin));
   }
 

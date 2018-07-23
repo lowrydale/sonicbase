@@ -48,7 +48,7 @@
 	<method signature="java.lang.Object doUpdate(java.lang.String,ParameterHandler,net.sf.jsqlparser.statement.update.Update)" class="DatabaseClient" />
 	<method signature="java.lang.StringBuilder doDescribeIndex(java.lang.String,java.lang.String,java.lang.String,java.lang.StringBuilder)" class="DatabaseClient" />
 	<method signature="java.lang.String handleSchemaOutOfSyncException(java.lang.String,java.lang.Exception)" class="DatabaseClient" />
-	<method signature="byte[] do_send(java.util.List)" class="DatabaseClient" />
+	<method signature="byte[] doSend(java.util.List)" class="DatabaseClient" />
 	<method signature="java.lang.String[] getWrite_verbs_array()" class="DatabaseClient" />
 	<method signature="void initDb(java.lang.String)" class="DatabaseClient" />
 	<method signature="com.google.api.client.http.HttpResponse restGet(java.lang.String)" class="DatabaseClient" />
@@ -4397,7 +4397,7 @@
 	<method signature="void &lt;init&gt;(java.lang.String)" class="RecordLockedException" />
 	<class name="DatabaseSocketClient" />
 	<method signature="DatabaseSocketClient$Connection borrow_connection(java.lang.String,int)" class="DatabaseSocketClient" />
-	<method signature="byte[] do_send(java.lang.String,java.lang.String,byte[],java.lang.String)" class="DatabaseSocketClient" />
+	<method signature="byte[] doSend(java.lang.String,java.lang.String,byte[],java.lang.String)" class="DatabaseSocketClient" />
 	<method signature="void sendBatch(java.lang.String,int,java.util.List)" class="DatabaseSocketClient" />
 	<method signature="void shutdown()" class="DatabaseSocketClient" />
 	<method signature="void processResponse(java.io.InputStream,DatabaseSocketClient$Request)" class="DatabaseSocketClient" />
@@ -4409,7 +4409,7 @@
 	<method signature="java.util.List getBatchThreads()" class="DatabaseSocketClient" />
 	<method signature="void serializeSingleRequest(java.io.ByteArrayOutputStream,java.lang.String,byte[])" class="DatabaseSocketClient" />
 	<method signature="void initBatchSender(java.lang.String,int,DatabaseSocketClient)" class="DatabaseSocketClient" />
-	<method signature="byte[] do_send(java.util.List)" class="DatabaseSocketClient" />
+	<method signature="byte[] doSend(java.util.List)" class="DatabaseSocketClient" />
 	<method signature="void return_connection(DatabaseSocketClient$Connection,java.lang.String,int)" class="DatabaseSocketClient" />
 	<method signature="org.apache.log4j.Logger access$900()" class="DatabaseSocketClient" />
 	<method signature="void &lt;init&gt;()" class="DatabaseSocketClient" />
@@ -4515,13 +4515,13 @@
 	<field name="indent" class="SelectStatementImpl$Explain" />
 	<field name="builder" class="SelectStatementImpl$Explain" />
 	<class name="DatabaseClient$Server" />
-	<method signature="byte[] do_send(java.lang.String,java.lang.String,ComObject)" class="DatabaseClient$Server" />
+	<method signature="byte[] doSend(java.lang.String,java.lang.String,ComObject)" class="DatabaseClient$Server" />
 	<method signature="boolean access$502(DatabaseClient$Server,boolean)" class="DatabaseClient$Server" />
 	<method signature="DatabaseSocketClient getSocketClient()" class="DatabaseClient$Server" />
 	<method signature="void &lt;clinit&gt;()" class="DatabaseClient$Server" />
 	<method signature="boolean access$500(DatabaseClient$Server)" class="DatabaseClient$Server" />
 	<method signature="DatabaseSocketClient access$600(DatabaseClient$Server)" class="DatabaseClient$Server" />
-	<method signature="byte[] do_send(java.lang.String,java.lang.String,byte[])" class="DatabaseClient$Server" />
+	<method signature="byte[] doSend(java.lang.String,java.lang.String,byte[])" class="DatabaseClient$Server" />
 	<method signature="java.lang.String access$000(DatabaseClient$Server)" class="DatabaseClient$Server" />
 	<method signature="void &lt;init&gt;(java.lang.String,int)" class="DatabaseClient$Server" />
 	<field name="socketClient" class="DatabaseClient$Server" />

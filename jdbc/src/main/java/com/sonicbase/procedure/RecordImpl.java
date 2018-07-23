@@ -41,59 +41,59 @@ public class RecordImpl implements Record {
   }
 
   public RecordImpl(DatabaseCommon common, ComObject cobj) {
-    byte[] bytes = cobj.getByteArray(ComObject.Tag.recordBytes);
+    byte[] bytes = cobj.getByteArray(ComObject.Tag.RECORD_BYTES);
     if (bytes != null) {
-      dbName = cobj.getString(ComObject.Tag.dbName);
-      tableSchema = common.getTables(dbName).get(cobj.getString(ComObject.Tag.tableName));
+      dbName = cobj.getString(ComObject.Tag.DB_NAME);
+      tableSchema = common.getTables(dbName).get(cobj.getString(ComObject.Tag.TABLE_NAME));
       record = new com.sonicbase.common.Record(dbName, common, bytes);
       this.common = common;
     }
     else {
-      ComArray array = cobj.getArray(ComObject.Tag.fields);
+      ComArray array = cobj.getArray(ComObject.Tag.FIELDS);
       if (array != null) {
         for (int i = 0; i < array.getArray().size(); i++) {
           ComObject parm = (ComObject) array.getArray().get(i);
-          String fieldName = parm.getString(ComObject.Tag.fieldName);
+          String fieldName = parm.getString(ComObject.Tag.FIELD_NAME);
           Map<Integer, Object> fields = parm.getMap();
           for (Map.Entry<Integer, Object> field : fields.entrySet()) {
-            if (field.getKey() == ComObject.Tag.stringValue.tag) {
-              this.fieldMap.put(fieldName, parm.getString(ComObject.Tag.stringValue));
+            if (field.getKey() == ComObject.Tag.STRING_VALUE.tag) {
+              this.fieldMap.put(fieldName, parm.getString(ComObject.Tag.STRING_VALUE));
             }
-            else if (field.getKey() == ComObject.Tag.longValue.tag) {
-              fieldMap.put(fieldName, parm.getLong(ComObject.Tag.longValue));
+            else if (field.getKey() == ComObject.Tag.LONG_VALUE.tag) {
+              fieldMap.put(fieldName, parm.getLong(ComObject.Tag.LONG_VALUE));
             }
-            else if (field.getKey() == ComObject.Tag.intValue.tag) {
-              fieldMap.put(fieldName, parm.getInt(ComObject.Tag.intValue));
+            else if (field.getKey() == ComObject.Tag.INT_VALUE.tag) {
+              fieldMap.put(fieldName, parm.getInt(ComObject.Tag.INT_VALUE));
             }
-            else if (field.getKey() == ComObject.Tag.booleanValue.tag) {
-              fieldMap.put(fieldName, parm.getBoolean(ComObject.Tag.booleanValue));
+            else if (field.getKey() == ComObject.Tag.BOOLEAN_VALUE.tag) {
+              fieldMap.put(fieldName, parm.getBoolean(ComObject.Tag.BOOLEAN_VALUE));
             }
-            else if (field.getKey() == ComObject.Tag.timeValue.tag) {
-              fieldMap.put(fieldName, parm.getTime(ComObject.Tag.timeValue));
+            else if (field.getKey() == ComObject.Tag.TIME_VALUE.tag) {
+              fieldMap.put(fieldName, parm.getTime(ComObject.Tag.TIME_VALUE));
             }
-            else if (field.getKey() == ComObject.Tag.dateValue.tag) {
-              fieldMap.put(fieldName, parm.getDate(ComObject.Tag.dateValue));
+            else if (field.getKey() == ComObject.Tag.DATE_VALUE.tag) {
+              fieldMap.put(fieldName, parm.getDate(ComObject.Tag.DATE_VALUE));
             }
-            else if (field.getKey() == ComObject.Tag.timestampValue.tag) {
-              fieldMap.put(fieldName, parm.getTimestamp(ComObject.Tag.timestampValue));
+            else if (field.getKey() == ComObject.Tag.TIMESTAMP_VALUE.tag) {
+              fieldMap.put(fieldName, parm.getTimestamp(ComObject.Tag.TIMESTAMP_VALUE));
             }
-            else if (field.getKey() == ComObject.Tag.floatValue.tag) {
-              fieldMap.put(fieldName, parm.getFloat(ComObject.Tag.floatValue));
+            else if (field.getKey() == ComObject.Tag.FLOAT_VALUE.tag) {
+              fieldMap.put(fieldName, parm.getFloat(ComObject.Tag.FLOAT_VALUE));
             }
-            else if (field.getKey() == ComObject.Tag.doubleValue.tag) {
-              fieldMap.put(fieldName, parm.getDouble(ComObject.Tag.doubleValue));
+            else if (field.getKey() == ComObject.Tag.DOUBLE_VALUE.tag) {
+              fieldMap.put(fieldName, parm.getDouble(ComObject.Tag.DOUBLE_VALUE));
             }
-            else if (field.getKey() == ComObject.Tag.bigDecimalValue.tag) {
-              fieldMap.put(fieldName, parm.getBigDecimal(ComObject.Tag.bigDecimalValue));
+            else if (field.getKey() == ComObject.Tag.BIG_DECIMAL_VALUE.tag) {
+              fieldMap.put(fieldName, parm.getBigDecimal(ComObject.Tag.BIG_DECIMAL_VALUE));
             }
-            else if (field.getKey() == ComObject.Tag.byteValue.tag) {
-              fieldMap.put(fieldName, parm.getByte(ComObject.Tag.byteValue));
+            else if (field.getKey() == ComObject.Tag.BYTE_VALUE.tag) {
+              fieldMap.put(fieldName, parm.getByte(ComObject.Tag.BYTE_VALUE));
             }
-            else if (field.getKey() == ComObject.Tag.shortValue.tag) {
-              fieldMap.put(fieldName, parm.getShort(ComObject.Tag.shortValue));
+            else if (field.getKey() == ComObject.Tag.SHORT_VALUE.tag) {
+              fieldMap.put(fieldName, parm.getShort(ComObject.Tag.SHORT_VALUE));
             }
-            else if (field.getKey() == ComObject.Tag.byteArrayValue.tag) {
-              fieldMap.put(fieldName, parm.getByteArray(ComObject.Tag.byteArrayValue));
+            else if (field.getKey() == ComObject.Tag.BYTE_ARRAY_VALUE.tag) {
+              fieldMap.put(fieldName, parm.getByteArray(ComObject.Tag.BYTE_ARRAY_VALUE));
             }
           }
         }
@@ -105,54 +105,54 @@ public class RecordImpl implements Record {
     ComObject ret = new ComObject();
     if (tableSchema != null) {
       byte[] bytes = record.serialize(common, serializationNumber);
-      ret.put(ComObject.Tag.recordBytes, bytes);
-      ret.put(ComObject.Tag.tableName, tableSchema.getName());
-      ret.put(ComObject.Tag.dbName, dbName);
+      ret.put(ComObject.Tag.RECORD_BYTES, bytes);
+      ret.put(ComObject.Tag.TABLE_NAME, tableSchema.getName());
+      ret.put(ComObject.Tag.DB_NAME, dbName);
     }
     else {
-      ComArray array = ret.putArray(ComObject.Tag.fields, ComObject.Type.objectType);
+      ComArray array = ret.putArray(ComObject.Tag.FIELDS, ComObject.Type.OBJECT_TYPE);
       for (Map.Entry<String, Object> field : fieldMap.entrySet()) {
         ComObject parm = new ComObject();
-        parm.put(ComObject.Tag.fieldName, field.getKey());
+        parm.put(ComObject.Tag.FIELD_NAME, field.getKey());
         Object value = field.getValue();
         if (value instanceof String) {
-          parm.put(ComObject.Tag.stringValue, (String)value);
+          parm.put(ComObject.Tag.STRING_VALUE, (String)value);
         }
         else if (value instanceof Long) {
-          parm.put(ComObject.Tag.longValue, (Long)value);
+          parm.put(ComObject.Tag.LONG_VALUE, (Long)value);
         }
         else if (value instanceof Integer) {
-          parm.put(ComObject.Tag.intValue, (Integer)value);
+          parm.put(ComObject.Tag.INT_VALUE, (Integer)value);
         }
         else if (value instanceof Boolean) {
-          parm.put(ComObject.Tag.booleanValue, (Boolean)value);
+          parm.put(ComObject.Tag.BOOLEAN_VALUE, (Boolean)value);
         }
         else if (value instanceof Time) {
-          parm.put(ComObject.Tag.timeValue, (Time)value);
+          parm.put(ComObject.Tag.TIME_VALUE, (Time)value);
         }
         else if (value instanceof Date) {
-          parm.put(ComObject.Tag.dateValue, (Date)value);
+          parm.put(ComObject.Tag.DATE_VALUE, (Date)value);
         }
         else if (value instanceof Timestamp) {
-          parm.put(ComObject.Tag.timestampValue, (Timestamp)value);
+          parm.put(ComObject.Tag.TIMESTAMP_VALUE, (Timestamp)value);
         }
         else if (value instanceof Float) {
-          parm.put(ComObject.Tag.floatValue, (Float)value);
+          parm.put(ComObject.Tag.FLOAT_VALUE, (Float)value);
         }
         else if (value instanceof Double) {
-          parm.put(ComObject.Tag.doubleValue, (Double)value);
+          parm.put(ComObject.Tag.DOUBLE_VALUE, (Double)value);
         }
         else if (value instanceof BigDecimal) {
-          parm.put(ComObject.Tag.bigDecimalValue, (BigDecimal)value);
+          parm.put(ComObject.Tag.BIG_DECIMAL_VALUE, (BigDecimal)value);
         }
         else if (value instanceof Byte) {
-          parm.put(ComObject.Tag.byteValue, (byte)value);
+          parm.put(ComObject.Tag.BYTE_VALUE, (byte)value);
         }
         else if (value instanceof Short) {
-          parm.put(ComObject.Tag.shortValue, (short)value);
+          parm.put(ComObject.Tag.SHORT_VALUE, (short)value);
         }
         else if (value instanceof byte[]) {
-          parm.put(ComObject.Tag.byteArrayValue, (byte[])value);
+          parm.put(ComObject.Tag.BYTE_ARRAY_VALUE, (byte[])value);
         }
         array.add(parm);
       }

@@ -10,15 +10,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class InsertStatementImpl extends StatementImpl implements InsertStatement {
-  private final DatabaseClient client;
   private String tableName;
-  private List<Object> values = new ArrayList<Object>();
-  private List<String> columnNames = new ArrayList<String>();
+  private List<Object> values = new ArrayList<>();
+  private List<String> columnNames = new ArrayList<>();
   private boolean ignore;
   private SelectStatementImpl select;
 
   public InsertStatementImpl(DatabaseClient client) {
-    this.client = client;
   }
 
   public String getTableName() {
@@ -43,7 +41,7 @@ public class InsertStatementImpl extends StatementImpl implements InsertStatemen
 
   @Override
   public void addValue(String columnName, Object value) {
-    columnNames.add(client.toLower(columnName));
+    columnNames.add(DatabaseClient.toLower(columnName));
     values.add(value);
   }
 
@@ -65,18 +63,16 @@ public class InsertStatementImpl extends StatementImpl implements InsertStatemen
 
   public void serialize(ComObject cobj) {
 
-    cobj.put(ComObject.Tag.tableName, tableName);
+    cobj.put(ComObject.Tag.TABLE_NAME, tableName);
 
-    //todo: add support for values when needed
-
-    ComArray columnsArray = cobj.putArray(ComObject.Tag.columns, ComObject.Type.stringType);
+    ComArray columnsArray = cobj.putArray(ComObject.Tag.COLUMNS, ComObject.Type.STRING_TYPE);
     for (String column : columnNames) {
       columnsArray.add(column);
     }
 
-    cobj.put(ComObject.Tag.ignore, ignore);
+    cobj.put(ComObject.Tag.IGNORE, ignore);
     if (select != null) {
-      cobj.put(ComObject.Tag.select, select.serialize());
+      cobj.put(ComObject.Tag.SELECT, select.serialize());
     }
 
   }

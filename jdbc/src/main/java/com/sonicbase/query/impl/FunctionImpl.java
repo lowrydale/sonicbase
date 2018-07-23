@@ -20,6 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class FunctionImpl extends ExpressionImpl {
+  public static final String UTF_8_STR = "utf-8";
   private String name;
   private List<ExpressionImpl> parms;
 
@@ -32,63 +33,72 @@ public class FunctionImpl extends ExpressionImpl {
 
   }
 
+
+  private static Map<String, Function> functionsByName = new HashMap<>();
+
+  private static Function getFunction(String name) {
+    return functionsByName.get(name);
+  }
+
+
   public enum Function {
-    ceiling(new CeilingFunction()),
-    floor(new FloorFunction()),
-    abs(new AbsFunction()),
-    str(new StrFunction()),
-    avg(new AvgFunction()),
-    max(new MaxFunction()),
-    max_timestamp(new MaxTimestampFunction()),
-    sum(new SumFunction()),
-    min(new MinFunction()),
-    min_timestamp(new MinTimestampFunction()),
-    bit_shift_left(new BitShiftLeftFunction()),
-    bit_shift_right(new BitShiftRightFunction()),
-    bit_and(new BitAndFunction()),
-    bit_not(new BitNotFunction()),
-    bit_or(new BitOrFunction()),
-    bit_xor(new BitXOrFunction()),
-    coalesce(new CoalesceFunction()),
-    char_length(new CharLengthFunction()),
-    concat(new ConcatFunction()),
-    now(new NowFunction()),
-    date_add(new DateAddFunction()),
-    day(new DayFunction()),
-    day_of_week(new DayOfWeekFunction()),
-    day_of_year(new DayOfYearFunction()),
-    minute(new MinuteFunction()),
-    month(new MonthFunction()),
-    second(new SecondFunction()),
-    hour(new HourFunction()),
-    week_of_month(new WeekOfMonthFunction()),
-    week_of_year(new WeekOfYearFunction()),
-    year(new YearFunction()),
-    power(new PowerFunction()),
-    hex(new HexFunction()),
-    log(new LogFunction()),
-    log10(new Log10Function()),
-    mod(new ModFunction()),
-    lower(new LowerFunction()),
-    upper(new UpperFunction()),
-    index_of(new IndexOfFunction()),
-    replace(new ReplaceFunction()),
-    round(new RoundFunction()),
-    pi(new PiFunction()),
-    sqrt(new SqrtFunction()),
-    tan(new TanFunction()),
-    cos(new CosFunction()),
-    sin(new SinFunction()),
-    cot(new CotFunction()),
-    trim(new TrimFunction()),
-    radians(new RadiansFunction()),
-    custom(new CustomFunction()),
-    is_null(new IsNullFunction());
+    CEILING("ceiling", new CeilingFunction()),
+    FLOOR("floor", new FloorFunction()),
+    ABS("abs", new AbsFunction()),
+    STR("str", new StrFunction()),
+    AVG("avg", new AvgFunction()),
+    MAX("max", new MaxFunction()),
+    MAX_TIMESTAMP("max_timestamp", new MaxTimestampFunction()),
+    SUM("sum", new SumFunction()),
+    MIN("min", new MinFunction()),
+    MIN_TIMESTAMP("min_timestamp", new MinTimestampFunction()),
+    BIT_SHIFT_LEFT("bit_shift_left", new BitShiftLeftFunction()),
+    BIT_SHIFT_RIGHT("bit_shift_right", new BitShiftRightFunction()),
+    BIT_AND("bit_and", new BitAndFunction()),
+    BIT_NOT("bit_not", new BitNotFunction()),
+    BIT_OR("bit_or", new BitOrFunction()),
+    BIT_XOR("bit_xor", new BitXOrFunction()),
+    COALESCE("coalesce", new CoalesceFunction()),
+    CHAR_LENGTH("char_length", new CharLengthFunction()),
+    CONCAT("concat", new ConcatFunction()),
+    NOW("now", new NowFunction()),
+    DATE_ADD("date_add", new DateAddFunction()),
+    DAY("day", new DayFunction()),
+    DAY_OF_WEEK("day_of_week", new DayOfWeekFunction()),
+    DAY_OF_YEAR("day_of_year", new DayOfYearFunction()),
+    MINUTE("minute", new MinuteFunction()),
+    MONTH("month", new MonthFunction()),
+    SECOND("second", new SecondFunction()),
+    HOUR("hour", new HourFunction()),
+    WEEK_OF_MONTH("week_of_month", new WeekOfMonthFunction()),
+    WEEK_OF_YEAR("week_of_year", new WeekOfYearFunction()),
+    YEAR("year", new YearFunction()),
+    POWER("power", new PowerFunction()),
+    HEX("hex", new HexFunction()),
+    LOG("log", new LogFunction()),
+    LOG10("log10", new Log10Function()),
+    MOD("mod", new ModFunction()),
+    LOWER("lower", new LowerFunction()),
+    UPPER("upper", new UpperFunction()),
+    INDEX_OF("index_of", new IndexOfFunction()),
+    REPLACE("replace", new ReplaceFunction()),
+    ROUND("round", new RoundFunction()),
+    PI("pi", new PiFunction()),
+    SQRT("sqrt", new SqrtFunction()),
+    TAN("tan", new TanFunction()),
+    COS("cos", new CosFunction()),
+    SIN("sin", new SinFunction()),
+    COT("cot", new CotFunction()),
+    TRIM("trim", new TrimFunction()),
+    RADIANS("radians", new RadiansFunction()),
+    CUSTOM("custom", new CustomFunction()),
+    IS_NULL("is_null", new IsNullFunction());
 
     private final FunctionBase func;
 
-    Function(FunctionBase func) {
+    Function(String name, FunctionBase func) {
       this.func = func;
+      functionsByName.put(name, this);
     }
   }
 
@@ -106,7 +116,7 @@ public class FunctionImpl extends ExpressionImpl {
 
   @Override
   public Type getType() {
-    return Type.function;
+    return Type.FUNCTION;
   }
 
   static class MethodObject {
@@ -125,18 +135,18 @@ public class FunctionImpl extends ExpressionImpl {
     public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
       try {
         Object classNameObj = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
-        String className = null;
+        String className;
         if (classNameObj instanceof byte[]) {
-          className = new String((byte[])classNameObj, "utf-8");
+          className = new String((byte[])classNameObj, UTF_8_STR);
         }
         else {
           className = (String) classNameObj;
         }
 
         Object methodNameObj = funcParms.get(1).evaluateSingleRecord(tableSchemas, records, parms);
-        String methodName = null;
+        String methodName;
         if (methodNameObj instanceof byte[]) {
-          methodName = new String((byte[])methodNameObj, "utf-8");
+          methodName = new String((byte[])methodNameObj, UTF_8_STR);
         }
         else {
           methodName = (String) methodNameObj;
@@ -149,8 +159,8 @@ public class FunctionImpl extends ExpressionImpl {
 
         String key = className + "." + methodName;
         MethodObject methodObj = methods.get(key);
-        Object obj = null;
-        Method method = null;
+        Object obj;
+        Method method;
         if (methodObj == null) {
           obj = Class.forName(className).newInstance();
           method = obj.getClass().getMethod(methodName, Object[].class);
@@ -235,6 +245,9 @@ public class FunctionImpl extends ExpressionImpl {
         }
         count++;
         sum += (Double) DataType.getDoubleConverter().convert(value);
+      }
+      if (count == 0) {
+        return 0;
       }
       return sum / count;
     }
@@ -491,8 +504,7 @@ public class FunctionImpl extends ExpressionImpl {
   static class NowFunction implements FunctionBase {
     @Override
     public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
-      Timestamp time = new Timestamp(System.currentTimeMillis());
-      return time;
+      return new Timestamp(System.currentTimeMillis());
     }
   }
 
@@ -511,8 +523,7 @@ public class FunctionImpl extends ExpressionImpl {
       Long delta = (Long) DataType.getLongConverter().convert(rhs);
       long timeMillis = time.getTime();
       timeMillis += delta;
-      Timestamp ret = new Timestamp(timeMillis);
-      return ret;
+      return new Timestamp(timeMillis);
     }
   }
 
@@ -682,8 +693,8 @@ public class FunctionImpl extends ExpressionImpl {
       }
       try {
         String str = (String) DataType.getStringConverter().convert(lhs);
-        Hex hex = new Hex("utf-8");
-        return new String(hex.encode(str.getBytes("utf-8")), "utf-8").toUpperCase();
+        Hex hex = new Hex(UTF_8_STR);
+        return new String(hex.encode(str.getBytes(UTF_8_STR)), UTF_8_STR).toUpperCase();
       }
       catch (Exception e) {
         throw new DatabaseException(e);
@@ -903,18 +914,15 @@ public class FunctionImpl extends ExpressionImpl {
     @Override
     public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
       Object lhs = funcParms.get(0).evaluateSingleRecord(tableSchemas, records, parms);
-      if (lhs == null) {
-        return true;
-      }
-      return false;
+      return lhs == null;
     }
   }
 
   @Override
   public Object evaluateSingleRecord(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms) {
-    Function funcValue = null;
+    Function funcValue;
     try {
-      funcValue = Function.valueOf(name.toLowerCase());
+      funcValue = FunctionImpl.getFunction(name.toLowerCase());
     }
     catch (Exception e) {
       throw new DatabaseException("Invalid function: name=" + name, e);
@@ -958,6 +966,7 @@ public class FunctionImpl extends ExpressionImpl {
    * DON"T MODIFY THIS SERIALIZATION
    * ###############################
    */
+  @Override
   public void deserialize(short serializationVersion, DataInputStream in) {
     try {
       super.deserialize(serializationVersion, in);

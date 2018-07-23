@@ -18,21 +18,22 @@ public class ClientStatsHandler {
   private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
 
   private final DatabaseClient client;
+  private static ConcurrentHashMap<String, ConcurrentHashMap<String, HistogramEntry>> registeredQueries = new ConcurrentHashMap<>();
 
   public ClientStatsHandler(DatabaseClient client) {
     this.client = client;
   }
 
-  public void registerCompletedQueryForStats(String dbName, HistogramEntry histogramEntry, long beginMillis, long beginNanos) {
+  public void registerCompletedQueryForStats(HistogramEntry histogramEntry, long beginNanos) {
     long latency = System.nanoTime() - beginNanos;
-    histogramEntry.histogram.update(latency);
-    if (histogramEntry.maxedLatencies.get()) {
+    histogramEntry.getHistogram().update(latency);
+    if (histogramEntry.getMaxedLatencies().get()) {
       return;
     }
-    histogramEntry.latencies.add(latency);
-    if (histogramEntry.latencies.size() > 1_000) {
-      histogramEntry.maxedLatencies.set(true);
-      histogramEntry.latencies.clear();
+    histogramEntry.getLatencies().add(latency);
+    if (histogramEntry.getLatencies().size() > 1_000) {
+      histogramEntry.getMaxedLatencies().set(true);
+      histogramEntry.getLatencies().clear();
     }
   }
 
@@ -40,7 +41,7 @@ public class ClientStatsHandler {
 
     private final String cluster;
     private final DatabaseClient client;
-    private Long sleepOverride = null;
+    private Long sleepOverride;
     public QueryStatsRecorder(DatabaseClient client, String cluster) {
       this.client = client;
       this.cluster = cluster;
@@ -59,7 +60,7 @@ public class ClientStatsHandler {
           Thread.sleep(sleepOverride == null ? 15_000 : sleepOverride);
 
           boolean oneIsAlive = false;
-          DatabaseClient sharedClient = client.getSharedClients().get(cluster);
+          DatabaseClient sharedClient = DatabaseClient.getSharedClients().get(cluster);
           ServersConfig.Host[] replicas = sharedClient.getCommon().getServersConfig().getShards()[0].getReplicas();
           for (ServersConfig.Host host : replicas) {
             if (!host.isDead()) {
@@ -74,48 +75,49 @@ public class ClientStatsHandler {
           }
 
           ComObject cobj = new ComObject();
-          ComArray array = cobj.putArray(ComObject.Tag.histogramSnapshot, ComObject.Type.objectType);
+          ComArray array = cobj.putArray(ComObject.Tag.HISTOGRAM_SNAPSHOT, ComObject.Type.OBJECT_TYPE);
 
           if (registeredQueries.get(cluster) == null) {
             continue;
           }
           for (HistogramEntry entry : registeredQueries.get(cluster).values()) {
-            if (entry.histogram == null || entry.histogram.getCount() == 0) {
+            if (entry.getHistogram() == null || entry.getHistogram().getCount() == 0) {
               continue;
             }
 
             ComObject snapshotObj = new ComObject();
-            snapshotObj.put(ComObject.Tag.dbName, entry.dbName);
-            snapshotObj.put(ComObject.Tag.id, entry.queryId);
-            if (!entry.maxedLatencies.get()) {
+            snapshotObj.put(ComObject.Tag.DB_NAME, entry.getDbName());
+            snapshotObj.put(ComObject.Tag.ID, entry.getQueryId());
+            if (!entry.getMaxedLatencies().get()) {
               ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
               DataOutputStream out = new DataOutputStream(bytesOut);
-              for (Long latency : entry.latencies) {
+              for (Long latency : entry.getLatencies()) {
                 Varint.writeUnsignedVarLong(latency, out);
               }
-              snapshotObj.put(ComObject.Tag.latenciesBytes, bytesOut.toByteArray());
+              snapshotObj.put(ComObject.Tag.LATENCIES_BYTES, bytesOut.toByteArray());
               array.add(snapshotObj);
             }
             else {
-              Snapshot snapshot = entry.histogram.getSnapshot();
-              snapshotObj.put(ComObject.Tag.count, (int) entry.histogram.getCount());
-              snapshotObj.put(ComObject.Tag.lat_avg, (double) snapshot.getMean());
-              snapshotObj.put(ComObject.Tag.lat_75, (double) snapshot.get75thPercentile());
-              snapshotObj.put(ComObject.Tag.lat_95, (double) snapshot.get95thPercentile());
-              snapshotObj.put(ComObject.Tag.lat_99, (double) snapshot.get99thPercentile());
-              snapshotObj.put(ComObject.Tag.lat_999, (double) snapshot.get999thPercentile());
-              snapshotObj.put(ComObject.Tag.lat_max, (double) snapshot.getMax());
+              Snapshot snapshot = entry.getHistogram().getSnapshot();
+              snapshotObj.put(ComObject.Tag.COUNT, (int) entry.getHistogram().getCount());
+              snapshotObj.put(ComObject.Tag.LAT_AVG, (double) snapshot.getMean());
+              snapshotObj.put(ComObject.Tag.LAT_75, (double) snapshot.get75thPercentile());
+              snapshotObj.put(ComObject.Tag.LAT_95, (double) snapshot.get95thPercentile());
+              snapshotObj.put(ComObject.Tag.LAT_99, (double) snapshot.get99thPercentile());
+              snapshotObj.put(ComObject.Tag.LAT_999, (double) snapshot.get999thPercentile());
+              snapshotObj.put(ComObject.Tag.LAT_MAX, (double) snapshot.getMax());
               array.add(snapshotObj);
             }
 
-            entry.latencies.clear();
-            entry.maxedLatencies.set(false);
-            entry.histogram = null;
+            entry.getLatencies().clear();
+            entry.getMaxedLatencies().set(false);
+            entry.setHistogram(null);
           }
 
-          byte[] ret = sharedClient.send("MonitorManager:registerStats", 0, 0, cobj, DatabaseClient.Replica.def);
+          sharedClient.send("MonitorManager:registerStats", 0, 0, cobj, DatabaseClient.Replica.DEF);
         }
         catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
           break;
         }
         catch (Exception e) {
@@ -125,21 +127,61 @@ public class ClientStatsHandler {
     }
   }
 
-  private class QueryStats {
-    private long begin;
-    private long duration;
-    private int queryId;
-  }
-
-  private static ConcurrentHashMap<String, ConcurrentHashMap<String, HistogramEntry>> registeredQueries = new ConcurrentHashMap<>();
-
   public static class HistogramEntry {
-    public Histogram histogram;
+    private Histogram histogram;
     private long queryId;
-    public String dbName;
-    public String query;
-    public AtomicBoolean maxedLatencies = new AtomicBoolean();
-    public ConcurrentLinkedQueue<Long> latencies;
+    private String dbName;
+    private String query;
+    private AtomicBoolean maxedLatencies = new AtomicBoolean();
+    private ConcurrentLinkedQueue<Long> latencies;
+
+    Histogram getHistogram() {
+      return histogram;
+    }
+
+    void setHistogram(Histogram histogram) {
+      this.histogram = histogram;
+    }
+
+    long getQueryId() {
+      return queryId;
+    }
+
+    void setQueryId(long queryId) {
+      this.queryId = queryId;
+    }
+
+    public String getDbName() {
+      return dbName;
+    }
+
+    public void setDbName(String dbName) {
+      this.dbName = dbName;
+    }
+
+    public String getQuery() {
+      return query;
+    }
+
+    public void setQuery(String query) {
+      this.query = query;
+    }
+
+    AtomicBoolean getMaxedLatencies() {
+      return maxedLatencies;
+    }
+
+    void setMaxedLatencies(AtomicBoolean maxedLatencies) {
+      this.maxedLatencies = maxedLatencies;
+    }
+
+    ConcurrentLinkedQueue<Long> getLatencies() {
+      return latencies;
+    }
+
+    void setLatencies(ConcurrentLinkedQueue<Long> latencies) {
+      this.latencies = latencies;
+    }
   }
 
   public HistogramEntry registerQueryForStats(String cluster, String dbName, String sql) {
@@ -153,35 +195,44 @@ public class ClientStatsHandler {
       if (entry != null) {
         //make a copy because background thread may wipe out the histogram
         HistogramEntry retEntry = new HistogramEntry();
-        retEntry.queryId = entry.queryId;
-        retEntry.query = entry.query;
-        retEntry.dbName = entry.dbName;
-        retEntry.histogram = entry.histogram;
-        retEntry.latencies = entry.latencies;
-        retEntry.maxedLatencies = entry.maxedLatencies;
-        if (retEntry.histogram == null) {
-          retEntry.histogram = entry.histogram = new Histogram(new ExponentiallyDecayingReservoir());
+        retEntry.setQueryId(entry.getQueryId());
+        retEntry.setQuery(entry.getQuery());
+        retEntry.setDbName(entry.getDbName());
+        retEntry.setHistogram(entry.getHistogram());
+        retEntry.setLatencies(entry.getLatencies());
+        retEntry.setMaxedLatencies(entry.getMaxedLatencies());
+        if (retEntry.getHistogram() == null) {
+          Histogram histogram = new Histogram(new ExponentiallyDecayingReservoir());
+          entry.setHistogram(histogram);
+          retEntry.setHistogram(histogram);
         }
         return retEntry;
       }
 
       ComObject cobj = new ComObject();
-      cobj.put(ComObject.Tag.method, "MonitorManager:registerQueryForStats");
-      cobj.put(ComObject.Tag.dbName, dbName);
-      cobj.put(ComObject.Tag.sql, sql);
+      cobj.put(ComObject.Tag.METHOD, "MonitorManager:registerQueryForStats");
+      cobj.put(ComObject.Tag.DB_NAME, dbName);
+      cobj.put(ComObject.Tag.SQL, sql);
 
-      DatabaseClient sharedClient = client.getSharedClients().get(cluster);
+      DatabaseClient sharedClient = DatabaseClient.getSharedClients().get(cluster);
       byte[] ret = sendToMasterOnSharedClient(cobj, sharedClient);
       if (ret != null) {
         ComObject retObj = new ComObject(ret);
         entry = new HistogramEntry();
         HistogramEntry retEntry = new HistogramEntry();
-        retEntry.queryId = entry.queryId = retObj.getLong(ComObject.Tag.id);
-        retEntry.dbName = entry.dbName = dbName;
-        retEntry.histogram = entry.histogram = new Histogram(new ExponentiallyDecayingReservoir());
-        retEntry.latencies = entry.latencies = new ConcurrentLinkedQueue<>();
-        retEntry.maxedLatencies = entry.maxedLatencies;
-        retEntry.query = entry.query = sql;
+        entry.setQueryId(retObj.getLong(ComObject.Tag.ID));
+        retEntry.setQueryId(retObj.getLong(ComObject.Tag.ID));
+        entry.setDbName(dbName);
+        retEntry.setDbName(dbName);
+        Histogram histogram = new Histogram(new ExponentiallyDecayingReservoir());
+        entry.setHistogram(histogram);
+        retEntry.setHistogram(histogram);
+        ConcurrentLinkedQueue<Long> latencies = new ConcurrentLinkedQueue<>();
+        entry.setLatencies(latencies);
+        retEntry.setLatencies(latencies);
+        retEntry.setMaxedLatencies(entry.getMaxedLatencies());
+        entry.setQuery(sql);
+        retEntry.setQuery(sql);
         clusterEntry.put(sql, entry);
         return retEntry;
       }

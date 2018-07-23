@@ -43,9 +43,8 @@ public class TestRebalance {
         public Object call() throws Exception {
           String role = "primaryMaster";
           dbServers[shard] = new DatabaseServer();
-          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
+          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
           dbServers[shard].setRole(role);
-          dbServers[shard].disableLogProcessor();
           return null;
         }
       }));
@@ -57,11 +56,11 @@ public class TestRebalance {
 
     ParameterHandler parms = new ParameterHandler();
 
-    client.executeQuery("test", QueryType.update0,
+    client.executeQuery("test",
         "create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))",
         parms, false, null, true);
 
-    client.executeQuery("test", QueryType.update0,
+    client.executeQuery("test",
         "create index socialSecurityNumber on persons(socialSecurityNumber)", parms, false, null, true);
 
     client.syncSchema();
@@ -92,7 +91,7 @@ public class TestRebalance {
     assertEquals(client.getPartitionSize("test", 3, "persons", "_primarykey"), 0);
 
     //client.beginRebalance("persons", "_primarykey");
-    client.beginRebalance("test", "persons", "_primarykey");
+    client.beginRebalance("test");
 
     while (true) {
       if (client.isRepartitioningComplete("test")) {
@@ -129,7 +128,7 @@ public class TestRebalance {
 
 
     //client.beginRebalance("persons", "_primarykey");
-    client.beginRebalance("test", "persons", "_primarykey");
+    client.beginRebalance("test");
 
     while (true) {
       if (client.isRepartitioningComplete("test")) {

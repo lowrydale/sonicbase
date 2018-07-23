@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION;
 
 public class UpdateStatementImpl extends StatementImpl implements UpdateStatement {
+  public static final String UTF_8_STR = "utf-8";
   private final DatabaseClient client;
   private final ExpressionImpl.RecordCache recordCache;
   private String tableName;
@@ -48,8 +49,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
 
   @Override
   public Object execute(String dbName, String sqlToUse, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
-                        boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) throws DatabaseException {
-
+                        boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) {
     while (true) {
       try {
         whereClause.setViewVersion(client.getCommon().getSchemaVersion());
@@ -76,7 +76,6 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
           if (ret == null || ret.getIds() == null) {
             return countUpdated;
           }
-          //todo: use tablescan update if necessary
 
           TableSchema tableSchema = client.getCommon().getTables(dbName).get(tableName);
           IndexSchema indexSchema = null;
@@ -84,6 +83,9 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
             if (entry.getValue().isPrimaryKey()) {
               indexSchema = entry.getValue();
             }
+          }
+          if (indexSchema == null) {
+            throw new DatabaseException("primary index not found: table=" + tableName);
           }
 
           String[] indexFields = indexSchema.getFields();
@@ -98,8 +100,8 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
             Record record = cachedRecord == null ? null : cachedRecord.getRecord();
             if (record == null) {
               boolean forceSelectOnServer = false;
-              record = whereClause.doReadRecord(dbName, client, forceSelectOnServer, recordCache, entry[0], tableName,
-                  null, null, null, client.getCommon().getSchemaVersion(), false, restrictToThisServer, procedureContext, schemaRetryCount);
+              record = ExpressionImpl.doReadRecord(dbName, client, forceSelectOnServer, recordCache, entry[0], tableName,
+                  null, null, null, client.getCommon().getSchemaVersion(), restrictToThisServer, procedureContext, schemaRetryCount);
             }
 
             Object[] newPrimaryKey = new Object[entry.length];
@@ -125,17 +127,17 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
                   tableSchema, columnNames, values, id);
 
               List<ColumnImpl> qColumns = getColumns();
-              List<ExpressionImpl> setExpressions = getSetExpressions();
+              List<ExpressionImpl> localSetExpressions = getSetExpressions();
               Object[] newFields = record.getFields();
               for (int i = 0; i < qColumns.size(); i++) {
                 String columnName = qColumns.get(i).getColumnName();
                 Object value = null;
-                ExpressionImpl setExpression = setExpressions.get(i);
+                ExpressionImpl setExpression = localSetExpressions.get(i);
                 if (setExpression instanceof ConstantImpl) {
                   ConstantImpl cNode1 = (ConstantImpl) setExpression;
                   value = cNode1.getValue();
                   if (value instanceof String) {
-                    value = ((String) value).getBytes("utf-8");
+                    value = ((String) value).getBytes(UTF_8_STR);
                   }
                 }
                 else if (setExpression instanceof ParameterImpl) {
@@ -143,7 +145,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
                   int parmNum = pNode.getParmOffset();
                   value = getParms().getValue(parmNum + 1);
                   if (value instanceof String) {
-                    value = ((String) value).getBytes("utf-8");
+                    value = ((String) value).getBytes(UTF_8_STR);
                   }
                 }
                 int offset = tableSchema.getFieldOffset(columnName);
@@ -156,7 +158,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
                     case LONGNVARCHAR:
                     case CLOB:
                     case NCLOB:
-                      String str = new String((byte[])value, "utf-8");
+                      String str = new String((byte[])value, UTF_8_STR);
                       if (str.length() > fieldSchema.getWidth()) {
                         throw new SQLException("value too long: field=" + fieldSchema.getName() + ", width=" + fieldSchema.getWidth());
                       }
@@ -189,31 +191,31 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
               }
 
               //update record
-              List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, fieldOffsets, client.getCommon(), tableSchema,
-                  indexSchema.getName(), null, BinaryExpression.Operator.equal, null, newPrimaryKey, null);
-              if (selectedShards.size() == 0) {
-                throw new Exception("No shards selected for query");
+              List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, tableSchema,
+                  indexSchema.getName(), null, BinaryExpression.Operator.EQUAL, null, newPrimaryKey, null);
+              if (selectedShards.isEmpty()) {
+                throw new DatabaseException("No shards selected for query");
               }
 
               ComObject cobj = new ComObject();
-              cobj.put(ComObject.Tag.dbName, dbName);
+              cobj.put(ComObject.Tag.DB_NAME, dbName);
               if (schemaRetryCount < 2) {
-                cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+                cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
               }
-              cobj.put(ComObject.Tag.tableName, tableName);
-              cobj.put(ComObject.Tag.indexName, indexSchema.getName());
-              cobj.put(ComObject.Tag.isExcpliciteTrans, client.isExplicitTrans());
-              cobj.put(ComObject.Tag.isCommitting, client.isCommitting());
-              cobj.put(ComObject.Tag.transactionId, client.getTransactionId());
-              cobj.put(ComObject.Tag.primaryKeyBytes, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), newPrimaryKey));
-              cobj.put(ComObject.Tag.bytes, record.serialize(client.getCommon(), SERIALIZATION_VERSION));
+              cobj.put(ComObject.Tag.TABLE_NAME, tableName);
+              cobj.put(ComObject.Tag.INDEX_NAME, indexSchema.getName());
+              cobj.put(ComObject.Tag.IS_EXCPLICITE_TRANS, client.isExplicitTrans());
+              cobj.put(ComObject.Tag.IS_COMMITTING, client.isCommitting());
+              cobj.put(ComObject.Tag.TRANSACTION_ID, client.getTransactionId());
+              cobj.put(ComObject.Tag.PRIMARY_KEY_BYTES, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), newPrimaryKey));
+              cobj.put(ComObject.Tag.BYTES, record.serialize(client.getCommon(), SERIALIZATION_VERSION));
               if (sequence0 != null && sequence1 != null && sequence2 != null) {
-                cobj.put(ComObject.Tag.sequence0Override, sequence0);
-                cobj.put(ComObject.Tag.sequence1Override, sequence1);
-                cobj.put(ComObject.Tag.sequence2Override, sequence2);
+                cobj.put(ComObject.Tag.SEQUENCE_0_OVERRIDE, sequence0);
+                cobj.put(ComObject.Tag.SEQUENCE_1_OVERRIDE, sequence1);
+                cobj.put(ComObject.Tag.SEQUENCE_2_OVERRIDE, sequence2);
               }
 
-              client.send("UpdateManager:updateRecord", selectedShards.get(0), rand.nextLong(), cobj, DatabaseClient.Replica.def);
+              client.send("UpdateManager:updateRecord", selectedShards.get(0), rand.nextLong(), cobj, DatabaseClient.Replica.DEF);
 
               //update keys
 
@@ -246,7 +248,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
                 if (prevMap == null) {
                   for (Map.Entry<Object[], InsertStatementHandler.KeyInfo> innerNewEntry : newEntry.getValue().entrySet()) {
                     KeyRecord keyRecord = new KeyRecord();
-                    byte[] primaryKeyBytes = client.getCommon().serializeKey(tableSchema, innerNewEntry.getValue().getIndexSchema().getName(), newPrimaryKey);
+                    byte[] primaryKeyBytes = DatabaseCommon.serializeKey(tableSchema, innerNewEntry.getValue().getIndexSchema().getName(), newPrimaryKey);
                     keyRecord.setPrimaryKey(primaryKeyBytes);
                     keyRecord.setDbViewNumber(client.getCommon().getSchemaVersion());
                     InsertStatementHandler.insertKey(client, dbName, tableSchema.getName(), innerNewEntry.getValue(), indexSchema.getName(),
@@ -260,7 +262,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
                         continue;
                       }
                       KeyRecord keyRecord = new KeyRecord();
-                      byte[] primaryKeyBytes = client.getCommon().serializeKey(tableSchema,
+                      byte[] primaryKeyBytes = DatabaseCommon.serializeKey(tableSchema,
                           indexSchema.getName(), newPrimaryKey);
                       keyRecord.setPrimaryKey(primaryKeyBytes);
                       keyRecord.setDbViewNumber(client.getCommon().getSchemaVersion());
@@ -280,8 +282,9 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
           Thread.sleep(200);
         }
         catch (InterruptedException e1) {
+          Thread.currentThread().interrupt();
+          throw new DatabaseException(e1);
         }
-        continue;
       }
       catch (Exception e) {
         throw new DatabaseException(e);
@@ -293,23 +296,23 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
   public void deleteKey(String dbName, String tableName, InsertStatementHandler.KeyInfo keyInfo, String primaryKeyIndexName,
                         Object[] primaryKey, int schemaRetryCount) {
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.dbName, dbName);
+    cobj.put(ComObject.Tag.DB_NAME, dbName);
     if (schemaRetryCount < 2) {
-      cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+      cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
     }
-    cobj.put(ComObject.Tag.method, "UpdateManager:deleteIndexEntryByKey");
-    cobj.put(ComObject.Tag.tableName, tableName);
-    cobj.put(ComObject.Tag.indexName, keyInfo.getIndexSchema().getName());
-    cobj.put(ComObject.Tag.primaryKeyIndexName, primaryKeyIndexName);
-    cobj.put(ComObject.Tag.isExcpliciteTrans, client.isExplicitTrans());
-    cobj.put(ComObject.Tag.isCommitting, client.isCommitting());
-    cobj.put(ComObject.Tag.transactionId, client.getTransactionId());
+    cobj.put(ComObject.Tag.METHOD, "UpdateManager:deleteIndexEntryByKey");
+    cobj.put(ComObject.Tag.TABLE_NAME, tableName);
+    cobj.put(ComObject.Tag.INDEX_NAME, keyInfo.getIndexSchema().getName());
+    cobj.put(ComObject.Tag.PRIMARY_KEY_INDEX_NAME, primaryKeyIndexName);
+    cobj.put(ComObject.Tag.IS_EXCPLICITE_TRANS, client.isExplicitTrans());
+    cobj.put(ComObject.Tag.IS_COMMITTING, client.isCommitting());
+    cobj.put(ComObject.Tag.TRANSACTION_ID, client.getTransactionId());
 
-    cobj.put(ComObject.Tag.serializationVersion, SERIALIZATION_VERSION);
-    cobj.put(ComObject.Tag.keyBytes, DatabaseCommon.serializeKey(client.getCommon().getTables(dbName).get(tableName), keyInfo.getIndexSchema().getName(), keyInfo.getKey()));
-    cobj.put(ComObject.Tag.primaryKeyBytes, DatabaseCommon.serializeKey(client.getCommon().getTables(dbName).get(tableName), primaryKeyIndexName, primaryKey));
+    cobj.put(ComObject.Tag.SERIALIZATION_VERSION, SERIALIZATION_VERSION);
+    cobj.put(ComObject.Tag.KEY_BYTES, DatabaseCommon.serializeKey(client.getCommon().getTables(dbName).get(tableName), keyInfo.getIndexSchema().getName(), keyInfo.getKey()));
+    cobj.put(ComObject.Tag.PRIMARY_KEY_BYTES, DatabaseCommon.serializeKey(client.getCommon().getTables(dbName).get(tableName), primaryKeyIndexName, primaryKey));
 
-    client.send("UpdateManager:deleteIndexEntryByKey", keyInfo.getShard(), 0, cobj, DatabaseClient.Replica.def);
+    client.send("UpdateManager:deleteIndexEntryByKey", keyInfo.getShard(), 0, cobj, DatabaseClient.Replica.DEF);
   }
 
   public String getTableName() {
@@ -330,11 +333,11 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
 
   public void addColumn(net.sf.jsqlparser.schema.Column column) {
     ColumnImpl newColumn = new ColumnImpl();
-    String tableName = column.getTable().getName();
-    if (tableName != null) {
-      tableName = tableName.toLowerCase();
+    String localTableName = column.getTable().getName();
+    if (localTableName != null) {
+      localTableName = localTableName.toLowerCase();
     }
-    newColumn.setTableName(tableName);
+    newColumn.setTableName(localTableName);
     newColumn.setColumnName(column.getColumnName().toLowerCase());
     columns.add(newColumn);
   }

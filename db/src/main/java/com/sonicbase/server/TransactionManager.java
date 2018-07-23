@@ -2,6 +2,7 @@ package com.sonicbase.server;
 
 import com.sonicbase.common.Record;
 import com.sonicbase.common.RecordLockedException;
+import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 
@@ -16,39 +17,35 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class TransactionManager {
 
   public enum OperationType {
-    batchInsertWithRecord,
-    insertWithRecord,
-    batchInsert,
-    insert,
-    update,
-    deleteRecord,
-    deleteIndexEntry,
-    deleteEntryByKey
+    BATCH_INSERT_WITH_RECORD,
+    INSERT_WITH_RECORD,
+    BATCH_INSERT,
+    INSERT,
+    UPDATE,
+    DELETE_RECORD,
+    DELETE_INDEX_ENTRY,
+    DELETE_ENTRY_BY_KEY
   }
 
   private final com.sonicbase.server.DatabaseServer server;
   private ConcurrentHashMap<Long, Transaction> transactions = new ConcurrentHashMap<>();
   private ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Object[], RecordLock>>> locks = new ConcurrentHashMap<>();
 
-  public TransactionManager(
+  TransactionManager(
       DatabaseServer databaseServer) {
     this.server = databaseServer;
   }
 
-  public ConcurrentHashMap<Long, Transaction> getTransactions() {
+  public Map<Long, Transaction> getTransactions() {
     return transactions;
   }
 
-  public ConcurrentHashMap<String, ConcurrentSkipListMap<Object[], RecordLock>> getLocks(String dbName) {
+  Map<String, ConcurrentSkipListMap<Object[], RecordLock>> getLocks(String dbName) {
     return locks.get(dbName);
   }
 
-  public Transaction getTransaction(long transactionId) {
+  Transaction getTransaction(long transactionId) {
     return transactions.get(transactionId);
-  }
-
-  public void shutdown() {
-
   }
 
   public static class RecordLock {
@@ -77,7 +74,7 @@ public class TransactionManager {
     private String command;
     private boolean replayed;
 
-    public Operation(OperationType type, String command, byte[] body, boolean replayedCommand) {
+    Operation(OperationType type, String command, byte[] body, boolean replayedCommand) {
       this.type = type;
       this.body = body;
       this.command = command;
@@ -107,28 +104,28 @@ public class TransactionManager {
     private ConcurrentHashMap<String, List<Record>> records = new ConcurrentHashMap<>();
     private List<Operation> operations = new ArrayList<>();
 
-    public Transaction(long transactionId) {
+    Transaction(long transactionId) {
       this.id = transactionId;
     }
 
-    public ConcurrentHashMap<String, List<Record>> getRecords() {
+    public Map<String, List<Record>> getRecords() {
       return records;
     }
 
-    public void addOperation(OperationType type, String command, byte[] body, boolean replayedCommand) {
+    void addOperation(OperationType type, String command, byte[] body, boolean replayedCommand) {
       operations.add(new Operation(type, command, body, replayedCommand));
     }
 
-    public List<Operation> getOperations() {
+    List<Operation> getOperations() {
       return operations;
     }
 
-    public List<RecordLock> getLocks() {
+    List<RecordLock> getLocks() {
       return locks;
     }
   }
 
-  public void deleteLock(String dbName, String tableName, String indexName, long transactionId, TableSchema tableSchema, Object[] primaryKey) {
+  void deleteLock(String dbName, String tableName, long transactionId, TableSchema tableSchema, Object[] primaryKey) {
     synchronized (locks) {
       ConcurrentSkipListMap<Object[], RecordLock> tableLocks = locks.get(dbName).get(tableName);
       RecordLock lock = tableLocks.get(primaryKey);
@@ -145,6 +142,9 @@ public class TransactionManager {
                 comparators = entry.getValue().getComparators();
               }
             }
+            if (comparators == null) {
+              throw new DatabaseException("Comparators are null: dbName=" + dbName + ", table=" + tableName);
+            }
             boolean mismatch = false;
             for (int j = 0; j < primaryKey.length; j++) {
               if (comparators[j].compare(primaryKey[j], lock.primaryKey[j]) != 0) {
@@ -154,7 +154,7 @@ public class TransactionManager {
             }
             if (!mismatch) {
               trans.locks.remove(i);
-              if (trans.locks.size() == 0) {
+              if (trans.locks.isEmpty()) {
                 transactions.remove(transactionId);
               }
               break;
@@ -165,15 +165,12 @@ public class TransactionManager {
     }
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP2", justification = "copying the passed in data is too slow")
-  @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
-  public void preHandleTransaction(String dbName, String tableName, String indexName, boolean isExplicitTrans,
-                                   boolean isCommitting, long transactionId, Object[] primaryKey,
-                                   AtomicBoolean shouldExecute,
-                                   AtomicBoolean shouldDeleteLock) {
-    ConcurrentSkipListMap<Object[], RecordLock> tableLocks = null;
+  void preHandleTransaction(String dbName, String tableName, String indexName, boolean isExplicitTrans,
+                            boolean isCommitting, long transactionId, Object[] primaryKey,
+                            AtomicBoolean shouldExecute, AtomicBoolean shouldDeleteLock) {
+    ConcurrentSkipListMap<Object[], RecordLock> tableLocks;
     if (!locks.containsKey(dbName)) {
-      locks.put(dbName, new ConcurrentHashMap<String, ConcurrentSkipListMap<Object[], RecordLock>>());
+      locks.put(dbName, new ConcurrentHashMap<>());
     }
     tableLocks = locks.get(dbName).get(tableName);
     synchronized (locks) {
@@ -185,24 +182,24 @@ public class TransactionManager {
             break;
           }
         }
+        if (primaryKeySchema == null) {
+          throw new DatabaseException("primaryKeySchema is null: dbName=" + dbName + ", table=" + tableName);
+        }
         final Comparator[] comparators = primaryKeySchema.getComparators();
-        tableLocks = new ConcurrentSkipListMap<Object[], RecordLock>(new Comparator<Object[]>() {
-          @Override
-          public int compare(Object[] o1, Object[] o2) {
-            for (int i = 0; i < o1.length; i++) {
-              if (o1[i] == null || o2[i] == null) {
-                continue;
-              }
-              int value = comparators[i].compare(o1[i], o2[i]);
-              if (value < 0) {
-                return -1;
-              }
-              if (value > 0) {
-                return 1;
-              }
+        tableLocks = new ConcurrentSkipListMap<>((o1, o2) -> {
+          for (int i = 0; i < o1.length; i++) {
+            if (o1[i] == null || o2[i] == null) {
+              continue;
             }
-            return 0;
+            int value = comparators[i].compare(o1[i], o2[i]);
+            if (value < 0) {
+              return -1;
+            }
+            if (value > 0) {
+              return 1;
+            }
           }
+          return 0;
         });
         locks.get(dbName).put(tableName, tableLocks);
       }
@@ -210,11 +207,7 @@ public class TransactionManager {
     RecordLock lock = tableLocks.get(primaryKey);
     if (lock == null) {
       if (isExplicitTrans) {
-        Transaction trans = transactions.get(transactionId);
-        if (trans == null) {
-          trans = new Transaction(transactionId);
-          transactions.put(transactionId, trans);
-        }
+        Transaction trans = transactions.computeIfAbsent(transactionId, k -> new Transaction(transactionId));
         lock = new RecordLock();
         lock.lockCount = 1;
         lock.transaction = trans;

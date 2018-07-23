@@ -1,10 +1,8 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.util;
 
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComArray;
 import com.sonicbase.common.ComObject;
-import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.OrderByExpressionImpl;
@@ -20,28 +18,29 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 
 public class PartitionUtils {
-
+  private PartitionUtils() {
+  }
 
   public static class IndexCounts {
-    private ConcurrentHashMap<Integer, Long> counts = new ConcurrentHashMap<>();
+    private Map<Integer, Long> counts = new ConcurrentHashMap<>();
 
-    public ConcurrentHashMap<Integer, Long> getCounts() {
+    public Map<Integer, Long> getCounts() {
       return counts;
     }
   }
 
   public static class TableIndexCounts {
-    private ConcurrentHashMap<String, IndexCounts> indices = new ConcurrentHashMap<>();
+    private Map<String, IndexCounts> indices = new ConcurrentHashMap<>();
 
-    public ConcurrentHashMap<String, IndexCounts> getIndices() {
+    public Map<String, IndexCounts> getIndices() {
       return indices;
     }
   }
 
   public static class GlobalIndexCounts {
-    private ConcurrentHashMap<String, TableIndexCounts> tables = new ConcurrentHashMap<>();
+    private Map<String, TableIndexCounts> tables = new ConcurrentHashMap<>();
 
-    public ConcurrentHashMap<String, TableIndexCounts> getTables() {
+    public Map<String, TableIndexCounts> getTables() {
       return tables;
     }
 
@@ -52,44 +51,41 @@ public class PartitionUtils {
       List<Future> futures = new ArrayList<>();
       for (int i = 0; i < client.getShardCount(); i++) {
         final int shard = i;
-        futures.add(client.getExecutor().submit(new Callable() {
-          @Override
-          public Object call() throws Exception {
-            ComObject cobj = new ComObject();
-            cobj.put(ComObject.Tag.dbName, dbName);
-            cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-            byte[] response = client.send("PartitionManager:getIndexCounts", shard, 0, cobj, DatabaseClient.Replica.master);
-            synchronized (ret) {
-              ComObject retObj = new ComObject(response);
-              ComArray tables = retObj.getArray(ComObject.Tag.tables);
-              if (tables != null) {
-                for (int i = 0; i < tables.getArray().size(); i++) {
-                  ComObject tableObj = (ComObject) tables.getArray().get(i);
-                  String tableName = tableObj.getString(ComObject.Tag.tableName);
+        futures.add(client.getExecutor().submit((Callable) () -> {
+          ComObject cobj = new ComObject();
+          cobj.put(ComObject.Tag.DB_NAME, dbName);
+          cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
+          byte[] response = client.send("PartitionManager:getIndexCounts", shard, 0, cobj, DatabaseClient.Replica.MASTER);
+          synchronized (ret) {
+            ComObject retObj = new ComObject(response);
+            ComArray tables = retObj.getArray(ComObject.Tag.TABLES);
+            if (tables != null) {
+              for (int i1 = 0; i1 < tables.getArray().size(); i1++) {
+                ComObject tableObj = (ComObject) tables.getArray().get(i1);
+                String tableName = tableObj.getString(ComObject.Tag.TABLE_NAME);
 
-                  TableIndexCounts tableIndexCounts = ret.tables.get(tableName);
-                  if (tableIndexCounts == null) {
-                    tableIndexCounts = new TableIndexCounts();
-                    ret.tables.put(tableName, tableIndexCounts);
-                  }
-                  ComArray indices = tableObj.getArray(ComObject.Tag.indices);
-                  if (indices != null) {
-                    for (int j = 0; j < indices.getArray().size(); j++) {
-                      ComObject indexObj = (ComObject) indices.getArray().get(j);
-                      String indexName = indexObj.getString(ComObject.Tag.indexName);
-                      long size = indexObj.getLong(ComObject.Tag.size);
-                      IndexCounts indexCounts = tableIndexCounts.indices.get(indexName);
-                      if (indexCounts == null) {
-                        indexCounts = new IndexCounts();
-                        tableIndexCounts.indices.put(indexName, indexCounts);
-                      }
-                      indexCounts.counts.put(shard, size);
+                TableIndexCounts tableIndexCounts = ret.tables.get(tableName);
+                if (tableIndexCounts == null) {
+                  tableIndexCounts = new TableIndexCounts();
+                  ret.tables.put(tableName, tableIndexCounts);
+                }
+                ComArray indices = tableObj.getArray(ComObject.Tag.INDICES);
+                if (indices != null) {
+                  for (int j = 0; j < indices.getArray().size(); j++) {
+                    ComObject indexObj = (ComObject) indices.getArray().get(j);
+                    String indexName = indexObj.getString(ComObject.Tag.INDEX_NAME);
+                    long size = indexObj.getLong(ComObject.Tag.SIZE);
+                    IndexCounts indexCounts = tableIndexCounts.indices.get(indexName);
+                    if (indexCounts == null) {
+                      indexCounts = new IndexCounts();
+                      tableIndexCounts.indices.put(indexName, indexCounts);
                     }
+                    indexCounts.counts.put(shard, size);
                   }
                 }
               }
-              return null;
             }
+            return null;
           }
         }));
 
@@ -103,7 +99,6 @@ public class PartitionUtils {
             Long count = indexEntry.getValue().counts.get(i);
             if (count == null) {
               indexEntry.getValue().counts.put(i, 0L);
-              count = 0L;
             }
           }
         }
@@ -118,14 +113,14 @@ public class PartitionUtils {
 
 
   public static List<Integer> findOrderedPartitionForRecord(
-      boolean includeCurrPartitions, boolean includeLastPartitions, int[] fieldOffsets,
-      DatabaseCommon common, TableSchema tableSchema, String indexName,
+      boolean includeCurrPartitions, boolean includeLastPartitions,
+      TableSchema tableSchema, String indexName,
       List<OrderByExpressionImpl> orderByExpressions,
       BinaryExpression.Operator leftOperator,
       BinaryExpression.Operator rightOperator,
       Object[] leftKey, Object[] rightKey) {
     boolean ascending = true;
-    if (orderByExpressions != null && orderByExpressions.size() != 0) {
+    if (orderByExpressions != null && !orderByExpressions.isEmpty()) {
       OrderByExpressionImpl expression = orderByExpressions.get(0);
       String columnName = expression.getColumnName();
       if (expression.getTableName() == null || !expression.getTableName().equals(tableSchema.getName()) ||
@@ -134,7 +129,7 @@ public class PartitionUtils {
       }
     }
 
-    IndexSchema specifiedIndexSchema = tableSchema.getIndexes().get(indexName);
+    IndexSchema specifiedIndexSchema = tableSchema.getIndices().get(indexName);
     Comparator[] comparators = specifiedIndexSchema.getComparators();
 
     List<Integer> ret = new ArrayList<>();
@@ -190,18 +185,16 @@ public class PartitionUtils {
       BinaryExpression.Operator leftOperator,
       Comparator[] comparators, Object[] leftKey,
       Object[] rightKey, boolean ascending, List<Integer> selectedPartitions) {
-    //todo: do a binary search
 
     BinaryExpression.Operator greaterOp = leftOperator;
     Object[] greaterKey = leftKey;
     Object[] lessKey = rightKey;
-    if (greaterOp == com.sonicbase.query.BinaryExpression.Operator.less ||
-        greaterOp == com.sonicbase.query.BinaryExpression.Operator.lessEqual) {
+    if (greaterOp == com.sonicbase.query.BinaryExpression.Operator.LESS ||
+        greaterOp == com.sonicbase.query.BinaryExpression.Operator.LESS_EQUAL) {
       greaterKey = rightKey;
       lessKey = leftKey;
     }
 
-    outer:
     for (int i = !ascending ? partitions.length - 1 : 0; (!ascending ? i >= 0 : i < partitions.length); i += (!ascending ? -1 : 1)) {
       if (partitions[i].isUnboundUpper()) {
         selectedPartitions.add(i);
@@ -271,7 +264,7 @@ public class PartitionUtils {
       return;
     }
 
-    if (operator == com.sonicbase.query.BinaryExpression.Operator.equal) {
+    if (operator == com.sonicbase.query.BinaryExpression.Operator.EQUAL) {
 
       TableSchema.Partition partitionZero = partitions[0];
       if (partitionZero.getUpperKey() == null) {
@@ -281,7 +274,6 @@ public class PartitionUtils {
 
       for (int i = 0; i < partitions.length - 1; i++) {
         int compareValue = 0;
-        //for (int j = 0; j < fieldOffsets.length; j++) {
 
         for (int k = 0; k < key.length; k++) {
           if (key[k] == null || partitions[0].getUpperKey()[k] == null) {
@@ -331,7 +323,6 @@ public class PartitionUtils {
       return;
     }
 
-    //todo: do a binary search
     outer:
     for (int i = !ascending ? partitions.length - 1 : 0; (!ascending ? i >= 0 : i < partitions.length); i += (!ascending ? -1 : 1)) {
       Object[] lowerKey = partitions[i].getUpperKey();
@@ -349,11 +340,9 @@ public class PartitionUtils {
         String[] indexFields = tableSchema.getIndices().get(indexName).getFields();
         Object[] tempLowerKey = new Object[indexFields.length];
         for (int j = 0; j < indexFields.length; j++) {
-          //int offset = tableSchema.getFieldOffset(indexFields[j]);
           tempLowerKey[j] = lowerLowerKey[j];
         }
         int compareValue = 0;
-        //for (int j = 0; j < fieldOffsets.length; j++) {
 
         for (int k = 0; k < key.length; k++) {
           int value = comparators[k].compare(key[k], tempLowerKey[k]);
@@ -366,16 +355,13 @@ public class PartitionUtils {
             break;
           }
         }
-        if (compareValue == 0) {
-          if (operator == com.sonicbase.query.BinaryExpression.Operator.greater) {
-            continue outer;
-          }
+        if (compareValue == 0 && operator == BinaryExpression.Operator.GREATER) {
+          continue outer;
         }
-        //}
-        if (compareValue == 1) {// && (operator == BinaryExpression.Operator.less || operator == BinaryExpression.Operator.lessEqual)) {
+        if (compareValue == 1) {
           selectedPartitions.add(i);
         }
-        if (compareValue == -1 && (operator == com.sonicbase.query.BinaryExpression.Operator.greater || operator == com.sonicbase.query.BinaryExpression.Operator.greaterEqual)) {
+        if (compareValue == -1 && (operator == com.sonicbase.query.BinaryExpression.Operator.GREATER || operator == com.sonicbase.query.BinaryExpression.Operator.GREATER_EQUAL)) {
           selectedPartitions.add(i);
         }
         if (ascending) {
@@ -387,12 +373,10 @@ public class PartitionUtils {
       String[] indexFields = tableSchema.getIndices().get(indexName).getFields();
       Object[] tempLowerKey = new Object[indexFields.length];
       for (int j = 0; j < indexFields.length; j++) {
-        //int offset = tableSchema.getFieldOffset(indexFields[j]);
         tempLowerKey[j] = lowerKey[j];
       }
 
       int compareValue = 0;
-      //for (int j = 0; j < fieldOffsets.length; j++) {
 
       for (int k = 0; k < comparators.length; k++) {
         int value = comparators[k].compare(key[k], tempLowerKey[k]);
@@ -405,23 +389,19 @@ public class PartitionUtils {
           break;
         }
       }
-      if (compareValue == 0) {
-        if (operator == com.sonicbase.query.BinaryExpression.Operator.greater) {
-          continue outer;
-        }
+      if (compareValue == 0 && operator == BinaryExpression.Operator.GREATER) {
+        continue outer;
       }
-      //}
       if (compareValue == 1 &&
-          (operator == com.sonicbase.query.BinaryExpression.Operator.less ||
-              operator == com.sonicbase.query.BinaryExpression.Operator.lessEqual)) {
+          (operator == com.sonicbase.query.BinaryExpression.Operator.LESS ||
+              operator == com.sonicbase.query.BinaryExpression.Operator.LESS_EQUAL)) {
         selectedPartitions.add(i);
       }
       if (compareValue == -1 || compareValue == 0 || i == partitions.length - 1) {
         selectedPartitions.add(i);
-        if (operator == com.sonicbase.query.BinaryExpression.Operator.equal) {
+        if (operator == com.sonicbase.query.BinaryExpression.Operator.EQUAL) {
           return;
         }
-        continue outer;
       }
     }
   }

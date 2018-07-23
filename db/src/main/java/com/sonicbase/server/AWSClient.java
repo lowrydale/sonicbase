@@ -30,6 +30,10 @@ import java.util.Set;
  */
 public class AWSClient {
 
+  public static final String KEYS_PART_STR = "/keys/";
+  public static final String AWSKEYS_STR = "-awskeys";
+  public static final String JSON_STR = ".json";
+  public static final String USER_DIR_STR = "user.dir";
   private final DatabaseClient client;
   private static Logger logger = LoggerFactory.getLogger(AWSClient.class);
 
@@ -38,6 +42,9 @@ public class AWSClient {
 
   public AWSClient(DatabaseClient client) {
     this.client = client;
+    ObjectNode config = getConfig();
+    String dir = config.get("installDirectory").asText();
+    installDir = new File(dir.replace("$HOME", System.getProperty("user.home")));
   }
 
   public TransferManager getTransferManager() {
@@ -46,9 +53,8 @@ public class AWSClient {
         return transferManager;
       }
     }
-    File installDir = getInstallDir();
     String cluster = client.getCluster();
-    File keysFile = new File(installDir, "/keys/" + cluster + "-awskeys");
+    File keysFile = new File(installDir, KEYS_PART_STR + cluster + AWSKEYS_STR);
     if (!keysFile.exists()) {
       throw new DatabaseException(cluster + "-awskeys file not found");
     }
@@ -72,9 +78,12 @@ public class AWSClient {
   private ObjectNode getConfig() {
     try {
       String cluster = client.getCluster();
-      File file = new File(System.getProperty("user.dir"), "config/config-" + cluster + ".json");
+      File file = new File(System.getProperty(USER_DIR_STR), "config/config-" + cluster + JSON_STR);
       if (!file.exists()) {
-        file = new File(System.getProperty("user.dir"), "db/src/main/resources/config/config-" + cluster + ".json");
+        file = new File(System.getProperty(USER_DIR_STR), "src/main/resources/config/config-" + cluster + JSON_STR);
+      }
+      if (!file.exists()) {
+        file = new File(System.getProperty(USER_DIR_STR), "../db/src/main/resources/config/config-" + cluster + JSON_STR);
       }
       String configStr = IOUtils.toString(new BufferedInputStream(new FileInputStream(file)), "utf-8");
       ObjectMapper mapper = new ObjectMapper();
@@ -85,15 +94,6 @@ public class AWSClient {
     }
   }
 
-  public File getInstallDir() {
-    if (installDir == null) {
-      ObjectNode config = getConfig();
-      String dir = config.get("installDirectory").asText();
-      installDir = new File(dir.replace("$HOME", System.getProperty("user.home")));
-    }
-    return installDir;
-  }
-
   public AmazonS3 getS3Client() {
 
     ClientConfiguration config = new ClientConfiguration();
@@ -101,9 +101,8 @@ public class AWSClient {
     config.setSocketTimeout(6_000_000);
     config.setRequestTimeout(6_000_000);
 
-    File installDir = getInstallDir();
     String cluster = client.getCluster();
-    File keysFile = new File(installDir, "/keys/" + cluster + "-awskeys");
+    File keysFile = new File(installDir, KEYS_PART_STR + cluster + AWSKEYS_STR);
     if (!keysFile.exists()) {
       return new AmazonS3Client(new InstanceProfileCredentialsProvider(true), config);
     }
@@ -128,9 +127,8 @@ public class AWSClient {
     config.setRequestTimeout(20_000);
     config.setConnectionTimeout(60_000);
 
-    File installDir = getInstallDir();
     String cluster = client.getCluster();
-    File keysFile = new File(installDir, "/keys/" + cluster + "-awskeys");
+    File keysFile = new File(installDir, KEYS_PART_STR + cluster + AWSKEYS_STR);
     if (!keysFile.exists()) {
       return new AmazonSQSClient(new InstanceProfileCredentialsProvider(true), config);
     }
@@ -164,7 +162,7 @@ public class AWSClient {
         }
         req.setContinuationToken(result.getNextContinuationToken());
       }
-      while (result.isTruncated() == true);
+      while (result.isTruncated());
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -173,12 +171,13 @@ public class AWSClient {
 
   public void uploadDirectory(final String bucket, final String prefix, final String path,
                               final File srcDir) {
-      TransferManager transferManager = getTransferManager();
-        MultipleFileUpload xfer = transferManager.uploadDirectory(bucket, prefix + "/" + path, srcDir, true);
+      TransferManager localTransferManager = getTransferManager();
+        MultipleFileUpload xfer = localTransferManager.uploadDirectory(bucket, prefix + "/" + path, srcDir, true);
     try {
       xfer.waitForCompletion();
     }
     catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
       throw new DatabaseException(e);
     }
   }
@@ -200,6 +199,7 @@ public class AWSClient {
           Thread.sleep(2000);
         }
         catch (InterruptedException e1) {
+          Thread.currentThread().interrupt();
           throw new DatabaseException(e1);
         }
       }
@@ -243,12 +243,13 @@ public class AWSClient {
     try {
       S3Object object = s3client.getObject(
           new GetObjectRequest(bucket, key));
+      ByteArrayOutputStream localOut;
       try (InputStream objectData = object.getObjectContent();
            ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+        localOut = out;
         IOUtils.copy(objectData, out);
-        out.close();
-        return out.toByteArray();
       }
+      return localOut.toByteArray();
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -256,16 +257,17 @@ public class AWSClient {
   }
 
   public void downloadDirectory(final String bucket, String prefix, String subDirectory, File destDir) {
-    TransferManager transferManager = getTransferManager();
-    MultipleFileDownload download = transferManager.downloadDirectory(bucket, prefix + "/" + subDirectory, destDir, true);
+    TransferManager localTransferManager = getTransferManager();
+    MultipleFileDownload download = localTransferManager.downloadDirectory(bucket, prefix + "/" + subDirectory, destDir, true);
     try {
       download.waitForCompletion();
     }
     catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
       throw new DatabaseException(e);
     }
 
-    File srcDir = new File(destDir, prefix + "/" + subDirectory);
+    File srcDir = new File(destDir, prefix + File.separator + subDirectory);
     File[] srcFiles = srcDir.listFiles();
     if (srcFiles != null) {
       for (File srcFile : srcFiles) {
@@ -273,7 +275,7 @@ public class AWSClient {
       }
     }
     try {
-      int pos = prefix.indexOf("/");
+      int pos = prefix.indexOf('/');
       if (pos != -1) {
         prefix = prefix.substring(0, pos);
       }
@@ -307,7 +309,7 @@ public class AWSClient {
           if (key.charAt(0) == '/') {
             key = key.substring(1);
           }
-          int pos = key.indexOf("/");
+          int pos = key.indexOf('/');
           if (pos != -1) {
             key = key.substring(0, pos);
             dirs.add(key);
@@ -315,7 +317,7 @@ public class AWSClient {
         }
         req.setContinuationToken(result.getNextContinuationToken());
       }
-      while (result.isTruncated() == true);
+      while (result.isTruncated());
 
       List<String> ret = new ArrayList<>();
       for (String str : dirs) {
@@ -343,7 +345,7 @@ public class AWSClient {
         }
         req.setContinuationToken(result.getNextContinuationToken());
       }
-      while (result.isTruncated() == true);
+      while (result.isTruncated());
     }
     catch (Exception e) {
       throw new DatabaseException(e);

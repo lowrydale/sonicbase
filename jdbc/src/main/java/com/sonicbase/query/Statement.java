@@ -1,8 +1,5 @@
 package com.sonicbase.query;
 
-/**
- * Responsible for
- */
 public interface Statement {
 
   BinaryExpression createBinaryExpression(String columnName, BinaryExpression.Operator op, long value);

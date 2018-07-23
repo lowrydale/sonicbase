@@ -10,7 +10,7 @@ import net.sf.jsqlparser.statement.create.table.ColDataType;
 
 import java.sql.SQLException;
 
-public class AlterStatementHandler extends StatementHandler {
+public class AlterStatementHandler implements StatementHandler {
   private final DatabaseClient client;
 
   public AlterStatementHandler(DatabaseClient client) {
@@ -39,28 +39,28 @@ public class AlterStatementHandler extends StatementHandler {
   private void doDropColumn(String dbName, String tableName, String columnName) {
 
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.dbName, dbName);
-    cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-    cobj.put(ComObject.Tag.tableName, tableName);
-    cobj.put(ComObject.Tag.columnName, columnName);
-    cobj.put(ComObject.Tag.masterSlave, "master");
+    cobj.put(ComObject.Tag.DB_NAME, dbName);
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
+    cobj.put(ComObject.Tag.TABLE_NAME, tableName);
+    cobj.put(ComObject.Tag.COLUMN_NAME, columnName);
+    cobj.put(ComObject.Tag.MASTER_SLAVE, "master");
     byte[] ret = client.sendToMaster("SchemaManager:dropColumn", cobj);
     ComObject retObj = new ComObject(ret);
-    client.getCommon().deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
+    client.getCommon().deserializeSchema(retObj.getByteArray(ComObject.Tag.SCHEMA_BYTES));
   }
 
   private void doAddColumn(String dbName, String tableName, String columnName, ColDataType type) {
 
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.dbName, dbName);
-    cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-    cobj.put(ComObject.Tag.tableName, tableName);
-    cobj.put(ComObject.Tag.columnName, columnName);
-    cobj.put(ComObject.Tag.dataType, type.getDataType());
-    cobj.put(ComObject.Tag.masterSlave, "master");
+    cobj.put(ComObject.Tag.DB_NAME, dbName);
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
+    cobj.put(ComObject.Tag.TABLE_NAME, tableName);
+    cobj.put(ComObject.Tag.COLUMN_NAME, columnName);
+    cobj.put(ComObject.Tag.DATA_TYPE, type.getDataType());
+    cobj.put(ComObject.Tag.MASTER_SLAVE, "master");
     byte[] ret = client.sendToMaster("SchemaManager:addColumn", cobj);
     ComObject retObj = new ComObject(ret);
-    client.getCommon().deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
+    client.getCommon().deserializeSchema(retObj.getByteArray(ComObject.Tag.SCHEMA_BYTES));
   }
 
 }

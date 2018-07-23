@@ -18,7 +18,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class CreateTableStatementHandler extends StatementHandler {
+public class CreateTableStatementHandler implements StatementHandler {
   private final DatabaseClient client;
 
   public CreateTableStatementHandler(DatabaseClient client) {
@@ -59,14 +59,13 @@ public class CreateTableStatementHandler extends StatementHandler {
       }
       List argList = columnDefinition.getColDataType().getArgumentsStringList();
       if (argList != null) {
-        int width = Integer.valueOf((String) argList.get(0));
+        int width = Integer.parseInt((String) argList.get(0));
         fieldSchema.setWidth(width);
       }
-      //fieldSchema.setWidth(width);
       fields.add(fieldSchema);
     }
 
-    List<String> primaryKey = new ArrayList<String>();
+    List<String> primaryKey = new ArrayList<>();
     List indexes = createTable.getIndexes();
     if (indexes == null) {
       primaryKey.add("_sonicbase_id");
@@ -92,14 +91,14 @@ public class CreateTableStatementHandler extends StatementHandler {
   public int doCreateTable(String dbName, CreateTableStatementImpl createTableStatement) {
     try {
       ComObject cobj = new ComObject();
-      cobj.put(ComObject.Tag.dbName, dbName);
-      cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-      cobj.put(ComObject.Tag.masterSlave, "master");
-      cobj.put(ComObject.Tag.createTableStatement, createTableStatement.serialize());
+      cobj.put(ComObject.Tag.DB_NAME, dbName);
+      cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
+      cobj.put(ComObject.Tag.MASTER_SLAVE, "master");
+      cobj.put(ComObject.Tag.CREATE_TABLE_STATEMENT, createTableStatement.serialize());
 
       byte[] ret = client.sendToMaster("SchemaManager:createTable", cobj);
       ComObject retObj = new ComObject(ret);
-      client.getCommon().deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
+      client.getCommon().deserializeSchema(retObj.getByteArray(ComObject.Tag.SCHEMA_BYTES));
 
       return 1;
     }

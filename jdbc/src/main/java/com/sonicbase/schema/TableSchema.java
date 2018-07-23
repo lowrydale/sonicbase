@@ -12,8 +12,8 @@ import java.util.*;
 @ExcludeRename
 public class TableSchema {
   private int version;
-  private List<FieldSchema> fields = new ArrayList<FieldSchema>();
-  private Map<String, Integer> fieldOffsets = new HashMap<String, Integer>();
+  private List<FieldSchema> fields = new ArrayList<>();
+  private Map<String, Integer> fieldOffsets = new HashMap<>();
   private String name;
   private Map<String, IndexSchema> indexes = new HashMap<>();
   private String[] primaryKey;
@@ -88,7 +88,7 @@ public class TableSchema {
   }
 
   public List<FieldSchema> getFieldsForVersion(int schemaVersion, int serializedVersion) {
-    if (schemaVersion == serializedVersion || previousFields.size() == 0) {
+    if (schemaVersion == serializedVersion || previousFields.isEmpty()) {
       return fields;
     }
     for (int i = 0; i < previousFields.size(); i++) {
@@ -270,9 +270,6 @@ public class TableSchema {
   public static void serializeIndexSchema(DataOutputStream out, TableSchema tableSchema, IndexSchema indexSchema) throws IOException {
     out.writeUTF(indexSchema.getName());
     out.writeInt(indexSchema.getIndexId());
-    if (indexSchema.getIndexId() > 10) {
-      System.out.println(">10");
-    }
 
     out.writeBoolean(indexSchema.isUnique());
     out.writeInt(indexSchema.getFields().length);
@@ -310,10 +307,6 @@ public class TableSchema {
         }
       }
     }
-  }
-
-  public Map<String, IndexSchema> getIndexes() {
-    return indexes;
   }
 
   public Map<Integer, IndexSchema> getIndexesById() {
@@ -357,9 +350,7 @@ public class TableSchema {
   public static IndexSchema deserializeIndexSchema(DataInputStream in, TableSchema tableSchema) throws IOException {
     String name = in.readUTF();
     int indexId = in.readInt();
-    if (indexId > 10) {
-      System.out.println(">10");
-    }
+
     boolean isUnique = in.readBoolean();
     int columnCount = in.readInt();
     String[] columns = new String[columnCount];
@@ -378,7 +369,7 @@ public class TableSchema {
     indexSchema.setIsPrimaryKey(isPrimaryKey);
     indexSchema.setIsPrimaryKeyGroup(isPrimaryKeyGroup);
 
-    tableSchema.getIndexes().put(indexSchema.getName(), indexSchema);
+    tableSchema.getIndices().put(indexSchema.getName(), indexSchema);
     tableSchema.getIndexesById().put(indexSchema.getIndexId(), indexSchema);
 
     Partition[] partitions = new Partition[in.readInt()];

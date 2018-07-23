@@ -7,9 +7,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.text.ParseException;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
@@ -67,14 +68,24 @@ public class LongRunningCalls {
         int version = getHighestSafeSnapshotVersion(file);
         version++;
         file = new File(file, String.valueOf(version) + ".in-process");
-        file.delete();
+        if (file.exists()) {
+          try {
+            Files.delete(file.toPath());
+          }
+          catch (IOException e) {
+            logger.error("Error deleting file: path={}", file.getAbsolutePath());
+          }
+        }
 
         try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file)))) {
           serialize(out);
         }
 
-        File newFile = new File(server.getDataDir(), "lrc/" + server.getShard() + "/" + server.getReplica() + "/" + String.valueOf(version));
-        file.renameTo(newFile);
+        File newFile = new File(server.getDataDir(), "lrc" + File.separator + server.getShard() + File.separator +
+            server.getReplica() + File.separator + version);
+        if (!file.renameTo(newFile)) {
+          logger.error("Error renaming file: oldPath={}, newPath={}", file.getAbsolutePath(), newFile.getAbsolutePath());
+        }
 
         deleteOldFiles();
       }
@@ -84,7 +95,7 @@ public class LongRunningCalls {
     }
   }
 
-  private void deleteOldFiles() throws IOException, InterruptedException, ParseException {
+  private void deleteOldFiles() {
     File dataRootDir = getReplicaRoot();
     dataRootDir.mkdirs();
     int highestSnapshot = getHighestSafeSnapshotVersion(dataRootDir);
@@ -99,14 +110,21 @@ public class LongRunningCalls {
       }
       if (fileStr.contains("in-process") || (fileNum != -1 && fileNum < (highestSnapshot - 1))) {
         File currFile = new File(dataRootDir, fileStr);
-        logger.info("Deleting file: " + currFile.getAbsolutePath());
-        currFile.delete();
+        logger.info("Deleting file: path={}", currFile.getAbsolutePath());
+        if (currFile.exists()) {
+          try {
+            Files.delete(currFile.toPath());
+          }
+          catch (IOException e) {
+            logger.error("Error deleting file: path={}", currFile.getAbsolutePath());
+          }
+        }
       }
     }
   }
 
   public File getReplicaRoot() {
-    return new File(server.getDataDir(), "lrc/" + server.getShard() + "/" + server.getReplica());
+    return new File(server.getDataDir(), "lrc" + File.separator + server.getShard() + File.separator + server.getReplica());
   }
 
   private int getHighestSafeSnapshotVersion(File dataRootDir) {
@@ -118,7 +136,7 @@ public class LongRunningCalls {
           int pos = dir.indexOf('.');
           if (pos == -1) {
             try {
-              int value = Integer.valueOf(dir);
+              int value = Integer.parseInt(dir);
               if (value > highestSnapshot) {
                 highestSnapshot = value;
               }
@@ -180,29 +198,26 @@ public class LongRunningCalls {
     }
 
     public void deserialize(DataInputStream in) throws IOException {
-      short serializationVersion = (short)Varint.readSignedVarLong(in);
+      Varint.readSignedVarLong(in); //serialization version
       int len = (int)Varint.readSignedVarLong(in);
       body = new byte[len];
       in.readFully(body);
     }
 
-    public void execute(final ConcurrentLinkedQueue<SingleCommand> parentList) {
-      Thread thread = new Thread(new Runnable(){
-        @Override
-        public void run() {
-          try {
-            doExecute(parentList);
-          }
-          finally {
-            executionThreads.remove(Thread.currentThread());
-          }
+    public void execute(final Queue<SingleCommand> parentList) {
+      Thread thread = new Thread(() -> {
+        try {
+          doExecute(parentList);
+        }
+        finally {
+          executionThreads.remove(Thread.currentThread());
         }
       });
       executionThreads.add(thread);
       thread.start();
     }
 
-    private void doExecute(ConcurrentLinkedQueue<SingleCommand> parentList) {
+    private void doExecute(Queue<SingleCommand> parentList) {
       longRunningCommands.server.invokeMethod(body, false, false);
       synchronized (parentList) {
         parentList.remove(SingleCommand.this);
@@ -213,8 +228,8 @@ public class LongRunningCalls {
 
   static Map<Integer, Type> lookupTypeById = new HashMap<>();
   enum Type {
-    single(0),
-    compound(1);
+    SINGLE(0),
+    COMPOUND(1);
 
     private final int value;
 
@@ -239,7 +254,7 @@ public class LongRunningCalls {
   public void deserialize(DataInputStream in) throws IOException {
     synchronized (commands) {
       commands.clear();
-      short serializationVersion = (short)Varint.readSignedVarLong(in);
+      Varint.readSignedVarLong(in); //serialization version
       long count = Varint.readSignedVarLong(in);
       for (int i = 0; i < count; i++) {
         SingleCommand command = new SingleCommand(this);

@@ -12,13 +12,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class CreateTableStatementImpl implements CreateTableStatement {
-  private DatabaseClient client;
   private String tableName;
   private List<FieldSchema> fields = new ArrayList<>();
-  private List<String> primaryKey = new ArrayList<String>();
+  private List<String> primaryKey = new ArrayList<>();
 
   public CreateTableStatementImpl(DatabaseClient client) {
-    this.client = client;
   }
 
   public CreateTableStatementImpl() {

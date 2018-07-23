@@ -61,7 +61,7 @@ public class SignedExpressionImpl extends ExpressionImpl {
 
   @Override
   public Type getType() {
-    return Type.signedExpression;
+    return Type.SIGNED_EXPRESSION;
   }
 
   /**
@@ -117,6 +117,7 @@ public class SignedExpressionImpl extends ExpressionImpl {
   }
 
 
+  @Override
   public NextReturn next(SelectStatementImpl.Explain explainBuilder, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
     return null;
   }

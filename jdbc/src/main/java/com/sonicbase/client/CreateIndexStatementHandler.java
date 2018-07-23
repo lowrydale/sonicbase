@@ -13,7 +13,7 @@ import net.sf.jsqlparser.statement.create.table.Index;
 import java.sql.SQLException;
 import java.util.List;
 
-public class CreateIndexStatementHandler extends StatementHandler {
+public class CreateIndexStatementHandler implements StatementHandler {
   private final DatabaseClient client;
 
   public CreateIndexStatementHandler(DatabaseClient client) {
@@ -50,12 +50,12 @@ public class CreateIndexStatementHandler extends StatementHandler {
 
   public void doCreateIndex(String dbName, CreateIndexStatementImpl statement) {
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.dbName, dbName);
-    cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-    cobj.put(ComObject.Tag.masterSlave, "master");
-    cobj.put(ComObject.Tag.tableName, statement.getTableName());
-    cobj.put(ComObject.Tag.indexName, statement.getName());
-    cobj.put(ComObject.Tag.isUnique, statement.isUnique());
+    cobj.put(ComObject.Tag.DB_NAME, dbName);
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
+    cobj.put(ComObject.Tag.MASTER_SLAVE, "master");
+    cobj.put(ComObject.Tag.TABLE_NAME, statement.getTableName());
+    cobj.put(ComObject.Tag.INDEX_NAME, statement.getName());
+    cobj.put(ComObject.Tag.IS_UNIQUE, statement.isUnique());
     StringBuilder builder = new StringBuilder();
     boolean first = true;
     for (String field : statement.getColumns()) {
@@ -65,13 +65,12 @@ public class CreateIndexStatementHandler extends StatementHandler {
       first = false;
       builder.append(field);
     }
-    //command = command + ":" + builder.toString();
 
-    cobj.put(ComObject.Tag.fieldsStr, builder.toString());
+    cobj.put(ComObject.Tag.FIELDS_STR, builder.toString());
 
     byte[] ret = client.sendToMaster("SchemaManager:createIndex", cobj);
     ComObject retObj = new ComObject(ret);
-    client.getCommon().deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
+    client.getCommon().deserializeSchema(retObj.getByteArray(ComObject.Tag.SCHEMA_BYTES));
   }
 
 

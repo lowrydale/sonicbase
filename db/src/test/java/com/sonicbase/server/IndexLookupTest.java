@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
 import com.sonicbase.common.DatabaseCommon;
@@ -170,7 +169,7 @@ public class IndexLookupTest {
     rightExpression.setValue(300L);
     rightExpression.setSqlType(DataType.Type.BIGINT.getValue());
     expression.setRightExpression(rightExpression);
-    expression.setOperator(BinaryExpression.Operator.equal);
+    expression.setOperator(BinaryExpression.Operator.EQUAL);
 
     indexLookup.setExpression(expression);
     indexLookup.handleRecordEvaluateExpression(records, done);

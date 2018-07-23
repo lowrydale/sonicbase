@@ -10,6 +10,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.GregorianCalendar;
 import java.util.TimeZone;
 
 /**
@@ -20,18 +21,25 @@ import java.util.TimeZone;
 public final class DateUtils {
 
 
+  private static final String TIME_STR_1 = "yyyy-MM-dd'T'HH_mm_ssZ";
+  private static final String TIME_STR_2 = "yyyy-MM-dd HH:mm:ss.SSSZ GG";
+  private static final String TIME_STR_3 = "yyyy-MM-dd HH:mm:ss.SSSZ";
+
+  private DateUtils() {
+  }
+
   public static String toString(final Date date) {
-    return DateFormatUtils.format(date, "yyyy-MM-dd'T'HH_mm_ssZ", TimeZone.getTimeZone("UTC"));
+    return DateFormatUtils.format(date, TIME_STR_1, TimeZone.getTimeZone("UTC"));
   }
 
   public static String fromDate(final Date date) {
-    return DateFormatUtils.format(date, "yyyy-MM-dd'T'HH_mm_ssZ", TimeZone.getTimeZone("UTC"));
+    return DateFormatUtils.format(date, TIME_STR_1, TimeZone.getTimeZone("UTC"));
   }
 
   public static Date fromString(final String formattedString)
       throws ParseException {
     String[] patterns = new String[]{"yyyy-MM-dd'T'HH:mm:ssZ", "yyyy-MM-dd'T'HH:mm:ss",
-        "yyyy-MM-dd'T'HH:mm:ss.SSS", "yyyy-MM-dd'T'HH_mm_ssZ", "yyyy-MM-dd'T'HH_mm_ss"};
+        "yyyy-MM-dd'T'HH:mm:ss.SSS", TIME_STR_1, "yyyy-MM-dd'T'HH_mm_ss"};
     return org.apache.commons.lang.time.DateUtils.parseDate(formattedString, patterns);
   }
 
@@ -41,10 +49,10 @@ public final class DateUtils {
 
     SimpleDateFormat format1 = null;
     if (cal2.compareTo(cal) > 0) {
-      format1 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSZ GG");
+      format1 = new SimpleDateFormat(TIME_STR_2);
     }
     else {
-      format1 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSZ");
+      format1 = new SimpleDateFormat(TIME_STR_3);
     }
     TimeZone tz = TimeZone.getTimeZone("UTC");
     format1.setTimeZone(tz);
@@ -59,14 +67,16 @@ public final class DateUtils {
   }
 
   public static String toDbTimestampString(Timestamp timestamp) {
-    Timestamp timestamp2 = new Timestamp(-1, 11, 31, 17, 0, 1, 0);
+    Calendar cal = new GregorianCalendar();
+    cal.set(-1, 11, 31, 17, 0, 1);
+    Timestamp timestamp2 = new Timestamp(cal.getTimeInMillis());
 
     SimpleDateFormat format1 = null;
     if (timestamp2.compareTo(timestamp) > 0) {
-      format1 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSZ GG");
+      format1 = new SimpleDateFormat(TIME_STR_2);
     }
     else {
-      format1 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSZ");
+      format1 = new SimpleDateFormat(TIME_STR_3);
     }
     TimeZone tz = TimeZone.getTimeZone("UTC");
     format1.setTimeZone(tz);
@@ -74,8 +84,8 @@ public final class DateUtils {
   }
 
   static String[] formatStrings = new String[]{
-      "yyyy-MM-dd HH:mm:ss.SSSZ",
-      "yyyy-MM-dd HH:mm:ss.SSSZ GG",
+      TIME_STR_3,
+      TIME_STR_2,
       "yyyy-MM-dd HH:mm:ss.SSS",
       "yyyy-MM-dd HH:mm:ss.SSS GG",
       "yyyy-MM-dd HH:mm:ssZ",
@@ -101,7 +111,6 @@ public final class DateUtils {
       }
       catch (Exception e) {
         lastException = e;
-        continue;
       }
     }
     throw new DatabaseException("Error parsing date", lastException);
@@ -125,7 +134,6 @@ public final class DateUtils {
       }
       catch (Exception e) {
         lastException = e;
-        continue;
       }
     }
     throw new DatabaseException("Error parsing date", lastException);

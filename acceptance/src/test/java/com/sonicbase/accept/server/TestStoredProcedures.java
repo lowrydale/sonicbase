@@ -61,10 +61,6 @@ public class TestStoredProcedures {
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
-    ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
-    array.add(com.sonicbase.server.DatabaseServer.FOUR_SERVER_LICENSE);
-    config.put("licenseKeys", array);
-
     DatabaseClient.getServers().clear();
 
     dbServers = new com.sonicbase.server.DatabaseServer[2];
@@ -79,7 +75,7 @@ public class TestStoredProcedures {
       @Override
       public void run() {
         serverA1.startServer(new String[]{"-port", String.valueOf(9010), "-host", "localhost",
-            "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(0)}, "db/src/main/resources/config/config-2-servers-a.json", true);
+            "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(0)});
         latch.countDown();
       }
     });
@@ -96,7 +92,7 @@ public class TestStoredProcedures {
       @Override
       public void run() {
         serverA2.startServer(new String[]{"-port", String.valueOf(9060), "-host", "localhost",
-            "-mport", String.valueOf(9060), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(1)}, "db/src/main/resources/config/config-2-servers-a.json", true);
+            "-mport", String.valueOf(9060), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(1)});
         latch.countDown();
       }
     });
@@ -168,7 +164,7 @@ public class TestStoredProcedures {
 //      long size = client.getPartitionSize("test", 0, "children", "_1_socialsecuritynumber");
 //      assertEquals(size, 10);
 
-    client.beginRebalance("db", "persons", "_primarykey");
+    client.beginRebalance("db");
 
 
     while (true) {
@@ -183,7 +179,7 @@ public class TestStoredProcedures {
     }
     client.syncSchema();
 
-    client.beginRebalance("db", "persons", "_primarykey");
+    client.beginRebalance("db");
 
 
     while (true) {

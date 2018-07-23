@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.sonicbase.client.DatabaseClient.toLower;
 
-public class SelectStatementHandler extends StatementHandler {
+public class SelectStatementHandler implements StatementHandler {
 
   private final DatabaseClient client;
 
@@ -44,9 +44,6 @@ public class SelectStatementHandler extends StatementHandler {
                         SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2, boolean restrictToThisServer,
                         StoredProcedureContextImpl procedureContext, int schemaRetryCount) {
     Select selectNode = (Select) statement;
-//    int currParmNum = 0;
-//    List<String> columnNames = new ArrayList<>();
-//    List<Object> values = new ArrayList<>();
     SelectBody selectBody = selectNode.getSelectBody();
     AtomicInteger currParmNum = new AtomicInteger();
     if (selectBody instanceof PlainSelect) {
@@ -80,9 +77,9 @@ public class SelectStatementHandler extends StatementHandler {
         }
       }
       SetOperation setOperation = new SetOperation();
-      setOperation.selectStatements = statements;
-      setOperation.operations = operations;
-      setOperation.orderBy = orderBy;
+      setOperation.setSelectStatements(statements);
+      setOperation.setOperations(operations);
+      setOperation.setOrderBy(orderBy);
       try {
         return serverSetSelect(dbName, tableNames, setOperation, restrictToThisServer, procedureContext);
       }
@@ -94,17 +91,74 @@ public class SelectStatementHandler extends StatementHandler {
   }
 
   public static class SetOperation {
-    public SelectStatementImpl[] selectStatements;
-    public String[] operations;
-    public OrderByExpressionImpl[] orderBy;
-    public long serverSelectPageNumber;
-    public long resultSetId;
-    public Integer shard;
-    public Integer replica;
+    private SelectStatementImpl[] selectStatements;
+    private String[] operations;
+    private OrderByExpressionImpl[] orderBy;
+    private long serverSelectPageNumber;
+    private long resultSetId;
+    private Integer shard;
+    private Integer replica;
+
+
+    public SelectStatementImpl[] getSelectStatements() {
+      return selectStatements;
+    }
+
+    public void setSelectStatements(SelectStatementImpl[] selectStatements) {
+      this.selectStatements = selectStatements;
+    }
+
+    public String[] getOperations() {
+      return operations;
+    }
+
+    public void setOperations(String[] operations) {
+      this.operations = operations;
+    }
+
+    public OrderByExpressionImpl[] getOrderBy() {
+      return orderBy;
+    }
+
+    public void setOrderBy(OrderByExpressionImpl[] orderBy) {
+      this.orderBy = orderBy;
+    }
+
+    public long getServerSelectPageNumber() {
+      return serverSelectPageNumber;
+    }
+
+    public void setServerSelectPageNumber(long serverSelectPageNumber) {
+      this.serverSelectPageNumber = serverSelectPageNumber;
+    }
+
+    public long getResultSetId() {
+      return resultSetId;
+    }
+
+    public void setResultSetId(long resultSetId) {
+      this.resultSetId = resultSetId;
+    }
+
+    public Integer getShard() {
+      return shard;
+    }
+
+    public void setShard(Integer shard) {
+      this.shard = shard;
+    }
+
+    public Integer getReplica() {
+      return replica;
+    }
+
+    public void setReplica(Integer replica) {
+      this.replica = replica;
+    }
   }
 
   public ResultSet serverSetSelect(String dbName, String[] tableNames, SetOperation setOperation,
-                                   boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) throws Exception {
+                                   boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) {
     while (true) {
       if (client.getShutdown()) {
         throw new DatabaseException("Shutting down");
@@ -113,7 +167,7 @@ public class SelectStatementHandler extends StatementHandler {
       try {
         Map<String, SelectFunctionImpl> functionAliases = new HashMap<>();
         Map<String, ColumnImpl> aliases = new HashMap<>();
-        for (SelectStatementImpl select : setOperation.selectStatements) {
+        for (SelectStatementImpl select : setOperation.getSelectStatements()) {
           aliases.putAll(select.getAliases());
           functionAliases.putAll(select.getFunctionAliases());
         }
@@ -137,31 +191,31 @@ public class SelectStatementHandler extends StatementHandler {
 
   public void doServerSetSelect(String dbName, String[] tableNames, SetOperation setOperation, ResultSetImpl ret, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) throws IOException {
     ComObject cobj = new ComObject();
-    ComArray array = cobj.putArray(ComObject.Tag.selectStatements, ComObject.Type.byteArrayType);
-    for (int i = 0; i < setOperation.selectStatements.length; i++) {
-      setOperation.selectStatements[i].setTableNames(new String[]{setOperation.selectStatements[i].getFromTable()});
-      array.add(setOperation.selectStatements[i].serialize());
+    ComArray array = cobj.putArray(ComObject.Tag.SELECT_STATEMENTS, ComObject.Type.BYTE_ARRAY_TYPE);
+    for (int i = 0; i < setOperation.getSelectStatements().length; i++) {
+      setOperation.getSelectStatements()[i].setTableNames(new String[]{setOperation.getSelectStatements()[i].getFromTable()});
+      array.add(setOperation.getSelectStatements()[i].serialize());
     }
-    if (setOperation.orderBy != null) {
-      ComArray orderByArray = cobj.putArray(ComObject.Tag.orderByExpressions, ComObject.Type.byteArrayType);
-      for (int i = 0; i < setOperation.orderBy.length; i++) {
-        orderByArray.add(setOperation.orderBy[i].serialize());
+    if (setOperation.getOrderBy() != null) {
+      ComArray orderByArray = cobj.putArray(ComObject.Tag.ORDER_BY_EXPRESSIONS, ComObject.Type.BYTE_ARRAY_TYPE);
+      for (int i = 0; i < setOperation.getOrderBy().length; i++) {
+        orderByArray.add(setOperation.getOrderBy()[i].serialize());
       }
     }
-    ComArray tablesArray = cobj.putArray(ComObject.Tag.tables, ComObject.Type.stringType);
+    ComArray tablesArray = cobj.putArray(ComObject.Tag.TABLES, ComObject.Type.STRING_TYPE);
     for (int i = 0; i < tableNames.length; i++) {
       tablesArray.add(tableNames[i]);
     }
-    ComArray strArray = cobj.putArray(ComObject.Tag.operations, ComObject.Type.stringType);
-    for (int i = 0; i < setOperation.operations.length; i++) {
-      strArray.add(setOperation.operations[i]);
+    ComArray strArray = cobj.putArray(ComObject.Tag.OPERATIONS, ComObject.Type.STRING_TYPE);
+    for (int i = 0; i < setOperation.getOperations().length; i++) {
+      strArray.add(setOperation.getOperations()[i]);
     }
-    cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-    cobj.put(ComObject.Tag.count, DatabaseClient.SELECT_PAGE_SIZE);
-    cobj.put(ComObject.Tag.method, "ReadManager:serverSetSelect");
-    cobj.put(ComObject.Tag.dbName, dbName);
-    cobj.put(ComObject.Tag.serverSelectPageNumber, setOperation.serverSelectPageNumber);
-    cobj.put(ComObject.Tag.resultSetId, setOperation.resultSetId);
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
+    cobj.put(ComObject.Tag.COUNT, DatabaseClient.SELECT_PAGE_SIZE);
+    cobj.put(ComObject.Tag.METHOD, "ReadManager:serverSetSelect");
+    cobj.put(ComObject.Tag.DB_NAME, dbName);
+    cobj.put(ComObject.Tag.SERVER_SELECT_PAGE_NUMBER, setOperation.getServerSelectPageNumber());
+    cobj.put(ComObject.Tag.RESULT_SET_ID, setOperation.getResultSetId());
 
     ComObject retObj = null;
     if (restrictToThisServer) {
@@ -169,12 +223,12 @@ public class SelectStatementHandler extends StatementHandler {
     }
     else {
       byte[] recordRet = null;
-      if (setOperation.shard == null) {
+      if (setOperation.getShard() == null) {
         recordRet = client.send(null, Math.abs(ThreadLocalRandom.current().nextInt() % client.getShardCount()),
-            Math.abs(ThreadLocalRandom.current().nextLong()), cobj, DatabaseClient.Replica.def);
+            Math.abs(ThreadLocalRandom.current().nextLong()), cobj, DatabaseClient.Replica.DEF);
       }
       else {
-        recordRet = client.send(null, setOperation.shard, setOperation.replica, cobj, DatabaseClient.Replica.specified);
+        recordRet = client.send(null, setOperation.getShard(), setOperation.getReplica(), cobj, DatabaseClient.Replica.SPECIFIED);
       }
       retObj = new ComObject(recordRet);
     }
@@ -193,14 +247,14 @@ public class SelectStatementHandler extends StatementHandler {
         }
       }
     }
-    setOperation.serverSelectPageNumber = retObj.getLong(ComObject.Tag.serverSelectPageNumber);
-    setOperation.resultSetId = retObj.getLong(ComObject.Tag.resultSetId);
-    setOperation.shard = retObj.getInt(ComObject.Tag.shard);
-    setOperation.replica = retObj.getInt(ComObject.Tag.replica);
+    setOperation.setServerSelectPageNumber(retObj.getLong(ComObject.Tag.SERVER_SELECT_PAGE_NUMBER));
+    setOperation.setResultSetId(retObj.getLong(ComObject.Tag.RESULT_SET_ID));
+    setOperation.setShard(retObj.getInt(ComObject.Tag.SHARD));
+    setOperation.setReplica(retObj.getInt(ComObject.Tag.REPLICA));
 
     ret.getRecordCache().getRecordsForTable().clear();
 
-    ComArray tableRecords = retObj.getArray(ComObject.Tag.tableRecords);
+    ComArray tableRecords = retObj.getArray(ComObject.Tag.TABLE_RECORDS);
     Object[][][] retKeys = new Object[tableRecords == null ? 0 : tableRecords.getArray().size()][][];
     Record[][] currRetRecords = new Record[tableRecords == null ? 0 : tableRecords.getArray().size()][];
     ExpressionImpl.CachedRecord[][] retRecords = new ExpressionImpl.CachedRecord[tableRecords == null ? 0 : tableRecords.getArray().size()][];
@@ -247,7 +301,7 @@ public class SelectStatementHandler extends StatementHandler {
 
       BinaryExpressionImpl ret = new BinaryExpressionImpl();
       ret.setNot(between.isNot());
-      ret.setOperator(com.sonicbase.query.BinaryExpression.Operator.and);
+      ret.setOperator(com.sonicbase.query.BinaryExpression.Operator.AND);
 
       BinaryExpressionImpl leftExpression = new BinaryExpressionImpl();
       ColumnImpl leftColumn = new ColumnImpl();
@@ -265,8 +319,8 @@ public class SelectStatementHandler extends StatementHandler {
       rightColumn.setColumnName(column.getColumnName());
       rightExpression.setLeftExpression(rightColumn);
 
-      leftExpression.setOperator(com.sonicbase.query.BinaryExpression.Operator.greaterEqual);
-      rightExpression.setOperator(com.sonicbase.query.BinaryExpression.Operator.lessEqual);
+      leftExpression.setOperator(com.sonicbase.query.BinaryExpression.Operator.GREATER_EQUAL);
+      rightExpression.setOperator(com.sonicbase.query.BinaryExpression.Operator.LESS_EQUAL);
 
       ret.setLeftExpression(leftExpression);
       ret.setRightExpression(rightExpression);
@@ -289,7 +343,7 @@ public class SelectStatementHandler extends StatementHandler {
       else if (between.getBetweenExpressionStart() instanceof StringValue) {
         String start = ((StringValue) between.getBetweenExpressionStart()).getValue();
         String end = ((StringValue) between.getBetweenExpressionEnd()).getValue();
-        if (1 == start.compareTo(end)) {
+        if (0 < start.compareTo(end)) {
           String temp = start;
           start = end;
           end = temp;
@@ -307,7 +361,7 @@ public class SelectStatementHandler extends StatementHandler {
     }
     else if (whereExpression instanceof AndExpression) {
       BinaryExpressionImpl binaryOp = new BinaryExpressionImpl();
-      binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.and);
+      binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.AND);
       AndExpression andExpression = (AndExpression) whereExpression;
       Expression leftExpression = andExpression.getLeftExpression();
       binaryOp.setLeftExpression(getExpression(client, currParmNum, leftExpression, tableName, parms));
@@ -318,7 +372,7 @@ public class SelectStatementHandler extends StatementHandler {
     else if (whereExpression instanceof OrExpression) {
       BinaryExpressionImpl binaryOp = new BinaryExpressionImpl();
 
-      binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.or);
+      binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.OR);
       OrExpression andExpression = (OrExpression) whereExpression;
       Expression leftExpression = andExpression.getLeftExpression();
       binaryOp.setLeftExpression(getExpression(client, currParmNum, leftExpression, tableName, parms));
@@ -339,52 +393,49 @@ public class SelectStatementHandler extends StatementHandler {
       BinaryExpressionImpl binaryOp = new BinaryExpressionImpl();
 
       if (whereExpression instanceof EqualsTo) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.equal);
+        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.EQUAL);
       }
       else if (whereExpression instanceof LikeExpression) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.like);
+        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.LIKE);
       }
       else if (whereExpression instanceof NotEqualsTo) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.notEqual);
+        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.NOT_EQUAL);
       }
       else if (whereExpression instanceof MinorThan) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.less);
+        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.LESS);
       }
       else if (whereExpression instanceof MinorThanEquals) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.lessEqual);
+        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.LESS_EQUAL);
       }
       else if (whereExpression instanceof GreaterThan) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.greater);
+        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.GREATER);
       }
       else if (whereExpression instanceof GreaterThanEquals) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.greaterEqual);
+        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.GREATER_EQUAL);
       }
       else if (whereExpression instanceof Addition) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.plus);
+        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.PLUS);
       }
       else if (whereExpression instanceof Subtraction) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.minus);
+        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.MINUS);
       }
       else if (whereExpression instanceof Multiplication) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.times);
+        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.TIMES);
       }
       else if (whereExpression instanceof Division) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.divide);
-      }
-      else if (whereExpression instanceof Division) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.divide);
+        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.DIVIDE);
       }
       else if (whereExpression instanceof BitwiseAnd) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.bitwiseAnd);
+        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.BITWISE_AND);
       }
       else if (whereExpression instanceof BitwiseOr) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.bitwiseOr);
+        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.BITWISE_OR);
       }
       else if (whereExpression instanceof BitwiseXor) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.bitwiseXOr);
+        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.BITWISE_X_OR);
       }
       else if (whereExpression instanceof Modulo) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.modulo);
+        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.MODULO);
       }
       net.sf.jsqlparser.expression.BinaryExpression bexp = (net.sf.jsqlparser.expression.BinaryExpression) whereExpression;
       binaryOp.setNot(bexp.isNot());
@@ -397,14 +448,6 @@ public class SelectStatementHandler extends StatementHandler {
 
       retExpression = binaryOp;
     }
-//    else if (whereExpression instanceof ParenthesisImpl) {
-//      Parenthesis retParenthesis = new Parenthesis();
-//      Parenthesis parenthesis = (Parenthesis) whereExpression;
-//      retParenthesis.setWhereClause(getExpression(currParmNum, parenthesis.getExpression()));
-//      retParenthesis.setNot(parenthesis.isNot());
-//      return retParenthesis;
-
-//    }
     else if (whereExpression instanceof net.sf.jsqlparser.expression.operators.relational.InExpression) {
       InExpressionImpl retInExpression = new InExpressionImpl(client, parms, tableName);
       net.sf.jsqlparser.expression.operators.relational.InExpression inExpression = (net.sf.jsqlparser.expression.operators.relational.InExpression) whereExpression;
@@ -483,7 +526,6 @@ public class SelectStatementHandler extends StatementHandler {
         }
       }
       FunctionImpl func = new FunctionImpl(sourceFunc.getName(), expressions);
-      //func.setNot(sourceFunc.isNot());
       retExpression = func;
     }
     else if (whereExpression instanceof SignedExpression) {
@@ -540,16 +582,16 @@ public class SelectStatementHandler extends StatementHandler {
         String rightFrom = rightFromItem.toString();
         SelectStatement.JoinType type = null;
         if (join.isInner()) {
-          type = SelectStatement.JoinType.inner;
+          type = SelectStatement.JoinType.INNER;
         }
         else if (join.isFull()) {
-          type = SelectStatement.JoinType.full;
+          type = SelectStatement.JoinType.FULL;
         }
         else if (join.isOuter() && join.isLeft()) {
-          type = SelectStatement.JoinType.leftOuter;
+          type = SelectStatement.JoinType.LEFT_OUTER;
         }
         else if (join.isOuter() && join.isRight()) {
-          type = SelectStatement.JoinType.rightOuter;
+          type = SelectStatement.JoinType.RIGHT_OUTER;
         }
         selectStatement.addJoinExpression(type, rightFrom, onExpression);
       }
@@ -557,7 +599,6 @@ public class SelectStatementHandler extends StatementHandler {
 
     Distinct distinct = selectBody.getDistinct();
     if (distinct != null) {
-      //distinct.getOnSelectItems();
       selectStatement.setIsDistinct();
     }
 
@@ -578,13 +619,15 @@ public class SelectStatementHandler extends StatementHandler {
         else if (item.getExpression() instanceof Function) {
           Function function = (Function) item.getExpression();
           String name = function.getName();
-          boolean groupCount = null != pselect.getGroupByColumnReferences() && pselect.getGroupByColumnReferences().size() != 0 && name.equalsIgnoreCase("count");
+          boolean groupCount = null != pselect.getGroupByColumnReferences() &&
+              !pselect.getGroupByColumnReferences().isEmpty() &&
+              name.equalsIgnoreCase("count");
           if (groupCount || name.equalsIgnoreCase("min") || name.equalsIgnoreCase("max") || name.equalsIgnoreCase("sum") || name.equalsIgnoreCase("avg")) {
             Column parm = (Column) function.getParameters().getExpressions().get(0);
             selectStatement.addSelectColumn(name, function.getParameters(), parm.getTable().getName(), parm.getColumnName(), aliasName);
           }
           else if (name.equalsIgnoreCase("count")) {
-            if (null == pselect.getGroupByColumnReferences() || pselect.getGroupByColumnReferences().size() == 0) {
+            if (null == pselect.getGroupByColumnReferences() || pselect.getGroupByColumnReferences().isEmpty()) {
               if (function.isAllColumns()) {
                 selectStatement.setCountFunction();
               }
@@ -599,10 +642,8 @@ public class SelectStatementHandler extends StatementHandler {
 
               String currAlias = null;
               for (SelectItem currItem : selectItems) {
-                if (((SelectExpressionItem) currItem).getExpression() == function) {
-                  if (((SelectExpressionItem) currItem).getAlias() != null) {
-                    currAlias = ((SelectExpressionItem) currItem).getAlias().getName();
-                  }
+                if (((SelectExpressionItem) currItem).getExpression() == function && ((SelectExpressionItem) currItem).getAlias() != null) {
+                  currAlias = ((SelectExpressionItem) currItem).getAlias().getName();
                 }
               }
               if (!(expression instanceof AllRecordsExpressionImpl)) {
@@ -627,7 +668,7 @@ public class SelectStatementHandler extends StatementHandler {
     }
 
     List<Expression> groupColumns = pselect.getGroupByColumnReferences();
-    if (groupColumns != null && groupColumns.size() != 0) {
+    if (groupColumns != null && !groupColumns.isEmpty()) {
       for (int i = 0; i < groupColumns.size(); i++) {
         Column column = (Column) groupColumns.get(i);
         selectStatement.addOrderBy(column.getTable().getName(), column.getColumnName(), true);

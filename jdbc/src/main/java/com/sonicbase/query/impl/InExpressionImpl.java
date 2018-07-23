@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public class InExpressionImpl extends ExpressionImpl implements InExpression {
   private ParameterHandler parms;
   private String tableName;
-  private List<ExpressionImpl> expressionList = new ArrayList<ExpressionImpl>();
+  private List<ExpressionImpl> expressionList = new ArrayList<>();
   private ExpressionImpl leftExpression;
   private boolean isNot;
 
@@ -37,9 +37,6 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
   public InExpressionImpl() {
   }
 
-  public List<ExpressionImpl> getExpressions() {
-    return expressionList;
-  }
 
   public String toString() {
     String ret = "";
@@ -66,6 +63,7 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
     return expressionList;
   }
 
+  @Override
   public void setTableName(String tableName) {
     super.setTableName(tableName);
     leftExpression.setTableName(tableName);
@@ -102,11 +100,13 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
     leftExpression.getColumns(columns);
   }
 
+  @Override
   public void setColumns(List<ColumnImpl> columns) {
     super.setColumns(columns);
     leftExpression.setColumns(columns);
   }
 
+  @Override
   public void setProbe(boolean probe) {
     super.setProbe(probe);
     leftExpression.setProbe(probe);
@@ -142,7 +142,7 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
 
   @Override
   public ExpressionImpl.Type getType() {
-    return ExpressionImpl.Type.inExpression;
+    return ExpressionImpl.Type.IN_EXPRESSION;
   }
 
   /**
@@ -180,16 +180,10 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
     Comparator comparator = DataType.Type.getComparatorForValue(lhsValue);
     for (ExpressionImpl expression : expressionList) {
       if (comparator.compare(lhsValue, expression.evaluateSingleRecord(tableSchemas, records, parms)) == 0) {
-        if (isNot) {
-          return false;
-        }
-        return true;
+        return !isNot;
       }
     }
-    if (isNot) {
-      return true;
-    }
-    return false;
+    return isNot;
   }
 
   @Override
@@ -208,21 +202,18 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
          setNextKey(context.getNextKey());
          return new NextReturn(context.getTableNames(), context.getCurrKeys());
        }
-      //return tableScan(count, getClient(), (ExpressionImpl) getTopLevelExpression(), getParms(), getTableName());
     }
     Object[][][] ret = null;
     IndexSchema indexSchema = null;
-    List<ExpressionImpl> expressionList = getExpressionList();
+    List<ExpressionImpl> localExpressionList = getExpressionList();
     ColumnImpl cNode = (ColumnImpl) getLeftExpression();
     String[] preferredIndexColumns = null;
 
     for (Map.Entry<String, IndexSchema> currIndexSchema : getClient().getCommon().getTables(dbName).get(getTableName()).getIndices().entrySet()) {
       String[] fields = currIndexSchema.getValue().getFields();
-      if (fields[0].equals(cNode.getColumnName())) {
-        if (preferredIndexColumns == null || preferredIndexColumns.length > fields.length) {
-          preferredIndexColumns = fields;
-          indexSchema = currIndexSchema.getValue();
-        }
+      if (fields[0].equals(cNode.getColumnName()) && (preferredIndexColumns == null || preferredIndexColumns.length > fields.length)) {
+        preferredIndexColumns = fields;
+        indexSchema = currIndexSchema.getValue();
       }
     }
 
@@ -239,7 +230,7 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
       }
     }
 
-    for (ExpressionImpl inValue : expressionList) {
+    for (ExpressionImpl inValue : localExpressionList) {
 
       Object value = getValueFromExpression(parms, inValue);
 
@@ -249,7 +240,7 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
       IndexLookup indexLookup = new IndexLookup();
       indexLookup.setCount(count);
       indexLookup.setIndexName(indexSchema.getName());
-      indexLookup.setLeftOp(BinaryExpression.Operator.equal);
+      indexLookup.setLeftOp(BinaryExpression.Operator.EQUAL);
       indexLookup.setLeftKey(key);
       indexLookup.setLeftOriginalKey(key);
       indexLookup.setColumnName(cNode.getColumnName());
@@ -269,21 +260,13 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
   }
 
 
+  @Override
   public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
     return next(DatabaseClient.SELECT_PAGE_SIZE, explain, currOffset, countReturned, limit, offset, false, false, schemaRetryCount);
   }
 
   @Override
   public boolean canUseIndex() {
-//    if (leftExpression instanceof ColumnImpl) {
-//      String columnName = ((ColumnImpl) leftExpression).getColumnName();
-//
-//      for (Map.Entry<String, IndexSchema> entry : getClient().getCommon().getTables(dbName).get(tableName).getIndices().entrySet()) {
-//        if (entry.getValue().getFields()[0].equals(columnName)) {
-//          return true;
-//        }
-//      }
-//    }
     return false;
   }
 

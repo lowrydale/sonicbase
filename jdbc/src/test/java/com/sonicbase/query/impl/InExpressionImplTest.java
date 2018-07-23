@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.query.impl;
 
 import com.sonicbase.client.DatabaseClient;
@@ -54,17 +53,17 @@ public class InExpressionImplTest {
     when(client.send(eq("ReadManager:indexLookup"), anyInt(), anyInt(), anyObject(), anyObject())).thenAnswer(invocationOnMock -> {
       calledLookup.set(true);
       ComObject retObj = new ComObject();
-      ComArray array = retObj.putArray(ComObject.Tag.keys, ComObject.Type.byteArrayType);
-      array = retObj.putArray(ComObject.Tag.keyRecords, ComObject.Type.byteArrayType);
-      array = retObj.putArray(ComObject.Tag.records, ComObject.Type.byteArrayType);
+      ComArray array = retObj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
+      array = retObj.putArray(ComObject.Tag.KEY_RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
+      array = retObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
 
       for (int i = 0; i < records.length; i++) {
         byte[] bytes = records[i];
         array.add(bytes);
       }
 
-      retObj.put(ComObject.Tag.currOffset, records.length);
-      retObj.put(ComObject.Tag.countReturned, records.length);
+      retObj.put(ComObject.Tag.CURR_OFFSET, records.length);
+      retObj.put(ComObject.Tag.COUNT_RETURNED, records.length);
 
       return retObj.serialize();
     });
@@ -108,7 +107,6 @@ public class InExpressionImplTest {
     retInExpression.setCounters(null);
     retInExpression.setDbName("test");
     retInExpression.setDebug(false);
-    retInExpression.setLimit(null);
     retInExpression.setOrderByExpressions(null);
     retInExpression.setParms(null);
     retInExpression.setReplica(1);

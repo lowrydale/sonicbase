@@ -24,7 +24,7 @@ public class GroupByContext {
 
   public GroupByContext(List<FieldContext> fieldContexts) {
     this.fieldContexts = fieldContexts;
-    this.groupCounters = new ConcurrentHashMap<>();//new ConcurrentSkipListMap<>(comparator);
+    this.groupCounters = new ConcurrentHashMap<>();
   }
 
   public static class FieldContext {
@@ -32,7 +32,7 @@ public class GroupByContext {
     private int fieldOffset;
     private DataType.Type dataType;
     private Comparator comparator;
-    public TableSchema tableSchema;
+    private TableSchema tableSchema;
 
     public void setFieldName(String fieldName) {
       this.fieldName = fieldName;
@@ -91,33 +91,27 @@ public class GroupByContext {
 
   private Map<Object[], GroupCounter> getOrCreateInnerMap(GroupCounter counter) {
     String key = counter.counter.getTableName() + ":" + counter.counter.getColumnName();
-    Map<Object[], GroupCounter> map = groupCounters.get(key);
-    if (map == null) {
-      map = new ConcurrentSkipListMap<>(new Comparator<Object[]>(){
-        @Override
-        public int compare(Object[] o1, Object[] o2) {
-          for (int i = 0; i < fieldContexts.size(); i++) {
-            int value = fieldContexts.get(i).getComparator().compare(o1[i], o2[i]);
-            if (value == 0) {
-              continue;
-            }
-            if (value < 0) {
-              return -1;
-            }
-            if (value > 0) {
-              return 1;
-            }
-          }
-          return 0;
+    return groupCounters.computeIfAbsent(key, k ->
+        new ConcurrentSkipListMap<>((o1, o2) -> {
+      for (int i = 0; i < fieldContexts.size(); i++) {
+        int value = fieldContexts.get(i).getComparator().compare(o1[i], o2[i]);
+        if (value == 0) {
+          continue;
         }
-      });
-      groupCounters.put(key, map);
-    } return map;
+        if (value < 0) {
+          return -1;
+        }
+        if (value > 0) {
+          return 1;
+        }
+      }
+      return 0;
+    }));
   }
 
-  public void deserialize(byte[] bytes, DatabaseCommon common, String dbName) throws IOException {
+  public void deserialize(byte[] bytes, DatabaseCommon common) throws IOException {
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
-    deserialize(in, common, dbName);
+    deserialize(in, common);
   }
 
   /**
@@ -125,7 +119,7 @@ public class GroupByContext {
    * DON"T MODIFY THIS SERIALIZATION
    * ###############################
    */
-  public void deserialize(DataInputStream in, DatabaseCommon common, String dbName) throws IOException {
+  public void deserialize(DataInputStream in, DatabaseCommon common) throws IOException {
     int fieldCount = in.readInt();
     fieldContexts = new ArrayList<>();
     for (int i = 0; i < fieldCount; i++) {
@@ -149,10 +143,9 @@ public class GroupByContext {
         GroupCounter groupCounter = new GroupCounter();
         Object[] groupValues = new Object[fieldContexts.size()];
         for (int k = 0; k < groupValues.length; k++) {
-          int len = (int) Varint.readSignedVarLong(in);
-          groupValues[k] = DatabaseCommon.deserializeFields(dbName, common, in,
-              fieldContexts.get(k).tableSchema, common.getSchemaVersion(), common.getSchemaVersion(), null,
-              true)[0];
+          Varint.readSignedVarLong(in); //len
+          groupValues[k] = DatabaseCommon.deserializeFields(in,
+              fieldContexts.get(k).tableSchema, common.getSchemaVersion(), null)[0];
         }
         Counter counter = new Counter();
         counter.deserialize(in);
@@ -202,7 +195,7 @@ public class GroupByContext {
       for (GroupCounter counter : innerMap.getValue().values()) {
         for  (int i = 0; i < count; i++) {
           DatabaseCommon.serializeFields(new Object[]{counter.groupValues[i]}, out, fieldContexts.get(i).tableSchema,
-              common.getSchemaVersion(), true);
+              common.getSchemaVersion());
         }
         out.write(counter.counter.serialize());
       }

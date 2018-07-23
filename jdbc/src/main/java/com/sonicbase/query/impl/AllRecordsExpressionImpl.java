@@ -29,7 +29,7 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
 
   @Override
   public Type getType() {
-    return Type.allExpression;
+    return Type.ALL_EXPRESSION;
   }
 
   @Override
@@ -93,13 +93,13 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
                          boolean b, boolean analyze, int schemaRetryCount) {
     List<OrderByExpressionImpl> orderByExpressions = getOrderByExpressions();
     String orderByColumn = null;
-    if (orderByExpressions != null && orderByExpressions.size() != 0) {
+    if (orderByExpressions != null && !orderByExpressions.isEmpty()) {
       orderByColumn = orderByExpressions.get(0).getColumnName();
     }
     TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(getFromTable());
     IndexSchema indexSchema = null;
     IndexSchema primaryIndex = null;
-    for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndexes().entrySet()) {
+    for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
       if (entry.getValue().isPrimaryKey()) {
         primaryIndex = entry.getValue();
       }
@@ -110,7 +110,6 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
         }
       }
       else {
-        //todo: check for compound fields
         if (entry.getValue().getFields()[0].equals(orderByColumn)) {
           indexSchema = entry.getValue();
           break;
@@ -122,9 +121,8 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
     }
     boolean ascending = true;
 
-    if (orderByExpressions != null && orderByExpressions.size() != 0) {
+    if (orderByExpressions != null && !orderByExpressions.isEmpty()) {
       OrderByExpressionImpl expression = orderByExpressions.get(0);
-      String columnName = expression.getColumnName();
       ascending = expression.isAscending();
     }
     if (analyze) {
@@ -134,7 +132,7 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
 
       setTableName(getFromTable());
 
-      BinaryExpression.Operator op = ascending ? BinaryExpression.Operator.greater : BinaryExpression.Operator.less;
+      BinaryExpression.Operator op = ascending ? BinaryExpression.Operator.GREATER : BinaryExpression.Operator.LESS;
       AtomicReference<String> usedIndex = new AtomicReference<>();
 
       IndexLookup indexLookup = new IndexLookup();

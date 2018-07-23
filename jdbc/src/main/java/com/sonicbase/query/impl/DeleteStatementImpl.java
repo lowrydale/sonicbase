@@ -52,7 +52,7 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
 
   @Override
   public Object execute(String dbName, String sqlToUse, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
-                        boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) throws DatabaseException {
+                        boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) {
     while (true) {
       try {
         expression.setViewVersion(client.getCommon().getSchemaVersion());
@@ -86,6 +86,9 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
               indexSchema = entry.getValue();
             }
           }
+          if (indexSchema == null) {
+            throw new DatabaseException("primary index not found");
+          }
 
           String[] indexFields = indexSchema.getFields();
           int[] fieldOffsets = new int[indexFields.length];
@@ -94,58 +97,59 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
           }
 
           for (Object[][] entry : ids.getKeys()) {
-            ExpressionImpl.CachedRecord cachedRecord = recordCache.get(tableName, entry[0]);;
+            ExpressionImpl.CachedRecord cachedRecord = recordCache.get(tableName, entry[0]);
             Record record = cachedRecord == null ? null : cachedRecord.getRecord();
             if (record == null) {
               boolean forceSelectOnServer = false;
-              record = expression.doReadRecord(dbName, client, forceSelectOnServer, recordCache, entry[0], tableName,
-                  null, null, null, client.getCommon().getSchemaVersion(), false, restrictToThisServer, procedureContext, schemaRetryCount);
+              record = ExpressionImpl.doReadRecord(dbName, client, forceSelectOnServer, recordCache, entry[0], tableName,
+                  null, null, null, client.getCommon().getSchemaVersion(),
+                  restrictToThisServer, procedureContext, schemaRetryCount);
             }
             if (record != null) {
-              List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, fieldOffsets, client.getCommon(), tableSchema,
-                  indexSchema.getName(), null, BinaryExpression.Operator.equal, null, entry[0], null);
-              if (selectedShards.size() == 0) {
-                throw new Exception("No shards selected for query");
+              List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, tableSchema,
+                  indexSchema.getName(), null, BinaryExpression.Operator.EQUAL, null, entry[0], null);
+              if (selectedShards.isEmpty()) {
+                throw new DatabaseException("No shards selected for query");
               }
 
               ComObject cobj = new ComObject();
-              cobj.put(ComObject.Tag.serializationVersion, DatabaseClient.SERIALIZATION_VERSION);
-              cobj.put(ComObject.Tag.keyBytes, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), entry[0]));
+              cobj.put(ComObject.Tag.SERIALIZATION_VERSION, DatabaseClient.SERIALIZATION_VERSION);
+              cobj.put(ComObject.Tag.KEY_BYTES, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), entry[0]));
               if (schemaRetryCount < 2) {
-                cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+                cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
               }
-              cobj.put(ComObject.Tag.dbName, dbName);
-              cobj.put(ComObject.Tag.tableName, tableName);
-              cobj.put(ComObject.Tag.indexName, indexSchema.getName());
-              cobj.put(ComObject.Tag.isExcpliciteTrans, client.isExplicitTrans());
-              cobj.put(ComObject.Tag.isCommitting, client.isCommitting());
-              cobj.put(ComObject.Tag.transactionId, client.getTransactionId());
+              cobj.put(ComObject.Tag.DB_NAME, dbName);
+              cobj.put(ComObject.Tag.TABLE_NAME, tableName);
+              cobj.put(ComObject.Tag.INDEX_NAME, indexSchema.getName());
+              cobj.put(ComObject.Tag.IS_EXCPLICITE_TRANS, client.isExplicitTrans());
+              cobj.put(ComObject.Tag.IS_COMMITTING, client.isCommitting());
+              cobj.put(ComObject.Tag.TRANSACTION_ID, client.getTransactionId());
               if (sequence0 != null && sequence1 != null && sequence2 != null) {
-                cobj.put(ComObject.Tag.sequence0Override, sequence0);
-                cobj.put(ComObject.Tag.sequence1Override, sequence1);
-                cobj.put(ComObject.Tag.sequence2Override, sequence2);
+                cobj.put(ComObject.Tag.SEQUENCE_0_OVERRIDE, sequence0);
+                cobj.put(ComObject.Tag.SEQUENCE_1_OVERRIDE, sequence1);
+                cobj.put(ComObject.Tag.SEQUENCE_2_OVERRIDE, sequence2);
               }
-              client.send("UpdateManager:deleteRecord", selectedShards.get(0), rand.nextLong(), cobj, DatabaseClient.Replica.def);
+              client.send("UpdateManager:deleteRecord", selectedShards.get(0), rand.nextLong(), cobj, DatabaseClient.Replica.DEF);
 
               cobj = new ComObject();
-              cobj.put(ComObject.Tag.dbName, dbName);
+              cobj.put(ComObject.Tag.DB_NAME, dbName);
               if (schemaRetryCount < 2) {
-                cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+                cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
               }
-              cobj.put(ComObject.Tag.primaryKeyBytes, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), entry[0]));
-              cobj.put(ComObject.Tag.tableName, tableName);
-              cobj.put(ComObject.Tag.isExcpliciteTrans, client.isExplicitTrans());
-              cobj.put(ComObject.Tag.isCommitting, client.isCommitting());
-              cobj.put(ComObject.Tag.transactionId, client.getTransactionId());
+              cobj.put(ComObject.Tag.PRIMARY_KEY_BYTES, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), entry[0]));
+              cobj.put(ComObject.Tag.TABLE_NAME, tableName);
+              cobj.put(ComObject.Tag.IS_EXCPLICITE_TRANS, client.isExplicitTrans());
+              cobj.put(ComObject.Tag.IS_COMMITTING, client.isCommitting());
+              cobj.put(ComObject.Tag.TRANSACTION_ID, client.getTransactionId());
               byte[] bytes = record.serialize(client.getCommon(), DatabaseClient.SERIALIZATION_VERSION);
-              cobj.put(ComObject.Tag.recordBytes, bytes);
+              cobj.put(ComObject.Tag.RECORD_BYTES, bytes);
               if (sequence0 != null && sequence1 != null && sequence2 != null) {
-                cobj.put(ComObject.Tag.sequence0Override, sequence0);
-                cobj.put(ComObject.Tag.sequence1Override, sequence1);
-                cobj.put(ComObject.Tag.sequence2Override, sequence2);
+                cobj.put(ComObject.Tag.SEQUENCE_0_OVERRIDE, sequence0);
+                cobj.put(ComObject.Tag.SEQUENCE_1_OVERRIDE, sequence1);
+                cobj.put(ComObject.Tag.SEQUENCE_2_OVERRIDE, sequence2);
               }
 
-              client.sendToAllShards("UpdateManager:deleteIndexEntry", rand.nextLong(), cobj, DatabaseClient.Replica.def);
+              client.sendToAllShards("UpdateManager:deleteIndexEntry", rand.nextLong(), cobj, DatabaseClient.Replica.DEF);
               countDeleted++;
             }
           }
@@ -156,8 +160,8 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
           Thread.sleep(200);
         }
         catch (InterruptedException e1) {
+          Thread.currentThread().interrupt();
         }
-        continue;
       }
       catch (Exception e) {
         throw new DatabaseException(e);
@@ -166,13 +170,23 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
 
   }
 
-  public void serialize(DataOutputStream out) throws Exception {
-    out.writeUTF(tableName);
-    ExpressionImpl.serializeExpression(expression, out);
+  public void serialize(DataOutputStream out) {
+    try {
+      out.writeUTF(tableName);
+      ExpressionImpl.serializeExpression(expression, out);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
   }
 
-  public void deserialize(DataInputStream in) throws Exception {
-    tableName = in.readUTF();
-    expression = ExpressionImpl.deserializeExpression(in);
+  public void deserialize(DataInputStream in) {
+    try {
+      tableName = in.readUTF();
+      expression = ExpressionImpl.deserializeExpression(in);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
   }
 }

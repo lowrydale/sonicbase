@@ -61,10 +61,6 @@ public class TestFunctions {
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
-    ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
-    array.add(com.sonicbase.server.DatabaseServer.FOUR_SERVER_LICENSE);
-    config.put("licenseKeys", array);
-
     DatabaseClient.getServers().clear();
 
     dbServers = new com.sonicbase.server.DatabaseServer[4];
@@ -77,10 +73,8 @@ public class TestFunctions {
       final int shard = i;
 
       dbServers[shard] = new com.sonicbase.server.DatabaseServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
+      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
       dbServers[shard].setRole(role);
-      dbServers[shard].disableLogProcessor();
-      dbServers[shard].setMinSizeForRepartition(0);
     }
     for (Future future : futures) {
       future.get();
@@ -765,76 +759,4 @@ public class TestFunctions {
     assertFalse(rs.next());
   }
 
-   /*
-    md5
-    to_base64
-    from_base64
-    to_hex
-    from_hex
-    log2
-    is_null
-    is_not_null
-    degrees
-    bit_length
-    add_time
-    current_time
-    current_date
-    make_time
-    make_date
-    sec_to_time
-    time_to_sec
-    time_diff
-    timestamp_add
-
-
-    "ceiling"
-    "floor"
-    "abs"
-    "str"
-    "avg"
-    "max"
-    "max_timestamp"
-    "sum"
-    "min"
-    "min_timestamp"
-    "bit_shift_left"
-    "bit_shift_right"
-    "bit_and"
-    "bit_not"
-    "bit_or"
-    "bit_xor"
-    "coalesce"
-    "char_length"
-    "concat"
-    "now"
-    "date_add"
-    "day"
-    "day_of_week"
-    "day_of_year"
-    "minute"
-    "month"
-    "second"
-    "hour"
-    "week_of_month"
-    "week_of_year"
-    "year"
-    "power"
-    "hex"
-    "log"
-    "log10"
-    "mod"
-    "lower"
-    "upper"
-    "pi"
-    "index_of"
-    "replace"
-    "round"
-    "sqrt"
-    "tan"
-    "cos"
-    "sin"
-    "cot"
-    "trim"
-    "radians"
-*/
 }

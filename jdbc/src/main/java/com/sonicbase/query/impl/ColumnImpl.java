@@ -42,6 +42,7 @@ public class ColumnImpl extends ExpressionImpl {
     return columnName;
   }
 
+  @Override
   public void getColumnsInExpression(List<ColumnImpl> columns) {
     super.getColumnsInExpression(columns);
     boolean found = false;
@@ -101,16 +102,16 @@ public class ColumnImpl extends ExpressionImpl {
       else {
         ComObject cobj = new ComObject();
         if (columnName != null) {
-          cobj.put(ComObject.Tag.columnName, columnName);
+          cobj.put(ComObject.Tag.COLUMN_NAME, columnName);
         }
         if (tableName != null) {
-          cobj.put(ComObject.Tag.tableName, tableName);
+          cobj.put(ComObject.Tag.TABLE_NAME, tableName);
         }
         if (alias != null) {
-          cobj.put(ComObject.Tag.alias, alias);
+          cobj.put(ComObject.Tag.ALIAS, alias);
         }
         if (function != null) {
-          cobj.put(ComObject.Tag.function, function);
+          cobj.put(ComObject.Tag.FUNCTION, function);
         }
         byte[] bytes = cobj.serialize();
         out.writeInt(bytes.length);
@@ -124,7 +125,7 @@ public class ColumnImpl extends ExpressionImpl {
 
   @Override
   public ExpressionImpl.Type getType() {
-    return ExpressionImpl.Type.column;
+    return ExpressionImpl.Type.COLUMN;
   }
 
   /**
@@ -147,10 +148,10 @@ public class ColumnImpl extends ExpressionImpl {
         byte[] buffer = new byte[len];
         in.readFully(buffer);
         ComObject cobj = new ComObject(buffer);
-        columnName = cobj.getString(ComObject.Tag.columnName);
-        tableName = cobj.getString(ComObject.Tag.tableName);
-        alias = cobj.getString(ComObject.Tag.alias);
-        function = cobj.getString(ComObject.Tag.function);
+        columnName = cobj.getString(ComObject.Tag.COLUMN_NAME);
+        tableName = cobj.getString(ComObject.Tag.TABLE_NAME);
+        alias = cobj.getString(ComObject.Tag.ALIAS);
+        function = cobj.getString(ComObject.Tag.FUNCTION);
       }
     }
     catch (IOException e) {
@@ -175,6 +176,7 @@ public class ColumnImpl extends ExpressionImpl {
     return null;
   }
 
+  @Override
   public String getTableName() {
     return tableName;
   }
@@ -184,6 +186,7 @@ public class ColumnImpl extends ExpressionImpl {
     columns.add(this);
   }
 
+  @Override
   public void setTableName(String tableName) {
     if (this.tableName != null) {
       return;
@@ -237,11 +240,12 @@ public class ColumnImpl extends ExpressionImpl {
   }
 
   public boolean equals(Object rhsObj) {
+    if (!(rhsObj instanceof ColumnImpl)) {
+      return false;
+    }
     ColumnImpl rhs = ((ColumnImpl)rhsObj);
-    if (tableName == null) {
-      if (rhs.getTableName() != null) {
-        return false;
-      }
+    if (tableName == null && rhs.getTableName() != null) {
+      return false;
     }
     if (rhs.getTableName() == null) {
       return false;
@@ -249,10 +253,7 @@ public class ColumnImpl extends ExpressionImpl {
     if (!tableName.equals(rhs.getTableName())) {
       return false;
     }
-    if (!columnName.equals(rhs.getColumnName())) {
-      return false;
-    }
-    return true;
+    return columnName.equals(rhs.getColumnName());
   }
 
 }

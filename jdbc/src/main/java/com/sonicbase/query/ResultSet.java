@@ -11,7 +11,7 @@ import java.sql.Timestamp;
 
 public interface ResultSet {
 
-  boolean next() throws DatabaseException;
+  boolean next();
 
   String getString(String columnLabel);
 

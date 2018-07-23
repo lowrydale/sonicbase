@@ -21,10 +21,10 @@ public interface SelectStatement extends Statement {
   void addOrderByExpression(String tableName, String columnName, boolean ascending);
 
   enum JoinType {
-    inner,
-    full,
-    leftOuter,
-    rightOuter
+    INNER,
+    FULL,
+    LEFT_OUTER,
+    RIGHT_OUTER
   }
   void addJoinExpression(JoinType type, String rightFrom, Expression joinExpression);
 

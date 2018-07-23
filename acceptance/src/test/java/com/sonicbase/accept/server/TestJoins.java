@@ -1,8 +1,6 @@
 package com.sonicbase.accept.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
@@ -64,10 +62,6 @@ public class TestJoins {
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
-    ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
-    array.add(com.sonicbase.server.DatabaseServer.FOUR_SERVER_LICENSE);
-    config.put("licenseKeys", array);
-
     DatabaseClient.getServers().clear();
 
     dbServers = new com.sonicbase.server.DatabaseServer[4];
@@ -79,11 +73,8 @@ public class TestJoins {
     for (int i = 0; i < dbServers.length; i++) {
       final int shard = i;
       dbServers[shard] = new com.sonicbase.server.DatabaseServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
-      dbServers[shard].overrideProLicense();
+      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
       dbServers[shard].setRole(role);
-      dbServers[shard].disableLogProcessor();
-      dbServers[shard].setMinSizeForRepartition(0);
     }
     for (Future future : futures) {
       future.get();
@@ -201,11 +192,11 @@ public class TestJoins {
 //    assertEquals(client.getPartitionSize(3, "persons", "_1__primarykey"), 8);
 
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.dbName, "test");
-    cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-    cobj.put(ComObject.Tag.method, "DeleteManager:forceDeletes");
+    cobj.put(ComObject.Tag.DB_NAME, "test");
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
+    cobj.put(ComObject.Tag.METHOD, "DeleteManager:forceDeletes");
     String command = "DatabaseServer:ComObject:forceDeletes:";
-    //client.sendToAllShards(null, 0, command, cobj, DatabaseClient.Replica.all);
+    //client.sendToAllShards(null, 0, command, cobj, DatabaseClient.Replica.ALL);
 
     executor.shutdownNow();
   }
@@ -397,7 +388,7 @@ public class TestJoins {
       ids.add((long) (i + 100));
     }
 
-    client.beginRebalance("test", "personsString", "_primarykey");
+    client.beginRebalance("test");
 
     while (true) {
       if (client.isRepartitioningComplete("test")) {
@@ -466,7 +457,7 @@ public class TestJoins {
       ids.add((long) (i + 100));
     }
 
-    client.beginRebalance("test", "personsDouble", "_primarykey");
+    client.beginRebalance("test");
 
     while (true) {
       if (client.isRepartitioningComplete("test")) {
@@ -584,7 +575,7 @@ public class TestJoins {
       ids.add((long) (i + 100));
     }
 
-    client.beginRebalance("test", "personsNumeric", "_primarykey");
+    client.beginRebalance("test");
 
     while (true) {
       if (client.isRepartitioningComplete("test")) {
@@ -654,7 +645,7 @@ public class TestJoins {
       ids.add((long) (i + 100));
     }
 
-    client.beginRebalance("test", "personsTimestamp", "_primarykey");
+    client.beginRebalance("test");
 
     while (true) {
       if (client.isRepartitioningComplete("test")) {

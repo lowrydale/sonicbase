@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.client;
 
 import com.codahale.metrics.ExponentiallyDecayingReservoir;
@@ -41,13 +40,13 @@ public class ClientStatsHandlerTest {
     ConcurrentLinkedQueue<Long> latencies = new ConcurrentLinkedQueue<>();
     latencies.add(100L);
     latencies.add(200L);
-    histogramEntry.histogram = new Histogram(new ExponentiallyDecayingReservoir());
-    histogramEntry.latencies = latencies;
-    histogramEntry.dbName = "test";
-    histogramEntry.query = "select * from persons";
+    histogramEntry.setHistogram(new Histogram(new ExponentiallyDecayingReservoir()));
+    histogramEntry.setLatencies(latencies);
+    histogramEntry.setDbName("test");
+    histogramEntry.setQuery("select * from persons");
     Thread statsRecorderThread = ThreadUtil.createThread(new ClientStatsHandler.QueryStatsRecorder(client, "test", 5), "SonicBase Stats Recorder");
     statsRecorderThread.start();
-    handler.registerCompletedQueryForStats("test", histogramEntry, System.currentTimeMillis(), System.nanoTime());
+    handler.registerCompletedQueryForStats(histogramEntry, System.nanoTime());
     //Thread.sleep(500);
 
     handler.registerQueryForStats("test", "test", "select * from persons");

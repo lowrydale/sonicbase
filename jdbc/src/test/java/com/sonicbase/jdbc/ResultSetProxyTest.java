@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.jdbc;
 
 import com.sonicbase.jdbcdriver.ResultSetProxy;
@@ -28,7 +27,7 @@ public class ResultSetProxyTest {
   @Test
   public void test() throws SQLException, IOException {
     ResultSetImpl rs = mock(ResultSetImpl.class);
-    ResultSetProxy rsp = new ResultSetProxy(null, rs);
+    ResultSetProxy rsp = new ResultSetProxy(rs);
 
     //getNCharacterStream
     when(rs.getString(anyString())).thenReturn("value");
@@ -59,7 +58,7 @@ public class ResultSetProxyTest {
 
     //getNString
     rs = mock(ResultSetImpl.class);
-    rsp = new ResultSetProxy(null, rs);
+    rsp = new ResultSetProxy(rs);
     when(rs.getString(anyString())).thenReturn("value");
     assertEquals(rsp.getNString("field"), "value");
     when(rs.getString(anyString())).thenReturn(null);
@@ -88,7 +87,7 @@ public class ResultSetProxyTest {
 
     //getNClob
     rs = mock(ResultSetImpl.class);
-    rsp = new ResultSetProxy(null, rs);
+    rsp = new ResultSetProxy(rs);
     when(rs.getString(anyString())).thenReturn("value");
     assertEquals(IOUtils.toString(rsp.getNClob("field").getCharacterStream()), "value");
     when(rs.getString(anyString())).thenReturn(null);
@@ -117,7 +116,7 @@ public class ResultSetProxyTest {
 
     //getClob
     rs = mock(ResultSetImpl.class);
-    rsp = new ResultSetProxy(null, rs);
+    rsp = new ResultSetProxy(rs);
     when(rs.getString(anyString())).thenReturn("value");
     assertEquals(IOUtils.toString(rsp.getClob("field").getCharacterStream()), "value");
     when(rs.getString(anyString())).thenReturn(null);
@@ -146,7 +145,7 @@ public class ResultSetProxyTest {
 
     //getBlob
     rs = mock(ResultSetImpl.class);
-    rsp = new ResultSetProxy(null, rs);
+    rsp = new ResultSetProxy(rs);
     when(rs.getBytes(anyString())).thenReturn(new byte[]{1,2,3});
     assertEquals(rsp.getBlob("field").getBytes(0,3), new byte[]{1,2,3});
     when(rs.getBytes(anyString())).thenReturn(null);
@@ -175,7 +174,7 @@ public class ResultSetProxyTest {
 
     //getBigDecimal
     rs = mock(ResultSetImpl.class);
-    rsp = new ResultSetProxy(null, rs);
+    rsp = new ResultSetProxy(rs);
     when(rs.getBigDecimal(anyString())).thenReturn(new BigDecimal(123));
     assertEquals(rsp.getBigDecimal("field"), new BigDecimal(123));
     when(rs.getBigDecimal(anyString())).thenReturn(null);
@@ -204,7 +203,7 @@ public class ResultSetProxyTest {
 
     //getCharacterStream
     rs = mock(ResultSetImpl.class);
-    rsp = new ResultSetProxy(null, rs);
+    rsp = new ResultSetProxy(rs);
     when(rs.getCharacterStream(anyString())).thenReturn(new BufferedReader(new InputStreamReader(new ByteArrayInputStream("123".getBytes("utf-8")))));
     assertEquals(IOUtils.toString(rsp.getCharacterStream("field")), "123");
     when(rs.getCharacterStream(anyString())).thenReturn(null);
@@ -233,7 +232,7 @@ public class ResultSetProxyTest {
 
     //getBinaryStream
     rs = mock(ResultSetImpl.class);
-    rsp = new ResultSetProxy(null, rs);
+    rsp = new ResultSetProxy(rs);
     when(rs.getBinaryStream(anyString())).thenReturn(new ByteArrayInputStream("123".getBytes("utf-8")));
     assertEquals(IOUtils.toString(rsp.getBinaryStream("field")), "123");
     when(rs.getBinaryStream(anyString())).thenReturn(null);
@@ -262,7 +261,7 @@ public class ResultSetProxyTest {
 
     //getUnicodeStream
     rs = mock(ResultSetImpl.class);
-    rsp = new ResultSetProxy(null, rs);
+    rsp = new ResultSetProxy(rs);
     when(rs.getUnicodeStream(anyString())).thenReturn(new ByteArrayInputStream("123".getBytes("utf-8")));
     assertEquals(IOUtils.toString(rsp.getUnicodeStream("field")), "123");
     when(rs.getUnicodeStream(anyString())).thenReturn(null);
@@ -284,7 +283,7 @@ public class ResultSetProxyTest {
 
     //getTimestamp
     rs = mock(ResultSetImpl.class);
-    rsp = new ResultSetProxy(null, rs);
+    rsp = new ResultSetProxy(rs);
     when(rs.getTimestamp(anyString())).thenReturn(new Timestamp(123));
     assertEquals(rsp.getTimestamp("field"), new Timestamp(123));
     when(rs.getTimestamp(anyString())).thenReturn(null);
@@ -313,7 +312,7 @@ public class ResultSetProxyTest {
 
     //getTime
     rs = mock(ResultSetImpl.class);
-    rsp = new ResultSetProxy(null, rs);
+    rsp = new ResultSetProxy(rs);
     when(rs.getTime(anyString())).thenReturn(new Time(123));
     assertEquals(rsp.getTime("field"), new Time(123));
     when(rs.getTime(anyString())).thenReturn(null);
@@ -342,7 +341,7 @@ public class ResultSetProxyTest {
 
     //getDate
     rs = mock(ResultSetImpl.class);
-    rsp = new ResultSetProxy(null, rs);
+    rsp = new ResultSetProxy(rs);
     when(rs.getDate(anyString())).thenReturn(new Date(123));
     assertEquals(rsp.getDate("field"), new Date(123));
     when(rs.getDate(anyString())).thenReturn(null);
@@ -371,7 +370,7 @@ public class ResultSetProxyTest {
 
     //getBytes
     rs = mock(ResultSetImpl.class);
-    rsp = new ResultSetProxy(null, rs);
+    rsp = new ResultSetProxy(rs);
     when(rs.getBytes(anyString())).thenReturn("123".getBytes("utf-8"));
     assertEquals(rsp.getBytes("field"), "123".getBytes("utf-8"));
     when(rs.getBytes(anyString())).thenReturn(null);
@@ -400,7 +399,7 @@ public class ResultSetProxyTest {
 
     //getBigDecimal
     rs = mock(ResultSetImpl.class);
-    rsp = new ResultSetProxy(null, rs);
+    rsp = new ResultSetProxy(rs);
     when(rs.getBigDecimal(anyString(), anyInt())).thenReturn(new BigDecimal(123));
     assertEquals(rsp.getBigDecimal("field", 1), new BigDecimal(123));
     when(rs.getBigDecimal(anyString(), anyInt())).thenReturn(null);
@@ -429,7 +428,7 @@ public class ResultSetProxyTest {
 
     //getDouble
     rs = mock(ResultSetImpl.class);
-    rsp = new ResultSetProxy(null, rs);
+    rsp = new ResultSetProxy(rs);
     when(rs.getDouble(anyString())).thenReturn(123d);
     assertEquals(rsp.getDouble("field"), 123d);
     when(rs.getDouble(anyString())).thenReturn(null);
@@ -458,7 +457,7 @@ public class ResultSetProxyTest {
 
     //getFloat
     rs = mock(ResultSetImpl.class);
-    rsp = new ResultSetProxy(null, rs);
+    rsp = new ResultSetProxy(rs);
     when(rs.getFloat(anyString())).thenReturn(123f);
     assertEquals(rsp.getFloat("field"), 123f);
     when(rs.getFloat(anyString())).thenReturn(null);
@@ -487,7 +486,7 @@ public class ResultSetProxyTest {
 
     //getLong
     rs = mock(ResultSetImpl.class);
-    rsp = new ResultSetProxy(null, rs);
+    rsp = new ResultSetProxy(rs);
     when(rs.getLong(anyString())).thenReturn(123L);
     assertEquals(rsp.getLong("field"), 123L);
     when(rs.getLong(anyString())).thenReturn(null);
@@ -516,7 +515,7 @@ public class ResultSetProxyTest {
 
     //getInt
     rs = mock(ResultSetImpl.class);
-    rsp = new ResultSetProxy(null, rs);
+    rsp = new ResultSetProxy(rs);
     when(rs.getInt(anyString())).thenReturn(123);
     assertEquals(rsp.getInt("field"), 123);
     when(rs.getInt(anyString())).thenReturn(null);
@@ -545,7 +544,7 @@ public class ResultSetProxyTest {
 
     //getShort
     rs = mock(ResultSetImpl.class);
-    rsp = new ResultSetProxy(null, rs);
+    rsp = new ResultSetProxy(rs);
     when(rs.getShort(anyString())).thenReturn((short)123);
     assertEquals(rsp.getShort("field"), (short)123);
     when(rs.getShort(anyString())).thenReturn(null);
@@ -574,7 +573,7 @@ public class ResultSetProxyTest {
 
     //getByte
     rs = mock(ResultSetImpl.class);
-    rsp = new ResultSetProxy(null, rs);
+    rsp = new ResultSetProxy(rs);
     when(rs.getByte(anyString())).thenReturn((byte)123);
     assertEquals(rsp.getByte("field"), (byte)123);
     when(rs.getByte(anyString())).thenReturn(null);
@@ -603,7 +602,7 @@ public class ResultSetProxyTest {
 
     //getBoolean
     rs = mock(ResultSetImpl.class);
-    rsp = new ResultSetProxy(null, rs);
+    rsp = new ResultSetProxy(rs);
     when(rs.getBoolean(anyString())).thenReturn(true);
     assertEquals(rsp.getBoolean("field"), true);
     when(rs.getBoolean(anyString())).thenReturn(null);
@@ -632,7 +631,7 @@ public class ResultSetProxyTest {
 
     //getString
     rs = mock(ResultSetImpl.class);
-    rsp = new ResultSetProxy(null, rs);
+    rsp = new ResultSetProxy(rs);
     when(rs.getString(anyString())).thenReturn("123");
     assertEquals(rsp.getString("field"), "123");
     when(rs.getString(anyString())).thenReturn(null);

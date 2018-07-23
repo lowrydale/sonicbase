@@ -1,22 +1,17 @@
 package com.sonicbase.jdbcdriver;
 
-/**
- * User: lowryda
- * Date: 10/26/14
- * Time: 4:26 PM
- */
 public enum QueryType {
-  update0,
-  update1,
-  update2,
-  update3,
-  update4,
-  execute0,
-  execute1,
-  execute2,
-  execute3,
-  execute4,
-  query0,
-  query1,
-  batch0
+  UPDATE_0,
+  UPDATE_1,
+  UPDATE_2,
+  UPDATE_3,
+  UPDATE_4,
+  EXECUTE_0,
+  EXECUTE_1,
+  EXECUTE_2,
+  EXECUTE_3,
+  EXECUTE_4,
+  QUERY_0,
+  QUERY_1,
+  BATCH_0
 }

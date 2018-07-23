@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.common;
 
 import com.sonicbase.schema.DataType;
@@ -44,7 +43,7 @@ public class DatabaseCommonTest {
 
     DataType.Type[] types = DatabaseCommon.deserializeKeyPrep(tableSchema, bytes);
 
-    Object[] key = DatabaseCommon.deserializeKey(tableSchema, types, new DataInputStream(new ByteArrayInputStream(bytes)));
+    Object[] key = DatabaseCommon.deserializeKey(types, new DataInputStream(new ByteArrayInputStream(bytes)));
 
     assertEquals(compareKeys(indexSchema, keys, key), 0);
   }

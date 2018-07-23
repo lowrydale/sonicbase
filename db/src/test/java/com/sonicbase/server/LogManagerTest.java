@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.server;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -63,16 +62,16 @@ public class LogManagerTest {
         "      ]\n" +
         "    }\n" +
         "  ]}\n");
-    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), 1, true, true);
+    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), true, true);
     common.setServersConfig(serversConfig);
 
     com.sonicbase.server.LogManager logManager = new com.sonicbase.server.LogManager(server, new File("/tmp/database"));
 
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.dbName, "__none__");
-    cobj.put(ComObject.Tag.schemaVersion, 1000);
-    cobj.put(ComObject.Tag.method, "DatabaseServer:updateServersConfig");
-    cobj.put(ComObject.Tag.serversConfig, common.getServersConfig().serialize(SERIALIZATION_VERSION));
+    cobj.put(ComObject.Tag.DB_NAME, "__none__");
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
+    cobj.put(ComObject.Tag.METHOD, "DatabaseServer:updateServersConfig");
+    cobj.put(ComObject.Tag.SERVERS_CONFIG, common.getServersConfig().serialize(SERIALIZATION_VERSION));
 
     byte[] body = cobj.serialize();
 
@@ -91,7 +90,7 @@ public class LogManagerTest {
             byte[] bytes = (byte[]) args[0];
             try {
               ComObject cobj = new ComObject(bytes);
-              ServersConfig sc = new ServersConfig(cobj.getByteArray(ComObject.Tag.serversConfig), SERIALIZATION_VERSION);
+              ServersConfig sc = new ServersConfig(cobj.getByteArray(ComObject.Tag.SERVERS_CONFIG), SERIALIZATION_VERSION);
               common.setServersConfig(sc);
               return null;
             }

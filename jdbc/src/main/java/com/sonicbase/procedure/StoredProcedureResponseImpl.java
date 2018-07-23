@@ -14,7 +14,7 @@ public class StoredProcedureResponseImpl implements StoredProcedureResponse {
   public StoredProcedureResponseImpl(DatabaseCommon common, ComObject comObject) {
     this.common = common;
 
-    ComArray array = comObject.getArray(ComObject.Tag.records);
+    ComArray array = comObject.getArray(ComObject.Tag.RECORDS);
     if (array != null) {
       for (int i = 0; i < array.getArray().size(); i++) {
         ComObject recordObj = (ComObject) array.getArray().get(i);
@@ -45,7 +45,7 @@ public class StoredProcedureResponseImpl implements StoredProcedureResponse {
 
   public ComObject serialize() {
     ComObject ret = new ComObject();
-    ComArray array = ret.putArray(ComObject.Tag.records, ComObject.Type.objectType);
+    ComArray array = ret.putArray(ComObject.Tag.RECORDS, ComObject.Type.OBJECT_TYPE);
     for (Record record : records) {
       array.add(((RecordImpl)record).serialize());
     }

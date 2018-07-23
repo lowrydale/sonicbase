@@ -2,10 +2,9 @@ package com.sonicbase.server;
 
 import com.amazonaws.transform.MapEntry;
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.index.Index;
 import com.sonicbase.query.BinaryExpression;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -27,7 +26,7 @@ public class IndexLookupOneKey extends IndexLookup {
 
     prepareNullKey();
 
-    if (originalLeftKey != null && leftOperator.equals(BinaryExpression.Operator.equal)) {
+    if (originalLeftKey != null && leftOperator.equals(BinaryExpression.Operator.EQUAL)) {
       handleLookupEquals();
       return null;
     }
@@ -62,7 +61,7 @@ public class IndexLookupOneKey extends IndexLookup {
 
           if (excludeKeys != null) {
             for (Object[] excludeKey : excludeKeys) {
-              if (server.getCommon().compareKey(indexSchema.getComparators(), excludeKey, leftKey) == 0) {
+              if (DatabaseCommon.compareKey(indexSchema.getComparators(), excludeKey, leftKey) == 0) {
                 continue outer;
               }
             }
@@ -80,7 +79,7 @@ public class IndexLookupOneKey extends IndexLookup {
             entry = processKey.getEntry();
           }
 
-          if (leftOperator.equals(BinaryExpression.Operator.equal)) {
+          if (leftOperator.equals(BinaryExpression.Operator.EQUAL)) {
             entry = null;
             break outer;
           }
@@ -116,7 +115,6 @@ public class IndexLookupOneKey extends IndexLookup {
     return shouldProcess;
   }
 
-  @NotNull
   private Map.Entry[] visitMap(Map.Entry<Object[], Object> entry, final int diff) {
     Map.Entry[] entries;
     if (ascending != null && !ascending) {
@@ -129,10 +127,7 @@ public class IndexLookupOneKey extends IndexLookup {
           curr.setKey(key);
           curr.setValue(value);
           currEntries.add(curr);
-          if (countRead.incrementAndGet() >= count - diff) {
-            return false;
-          }
-          return true;
+          return countRead.incrementAndGet() < count - diff;
         }
       });
       entries = currEntries.toArray(new Map.Entry[currEntries.size()]);
@@ -141,22 +136,16 @@ public class IndexLookupOneKey extends IndexLookup {
       final AtomicInteger countRead = new AtomicInteger();
       final List<MapEntry<Object[], Object>> currEntries = new ArrayList<>();
       final AtomicBoolean first = new AtomicBoolean(true);
-      index.visitTailMap(entry.getKey(), new Index.Visitor() {
-        @Override
-        public boolean visit(Object[] key, Object value) throws IOException {
-          if (first.get()) {
-            first.set(false);
-            return true;
-          }
-          MapEntry<Object[], Object> curr = new MapEntry<>();
-          curr.setKey(key);
-          curr.setValue(value);
-          currEntries.add(curr);
-          if (countRead.incrementAndGet() >= count - diff) {
-            return false;
-          }
+      index.visitTailMap(entry.getKey(), (key, value) -> {
+        if (first.get()) {
+          first.set(false);
           return true;
         }
+        MapEntry<Object[], Object> curr = new MapEntry<>();
+        curr.setKey(key);
+        curr.setValue(value);
+        currEntries.add(curr);
+        return countRead.incrementAndGet() < count - diff;
       });
       entries = currEntries.toArray(new Map.Entry[currEntries.size()]);
     }
@@ -186,18 +175,17 @@ public class IndexLookupOneKey extends IndexLookup {
         entry = index.lastEntry();
       }
       else {
-        if (ascending != null && !ascending && originalLeftKey != null &&
-            (leftOperator.equals(BinaryExpression.Operator.less) || leftOperator.equals(BinaryExpression.Operator.lessEqual))) {
+        if (ascending != null && !ascending &&
+            (leftOperator.equals(BinaryExpression.Operator.LESS) || leftOperator.equals(BinaryExpression.Operator.LESS_EQUAL))) {
           entry = index.floorEntry(originalLeftKey);
           if (entry == null) {
             entry = index.lastEntry();
           }
         }
-        else if (ascending != null && !ascending && originalLeftKey != null &&
-            (leftOperator.equals(BinaryExpression.Operator.greater) || leftOperator.equals(BinaryExpression.Operator.greaterEqual))) {
-          if (entry == null) {
-            entry = index.lastEntry();
-          }
+        else if (ascending != null && !ascending &&
+            (leftOperator.equals(BinaryExpression.Operator.GREATER) || leftOperator.equals(BinaryExpression.Operator.GREATER_EQUAL)) &&
+            entry == null) {
+          entry = index.lastEntry();
         }
       }
     }
@@ -207,20 +195,18 @@ public class IndexLookupOneKey extends IndexLookup {
         entry = index.lastEntry();
       }
 
-      if (leftOperator.equals(BinaryExpression.Operator.less) ||
-          leftOperator.equals(BinaryExpression.Operator.lessEqual) ||
-          leftOperator.equals(BinaryExpression.Operator.greater) ||
-          leftOperator.equals(BinaryExpression.Operator.greaterEqual)) {
-        boolean foundMatch = leftKey != null && 0 == server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), leftKey);
+      if (leftOperator.equals(BinaryExpression.Operator.LESS) ||
+          leftOperator.equals(BinaryExpression.Operator.LESS_EQUAL) ||
+          leftOperator.equals(BinaryExpression.Operator.GREATER) ||
+          leftOperator.equals(BinaryExpression.Operator.GREATER_EQUAL)) {
+        boolean foundMatch = 0 == DatabaseCommon.compareKey(indexSchema.getComparators(), entry.getKey(), leftKey);
         if (foundMatch) {
-          //todo: match below
           entry = index.lowerEntry((entry.getKey()));
         }
-        else if (leftOperator.equals(BinaryExpression.Operator.less) ||
-            leftOperator.equals(BinaryExpression.Operator.greater)) {
-          foundMatch = originalLeftKey != null && 0 == server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), originalLeftKey);
+        else if (leftOperator.equals(BinaryExpression.Operator.LESS) ||
+            leftOperator.equals(BinaryExpression.Operator.GREATER)) {
+          foundMatch = originalLeftKey != null && 0 == DatabaseCommon.compareKey(indexSchema.getComparators(), entry.getKey(), originalLeftKey);
           if (foundMatch) {
-            //todo: match below
             entry = index.lowerEntry((entry.getKey()));
           }
         }
@@ -229,19 +215,18 @@ public class IndexLookupOneKey extends IndexLookup {
     return entry;
   }
 
-  @Nullable
   private Map.Entry<Object[], Object> getStartingOneKeyAscending(Map.Entry<Object[], Object> entry) {
     if (leftKey == null) {
       if (originalLeftKey == null) {
         entry = index.firstEntry();
       }
-      else if (leftOperator.equals(BinaryExpression.Operator.greater) || leftOperator.equals(BinaryExpression.Operator.greaterEqual)) {
+      else if (leftOperator.equals(BinaryExpression.Operator.GREATER) || leftOperator.equals(BinaryExpression.Operator.GREATER_EQUAL)) {
         entry = index.floorEntry(originalLeftKey);
         if (entry == null) {
           entry = index.firstEntry();
         }
       }
-      else if (leftOperator.equals(BinaryExpression.Operator.less) || leftOperator.equals(BinaryExpression.Operator.lessEqual)) {
+      else if (leftOperator.equals(BinaryExpression.Operator.LESS) || leftOperator.equals(BinaryExpression.Operator.LESS_EQUAL)) {
         entry = index.firstEntry();
       }
     }
@@ -251,55 +236,46 @@ public class IndexLookupOneKey extends IndexLookup {
         entry = index.firstEntry();
       }
     }
-    if (entry != null) {
-
-      if (leftOperator.equals(BinaryExpression.Operator.less) ||
-          leftOperator.equals(BinaryExpression.Operator.lessEqual) ||
-          leftOperator.equals(BinaryExpression.Operator.greater) ||
-          leftOperator.equals(BinaryExpression.Operator.greaterEqual)) {
-        boolean foundMatch = leftKey != null && 0 == server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), leftKey);
+    if (entry != null && (leftOperator.equals(BinaryExpression.Operator.LESS) ||
+        leftOperator.equals(BinaryExpression.Operator.LESS_EQUAL) ||
+        leftOperator.equals(BinaryExpression.Operator.GREATER) ||
+        leftOperator.equals(BinaryExpression.Operator.GREATER_EQUAL))) {
+      boolean foundMatch = leftKey != null && 0 == DatabaseCommon.compareKey(indexSchema.getComparators(), entry.getKey(), leftKey);
+      if (foundMatch) {
+        entry = index.higherEntry((entry.getKey()));
+      }
+      else if (leftOperator.equals(BinaryExpression.Operator.LESS) ||
+          leftOperator.equals(BinaryExpression.Operator.GREATER)) {
+        foundMatch = originalLeftKey != null && 0 == DatabaseCommon.compareKey(indexSchema.getComparators(), entry.getKey(), originalLeftKey);
         if (foundMatch) {
-          //todo: match below
           entry = index.higherEntry((entry.getKey()));
         }
-        else if (leftOperator.equals(BinaryExpression.Operator.less) ||
-            leftOperator.equals(BinaryExpression.Operator.greater)) {
-          foundMatch = originalLeftKey != null && 0 == server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), originalLeftKey);
-          if (foundMatch) {
-            //todo: match below
-            entry = index.higherEntry((entry.getKey()));
-          }
-        }
       }
-
     }
     return entry;
   }
 
-  @Nullable
   private Map.Entry<Object[], Object> adjustStartingOneKey(Map.Entry<Object[], Object> entry) {
     if ((ascending != null && !ascending)) {
-      if (leftKey != null && (leftOperator.equals(BinaryExpression.Operator.less) ||
-          leftOperator.equals(BinaryExpression.Operator.lessEqual) || leftOperator.equals(BinaryExpression.Operator.greaterEqual))) {
-        boolean foundMatch = leftKey != null && 0 == server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), leftKey);
+      if (leftKey != null && (leftOperator.equals(BinaryExpression.Operator.LESS) ||
+          leftOperator.equals(BinaryExpression.Operator.LESS_EQUAL) || leftOperator.equals(BinaryExpression.Operator.GREATER_EQUAL))) {
+        boolean foundMatch = 0 == DatabaseCommon.compareKey(indexSchema.getComparators(), entry.getKey(), leftKey);
         if (foundMatch) {
-          //todo: match below
           entry = index.lowerEntry((entry.getKey()));
         }
       }
-      else if (leftOperator.equals(BinaryExpression.Operator.less) || leftOperator.equals(BinaryExpression.Operator.greater)) {
-        boolean foundMatch = originalLeftKey != null && 0 == server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), originalLeftKey);
+      else if (leftOperator.equals(BinaryExpression.Operator.LESS) || leftOperator.equals(BinaryExpression.Operator.GREATER)) {
+        boolean foundMatch = originalLeftKey != null && 0 == DatabaseCommon.compareKey(indexSchema.getComparators(), entry.getKey(), originalLeftKey);
         if (foundMatch) {
-          //todo: match below
           entry = index.lowerEntry((entry.getKey()));
         }
       }
     }
     else {
-      if (leftKey != null && (leftOperator.equals(BinaryExpression.Operator.greater) ||
-          leftOperator.equals(BinaryExpression.Operator.greaterEqual))) {
-        while (entry != null && leftKey != null) {
-          int compare = server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), leftKey);
+      if (leftKey != null && (leftOperator.equals(BinaryExpression.Operator.GREATER) ||
+          leftOperator.equals(BinaryExpression.Operator.GREATER_EQUAL))) {
+        while (entry != null) {
+          int compare = DatabaseCommon.compareKey(indexSchema.getComparators(), entry.getKey(), leftKey);
           if (compare <= 0) {
             entry = index.higherEntry(entry.getKey());
           }
@@ -308,9 +284,9 @@ public class IndexLookupOneKey extends IndexLookup {
           }
         }
       }
-      else if (leftOperator.equals(BinaryExpression.Operator.greaterEqual)) {
+      else if (leftOperator.equals(BinaryExpression.Operator.GREATER_EQUAL)) {
         while (entry != null && leftKey != null) {
-          int compare = server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), leftKey);
+          int compare = DatabaseCommon.compareKey(indexSchema.getComparators(), entry.getKey(), leftKey);
           if (compare < 0) {
             entry = index.higherEntry(entry.getKey());
           }
@@ -342,7 +318,6 @@ public class IndexLookupOneKey extends IndexLookup {
     if (!hasNull && originalLeftKey.length == indexSchema.getFields().length &&
         (indexSchema.isPrimaryKey() || indexSchema.isUnique())) {
       byte[][] records = null;
-      Object[][] currKeys = null;
       byte[][] currKeyRecords = null;
       Object value = null;
 
@@ -366,19 +341,15 @@ public class IndexLookupOneKey extends IndexLookup {
 
           AtomicBoolean done = new AtomicBoolean();
           handleRecord(viewVersion, keyToUse, evaluateExpression, records, currKeyRecords, done);
-          if (done.get()) {
-            return;
-          }
         }
       }
-
     }
     else {
       entries = index.equalsEntries(originalLeftKey);
       if (entries != null) {
         for (Map.Entry<Object[], Object> currEntry : entries) {
           entry = currEntry;
-          if (server.getCommon().compareKey(indexSchema.getComparators(), originalLeftKey, entry.getKey()) != 0) {
+          if (DatabaseCommon.compareKey(indexSchema.getComparators(), originalLeftKey, entry.getKey()) != 0) {
             break;
           }
           Object value = entry.getValue();
@@ -387,15 +358,13 @@ public class IndexLookupOneKey extends IndexLookup {
           }
           if (excludeKeys != null) {
             for (Object[] excludeKey : excludeKeys) {
-              if (server.getCommon().compareKey(indexSchema.getComparators(), excludeKey, originalLeftKey) == 0) {
+              if (DatabaseCommon.compareKey(indexSchema.getComparators(), excludeKey, originalLeftKey) == 0) {
                 return;
               }
             }
           }
           byte[][] records = null;
-          Object[][] currKeys = null;
           byte[][] currKeyRecords = null;
-
           boolean shouldProcess = true;
 
           shouldProcess = handleProbe(countSkipped, shouldProcess);
@@ -447,29 +416,29 @@ public class IndexLookupOneKey extends IndexLookup {
 
     public CheckForEndOfTraversal invoke() {
       if (originalLeftKey != null) {
-        int compare = server.getCommon().compareKey(indexSchema.getComparators(), currEntry.getKey(), originalLeftKey);
+        int compare = DatabaseCommon.compareKey(indexSchema.getComparators(), currEntry.getKey(), originalLeftKey);
         if (compare == 0 &&
-            (leftOperator.equals(BinaryExpression.Operator.less) || leftOperator.equals(BinaryExpression.Operator.greater))) {
+            (leftOperator.equals(BinaryExpression.Operator.LESS) || leftOperator.equals(BinaryExpression.Operator.GREATER))) {
           entry = null;
           myResult = true;
           return this;
         }
-        if (compare == 1 && (ascending == null || ascending) && leftOperator.equals(BinaryExpression.Operator.lessEqual)) {
+        if (compare == 1 && (ascending == null || ascending) && leftOperator.equals(BinaryExpression.Operator.LESS_EQUAL)) {
           entry = null;
           myResult = true;
           return this;
         }
-        if (compare == 1 && (ascending == null || ascending) && leftOperator.equals(BinaryExpression.Operator.less)) {
+        if (compare == 1 && (ascending == null || ascending) && leftOperator.equals(BinaryExpression.Operator.LESS)) {
           entry = null;
           myResult = true;
           return this;
         }
-        if (compare == -1 && (ascending != null && !ascending) && leftOperator.equals(BinaryExpression.Operator.greaterEqual)) {
+        if (compare == -1 && (ascending != null && !ascending) && leftOperator.equals(BinaryExpression.Operator.GREATER_EQUAL)) {
           entry = null;
           myResult = true;
           return this;
         }
-        if (compare == -1 && (ascending != null && !ascending) && leftOperator.equals(BinaryExpression.Operator.greater)) {
+        if (compare == -1 && (ascending != null && !ascending) && leftOperator.equals(BinaryExpression.Operator.GREATER)) {
           entry = null;
           myResult = true;
           return this;

@@ -3,8 +3,6 @@ package com.sonicbase.query.impl;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.BinaryExpression;
 
-import java.io.IOException;
-
 /**
  * Responsible for
  */
@@ -24,12 +22,10 @@ public class SelectContextImpl {
   private Boolean sortWithIndex;
   private StoredProcedureContextImpl procedureContext;
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
-  @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public SelectContextImpl(
       String tableName, String indexName, BinaryExpression.Operator operator,
       int nextShard, Object[] nextKey,
-      Object[][][] keys, ExpressionImpl.RecordCache recordCache, int lastShard, boolean currPartitions) throws IOException {
+      Object[][][] keys, ExpressionImpl.RecordCache recordCache, int lastShard, boolean currPartitions)  {
     this.tableNames = new String[]{tableName};
     this.indexName = indexName;
     this.operator = operator;

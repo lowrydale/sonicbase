@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.query.impl;
 
 import com.sonicbase.client.DatabaseClient;
@@ -53,7 +52,7 @@ public class GroupByContextTest {
     byte[] bytes = groupByContext.serialize(common);
 
     groupByContext = new GroupByContext();
-    groupByContext.deserialize(bytes, common, "test");
+    groupByContext.deserialize(bytes, common);
 
     Map<String, Map<Object[], GroupByContext.GroupCounter>> counters = groupByContext.getGroupCounters();
 

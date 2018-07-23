@@ -13,6 +13,7 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+@SuppressWarnings("squid:S1168") // I prefer to return null instead of an empty array
 public class Index {
   private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
 
@@ -21,7 +22,6 @@ public class Index {
   private final Comparator[] comparators;
   private Object[] mutexes = new Object[100_000];
 
-  private boolean fastUtil = false;
   private AtomicLong count = new AtomicLong();
 
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP", justification = "copying the returned data is too slow")
@@ -40,36 +40,33 @@ public class Index {
   private AtomicLong size = new AtomicLong();
 
 
-  private static Comparator utf8Comparator = new Comparator() {
-    @Override
-    public int compare(Object o1, Object o2) {
-      byte[] b1 = (byte[]) o1;
-      byte[] b2 = (byte[]) o2;
-      if (b1 == null && b2 == null) {
-        return 0;
-      }
-      if (b1 == null) {
-        return -1;
-      }
-      if (b2 == null) {
-        return 1;
-      }
-      for (int i = 0; i < Math.min(b1.length, b2.length); i++) {
-        if (b1[i] < b2[i]) {
-          return -1;
-        }
-        if (b1[i] > b2[i]) {
-          return 1;
-        }
-      }
-      if (b1.length < b2.length) {
-        return -1;
-      }
-      if (b1.length > b2.length) {
-        return 1;
-      }
+  private static Comparator utf8Comparator = (o1, o2) -> {
+    byte[] b1 = (byte[]) o1;
+    byte[] b2 = (byte[]) o2;
+    if (b1 == null && b2 == null) {
       return 0;
     }
+    if (b1 == null) {
+      return -1;
+    }
+    if (b2 == null) {
+      return 1;
+    }
+    for (int i = 0; i < Math.min(b1.length, b2.length); i++) {
+      if (b1[i] < b2[i]) {
+        return -1;
+      }
+      if (b1[i] > b2[i]) {
+        return 1;
+      }
+    }
+    if (b1.length < b2.length) {
+      return -1;
+    }
+    if (b1.length > b2.length) {
+      return 1;
+    }
+    return 0;
   };
   Comparator<Object[]> comparator = null;
 
@@ -78,23 +75,20 @@ public class Index {
   public Index(TableSchema tableSchema, String indexName, final Comparator[] comparators) {
     this.comparators = comparators;
 
-    comparator = new Comparator<Object[]>() {
-      @Override
-      public int compare(Object[] o1, Object[] o2) {
-        for (int i = 0; i < Math.min(o1.length, o2.length); i++) {
-          if (o1[i] == null || o2[i] == null) {
-            continue;
-          }
-          int value = comparators[i].compare(o1[i], o2[i]);
-          if (value < 0) {
-            return -1;
-          }
-          if (value > 0) {
-            return 1;
-          }
+    comparator = (o1, o2) -> {
+      for (int i = 0; i < Math.min(o1.length, o2.length); i++) {
+        if (o1[i] == null || o2[i] == null) {
+          continue;
         }
-        return 0;
+        int value = comparators[i].compare(o1[i], o2[i]);
+        if (value < 0) {
+          return -1;
+        }
+        if (value > 0) {
+          return 1;
+        }
       }
+      return 0;
     };
 
     for (int i = 0; i < mutexes.length; i++) {
@@ -105,42 +99,13 @@ public class Index {
     if (fields.length == 1) {
       FieldSchema fieldSchema = tableSchema.getFields().get(tableSchema.getFieldOffset(fields[0]));
       if (fieldSchema.getType() == DataType.Type.BIGINT) {
-        longSkipIndex = new ConcurrentSkipListMap<>(new Comparator<Long>() {
-          @Override
-          public int compare(Long o1, Long o2) {
-
-            return o1 < o2 ? -1 : o1 > o2 ? 1 : 0;
-          }
-        });
+        longSkipIndex = new ConcurrentSkipListMap<>((o1, o2) -> o1 < o2 ? -1 : o1 > o2 ? 1 : 0);
       }
       else if (fieldSchema.getType() == DataType.Type.VARCHAR) {
         stringSkipIndex = new ConcurrentSkipListMap<>(utf8Comparator);
       }
       else {
-        objectSkipIndex = new ConcurrentSkipListMap<>(new Comparator<Object[]>() {
-          @Override
-          public int compare(Object[] o1, Object[] o2) {
-            for (int i = 0; i < Math.min(o1.length, o2.length); i++) {
-              if (o1[i] == null || o2[i] == null) {
-                continue;
-              }
-              int value = comparators[i].compare(o1[i], o2[i]);
-              if (value < 0) {
-                return -1;
-              }
-              if (value > 0) {
-                return 1;
-              }
-            }
-            return 0;
-          }
-        });
-      }
-    }
-    else {
-      objectSkipIndex = new ConcurrentSkipListMap<>(new Comparator<Object[]>() {
-        @Override
-        public int compare(Object[] o1, Object[] o2) {
+        objectSkipIndex = new ConcurrentSkipListMap<>((o1, o2) -> {
           for (int i = 0; i < Math.min(o1.length, o2.length); i++) {
             if (o1[i] == null || o2[i] == null) {
               continue;
@@ -154,7 +119,24 @@ public class Index {
             }
           }
           return 0;
+        });
+      }
+    }
+    else {
+      objectSkipIndex = new ConcurrentSkipListMap<>((o1, o2) -> {
+        for (int i = 0; i < Math.min(o1.length, o2.length); i++) {
+          if (o1[i] == null || o2[i] == null) {
+            continue;
+          }
+          int value = comparators[i].compare(o1[i], o2[i]);
+          if (value < 0) {
+            return -1;
+          }
+          if (value > 0) {
+            return 1;
+          }
         }
+        return 0;
       });
     }
   }
@@ -361,41 +343,39 @@ public class Index {
         if (objectSkipIndex.isEmpty()) {
           return null;
         }
-        boolean haveKey = false;
         Object[] lastKey = key;
-        if (!haveKey) {
-          Iterator<Map.Entry<Object[], Object>> iterator = objectSkipIndex.tailMap(lastKey).entrySet().iterator();
-          if (iterator.hasNext()) {
-            Map.Entry<Object[], Object> entry = iterator.next();
-            if (entry != null) {
-              lastKey = entry.getKey();
-              while (true) {
-                ConcurrentNavigableMap<Object[], Object> head = objectSkipIndex.headMap(lastKey);
-                if (head.isEmpty()) {
-                  break;
-                }
-                Object[] curr = head.lastKey();
-                if (objectSkipIndex.comparator().compare(curr, key) == 0) {
-                  lastKey = curr;
-                } else {
-                  break;
-                }
-              }
 
-              ConcurrentNavigableMap<Object[], Object> head = objectSkipIndex.tailMap(lastKey);
-              Set<Map.Entry<Object[], Object>> entries = head.entrySet();
-              for (Map.Entry<Object[], Object> currEntry : entries) {
-                if (0 != objectSkipIndex.comparator().compare(currEntry.getKey(), key)) {
-                  break;
-                }
-                lastKey = currEntry.getKey();
-                Object value = objectSkipIndex.get(lastKey);
-                ret.add(new MyEntry<>(lastKey, value));
+        Iterator<Map.Entry<Object[], Object>> iterator = objectSkipIndex.tailMap(lastKey).entrySet().iterator();
+        if (iterator.hasNext()) {
+          Map.Entry<Object[], Object> entry = iterator.next();
+          if (entry != null) {
+            lastKey = entry.getKey();
+            while (true) {
+              ConcurrentNavigableMap<Object[], Object> head = objectSkipIndex.headMap(lastKey);
+              if (head.isEmpty()) {
+                break;
+              }
+              Object[] curr = head.lastKey();
+              if (objectSkipIndex.comparator().compare(curr, key) == 0) {
+                lastKey = curr;
+              } else {
+                break;
               }
             }
+
+            ConcurrentNavigableMap<Object[], Object> head = objectSkipIndex.tailMap(lastKey);
+            Set<Map.Entry<Object[], Object>> entries = head.entrySet();
+            for (Map.Entry<Object[], Object> currEntry : entries) {
+              if (0 != objectSkipIndex.comparator().compare(currEntry.getKey(), key)) {
+                break;
+              }
+              lastKey = currEntry.getKey();
+              Object value = objectSkipIndex.get(lastKey);
+              ret.add(new MyEntry<>(lastKey, value));
+            }
           }
-          return ret;
         }
+        return ret;
       }
     }
     return null;

@@ -2,30 +2,12 @@ package com.sonicbase.common;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 
 public class FileUtils {
 
-  public static long sizeOfDirectory(File dir) {
-    File[] files = dir.listFiles();
-    if (files == null) {
-      return 0;
-    }
-    long ret = 0;
-    for (File file : files) {
-      try {
-        if (file.isDirectory()) {
-          ret += sizeOfDirectory(file);
-        }
-        else {
-          ret += file.length();
-        }
-      }
-      catch (Exception e) {
-      }
-    }
-    return ret;
+  private FileUtils() {
   }
-
 
   public static void deleteDirectory(File file) throws IOException {
 
@@ -38,14 +20,14 @@ public class FileUtils {
         deleteDirectory(childFile);
       }
       else {
-        if (!childFile.delete()) {
-          throw new IOException();
+        if (childFile.exists()) {
+          Files.delete(childFile.toPath());
         }
       }
     }
 
-    if (!file.delete()) {
-      throw new IOException();
+    if (file.exists()) {
+      Files.delete(file.toPath());
     }
   }
 }

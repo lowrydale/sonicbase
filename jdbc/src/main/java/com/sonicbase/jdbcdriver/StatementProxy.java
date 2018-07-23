@@ -15,14 +15,9 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.Calendar;
 
-/**
- * Created by IntelliJ IDEA.
- * User: lowryda
- * Date: Oct 7, 2011
- * Time: 3:18:32 PM
- */
 public class StatementProxy extends ParameterHandler implements java.sql.Statement, PreparedStatement {
 
+  public static final String NOT_SUPPORTED_STR = "not supported";
   private final String dbName;
 
   private String sql;
@@ -38,53 +33,54 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
   private StoredProcedureContextImpl procedureContext;
   private boolean disableStats;
 
-  public StatementProxy(ConnectionProxy connectionProxy, DatabaseClient databaseClient, String sql) throws SQLException {
+  public StatementProxy(ConnectionProxy connectionProxy, DatabaseClient databaseClient, String sql) {
     this.connectionProxy = connectionProxy;
     this.databaseClient = databaseClient;
     this.sql = sql;
     this.dbName = connectionProxy.getDbName();
 
-    InsertStatementHandler.batch.set(null);
+    InsertStatementHandler.getBatch().set(null);
   }
 
-  public void close() throws SQLException {
+  public void close() {
     clearBatch();
   }
 
-  public int getMaxFieldSize() throws SQLException {
+  public int getMaxFieldSize() {
     if (maxFieldSize != null) {
       return maxFieldSize;
     }
     return Integer.MAX_VALUE;
   }
 
-  public void setMaxFieldSize(int max) throws SQLException {
+  public void setMaxFieldSize(int max) {
     maxFieldSize = max;
   }
 
-  public int getMaxRows() throws SQLException {
+  public int getMaxRows() {
     if (maxRows != null) {
       return maxRows;
     }
     return Integer.MAX_VALUE;
   }
 
-  public void setMaxRows(int max) throws SQLException {
+  public void setMaxRows(int max) {
     maxRows = max;
   }
 
   public void setEscapeProcessing(boolean enable) throws SQLException {
+    throw new NotImplementedException();
   }
 
-  public int getQueryTimeout() throws SQLException {
+  public int getQueryTimeout() {
     return 0;
   }
 
   public void setQueryTimeout(int seconds) throws SQLException {
+    throw new NotImplementedException();
   }
 
   public void cancel() throws SQLException {
-    //todo: implement
     throw new NotImplementedException();
   }
 
@@ -94,45 +90,40 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
 
   public void clearWarnings() throws SQLException {
     throw new NotImplementedException();
-    //todo: implement
   }
 
   public void setCursorName(String name) throws SQLException {
     throw new NotImplementedException();
-    //todo: implement
   }
 
   public ResultSet getResultSet() throws SQLException {
     throw new NotImplementedException();
-    //todo: implement
   }
 
   public int getUpdateCount() throws SQLException {
-    //todo: implement
     throw new NotImplementedException();
   }
 
   public boolean getMoreResults() throws SQLException {
-    //todo: implement
     throw new NotImplementedException();
   }
 
-  public void setFetchDirection(int direction) throws SQLException {
+  public void setFetchDirection(int direction) {
     fetchDirection = direction;
   }
 
-  public int getFetchDirection() throws SQLException {
+  public int getFetchDirection() {
     if (fetchDirection != null) {
       return fetchDirection;
     }
     return ResultSet.FETCH_FORWARD;
   }
 
-  public void setFetchSize(int rows) throws SQLException {
+  public void setFetchSize(int rows) {
     fetchSize = rows;
   }
 
-  public int getFetchSize() throws SQLException {
+  public int getFetchSize() {
     if (fetchSize != null) {
       return fetchSize;
     }
@@ -140,12 +131,10 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
   }
 
   public int getResultSetConcurrency() throws SQLException {
-    //todo: implement
     throw new NotImplementedException();
   }
 
   public int getResultSetType() throws SQLException {
-    //todo: implement
     throw new NotImplementedException();
   }
 
@@ -155,24 +144,24 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
 
   public void addBatch() throws SQLException {
     try {
-      if (InsertStatementHandler.batch.get() == null) {
-        InsertStatementHandler.batch.set(new ArrayList<InsertStatementHandler.InsertRequest>());
+      if (InsertStatementHandler.getBatch().get() == null) {
+        InsertStatementHandler.getBatch().set(new ArrayList<>());
       }
       String normalizedSQL = sql.trim().toLowerCase();
       if (!normalizedSQL.startsWith("insert")) {
-        int pos = normalizedSQL.indexOf(" ");
+        int pos = normalizedSQL.indexOf(' ');
         String verb = normalizedSQL.substring(0, pos);
         throw new DatabaseException("Verb not supported by batch operations: verb=" + verb);
       }
-      databaseClient.executeQuery(dbName, QueryType.execute0, sql, parms, restrictToThisServer, procedureContext, disableStats);
+      databaseClient.executeQuery(dbName, sql, parms, restrictToThisServer, procedureContext, disableStats);
     }
     catch (Exception e) {
       throw new SQLException(e);
     }
   }
 
-  public void clearBatch() throws SQLException {
-    InsertStatementHandler.batch.set(null);
+  public void clearBatch() {
+    InsertStatementHandler.getBatch().set(null);
   }
 
   public int[] executeBatch() throws SQLException {
@@ -185,24 +174,22 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
     }
   }
 
-  public Connection getConnection() throws SQLException {
+  public Connection getConnection() {
     return connectionProxy;
   }
 
   public boolean getMoreResults(int current) throws SQLException {
-    //todo: implement
     throw new NotImplementedException();
   }
 
   public ResultSet getGeneratedKeys() throws SQLException {
-    //todo: implement
     throw new NotImplementedException();
   }
 
   public ResultSet executeQuery() throws SQLException {
     try {
-      ResultSetImpl ret = (ResultSetImpl) databaseClient.executeQuery(dbName, QueryType.query1, sql, parms, restrictToThisServer, procedureContext, disableStats);
-      return new ResultSetProxy(connectionProxy, ret);
+      ResultSetImpl ret = (ResultSetImpl) databaseClient.executeQuery(dbName, sql, parms, restrictToThisServer, procedureContext, disableStats);
+      return new ResultSetProxy(ret);
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -211,8 +198,8 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
 
   public ResultSet executeQuery(String sql) throws SQLException {
     try {
-      ResultSetImpl ret = (ResultSetImpl)databaseClient.executeQuery(dbName, QueryType.query1, sql, parms, restrictToThisServer, procedureContext, disableStats);
-      return new ResultSetProxy(connectionProxy, ret);
+      ResultSetImpl ret = (ResultSetImpl)databaseClient.executeQuery(dbName, sql, parms, restrictToThisServer, procedureContext, disableStats);
+      return new ResultSetProxy(ret);
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -221,7 +208,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
 
   public int executeUpdate() throws SQLException {
     try {
-      return (Integer) databaseClient.executeQuery(dbName, QueryType.update0, sql, parms, restrictToThisServer, procedureContext, disableStats);
+      return (Integer) databaseClient.executeQuery(dbName,  sql, parms, restrictToThisServer, procedureContext, disableStats);
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -230,7 +217,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
 
   public int executeUpdate(String sql) throws SQLException {
     try {
-      return (Integer) databaseClient.executeQuery(dbName, QueryType.update1, sql, parms, restrictToThisServer, procedureContext, disableStats);
+      return (Integer) databaseClient.executeQuery(dbName, sql, parms, restrictToThisServer, procedureContext, disableStats);
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -250,16 +237,16 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
   }
 
   public void doUpdate(Long sequence0, Long sequence1, Short sequence2, boolean disableStats) throws SQLException {
-    databaseClient.executeQuery(dbName, QueryType.update0, sql, parms, false, sequence0, sequence1, sequence2, restrictToThisServer, procedureContext, disableStats);
+    databaseClient.executeQuery(dbName, sql, parms, sequence0, sequence1, sequence2, restrictToThisServer, procedureContext, disableStats);
   }
 
   public void doDelete(Long sequence0, Long sequence1, Short sequence2, boolean disableStats) throws SQLException {
-    databaseClient.executeQuery(dbName, QueryType.update0, sql, parms, false, sequence0, sequence1, sequence2, restrictToThisServer, procedureContext, disableStats);
+    databaseClient.executeQuery(dbName, sql, parms, sequence0, sequence1, sequence2, restrictToThisServer, procedureContext, disableStats);
   }
 
   public boolean execute() throws SQLException {
     try {
-      int ret = (int)(Integer) databaseClient.executeQuery(dbName, QueryType.execute0, sql, parms, restrictToThisServer, procedureContext, disableStats);
+      int ret = (int)(Integer) databaseClient.executeQuery(dbName, sql, parms, restrictToThisServer, procedureContext, disableStats);
       return ret > 0;
     }
     catch (Exception e) {
@@ -269,7 +256,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
 
   public boolean execute(String sql) throws SQLException {
     try {
-      int ret = (Integer) databaseClient.executeQuery(dbName, QueryType.execute0, sql, parms, restrictToThisServer, procedureContext, disableStats);
+      int ret = (Integer) databaseClient.executeQuery(dbName, sql, parms, restrictToThisServer, procedureContext, disableStats);
       return ret > 0;
     }
     catch (Exception e) {
@@ -279,7 +266,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
 
   public boolean execute(String sql, int autoGeneratedKeys) throws SQLException {
     try {
-      int ret = (Integer) databaseClient.executeQuery(dbName, QueryType.execute1, sql, parms, restrictToThisServer, procedureContext, disableStats);
+      int ret = (Integer) databaseClient.executeQuery(dbName, sql, parms, restrictToThisServer, procedureContext, disableStats);
       return ret > 0;
     }
     catch (Exception e) {
@@ -289,7 +276,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
 
   public boolean execute(String sql, int[] columnIndexes) throws SQLException {
     try {
-      int ret = (Integer) databaseClient.executeQuery(dbName, QueryType.execute2, sql, parms, restrictToThisServer, procedureContext, disableStats);
+      int ret = (Integer) databaseClient.executeQuery(dbName, sql, parms, restrictToThisServer, procedureContext, disableStats);
       return ret > 0;
     }
     catch (Exception e) {
@@ -299,7 +286,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
 
   public boolean execute(String sql, String[] columnNames) throws SQLException {
     try {
-      int ret = (Integer) databaseClient.executeQuery(dbName, QueryType.execute3, sql, parms, restrictToThisServer, procedureContext, disableStats);
+      int ret = (Integer) databaseClient.executeQuery(dbName, sql, parms, restrictToThisServer, procedureContext, disableStats);
       return ret > 0;
     }
     catch (Exception e) {
@@ -309,22 +296,18 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
 
 
   public int getResultSetHoldability() throws SQLException {
-    //todo: implement
     throw new NotImplementedException();
   }
 
   public boolean isClosed() throws SQLException {
-    //todo: implement
     throw new NotImplementedException();
   }
 
   public void setPoolable(boolean poolable) throws SQLException {
-    //todo: implement
     throw new NotImplementedException();
   }
 
   public boolean isPoolable() throws SQLException {
-    //todo: implement
     throw new NotImplementedException();
   }
 
@@ -332,20 +315,17 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
     throw new NotImplementedException();
   }
 
-  public boolean isCloseOnCompletion() throws SQLException {
-    return false;  //To change body of implemented methods use File | Settings | File Templates.
+  public boolean isCloseOnCompletion() {
+    return false;
   }
 
-  public <T> T unwrap(Class<T> iface) throws SQLException {
+  public <T> T unwrap(Class<T> iface) {
     return (T) this;
   }
 
   public boolean isWrapperFor(Class<?> iface) throws SQLException {
-    //todo: implement
     throw new NotImplementedException();
   }
-
-  //######################################################## begin delegated setters and getters;
 
   public void setNull(int parameterIndex, int sqlType) throws SQLException {
     try {
@@ -501,11 +481,11 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
   }
 
   public void setObject(int parameterIndex, Object x, int targetSqlType) throws SQLException {
-    throw new SQLException("not supported");
+    throw new SQLException(NOT_SUPPORTED_STR);
   }
 
   public void setObject(int parameterIndex, Object x) throws SQLException {
-    throw new SQLException("not supported");
+    throw new SQLException(NOT_SUPPORTED_STR);
   }
 
   public void setCharacterStream(int parameterIndex, Reader reader, int length) throws SQLException {
@@ -518,7 +498,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
   }
 
   public void setRef(int parameterIndex, Ref x) throws SQLException {
-    throw new SQLException("not supported");
+    throw new SQLException(NOT_SUPPORTED_STR);
   }
 
   public void setBlob(int parameterIndex, Blob x) throws SQLException {
@@ -540,7 +520,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
   }
 
   public void setArray(int parameterIndex, Array x) throws SQLException {
-    throw new SQLException("not supported");
+    throw new SQLException(NOT_SUPPORTED_STR);
   }
 
   public ResultSetMetaData getMetaData() throws SQLException {
@@ -548,15 +528,15 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
   }
 
   public void setDate(int parameterIndex, Date x, Calendar cal) throws SQLException {
-    throw new SQLException("not supported");
+    throw new SQLException(NOT_SUPPORTED_STR);
   }
 
   public void setTime(int parameterIndex, Time x, Calendar cal) throws SQLException {
-    throw new SQLException("not supported");
+    throw new SQLException(NOT_SUPPORTED_STR);
   }
 
   public void setTimestamp(int parameterIndex, Timestamp x, Calendar cal) throws SQLException {
-    throw new SQLException("not supported");
+    throw new SQLException(NOT_SUPPORTED_STR);
   }
 
   public void setNull(int parameterIndex, int sqlType, String typeName) throws SQLException {
@@ -569,7 +549,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
   }
 
   public void setURL(int parameterIndex, URL x) throws SQLException {
-    throw new SQLException("not supported");
+    throw new SQLException(NOT_SUPPORTED_STR);
   }
 
   public ParameterMetaData getParameterMetaData() throws SQLException {
@@ -577,7 +557,7 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
   }
 
   public void setRowId(int parameterIndex, RowId x) throws SQLException {
-    throw new SQLException("not supported");
+    throw new SQLException(NOT_SUPPORTED_STR);
   }
 
   public void setNString(int parameterIndex, String value) throws SQLException {
@@ -635,11 +615,11 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
   }
 
   public void setSQLXML(int parameterIndex, SQLXML xmlObject) throws SQLException {
-    throw new SQLException("not supported");
+    throw new SQLException(NOT_SUPPORTED_STR);
   }
 
   public void setObject(int parameterIndex, Object x, int targetSqlType, int scaleOrLength) throws SQLException {
-    throw new SQLException("not supported");
+    throw new SQLException(NOT_SUPPORTED_STR);
   }
 
   public void setAsciiStream(int parameterIndex, InputStream x, long length) throws SQLException {
@@ -742,10 +722,6 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
 
   public void setProcedureContext(StoredProcedureContextImpl procedureContext) {
     this.procedureContext = procedureContext;
-  }
-
-  public void disableStats() {
-    this.disableStats = true;
   }
 
   public void setParms(ParameterHandler parms) {

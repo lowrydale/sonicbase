@@ -22,13 +22,14 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.security.cert.X509Certificate;
 import java.util.*;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 
 public class DescribeStatementHandler {
+  public static final String TABLE_NAME_STR = ", tableName=";
+  public static final String WIDTH_STR = "Width";
+  public static final String SERVER_STR = "server";
   private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
 
   private final DatabaseClient client;
@@ -43,7 +44,7 @@ public class DescribeStatementHandler {
       String table = parts[2].trim().toLowerCase();
       TableSchema tableSchema = client.getCommon().getTables(dbName).get(table);
       if (tableSchema == null) {
-        throw new DatabaseException("Table not defined: dbName=" + dbName + ", tableName=" + table);
+        throw new DatabaseException("Table not defined: dbName=" + dbName + TABLE_NAME_STR + table);
       }
       List<FieldSchema> fields = tableSchema.getFields();
       int maxLen = 0;
@@ -52,7 +53,7 @@ public class DescribeStatementHandler {
       for (FieldSchema field : fields) {
         maxLen = Math.max("Name".length(), Math.max(field.getName().length(), maxLen));
         maxTypeLen = Math.max("Type".length(), Math.max(field.getType().name().length(), maxTypeLen));
-        maxWidthLen = Math.max("Width".length(), Math.max(String.valueOf(field.getWidth()).length(), maxWidthLen));
+        maxWidthLen = Math.max(WIDTH_STR.length(), Math.max(String.valueOf(field.getWidth()).length(), maxWidthLen));
       }
 
       int totalWidth = "| ".length() + maxLen + " | ".length() + maxTypeLen + " | ".length() + maxWidthLen + " |".length();
@@ -67,7 +68,7 @@ public class DescribeStatementHandler {
       builder.append(" | Type");
       appendChars(builder, " ", maxTypeLen - "Type".length());
       builder.append(" | Width");
-      appendChars(builder, " ", maxWidthLen - "Width".length());
+      appendChars(builder, " ", maxWidthLen - WIDTH_STR.length());
       builder.append(" |\n");
       appendChars(builder, "-", totalWidth);
       builder.append("\n");
@@ -89,7 +90,7 @@ public class DescribeStatementHandler {
       appendChars(builder, "-", totalWidth);
       builder.append("\n");
 
-      for (IndexSchema indexSchema : tableSchema.getIndexes().values()) {
+      for (IndexSchema indexSchema : tableSchema.getIndices().values()) {
         builder.append("Index=").append(indexSchema.getName()).append("\n");
         doDescribeOneIndex(tableSchema, indexSchema, builder);
       }
@@ -131,17 +132,17 @@ public class DescribeStatementHandler {
     else if (parts[1].trim().equalsIgnoreCase("repartitioner")) {
       return describeRepartitioner(dbName);
     }
-    else if (parts[1].trim().equalsIgnoreCase("server") &&
+    else if (parts[1].trim().equalsIgnoreCase(SERVER_STR) &&
         parts[2].trim().equalsIgnoreCase("stats")) {
-      return describeServerStats(dbName);
+      return describeServerStats();
     }
-    else if (parts[1].trim().equalsIgnoreCase("server") &&
+    else if (parts[1].trim().equalsIgnoreCase(SERVER_STR) &&
         parts[2].trim().equalsIgnoreCase("health")) {
-      return describeServerHeath(dbName);
+      return describeServerHeath();
     }
     else if (parts[1].trim().equalsIgnoreCase("schema") &&
         parts[2].trim().equalsIgnoreCase("version")) {
-      return describeSchemaVersion(dbName);
+      return describeSchemaVersion();
     }
     else {
       throw new DatabaseException("Unknown target for describe: target=" + parts[1]);
@@ -180,12 +181,7 @@ public class DescribeStatementHandler {
       HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
 
       // Create all-trusting host name verifier
-      HostnameVerifier allHostsValid = new HostnameVerifier() {
-
-        public boolean verify(String hostname, SSLSession session) {
-          return true;
-        }
-      };
+      HostnameVerifier allHostsValid = (hostname, session) -> true;
       // Install the all-trusting host verifier
       HttpsURLConnection.setDefaultHostnameVerifier(allHostsValid);
       /*
@@ -196,13 +192,11 @@ public class DescribeStatementHandler {
       ObjectMapper mapper = new ObjectMapper();
       ObjectNode config = (ObjectNode) mapper.readTree(json);
 
-      URL url = new URL("https://" + config.get("server").get("publicAddress").asText() + ":" +
-          config.get("server").get("port").asInt() + "/license/currUsage");
+      URL url = new URL("https://" + config.get(SERVER_STR).get("publicAddress").asText() + ":" +
+          config.get(SERVER_STR).get("port").asInt() + "/license/currUsage");
       URLConnection con = url.openConnection();
       InputStream in = new BufferedInputStream(con.getInputStream());
 
-//      HttpResponse response = restGet("https://" + config.getDict("server").getString("publicAddress") + ":" +
-//          config.getDict("server").getInt("port") + "/license/currUsage");
       ObjectNode dict = (ObjectNode) mapper.readTree(IOUtils.toString(in, "utf-8"));
       StringBuilder builder = new StringBuilder();
       builder.append("total cores in use=" + dict.get("totalCores").asInt() + "\n");
@@ -225,7 +219,7 @@ public class DescribeStatementHandler {
     }
   }
 
-  private ResultSet describeServerHeath(String dbName) {
+  private ResultSet describeServerHeath() {
     try {
       client.syncSchema();
 
@@ -257,7 +251,7 @@ public class DescribeStatementHandler {
     }
   }
 
-  private ResultSet describeSchemaVersion(String dbName) {
+  private ResultSet describeSchemaVersion() {
     try {
       if (!client.getCommon().haveProLicense()) {
         throw new InsufficientLicense("You must have a pro license to describe schema version");
@@ -278,14 +272,14 @@ public class DescribeStatementHandler {
 
 
           ComObject cobj = new ComObject();
-          cobj.put(ComObject.Tag.dbName, "__none__");
-          cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+          cobj.put(ComObject.Tag.DB_NAME, "__none__");
+          cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
           byte[] ret = null;
           try {
-            ret = client.send("DatabaseServer:getSchema", j, i, cobj, DatabaseClient.Replica.specified);
+            ret = client.send("DatabaseServer:getSchema", j, i, cobj, DatabaseClient.Replica.SPECIFIED);
             ComObject retObj = new ComObject(ret);
             DatabaseCommon tmpCommon = new DatabaseCommon();
-            tmpCommon.deserializeSchema(retObj.getByteArray(ComObject.Tag.schemaBytes));
+            tmpCommon.deserializeSchema(retObj.getByteArray(ComObject.Tag.SCHEMA_BYTES));
             line.put("version", String.valueOf(tmpCommon.getSchemaVersion()));
           }
           catch (Exception e) {
@@ -302,7 +296,7 @@ public class DescribeStatementHandler {
     }
   }
 
-  private ResultSetImpl describeServerStats(final String dbName) throws ExecutionException, InterruptedException {
+  private ResultSetImpl describeServerStats()  {
     while (true) {
       if (client.getShutdown()) {
         throw new DatabaseException("Shutting down");
@@ -322,56 +316,53 @@ public class DescribeStatementHandler {
           for (int j = 0; j < client.getReplicaCount(); j++) {
             final int shard = i;
             final int replica = j;
-            boolean dead = client.getServersArray()[i][j].isDead();//common.getServersConfig().getShards()[shard].getReplicas()[replica].isDead();
+            boolean dead = client.getServersArray()[i][j].isDead();
             if (dead) {
               continue;
             }
-            futures.add(client.getExecutor().submit(new Callable<Map<String, String>>() {
-              @Override
-              public Map<String, String> call() throws Exception {
-                boolean dead = client.getCommon().getServersConfig().getShards()[shard].getReplicas()[replica].isDead();
-                if (dead) {
-                  Map<String, String> line = new HashMap<>();
-                  line.put("host", "shard=" + shard + ", replica=" + replica);
-                  line.put("cpu", "?");
-                  line.put("resGig", "?");
-                  line.put("javaMemMin", "?");
-                  line.put("javaMemMax", "?");
-                  line.put("receive", "?");
-                  line.put("transmit", "?");
-                  line.put("diskAvail", "?");
-                  return line;
-                }
-                ComObject cobj = new ComObject();
-                cobj.put(ComObject.Tag.dbName, "__none__");
-                cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-                cobj.put(ComObject.Tag.method, "OSStatsManager:getOSStats");
-
-                byte[] ret = client.send(null, shard, replica, cobj, DatabaseClient.Replica.specified);
-                ComObject retObj = new ComObject(ret);
-
-                double resGig = retObj.getDouble(ComObject.Tag.resGig);
-                double cpu = retObj.getDouble(ComObject.Tag.cpu);
-                double javaMemMin = retObj.getDouble(ComObject.Tag.javaMemMin);
-                double javaMemMax = retObj.getDouble(ComObject.Tag.javaMemMax);
-                double recRate = retObj.getDouble(ComObject.Tag.avgRecRate) / 1000000000d;
-                double transRate = retObj.getDouble(ComObject.Tag.avgTransRate) / 1000000000d;
-                String diskAvail = retObj.getString(ComObject.Tag.diskAvail);
-                String host = retObj.getString(ComObject.Tag.host);
-                int port = retObj.getInt(ComObject.Tag.port);
-
+            futures.add(client.getExecutor().submit(() -> {
+              boolean dead1 = client.getCommon().getServersConfig().getShards()[shard].getReplicas()[replica].isDead();
+              if (dead1) {
                 Map<String, String> line = new HashMap<>();
-
-                line.put("host", host + ":" + port);
-                line.put("cpu", String.format("%.0f", cpu));
-                line.put("resGig", String.format("%.2f", resGig));
-                line.put("javaMemMin", String.format("%.2f", javaMemMin));
-                line.put("javaMemMax", String.format("%.2f", javaMemMax));
-                line.put("receive", String.format("%.4f", recRate));
-                line.put("transmit", String.format("%.4f", transRate));
-                line.put("diskAvail", diskAvail);
+                line.put("host", "shard=" + shard + ", replica=" + replica);
+                line.put("cpu", "?");
+                line.put("resGig", "?");
+                line.put("javaMemMin", "?");
+                line.put("javaMemMax", "?");
+                line.put("receive", "?");
+                line.put("transmit", "?");
+                line.put("diskAvail", "?");
                 return line;
               }
+              ComObject cobj = new ComObject();
+              cobj.put(ComObject.Tag.DB_NAME, "__none__");
+              cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
+              cobj.put(ComObject.Tag.METHOD, "OSStatsManager:getOSStats");
+
+              byte[] ret = client.send(null, shard, replica, cobj, DatabaseClient.Replica.SPECIFIED);
+              ComObject retObj = new ComObject(ret);
+
+              double resGig = retObj.getDouble(ComObject.Tag.RES_GIG);
+              double cpu = retObj.getDouble(ComObject.Tag.CPU);
+              double javaMemMin = retObj.getDouble(ComObject.Tag.JAVA_MEM_MIN);
+              double javaMemMax = retObj.getDouble(ComObject.Tag.JAVA_MEM_MAX);
+              double recRate = retObj.getDouble(ComObject.Tag.AVG_REC_RATE) / 1000000000d;
+              double transRate = retObj.getDouble(ComObject.Tag.AVG_TRANS_RATE) / 1000000000d;
+              String diskAvail = retObj.getString(ComObject.Tag.DISK_AVAIL);
+              String host = retObj.getString(ComObject.Tag.HOST);
+              int port = retObj.getInt(ComObject.Tag.PORT);
+
+              Map<String, String> line = new HashMap<>();
+
+              line.put("host", host + ":" + port);
+              line.put("cpu", String.format("%.0f", cpu));
+              line.put("resGig", String.format("%.2f", resGig));
+              line.put("javaMemMin", String.format("%.2f", javaMemMin));
+              line.put("javaMemMax", String.format("%.2f", javaMemMax));
+              line.put("receive", String.format("%.4f", recRate));
+              line.put("transmit", String.format("%.4f", transRate));
+              line.put("diskAvail", diskAvail);
+              return line;
             }));
 
           }
@@ -418,7 +409,7 @@ public class DescribeStatementHandler {
 
 
 
-  private ResultSet describeShards(String dbName) throws IOException, ExecutionException, InterruptedException {
+  private ResultSet describeShards(String dbName) {
     while (true) {
       if (client.getShutdown()) {
         throw new DatabaseException("Shutting down");
@@ -427,17 +418,13 @@ public class DescribeStatementHandler {
       try {
         client.syncSchema();
 
-//        if (!common.haveProLicense()) {
-//          throw new InsufficientLicense("You must have a pro license to describe shards");
-//        }
-
         StringBuilder ret = new StringBuilder();
 
         Map<String, Entry> entries = new HashMap<>();
         PartitionUtils.GlobalIndexCounts counts = PartitionUtils.getIndexCounts(dbName, client);
         for (Map.Entry<String, PartitionUtils.TableIndexCounts> tableEntry : counts.getTables().entrySet()) {
           for (Map.Entry<String, PartitionUtils.IndexCounts> indexEntry : tableEntry.getValue().getIndices().entrySet()) {
-            ConcurrentHashMap<Integer, Long> currCounts = indexEntry.getValue().getCounts();
+            Map<Integer, Long> currCounts = indexEntry.getValue().getCounts();
             for (Map.Entry<Integer, Long> countEntry : currCounts.entrySet()) {
               Entry entry = new Entry(tableEntry.getKey(), indexEntry.getKey(), countEntry.getKey(), "Table=" +
                   tableEntry.getKey() + ", Index=" + indexEntry.getKey() +
@@ -448,7 +435,7 @@ public class DescribeStatementHandler {
         }
 
         for (final Map.Entry<String, TableSchema> table : client.getCommon().getTables(dbName).entrySet()) {
-          for (final Map.Entry<String, IndexSchema> indexSchema : table.getValue().getIndexes().entrySet()) {
+          for (final Map.Entry<String, IndexSchema> indexSchema : table.getValue().getIndices().entrySet()) {
             int shard = 0;
             TableSchema.Partition[] partitions = indexSchema.getValue().getCurrPartitions();
             TableSchema.Partition[] lastPartitions = indexSchema.getValue().getLastPartitions();
@@ -488,39 +475,34 @@ public class DescribeStatementHandler {
   class ShardState {
     private int shard;
     private long count;
-    public String exception;
+    private String exception;
   }
 
   public ResultSetImpl describeRepartitioner(String dbName) {
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.dbName, dbName);
-    cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
+    cobj.put(ComObject.Tag.DB_NAME, dbName);
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
     byte[] ret = client.sendToMaster("PartitionManager:getRepartitionerState", cobj);
     ComObject retObj = new ComObject(ret);
 
     StringBuilder builder = new StringBuilder();
-    String state = retObj.getString(ComObject.Tag.state);
+    String state = retObj.getString(ComObject.Tag.STATE);
     builder.append("state=" + state).append("\n");
     if (state.equals("rebalancing")) {
-      builder.append("table=").append(retObj.getString(ComObject.Tag.tableName)).append("\n");
-      builder.append("index=").append(retObj.getString(ComObject.Tag.indexName)).append("\n");
+      builder.append("table=").append(retObj.getString(ComObject.Tag.TABLE_NAME)).append("\n");
+      builder.append("index=").append(retObj.getString(ComObject.Tag.INDEX_NAME)).append("\n");
       builder.append("shards:\n");
       List<ShardState> shards = new ArrayList<>();
-      ComArray array = retObj.getArray(ComObject.Tag.shards);
+      ComArray array = retObj.getArray(ComObject.Tag.SHARDS);
       for (int i = 0; i < array.getArray().size(); i++) {
         ShardState shardState = new ShardState();
-        shardState.shard = ((ComObject) array.getArray().get(i)).getInt(ComObject.Tag.shard);
-        shardState.count = ((ComObject) array.getArray().get(i)).getLong(ComObject.Tag.countLong);
-        shardState.exception = ((ComObject) array.getArray().get(i)).getString(ComObject.Tag.exception);
+        shardState.shard = ((ComObject) array.getArray().get(i)).getInt(ComObject.Tag.SHARD);
+        shardState.count = ((ComObject) array.getArray().get(i)).getLong(ComObject.Tag.COUNT_LONG);
+        shardState.exception = ((ComObject) array.getArray().get(i)).getString(ComObject.Tag.EXCEPTION);
 
         shards.add(shardState);
       }
-      Collections.sort(shards, new Comparator<ShardState>() {
-        @Override
-        public int compare(ShardState o1, ShardState o2) {
-          return Integer.compare(o1.shard, o2.shard);
-        }
-      });
+      Collections.sort(shards, Comparator.comparingInt(o -> o.shard));
       for (ShardState shardState : shards) {
         builder.append("shard " + shardState.shard + "=" + shardState.count).append("\n");
         if (shardState.exception != null) {
@@ -536,7 +518,7 @@ public class DescribeStatementHandler {
   private StringBuilder doDescribeIndex(String dbName, String table, String index, StringBuilder builder) {
     TableSchema tableSchema = client.getCommon().getTables(dbName).get(table);
     if (tableSchema == null) {
-      throw new DatabaseException("Table not defined: dbName=" + dbName + ", tableName=" + table);
+      throw new DatabaseException("Table not defined: dbName=" + dbName + TABLE_NAME_STR + table);
     }
 
     int countFound = 0;
@@ -549,7 +531,7 @@ public class DescribeStatementHandler {
 
     }
     if (countFound == 0) {
-      throw new DatabaseException("Index not defined: dbName=" + dbName + ", tableName=" + table + ", indexName=" + index);
+      throw new DatabaseException("Index not defined: dbName=" + dbName + TABLE_NAME_STR + table + ", indexName=" + index);
     }
     return builder;
   }
@@ -563,7 +545,7 @@ public class DescribeStatementHandler {
       FieldSchema fieldSchema = tableSchema.getFields().get(tableSchema.getFieldOffset(field));
       maxLen = Math.max("Name".length(), Math.max(fieldSchema.getName().length(), maxLen));
       maxTypeLen = Math.max("Type".length(), Math.max(fieldSchema.getType().name().length(), maxTypeLen));
-      maxWidthLen = Math.max("Width".length(), Math.max(String.valueOf(fieldSchema.getWidth()).length(), maxWidthLen));
+      maxWidthLen = Math.max(WIDTH_STR.length(), Math.max(String.valueOf(fieldSchema.getWidth()).length(), maxWidthLen));
     }
 
     int totalWidth = "| ".length() + maxLen + " | ".length() + maxTypeLen + " | ".length() + maxWidthLen + " |".length();
@@ -576,7 +558,7 @@ public class DescribeStatementHandler {
     builder.append(" | Type");
     appendChars(builder, " ", maxTypeLen - "Type".length());
     builder.append(" | Width");
-    appendChars(builder, " ", maxWidthLen - "Width".length());
+    appendChars(builder, " ", maxWidthLen - WIDTH_STR.length());
     builder.append(" |\n");
     appendChars(builder, "-", totalWidth);
     builder.append("\n");

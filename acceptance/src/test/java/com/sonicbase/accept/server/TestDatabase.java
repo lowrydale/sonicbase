@@ -1,8 +1,6 @@
 package com.sonicbase.accept.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
@@ -18,8 +16,6 @@ import com.sonicbase.query.impl.SelectContextImpl;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
-import com.sonicbase.server.UpdateManager;
-import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
@@ -28,7 +24,6 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import javax.crypto.*;
-import javax.crypto.spec.SecretKeySpec;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -37,7 +32,6 @@ import java.security.InvalidKeyException;
 import java.security.Key;
 import java.sql.*;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
@@ -81,10 +75,6 @@ public class TestDatabase {
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
-      ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
-      array.add(DatabaseServer.FOUR_SERVER_LICENSE);
-      config.put("licenseKeys", array);
-
       DatabaseClient.getServers().clear();
 
       dbServers = new DatabaseServer[4];
@@ -101,10 +91,8 @@ public class TestDatabase {
         //          String role = "primaryMaster";
 
         dbServers[shard] = new DatabaseServer();
-        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
+        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
         dbServers[shard].setRole(role);
-        dbServers[shard].disableLogProcessor();
-        dbServers[shard].setMinSizeForRepartition(0);
 
 //        if (shard == 0) {
 //          Map<Integer, Object> map = new HashMap<>();
@@ -380,10 +368,10 @@ public class TestDatabase {
 
       while (true) {
         ComObject cobj = new ComObject();
-        cobj.put(ComObject.Tag.method, "DatabaseServer:areAllLongRunningCommandsComplete");
+        cobj.put(ComObject.Tag.METHOD, "DatabaseServer:areAllLongRunningCommandsComplete");
         byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().sendToMaster(cobj);
         ComObject retObj = new ComObject(bytes);
-        if (retObj.getBoolean(ComObject.Tag.isComplete)) {
+        if (retObj.getBoolean(ComObject.Tag.IS_COMPLETE)) {
           break;
         }
         Thread.sleep(1000);
@@ -406,7 +394,7 @@ public class TestDatabase {
 //      long size = client.getPartitionSize("test", 0, "children", "_1_socialsecuritynumber");
 //      assertEquals(size, 10);
 
-      client.beginRebalance("test", "persons", "_primarykey");
+      client.beginRebalance("test");
 
 
       while (true) {
@@ -502,9 +490,9 @@ public class TestDatabase {
           "    \"sharedDirectory\": true\n" +
           "  }");
 
-      for (DatabaseServer dbServer : dbServers) {
-        dbServer.setBackupConfig(backupConfig);
-      }
+//      for (DatabaseServer dbServer : dbServers) {
+//        dbServer.setBackupConfig(backupConfig);
+//      }
 
       client.syncSchema();
 
@@ -560,10 +548,10 @@ public class TestDatabase {
       //client.syncSchema();
 
       ComObject cobj = new ComObject();
-      cobj.put(ComObject.Tag.dbName, "test");
-      cobj.put(ComObject.Tag.schemaVersion, client.getCommon().getSchemaVersion());
-      cobj.put(ComObject.Tag.method, "DeleteManager:forceDeletes");
-      client.sendToAllShards(null, 0, cobj, DatabaseClient.Replica.all);
+      cobj.put(ComObject.Tag.DB_NAME, "test");
+      cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
+      cobj.put(ComObject.Tag.METHOD, "DeleteManager:forceDeletes");
+      client.sendToAllShards(null, 0, cobj, DatabaseClient.Replica.ALL);
 
         // Thread.sleep(10000);
       executor.shutdownNow();
@@ -723,7 +711,7 @@ public class TestDatabase {
     IndexLookup indexLookup = new IndexLookup();
     indexLookup.setCount(1000);
     indexLookup.setIndexName(indexSchema.getName());
-    indexLookup.setLeftOp(BinaryExpression.Operator.equal);
+    indexLookup.setLeftOp(BinaryExpression.Operator.EQUAL);
     indexLookup.setLeftKey(new Object[]{"933-28-0".getBytes()});
     indexLookup.setLeftOriginalKey(new Object[]{"933-28-0".getBytes()});
     indexLookup.setColumnName("socialsecuritynumber");
@@ -3613,10 +3601,6 @@ public class TestDatabase {
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
-    ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
-    array.add(DatabaseServer.FOUR_SERVER_LICENSE);
-    config.put("licenseKeys", array);
-
     DatabaseClient.getServers().clear();
 
     final DatabaseServer[] dbServers = new DatabaseServer[4];
@@ -3629,9 +3613,8 @@ public class TestDatabase {
         public Object call() throws Exception {
           String role = "primaryMaster";
           dbServers[shard] = new DatabaseServer();
-          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
+          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
           dbServers[shard].setRole(role);
-          dbServers[shard].disableLogProcessor();
           return null;
         }
       }));
@@ -3669,7 +3652,7 @@ public class TestDatabase {
       ids.add((long) i);
     }
 
-    client.beginRebalance("test", "persons", "_primarykey");
+    client.beginRebalance("test");
 
     while (true) {
       if (client.isRepartitioningComplete("test")) {
@@ -3713,10 +3696,6 @@ public class TestDatabase {
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
-    ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
-    array.add(DatabaseServer.FOUR_SERVER_LICENSE);
-    config.put("licenseKeys", array);
-
     DatabaseClient.getServers().clear();
 
     final DatabaseServer[] dbServers = new DatabaseServer[4];
@@ -3729,9 +3708,8 @@ public class TestDatabase {
         public Object call() throws Exception {
           String role = "primaryMaster";
           dbServers[shard] = new DatabaseServer();
-          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
+          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
           dbServers[shard].setRole(role);
-          dbServers[shard].disableLogProcessor();
           return null;
         }
       }));
@@ -3769,7 +3747,7 @@ public class TestDatabase {
       ids.add((long) i);
     }
 
-    client.beginRebalance("test", "persons", "_primarykey");
+    client.beginRebalance("test");
 
     while (true) {
       if (client.isRepartitioningComplete("test")) {
@@ -3807,10 +3785,6 @@ public class TestDatabase {
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
-    ArrayNode array = new ArrayNode(JsonNodeFactory.instance);
-    array.add(DatabaseServer.FOUR_SERVER_LICENSE);
-    config.put("licenseKeys", array);
-
     DatabaseClient.getServers().clear();
 
     final DatabaseServer[] dbServers = new DatabaseServer[4];
@@ -3823,9 +3797,8 @@ public class TestDatabase {
         public Object call() throws Exception {
           String role = "primaryMaster";
           dbServers[shard] = new DatabaseServer();
-          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
+          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
           dbServers[shard].setRole(role);
-          dbServers[shard].disableLogProcessor();
           return null;
         }
       }));
@@ -3863,7 +3836,7 @@ public class TestDatabase {
       ids.add((long) i);
     }
 
-    client.beginRebalance("test", "persons", "_primarykey");
+    client.beginRebalance("test");
 
     while (true) {
       if (client.isRepartitioningComplete("test")) {
@@ -4070,20 +4043,20 @@ public class TestDatabase {
 
   public static void xmain(String[] args) throws Exception {
 
-    SecretKey symKey = KeyGenerator.getInstance(algorithm).generateKey();
-    symKey = new SecretKeySpec(Base64.getDecoder().decode(DatabaseServer.LICENSE_KEY), algorithm);
+//    SecretKey symKey = KeyGenerator.getInstance(algorithm).generateKey();
+//    symKey = new SecretKeySpec(Base64.getDecoder().decode(DatabaseServer.LICENSE_KEY), algorithm);
+//
+//    System.out.println("key=" + new String(Base64.getEncoder().encode(symKey.getEncoded()), "utf-8"));
+//
+//    Cipher c = Cipher.getInstance(algorithm);
+//
+//    byte[] encryptionBytes = encryptF("sonicbase:pro:4", symKey, c);
+//
+//    System.out.println("encrypted: " + new String(new Hex().encode(encryptionBytes), "utf-8"));
+//    System.out.println("Decrypted: " + decryptF(encryptionBytes, symKey, c));
 
-    System.out.println("key=" + new String(Base64.getEncoder().encode(symKey.getEncoded()), "utf-8"));
-
-    Cipher c = Cipher.getInstance(algorithm);
-
-    byte[] encryptionBytes = encryptF("sonicbase:pro:4", symKey, c);
-
-    System.out.println("encrypted: " + new String(new Hex().encode(encryptionBytes), "utf-8"));
-    System.out.println("Decrypted: " + decryptF(encryptionBytes, symKey, c));
-
-    symKey = new SecretKeySpec(Base64.getDecoder().decode(DatabaseServer.LICENSE_KEY), algorithm);
-    System.out.println("Decrypted: " + decryptF(encryptionBytes, symKey, c));
+//    symKey = new SecretKeySpec(Base64.getDecoder().decode(DatabaseServer.LICENSE_KEY), algorithm);
+//    System.out.println("Decrypted: " + decryptF(encryptionBytes, symKey, c));
 
   }
 

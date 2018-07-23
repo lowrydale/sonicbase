@@ -52,9 +52,8 @@ public class TestTransactions {
           String role = "primaryMaster";
 
           dbServers[shard] = new DatabaseServer();
-          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, true);
+          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
           dbServers[shard].setRole(role);
-          dbServers[shard].disableLogProcessor();
           return null;
         }
       }));

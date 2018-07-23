@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -10,7 +9,6 @@ import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.SchemaOutOfSyncException;
 import com.sonicbase.common.ServersConfig;
 import com.sonicbase.jdbcdriver.ParameterHandler;
-import com.sonicbase.jdbcdriver.QueryType;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.SelectStatementImpl;
@@ -87,7 +85,7 @@ public class DatabaseClientTest {
         "      ]\n" +
         "    }\n" +
         "  ]}\n");
-    serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), 1, true, true);
+    serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), true, true);
     common.setServersConfig(serversConfig);
   }
 
@@ -96,9 +94,9 @@ public class DatabaseClientTest {
 
     DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
       public byte[] sendToMaster(ComObject cobj) {
-        assertEquals(cobj.getString(ComObject.Tag.dbName), "test");
-        assertEquals(cobj.getString(ComObject.Tag.masterSlave), "master");
-        assertEquals(cobj.getString(ComObject.Tag.method), "SchemaManager:createDatabase");
+        assertEquals(cobj.getString(ComObject.Tag.DB_NAME), "test");
+        assertEquals(cobj.getString(ComObject.Tag.MASTER_SLAVE), "master");
+        assertEquals(cobj.getString(ComObject.Tag.METHOD), "SchemaManager:createDatabase");
         return null;
       }
       public String getCluster() {
@@ -121,7 +119,7 @@ public class DatabaseClientTest {
     DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
       public byte[][] sendToAllShards(
           final String method,
-          final long auth_user, final ComObject body, final Replica replica) {
+          final long authUser, final ComObject body, final Replica replica) {
         if (committing.get()) {
           assertEquals(method, "UpdateManager:commit");
           called.set(true);
@@ -152,7 +150,7 @@ public class DatabaseClientTest {
 
     called.set(false);
     committing.set(true);
-    client.commit("test", null);
+    client.commit("test");
     assertTrue(called.get());
 
     client.setIsExplicitTrans(true);
@@ -175,7 +173,7 @@ public class DatabaseClientTest {
         return null;
       }
       public byte[] send(String method,
-                         int shard, long auth_user, ComObject body, Replica replica) {
+                         int shard, long authUser, ComObject body, Replica replica) {
 
         ComObject retObj = new ComObject();
         try {
@@ -184,7 +182,7 @@ public class DatabaseClientTest {
           common.getTables("test").put(tableSchema.getName(), tableSchema);
           common.getTablesById("test").put(tableSchema.getTableId(), tableSchema);
           byte[] bytes = common.serializeSchema((short)1000);
-          retObj.put(ComObject.Tag.schemaBytes, bytes);
+          retObj.put(ComObject.Tag.SCHEMA_BYTES, bytes);
           return retObj.serialize();
         }
         catch (IOException e) {
@@ -266,7 +264,7 @@ public class DatabaseClientTest {
     common.getTablesById("test").put(tableSchema.getTableId(), tableSchema);
 
     common.getDatabases().put("test", new Schema());
-    client.executeQuery("test", QueryType.query1, "select * from table1 limit 5 offset 10", new ParameterHandler(), false, null, false);
+    client.executeQuery("test", "select * from table1 limit 5 offset 10", new ParameterHandler(), false, null, false);
 
     assertTrue(handled.get());
   }
@@ -283,9 +281,9 @@ public class DatabaseClientTest {
       public void syncSchema() {
         calledSync.set(true);
       }
-      public byte[] do_sendOnSocket(List<DatabaseSocketClient.Request> requests) {
+      public byte[] doSendOnSocket(List<DatabaseSocketClient.Request> requests) {
         for(DatabaseSocketClient.Request request : requests) {
-          called.add(request.hostPort);
+          called.add(request.getHostPort());
         }
         return null;
       }
@@ -299,12 +297,12 @@ public class DatabaseClientTest {
         ServersConfig.Host replicaHost = shard.getReplicas()[j];
 
         servers[i][j] = new DatabaseClient.Server(replicaHost.getPrivateAddress(), replicaHost.getPort()) {
-          public byte[] do_send(String batchKey, ComObject body) {
+          public byte[] doSend(String batchKey, ComObject body) {
             called.add(replicaHost.getPrivateAddress() + ":" + replicaHost.getPort());
             return null;
           }
 
-          public byte[] do_send(String batchKey, byte[] body) {
+          public byte[] doSend(String batchKey, byte[] body) {
             called.add(replicaHost.getPrivateAddress() + ":" + replicaHost.getPort());
             return null;
           }
@@ -315,36 +313,36 @@ public class DatabaseClientTest {
 
     called.clear();
     client.send("method", servers[0], 0, 0, new ComObject(),
-        DatabaseClient.Replica.specified, true);
+        DatabaseClient.Replica.SPECIFIED, true);
 
     assertEquals(called.iterator().next(), "localhost:9010");
     assertEquals(called.size(), 1);
 
     called.clear();
     client.send("method", servers[0], 0, 0, new ComObject(),
-        DatabaseClient.Replica.def, true);
+        DatabaseClient.Replica.DEF, true);
     client.send("method", servers[0], 0, 0, new ComObject(),
-        DatabaseClient.Replica.def, true);
+        DatabaseClient.Replica.DEF, true);
     client.send("method", servers[0], 0, 0, new ComObject(),
-        DatabaseClient.Replica.def, true);
+        DatabaseClient.Replica.DEF, true);
     assertEquals(called.size(), 3);
 
     called.clear();
     client.send("method", servers[0], 0, 0, new ComObject(),
-        DatabaseClient.Replica.master, true);
+        DatabaseClient.Replica.MASTER, true);
 
     assertEquals(called.iterator().next(), "localhost:9010");
     assertEquals(called.size(), 1);
 
     called.clear();
     client.send("method", servers[0], 0, 0, new ComObject(),
-        DatabaseClient.Replica.all, true);
+        DatabaseClient.Replica.ALL, true);
     assertEquals(called.size(), 3);
 
 
     called.clear();
     client.send("UpdateManager:deleteRecord", servers[0], 0, 0, new ComObject(),
-        DatabaseClient.Replica.specified, true);
+        DatabaseClient.Replica.SPECIFIED, true);
 
     assertEquals(called.iterator().next(), "localhost:9010");
     assertEquals(called.size(), 1);
@@ -353,7 +351,7 @@ public class DatabaseClientTest {
     servers[0][1].setDead(true);
     called.clear();
     client.send("UpdateManager:deleteRecord", servers[0], 0, 1, new ComObject(),
-        DatabaseClient.Replica.specified, false);
+        DatabaseClient.Replica.SPECIFIED, false);
 
     assertEquals(called.iterator().next(), "localhost:9010");
     assertEquals(called.size(), 1);
@@ -362,7 +360,7 @@ public class DatabaseClientTest {
 
     called.clear();
     client.send("UpdateManager:deleteRecord", servers[0], 0, 0, new ComObject(),
-        DatabaseClient.Replica.def, false);
+        DatabaseClient.Replica.DEF, false);
 
     assertEquals(called.size(), 3);
 
@@ -370,7 +368,7 @@ public class DatabaseClientTest {
 
     called.clear();
     client.send("UpdateManager:deleteRecord", servers[0], 0, 0, new ComObject(),
-        DatabaseClient.Replica.def, false);
+        DatabaseClient.Replica.DEF, false);
 
     assertTrue(called.contains("localhost:9020"));
     assertTrue(called.contains("localhost:9030"));
@@ -381,7 +379,7 @@ public class DatabaseClientTest {
 
     called.clear();
     client.send("UpdateManager:deleteRecord", servers[0], 0, 0, new ComObject(),
-        DatabaseClient.Replica.def, false);
+        DatabaseClient.Replica.DEF, false);
 
     assertTrue(called.contains("localhost:9010"));
     assertTrue(called.contains("localhost:9030"));
@@ -403,9 +401,9 @@ public class DatabaseClientTest {
       public void syncSchema(Integer serverVersion) {
         calledSync.set(true);
       }
-      public byte[] do_sendOnSocket(List<DatabaseSocketClient.Request> requests) {
+      public byte[] doSendOnSocket(List<DatabaseSocketClient.Request> requests) {
         for(DatabaseSocketClient.Request request : requests) {
-          called.add(request.hostPort);
+          called.add(request.getHostPort());
         }
         return null;
       }
@@ -459,15 +457,15 @@ public class DatabaseClientTest {
     DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
 
       public byte[] send(String method,
-                         int shard, long auth_user, ComObject body, Replica replica) {
-        if (shard == 0 && auth_user == 1) {
+                         int shard, long authUser, ComObject body, Replica replica) {
+        if (shard == 0 && authUser == 1) {
           calledGetSchema.set(true);
         }
         return null;
       }
 
       public byte[] send(
-          String batchKey, Server[] replicas, int shard, long auth_user,
+          String batchKey, Server[] replicas, int shard, long authUser,
           ComObject body, Replica replica) {
         if (callCount.incrementAndGet() == 1) {
           throw new DatabaseException();
@@ -481,7 +479,7 @@ public class DatabaseClientTest {
     };
 
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.method, "DatabaseServer:heartbeat");
+    cobj.put(ComObject.Tag.METHOD, "DatabaseServer:heartbeat");
     client.sendToMaster(cobj);
 
     assertTrue(calledGetSchema.get());
@@ -493,7 +491,7 @@ public class DatabaseClientTest {
     DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
 
       public byte[] send(String method,
-                         int shard, long auth_user, ComObject body, Replica replica, boolean ignoreDeath) {
+                         int shard, long authUser, ComObject body, Replica replica, boolean ignoreDeath) {
         callCount.incrementAndGet();
         return null;
       }
@@ -504,8 +502,8 @@ public class DatabaseClientTest {
     };
 
     ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.method, "DatabaseServer:heartbeat");
-    client.sendToAllShards(null, 0, cobj, DatabaseClient.Replica.specified);
+    cobj.put(ComObject.Tag.METHOD, "DatabaseServer:heartbeat");
+    client.sendToAllShards(null, 0, cobj, DatabaseClient.Replica.SPECIFIED);
 
     assertEquals(callCount.get(), 2);
   }
@@ -516,7 +514,7 @@ public class DatabaseClientTest {
     DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
 
       public byte[] send(String method,
-                         int shard, long auth_user, ComObject body, Replica replica) {
+                         int shard, long authUser, ComObject body, Replica replica) {
         if (method.equals("DatabaseServer:getConfig")) {
           callCount.incrementAndGet();
         }

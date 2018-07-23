@@ -14,7 +14,6 @@ import com.sonicbase.common.ComObject;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.TableSchema;
 
-import javax.naming.event.ObjectChangeListener;
 import java.sql.*;
 import java.util.Map;
 import java.util.Properties;
@@ -22,32 +21,20 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * Created by IntelliJ IDEA.
- * User: lowryda
- * Date: Oct 7, 2011
- * Time: 3:09:46 PM
- */
 public class ConnectionProxy implements Connection {
 
   private static final Object clientMutex = new Object();
+  public static final String NOT_SUPPORTED_STR = "not supported";
   private static Map<String, ClientEntry> clients = new ConcurrentHashMap<>();
   private final String dbName;
   private final String url;
   private DatabaseClient client;
   private boolean autoCommit;
   private java.util.Map<String, Class<?>> typemap;
-  private Properties _clientInfo;
-  private Properties properties;
   private boolean closed = false;
-  private int shard;
 
   public void addClient(String url, DatabaseClient client) {
-    ConnectionProxy.ClientEntry clientEntry = clients.get(url);
-    if (clientEntry == null) {
-      clientEntry = new ConnectionProxy.ClientEntry(client);
-      clients.put(url, clientEntry);
-    }
+    clients.computeIfAbsent(url, k -> new ClientEntry(client));
   }
 
   public void setClient(DatabaseClient client) {
@@ -66,7 +53,6 @@ public class ConnectionProxy implements Connection {
 
   public ConnectionProxy(String url, Object server) throws SQLException {
 
-    this.properties = properties;
     initGlobalContext();
     try {
       String[] outerParts = url.split("/");
@@ -79,7 +65,7 @@ public class ConnectionProxy implements Connection {
       }
       client = new DatabaseClient(hosts, DatabaseServerProxy.getShard(server), DatabaseServerProxy.getReplica(server), true, DatabaseServerProxy.getCommon(server), server, false);
       if (db != null) {
-        client.initDb(db);
+        client.initDb();
       }
       this.dbName = db;
       this.url = url;
@@ -91,7 +77,6 @@ public class ConnectionProxy implements Connection {
 
   public ConnectionProxy(String url, Properties properties) throws SQLException {
 
-    this.properties = properties;
     initGlobalContext();
     try {
       if (!url.equalsIgnoreCase("mock")) {
@@ -106,11 +91,11 @@ public class ConnectionProxy implements Connection {
         synchronized (clientMutex) {
           ClientEntry clientEntry = clients.get(url);
           if (clientEntry == null) {
-            DatabaseClient client = new DatabaseClient(hosts, -1, -1, false);
-            clientEntry = new ClientEntry(client);
+            DatabaseClient localClient = new DatabaseClient(hosts, -1, -1, false);
+            clientEntry = new ClientEntry(localClient);
             clients.put(url, clientEntry);
             if (db != null) {
-              client.initDb(db);
+              localClient.initDb();
             }
           }
           clientEntry.refCount.incrementAndGet();
@@ -201,13 +186,13 @@ public class ConnectionProxy implements Connection {
     return DescribeStatementHandler.describeLicenses();
   }
 
-    public enum Replica {
-    primary(DatabaseClient.Replica.primary),
-    secondary(DatabaseClient.Replica.secondary),
-    all(DatabaseClient.Replica.all),
-    def(DatabaseClient.Replica.def),
-    specified(DatabaseClient.Replica.specified),
-    master(DatabaseClient.Replica.master);
+  public enum Replica {
+    PRIMARY(DatabaseClient.Replica.PRIMARY),
+    SECONDARY(DatabaseClient.Replica.SECONDARY),
+    ALL(DatabaseClient.Replica.ALL),
+    DEF(DatabaseClient.Replica.DEF),
+    SPECIFIED(DatabaseClient.Replica.SPECIFIED),
+    MASTER(DatabaseClient.Replica.MASTER);
 
     private final DatabaseClient.Replica cliReplica;
 
@@ -217,19 +202,19 @@ public class ConnectionProxy implements Connection {
   }
 
   public byte[] send(String batchKey,
-                     int shard, long auth_user, ComObject body, Replica replica) {
+                     int shard, long authUser, ComObject body, Replica replica) {
     if (client != null) {
-      return client.send(batchKey, shard, auth_user, body, replica.cliReplica);
+      return client.send(batchKey, shard, authUser, body, replica.cliReplica);
     }
-    return clients.get(url).client.send(batchKey, shard, auth_user, body, replica.cliReplica);
+    return clients.get(url).client.send(batchKey, shard, authUser, body, replica.cliReplica);
   }
 
   public byte[] send(String batchKey,
-                     int shard, long auth_user, ComObject body, Replica replica, boolean ignoreDeath) {
+                     int shard, long authUser, ComObject body, Replica replica, boolean ignoreDeath) {
     if (client != null) {
-      return client.send(batchKey, shard, auth_user,  body, replica.cliReplica, ignoreDeath);
+      return client.send(batchKey, shard, authUser,  body, replica.cliReplica, ignoreDeath);
     }
-    return clients.get(url).client.send(batchKey, shard, auth_user,  body, replica.cliReplica, ignoreDeath);
+    return clients.get(url).client.send(batchKey, shard, authUser,  body, replica.cliReplica, ignoreDeath);
   }
 
   public int getMasterReplica(int shard) {
@@ -305,10 +290,10 @@ public class ConnectionProxy implements Connection {
   public void commit() throws SQLException {
     try {
       if (client != null) {
-        client.commit(dbName, null);
+        client.commit(dbName);
       }
       else {
-        clients.get(url).client.commit(dbName, null);
+        clients.get(url).client.commit(dbName);
       }
       autoCommit = true;
     }
@@ -437,7 +422,7 @@ public class ConnectionProxy implements Connection {
   }
 
   public CallableStatement prepareCall(String sql) throws SQLException {
-    throw new SQLException("not supported");
+    throw new SQLException(NOT_SUPPORTED_STR);
   }
 
   public Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException {
@@ -453,7 +438,7 @@ public class ConnectionProxy implements Connection {
   }
 
   public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
-    throw new SQLException("not supported");
+    throw new SQLException(NOT_SUPPORTED_STR);
   }
 
   public PreparedStatement prepareStatement(String sql, int autoGeneratedKeys) throws SQLException {
@@ -473,7 +458,7 @@ public class ConnectionProxy implements Connection {
   }
 
   public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency) throws SQLException {
-    throw new SQLException("not supported");
+    throw new SQLException(NOT_SUPPORTED_STR);
   }
 
   public Map<String, Class<?>> getTypeMap() throws SQLException {

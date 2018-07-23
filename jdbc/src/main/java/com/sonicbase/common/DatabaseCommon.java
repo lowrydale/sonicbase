@@ -1,18 +1,19 @@
 package com.sonicbase.common;
 
-import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.*;
 import org.apache.giraph.utils.Varint;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.math.BigDecimal;
+import java.nio.file.Files;
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -29,7 +30,11 @@ import static java.sql.Types.*;
 @ExcludeRename
 public class DatabaseCommon {
 
-  private org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
+  public static final String SONICBASE_SCHEMA_STR = "_sonicbase_schema";
+  public static final String SNAPSHOT_STR = "snapshot";
+  public static final String UTF_8_STR = "utf-8";
+  public static final String SCHEMA_BIN_STR = "schema.bin";
+  private static Logger logger = LoggerFactory.getLogger(DatabaseCommon.class);
 
 
   private int shard = -1;
@@ -44,37 +49,28 @@ public class DatabaseCommon {
   private Lock internalWriteLock = internalReadWriteLock.writeLock();
   private int schemaVersion;
   private boolean haveProLicense;
-  private int[] masterReplicas;
-  private boolean[][] deadNodes;
 
   public Lock getSchemaReadLock(String dbName) {
-    Lock ret = schemaReadLock.get(dbName);
-    if (ret == null) {
+    return schemaReadLock.computeIfAbsent(dbName, k -> {
       ReadWriteLock lock = new ReentrantReadWriteLock();
       schemaReadWriteLock.put(dbName, lock);
-      schemaReadLock.put(dbName, lock.readLock());
       schemaWriteLock.put(dbName, lock.writeLock());
-      ret = schemaReadLock.get(dbName);
-    }
-    return ret;
+      return lock.readLock();
+    });
   }
 
   public Lock getSchemaWriteLock(String dbName) {
-    Lock ret = schemaWriteLock.get(dbName);
-    if (ret == null) {
+    return schemaWriteLock.computeIfAbsent(dbName, k -> {
       ReadWriteLock lock = new ReentrantReadWriteLock();
       schemaReadWriteLock.put(dbName, lock);
       schemaReadLock.put(dbName, lock.readLock());
-      schemaWriteLock.put(dbName, lock.writeLock());
-      ret = schemaWriteLock.get(dbName);
-    }
-    return ret;
+      return lock.writeLock();
+    });
   }
 
   public Schema getSchema(String dbName) {
 
-    Schema retSchema = ensureSchemaExists(dbName);
-    return retSchema;
+    return ensureSchemaExists(dbName);
   }
 
   public Map<String, TableSchema> getTables(String dbName) {
@@ -100,8 +96,9 @@ public class DatabaseCommon {
     if (tableSchema != null) {
       return tableSchema;
     }
-    File file = new File(dataDir, "snapshot/" + shard + "/" + replica + "/_sonicbase_schema/" + dbName);
-    File tableDir = new File(file, tableName + "/table");
+    File file = new File(dataDir, SNAPSHOT_STR + File.separator + shard + File.separator + replica + File.separator +
+        SONICBASE_SCHEMA_STR + File.separator + dbName);
+    File tableDir = new File(file, tableName + File.separator + "table");
     try {
       loadTableSchema(dbSchema, tableDir);
     }
@@ -115,9 +112,9 @@ public class DatabaseCommon {
     try {
       internalWriteLock.lock();
       try {
-        String dataRoot = dataRoot = new File(dataDir, "snapshot/" + shard + "/" + replica).getAbsolutePath();
-        File schemaFile = new File(dataRoot, "schema.bin");
-        logger.info("Loading schema: file=" + schemaFile.getAbsolutePath());
+        String dataRoot = dataRoot = new File(dataDir, SNAPSHOT_STR + File.separator + shard + File.separator + replica).getAbsolutePath();
+        File schemaFile = new File(dataRoot, SCHEMA_BIN_STR);
+        logger.info("Loading schema: file={}", schemaFile.getAbsolutePath());
         if (schemaFile.exists()) {
           try (DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(schemaFile)))) {
             deserializeSchema(in);
@@ -126,7 +123,6 @@ public class DatabaseCommon {
         else {
           logger.info("No schema file found");
         }
-        //schema.clear();
         List<String> dbNames = getDbNames(dataDir);
         for (String dbName : dbNames) {
           Schema dbSchema = schema.get(dbName);
@@ -134,7 +130,8 @@ public class DatabaseCommon {
             dbSchema = new Schema();
             schema.put(dbName, dbSchema);
           }
-          File file = new File(dataDir, "snapshot/" + shard + "/" + replica + "/_sonicbase_schema/" + dbName);
+          File file = new File(dataDir, SNAPSHOT_STR + File.separator + shard + File.separator + replica + File.separator +
+              SONICBASE_SCHEMA_STR + File.separator + dbName);
           File[] tableNames = file.listFiles();
           if (tableNames != null) {
             for (File tableFile : tableNames) {
@@ -169,18 +166,12 @@ public class DatabaseCommon {
         try {
           tableSchema.deserialize(in, serializationVersion);
           TableSchema existingSchema = dbSchema.getTables().get(tableSchema.getName());
-//          if (existingSchema != null) {
-//            for (IndexSchema indexSchema : existingSchema.getIndexes().values()) {
-//              tableSchema.getIndexes().put(indexSchema.getName(), indexSchema);
-//              tableSchema.getIndexesById().put(indexSchema.getIndexId(), indexSchema);
-//            }
-//          }
           existingSchema.getIndexesById().clear();
-          existingSchema.getIndexes().clear(); //ignore indices in the table will read index files
+          existingSchema.getIndices().clear(); //ignore indices in the table will read index files
 
           dbSchema.getTables().put(tableSchema.getName(), tableSchema);
           dbSchema.getTablesById().put(tableSchema.getTableId(), tableSchema);
-          File indicesDir = new File(tableFile, "/indices");
+          File indicesDir = new File(tableFile, File.separator + "indices");
           if (indicesDir.exists()) {
             File[] indices = indicesDir.listFiles();
             if (indices != null) {
@@ -242,13 +233,14 @@ public class DatabaseCommon {
     }
   }
 
-  public void saveSchema(DatabaseClient client, String dataDir) {
+  public void saveSchema(String dataDir) {
     try {
       internalWriteLock.lock();
-      String dataRoot = dataRoot = new File(dataDir, "snapshot/" + shard + "/" + replica).getAbsolutePath();
-      File schemaFile = new File(dataRoot, "schema.bin");
+      String dataRoot = new File(dataDir, SNAPSHOT_STR + File.separator + shard + File.separator +
+          replica).getAbsolutePath();
+      File schemaFile = new File(dataRoot, SCHEMA_BIN_STR);
       if (schemaFile.exists()) {
-        schemaFile.delete();
+        Files.delete(schemaFile.toPath());
       }
 
       schemaFile.getParentFile().mkdirs();
@@ -256,13 +248,12 @@ public class DatabaseCommon {
         if (getShard() == 0 &&
             getServersConfig().getShards()[0].getMasterReplica() == getReplica()) {
           this.schemaVersion++;
-          //          schema.get(dbName).incrementSchemaVersion();
         }
         serializeSchema(out, SERIALIZATION_VERSION);
 
       }
       loadSchema(dataDir);
-      logger.info("Saved schema - postLoad: dir=" + dataRoot);
+      logger.info("Saved schema - postLoad: dir={}", dataRoot);
 
     }
     catch (IOException e) {
@@ -315,14 +306,14 @@ public class DatabaseCommon {
     this.replica = replica;
   }
 
-  public void updateTable(DatabaseClient client, String dbName, String dataDir, TableSchema tableSchema) {
+  public void updateTable(String dbName, TableSchema tableSchema) {
     synchronized (this) {
       schema.get(dbName).updateTable(tableSchema);
     }
   }
 
 
-  public void addTable(DatabaseClient client, String dbName, String dataDir, TableSchema schema) {
+  public void addTable(String dbName,TableSchema schema) {
     synchronized (this) {
       Schema retSchema = ensureSchemaExists(dbName);
       retSchema.addTable(schema);
@@ -331,12 +322,7 @@ public class DatabaseCommon {
 
   private Schema ensureSchemaExists(String dbName) {
     synchronized (this) {
-      Schema retSchema = this.schema.get(dbName);
-      if (retSchema == null) {
-        retSchema = new Schema();
-        this.schema.put(dbName, retSchema);
-      }
-      return retSchema;
+      return this.schema.computeIfAbsent(dbName, k -> new Schema());
     }
   }
 
@@ -402,7 +388,7 @@ public class DatabaseCommon {
 
     int indexId = -1;
     try {
-      short serializationVersion = (short)Varint.readSignedVarLong(in);
+      Varint.readSignedVarLong(in); // serializationVersion
       Varint.readSignedVarLong(in);
       indexId = (int) Varint.readSignedVarLong(in);
       IndexSchema indexSchema = tableSchema.getIndexesById().get(indexId);
@@ -423,34 +409,20 @@ public class DatabaseCommon {
           else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.TINYINT) {
             fields[i] = in.readByte();
           }
-          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.CHAR) {
-            int len = (int) Varint.readSignedVarLong(in);
-            byte[] bytes = new byte[len];
-            in.read(bytes);
-            fields[i] = bytes;
-          }
-          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.NCHAR) {
-            int len = (int) Varint.readSignedVarLong(in);
-            byte[] bytes = new byte[len];
-            in.read(bytes);
-            fields[i] = bytes;
-          }
-          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.FLOAT) {
+          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.FLOAT ||
+              tableSchema.getFields().get(columns[i]).getType() == DataType.Type.DOUBLE) {
             fields[i] = in.readDouble();
           }
           else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.REAL) {
             fields[i] = in.readFloat();
           }
-          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.DOUBLE) {
-            fields[i] = in.readDouble();
-          }
-          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.BOOLEAN) {
+          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.BOOLEAN ||
+              tableSchema.getFields().get(columns[i]).getType() == DataType.Type.BIT) {
             fields[i] = in.readBoolean();
           }
-          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.BIT) {
-            fields[i] = in.readBoolean();
-          }
-          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.VARCHAR ||
+          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.CHAR ||
+              tableSchema.getFields().get(columns[i]).getType() == DataType.Type.NCHAR ||
+              tableSchema.getFields().get(columns[i]).getType() == DataType.Type.VARCHAR ||
               tableSchema.getFields().get(columns[i]).getType() == DataType.Type.LONGVARCHAR ||
               tableSchema.getFields().get(columns[i]).getType() == DataType.Type.LONGNVARCHAR ||
               tableSchema.getFields().get(columns[i]).getType() == DataType.Type.CLOB ||
@@ -473,35 +445,35 @@ public class DatabaseCommon {
             int len = (int) Varint.readSignedVarLong(in);
             byte[] buffer = new byte[len];
             in.readFully(buffer);
-            String str = new String(buffer, "utf-8");
+            String str = new String(buffer, UTF_8_STR);
             fields[i] = new BigDecimal(str);
           }
           else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.DECIMAL) {
             int len = (int) Varint.readSignedVarLong(in);
             byte[] buffer = new byte[len];
             in.readFully(buffer);
-            String str = new String(buffer, "utf-8");
+            String str = new String(buffer, UTF_8_STR);
             fields[i] = new BigDecimal(str);
           }
           else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.DATE) {
             int len = (int) Varint.readSignedVarLong(in);
             byte[] buffer = new byte[len];
             in.readFully(buffer);
-            String str = new String(buffer, "utf-8");
+            String str = new String(buffer, UTF_8_STR);
             fields[i] = Date.valueOf(str);
           }
           else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.TIME) {
             int len = (int) Varint.readSignedVarLong(in);
             byte[] buffer = new byte[len];
             in.readFully(buffer);
-            String str = new String(buffer, "utf-8");
+            String str = new String(buffer, UTF_8_STR);
             fields[i] = Time.valueOf(str);
           }
           else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.TIMESTAMP) {
             int len = (int) Varint.readSignedVarLong(in);
             byte[] buffer = new byte[len];
             in.readFully(buffer);
-            String str = new String(buffer, "utf-8");
+            String str = new String(buffer, UTF_8_STR);
             fields[i] = Timestamp.valueOf(str);
           }
         }
@@ -521,10 +493,9 @@ public class DatabaseCommon {
 
   public static DataType.Type[] deserializeKeyPrep(TableSchema tableSchema, byte[] bytes) throws IOException {
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
-    short serializationVersion = (short)Varint.readSignedVarLong(in);
+    Varint.readSignedVarLong(in); // serializationVersion
     Varint.readSignedVarLong(in);
     int indexId = (int) Varint.readSignedVarLong(in);
-    //logger.info("tableId=" + tableId + " indexId=" + indexId + ", indexCount=" + tableSchema.getIndices().size());
     IndexSchema indexSchema = tableSchema.getIndexesById().get(indexId);
 
     String[] columns = indexSchema.getFields();
@@ -540,13 +511,11 @@ public class DatabaseCommon {
     return types;
   }
 
-  public static Object[] deserializeKey(TableSchema tableSchema, DataType.Type[] types, DataInputStream in) throws EOFException {
+  public static Object[] deserializeKey(DataType.Type[] types, DataInputStream in) throws EOFException {
     try {
-      short serializationVersion = (short)Varint.readSignedVarLong(in);
+      Varint.readSignedVarLong(in); // serializationVersion
       Varint.readSignedVarLong(in);
-      int indexId = (int) Varint.readSignedVarLong(in);
-      IndexSchema indexSchema = tableSchema.getIndexesById().get(indexId);
-      String[] columns = indexSchema.getFields();
+      Varint.readSignedVarLong(in); //indexId
       int keyLength = (int) Varint.readSignedVarLong(in);
       Object[] fields = new Object[keyLength];
       for (int i = 0; i < keyLength; i++) {
@@ -563,18 +532,6 @@ public class DatabaseCommon {
           else if (types[i] == DataType.Type.TINYINT) {
             fields[i] = in.readByte();
           }
-          else if (types[i] == DataType.Type.CHAR) {
-            int len = (int) Varint.readSignedVarLong(in);
-            byte[] bytes = new byte[len];
-            in.read(bytes);
-            fields[i] = bytes;
-          }
-          else if (types[i] == DataType.Type.NCHAR) {
-            int len = (int) Varint.readSignedVarLong(in);
-            byte[] bytes = new byte[len];
-            in.read(bytes);
-            fields[i] = bytes;
-          }
           else if (types[i] == DataType.Type.FLOAT) {
             fields[i] = in.readDouble();
           }
@@ -590,7 +547,9 @@ public class DatabaseCommon {
           else if (types[i] == DataType.Type.BIT) {
             fields[i] = in.readBoolean();
           }
-          else if (types[i] == DataType.Type.VARCHAR ||
+          else if (types[i] == DataType.Type.CHAR ||
+              types[i] == DataType.Type.NCHAR ||
+              types[i] == DataType.Type.VARCHAR ||
               types[i] == DataType.Type.LONGVARCHAR ||
               types[i] == DataType.Type.LONGNVARCHAR ||
               types[i] == DataType.Type.CLOB ||
@@ -609,39 +568,33 @@ public class DatabaseCommon {
             in.readFully(data);
             fields[i] = data;
           }
-          else if (types[i] == DataType.Type.NUMERIC) {
+          else if (types[i] == DataType.Type.NUMERIC ||
+              types[i] == DataType.Type.DECIMAL) {
             int len = (int) Varint.readSignedVarLong(in);
             byte[] buffer = new byte[len];
             in.readFully(buffer);
-            String str = new String(buffer, "utf-8");
-            fields[i] = new BigDecimal(str);
-          }
-          else if (types[i] == DataType.Type.DECIMAL) {
-            int len = (int) Varint.readSignedVarLong(in);
-            byte[] buffer = new byte[len];
-            in.readFully(buffer);
-            String str = new String(buffer, "utf-8");
+            String str = new String(buffer, UTF_8_STR);
             fields[i] = new BigDecimal(str);
           }
           else if (types[i] == DataType.Type.DATE) {
             int len = (int) Varint.readSignedVarLong(in);
             byte[] buffer = new byte[len];
             in.readFully(buffer);
-            String str = new String(buffer, "utf-8");
+            String str = new String(buffer, UTF_8_STR);
             fields[i] = Date.valueOf(str);
           }
           else if (types[i] == DataType.Type.TIME) {
             int len = (int) Varint.readSignedVarLong(in);
             byte[] buffer = new byte[len];
             in.readFully(buffer);
-            String str = new String(buffer, "utf-8");
+            String str = new String(buffer, UTF_8_STR);
             fields[i] = Time.valueOf(str);
           }
           else if (types[i] == DataType.Type.TIMESTAMP) {
             int len = (int) Varint.readSignedVarLong(in);
             byte[] buffer = new byte[len];
             in.readFully(buffer);
-            String str = new String(buffer, "utf-8");
+            String str = new String(buffer, UTF_8_STR);
             fields[i] = Timestamp.valueOf(str);
           }
         }
@@ -662,7 +615,7 @@ public class DatabaseCommon {
       DataOutputStream out = new DataOutputStream(bytesOut);
       Varint.writeSignedVarLong(SERIALIZATION_VERSION, out);
       Varint.writeSignedVarLong(tableSchema.getTableId(), out);
-      Varint.writeSignedVarLong(tableSchema.getIndexes().get(indexName).getIndexId(), out);
+      Varint.writeSignedVarLong(tableSchema.getIndices().get(indexName).getIndexId(), out);
       IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
       String[] columns = indexSchema.getFields();
       if (key == null) {
@@ -690,26 +643,6 @@ public class DatabaseCommon {
               else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.TINYINT) {
                 out.write((byte) key[i]);
               }
-              else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.CHAR) {
-                byte[] bytes = (byte[]) key[i];
-                if (bytes == null) {
-                  Varint.writeSignedVarLong(0, out);
-                }
-                else {
-                  Varint.writeSignedVarLong(bytes.length, out);
-                  out.write(bytes);
-                }
-              }
-              else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.NCHAR) {
-                byte[] bytes = (byte[]) key[i];
-                if (bytes == null) {
-                  Varint.writeSignedVarLong(0, out);
-                }
-                else {
-                  Varint.writeSignedVarLong(bytes.length, out);
-                  out.write(bytes);
-                }
-              }
               else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.FLOAT) {
                 out.writeDouble((Double) key[i]);
               }
@@ -725,12 +658,17 @@ public class DatabaseCommon {
               else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.BIT) {
                 out.writeBoolean((Boolean) key[i]);
               }
-              else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.VARCHAR ||
+              else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.CHAR ||
+                  tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.NCHAR ||
+                  tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.VARCHAR ||
                   tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.CLOB ||
                   tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.NCLOB ||
                   tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.LONGNVARCHAR ||
                   tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.NVARCHAR ||
-                  tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.LONGVARCHAR
+                  tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.LONGVARCHAR ||
+                  tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.LONGVARBINARY ||
+                  tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.VARBINARY ||
+                  tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.BLOB
                   ) {
                 byte[] bytes = (byte[]) key[i];
                 if (bytes == null) {
@@ -741,50 +679,32 @@ public class DatabaseCommon {
                   out.write(bytes);
                 }
               }
-              else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.LONGVARBINARY ||
-                  tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.VARBINARY ||
-                  tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.BLOB) {
-                byte[] bytes = (byte[]) key[i];
-                if (bytes == null) {
-                  Varint.writeSignedVarLong(0, out);
-                }
-                else {
-                  Varint.writeSignedVarLong(bytes.length, out);
-                  out.write(bytes);
-                }
-              }
-              else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.NUMERIC) {
+              else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.NUMERIC ||
+                  tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.DECIMAL) {
                 BigDecimal value = ((BigDecimal) key[i]);
                 String strValue = value.toPlainString();
-                byte[] bytes = strValue.getBytes("utf-8");
-                Varint.writeSignedVarLong(bytes.length, out);
-                out.write(bytes);
-              }
-              else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.DECIMAL) {
-                BigDecimal value = ((BigDecimal) key[i]);
-                String strValue = value.toPlainString();
-                byte[] bytes = strValue.getBytes("utf-8");
+                byte[] bytes = strValue.getBytes(UTF_8_STR);
                 Varint.writeSignedVarLong(bytes.length, out);
                 out.write(bytes);
               }
               else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.DATE) {
                 Date value = ((Date) key[i]);
                 String str = value.toString();
-                byte[] bytes = str.getBytes("utf-8");
+                byte[] bytes = str.getBytes(UTF_8_STR);
                 Varint.writeSignedVarLong(bytes.length, out);
                 out.write(bytes);
               }
               else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.TIME) {
                 Time value = ((Time) key[i]);
                 String str = value.toString();
-                byte[] bytes = str.getBytes("utf-8");
+                byte[] bytes = str.getBytes(UTF_8_STR);
                 Varint.writeSignedVarLong(bytes.length, out);
                 out.write(bytes);
               }
               else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.TIMESTAMP) {
                 Timestamp value = ((Timestamp) key[i]);
                 String str = value.toString();
-                byte[] bytes = str.getBytes("utf-8");
+                byte[] bytes = str.getBytes(UTF_8_STR);
                 Varint.writeSignedVarLong(bytes.length, out);
                 out.write(bytes);
               }
@@ -805,7 +725,7 @@ public class DatabaseCommon {
 
       DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
 
-      int serializationVersion = (int) Varint.readUnsignedVarLong(in);
+      Varint.readUnsignedVarLong(in); // serializationVersion
       int count = (int) Varint.readUnsignedVarLong(in);
       if (count == 0) {
         return null;
@@ -816,7 +736,7 @@ public class DatabaseCommon {
           int type = (int) Varint.readSignedVarLong(in);
           switch (type) {
             case BIGINT:
-              ret[i] = (long)Varint.readSignedVarLong(in);
+              ret[i] = Varint.readSignedVarLong(in);
               break;
             case INTEGER:
               ret[i] = (int)Varint.readSignedVarLong(in);
@@ -849,7 +769,7 @@ public class DatabaseCommon {
               int len = (int) Varint.readSignedVarLong(in);
               byte[] buffer = new byte[len];
               in.readFully(buffer);
-              String value = new String(buffer, "utf-8");
+              String value = new String(buffer, UTF_8_STR);
               ret[i] = new BigDecimal(value);
               break;
             }
@@ -857,7 +777,7 @@ public class DatabaseCommon {
               int len = (int) Varint.readSignedVarLong(in);
               byte[] buffer = new byte[len];
               in.readFully(buffer);
-              String value = new String(buffer, "utf-8");
+              String value = new String(buffer, UTF_8_STR);
               ret[i] = Date.valueOf(value);
             }
               break;
@@ -865,7 +785,7 @@ public class DatabaseCommon {
               int len = (int) Varint.readSignedVarLong(in);
               byte[] buffer = new byte[len];
               in.readFully(buffer);
-              String value = new String(buffer, "utf-8");
+              String value = new String(buffer, UTF_8_STR);
               ret[i] = Time.valueOf(value);
             }
               break;
@@ -873,7 +793,7 @@ public class DatabaseCommon {
               int len = (int) Varint.readSignedVarLong(in);
               byte[] buffer = new byte[len];
               in.readFully(buffer);
-              String value = new String(buffer, "utf-8");
+              String value = new String(buffer, UTF_8_STR);
               ret[i] = Timestamp.valueOf(value);
             }
             break;
@@ -936,28 +856,28 @@ public class DatabaseCommon {
             else if (key[i] instanceof BigDecimal) {
               BigDecimal value = ((BigDecimal) key[i]);
               String strValue = value.toPlainString();
-              byte[] bytes = strValue.getBytes("utf-8");
+              byte[] bytes = strValue.getBytes(UTF_8_STR);
               Varint.writeSignedVarLong(bytes.length, out);
               out.write(bytes);
             }
             else if (key[i] instanceof Date) {
               Date value = ((Date) key[i]);
               String str = value.toString();
-              byte[] bytes = str.getBytes("utf-8");
+              byte[] bytes = str.getBytes(UTF_8_STR);
               Varint.writeSignedVarLong(bytes.length, out);
               out.write(bytes);
             }
             else if (key[i] instanceof Time) {
               Time value = ((Time) key[i]);
               String str = value.toString();
-              byte[] bytes = str.getBytes("utf-8");
+              byte[] bytes = str.getBytes(UTF_8_STR);
               Varint.writeSignedVarLong(bytes.length, out);
               out.write(bytes);
             }
             else if (key[i] instanceof Timestamp) {
               Timestamp value = ((Timestamp) key[i]);
               String str = value.toString();
-              byte[] bytes = str.getBytes("utf-8");
+              byte[] bytes = str.getBytes(UTF_8_STR);
               Varint.writeSignedVarLong(bytes.length, out);
               out.write(bytes);
             }
@@ -976,16 +896,14 @@ public class DatabaseCommon {
   }
 
   public static void serializeFields(
-      Object[] fields, DataOutputStream outerOut, TableSchema tableSchema, int schemaVersion, boolean serializeHeader) throws IOException {
+      Object[] fields, DataOutputStream outerOut, TableSchema tableSchema, int schemaVersion) throws IOException {
 
     ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
     DataOutputStream out = new DataOutputStream(bytesOut);
-    AtomicInteger readLen = new AtomicInteger();
 
     Varint.writeSignedVarLong(schemaVersion, out);
 
     int offset = 0;
-    byte[] buffer = new byte[16];
     for (Object field : fields) {
       if (field == null) {
         Varint.writeSignedVarLong(0, out);
@@ -1015,19 +933,8 @@ public class DatabaseCommon {
           out.write((byte) field);
           offset++;
         }
-        else if (tableSchema.getFields().get(offset).getType() == DataType.Type.CHAR) {
-          byte[] bytes = (byte[]) field;
-          Varint.writeSignedVarLong(bytes.length, out);
-          out.write(bytes);
-          offset++;
-        }
-        else if (tableSchema.getFields().get(offset).getType() == DataType.Type.NCHAR) {
-          byte[] bytes = (byte[]) field;
-          Varint.writeSignedVarLong(bytes.length, out);
-          out.write(bytes);
-          offset++;
-        }
-        else if (tableSchema.getFields().get(offset).getType() == DataType.Type.FLOAT) {
+        else if (tableSchema.getFields().get(offset).getType() == DataType.Type.FLOAT ||
+            tableSchema.getFields().get(offset).getType() == DataType.Type.DOUBLE) {
           Varint.writeSignedVarLong(8, out);
           out.writeDouble((Double) field);
           offset++;
@@ -1037,33 +944,15 @@ public class DatabaseCommon {
           out.writeFloat((Float) field);
           offset++;
         }
-        else if (tableSchema.getFields().get(offset).getType() == DataType.Type.DOUBLE) {
-          Varint.writeSignedVarLong(8, out);
-          out.writeDouble((Double) field);
-          offset++;
-        }
-        else if (tableSchema.getFields().get(offset).getType() == DataType.Type.VARCHAR ||
+        else if (tableSchema.getFields().get(offset).getType() == DataType.Type.CHAR ||
+            tableSchema.getFields().get(offset).getType() == DataType.Type.NCHAR ||
+            tableSchema.getFields().get(offset).getType() == DataType.Type.VARCHAR ||
             tableSchema.getFields().get(offset).getType() == DataType.Type.NVARCHAR ||
             tableSchema.getFields().get(offset).getType() == DataType.Type.CLOB ||
             tableSchema.getFields().get(offset).getType() == DataType.Type.NCLOB ||
             tableSchema.getFields().get(offset).getType() == DataType.Type.LONGNVARCHAR ||
-            tableSchema.getFields().get(offset).getType() == DataType.Type.LONGVARCHAR) {
-          byte[] bytes = (byte[]) field;
-          Varint.writeSignedVarLong(bytes.length, out);
-          out.write(bytes);
-          offset++;
-        }
-        else if (tableSchema.getFields().get(offset).getType() == DataType.Type.BOOLEAN) {
-          Varint.writeSignedVarLong(1, out);
-          out.write((Boolean) field ? 1 : 0);
-          offset++;
-        }
-        else if (tableSchema.getFields().get(offset).getType() == DataType.Type.BIT) {
-          Varint.writeSignedVarLong(1, out);
-          out.write((Boolean) field ? 1 : 0);
-          offset++;
-        }
-        else if (tableSchema.getFields().get(offset).getType() == DataType.Type.LONGVARBINARY ||
+            tableSchema.getFields().get(offset).getType() == DataType.Type.LONGVARCHAR ||
+            tableSchema.getFields().get(offset).getType() == DataType.Type.LONGVARBINARY ||
             tableSchema.getFields().get(offset).getType() == DataType.Type.VARBINARY ||
             tableSchema.getFields().get(offset).getType() == DataType.Type.BLOB) {
           byte[] bytes = (byte[]) field;
@@ -1071,18 +960,17 @@ public class DatabaseCommon {
           out.write(bytes);
           offset++;
         }
-        else if (tableSchema.getFields().get(offset).getType() == DataType.Type.NUMERIC) {
-          BigDecimal value = ((BigDecimal) field);
-          String strValue = value.toPlainString();
-          byte[] bytes = strValue.getBytes("utf-8");
-          Varint.writeSignedVarLong(bytes.length, out);
-          out.write(bytes);
+        else if (tableSchema.getFields().get(offset).getType() == DataType.Type.BOOLEAN ||
+            tableSchema.getFields().get(offset).getType() == DataType.Type.BIT) {
+          Varint.writeSignedVarLong(1, out);
+          out.write((Boolean) field ? 1 : 0);
           offset++;
         }
-        else if (tableSchema.getFields().get(offset).getType() == DataType.Type.DECIMAL) {
+        else if (tableSchema.getFields().get(offset).getType() == DataType.Type.NUMERIC ||
+            tableSchema.getFields().get(offset).getType() == DataType.Type.DECIMAL) {
           BigDecimal value = ((BigDecimal) field);
           String strValue = value.toPlainString();
-          byte[] bytes = strValue.getBytes("utf-8");
+          byte[] bytes = strValue.getBytes(UTF_8_STR);
           Varint.writeSignedVarLong(bytes.length, out);
           out.write(bytes);
           offset++;
@@ -1090,7 +978,7 @@ public class DatabaseCommon {
         else if (tableSchema.getFields().get(offset).getType() == DataType.Type.DATE) {
           Date value = ((Date) field);
           String str = value.toString();
-          byte[] bytes = str.getBytes("utf-8");
+          byte[] bytes = str.getBytes(UTF_8_STR);
           Varint.writeSignedVarLong(bytes.length, out);
           out.write(bytes);
           offset++;
@@ -1098,7 +986,7 @@ public class DatabaseCommon {
         else if (tableSchema.getFields().get(offset).getType() == DataType.Type.TIME) {
           Time value = ((Time) field);
           String str = value.toString();
-          byte[] bytes = str.getBytes("utf-8");
+          byte[] bytes = str.getBytes(UTF_8_STR);
           Varint.writeSignedVarLong(bytes.length, out);
           out.write(bytes);
           offset++;
@@ -1106,7 +994,7 @@ public class DatabaseCommon {
         else if (tableSchema.getFields().get(offset).getType() == DataType.Type.TIMESTAMP) {
           Timestamp value = ((Timestamp) field);
           String str = value.toString();
-          byte[] bytes = str.getBytes("utf-8");
+          byte[] bytes = str.getBytes(UTF_8_STR);
           Varint.writeSignedVarLong(bytes.length, out);
           out.write(bytes);
           offset++;
@@ -1123,12 +1011,12 @@ public class DatabaseCommon {
   }
 
   public static Object[] deserializeFields(
-      String dbName, DatabaseCommon common, DataInputStream in, TableSchema tableSchema, int schemaVersion,
-      int dbViewNumber, Set<Integer> columns, boolean deserializeHeader) throws IOException {
+      DataInputStream in, TableSchema tableSchema, int schemaVersion,
+      Set<Integer> columns) throws IOException {
     List<FieldSchema> currFieldList = tableSchema.getFields();
     List<FieldSchema> serializedFieldList = null;
 
-    int serializedVersion = (int)Varint.readSignedVarLong(in);;
+    int serializedVersion = (int)Varint.readSignedVarLong(in);
 
     serializedFieldList = tableSchema.getFieldsForVersion(schemaVersion, serializedVersion);
 
@@ -1145,11 +1033,9 @@ public class DatabaseCommon {
       }
       int size = (int) Varint.readSignedVarLong(in);
       if (size > 0) {
-        if (columns != null) {
-          if (!columns.contains(currOffset)) {
-            in.skipBytes(size);
-            continue;
-          }
+        if (columns != null && !columns.contains(currOffset)) {
+          in.skipBytes(size);
+          continue;
         }
         if (field.getType() == DataType.Type.BIGINT) {
           fields[currOffset] = Varint.readSignedVarLong(in);
@@ -1163,16 +1049,6 @@ public class DatabaseCommon {
         else if (field.getType() == DataType.Type.TINYINT) {
           fields[currOffset] = in.readByte();
         }
-        else if (field.getType() == DataType.Type.NCHAR) {
-          byte[] buffer = new byte[size];
-          in.readFully(buffer);
-          fields[currOffset] = buffer;
-        }
-        else if (field.getType() == DataType.Type.CHAR) {
-          byte[] buffer = new byte[size];
-          in.readFully(buffer);
-          fields[currOffset] = buffer;
-        }
         else if (field.getType() == DataType.Type.FLOAT) {
           fields[currOffset] = in.readDouble();
         }
@@ -1182,12 +1058,17 @@ public class DatabaseCommon {
         else if (field.getType() == DataType.Type.DOUBLE) {
           fields[currOffset] = in.readDouble();
         }
-        else if (field.getType() == DataType.Type.VARCHAR ||
+        else if (field.getType() == DataType.Type.NCHAR ||
+            field.getType() == DataType.Type.CHAR ||
+            field.getType() == DataType.Type.VARCHAR ||
             field.getType() == DataType.Type.NVARCHAR ||
             field.getType() == DataType.Type.CLOB ||
             field.getType() == DataType.Type.NCLOB ||
             field.getType() == DataType.Type.LONGNVARCHAR ||
-            field.getType() == DataType.Type.LONGVARCHAR) {
+            field.getType() == DataType.Type.LONGVARCHAR ||
+            field.getType() == DataType.Type.VARBINARY ||
+            field.getType() == DataType.Type.LONGVARBINARY ||
+            field.getType() == DataType.Type.BLOB) {
           byte[] buffer = new byte[size];
           in.readFully(buffer);
           fields[currOffset] = buffer;
@@ -1198,45 +1079,33 @@ public class DatabaseCommon {
         else if (field.getType() == DataType.Type.BIT) {
           fields[currOffset] = in.readByte() == 1;
         }
-        else if (field.getType() == DataType.Type.VARBINARY ||
-            field.getType() == DataType.Type.LONGVARBINARY ||
-            field.getType() == DataType.Type.BLOB) {
+        else if (field.getType() == DataType.Type.DECIMAL ||
+            field.getType() == DataType.Type.NUMERIC) {
           byte[] buffer = new byte[size];
           in.readFully(buffer);
-          fields[currOffset] = buffer;
-        }
-        else if (field.getType() == DataType.Type.NUMERIC) {
-          byte[] buffer = new byte[size];
-          in.readFully(buffer);
-          String str = new String(buffer, "utf-8");
-          fields[currOffset] = new BigDecimal(str);
-        }
-        else if (field.getType() == DataType.Type.DECIMAL) {
-          byte[] buffer = new byte[size];
-          in.readFully(buffer);
-          String str = new String(buffer, "utf-8");
+          String str = new String(buffer, UTF_8_STR);
           fields[currOffset] = new BigDecimal(str);
         }
         else if (field.getType() == DataType.Type.DATE) {
           byte[] buffer = new byte[size];
           in.readFully(buffer);
-          String str = new String(buffer, "utf-8");
+          String str = new String(buffer, UTF_8_STR);
           fields[currOffset] = Date.valueOf(str);
         }
         else if (field.getType() == DataType.Type.TIME) {
           byte[] buffer = new byte[size];
           in.readFully(buffer);
-          String str = new String(buffer, "utf-8");
+          String str = new String(buffer, UTF_8_STR);
           fields[currOffset] = Time.valueOf(str);
         }
         else if (field.getType() == DataType.Type.TIMESTAMP) {
           byte[] buffer = new byte[size];
           in.readFully(buffer);
-          String str = new String(buffer, "utf-8");
+          String str = new String(buffer, UTF_8_STR);
           fields[currOffset] = Timestamp.valueOf(str);
         }
         else {
-          System.out.println("unknown field");
+          logger.info("unknown field");
         }
       }
       else {
@@ -1259,8 +1128,8 @@ public class DatabaseCommon {
 
     Integer replicaCount = null;
     ServersConfig.Shard[] shards = serversConfig.getShards();
-    for (ServersConfig.Shard shard : shards) {
-      ServersConfig.Host[] replicas = shard.getReplicas();
+    for (ServersConfig.Shard localShard : shards) {
+      ServersConfig.Host[] replicas = localShard.getReplicas();
       if (replicaCount == null) {
         replicaCount = replicas.length;
       }
@@ -1312,10 +1181,10 @@ public class DatabaseCommon {
   public void saveServersConfig(String dataDir) throws IOException {
     try {
       internalWriteLock.lock();
-      String dataRoot = dataRoot = new File(dataDir, "snapshot/" + shard + "/" + replica).getAbsolutePath();
+      String dataRoot = dataRoot = new File(dataDir, SNAPSHOT_STR + File.separator + shard + File.separator + replica).getAbsolutePath();
       File configFile = new File(dataRoot, "config.bin");
       if (configFile.exists()) {
-        configFile.delete();
+        Files.delete(configFile.toPath());
       }
       configFile.getParentFile().mkdirs();
       try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(configFile)))) {
@@ -1332,7 +1201,7 @@ public class DatabaseCommon {
     return schemaVersion;
   }
 
-  public void dropTable(DatabaseClient client, String dbName, String tableName, String dataDir) {
+  public void dropTable(String dbName, String tableName) {
     synchronized (this) {
       schema.get(dbName).getTables().remove(tableName);
     }
@@ -1346,7 +1215,7 @@ public class DatabaseCommon {
       StringBuilder keyStr = new StringBuilder("[");
       for (Object curr : key) {
         if (curr instanceof byte[]) {
-          keyStr.append(",").append(new String((byte[]) curr, "utf-8"));
+          keyStr.append(",").append(new String((byte[]) curr, UTF_8_STR));
         }
         else {
           keyStr.append(",").append(curr);
@@ -1370,9 +1239,7 @@ public class DatabaseCommon {
   }
 
   public boolean haveProLicense() {
-
     return true;
-    //return haveProLicense;
   }
 
   public void setSchemaVersion(int schemaVersion) {
@@ -1380,19 +1247,18 @@ public class DatabaseCommon {
   }
 
   public List<String> getDbNames(String dataDir) {
-    File file = file = new File(dataDir, "snapshot/" + shard + "/" + replica);
+    File file = new File(dataDir, SNAPSHOT_STR + File.separator + shard + File.separator + replica);
     Set<String> dbs = new HashSet<>();
     String[] dirs = file.list();
-    List<String> ret = new ArrayList<>();
     if (dirs != null) {
       for (String dir : dirs) {
         if (dir.equals("config.bin")) {
           continue;
         }
-        if (dir.equals("schema.bin")) {
+        if (dir.equals(SCHEMA_BIN_STR)) {
           continue;
         }
-        if (dir.equals("_sonicbase_schema")) {
+        if (dir.equals(SONICBASE_SCHEMA_STR)) {
           continue;
         }
         dbs.add(dir);

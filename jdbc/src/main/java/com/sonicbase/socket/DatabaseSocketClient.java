@@ -3,11 +3,11 @@ package com.sonicbase.socket;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.DeadServerException;
 import com.sonicbase.query.DatabaseException;
-import io.netty.channel.*;
-import io.netty.channel.nio.NioEventLoopGroup;
 import net.jpountz.lz4.LZ4Compressor;
 import net.jpountz.lz4.LZ4Factory;
 import net.jpountz.lz4.LZ4FastDecompressor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -33,23 +33,14 @@ import java.util.zip.GZIPOutputStream;
  */
 public class DatabaseSocketClient {
 
-  private static int CONNECTION_COUNT = 10000;
-
-  private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
-
-
+  private static final int CONNECTION_COUNT = 10000;
+  public static final String PORT_STR = ", port=";
+  private static Logger logger = LoggerFactory.getLogger(DatabaseSocketClient.class);
   private static ConcurrentHashMap<String, ArrayBlockingQueue<Connection>> pools = new ConcurrentHashMap<>();
-
   private static AtomicInteger connectionCount = new AtomicInteger();
   private static ConcurrentLinkedQueue<Connection> openConnections = new ConcurrentLinkedQueue<>();
-  private static boolean shutdown;
 
-
-  public static int getConnectionCount() {
-    return connectionCount.get();
-  }
-
-  private static Connection borrow_connection(final String host, final int port) {
+  private static Connection borrowConnection(final String host, final int port) {
     for (int i = 0; i < 1; i++) {
       try {
         Connection sock = null;
@@ -64,17 +55,14 @@ public class DatabaseSocketClient {
             final CountDownLatch latch = new CountDownLatch(1);
             final AtomicReference<Connection> newSock = new AtomicReference<>();
             connectionCount.incrementAndGet();
-            Thread thread = new Thread(new Runnable(){
-              @Override
-              public void run() {
-                try {
-                  newSock.set(new Connection(host, port));//new NioClient(host, port);
-                  openConnections.add(newSock.get());
-                  latch.countDown();
-                }
-                catch (Exception e) {
-                  logger.error("Error connecting to server: host=" + host + ", port=" + port);
-                }
+            Thread thread = new Thread(() -> {
+              try {
+                newSock.set(new Connection(host, port));
+                openConnections.add(newSock.get());
+                latch.countDown();
+              }
+              catch (Exception e) {
+                logger.error("Error connecting to server: host={}, port={}", host, port);
               }
             });
             thread.start();
@@ -84,14 +72,14 @@ public class DatabaseSocketClient {
             else {
               thread.interrupt();
               thread.join();
-              throw new DatabaseException("Error connecting to server: host=" + host + ", port=" + port);
+              throw new DatabaseException("Error connecting to server: host=" + host + PORT_STR + port);
             }
           }
           catch (Exception t) {
-            throw new Exception("Error creating connection: host=" + host + ", port=" + port, t);
+            throw new DatabaseException("Error creating connection: host=" + host + PORT_STR + port, t);
           }
         }
-        sock.count_called++;
+        sock.countCalled++;
         return sock;
       }
       catch (Exception t) {
@@ -99,6 +87,7 @@ public class DatabaseSocketClient {
           Thread.sleep(100);
         }
         catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
           throw new DatabaseException(e);
         }
         throw new DatabaseException(t);
@@ -107,23 +96,20 @@ public class DatabaseSocketClient {
     throw new DatabaseException("Error borrowing connection");
   }
 
-  public static void return_connection(
+  public static void returnConnection(
       Connection sock, String host, int port) {
     if (sock != null) {
       try {
         pools.get(host + ":" + port).put(sock);
       }
       catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
         throw new DatabaseException(e);
       }
     }
   }
 
-  private static EventLoopGroup clientGroup = new NioEventLoopGroup(); // NIO event loops are also OK
-
-
   public static void shutdown() {
-    shutdown = true;
     synchronized (DatabaseSocketClient.class) {
       for (ArrayBlockingQueue<Connection> pool : pools.values()) {
         while (true) {
@@ -134,6 +120,7 @@ public class DatabaseSocketClient {
             }
           }
           catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             logger.error("Error closing connection pool");
           }
         }
@@ -157,13 +144,13 @@ public class DatabaseSocketClient {
   }
 
   static class Connection {
-    private int count_called;
+    private int countCalled;
     private SocketChannel sock;
 
     public Connection(String host, int port) throws IOException {
       for (int i = 0; i < 3; i++) {
         try {
-          this.count_called = 0;
+          this.countCalled = 0;
           this.sock = SocketChannel.open();
           InetSocketAddress address = new InetSocketAddress(host, port);
           this.sock.connect(address);
@@ -181,9 +168,10 @@ public class DatabaseSocketClient {
             throw new DatabaseException(e);
           }
           try {
-            Thread.sleep(100);//1000 + (100 * (i + 1)));
+            Thread.sleep(100);
           }
           catch (InterruptedException e1) {
+            Thread.currentThread().interrupt();
             throw new DatabaseException(e1);
           }
         }
@@ -192,7 +180,6 @@ public class DatabaseSocketClient {
   }
 
   public static final boolean ENABLE_BATCH = true;
-  private static final int BATCH_SIZE = 160; //last was 80
 
   public static class Request {
     private byte[] body;
@@ -201,9 +188,7 @@ public class DatabaseSocketClient {
     private boolean success;
 
     private Exception exception;
-    private String batchKey;
-    public String hostPort;
-    public DatabaseSocketClient socketClient;
+    private String hostPort;
 
     public byte[] getResponse() {
       return response;
@@ -229,16 +214,12 @@ public class DatabaseSocketClient {
       this.exception = exception;
     }
 
-    public void setBatchKey(String batchKey) {
-      this.batchKey = batchKey;
-    }
-
     public void setHostPort(String hostPort) {
       this.hostPort = hostPort;
     }
 
-    public void setSocketClient(DatabaseSocketClient socketClient) {
-      this.socketClient = socketClient;
+    public String getHostPort() {
+      return hostPort;
     }
   }
 
@@ -262,12 +243,11 @@ public class DatabaseSocketClient {
           maxConnectionCount = Math.max(value.size(), maxConnectionCount);
         }
 
-        logger.info("SocketClient stats: callCount=" + totalCallCount.get() + ", avgDuration=" +
-            (callDuration.get() / callCount.get() / 1000000d) + ", processingDuration=" +
-            (processingDuration.get() / callCount.get() / 1000000d) + ", avgRequestDuration=" +
-            (requestDuration.get() / callCount.get() / 1000000d) + ", avgResponseDuration=" +
-            (responseDuration.get() / callCount.get() / 1000000d) + ", avgConnectionCount=" + (connectionCount / pools.size()) +
-            ", maxConnectionCount=" + maxConnectionCount);
+        logger.info("SocketClient stats: callCount={}, avgDuration={}, processingDuration={}, avgRequestDuration={}, avgResponseDuration={}, avgConnectionCount={}, maxConnectionCount={}",
+            totalCallCount.get(), ((double)callDuration.get() / callCount.get() / 1000000d),
+            ((double)processingDuration.get() / callCount.get() / 1000000d),
+            ((double)requestDuration.get() / callCount.get() / 1000000d),
+            ((double)responseDuration.get() / callCount.get() / 1000000d), (connectionCount / pools.size()), maxConnectionCount);
         synchronized (lastLogReset) {
           if (System.currentTimeMillis() - lastLogReset.get() > 4 * 60 * 1000) {
             callDuration.set(0);
@@ -315,7 +295,7 @@ public class DatabaseSocketClient {
       }
 
       boolean shouldReturn = true;
-      Connection sock = borrow_connection(host, port);
+      Connection sock = borrowConnection(host, port);
       try {
         ByteArrayOutputStream sockBytes = new ByteArrayOutputStream();
 
@@ -326,7 +306,7 @@ public class DatabaseSocketClient {
           sockBytes.write(originalLenBuff);
 
         }
-        long checksumValue = 0;//checksum.getValue();
+        long checksumValue = 0;
         byte[] longBuff = new byte[8];
 
         Util.writeRawLittleEndian64(checksumValue, longBuff);
@@ -350,7 +330,7 @@ public class DatabaseSocketClient {
           originalBodyLen = Util.readRawLittleEndian32(responseBody, 0);
           offset += 4;
         }
-        long responseChecksum = Util.readRawLittleEndian64(responseBody, offset);
+        Util.readRawLittleEndian64(responseBody, offset); // responseChecksum
         offset += 8;
 
         if (DatabaseSocketClient.COMPRESS) {
@@ -377,16 +357,15 @@ public class DatabaseSocketClient {
             processResponse(bytesIn, currRequest);
           }
           catch (Exception t) {
-            System.out.println("Error processing response: method=" +
-                new ComObject(currRequest.body).getString(ComObject.Tag.method));
+            logger.error("Error processing response: method={}",
+                new ComObject(currRequest.body).getString(ComObject.Tag.METHOD));
             throw new DeadServerException(t);
           }
         }
-        //  break;
       }
       catch (Exception e) {
         if (sock != null && sock.sock != null) {
-          sock.sock.close();//clientHandler.channel.close();
+          sock.sock.close();
           openConnections.remove(sock);
         }
         connectionCount.decrementAndGet();
@@ -395,18 +374,17 @@ public class DatabaseSocketClient {
       }
       finally {
         if (shouldReturn) {
-          if (sock.count_called > 100000) {
+          if (sock.countCalled > 100000) {
             if (sock != null && sock.sock != null) {
-              sock.sock.close();//clientHandler.channel.close();
+              sock.sock.close();
               openConnections.remove(sock);
             }
           }
           else {
-            return_connection(sock, host, port);
+            returnConnection(sock, host, port);
           }
         }
       }
-      //}
       callDuration.addAndGet(System.nanoTime() - begin);
     }
     catch (IOException e) {
@@ -415,9 +393,7 @@ public class DatabaseSocketClient {
   }
 
   private static byte[] readResponse(byte[] intBuff, Connection sock, int totalRead, int bodyLen, long processingBegin) throws IOException {
-    int nBytes = 0;//sock.clientHandler.await();
-    //
-    //     while (true) {
+    int nBytes;
     long beginResponse = 0;
     boolean first = true;
     ByteBuffer buf = ByteBuffer.allocateDirect(intBuff.length - totalRead);
@@ -440,7 +416,6 @@ public class DatabaseSocketClient {
 
     totalRead = 0;
     byte[] responseBody = new byte[bodyLen];
-    nBytes = 0;
     buf = ByteBuffer.allocateDirect(responseBody.length - totalRead);
     while ((nBytes = sock.sock.read(buf)) > 0) {
       buf.flip();
@@ -512,12 +487,9 @@ public class DatabaseSocketClient {
   public static final boolean COMPRESS = true;
   public static final boolean LZO_COMPRESSION = true;
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP2", justification = "copying the passed in data is too slow")
-  @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
-  public byte[] do_send(String batchKey, byte[] body, String hostPort) {
+  public byte[] doSend(String batchKey, byte[] body, String hostPort) {
     try {
       Request request = new Request();
-      request.batchKey = batchKey;
       request.body = body;
 
       try {
@@ -538,23 +510,23 @@ public class DatabaseSocketClient {
         if (exceptionStr.contains("Server not running")) {
           throw new DeadServerException();
         }
-        throw new Exception(exceptionStr);
+        throw new DatabaseException(exceptionStr);
       }
       return request.response;
     }
     catch (DeadServerException e) {
       String[] parts = hostPort.split(":");
-      throw new DeadServerException("Server error: host=" + parts[0] + ", port=" + parts[1] +
-          ", method=" + new ComObject(body).getString(ComObject.Tag.method), e);
+      throw new DeadServerException("Server error: host=" + parts[0] + PORT_STR + parts[1] +
+          ", method=" + new ComObject(body).getString(ComObject.Tag.METHOD), e);
     }
     catch (Exception e) {
       String[] parts = hostPort.split(":");
-      throw new DatabaseException("Server error: host=" + parts[0] + ", port=" + parts[1] +
-          ", method=" + new ComObject(body).getString(ComObject.Tag.method), e);
+      throw new DatabaseException("Server error: host=" + parts[0] + PORT_STR + parts[1] +
+          ", method=" + new ComObject(body).getString(ComObject.Tag.METHOD), e);
     }
   }
 
-  public static byte[] do_send(List<Request> requests) {
+  public static byte[] doSend(List<Request> requests) {
     try {
 
       String[] parts = requests.get(0).hostPort.split(":");
@@ -569,7 +541,7 @@ public class DatabaseSocketClient {
           if (exceptionStr.contains("Server not running")) {
             throw new DeadServerException();
           }
-          throw new Exception(exceptionStr);
+          throw new DatabaseException(exceptionStr);
         }
       }
       return requests.get(0).response;

@@ -1,5 +1,6 @@
 package com.sonicbase.server;
 
+import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.Record;
 import com.sonicbase.procedure.RecordImpl;
 import com.sonicbase.query.BinaryExpression;
@@ -7,7 +8,6 @@ import com.sonicbase.query.impl.ExpressionImpl;
 import com.sonicbase.schema.TableSchema;
 
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.sonicbase.client.DatabaseClient.OPTIMIZED_RANGE_PAGE_SIZE;
@@ -34,12 +34,12 @@ public class IndexLookupWithExpression extends IndexLookup {
       int compareRight = 1;
       if (rightOperator != null) {
         if (rightKey != null) {
-          compareRight = server.getCommon().compareKey(indexSchema.getComparators(), entry.getKey(), rightKey);
+          compareRight = DatabaseCommon.compareKey(indexSchema.getComparators(), entry.getKey(), rightKey);
         }
-        if (rightOperator.equals(BinaryExpression.Operator.less) && compareRight >= 0) {
+        if (rightOperator.equals(BinaryExpression.Operator.LESS) && compareRight >= 0) {
           rightIsDone = true;
         }
-        if (rightOperator.equals(BinaryExpression.Operator.lessEqual) && compareRight > 0) {
+        if (rightOperator.equals(BinaryExpression.Operator.LESS_EQUAL) && compareRight > 0) {
           rightIsDone = true;
         }
         if (rightIsDone) {
@@ -58,21 +58,19 @@ public class IndexLookupWithExpression extends IndexLookup {
         }
       }
       if (shouldProcess) {
-
-        boolean forceSelectOnServer = false;
         byte[][] records = null;
         if (entry.getValue() != null && !entry.getValue().equals(0L)) {
           records = server.getAddressMap().fromUnsafeToRecords(entry.getValue());
         }
         if (expression != null && records != null) {
-          ProcessWithExpression processWithExpression = new ProcessWithExpression(entry, forceSelectOnServer, records).invoke();
+          ProcessWithExpression processWithExpression = new ProcessWithExpression(entry, records).invoke();
           entry = processWithExpression.getEntry();
           if (processWithExpression.shouldBreak()) {
             break outer;
           }
         }
         else {
-          ProcessWithoutExpression processWithoutExpression = new ProcessWithoutExpression(entry, forceSelectOnServer, records).invoke();
+          ProcessWithoutExpression processWithoutExpression = new ProcessWithoutExpression(entry, records).invoke();
           entry = processWithoutExpression.getEntry();
           if (processWithoutExpression.shoudBreak()) {
             break outer;
@@ -114,12 +112,10 @@ public class IndexLookupWithExpression extends IndexLookup {
   private class ProcessWithExpression {
     private boolean myResult;
     private Map.Entry<Object[], Object> entry;
-    private boolean forceSelectOnServer;
     private byte[][] records;
 
-    public ProcessWithExpression(Map.Entry<Object[], Object> entry, boolean forceSelectOnServer, byte[]... records) {
+    public ProcessWithExpression(Map.Entry<Object[], Object> entry, byte[]... records) {
       this.entry = entry;
-      this.forceSelectOnServer = forceSelectOnServer;
       this.records = records;
     }
 
@@ -155,12 +151,8 @@ public class IndexLookupWithExpression extends IndexLookup {
           }
           if (pass) {
             byte[][] currRecords = new byte[][]{bytes};
-            AtomicBoolean done = new AtomicBoolean();
             records = processViewFlags(viewVersion, records);
             if (records != null) {
-
-              int[] keyOffsets = null;
-
               byte[][] currRet = evaluateCounters(columnOffsets, currRecords);
               if (counters == null) {
                 for (byte[] currBytes : currRet) {
@@ -174,13 +166,9 @@ public class IndexLookupWithExpression extends IndexLookup {
                       include = false;
                     }
                   }
-                  if (include) {
-                    if (limit != null) {
-                      if (currOffset.get() >= targetOffset + limit) {
-                        include = false;
-                        localDone = true;
-                      }
-                    }
+                  if (include && limit != null && currOffset.get() >= targetOffset + limit) {
+                    include = false;
+                    localDone = true;
                   }
                   if (include) {
                     retRecords.add(currBytes);
@@ -204,12 +192,10 @@ public class IndexLookupWithExpression extends IndexLookup {
   private class ProcessWithoutExpression {
     private boolean myResult;
     private Map.Entry<Object[], Object> entry;
-    private boolean forceSelectOnServer;
     private byte[][] records;
 
-    public ProcessWithoutExpression(Map.Entry<Object[], Object> entry, boolean forceSelectOnServer, byte[]... records) {
+    public ProcessWithoutExpression(Map.Entry<Object[], Object> entry, byte[]... records) {
       this.entry = entry;
-      this.forceSelectOnServer = forceSelectOnServer;
       this.records = records;
     }
 
@@ -222,11 +208,8 @@ public class IndexLookupWithExpression extends IndexLookup {
     }
 
     public ProcessWithoutExpression invoke() {
-      AtomicBoolean done = new AtomicBoolean();
       records = processViewFlags(viewVersion, records);
       if (records != null) {
-        int[] keyOffsets = null;
-
         byte[][] retRecordsArray = evaluateCounters(columnOffsets, records);
         if (counters == null) {
           for (byte[] currBytes : retRecordsArray) {
@@ -240,13 +223,9 @@ public class IndexLookupWithExpression extends IndexLookup {
                 include = false;
               }
             }
-            if (include) {
-              if (limit != null) {
-                if (currOffset.get() >= targetOffset + limit) {
-                  include = false;
-                  localDone = true;
-                }
-              }
+            if (include && limit != null && currOffset.get() >= targetOffset + limit) {
+              include = false;
+              localDone = true;
             }
             if (include) {
               retRecords.add(currBytes);

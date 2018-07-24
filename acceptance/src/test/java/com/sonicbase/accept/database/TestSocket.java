@@ -10,9 +10,6 @@ import java.util.List;
 
 import static org.testng.Assert.assertEquals;
 
-/**
- * Created by lowryda on 8/14/17.
- */
 public class TestSocket {
 
   @Test

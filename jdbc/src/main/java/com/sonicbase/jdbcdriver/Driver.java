@@ -55,7 +55,6 @@ public class Driver implements java.sql.Driver {
   }
 
   public Logger getParentLogger() throws SQLFeatureNotSupportedException {
-    // todo: implement for JDK 1.7
     return null;
   }
 }

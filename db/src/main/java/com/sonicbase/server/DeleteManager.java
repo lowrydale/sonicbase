@@ -18,9 +18,6 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * Created by lowryda on 5/15/17.
- */
 @SuppressWarnings("squid:S1172") // all methods called from method invoker must have cobj and replayed command parms
 public class DeleteManager {
 

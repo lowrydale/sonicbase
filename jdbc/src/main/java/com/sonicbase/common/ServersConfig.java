@@ -72,8 +72,6 @@ public class ServersConfig {
     private Host[] replicas;
     private int masterReplica;
 
-    @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP2", justification = "copying the passed in data is too slow")
-    @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
     public Shard(Host[] hosts) {
       this.replicas = hosts;
     }
@@ -116,7 +114,6 @@ public class ServersConfig {
       return false;
     }
 
-    @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP", justification = "copying the returned data is too slow")
     public Host[] getReplicas() {
       return replicas;
     }
@@ -170,7 +167,6 @@ public class ServersConfig {
     out.writeBoolean(optimizeForThroughput);
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP", justification = "copying the returned data is too slow")
   public Shard[] getShards() {
     return shards;
   }

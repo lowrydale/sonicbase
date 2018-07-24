@@ -8,9 +8,6 @@ import java.util.Arrays;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
-/**
- * Created by lowryda on 6/24/17.
- */
 public class TestComObject {
 
   @Test

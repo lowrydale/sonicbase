@@ -172,7 +172,6 @@ public class InsertStatementHandler implements StatementHandler {
     private IndexSchema indexSchema;
     public boolean currAndLastMatch;
 
-    @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP", justification = "copying the returned data is too slow")
     public Object[] getKey() {
       return key;
     }
@@ -189,8 +188,6 @@ public class InsertStatementHandler implements StatementHandler {
       return currPartition;
     }
 
-    @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP2", justification = "copying the passed in data is too slow")
-    @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
     public KeyInfo(int shard, Object[] key, IndexSchema indexSchema, boolean currPartition) {
       this.shard = shard;
       this.key = key;

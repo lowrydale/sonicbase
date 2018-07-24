@@ -1,24 +1,17 @@
 package com.sonicbase.schema;
 
-/**
- * Responsible for
- */
 public class RecordIndexPartition {
 
   private int shardOwning;
 
-  public RecordIndexPartition() {
+  RecordIndexPartition() {
   }
 
-  public RecordIndexPartition(int shardOwning) {
-    this.shardOwning = shardOwning;
-  }
-
-  public int getShardOwning() {
+  int getShardOwning() {
     return shardOwning;
   }
 
-  public void setShardOwning(int shardOwning) {
+  void setShardOwning(int shardOwning) {
     this.shardOwning = shardOwning;
   }
 }

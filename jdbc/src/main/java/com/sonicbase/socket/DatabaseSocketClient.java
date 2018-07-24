@@ -34,7 +34,7 @@ import java.util.zip.GZIPOutputStream;
 public class DatabaseSocketClient {
 
   private static final int CONNECTION_COUNT = 10000;
-  public static final String PORT_STR = ", port=";
+  private static final String PORT_STR = ", port=";
   private static Logger logger = LoggerFactory.getLogger(DatabaseSocketClient.class);
   private static ConcurrentHashMap<String, ArrayBlockingQueue<Connection>> pools = new ConcurrentHashMap<>();
   private static AtomicInteger connectionCount = new AtomicInteger();

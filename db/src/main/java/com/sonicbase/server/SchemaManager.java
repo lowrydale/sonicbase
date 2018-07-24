@@ -641,78 +641,9 @@ public class SchemaManager {
         server.getCommon().getSchemaWriteLock(dbName).unlock();
       }
 
-      if (!replayedCommand && masterSlave.equals(MASTER_STR)) {
-        cobj = new ComObject();
-        cobj.put(ComObject.Tag.DB_NAME, dbName);
-        cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
-        cobj.put(ComObject.Tag.METHOD, "SchemaManager:createIndexSlave");
-        cobj.put(ComObject.Tag.SCHEMA_BYTES, server.getCommon().serializeSchema(DatabaseClient.SERIALIZATION_VERSION));
-        cobj.put(ComObject.Tag.TABLE_NAME, table.get());
-        ComArray array = cobj.putArray(ComObject.Tag.INDICES, ComObject.Type.STRING_TYPE);
-        for (String currIndexName : createdIndices) {
-          array.add(currIndexName);
-        }
-        cobj.put(ComObject.Tag.MASTER_SLAVE, SLAVE_STR);
+      createIndexSlave(replayedCommand, dbName, table, masterSlave, createdIndices);
 
-        for (int i = 0; i < server.getShardCount(); i++) {
-          server.getDatabaseClient().send(null, i, 0, cobj, DatabaseClient.Replica.DEF);
-        }
-      }
-
-      if (!replayedCommand && createdIndices != null) {
-        String primaryIndexName = null;
-        TableSchema tableSchema = server.getCommon().getTableSchema(dbName, table.get(), server.getDataDir());
-        for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
-          if (entry.getValue().isPrimaryKey()) {
-            primaryIndexName = entry.getKey();
-          }
-        }
-        long totalSize = 0;
-        if (primaryIndexName != null) {
-          for (int shard = 0; shard < server.getShardCount(); shard++) {
-            cobj = new ComObject();
-            cobj.put(ComObject.Tag.DB_NAME, dbName);
-            cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getClient().getCommon().getSchemaVersion());
-            byte[] response = server.getClient().send("PartitionManager:getIndexCounts", shard, 0, cobj, DatabaseClient.Replica.MASTER);
-            ComObject retObj = new ComObject(response);
-            ComArray tables = retObj.getArray(ComObject.Tag.TABLES);
-            if (tables != null) {
-              for (int i = 0; i < tables.getArray().size(); i++) {
-                ComObject tableObj = (ComObject) tables.getArray().get(i);
-                String tableName = tableObj.getString(ComObject.Tag.TABLE_NAME);
-                if (tableName.equals(table.get())) {
-                  ComArray indices = tableObj.getArray(ComObject.Tag.INDICES);
-                  if (indices != null) {
-                    for (int j = 0; j < indices.getArray().size(); j++) {
-                      ComObject indexObj = (ComObject) indices.getArray().get(j);
-                      String foundIndexName = indexObj.getString(ComObject.Tag.INDEX_NAME);
-                      if (primaryIndexName.equals(foundIndexName)) {
-                        long size = indexObj.getLong(ComObject.Tag.SIZE);
-                        totalSize += size;
-                      }
-                    }
-                  }
-                }
-              }
-
-            }
-          }
-        }
-
-        if (totalSize != 0) {
-          for (String currIndexName : createdIndices) {
-            cobj = new ComObject();
-            cobj.put(ComObject.Tag.DB_NAME, dbName);
-            cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
-            cobj.put(ComObject.Tag.TABLE_NAME, table.get());
-            cobj.put(ComObject.Tag.INDEX_NAME, currIndexName);
-            cobj.put(ComObject.Tag.METHOD, "UpdateManager:populateIndex");
-            for (int i = 0; i < server.getShardCount(); i++) {
-              server.getDatabaseClient().send(null, i, 0, cobj, DatabaseClient.Replica.DEF);
-            }
-          }
-        }
-      }
+      populateIndexIfNeeded(replayedCommand, dbName, table, createdIndices);
 
       ComObject retObj = new ComObject();
       retObj.put(ComObject.Tag.SCHEMA_BYTES, server.getCommon().serializeSchema(cobj.getShort(ComObject.Tag.SERIALIZATION_VERSION)));
@@ -720,6 +651,88 @@ public class SchemaManager {
     }
     catch (IOException e) {
       throw new DatabaseException(e);
+    }
+  }
+
+  private void populateIndexIfNeeded(boolean replayedCommand, String dbName, AtomicReference<String> table, List<String> createdIndices) {
+    if (!replayedCommand && createdIndices != null) {
+      String primaryIndexName = null;
+      TableSchema tableSchema = server.getCommon().getTableSchema(dbName, table.get(), server.getDataDir());
+      for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
+        if (entry.getValue().isPrimaryKey()) {
+          primaryIndexName = entry.getKey();
+        }
+      }
+      long totalSize = 0;
+      if (primaryIndexName != null) {
+        totalSize = getIndexTotalSize(dbName, table, primaryIndexName, totalSize);
+      }
+
+      if (totalSize != 0) {
+        for (String currIndexName : createdIndices) {
+          ComObject cobj = new ComObject();
+          cobj.put(ComObject.Tag.DB_NAME, dbName);
+          cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
+          cobj.put(ComObject.Tag.TABLE_NAME, table.get());
+          cobj.put(ComObject.Tag.INDEX_NAME, currIndexName);
+          cobj.put(ComObject.Tag.METHOD, "UpdateManager:populateIndex");
+          for (int i = 0; i < server.getShardCount(); i++) {
+            server.getDatabaseClient().send(null, i, 0, cobj, DatabaseClient.Replica.DEF);
+          }
+        }
+      }
+    }
+  }
+
+  private long getIndexTotalSize(String dbName, AtomicReference<String> table, String primaryIndexName, long totalSize) {
+    for (int shard = 0; shard < server.getShardCount(); shard++) {
+      ComObject cobj = new ComObject();
+      cobj.put(ComObject.Tag.DB_NAME, dbName);
+      cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getClient().getCommon().getSchemaVersion());
+      byte[] response = server.getClient().send("PartitionManager:getIndexCounts", shard, 0, cobj, DatabaseClient.Replica.MASTER);
+      ComObject retObj = new ComObject(response);
+      ComArray tables = retObj.getArray(ComObject.Tag.TABLES);
+      if (tables != null) {
+        for (int i = 0; i < tables.getArray().size(); i++) {
+          ComObject tableObj = (ComObject) tables.getArray().get(i);
+          String tableName = tableObj.getString(ComObject.Tag.TABLE_NAME);
+          if (tableName.equals(table.get())) {
+            ComArray indices = tableObj.getArray(ComObject.Tag.INDICES);
+            if (indices != null) {
+              for (int j = 0; j < indices.getArray().size(); j++) {
+                ComObject indexObj = (ComObject) indices.getArray().get(j);
+                String foundIndexName = indexObj.getString(ComObject.Tag.INDEX_NAME);
+                if (primaryIndexName.equals(foundIndexName)) {
+                  long size = indexObj.getLong(ComObject.Tag.SIZE);
+                  totalSize += size;
+                }
+              }
+            }
+          }
+        }
+
+      }
+    }
+    return totalSize;
+  }
+
+  private void createIndexSlave(boolean replayedCommand, String dbName, AtomicReference<String> table, String masterSlave, List<String> createdIndices) throws IOException {
+    if (!replayedCommand && masterSlave.equals(MASTER_STR)) {
+      ComObject cobj = new ComObject();
+      cobj.put(ComObject.Tag.DB_NAME, dbName);
+      cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
+      cobj.put(ComObject.Tag.METHOD, "SchemaManager:createIndexSlave");
+      cobj.put(ComObject.Tag.SCHEMA_BYTES, server.getCommon().serializeSchema(DatabaseClient.SERIALIZATION_VERSION));
+      cobj.put(ComObject.Tag.TABLE_NAME, table.get());
+      ComArray array = cobj.putArray(ComObject.Tag.INDICES, ComObject.Type.STRING_TYPE);
+      for (String currIndexName : createdIndices) {
+        array.add(currIndexName);
+      }
+      cobj.put(ComObject.Tag.MASTER_SLAVE, SLAVE_STR);
+
+      for (int i = 0; i < server.getShardCount(); i++) {
+        server.getDatabaseClient().send(null, i, 0, cobj, DatabaseClient.Replica.DEF);
+      }
     }
   }
 

@@ -14,7 +14,7 @@ public class LicenseManagerProxy {
   private Method startMasterLicenseValidator;
   private Method shutdownMasterLicenseValidator;
 
-  public LicenseManagerProxy(Object proServer) {
+  LicenseManagerProxy(Object proServer) {
     try {
       Class proClz = Class.forName("com.sonicbase.server.ProServer");
       Method method = proClz.getMethod("getLicenseManager");
@@ -28,7 +28,7 @@ public class LicenseManagerProxy {
     }
   }
 
-  public void startMasterLicenseValidator() {
+  void startMasterLicenseValidator() {
     try {
       if (startMasterLicenseValidator != null) {
         startMasterLicenseValidator.invoke(licenseManager);
@@ -39,7 +39,7 @@ public class LicenseManagerProxy {
     }
   }
 
-  public void shutdownMasterLicenseValidator() {
+  void shutdownMasterLicenseValidator() {
     try {
       if (shutdownMasterLicenseValidator != null) {
         shutdownMasterLicenseValidator.invoke(licenseManager);

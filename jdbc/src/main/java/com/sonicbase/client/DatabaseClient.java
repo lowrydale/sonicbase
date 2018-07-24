@@ -899,6 +899,295 @@ public class DatabaseClient {
 
   private ConcurrentHashMap<String, String> inserted = new ConcurrentHashMap<>();
 
+  private byte[] sendReplicaAll(String method, ComObject body, int shard, Server[] replicas) {
+    byte[] ret = null;
+    try {
+      boolean local = false;
+      List<DatabaseSocketClient.Request> requests = new ArrayList<>();
+      for (int i = 0; i < replicas.length; i++) {
+        if (isShutdown.get()) {
+          throw new DatabaseException(SHUTTING_DOWN_STR);
+        }
+        Server server = replicas[i];
+        if (server.dead) {
+          throw new DeadServerException(HOST_STR + server.hostPort + METHOD_STR + method);
+        }
+        if (shard == this.shard && i == this.replica && databaseServer != null) {
+          local = true;
+          ret = invokeOnServer(databaseServer, body.serialize(), false, true);
+        }
+        else {
+          Object dbServer = getLocalDbServer(shard, i);
+          if (dbServer != null) {
+            local = true;
+            ret = invokeOnServer(dbServer, body.serialize(), false, true);
+          }
+          else {
+            DatabaseSocketClient.Request request = new DatabaseSocketClient.Request();
+            request.setBody(body.serialize());
+            request.setHostPort(server.hostPort);
+            requests.add(request);
+          }
+        }
+      }
+      if (!local) {
+        ret = doSendOnSocket(requests);
+      }
+      return ret;
+    }
+    catch (DeadServerException e) {
+      throw e;
+    }
+    catch (Exception e) {
+      try {
+        handleSchemaOutOfSyncException(e);
+      }
+      catch (Exception t) {
+        throw new DatabaseException(t);
+      }
+    }
+    return null;
+  }
+
+  private byte[] sendReplicaMaster(String method, ComObject body, int shard, Server[] replicas, boolean ignoreDeath) throws Exception {
+    int masterReplica = -1;
+    while (true) {
+      if (isShutdown.get()) {
+        throw new DatabaseException(SHUTTING_DOWN_STR);
+      }
+
+      masterReplica = common.getServersConfig().getShards()[shard].getMasterReplica();
+      if (masterReplica != -1) {
+        break;
+      }
+      syncSchema();
+    }
+
+    Server currReplica = replicas[masterReplica];
+    try {
+      if (!ignoreDeath && currReplica.dead) {
+        throw new DeadServerException(HOST_STR + currReplica.hostPort + METHOD_STR + method);
+      }
+      if (shard == this.shard && masterReplica == this.replica && databaseServer != null) {
+        return invokeOnServer(databaseServer, body.serialize(), false, true);
+      }
+      Object dbServer = getLocalDbServer(shard, masterReplica);
+      if (dbServer != null) {
+        return invokeOnServer(dbServer, body.serialize(), false, true);
+      }
+      return currReplica.doSend(null, body);
+    }
+    catch (Exception e) {
+      syncSchema();
+
+      masterReplica = common.getServersConfig().getShards()[shard].getMasterReplica();
+      currReplica = replicas[masterReplica];
+      try {
+        if (!ignoreDeath && currReplica.dead) {
+          throw new DeadServerException(HOST_STR + currReplica.hostPort + METHOD_STR + method);
+        }
+        if (shard == this.shard && masterReplica == this.replica && databaseServer != null) {
+          return invokeOnServer(databaseServer, body.serialize(), false, true);
+        }
+        Object dbServer = getLocalDbServer(shard, masterReplica);
+        if (dbServer != null) {
+          return invokeOnServer(dbServer, body.serialize(), false, true);
+        }
+        return currReplica.doSend(null, body);
+      }
+      catch (DeadServerException e1) {
+        throw e;
+      }
+      catch (Exception e1) {
+        e = new DatabaseException(HOST_STR + currReplica.hostPort + METHOD_STR + method, e1);
+        handleDeadServer(e, currReplica);
+        handleSchemaOutOfSyncException(e);
+      }
+    }
+    return null;
+  }
+
+  private byte[] sendReplicaSpecified(String method, ComObject body, int shard, long authUser, Server[] replicas, boolean ignoreDeath) {
+    boolean skip = false;
+    if (!ignoreDeath && replicas[(int) authUser].dead && writeVerbs.contains(method)) {
+      ComObject header = new ComObject();
+      header.put(ComObject.Tag.METHOD, body.getString(ComObject.Tag.METHOD));
+      header.put(ComObject.Tag.REPLICA, (int) authUser);
+      body.put(ComObject.Tag.HEADER, header);
+
+      body.put(ComObject.Tag.METHOD, "queueForOtherServer");
+
+      int masterReplica = common.getServersConfig().getShards()[shard].getMasterReplica();
+      if (shard == this.shard && masterReplica == this.replica && databaseServer != null) {
+        invokeOnServer(databaseServer, body.serialize(), false, true);
+      }
+      else {
+        Object dbServer = getLocalDbServer(shard, (int) masterReplica);
+        if (dbServer != null) {
+          invokeOnServer(dbServer, body.serialize(), false, true);
+        }
+        else {
+          replicas[masterReplica].doSend(null, body);
+        }
+      }
+      skip = true;
+    }
+    if (!skip) {
+      try {
+        if (shard == this.shard && authUser == this.replica && databaseServer != null) {
+          return invokeOnServer(databaseServer, body.serialize(), false, true);
+        }
+        Object dbServer = getLocalDbServer(shard, (int) authUser);
+        if (dbServer != null) {
+          return invokeOnServer(dbServer, body.serialize(), false, true);
+        }
+        return replicas[(int) authUser].doSend(null, body);
+      }
+      catch (DeadServerException e) {
+        throw e;
+      }
+      catch (Exception e) {
+        e = new DatabaseException(HOST_STR + replicas[(int) authUser].hostPort + METHOD_STR + method, e);
+        try {
+          handleDeadServer(e, replicas[(int) authUser]);
+          handleSchemaOutOfSyncException(e);
+        }
+        catch (Exception t) {
+          throw new DatabaseException(t);
+        }
+      }
+    }
+    return null;
+  }
+
+  private byte[] sendReplicaDef(String method, ComObject body, int shard, long authUser, Server[] replicas, boolean ignoreDeath) throws InterruptedException {
+    byte[] ret = null;
+    if (writeVerbs.contains(method)) {
+      SendToMasterReplikca sendToMasterReplikca = new SendToMasterReplikca(method, body, shard, replicas, ignoreDeath, ret).invoke();
+      ret = sendToMasterReplikca.getRet();
+      int masterReplica = sendToMasterReplikca.getMasterReplica();
+
+      while (true) {
+        if (isShutdown.get()) {
+          throw new DatabaseException(SHUTTING_DOWN_STR);
+        }
+
+        Server currReplica = null;
+        try {
+          for (int i = 0; i < getReplicaCount(); i++) {
+            if (i == masterReplica) {
+              continue;
+            }
+            if (isShutdown.get()) {
+              throw new DatabaseException(SHUTTING_DOWN_STR);
+            }
+            currReplica = replicas[i];
+            boolean dead = currReplica.dead;
+            while (true) {
+              if (isShutdown.get()) {
+                throw new DatabaseException(SHUTTING_DOWN_STR);
+              }
+
+              boolean skip = false;
+              if (!ignoreDeath && dead) {
+                HandleDeadOnWriteVerb handleDeadOnWriteVerb = new HandleDeadOnWriteVerb(method, body, shard,
+                    (int) authUser, replicas, masterReplica, skip).invoke();
+                if (handleDeadOnWriteVerb.hadError()) {
+                  continue;
+                }
+                masterReplica = handleDeadOnWriteVerb.getMasterReplica();
+                skip = handleDeadOnWriteVerb.isSkip();
+              }
+              if (!skip) {
+                SendWriteVerbToOtherReplica sendWriteVerbToOtherReplica = new SendWriteVerbToOtherReplica(body, shard,
+                    currReplica, i).invoke();
+                if (sendWriteVerbToOtherReplica.hadError()) {
+                  continue;
+                }
+              }
+              break;
+            }
+          }
+          return ret;
+        }
+        catch (SchemaOutOfSyncException e) {
+          throw e;
+        }
+        catch (DeadServerException e) {
+          if (isShutdown.get()) {
+            throw new DatabaseException(SHUTTING_DOWN_STR);
+          }
+          Thread.sleep(1000);
+          try {
+            syncSchema();
+          }
+          catch (Exception e1) {
+            logger.error("Error syncing schema", e1);
+          }
+        }
+        catch (Exception e) {
+          e = new DatabaseException(HOST_STR + currReplica.hostPort + METHOD_STR + method, e);
+          handleSchemaOutOfSyncException(e);
+        }
+      }
+    }
+    else {
+      return sendReplicaDefNonWriteVerb(method, body, shard, replicas);
+    }
+  }
+
+  private byte[] sendReplicaDefNonWriteVerb(String method, ComObject body, int shard, Server[] replicas) {
+    Exception lastException = null;
+    boolean success = false;
+    int offset = servers[shard][0].replicaOffset.incrementAndGet() % replicas.length;
+    for (int i = 0; i < 10; i++) {
+      if (isShutdown.get()) {
+        throw new DatabaseException(SHUTTING_DOWN_STR);
+      }
+      for (long localRand = offset; localRand < offset + replicas.length; localRand++) {
+        if (isShutdown.get()) {
+          throw new DatabaseException(SHUTTING_DOWN_STR);
+        }
+        int replicaOffset = Math.abs((int) (localRand % replicas.length));
+        if (!replicas[replicaOffset].dead) {
+          try {
+            if (shard == this.shard && replicaOffset == this.replica && databaseServer != null) {
+              return invokeOnServer(databaseServer, body.serialize(), false, true);
+            }
+            Object dbServer = getLocalDbServer(shard, (int) replicaOffset);
+            if (dbServer != null) {
+              return invokeOnServer(dbServer, body.serialize(), false, true);
+            }
+            else {
+              return replicas[replicaOffset].doSend(null, body);
+            }
+          }
+          catch (Exception e) {
+            try {
+              handleDeadServer(e, replicas[replicaOffset]);
+              handleSchemaOutOfSyncException(e);
+              lastException = e;
+            }
+            catch (SchemaOutOfSyncException s) {
+              throw s;
+            }
+            catch (Exception t) {
+              lastException = t;
+            }
+          }
+        }
+      }
+    }
+    if (!success) {
+      if (lastException != null) {
+        throw new DatabaseException("Failed to send to any replica: method=" + method, lastException);
+      }
+      throw new DatabaseException("Failed to send to any replica: method=" + method);
+    }
+    return null;
+  }
+
+
   public byte[] send(
       String methodStr, Server[] replicas, int shard, long authUser,
       ComObject body, Replica replica, boolean ignoreDeath) {
@@ -918,378 +1207,16 @@ public class DatabaseClient {
         }
         try {
           if (replica == Replica.ALL) {
-            try {
-              boolean local = false;
-              List<DatabaseSocketClient.Request> requests = new ArrayList<>();
-              for (int i = 0; i < replicas.length; i++) {
-                if (isShutdown.get()) {
-                  throw new DatabaseException(SHUTTING_DOWN_STR);
-                }
-                Server server = replicas[i];
-                if (server.dead) {
-                  throw new DeadServerException(HOST_STR + server.hostPort + METHOD_STR + method);
-                }
-                if (shard == this.shard && i == this.replica && databaseServer != null) {
-                  local = true;
-                  ret = invokeOnServer(databaseServer, body.serialize(), false, true);
-                }
-                else {
-                  Object dbServer = getLocalDbServer(shard, i);
-                  if (dbServer != null) {
-                    local = true;
-                    ret = invokeOnServer(dbServer, body.serialize(), false, true);
-                  }
-                  else {
-                    DatabaseSocketClient.Request request = new DatabaseSocketClient.Request();
-                    request.setBody(body.serialize());
-                    request.setHostPort(server.hostPort);
-                    requests.add(request);
-                  }
-                }
-              }
-              if (!local) {
-                ret = doSendOnSocket(requests);
-              }
-              return ret;
-            }
-            catch (DeadServerException e) {
-              throw e;
-            }
-            catch (Exception e) {
-              try {
-                handleSchemaOutOfSyncException(e);
-              }
-              catch (Exception t) {
-                throw new DatabaseException(t);
-              }
-            }
+            return sendReplicaAll(method, body, shard, replicas);
           }
           else if (replica == Replica.MASTER) {
-            int masterReplica = -1;
-            while (true) {
-              if (isShutdown.get()) {
-                throw new DatabaseException(SHUTTING_DOWN_STR);
-              }
-
-              masterReplica = common.getServersConfig().getShards()[shard].getMasterReplica();
-              if (masterReplica != -1) {
-                break;
-              }
-              syncSchema();
-            }
-
-            Server currReplica = replicas[masterReplica];
-            try {
-              if (!ignoreDeath && currReplica.dead) {
-                throw new DeadServerException(HOST_STR + currReplica.hostPort + METHOD_STR + method);
-              }
-              if (shard == this.shard && masterReplica == this.replica && databaseServer != null) {
-                return invokeOnServer(databaseServer, body.serialize(), false, true);
-              }
-              Object dbServer = getLocalDbServer(shard, masterReplica);
-              if (dbServer != null) {
-                return invokeOnServer(dbServer, body.serialize(), false, true);
-              }
-              return currReplica.doSend(null, body);
-            }
-            catch (Exception e) {
-              syncSchema();
-
-              masterReplica = common.getServersConfig().getShards()[shard].getMasterReplica();
-              currReplica = replicas[masterReplica];
-              try {
-                if (!ignoreDeath && currReplica.dead) {
-                  throw new DeadServerException(HOST_STR + currReplica.hostPort + METHOD_STR + method);
-                }
-                if (shard == this.shard && masterReplica == this.replica && databaseServer != null) {
-                  return invokeOnServer(databaseServer, body.serialize(), false, true);
-                }
-                Object dbServer = getLocalDbServer(shard, masterReplica);
-                if (dbServer != null) {
-                  return invokeOnServer(dbServer, body.serialize(), false, true);
-                }
-                return currReplica.doSend(null, body);
-              }
-              catch (DeadServerException e1) {
-                throw e;
-              }
-              catch (Exception e1) {
-                e = new DatabaseException(HOST_STR + currReplica.hostPort + METHOD_STR + method, e1);
-                handleDeadServer(e, currReplica);
-                handleSchemaOutOfSyncException(e);
-              }
-            }
+            return sendReplicaMaster(method, body, shard, replicas, ignoreDeath);
           }
           else if (replica == Replica.SPECIFIED) {
-            boolean skip = false;
-            if (!ignoreDeath && replicas[(int) authUser].dead && writeVerbs.contains(method)) {
-              ComObject header = new ComObject();
-              header.put(ComObject.Tag.METHOD, body.getString(ComObject.Tag.METHOD));
-              header.put(ComObject.Tag.REPLICA, (int) authUser);
-              body.put(ComObject.Tag.HEADER, header);
-
-              body.put(ComObject.Tag.METHOD, "queueForOtherServer");
-
-              int masterReplica = common.getServersConfig().getShards()[shard].getMasterReplica();
-              if (shard == this.shard && masterReplica == this.replica && databaseServer != null) {
-                invokeOnServer(databaseServer, body.serialize(), false, true);
-              }
-              else {
-                Object dbServer = getLocalDbServer(shard, (int) masterReplica);
-                if (dbServer != null) {
-                  invokeOnServer(dbServer, body.serialize(), false, true);
-                }
-                else {
-                  replicas[masterReplica].doSend(null, body);
-                }
-              }
-              skip = true;
-            }
-            if (!skip) {
-              try {
-                if (shard == this.shard && authUser == this.replica && databaseServer != null) {
-                  return invokeOnServer(databaseServer, body.serialize(), false, true);
-                }
-                Object dbServer = getLocalDbServer(shard, (int) authUser);
-                if (dbServer != null) {
-                  return invokeOnServer(dbServer, body.serialize(), false, true);
-                }
-                return replicas[(int) authUser].doSend(null, body);
-              }
-              catch (DeadServerException e) {
-                throw e;
-              }
-              catch (Exception e) {
-                e = new DatabaseException(HOST_STR + replicas[(int) authUser].hostPort + METHOD_STR + method, e);
-                try {
-                  handleDeadServer(e, replicas[(int) authUser]);
-                  handleSchemaOutOfSyncException(e);
-                }
-                catch (Exception t) {
-                  throw new DatabaseException(t);
-                }
-              }
-            }
+            return sendReplicaSpecified(method, body, shard, authUser, replicas, ignoreDeath);
           }
           else if (replica == Replica.DEF) {
-            if (writeVerbs.contains(method)) {
-              int masterReplica = -1;
-              for (int i = 0; i < 10; i++) {
-                if (isShutdown.get()) {
-                  throw new DatabaseException(SHUTTING_DOWN_STR);
-                }
-                masterReplica = common.getServersConfig().getShards()[shard].getMasterReplica();
-                Server currReplica = replicas[masterReplica];
-                try {
-                  if (!ignoreDeath && replicas[masterReplica].dead) {
-                    logger.error("dead server: master={}", masterReplica);
-                    throw new DeadServerException(HOST_STR + currReplica.hostPort + METHOD_STR + method);
-                  }
-                  body.put(ComObject.Tag.REPLICATION_MASTER, masterReplica);
-                  if (shard == this.shard && masterReplica == this.replica && databaseServer != null) {
-                    ret = invokeOnServer(databaseServer, body.serialize(), false, true);
-                  }
-                  else {
-                    Object dbServer = getLocalDbServer(shard, (int) masterReplica);
-                    if (dbServer != null) {
-                      ret = invokeOnServer(dbServer, body.serialize(), false, true);
-                    }
-                    else {
-                      ret = currReplica.doSend(null, body.serialize());
-                    }
-                  }
-
-                  body.remove(ComObject.Tag.REPLICATION_MASTER);
-
-                  if (ret != null) {
-                    ComObject retObj = new ComObject(ret);
-                    body.put(ComObject.Tag.SEQUENCE_0, retObj.getLong(ComObject.Tag.SEQUENCE_0));
-                    body.put(ComObject.Tag.SEQUENCE_1, retObj.getLong(ComObject.Tag.SEQUENCE_1));
-                  }
-                  break;
-                }
-                catch (SchemaOutOfSyncException e) {
-                  throw e;
-                }
-                catch (DeadServerException e) {
-                  if (isShutdown.get()) {
-                    throw new DatabaseException(SHUTTING_DOWN_STR);
-                  }
-                  Thread.sleep(1000);
-                  try {
-                    syncSchema();
-                  }
-                  catch (Exception e1) {
-                    logger.error("Error syncing schema", e1);
-                  }
-                }
-                catch (Exception e) {
-                  e = new DatabaseException(HOST_STR + currReplica.hostPort + METHOD_STR + method, e);
-                  handleSchemaOutOfSyncException(e);
-                }
-              }
-              while (true) {
-                if (isShutdown.get()) {
-                  throw new DatabaseException(SHUTTING_DOWN_STR);
-                }
-
-                Server currReplica = null;
-                try {
-                  for (int i = 0; i < getReplicaCount(); i++) {
-                    if (i == masterReplica) {
-                      continue;
-                    }
-                    if (isShutdown.get()) {
-                      throw new DatabaseException(SHUTTING_DOWN_STR);
-                    }
-                    currReplica = replicas[i];
-                    boolean dead = currReplica.dead;
-                    while (true) {
-                      if (isShutdown.get()) {
-                        throw new DatabaseException(SHUTTING_DOWN_STR);
-                      }
-
-                      boolean skip = false;
-                      if (!ignoreDeath && dead) {
-                        try {
-                          if (writeVerbs.contains(method)) {
-                            ComObject header = new ComObject();
-                            header.put(ComObject.Tag.METHOD, body.getString(ComObject.Tag.METHOD));
-                            header.put(ComObject.Tag.REPLICA, (int) authUser);
-                            body.put(ComObject.Tag.HEADER, header);
-
-                            body.put(ComObject.Tag.METHOD, "queueForOtherServer");
-
-                            masterReplica = common.getServersConfig().getShards()[shard].getMasterReplica();
-                            if (shard == this.shard && masterReplica == this.replica && databaseServer != null) {
-                              invokeOnServer(databaseServer, body.serialize(), false, true);
-                            }
-                            else {
-                              Object dbServer = getLocalDbServer(shard, (int) masterReplica);
-                              if (dbServer != null) {
-                                invokeOnServer(dbServer, body.serialize(), false, true);
-                              }
-                              else {
-                                replicas[masterReplica].doSend(null, body.serialize());
-                              }
-                            }
-                            skip = true;
-                          }
-                        }
-                        catch (Exception e) {
-                          if (e.getMessage().contains(SCHEMA_OUT_OF_SYNC_EXCEPTION_STR)) {
-                            syncSchema();
-                            body.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
-                            continue;
-                          }
-                          throw e;
-                        }
-                      }
-                      if (!skip) {
-                        try {
-                          if (shard == this.shard && i == this.replica && databaseServer != null) {
-                            invokeOnServer(databaseServer, body.serialize(), false, true);
-                          }
-                          else {
-                            Object dbServer = getLocalDbServer(shard, (int) i);
-                            if (dbServer != null) {
-                              invokeOnServer(dbServer, body.serialize(), false, true);
-                            }
-                            else {
-                              currReplica.doSend(null, body.serialize());
-                            }
-                          }
-                        }
-                        catch (Exception e) {
-                          if (-1 != ExceptionUtils.indexOfThrowable(e, DeadServerException.class)) {
-                            dead = true;
-                            continue;
-                          }
-                          try {
-                            handleSchemaOutOfSyncException(e);
-                          }
-                          catch (SchemaOutOfSyncException e1) {
-                            body.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
-                            continue;
-                          }
-                          throw e;
-                        }
-                      }
-                      break;
-                    }
-                  }
-                  return ret;
-                }
-                catch (SchemaOutOfSyncException e) {
-                  throw e;
-                }
-                catch (DeadServerException e) {
-                  if (isShutdown.get()) {
-                    throw new DatabaseException(SHUTTING_DOWN_STR);
-                  }
-                  Thread.sleep(1000);
-                  try {
-                    syncSchema();
-                  }
-                  catch (Exception e1) {
-                    logger.error("Error syncing schema", e1);
-                  }
-                }
-                catch (Exception e) {
-                  e = new DatabaseException(HOST_STR + currReplica.hostPort + METHOD_STR + method, e);
-                  handleSchemaOutOfSyncException(e);
-                }
-              }
-            }
-            else {
-              Exception lastException = null;
-              boolean success = false;
-              int offset = servers[shard][0].replicaOffset.incrementAndGet() % replicas.length;
-              for (int i = 0; i < 10; i++) {
-                if (isShutdown.get()) {
-                  throw new DatabaseException(SHUTTING_DOWN_STR);
-                }
-                for (long localRand = offset; localRand < offset + replicas.length; localRand++) {
-                  if (isShutdown.get()) {
-                    throw new DatabaseException(SHUTTING_DOWN_STR);
-                  }
-                  int replicaOffset = Math.abs((int) (localRand % replicas.length));
-                  if (!replicas[replicaOffset].dead) {
-                    try {
-                      if (shard == this.shard && replicaOffset == this.replica && databaseServer != null) {
-                        return invokeOnServer(databaseServer, body.serialize(), false, true);
-                      }
-                      Object dbServer = getLocalDbServer(shard, (int) replicaOffset);
-                      if (dbServer != null) {
-                        return invokeOnServer(dbServer, body.serialize(), false, true);
-                      }
-                      else {
-                        return replicas[replicaOffset].doSend(null, body);
-                      }
-                    }
-                    catch (Exception e) {
-                      try {
-                        handleDeadServer(e, replicas[replicaOffset]);
-                        handleSchemaOutOfSyncException(e);
-                        lastException = e;
-                      }
-                      catch (SchemaOutOfSyncException s) {
-                        throw s;
-                      }
-                      catch (Exception t) {
-                        lastException = t;
-                      }
-                    }
-                  }
-                }
-              }
-              if (!success) {
-                if (lastException != null) {
-                  throw new DatabaseException("Failed to send to any replica: method=" + method, lastException);
-                }
-                throw new DatabaseException("Failed to send to any replica: method=" + method);
-              }
-            }
+            return sendReplicaDef(method, body, shard, authUser, replicas, ignoreDeath);
           }
           if (attempt == 9) {
             throw new DatabaseException("Error sending message");
@@ -1297,6 +1224,10 @@ public class DatabaseClient {
         }
         catch (SchemaOutOfSyncException | DeadServerException e) {
           throw e;
+        }
+        catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new DatabaseException(e);
         }
         catch (Exception e) {
           if (attempt == 0) {
@@ -1793,5 +1724,222 @@ public class DatabaseClient {
     cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
     cobj.put(ComObject.Tag.FORCE, false);
     sendToMaster("PartitionManager:beginRebalance", cobj);
+  }
+
+  private class HandleDeadOnWriteVerb {
+    private boolean myResult;
+    private String method;
+    private ComObject body;
+    private int shard;
+    private int authUser;
+    private Server[] replicas;
+    private int masterReplica;
+    private boolean skip;
+
+    public HandleDeadOnWriteVerb(String method, ComObject body, int shard, int authUser, Server[] replicas, int masterReplica, boolean skip) {
+      this.method = method;
+      this.body = body;
+      this.shard = shard;
+      this.authUser = authUser;
+      this.replicas = replicas;
+      this.masterReplica = masterReplica;
+      this.skip = skip;
+    }
+
+    boolean hadError() {
+      return myResult;
+    }
+
+    public int getMasterReplica() {
+      return masterReplica;
+    }
+
+    public boolean isSkip() {
+      return skip;
+    }
+
+    public HandleDeadOnWriteVerb invoke() {
+      try {
+        if (writeVerbs.contains(method)) {
+          ComObject header = new ComObject();
+          header.put(ComObject.Tag.METHOD, body.getString(ComObject.Tag.METHOD));
+          header.put(ComObject.Tag.REPLICA, authUser);
+          body.put(ComObject.Tag.HEADER, header);
+
+          body.put(ComObject.Tag.METHOD, "queueForOtherServer");
+
+          masterReplica = common.getServersConfig().getShards()[shard].getMasterReplica();
+          if (shard == DatabaseClient.this.shard && masterReplica == DatabaseClient.this.replica && databaseServer != null) {
+            invokeOnServer(databaseServer, body.serialize(), false, true);
+          }
+          else {
+            Object dbServer = getLocalDbServer(shard, masterReplica);
+            if (dbServer != null) {
+              invokeOnServer(dbServer, body.serialize(), false, true);
+            }
+            else {
+              replicas[masterReplica].doSend(null, body.serialize());
+            }
+          }
+          skip = true;
+        }
+      }
+      catch (Exception e) {
+        if (e.getMessage().contains(SCHEMA_OUT_OF_SYNC_EXCEPTION_STR)) {
+          syncSchema();
+          body.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
+          myResult = true;
+          return this;
+        }
+        throw e;
+      }
+      myResult = false;
+      return this;
+    }
+  }
+
+  private class SendWriteVerbToOtherReplica {
+    private boolean myResult;
+    private ComObject body;
+    private int shard;
+    private Server currReplica;
+    private int i;
+    private boolean dead;
+
+    public SendWriteVerbToOtherReplica(ComObject body, int shard, Server currReplica, int i) {
+      this.body = body;
+      this.shard = shard;
+      this.currReplica = currReplica;
+      this.i = i;
+    }
+
+    boolean hadError() {
+      return myResult;
+    }
+
+    public boolean isDead() {
+      return dead;
+    }
+
+    public SendWriteVerbToOtherReplica invoke() {
+      try {
+        if (shard == DatabaseClient.this.shard && i == DatabaseClient.this.replica && databaseServer != null) {
+          invokeOnServer(databaseServer, body.serialize(), false, true);
+        }
+        else {
+          Object dbServer = getLocalDbServer(shard, i);
+          if (dbServer != null) {
+            invokeOnServer(dbServer, body.serialize(), false, true);
+          }
+          else {
+            currReplica.doSend(null, body.serialize());
+          }
+        }
+      }
+      catch (Exception e) {
+        if (-1 != ExceptionUtils.indexOfThrowable(e, DeadServerException.class)) {
+          dead = true;
+          myResult = true;
+          return this;
+        }
+        try {
+          handleSchemaOutOfSyncException(e);
+        }
+        catch (SchemaOutOfSyncException e1) {
+          body.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
+          myResult = true;
+          return this;
+        }
+        throw e;
+      }
+      myResult = false;
+      return this;
+    }
+  }
+
+  private class SendToMasterReplikca {
+    private String method;
+    private ComObject body;
+    private int shard;
+    private Server[] replicas;
+    private boolean ignoreDeath;
+    private byte[] ret;
+    private int masterReplica;
+
+    public SendToMasterReplikca(String method, ComObject body, int shard, Server[] replicas, boolean ignoreDeath, byte... ret) {
+      this.method = method;
+      this.body = body;
+      this.shard = shard;
+      this.replicas = replicas;
+      this.ignoreDeath = ignoreDeath;
+      this.ret = ret;
+    }
+
+    public byte[] getRet() {
+      return ret;
+    }
+
+    public int getMasterReplica() {
+      return masterReplica;
+    }
+
+    public SendToMasterReplikca invoke() throws InterruptedException {
+      masterReplica = -1;
+      for (int i = 0; i < 10; i++) {
+        if (isShutdown.get()) {
+          throw new DatabaseException(SHUTTING_DOWN_STR);
+        }
+        masterReplica = common.getServersConfig().getShards()[shard].getMasterReplica();
+        Server currReplica = replicas[masterReplica];
+        try {
+          if (!ignoreDeath && replicas[masterReplica].dead) {
+            logger.error("dead server: master={}", masterReplica);
+            throw new DeadServerException(HOST_STR + currReplica.hostPort + METHOD_STR + method);
+          }
+          body.put(ComObject.Tag.REPLICATION_MASTER, masterReplica);
+          if (shard == DatabaseClient.this.shard && masterReplica == DatabaseClient.this.replica && databaseServer != null) {
+            ret = invokeOnServer(databaseServer, body.serialize(), false, true);
+          }
+          else {
+            Object dbServer = getLocalDbServer(shard, (int) masterReplica);
+            if (dbServer != null) {
+              ret = invokeOnServer(dbServer, body.serialize(), false, true);
+            }
+            else {
+              ret = currReplica.doSend(null, body.serialize());
+            }
+          }
+
+          body.remove(ComObject.Tag.REPLICATION_MASTER);
+
+          if (ret != null) {
+            ComObject retObj = new ComObject(ret);
+            body.put(ComObject.Tag.SEQUENCE_0, retObj.getLong(ComObject.Tag.SEQUENCE_0));
+            body.put(ComObject.Tag.SEQUENCE_1, retObj.getLong(ComObject.Tag.SEQUENCE_1));
+          }
+          break;
+        }
+        catch (SchemaOutOfSyncException e) {
+          throw e;
+        }
+        catch (DeadServerException e) {
+          if (isShutdown.get()) {
+            throw new DatabaseException(SHUTTING_DOWN_STR);
+          }
+          Thread.sleep(1000);
+          try {
+            syncSchema();
+          }
+          catch (Exception e1) {
+            logger.error("Error syncing schema", e1);
+          }
+        }
+        catch (Exception e) {
+          e = new DatabaseException(HOST_STR + currReplica.hostPort + METHOD_STR + method, e);
+          handleSchemaOutOfSyncException(e);
+        }
+      }
+      return this;
+    }
   }
 }

@@ -17,19 +17,14 @@ public class Blob implements java.sql.Blob {
 
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
-  @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public Blob(byte[] data) {
     this.data = data;
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP", justification="copying the returned data is too slow")
   public byte[] getData() {
     return data;
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
-  @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public void setData(byte[] data) {
     this.data = data;
   }

@@ -35,9 +35,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static org.testng.Assert.assertEquals;
 
-/**
- * Created by lowryda on 8/28/17.
- */
 public class TestPartitionManagerConsistencySecondaryIndex {
 
   private Connection conn;

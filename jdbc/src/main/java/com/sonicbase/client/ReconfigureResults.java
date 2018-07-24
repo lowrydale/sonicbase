@@ -1,8 +1,6 @@
 package com.sonicbase.client;
 
-/**
- * Created by lowryda on 7/28/17.
- */
+
 public class ReconfigureResults {
   private boolean handedOffToMaster;
   private int shardCount;

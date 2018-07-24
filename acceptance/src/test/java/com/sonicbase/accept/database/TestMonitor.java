@@ -5,9 +5,6 @@ import org.testng.annotations.Test;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Created by lowryda on 4/8/17.
- */
 public class TestMonitor {
 
   @Test

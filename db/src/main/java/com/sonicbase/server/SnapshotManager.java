@@ -181,99 +181,7 @@ public class SnapshotManager {
           }
         }
         if (file.exists()) {
-          for (File tableFile : file.listFiles()) {
-            final String tableName = tableFile.getName();
-            if (!tableFile.isDirectory()) {
-              continue;
-            }
-            for (File indexDir : tableFile.listFiles()) {
-              final String indexName = indexDir.getName();
-              List<Future> futures = new ArrayList<>();
-              final AtomicInteger offset = new AtomicInteger();
-              logger.info("Recovering: table={}, index={}", tableName, indexName);
-              for (final File indexFile : indexDir.listFiles()) {
-                final int currOffset = offset.get();
-                final TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
-                final IndexSchema indexSchema = server.getIndexSchema(dbName, tableSchema.getName(), indexName);
-                final Index index = server.getIndex(dbName, tableName, indexName);
-                futures.add(executor.submit(() -> {
-                  try (DataInputStream inStream = new DataInputStream(new BufferedInputStream(
-                      new ByteCounterStream(finishedBytes, new FileInputStream(indexFile))))) {
-                    boolean isPrimaryKey = indexSchema.isPrimaryKey();
-                    while (true) {
-                      if (!inStream.readBoolean()) {
-                        break;
-                      }
-                      Object[] key = DatabaseCommon.deserializeKey(tableSchema, inStream);
-
-                      long updateTime = Varint.readUnsignedVarLong(inStream);
-
-                      int count = (int) Varint.readSignedVarLong(inStream);
-                      byte[][] records = new byte[count][];
-                      for (int i = 0; i < records.length; i++) {
-                        int len = (int) Varint.readSignedVarLong(inStream);
-                        records[i] = new byte[len];
-                        inStream.readFully(records[i]);
-                      }
-
-                      Object address;
-                      if (isPrimaryKey) {
-                        address = server.getAddressMap().toUnsafeFromRecords(updateTime, records);
-                        for (byte[] record : records) {
-                          if ((Record.getDbViewFlags(record) & Record.DB_VIEW_FLAG_DELETING) == 0) {
-                            index.addAndGetCount(1);
-                          }
-                        }
-                      }
-                      else {
-                        address = server.getAddressMap().toUnsafeFromKeys(updateTime, records);
-                        for (byte[] record : records) {
-                          if ((Record.getDbViewFlags(record) & Record.DB_VIEW_FLAG_DELETING) == 0) {
-                            index.addAndGetCount(1);
-                          }
-                        }
-                      }
-
-                      if (index.put(key, address) != null) {
-                        logger.error("Key already exists: key={}", DatabaseCommon.keyToString(key));
-                      }
-
-                      recoveredCount.incrementAndGet();
-                      if (currOffset == 0 && (System.currentTimeMillis() - lastLogged.get()) > 2000) {
-                        lastLogged.set(System.currentTimeMillis());
-                        logger.info("Recover progress - table={}, index={}, count={}, rate={}, duration={}sec",
-                            tableName, indexName, recoveredCount.get(),
-                            ((float) recoveredCount.get() / (float) (System.currentTimeMillis() - indexBegin) * 1000f),
-                            (System.currentTimeMillis() - indexBegin) / 1000f);
-                      }
-                    }
-                  }
-                  catch (Exception e) {
-                    logger.error("Error recovering bucket: table={}, index={}", tableName, indexName, e);
-                    throw new DatabaseException(e);
-                  }
-                  return true;
-                }
-                ));
-                offset.incrementAndGet();
-              }
-              for (Future future : futures) {
-                try {
-                  if (!(Boolean) future.get()) {
-                    throw new DatabaseException("Error recovering from bucket");
-                  }
-                }
-                catch (Exception t) {
-                  errorRecovering = t;
-                  throw new DatabaseException("Error recovering from bucket", t);
-                }
-              }
-              logger.info("Recover progress - finished index. table={}, index={}, count={}, rate={}, duration={}",
-                  tableName, indexName, recoveredCount.get(),
-                  ((float) recoveredCount.get() / (float) (System.currentTimeMillis() - indexBegin) * 1000f),
-                  (System.currentTimeMillis() - indexBegin) / 1000f);
-            }
-          }
+          recoverTables(dbName, executor, recoveredCount, indexBegin, lastLogged, file);
         }
         logger.info("Recover progress - finished all indices. count={}, rate={}, duration={}", recoveredCount.get(),
             ((float) recoveredCount.get() / (float) (System.currentTimeMillis() - indexBegin) * 1000f),
@@ -289,6 +197,112 @@ public class SnapshotManager {
     }
     finally {
       isRecovering = false;
+    }
+  }
+
+  private void recoverTables(String dbName, ThreadPoolExecutor executor, AtomicLong recoveredCount, long indexBegin, AtomicLong lastLogged, File file) {
+    for (File tableFile : file.listFiles()) {
+      final String tableName = tableFile.getName();
+      if (!tableFile.isDirectory()) {
+        continue;
+      }
+      for (File indexDir : tableFile.listFiles()) {
+        final String indexName = indexDir.getName();
+        List<Future> futures = new ArrayList<>();
+        final AtomicInteger offset = new AtomicInteger();
+        logger.info("Recovering: table={}, index={}", tableName, indexName);
+        for (final File indexFile : indexDir.listFiles()) {
+          final int currOffset = offset.get();
+          final TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
+          final IndexSchema indexSchema = server.getIndexSchema(dbName, tableSchema.getName(), indexName);
+          final Index index = server.getIndex(dbName, tableName, indexName);
+
+          recoverIndex(executor, recoveredCount, indexBegin, lastLogged, tableName, indexName, futures, indexFile, currOffset, tableSchema, indexSchema, index);
+
+          offset.incrementAndGet();
+        }
+        for (Future future : futures) {
+          try {
+            if (!(Boolean) future.get()) {
+              throw new DatabaseException("Error recovering from bucket");
+            }
+          }
+          catch (Exception t) {
+            errorRecovering = t;
+            throw new DatabaseException("Error recovering from bucket", t);
+          }
+        }
+        logger.info("Recover progress - finished index. table={}, index={}, count={}, rate={}, duration={}",
+            tableName, indexName, recoveredCount.get(),
+            ((float) recoveredCount.get() / (float) (System.currentTimeMillis() - indexBegin) * 1000f),
+            (System.currentTimeMillis() - indexBegin) / 1000f);
+      }
+    }
+  }
+
+  private void recoverIndex(ThreadPoolExecutor executor, AtomicLong recoveredCount, long indexBegin, AtomicLong lastLogged, String tableName, String indexName, List<Future> futures, File indexFile, int currOffset, TableSchema tableSchema, IndexSchema indexSchema, Index index) {
+    futures.add(executor.submit(() -> {
+      try (DataInputStream inStream = new DataInputStream(new BufferedInputStream(
+          new ByteCounterStream(finishedBytes, new FileInputStream(indexFile))))) {
+        boolean isPrimaryKey = indexSchema.isPrimaryKey();
+        while (true) {
+          if (!inStream.readBoolean()) {
+            break;
+          }
+          Object[] key = DatabaseCommon.deserializeKey(tableSchema, inStream);
+
+          long updateTime = Varint.readUnsignedVarLong(inStream);
+
+          int count = (int) Varint.readSignedVarLong(inStream);
+          byte[][] records = new byte[count][];
+          for (int i = 0; i < records.length; i++) {
+            int len = (int) Varint.readSignedVarLong(inStream);
+            records[i] = new byte[len];
+            inStream.readFully(records[i]);
+          }
+
+          addRecordsToIndex(index, isPrimaryKey, key, updateTime, records);
+
+          recoveredCount.incrementAndGet();
+          if (currOffset == 0 && (System.currentTimeMillis() - lastLogged.get()) > 2000) {
+            lastLogged.set(System.currentTimeMillis());
+            logger.info("Recover progress - table={}, index={}, count={}, rate={}, duration={}sec",
+                tableName, indexName, recoveredCount.get(),
+                ((float) recoveredCount.get() / (float) (System.currentTimeMillis() - indexBegin) * 1000f),
+                (System.currentTimeMillis() - indexBegin) / 1000f);
+          }
+        }
+      }
+      catch (Exception e) {
+        logger.error("Error recovering bucket: table={}, index={}", tableName, indexName, e);
+        throw new DatabaseException(e);
+      }
+      return true;
+    }
+    ));
+  }
+
+  private void addRecordsToIndex(Index index, boolean isPrimaryKey, Object[] key, long updateTime, byte[][] records) {
+    Object address;
+    if (isPrimaryKey) {
+      address = server.getAddressMap().toUnsafeFromRecords(updateTime, records);
+      for (byte[] record : records) {
+        if ((Record.getDbViewFlags(record) & Record.DB_VIEW_FLAG_DELETING) == 0) {
+          index.addAndGetCount(1);
+        }
+      }
+    }
+    else {
+      address = server.getAddressMap().toUnsafeFromKeys(updateTime, records);
+      for (byte[] record : records) {
+        if ((Record.getDbViewFlags(record) & Record.DB_VIEW_FLAG_DELETING) == 0) {
+          index.addAndGetCount(1);
+        }
+      }
+    }
+
+    if (index.put(key, address) != null) {
+      logger.error("Key already exists: key={}", DatabaseCommon.keyToString(key));
     }
   }
 
@@ -374,6 +388,10 @@ public class SnapshotManager {
         throw new DatabaseException(e);
       }
     }
+    startSnapshotThread();
+  }
+
+  private void startSnapshotThread() {
     snapshotThread = ThreadUtil.createThread(() -> {
       while (!Thread.interrupted()) {
         try {
@@ -449,8 +467,6 @@ public class SnapshotManager {
     long begin = System.currentTimeMillis();
     logger.info("Snapshot - begin");
 
-    //todo: may want to gzip this
-
     File snapshotRootDir = new File(getSnapshotRootDir(dbName));
     snapshotRootDir.mkdirs();
     int highestSnapshot = getHighestUnCommittedSnapshotVersion(snapshotRootDir);
@@ -504,59 +520,8 @@ public class SnapshotManager {
             outStreams[i] = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(currFile), 65_000));
           }
 
-          final boolean isPrimaryKey = indexEntry.getValue().isPrimaryKey();
-          Map.Entry<Object[], Object> first = index.firstEntry();
-          if (first != null) {
-            index.visitTailMap(first.getKey(), (key, value) -> {
-              int bucket = (int) (countSaved.incrementAndGet() % SNAPSHOT_PARTITION_COUNT);
-              byte[][] records = null;
-              long updateTime = 0;
-              synchronized (index.getMutex(key)) {
-                Object currValue = index.get(key);
-                if (!(currValue == null || currValue.equals(0L))) {
-                  if (isPrimaryKey) {
-                    records = server.getAddressMap().fromUnsafeToRecords(currValue);
-                  }
-                  else {
-                    records = server.getAddressMap().fromUnsafeToKeys(currValue);
-                  }
-                  updateTime = server.getUpdateTime(currValue);
-                }
-              }
-              if (records != null) {
-                outStreams[bucket].writeBoolean(true);
-                byte[] keyBytes = DatabaseCommon.serializeKey(tableEntry.getValue(), indexEntry.getKey(), key);
-                outStreams[bucket].write(keyBytes);
+          snapshotIndex(dbName, deleteIfOlder, countSaved, lastLogged, tableEntry, indexEntry, fieldOffsets, subBegin, savedCount, index, outStreams);
 
-                Varint.writeUnsignedVarLong(updateTime,  outStreams[bucket]);
-
-                Varint.writeSignedVarLong(records.length, outStreams[bucket]);
-                for (byte[] record : records) {
-
-                  if (deleteIfOlder != null) {
-                    updateTime = Record.getUpdateTime(record);
-                    if (updateTime < deleteIfOlder) {
-                      deleteRecord(dbName, tableEntry.getKey(), tableEntry.getValue(), indexEntry.getValue(),
-                          key, record, fieldOffsets);
-                    }
-                  }
-
-                  Varint.writeSignedVarLong(record.length, outStreams[bucket]);
-                  outStreams[bucket].write(record);
-
-                  savedCount.incrementAndGet();
-                  if (System.currentTimeMillis() - lastLogged.get() > 2000) {
-                    lastLogged.set(System.currentTimeMillis());
-                    logger.info("Snapshot progress - records: count=" + savedCount + RATE_STR +
-                        ((float) savedCount.get() / (float) (System.currentTimeMillis() - subBegin) * 1000f) +
-                        DURATION_STR + (System.currentTimeMillis() - subBegin) / 1000f +
-                        ", table=" + tableEntry.getKey() + INDEX_STR + indexEntry.getKey());
-                  }
-                }
-              }
-              return true;
-            });
-          }
           logger.info("Snapshot progress - finished index: count={}, rate={}, duration={}, table={}, index={}",
               savedCount, ((float) savedCount.get() / (float) (System.currentTimeMillis() - subBegin) * 1000f),
               (System.currentTimeMillis() - subBegin) / 1000f, tableEntry.getKey(), indexEntry.getKey());
@@ -588,6 +553,69 @@ public class SnapshotManager {
     }
 
     logger.info("Snapshot - end: snapshotId={}, duration={}", (highestSnapshot + 1), (System.currentTimeMillis() - begin));
+  }
+
+  private void snapshotIndex(String dbName, Long deleteIfOlder, AtomicLong countSaved, AtomicLong lastLogged, Map.Entry<String, TableSchema> tableEntry, Map.Entry<String, IndexSchema> indexEntry, int[] fieldOffsets, long subBegin, AtomicLong savedCount, Index index, DataOutputStream[] outStreams) {
+    final boolean isPrimaryKey = indexEntry.getValue().isPrimaryKey();
+    Map.Entry<Object[], Object> first = index.firstEntry();
+    if (first != null) {
+      index.visitTailMap(first.getKey(), (key, value) -> {
+        int bucket = (int) (countSaved.incrementAndGet() % SNAPSHOT_PARTITION_COUNT);
+        byte[][] records = null;
+        long updateTime = 0;
+        synchronized (index.getMutex(key)) {
+          Object currValue = index.get(key);
+          if (!(currValue == null || currValue.equals(0L))) {
+            if (isPrimaryKey) {
+              records = server.getAddressMap().fromUnsafeToRecords(currValue);
+            }
+            else {
+              records = server.getAddressMap().fromUnsafeToKeys(currValue);
+            }
+            updateTime = server.getUpdateTime(currValue);
+          }
+        }
+
+        writeRecords(dbName, deleteIfOlder, lastLogged, tableEntry, indexEntry, fieldOffsets, subBegin, savedCount,
+            outStreams, key, bucket, records, updateTime);
+
+        return true;
+      });
+    }
+  }
+
+  private void writeRecords(String dbName, Long deleteIfOlder, AtomicLong lastLogged, Map.Entry<String, TableSchema> tableEntry, Map.Entry<String, IndexSchema> indexEntry, int[] fieldOffsets, long subBegin, AtomicLong savedCount, DataOutputStream[] outStreams, Object[] key, int bucket, byte[][] records, long updateTime) throws IOException {
+    if (records != null) {
+      outStreams[bucket].writeBoolean(true);
+      byte[] keyBytes = DatabaseCommon.serializeKey(tableEntry.getValue(), indexEntry.getKey(), key);
+      outStreams[bucket].write(keyBytes);
+
+      Varint.writeUnsignedVarLong(updateTime,  outStreams[bucket]);
+
+      Varint.writeSignedVarLong(records.length, outStreams[bucket]);
+      for (byte[] record : records) {
+
+        if (deleteIfOlder != null) {
+          updateTime = Record.getUpdateTime(record);
+          if (updateTime < deleteIfOlder) {
+            deleteRecord(dbName, tableEntry.getKey(), tableEntry.getValue(), indexEntry.getValue(),
+                key, record, fieldOffsets);
+          }
+        }
+
+        Varint.writeSignedVarLong(record.length, outStreams[bucket]);
+        outStreams[bucket].write(record);
+
+        savedCount.incrementAndGet();
+        if (System.currentTimeMillis() - lastLogged.get() > 2000) {
+          lastLogged.set(System.currentTimeMillis());
+          logger.info("Snapshot progress - records: count=" + savedCount + RATE_STR +
+              ((float) savedCount.get() / (float) (System.currentTimeMillis() - subBegin) * 1000f) +
+              DURATION_STR + (System.currentTimeMillis() - subBegin) / 1000f +
+              ", table=" + tableEntry.getKey() + INDEX_STR + indexEntry.getKey());
+        }
+      }
+    }
   }
 
   private void deleteOldSnapshots(String dbName) throws IOException {

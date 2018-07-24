@@ -265,61 +265,7 @@ public class PartitionUtils {
     }
 
     if (operator == com.sonicbase.query.BinaryExpression.Operator.EQUAL) {
-
-      TableSchema.Partition partitionZero = partitions[0];
-      if (partitionZero.getUpperKey() == null) {
-        selectedPartitions.add(0);
-        return;
-      }
-
-      for (int i = 0; i < partitions.length - 1; i++) {
-        int compareValue = 0;
-
-        for (int k = 0; k < key.length; k++) {
-          if (key[k] == null || partitions[0].getUpperKey()[k] == null) {
-            continue;
-          }
-          int value = comparators[k].compare(key[k], partitions[i].getUpperKey()[k]);
-          if (value < 0) {
-            compareValue = -1;
-            break;
-          }
-          if (value > 0) {
-            compareValue = 1;
-            break;
-          }
-        }
-
-        if (i == 0 && compareValue == -1 || compareValue == 0) {
-          selectedPartitions.add(i);
-        }
-
-        int compareValue2 = 0;
-        if (partitions[i + 1].getUpperKey() == null) {
-          if (compareValue == 1 || compareValue == 0) {
-            selectedPartitions.add(i + 1);
-          }
-        }
-        else {
-          for (int k = 0; k < key.length; k++) {
-            if (key[k] == null || partitions[0].getUpperKey()[k] == null) {
-              continue;
-            }
-            int value = comparators[k].compare(key[k], partitions[i + 1].getUpperKey()[k]);
-            if (value < 0) {
-              compareValue2 = -1;
-              break;
-            }
-            if (value > 0) {
-              compareValue2 = 1;
-              break;
-            }
-          }
-          if ((compareValue == 1 || compareValue == 0) && compareValue2 == -1) {
-            selectedPartitions.add(i + 1);
-          }
-        }
-      }
+      doSelectPartitionsForOperatorEquals(partitions, comparators, key, selectedPartitions);
       return;
     }
 
@@ -327,8 +273,6 @@ public class PartitionUtils {
     for (int i = !ascending ? partitions.length - 1 : 0; (!ascending ? i >= 0 : i < partitions.length); i += (!ascending ? -1 : 1)) {
       Object[] lowerKey = partitions[i].getUpperKey();
       if (lowerKey == null) {
-
-
         if (i == 0 || (!ascending ? i == 0 : i == partitions.length - 1)) {
           selectedPartitions.add(i);
           break;
@@ -337,24 +281,9 @@ public class PartitionUtils {
         if (lowerLowerKey == null) {
           continue;
         }
-        String[] indexFields = tableSchema.getIndices().get(indexName).getFields();
-        Object[] tempLowerKey = new Object[indexFields.length];
-        for (int j = 0; j < indexFields.length; j++) {
-          tempLowerKey[j] = lowerLowerKey[j];
-        }
-        int compareValue = 0;
 
-        for (int k = 0; k < key.length; k++) {
-          int value = comparators[k].compare(key[k], tempLowerKey[k]);
-          if (value < 0) {
-            compareValue = -1;
-            break;
-          }
-          if (value > 0) {
-            compareValue = 1;
-            break;
-          }
-        }
+        int compareValue = compareLowerKeyWithKey(tableSchema, indexName, comparators, key, lowerLowerKey);
+
         if (compareValue == 0 && operator == BinaryExpression.Operator.GREATER) {
           continue outer;
         }
@@ -404,6 +333,86 @@ public class PartitionUtils {
         }
       }
     }
+  }
+
+  private static int compareLowerKeyWithKey(TableSchema tableSchema, String indexName, Comparator[] comparators, Object[] key, Object[] lowerLowerKey) {
+    String[] indexFields = tableSchema.getIndices().get(indexName).getFields();
+    Object[] tempLowerKey = new Object[indexFields.length];
+    for (int j = 0; j < indexFields.length; j++) {
+      tempLowerKey[j] = lowerLowerKey[j];
+    }
+    int compareValue = 0;
+
+    for (int k = 0; k < key.length; k++) {
+      int value = comparators[k].compare(key[k], tempLowerKey[k]);
+      if (value < 0) {
+        compareValue = -1;
+        break;
+      }
+      if (value > 0) {
+        compareValue = 1;
+        break;
+      }
+    }
+    return compareValue;
+  }
+
+  private static void doSelectPartitionsForOperatorEquals(TableSchema.Partition[] partitions, Comparator[] comparators, Object[] key, List<Integer> selectedPartitions) {
+    TableSchema.Partition partitionZero = partitions[0];
+    if (partitionZero.getUpperKey() == null) {
+      selectedPartitions.add(0);
+      return;
+    }
+
+    for (int i = 0; i < partitions.length - 1; i++) {
+      int compareValue = 0;
+
+      for (int k = 0; k < key.length; k++) {
+        if (key[k] == null || partitions[0].getUpperKey()[k] == null) {
+          continue;
+        }
+        int value = comparators[k].compare(key[k], partitions[i].getUpperKey()[k]);
+        if (value < 0) {
+          compareValue = -1;
+          break;
+        }
+        if (value > 0) {
+          compareValue = 1;
+          break;
+        }
+      }
+
+      if (i == 0 && compareValue == -1 || compareValue == 0) {
+        selectedPartitions.add(i);
+      }
+
+      int compareValue2 = 0;
+      if (partitions[i + 1].getUpperKey() == null) {
+        if (compareValue == 1 || compareValue == 0) {
+          selectedPartitions.add(i + 1);
+        }
+      }
+      else {
+        for (int k = 0; k < key.length; k++) {
+          if (key[k] == null || partitions[0].getUpperKey()[k] == null) {
+            continue;
+          }
+          int value = comparators[k].compare(key[k], partitions[i + 1].getUpperKey()[k]);
+          if (value < 0) {
+            compareValue2 = -1;
+            break;
+          }
+          if (value > 0) {
+            compareValue2 = 1;
+            break;
+          }
+        }
+        if ((compareValue == 1 || compareValue == 0) && compareValue2 == -1) {
+          selectedPartitions.add(i + 1);
+        }
+      }
+    }
+    return;
   }
 
 

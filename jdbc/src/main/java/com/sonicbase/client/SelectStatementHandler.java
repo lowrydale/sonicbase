@@ -294,216 +294,35 @@ public class SelectStatementHandler implements StatementHandler {
       DatabaseClient client, AtomicInteger currParmNum, Expression whereExpression, String tableName, ParameterHandler parms) {
 
     ExpressionImpl retExpression = null;
-    //todo: add math operators
     if (whereExpression instanceof Between) {
-      Between between = (Between) whereExpression;
-      Column column = (Column) between.getLeftExpression();
-
-      BinaryExpressionImpl ret = new BinaryExpressionImpl();
-      ret.setNot(between.isNot());
-      ret.setOperator(com.sonicbase.query.BinaryExpression.Operator.AND);
-
-      BinaryExpressionImpl leftExpression = new BinaryExpressionImpl();
-      ColumnImpl leftColumn = new ColumnImpl();
-      if (column.getTable() != null) {
-        leftColumn.setTableName(column.getTable().getName());
-      }
-      leftColumn.setColumnName(column.getColumnName());
-      leftExpression.setLeftExpression(leftColumn);
-
-      BinaryExpressionImpl rightExpression = new BinaryExpressionImpl();
-      ColumnImpl rightColumn = new ColumnImpl();
-      if (column.getTable() != null) {
-        rightColumn.setTableName(column.getTable().getName());
-      }
-      rightColumn.setColumnName(column.getColumnName());
-      rightExpression.setLeftExpression(rightColumn);
-
-      leftExpression.setOperator(com.sonicbase.query.BinaryExpression.Operator.GREATER_EQUAL);
-      rightExpression.setOperator(com.sonicbase.query.BinaryExpression.Operator.LESS_EQUAL);
-
-      ret.setLeftExpression(leftExpression);
-      ret.setRightExpression(rightExpression);
-
-      ConstantImpl leftValue = new ConstantImpl();
-      ConstantImpl rightValue = new ConstantImpl();
-      if (between.getBetweenExpressionStart() instanceof LongValue) {
-        long start = ((LongValue) between.getBetweenExpressionStart()).getValue();
-        long end = ((LongValue) between.getBetweenExpressionEnd()).getValue();
-        if (start > end) {
-          long temp = start;
-          start = end;
-          end = temp;
-        }
-        leftValue.setValue(start);
-        leftValue.setSqlType(Types.BIGINT);
-        rightValue.setValue(end);
-        rightValue.setSqlType(Types.BIGINT);
-      }
-      else if (between.getBetweenExpressionStart() instanceof StringValue) {
-        String start = ((StringValue) between.getBetweenExpressionStart()).getValue();
-        String end = ((StringValue) between.getBetweenExpressionEnd()).getValue();
-        if (0 < start.compareTo(end)) {
-          String temp = start;
-          start = end;
-          end = temp;
-        }
-        leftValue.setValue(start);
-        leftValue.setSqlType(Types.VARCHAR);
-        rightValue.setValue(end);
-        rightValue.setSqlType(Types.VARCHAR);
-      }
-
-      leftExpression.setRightExpression(leftValue);
-      rightExpression.setRightExpression(rightValue);
-
-      retExpression = ret;
+      retExpression = getBetweenExpression((Between) whereExpression);
     }
     else if (whereExpression instanceof AndExpression) {
-      BinaryExpressionImpl binaryOp = new BinaryExpressionImpl();
-      binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.AND);
-      AndExpression andExpression = (AndExpression) whereExpression;
-      Expression leftExpression = andExpression.getLeftExpression();
-      binaryOp.setLeftExpression(getExpression(client, currParmNum, leftExpression, tableName, parms));
-      Expression rightExpression = andExpression.getRightExpression();
-      binaryOp.setRightExpression(getExpression(client, currParmNum, rightExpression, tableName, parms));
-      retExpression = binaryOp;
+      retExpression = getAndExpression(client, currParmNum, (AndExpression) whereExpression, tableName, parms);
     }
     else if (whereExpression instanceof OrExpression) {
-      BinaryExpressionImpl binaryOp = new BinaryExpressionImpl();
-
-      binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.OR);
-      OrExpression andExpression = (OrExpression) whereExpression;
-      Expression leftExpression = andExpression.getLeftExpression();
-      binaryOp.setLeftExpression(getExpression(client, currParmNum, leftExpression, tableName, parms));
-      Expression rightExpression = andExpression.getRightExpression();
-      binaryOp.setRightExpression(getExpression(client, currParmNum, rightExpression, tableName, parms));
-      retExpression = binaryOp;
+      retExpression = getOrExpression(client, currParmNum, (OrExpression) whereExpression, tableName, parms);
     }
     else if (whereExpression instanceof Parenthesis) {
-      retExpression = getExpression(client, currParmNum, ((Parenthesis) whereExpression).getExpression(), tableName, parms);
-      if (((Parenthesis) whereExpression).isNot()) {
-        ParenthesisImpl parens = new ParenthesisImpl();
-        parens.setExpression(retExpression);
-        parens.setNot(true);
-        retExpression = parens;
-      }
+      retExpression = getParenthesisExpression(client, currParmNum, (Parenthesis) whereExpression, tableName, parms);
     }
     else if (whereExpression instanceof net.sf.jsqlparser.expression.BinaryExpression) {
-      BinaryExpressionImpl binaryOp = new BinaryExpressionImpl();
-
-      if (whereExpression instanceof EqualsTo) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.EQUAL);
-      }
-      else if (whereExpression instanceof LikeExpression) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.LIKE);
-      }
-      else if (whereExpression instanceof NotEqualsTo) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.NOT_EQUAL);
-      }
-      else if (whereExpression instanceof MinorThan) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.LESS);
-      }
-      else if (whereExpression instanceof MinorThanEquals) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.LESS_EQUAL);
-      }
-      else if (whereExpression instanceof GreaterThan) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.GREATER);
-      }
-      else if (whereExpression instanceof GreaterThanEquals) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.GREATER_EQUAL);
-      }
-      else if (whereExpression instanceof Addition) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.PLUS);
-      }
-      else if (whereExpression instanceof Subtraction) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.MINUS);
-      }
-      else if (whereExpression instanceof Multiplication) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.TIMES);
-      }
-      else if (whereExpression instanceof Division) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.DIVIDE);
-      }
-      else if (whereExpression instanceof BitwiseAnd) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.BITWISE_AND);
-      }
-      else if (whereExpression instanceof BitwiseOr) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.BITWISE_OR);
-      }
-      else if (whereExpression instanceof BitwiseXor) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.BITWISE_X_OR);
-      }
-      else if (whereExpression instanceof Modulo) {
-        binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.MODULO);
-      }
-      net.sf.jsqlparser.expression.BinaryExpression bexp = (net.sf.jsqlparser.expression.BinaryExpression) whereExpression;
-      binaryOp.setNot(bexp.isNot());
-
-      Expression left = bexp.getLeftExpression();
-      binaryOp.setLeftExpression(getExpression(client, currParmNum, left, tableName, parms));
-
-      Expression right = bexp.getRightExpression();
-      binaryOp.setRightExpression(getExpression(client, currParmNum, right, tableName, parms));
-
-      retExpression = binaryOp;
+      retExpression = getBinaryExpression(client, currParmNum, whereExpression, tableName, parms);
     }
     else if (whereExpression instanceof net.sf.jsqlparser.expression.operators.relational.InExpression) {
-      InExpressionImpl retInExpression = new InExpressionImpl(client, parms, tableName);
-      net.sf.jsqlparser.expression.operators.relational.InExpression inExpression = (net.sf.jsqlparser.expression.operators.relational.InExpression) whereExpression;
-      retInExpression.setNot(inExpression.isNot());
-      retInExpression.setLeftExpression(getExpression(client, currParmNum, inExpression.getLeftExpression(), tableName, parms));
-      ItemsList items = inExpression.getRightItemsList();
-      if (items instanceof ExpressionList) {
-        ExpressionList expressionList = (ExpressionList) items;
-        List expressions = expressionList.getExpressions();
-        for (Object obj : expressions) {
-          retInExpression.addExpression(getExpression(client, currParmNum, (Expression) obj, tableName, parms));
-        }
-      }
-      else if (items instanceof SubSelect) {
-        //todo: implement
-      }
-      retExpression = retInExpression;
+      retExpression = getInExpression(client, currParmNum, (InExpression) whereExpression, tableName, parms);
     }
     else if (whereExpression instanceof Column) {
-      Column column = (Column) whereExpression;
-      ColumnImpl columnNode = new ColumnImpl();
-      String colTableName = column.getTable().getName();
-      if (colTableName != null) {
-        columnNode.setTableName(toLower(colTableName));
-      }
-      else {
-        columnNode.setTableName(tableName);
-      }
-      columnNode.setColumnName(toLower(column.getColumnName()));
-      retExpression = columnNode;
+      retExpression = getColumnExpression((Column) whereExpression, tableName);
     }
     else if (whereExpression instanceof StringValue) {
-      StringValue string = (StringValue) whereExpression;
-      ConstantImpl constant = new ConstantImpl();
-      constant.setSqlType(Types.VARCHAR);
-      try {
-        constant.setValue(string.getValue().getBytes("utf-8"));
-      }
-      catch (UnsupportedEncodingException e) {
-        throw new DatabaseException(e);
-      }
-      retExpression = constant;
+      retExpression = getStringValueExpression((StringValue) whereExpression);
     }
     else if (whereExpression instanceof DoubleValue) {
-      DoubleValue doubleValue = (DoubleValue) whereExpression;
-      ConstantImpl constant = new ConstantImpl();
-      constant.setSqlType(Types.DOUBLE);
-      constant.setValue(doubleValue.getValue());
-      retExpression = constant;
+      retExpression = getDoubleValueExpression((DoubleValue) whereExpression);
     }
     else if (whereExpression instanceof LongValue) {
-      LongValue longValue = (LongValue) whereExpression;
-      ConstantImpl constant = new ConstantImpl();
-      constant.setSqlType(Types.BIGINT);
-      constant.setValue(longValue.getValue());
-      retExpression = constant;
+      retExpression = getLongValueExpression((LongValue) whereExpression);
     }
     else if (whereExpression instanceof JdbcNamedParameter) {
       ParameterImpl parameter = new ParameterImpl();
@@ -516,17 +335,7 @@ public class SelectStatementHandler implements StatementHandler {
       retExpression = parameter;
     }
     else if (whereExpression instanceof Function) {
-      Function sourceFunc = (Function) whereExpression;
-      ExpressionList sourceParms = sourceFunc.getParameters();
-      List<ExpressionImpl> expressions = new ArrayList<>();
-      if (sourceParms != null) {
-        for (Expression expression : sourceParms.getExpressions()) {
-          ExpressionImpl expressionImpl = getExpression(client, currParmNum, expression, tableName, parms);
-          expressions.add(expressionImpl);
-        }
-      }
-      FunctionImpl func = new FunctionImpl(sourceFunc.getName(), expressions);
-      retExpression = func;
+      retExpression = getFunctionExpression(client, currParmNum, (Function) whereExpression, tableName, parms);
     }
     else if (whereExpression instanceof SignedExpression) {
       SignedExpression expression = (SignedExpression) whereExpression;
@@ -550,6 +359,260 @@ public class SelectStatementHandler implements StatementHandler {
     return retExpression;
   }
 
+  private static ExpressionImpl getFunctionExpression(DatabaseClient client, AtomicInteger currParmNum, Function whereExpression, String tableName, ParameterHandler parms) {
+    ExpressionImpl retExpression;
+    Function sourceFunc = whereExpression;
+    ExpressionList sourceParms = sourceFunc.getParameters();
+    List<ExpressionImpl> expressions = new ArrayList<>();
+    if (sourceParms != null) {
+      for (Expression expression : sourceParms.getExpressions()) {
+        ExpressionImpl expressionImpl = getExpression(client, currParmNum, expression, tableName, parms);
+        expressions.add(expressionImpl);
+      }
+    }
+    FunctionImpl func = new FunctionImpl(sourceFunc.getName(), expressions);
+    retExpression = func;
+    return retExpression;
+  }
+
+  private static ExpressionImpl getLongValueExpression(LongValue whereExpression) {
+    ExpressionImpl retExpression;
+    LongValue longValue = whereExpression;
+    ConstantImpl constant = new ConstantImpl();
+    constant.setSqlType(Types.BIGINT);
+    constant.setValue(longValue.getValue());
+    retExpression = constant;
+    return retExpression;
+  }
+
+  private static ExpressionImpl getDoubleValueExpression(DoubleValue whereExpression) {
+    ExpressionImpl retExpression;
+    DoubleValue doubleValue = whereExpression;
+    ConstantImpl constant = new ConstantImpl();
+    constant.setSqlType(Types.DOUBLE);
+    constant.setValue(doubleValue.getValue());
+    retExpression = constant;
+    return retExpression;
+  }
+
+  private static ExpressionImpl getStringValueExpression(StringValue whereExpression) {
+    ExpressionImpl retExpression;
+    StringValue string = whereExpression;
+    ConstantImpl constant = new ConstantImpl();
+    constant.setSqlType(Types.VARCHAR);
+    try {
+      constant.setValue(string.getValue().getBytes("utf-8"));
+    }
+    catch (UnsupportedEncodingException e) {
+      throw new DatabaseException(e);
+    }
+    retExpression = constant;
+    return retExpression;
+  }
+
+  private static ExpressionImpl getColumnExpression(Column whereExpression, String tableName) {
+    ExpressionImpl retExpression;
+    Column column = whereExpression;
+    ColumnImpl columnNode = new ColumnImpl();
+    String colTableName = column.getTable().getName();
+    if (colTableName != null) {
+      columnNode.setTableName(toLower(colTableName));
+    }
+    else {
+      columnNode.setTableName(tableName);
+    }
+    columnNode.setColumnName(toLower(column.getColumnName()));
+    retExpression = columnNode;
+    return retExpression;
+  }
+
+  private static ExpressionImpl getInExpression(DatabaseClient client, AtomicInteger currParmNum, InExpression whereExpression, String tableName, ParameterHandler parms) {
+    ExpressionImpl retExpression;
+    InExpressionImpl retInExpression = new InExpressionImpl(client, parms, tableName);
+    InExpression inExpression = whereExpression;
+    retInExpression.setNot(inExpression.isNot());
+    retInExpression.setLeftExpression(getExpression(client, currParmNum, inExpression.getLeftExpression(), tableName, parms));
+    ItemsList items = inExpression.getRightItemsList();
+    if (items instanceof ExpressionList) {
+      ExpressionList expressionList = (ExpressionList) items;
+      List expressions = expressionList.getExpressions();
+      for (Object obj : expressions) {
+        retInExpression.addExpression(getExpression(client, currParmNum, (Expression) obj, tableName, parms));
+      }
+    }
+
+    retExpression = retInExpression;
+    return retExpression;
+  }
+
+  private static ExpressionImpl getBinaryExpression(DatabaseClient client, AtomicInteger currParmNum, Expression whereExpression, String tableName, ParameterHandler parms) {
+    ExpressionImpl retExpression;
+    BinaryExpressionImpl binaryOp = new BinaryExpressionImpl();
+
+    if (whereExpression instanceof EqualsTo) {
+      binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.EQUAL);
+    }
+    else if (whereExpression instanceof LikeExpression) {
+      binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.LIKE);
+    }
+    else if (whereExpression instanceof NotEqualsTo) {
+      binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.NOT_EQUAL);
+    }
+    else if (whereExpression instanceof MinorThan) {
+      binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.LESS);
+    }
+    else if (whereExpression instanceof MinorThanEquals) {
+      binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.LESS_EQUAL);
+    }
+    else if (whereExpression instanceof GreaterThan) {
+      binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.GREATER);
+    }
+    else if (whereExpression instanceof GreaterThanEquals) {
+      binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.GREATER_EQUAL);
+    }
+    else if (whereExpression instanceof Addition) {
+      binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.PLUS);
+    }
+    else if (whereExpression instanceof Subtraction) {
+      binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.MINUS);
+    }
+    else if (whereExpression instanceof Multiplication) {
+      binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.TIMES);
+    }
+    else if (whereExpression instanceof Division) {
+      binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.DIVIDE);
+    }
+    else if (whereExpression instanceof BitwiseAnd) {
+      binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.BITWISE_AND);
+    }
+    else if (whereExpression instanceof BitwiseOr) {
+      binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.BITWISE_OR);
+    }
+    else if (whereExpression instanceof BitwiseXor) {
+      binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.BITWISE_X_OR);
+    }
+    else if (whereExpression instanceof Modulo) {
+      binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.MODULO);
+    }
+    BinaryExpression bexp = (BinaryExpression) whereExpression;
+    binaryOp.setNot(bexp.isNot());
+
+    Expression left = bexp.getLeftExpression();
+    binaryOp.setLeftExpression(getExpression(client, currParmNum, left, tableName, parms));
+
+    Expression right = bexp.getRightExpression();
+    binaryOp.setRightExpression(getExpression(client, currParmNum, right, tableName, parms));
+
+    retExpression = binaryOp;
+    return retExpression;
+  }
+
+  private static ExpressionImpl getParenthesisExpression(DatabaseClient client, AtomicInteger currParmNum, Parenthesis whereExpression, String tableName, ParameterHandler parms) {
+    ExpressionImpl retExpression;
+    retExpression = getExpression(client, currParmNum, whereExpression.getExpression(), tableName, parms);
+    if (whereExpression.isNot()) {
+      ParenthesisImpl parens = new ParenthesisImpl();
+      parens.setExpression(retExpression);
+      parens.setNot(true);
+      retExpression = parens;
+    }
+    return retExpression;
+  }
+
+  private static ExpressionImpl getOrExpression(DatabaseClient client, AtomicInteger currParmNum, OrExpression whereExpression, String tableName, ParameterHandler parms) {
+    ExpressionImpl retExpression;
+    BinaryExpressionImpl binaryOp = new BinaryExpressionImpl();
+
+    binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.OR);
+    OrExpression andExpression = whereExpression;
+    Expression leftExpression = andExpression.getLeftExpression();
+    binaryOp.setLeftExpression(getExpression(client, currParmNum, leftExpression, tableName, parms));
+    Expression rightExpression = andExpression.getRightExpression();
+    binaryOp.setRightExpression(getExpression(client, currParmNum, rightExpression, tableName, parms));
+    retExpression = binaryOp;
+    return retExpression;
+  }
+
+  private static ExpressionImpl getAndExpression(DatabaseClient client, AtomicInteger currParmNum, AndExpression whereExpression, String tableName, ParameterHandler parms) {
+    ExpressionImpl retExpression;
+    BinaryExpressionImpl binaryOp = new BinaryExpressionImpl();
+    binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.AND);
+    AndExpression andExpression = whereExpression;
+    Expression leftExpression = andExpression.getLeftExpression();
+    binaryOp.setLeftExpression(getExpression(client, currParmNum, leftExpression, tableName, parms));
+    Expression rightExpression = andExpression.getRightExpression();
+    binaryOp.setRightExpression(getExpression(client, currParmNum, rightExpression, tableName, parms));
+    retExpression = binaryOp;
+    return retExpression;
+  }
+
+  private static ExpressionImpl getBetweenExpression(Between whereExpression) {
+    ExpressionImpl retExpression;
+    Between between = whereExpression;
+    Column column = (Column) between.getLeftExpression();
+
+    BinaryExpressionImpl ret = new BinaryExpressionImpl();
+    ret.setNot(between.isNot());
+    ret.setOperator(com.sonicbase.query.BinaryExpression.Operator.AND);
+
+    BinaryExpressionImpl leftExpression = new BinaryExpressionImpl();
+    ColumnImpl leftColumn = new ColumnImpl();
+    if (column.getTable() != null) {
+      leftColumn.setTableName(column.getTable().getName());
+    }
+    leftColumn.setColumnName(column.getColumnName());
+    leftExpression.setLeftExpression(leftColumn);
+
+    BinaryExpressionImpl rightExpression = new BinaryExpressionImpl();
+    ColumnImpl rightColumn = new ColumnImpl();
+    if (column.getTable() != null) {
+      rightColumn.setTableName(column.getTable().getName());
+    }
+    rightColumn.setColumnName(column.getColumnName());
+    rightExpression.setLeftExpression(rightColumn);
+
+    leftExpression.setOperator(com.sonicbase.query.BinaryExpression.Operator.GREATER_EQUAL);
+    rightExpression.setOperator(com.sonicbase.query.BinaryExpression.Operator.LESS_EQUAL);
+
+    ret.setLeftExpression(leftExpression);
+    ret.setRightExpression(rightExpression);
+
+    ConstantImpl leftValue = new ConstantImpl();
+    ConstantImpl rightValue = new ConstantImpl();
+    if (between.getBetweenExpressionStart() instanceof LongValue) {
+      long start = ((LongValue) between.getBetweenExpressionStart()).getValue();
+      long end = ((LongValue) between.getBetweenExpressionEnd()).getValue();
+      if (start > end) {
+        long temp = start;
+        start = end;
+        end = temp;
+      }
+      leftValue.setValue(start);
+      leftValue.setSqlType(Types.BIGINT);
+      rightValue.setValue(end);
+      rightValue.setSqlType(Types.BIGINT);
+    }
+    else if (between.getBetweenExpressionStart() instanceof StringValue) {
+      String start = ((StringValue) between.getBetweenExpressionStart()).getValue();
+      String end = ((StringValue) between.getBetweenExpressionEnd()).getValue();
+      if (0 < start.compareTo(end)) {
+        String temp = start;
+        start = end;
+        end = temp;
+      }
+      leftValue.setValue(start);
+      leftValue.setSqlType(Types.VARCHAR);
+      rightValue.setValue(end);
+      rightValue.setSqlType(Types.VARCHAR);
+    }
+
+    leftExpression.setRightExpression(leftValue);
+    rightExpression.setRightExpression(rightValue);
+
+    retExpression = ret;
+    return retExpression;
+  }
+
   public static SelectStatementImpl parseSelectStatement(DatabaseClient client, ParameterHandler parms,
                                                          PlainSelect selectBody, AtomicInteger currParmNum) {
     SelectStatementImpl selectStatement = new SelectStatementImpl(client);
@@ -569,6 +632,103 @@ public class SelectStatementHandler implements StatementHandler {
     Offset offset = pselect.getOffset();
     selectStatement.setOffset(offset);
 
+    parseJoins(client, parms, currParmNum, selectStatement, pselect);
+
+    Distinct distinct = selectBody.getDistinct();
+    if (distinct != null) {
+      selectStatement.setIsDistinct();
+    }
+
+    List<SelectItem> selectItems = selectBody.getSelectItems();
+    for (SelectItem selectItem : selectItems) {
+      if (selectItem instanceof SelectExpressionItem) {
+        psrseSelectExpression(selectStatement, pselect, expression, selectItems, (SelectExpressionItem) selectItem);
+      }
+    }
+
+    List<Expression> groupColumns = pselect.getGroupByColumnReferences();
+    if (groupColumns != null && !groupColumns.isEmpty()) {
+      for (int i = 0; i < groupColumns.size(); i++) {
+        Column column = (Column) groupColumns.get(i);
+        selectStatement.addOrderBy(column.getTable().getName(), column.getColumnName(), true);
+      }
+      selectStatement.setGroupByColumns(groupColumns);
+    }
+
+    List<OrderByElement> orderByElements = pselect.getOrderByElements();
+    if (orderByElements != null) {
+      for (OrderByElement element : orderByElements) {
+        selectStatement.addOrderBy(((Column) element.getExpression()).getTable().getName(), ((Column) element.getExpression()).getColumnName(), element.isAsc());
+      }
+    }
+    selectStatement.setPageSize(client.getPageSize());
+    selectStatement.setParms(parms);
+    return selectStatement;
+  }
+
+  private static void psrseSelectExpression(SelectStatementImpl selectStatement, PlainSelect pselect, ExpressionImpl expression, List<SelectItem> selectItems, SelectExpressionItem selectItem) {
+    SelectExpressionItem item = selectItem;
+    Alias alias = item.getAlias();
+    String aliasName = null;
+    if (alias != null) {
+      aliasName = alias.getName();
+    }
+
+    if (item.getExpression() instanceof Column) {
+      selectStatement.addSelectColumn(null, null, ((Column) item.getExpression()).getTable().getName(),
+          ((Column) item.getExpression()).getColumnName(), aliasName);
+    }
+    else if (item.getExpression() instanceof Function) {
+      Function function = (Function) item.getExpression();
+      String name = function.getName();
+      boolean groupCount = null != pselect.getGroupByColumnReferences() &&
+          !pselect.getGroupByColumnReferences().isEmpty() &&
+          name.equalsIgnoreCase("count");
+      if (groupCount || name.equalsIgnoreCase("min") || name.equalsIgnoreCase("max") || name.equalsIgnoreCase("sum") || name.equalsIgnoreCase("avg")) {
+        Column parm = (Column) function.getParameters().getExpressions().get(0);
+        selectStatement.addSelectColumn(name, function.getParameters(), parm.getTable().getName(), parm.getColumnName(), aliasName);
+      }
+      else if (name.equalsIgnoreCase("count")) {
+        if (null == pselect.getGroupByColumnReferences() || pselect.getGroupByColumnReferences().isEmpty()) {
+          if (function.isAllColumns()) {
+            selectStatement.setCountFunction();
+          }
+          else {
+            ExpressionList list = function.getParameters();
+            Column column = (Column) list.getExpressions().get(0);
+            selectStatement.setCountFunction(column.getTable().getName(), column.getColumnName());
+          }
+          if (function.isDistinct()) {
+            selectStatement.setIsDistinct();
+          }
+
+          String currAlias = null;
+          for (SelectItem currItem : selectItems) {
+            if (((SelectExpressionItem) currItem).getExpression() == function && ((SelectExpressionItem) currItem).getAlias() != null) {
+              currAlias = ((SelectExpressionItem) currItem).getAlias().getName();
+            }
+          }
+          if (!(expression instanceof AllRecordsExpressionImpl)) {
+            String columnName = "__all__";
+            if (!function.isAllColumns()) {
+              ExpressionList list = function.getParameters();
+              Column column = (Column) list.getExpressions().get(0);
+              columnName = column.getColumnName();
+            }
+            selectStatement.addSelectColumn(function.getName(), null, ((Table) pselect.getFromItem()).getName(),
+                columnName, currAlias);
+          }
+        }
+      }
+      else if (name.equalsIgnoreCase("upper") || name.equalsIgnoreCase("lower") ||
+          name.equalsIgnoreCase("substring") || name.equalsIgnoreCase("length")) {
+        Column parm = (Column) function.getParameters().getExpressions().get(0);
+        selectStatement.addSelectColumn(name, function.getParameters(), parm.getTable().getName(), parm.getColumnName(), aliasName);
+      }
+    }
+  }
+
+  private static void parseJoins(DatabaseClient client, ParameterHandler parms, AtomicInteger currParmNum, SelectStatementImpl selectStatement, PlainSelect pselect) {
     List<Join> joins = pselect.getJoins();
     if (joins != null) {
       if (!client.getCommon().haveProLicense()) {
@@ -596,95 +756,6 @@ public class SelectStatementHandler implements StatementHandler {
         selectStatement.addJoinExpression(type, rightFrom, onExpression);
       }
     }
-
-    Distinct distinct = selectBody.getDistinct();
-    if (distinct != null) {
-      selectStatement.setIsDistinct();
-    }
-
-    List<SelectItem> selectItems = selectBody.getSelectItems();
-    for (SelectItem selectItem : selectItems) {
-      if (selectItem instanceof SelectExpressionItem) {
-        SelectExpressionItem item = (SelectExpressionItem) selectItem;
-        Alias alias = item.getAlias();
-        String aliasName = null;
-        if (alias != null) {
-          aliasName = alias.getName();
-        }
-
-        if (item.getExpression() instanceof Column) {
-          selectStatement.addSelectColumn(null, null, ((Column) item.getExpression()).getTable().getName(),
-              ((Column) item.getExpression()).getColumnName(), aliasName);
-        }
-        else if (item.getExpression() instanceof Function) {
-          Function function = (Function) item.getExpression();
-          String name = function.getName();
-          boolean groupCount = null != pselect.getGroupByColumnReferences() &&
-              !pselect.getGroupByColumnReferences().isEmpty() &&
-              name.equalsIgnoreCase("count");
-          if (groupCount || name.equalsIgnoreCase("min") || name.equalsIgnoreCase("max") || name.equalsIgnoreCase("sum") || name.equalsIgnoreCase("avg")) {
-            Column parm = (Column) function.getParameters().getExpressions().get(0);
-            selectStatement.addSelectColumn(name, function.getParameters(), parm.getTable().getName(), parm.getColumnName(), aliasName);
-          }
-          else if (name.equalsIgnoreCase("count")) {
-            if (null == pselect.getGroupByColumnReferences() || pselect.getGroupByColumnReferences().isEmpty()) {
-              if (function.isAllColumns()) {
-                selectStatement.setCountFunction();
-              }
-              else {
-                ExpressionList list = function.getParameters();
-                Column column = (Column) list.getExpressions().get(0);
-                selectStatement.setCountFunction(column.getTable().getName(), column.getColumnName());
-              }
-              if (function.isDistinct()) {
-                selectStatement.setIsDistinct();
-              }
-
-              String currAlias = null;
-              for (SelectItem currItem : selectItems) {
-                if (((SelectExpressionItem) currItem).getExpression() == function && ((SelectExpressionItem) currItem).getAlias() != null) {
-                  currAlias = ((SelectExpressionItem) currItem).getAlias().getName();
-                }
-              }
-              if (!(expression instanceof AllRecordsExpressionImpl)) {
-                String columnName = "__all__";
-                if (!function.isAllColumns()) {
-                  ExpressionList list = function.getParameters();
-                  Column column = (Column) list.getExpressions().get(0);
-                  columnName = column.getColumnName();
-                }
-                selectStatement.addSelectColumn(function.getName(), null, ((Table) pselect.getFromItem()).getName(),
-                    columnName, currAlias);
-              }
-            }
-          }
-          else if (name.equalsIgnoreCase("upper") || name.equalsIgnoreCase("lower") ||
-              name.equalsIgnoreCase("substring") || name.equalsIgnoreCase("length")) {
-            Column parm = (Column) function.getParameters().getExpressions().get(0);
-            selectStatement.addSelectColumn(name, function.getParameters(), parm.getTable().getName(), parm.getColumnName(), aliasName);
-          }
-        }
-      }
-    }
-
-    List<Expression> groupColumns = pselect.getGroupByColumnReferences();
-    if (groupColumns != null && !groupColumns.isEmpty()) {
-      for (int i = 0; i < groupColumns.size(); i++) {
-        Column column = (Column) groupColumns.get(i);
-        selectStatement.addOrderBy(column.getTable().getName(), column.getColumnName(), true);
-      }
-      selectStatement.setGroupByColumns(groupColumns);
-    }
-
-    List<OrderByElement> orderByElements = pselect.getOrderByElements();
-    if (orderByElements != null) {
-      for (OrderByElement element : orderByElements) {
-        selectStatement.addOrderBy(((Column) element.getExpression()).getTable().getName(), ((Column) element.getExpression()).getColumnName(), element.isAsc());
-      }
-    }
-    selectStatement.setPageSize(client.getPageSize());
-    selectStatement.setParms(parms);
-    return selectStatement;
   }
 
 }

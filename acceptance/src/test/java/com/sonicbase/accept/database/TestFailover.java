@@ -28,9 +28,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.testng.Assert.*;
 
-/**
- * Created by lowryda on 6/22/17.
- */
 public class TestFailover {
 
   private Connection conn;

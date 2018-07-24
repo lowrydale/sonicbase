@@ -37,8 +37,6 @@ public class SelectContextImpl {
     this.currPartitions = currPartitions;
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
-  @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public SelectContextImpl(ExpressionImpl.NextReturn tableIds, boolean canUseIndex, String[] tableNames,
                            int nextShard, Object[] nextKey,
                            SelectStatementImpl selectStatement, ExpressionImpl.RecordCache recordCache,
@@ -72,7 +70,6 @@ public class SelectContextImpl {
     return sortWithIndex;
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP", justification="copying the returned data is too slow")
   public String[] getTableNames() {
     return tableNames;
   }
@@ -89,12 +86,10 @@ public class SelectContextImpl {
     return nextShard;
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP", justification="copying the returned data is too slow")
   public Object[] getNextKey() {
     return nextKey;
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP", justification="copying the returned data is too slow")
   public Object[][][] getCurrKeys() {
     return currKeys;
   }
@@ -103,8 +98,6 @@ public class SelectContextImpl {
     return lastKeys;
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
-  @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public void setNextKey(Object[] nextKey) {
     this.nextKey = nextKey;
   }
@@ -117,8 +110,6 @@ public class SelectContextImpl {
     this.operator = operator;
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
-  @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public void setCurrKeys(Object[][][] ids) {
     this.lastKeys = this.currKeys;
     this.currKeys = ids;

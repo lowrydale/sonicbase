@@ -19,9 +19,6 @@ import java.util.Map;
 
 import static com.sonicbase.common.ComObject.Type.*;
 
-/**
- * Created by lowryda on 6/24/17.
- */
 @ExcludeRename
 public class ComObject {
 

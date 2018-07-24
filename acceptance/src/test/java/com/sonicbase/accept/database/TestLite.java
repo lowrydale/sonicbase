@@ -24,9 +24,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.testng.Assert.assertEquals;
 
-/**
- * Created by lowryda on 6/17/17.
- */
 public class TestLite {
 
   @Test

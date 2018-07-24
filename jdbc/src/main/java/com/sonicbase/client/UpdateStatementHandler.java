@@ -27,7 +27,6 @@ public class UpdateStatementHandler implements StatementHandler {
     Update update = (Update) statement;
     UpdateStatementImpl updateStatement = new UpdateStatementImpl(client);
     AtomicInteger currParmNum = new AtomicInteger();
-    //todo: support multiple tables?
     updateStatement.setTableName(update.getTables().get(0).getName());
 
     List<Column> columns = update.getColumns();

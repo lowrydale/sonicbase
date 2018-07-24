@@ -10,9 +10,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Responsible for
- */
 public class Schema {
 
   private Map<String, TableSchema> tables = new ConcurrentHashMap<>();
@@ -117,7 +114,6 @@ public class Schema {
     return tables;
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP", justification="copying the returned data is too slow")
   public RecordIndexPartition[] getRecordIndexPartitions() {
     return currRecordIndexPartitions;
   }
@@ -134,8 +130,6 @@ public class Schema {
     }
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
-  @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public void reshardRecordIndex(RecordIndexPartition[] currPartitions) {
     synchronized (schemaMutex) {
       this.lastRecordIndexPartitions = this.currRecordIndexPartitions;

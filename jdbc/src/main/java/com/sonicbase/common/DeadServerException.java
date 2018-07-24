@@ -1,8 +1,5 @@
 package com.sonicbase.common;
 
-/**
- * Created by lowryda on 6/17/17.
- */
 public class DeadServerException extends RuntimeException {
 
   public DeadServerException() {

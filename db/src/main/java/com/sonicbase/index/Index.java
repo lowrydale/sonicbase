@@ -24,7 +24,6 @@ public class Index {
 
   private AtomicLong count = new AtomicLong();
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP", justification = "copying the returned data is too slow")
   public Comparator[] getComparators() {
     return comparators;
   }
@@ -70,8 +69,6 @@ public class Index {
   };
   Comparator<Object[]> comparator = null;
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP2", justification = "copying the passed in data is too slow")
-  @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public Index(TableSchema tableSchema, String indexName, final Comparator[] comparators) {
     this.comparators = comparators;
 

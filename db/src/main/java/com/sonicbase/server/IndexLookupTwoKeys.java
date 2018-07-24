@@ -48,80 +48,75 @@ public class IndexLookupTwoKeys extends IndexLookup {
         entry = adjustStartingKey.getEntry();
         Object[] key = adjustStartingKey.getKey();
 
-        outer:
-        while (entry != null) {
-          if (retKeyRecords.size() >= count || retRecords.size() >= count) {
-            break;
-          }
-
-          if (key != null) {
-            if (excludeKeys != null) {
-              for (Object[] excludeKey : excludeKeys) {
-                if (DatabaseCommon.compareKey(indexSchema.getComparators(), excludeKey, key) == 0) {
-                  continue outer;
-                }
-              }
-            }
-
-            boolean rightIsDone = false;
-            int compareRight = 1;
-            if (lessOriginalKey != null) {
-              compareRight = DatabaseCommon.compareKey(indexSchema.getComparators(), entry.getKey(), lessOriginalKey);
-            }
-            if (lessOp.equals(BinaryExpression.Operator.LESS) && compareRight >= 0) {
-              rightIsDone = true;
-            }
-            if (lessOp.equals(BinaryExpression.Operator.LESS_EQUAL) && compareRight > 0) {
-              rightIsDone = true;
-            }
-            if (rightIsDone) {
-              entry = null;
-              break;
-            }
-          }
-          byte[][] currKeyRecords = null;
-          byte[][] records = null;
-          boolean shouldProcess = true;
-
-          if (isProbe) {
-            if (countSkipped.incrementAndGet() < DatabaseClient.OPTIMIZED_RANGE_PAGE_SIZE) {
-              shouldProcess = false;
-            }
-            else {
-              countSkipped.set(0);
-            }
-          }
-          if (shouldProcess) {
-            ProcessKey processKey = new ProcessKey(entry, currKeyRecords, records).invoke();
-            entry = processKey.getEntry();
-            if (processKey.shouldBreak()) {
-              break outer;
-            }
-          }
-          if (ascending != null && !ascending) {
-            entry = index.lowerEntry(entry.getKey());
-          }
-          else {
-            entry = index.higherEntry(entry.getKey());
-          }
-          if (entry != null) {
-            if (entry.getKey() == null) {
-              throw new DatabaseException("entry key is null");
-            }
-            if (lessOriginalKey == null) {
-              throw new DatabaseException("original less key is null");
-            }
-            CheckForEndTraversal checkForEndTraversal = new CheckForEndTraversal(entry, greaterOp, greaterOriginalKey, lessOp, lessOriginalKey).invoke();
-            entry = checkForEndTraversal.getEntry();
-            if (checkForEndTraversal.shouldBreak()) {
-              break;
-            }
-          }
-        }
+        entry = traverseIndex(entry, countSkipped, greaterOp, greaterOriginalKey, lessOp, lessOriginalKey, key);
       }
     }
     catch (Exception e) {
       throw new DatabaseException(e);
+    }
+    return entry;
+  }
+
+  private Map.Entry<Object[], Object> traverseIndex(Map.Entry<Object[], Object> entry, AtomicInteger countSkipped, BinaryExpression.Operator greaterOp, Object[] greaterOriginalKey, BinaryExpression.Operator lessOp, Object[] lessOriginalKey, Object[] key) {
+    outer:
+    while (entry != null) {
+      if (retKeyRecords.size() >= count || retRecords.size() >= count) {
+        break;
+      }
+
+      if (key != null) {
+        if (excludeKeys != null) {
+          for (Object[] excludeKey : excludeKeys) {
+            if (DatabaseCommon.compareKey(indexSchema.getComparators(), excludeKey, key) == 0) {
+              continue outer;
+            }
+          }
+        }
+
+        CheckIfRightIsDone checkIfRightIsDone = new CheckIfRightIsDone(entry, lessOp, lessOriginalKey).invoke();
+        entry = checkIfRightIsDone.getEntry();
+        if (checkIfRightIsDone.is()) {
+          break;
+        }
+      }
+      byte[][] currKeyRecords = null;
+      byte[][] records = null;
+      boolean shouldProcess = true;
+
+      if (isProbe) {
+        if (countSkipped.incrementAndGet() < DatabaseClient.OPTIMIZED_RANGE_PAGE_SIZE) {
+          shouldProcess = false;
+        }
+        else {
+          countSkipped.set(0);
+        }
+      }
+      if (shouldProcess) {
+        ProcessKey processKey = new ProcessKey(entry, currKeyRecords, records).invoke();
+        entry = processKey.getEntry();
+        if (processKey.shouldBreak()) {
+          break outer;
+        }
+      }
+      if (ascending != null && !ascending) {
+        entry = index.lowerEntry(entry.getKey());
+      }
+      else {
+        entry = index.higherEntry(entry.getKey());
+      }
+      if (entry != null) {
+        if (entry.getKey() == null) {
+          throw new DatabaseException("entry key is null");
+        }
+        if (lessOriginalKey == null) {
+          throw new DatabaseException("original less key is null");
+        }
+        CheckForEndTraversal checkForEndTraversal = new CheckForEndTraversal(entry, greaterOp, greaterOriginalKey, lessOp, lessOriginalKey).invoke();
+        entry = checkForEndTraversal.getEntry();
+        if (checkForEndTraversal.shouldBreak()) {
+          break;
+        }
+      }
     }
     return entry;
   }
@@ -401,6 +396,48 @@ public class IndexLookupTwoKeys extends IndexLookup {
         return this;
       }
       if (-1 == compareValue) {
+        entry = null;
+        myResult = true;
+        return this;
+      }
+      myResult = false;
+      return this;
+    }
+  }
+
+  private class CheckIfRightIsDone {
+    private boolean myResult;
+    private Map.Entry<Object[], Object> entry;
+    private BinaryExpression.Operator lessOp;
+    private Object[] lessOriginalKey;
+
+    public CheckIfRightIsDone(Map.Entry<Object[], Object> entry, BinaryExpression.Operator lessOp, Object... lessOriginalKey) {
+      this.entry = entry;
+      this.lessOp = lessOp;
+      this.lessOriginalKey = lessOriginalKey;
+    }
+
+    boolean is() {
+      return myResult;
+    }
+
+    public Map.Entry<Object[], Object> getEntry() {
+      return entry;
+    }
+
+    public CheckIfRightIsDone invoke() {
+      boolean rightIsDone = false;
+      int compareRight = 1;
+      if (lessOriginalKey != null) {
+        compareRight = DatabaseCommon.compareKey(indexSchema.getComparators(), entry.getKey(), lessOriginalKey);
+      }
+      if (lessOp.equals(BinaryExpression.Operator.LESS) && compareRight >= 0) {
+        rightIsDone = true;
+      }
+      if (lessOp.equals(BinaryExpression.Operator.LESS_EQUAL) && compareRight > 0) {
+        rightIsDone = true;
+      }
+      if (rightIsDone) {
         entry = null;
         myResult = true;
         return this;

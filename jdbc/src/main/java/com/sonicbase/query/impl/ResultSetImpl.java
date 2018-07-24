@@ -38,7 +38,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class ResultSetImpl implements ResultSet {
   private static final String UTF8_STR = "utf-8";
   private static final String LENGTH_STR = "length";
-  public static final String COUNT_STR = "count";
+  private static final String COUNT_STR = "count";
   private String sqlToUse;
   private AtomicLong currOffset = new AtomicLong();
   private AtomicLong countReturned = new AtomicLong();
@@ -139,43 +139,50 @@ public class ResultSetImpl implements ResultSet {
           }
           if (!isNull) {
             GroupByContext.GroupCounter counter = groupByContext.getGroupCounters().get(actualLabel[0] + ":" + actualLabel[1]).get(values);
-            if (counter.getCounter().getLongCount() != null) {
-              if (function.equals("sum")) {
-                return type.getConverter().convert((long) counter.getCounter().getLongCount());
-              }
-              if (function.equals("max")) {
-                return type.getConverter().convert((long) counter.getCounter().getMaxLong());
-              }
-              if (function.equals("min")) {
-                return type.getConverter().convert((long) counter.getCounter().getMinLong());
-              }
-              if (function.equals("avg")) {
-                return type.getConverter().convert((double) counter.getCounter().getAvgLong());
-              }
-              if (function.equals(COUNT_STR)) {
-                return type.getConverter().convert((long) counter.getCounter().getCount());
-              }
-            }
-            else if (counter.getCounter().getDoubleCount() != null) {
-              if (function.equals("sum")) {
-                return type.getConverter().convert((double) counter.getCounter().getDoubleCount());
-              }
-              if (function.equals("max")) {
-                return type.getConverter().convert((double) counter.getCounter().getMaxDouble());
-              }
-              if (function.equals("min")) {
-                return type.getConverter().convert((double) counter.getCounter().getMinDouble());
-              }
-              if (function.equals("avg")) {
-                return type.getConverter().convert((double) counter.getCounter().getAvgDouble());
-              }
-              if (function.equals(COUNT_STR)) {
-                return type.getConverter().convert((long) counter.getCounter().getCount());
-              }
-            }
+            return convertCounterValueToType(type, function, counter);
           }
         }
       }
+    }
+    return null;
+  }
+
+  private Object convertCounterValueToType(DataType.Type type, String function, GroupByContext.GroupCounter counter) {
+    if (counter.getCounter().getLongCount() != null) {
+      if (function.equals("sum")) {
+        return type.getConverter().convert((long) counter.getCounter().getLongCount());
+      }
+      if (function.equals("max")) {
+        return type.getConverter().convert((long) counter.getCounter().getMaxLong());
+      }
+      if (function.equals("min")) {
+        return type.getConverter().convert((long) counter.getCounter().getMinLong());
+      }
+      if (function.equals("avg")) {
+        return type.getConverter().convert((double) counter.getCounter().getAvgLong());
+      }
+      if (function.equals(COUNT_STR)) {
+        return type.getConverter().convert((long) counter.getCounter().getCount());
+      }
+      return null;
+    }
+    else if (counter.getCounter().getDoubleCount() != null) {
+      if (function.equals("sum")) {
+        return type.getConverter().convert((double) counter.getCounter().getDoubleCount());
+      }
+      if (function.equals("max")) {
+        return type.getConverter().convert((double) counter.getCounter().getMaxDouble());
+      }
+      if (function.equals("min")) {
+        return type.getConverter().convert((double) counter.getCounter().getMinDouble());
+      }
+      if (function.equals("avg")) {
+        return type.getConverter().convert((double) counter.getCounter().getAvgDouble());
+      }
+      if (function.equals(COUNT_STR)) {
+        return type.getConverter().convert((long) counter.getCounter().getCount());
+      }
+      return null;
     }
     return null;
   }
@@ -224,24 +231,18 @@ public class ResultSetImpl implements ResultSet {
     private String[] tableNames;
     private long[][] ids;
 
-    @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP", justification = "copying the returned data is too slow")
     public String[] getTableNames() {
       return tableNames;
     }
 
-    @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP2", justification = "copying the passed in data is too slow")
-    @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
     public void setTableNames(String[] tableNames) {
       this.tableNames = tableNames;
     }
 
-    @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP", justification = "copying the returned data is too slow")
     public long[][] getIds() {
       return ids;
     }
 
-    @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP2", justification = "copying the passed in data is too slow")
-    @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
     public void setIds(long[][] ids) {
       this.ids = ids;
     }
@@ -338,38 +339,40 @@ public class ResultSetImpl implements ResultSet {
         comparators[i] = fieldSchema.getType().getComparator();
       }
 
-      Arrays.sort(records, (o1, o2) -> {
-        for (int i = 0; i < fieldOffsets.length; i++) {
-          if (o1[tableOffsets[i]] == null && o2[tableOffsets[i]] == null) {
-            continue;
-          }
-          if ((o1[tableOffsets[i]] == null || o1[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]] == null) &&
-              (o2[tableOffsets[i]] == null || o2[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]] == null)) {
-            continue;
-          }
-          if (o1[tableOffsets[i]] == null) {
-            return -1 * (ascendingFlags[i] ? 1 : -1);
-          }
-          if (o2[tableOffsets[i]] == null) {
-            return 1 * (ascendingFlags[i] ? 1 : -1);
-          }
-          if (o1[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]] == null) {
-            return 1 * (ascendingFlags[i] ? 1 : -1);
-          }
-          if (o2[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]] == null) {
-            return -1 * (ascendingFlags[i] ? 1 : -1);
-          }
-          int value = comparators[i].compare(o1[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]], o2[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]]);
-          if (value < 0) {
-            return -1 * (ascendingFlags[i] ? 1 : -1);
-          }
-          if (value > 0) {
-            return 1 * (ascendingFlags[i] ? 1 : -1);
-          }
-        }
-        return 0;
-      });
+      Arrays.sort(records, (o1, o2) -> getSortComparator(fieldOffsets, ascendingFlags, comparators, tableOffsets, o1, o2));
     }
+  }
+
+  private static int getSortComparator(int[] fieldOffsets, boolean[] ascendingFlags, Comparator[] comparators, int[] tableOffsets, ExpressionImpl.CachedRecord[] o1, ExpressionImpl.CachedRecord[] o2) {
+    for (int i = 0; i < fieldOffsets.length; i++) {
+      if (o1[tableOffsets[i]] == null && o2[tableOffsets[i]] == null) {
+        continue;
+      }
+      if ((o1[tableOffsets[i]] == null || o1[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]] == null) &&
+          (o2[tableOffsets[i]] == null || o2[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]] == null)) {
+        continue;
+      }
+      if (o1[tableOffsets[i]] == null) {
+        return -1 * (ascendingFlags[i] ? 1 : -1);
+      }
+      if (o2[tableOffsets[i]] == null) {
+        return 1 * (ascendingFlags[i] ? 1 : -1);
+      }
+      if (o1[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]] == null) {
+        return 1 * (ascendingFlags[i] ? 1 : -1);
+      }
+      if (o2[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]] == null) {
+        return -1 * (ascendingFlags[i] ? 1 : -1);
+      }
+      int value = comparators[i].compare(o1[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]], o2[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]]);
+      if (value < 0) {
+        return -1 * (ascendingFlags[i] ? 1 : -1);
+      }
+      if (value > 0) {
+        return 1 * (ascendingFlags[i] ? 1 : -1);
+      }
+    }
+    return 0;
   }
 
   public boolean isAfterLast() {
@@ -403,6 +406,61 @@ public class ResultSetImpl implements ResultSet {
       return false;
     }
 
+    Boolean first = getResultsForCounters();
+    if (first != null) {
+      return first;
+    }
+
+    if (((setOperation != null && retKeys == null) || (setOperation == null && selectContext.getCurrKeys() == null))
+        && (readRecords == null || readRecords.length == 0)) {
+      return false;
+    }
+
+    if (selectStatement != null && groupByColumns != null) {
+      Object[] lastFields = new Object[groupByColumns.size()];
+      Comparator[] comparators = new Comparator[groupByColumns.size()];
+      String[][] actualColumns = new String[groupByColumns.size()][];
+      for (int i = 0; i < lastFields.length; i++) {
+        String column = ((Column) groupByColumns.get(i)).getColumnName();
+        String fromTable = selectStatement.getFromTable();
+        TableSchema tableSchema = databaseClient.getCommon().getTables(dbName).get(fromTable);
+        DataType.Type type = tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType();
+        comparators[i] = type.getComparator();
+
+        actualColumns[i] = getActualColumn(column);
+        lastFields[i] = getField(actualColumns[i], column);
+      }
+
+      Boolean x = getMoreResultsAsNeededForGroupBy(lastFields, comparators, actualColumns);
+      if (x != null) {
+        return x;
+      }
+
+      skipResutlsUpToOffsetForGroupBy();
+    }
+
+    if ((setOperation != null && (retKeys.length == 0 || currPos >= retKeys.length)) ||
+        (setOperation == null && (selectContext.getCurrKeys().length == 0 || currPos >= selectContext.getCurrKeys().length))) {
+      int schemaRetryCount = 0;
+      while (true) {
+        try {
+          getMoreResults(schemaRetryCount);
+          break;
+        }
+        catch (SchemaOutOfSyncException e) {
+          schemaRetryCount++;
+        }
+        catch (Exception e) {
+          throw new DatabaseException(e);
+        }
+      }
+    }
+
+    return (setOperation == null || (retKeys != null && retKeys.length != 0)) &&
+        (setOperation != null || selectContext.getCurrKeys() != null);
+  }
+
+  private Boolean getResultsForCounters() {
     if (counters != null || (selectStatement != null && (isCount && selectStatement.isDistinct()))) {
 
       boolean requireEvaluation = false;
@@ -439,29 +497,12 @@ public class ResultSetImpl implements ResultSet {
         return currPos == 0;
       }
     }
+    return null;
+  }
 
-    if (((setOperation != null && retKeys == null) || (setOperation == null && selectContext.getCurrKeys() == null))
-        && (readRecords == null || readRecords.length == 0)) {
-      return false;
-    }
-
-    if (selectStatement != null && groupByColumns != null) {
-      Object[] lastFields = new Object[groupByColumns.size()];
-      Comparator[] comparators = new Comparator[groupByColumns.size()];
-      String[][] actualColumns = new String[groupByColumns.size()][];
-      for (int i = 0; i < lastFields.length; i++) {
-        String column = ((Column) groupByColumns.get(i)).getColumnName();
-        String fromTable = selectStatement.getFromTable();
-        TableSchema tableSchema = databaseClient.getCommon().getTables(dbName).get(fromTable);
-        DataType.Type type = tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType();
-        comparators[i] = type.getComparator();
-
-        actualColumns[i] = getActualColumn(column);
-        lastFields[i] = getField(actualColumns[i], column);
-      }
-      outer:
-      while (true) {
-        currPos++;
+  private void skipResutlsUpToOffsetForGroupBy() {
+    if (offset != null) {
+      while (currTotalPos < offset.getOffset() - 1) {
         if ((selectContext.getCurrKeys().length == 0 || currPos >= selectContext.getCurrKeys().length)) {
           int schemaRetryCount = 0;
           while (true) {
@@ -477,97 +518,81 @@ public class ResultSetImpl implements ResultSet {
             }
           }
         }
-        if (selectContext.getCurrKeys() == null && (readRecords == null || readRecords.length == 0)) {
-          currPos--;
-          return true;
-        }
-        if ((selectContext.getCurrKeys().length == 0 || currPos >= selectContext.getCurrKeys().length)) {
-          currPos--;
-          return true;
-        }
-        boolean nonNull = true;
-        for (int i = 0; i < lastFields.length; i++) {
-          if (lastFields[i] == null) {
-            nonNull = false;
-          }
-        }
-        boolean hasNull = false;
-        Object[] lastTmp = new Object[lastFields.length];
-        for (int i = 0; i < lastFields.length; i++) {
-          if (lastFields[i] == null) {
-            return false;
-          }
-          Object field = getField(actualColumns[i], actualColumns[i][1]);
-          if (nonNull && 0 != comparators[i].compare(field, lastFields[i]) && field != null && lastFields[i] != null) {
-            currPos--;
-            break outer;
-          }
-          if (lastFields[i] != null && field == null) {
-            currPos--;
-            break outer;
-          }
-          lastFields[i] = field;
-          lastTmp[i] = field;
-          if (field == null) {
-            hasNull = true;
-          }
-        }
-        if (!hasNull) {
-          boolean notNull = true;
-          for (int i = 0; i < lastFields.length; i++) {
-            if (lastFields[i] != null) {
-              notNull = true;
-            }
-          }
-          if (!notNull) {
-            currPos--;
-            break outer;
-          }
-        }
-
-      }
-      if (offset != null) {
-        while (currTotalPos < offset.getOffset() - 1) {
-          if ((selectContext.getCurrKeys().length == 0 || currPos >= selectContext.getCurrKeys().length)) {
-            int schemaRetryCount = 0;
-            while (true) {
-              try {
-                getMoreResults(schemaRetryCount);
-                break;
-              }
-              catch (SchemaOutOfSyncException e) {
-                schemaRetryCount++;
-              }
-              catch (Exception e) {
-                throw new DatabaseException(e);
-              }
-            }
-          }
-          currPos++;
-          currTotalPos++;
-        }
+        currPos++;
+        currTotalPos++;
       }
     }
+  }
 
-    if ((setOperation != null && (retKeys.length == 0 || currPos >= retKeys.length)) ||
-        (setOperation == null && (selectContext.getCurrKeys().length == 0 || currPos >= selectContext.getCurrKeys().length))) {
-      int schemaRetryCount = 0;
-      while (true) {
-        try {
-          getMoreResults(schemaRetryCount);
-          break;
-        }
-        catch (SchemaOutOfSyncException e) {
-          schemaRetryCount++;
-        }
-        catch (Exception e) {
-          throw new DatabaseException(e);
+  private Boolean getMoreResultsAsNeededForGroupBy(Object[] lastFields, Comparator[] comparators, String[][] actualColumns) {
+    outer:
+    while (true) {
+      currPos++;
+      if ((selectContext.getCurrKeys().length == 0 || currPos >= selectContext.getCurrKeys().length)) {
+        int schemaRetryCount = 0;
+        while (true) {
+          try {
+            getMoreResults(schemaRetryCount);
+            break;
+          }
+          catch (SchemaOutOfSyncException e) {
+            schemaRetryCount++;
+          }
+          catch (Exception e) {
+            throw new DatabaseException(e);
+          }
         }
       }
-    }
+      if (selectContext.getCurrKeys() == null && (readRecords == null || readRecords.length == 0)) {
+        currPos--;
+        return true;
+      }
+      if ((selectContext.getCurrKeys().length == 0 || currPos >= selectContext.getCurrKeys().length)) {
+        currPos--;
+        return true;
+      }
+      boolean nonNull = true;
+      for (int i = 0; i < lastFields.length; i++) {
+        if (lastFields[i] == null) {
+          nonNull = false;
+        }
+      }
+      boolean hasNull = false;
+      Object[] lastTmp = new Object[lastFields.length];
+      for (int i = 0; i < lastFields.length; i++) {
+        if (lastFields[i] == null) {
+          return false;
+        }
+        Object field = getField(actualColumns[i], actualColumns[i][1]);
+        if (nonNull && 0 != comparators[i].compare(field, lastFields[i]) && field != null && lastFields[i] != null) {
+          currPos--;
+          break outer;
+        }
+        if (lastFields[i] != null && field == null) {
+          currPos--;
+          break outer;
+        }
+        lastFields[i] = field;
+        lastTmp[i] = field;
+        if (field == null) {
+          hasNull = true;
+        }
+      }
+      if (!hasNull) {
+        boolean notNull = true;
+        for (int i = 0; i < lastFields.length; i++) {
+          if (lastFields[i] != null) {
+            notNull = true;
+          }
+        }
+        if (!notNull) {
+          currPos--;
+          break outer;
+        }
+      }
 
-    return (setOperation == null || (retKeys != null && retKeys.length != 0)) &&
-        (setOperation != null || selectContext.getCurrKeys() != null);
+    }
+    return null;
   }
 
 
@@ -1051,61 +1076,81 @@ public class ResultSetImpl implements ResultSet {
       }
     }
     else if (function.getName().equalsIgnoreCase("min")) {
-      String columnName = ((Column) function.getParms().getExpressions().get(0)).getColumnName();
-      if (counters != null) {
-        for (Counter counter : counters) {
-          if ((counter.getColumnName().equals(columnName))) {
-            if (counter.getLongCount() != null) {
-              return counter.getMinLong();
-            }
-            if (counter.getDoubleCount() != null) {
-              return counter.getMinDouble();
-            }
-          }
-        }
-      }
+      return getCounterValueMin(function);
     }
     else if (function.getName().equalsIgnoreCase("max")) {
-      String columnName = ((Column) function.getParms().getExpressions().get(0)).getColumnName();
-      if (counters != null) {
-        for (Counter counter : counters) {
-          if ((counter.getColumnName().equals(columnName))) {
-            if (counter.getLongCount() != null) {
-              return counter.getMaxLong();
-            }
-            if (counter.getDoubleCount() != null) {
-              return counter.getMaxDouble();
-            }
-          }
-        }
-      }
+      return getCounterValueMax(function);
     }
     else if (function.getName().equalsIgnoreCase("avg")) {
-      String columnName = ((Column) function.getParms().getExpressions().get(0)).getColumnName();
-      if (counters != null) {
-        for (Counter counter : counters) {
-          if ((counter.getColumnName().equals(columnName))) {
-            if (counter.getLongCount() != null) {
-              return counter.getAvgLong();
-            }
-            if (counter.getDoubleCount() != null) {
-              return counter.getAvgDouble();
-            }
+      return getCounterValueAvg(function);
+    }
+    else if (function.getName().equalsIgnoreCase("sum")) {
+      return getCounterValueSum(function);
+    }
+    return 0L;
+  }
+
+  private Object getCounterValueSum(SelectFunctionImpl function) {
+    String columnName = ((Column) function.getParms().getExpressions().get(0)).getColumnName();
+    if (counters != null) {
+      for (Counter counter : counters) {
+        if ((counter.getColumnName().equals(columnName))) {
+          if (counter.getLongCount() != null) {
+            return counter.getLongCount();
+          }
+          if (counter.getDoubleCount() != null) {
+            return counter.getDoubleCount();
           }
         }
       }
     }
-    else if (function.getName().equalsIgnoreCase("sum")) {
-      String columnName = ((Column) function.getParms().getExpressions().get(0)).getColumnName();
-      if (counters != null) {
-        for (Counter counter : counters) {
-          if ((counter.getColumnName().equals(columnName))) {
-            if (counter.getLongCount() != null) {
-              return counter.getLongCount();
-            }
-            if (counter.getDoubleCount() != null) {
-              return counter.getDoubleCount();
-            }
+    return 0L;
+  }
+
+  private Object getCounterValueAvg(SelectFunctionImpl function) {
+    String columnName = ((Column) function.getParms().getExpressions().get(0)).getColumnName();
+    if (counters != null) {
+      for (Counter counter : counters) {
+        if ((counter.getColumnName().equals(columnName))) {
+          if (counter.getLongCount() != null) {
+            return counter.getAvgLong();
+          }
+          if (counter.getDoubleCount() != null) {
+            return counter.getAvgDouble();
+          }
+        }
+      }
+    }
+    return 0L;
+  }
+
+  private Object getCounterValueMax(SelectFunctionImpl function) {
+    String columnName = ((Column) function.getParms().getExpressions().get(0)).getColumnName();
+    if (counters != null) {
+      for (Counter counter : counters) {
+        if ((counter.getColumnName().equals(columnName))) {
+          if (counter.getLongCount() != null) {
+            return counter.getMaxLong();
+          }
+          if (counter.getDoubleCount() != null) {
+            return counter.getMaxDouble();
+          }
+        }
+      }
+    }
+    return 0L;
+  }
+
+  private Object getCounterValueMin(SelectFunctionImpl function) {
+    String columnName = ((Column) function.getParms().getExpressions().get(0)).getColumnName();
+    if (counters != null) {
+      for (Counter counter : counters) {
+        if ((counter.getColumnName().equals(columnName))) {
+          if (counter.getLongCount() != null) {
+            return counter.getMinLong();
+          }
+          if (counter.getDoubleCount() != null) {
+            return counter.getMinDouble();
           }
         }
       }

@@ -428,47 +428,7 @@ public class DatabaseServer {
   public void startDeathMonitor(Long timeoutOverride) {
     synchronized (deathMonitorMutex) {
 
-      deathReportThread = ThreadUtil.createThread(() -> {
-        while (!shutdown) {
-          try {
-            Thread.sleep(timeoutOverride == null ? 10_000 : timeoutOverride);
-            StringBuilder builder = new StringBuilder();
-            for (int i = 0; i < shardCount; i++) {
-              for (int j = 0; j < replicationFactor; j++) {
-                builder.append("[").append(i).append(",").append(j).append("=");
-                builder.append(common.getServersConfig().getShards()[i].getReplicas()[j].isDead() ? "dead" : "alive").append("]");
-              }
-            }
-            logger.info("Death status={}", builder);
-
-            if (replicationFactor > 1 && masterManager.isNoLongerMaster()) {
-              logger.info("No longer master. Shutting down resources");
-              shutdownDeathMonitor();
-              shutdownRepartitioner();
-
-              licenseManager.shutdownMasterLicenseValidator();
-
-              masterManager.shutdownFixSchemaTimer();
-
-              if (streamsConsumerMonitorthread != null) {
-                streamsConsumerMonitorthread.interrupt();
-                streamsConsumerMonitorthread.join();
-                streamsConsumerMonitorthread = null;
-              }
-
-              break;
-            }
-          }
-          catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            break;
-          }
-          catch (Exception e) {
-            logger.error("Error in death reporting thread", e);
-          }
-        }
-      }, "SonicBase Death Reporting Thread");
-      deathReportThread.start();
+      startDeathReportThread(timeoutOverride);
 
       shutdownDeathMonitor = false;
       logger.info("Starting death monitor");
@@ -486,48 +446,96 @@ public class DatabaseServer {
             }
             continue;
           }
-          deathMonitorThreads[i][j] = ThreadUtil.createThread(() -> {
-            while (!shutdownDeathMonitor) {
-              try {
-                Thread.sleep((deathOverride == null && timeoutOverride == null) ? 2000 : timeoutOverride);
-                AtomicBoolean isHealthy = new AtomicBoolean();
-                for (int i1 = 0; i1 < 5; i1++) {
-                  checkHealthOfServer(localShard, localReplica, isHealthy);
-                  if (isHealthy.get()) {
-                    break;
-                  }
-                  Thread.sleep(timeoutOverride == null ? 1_000 : timeoutOverride);
-                }
-                boolean wasDead = common.getServersConfig().getShards()[localShard].getReplicas()[localReplica].isDead();
-                boolean changed = false;
-                if (wasDead && isHealthy.get() || !wasDead && !isHealthy.get()) {
-                  changed = true;
-                }
-                if (changed && isHealthy.get()) {
-                  ComObject cobj = new ComObject();
-                  cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
-                  cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
-                  cobj.put(ComObject.Tag.METHOD, "DatabaessServer:prepareToComeAlive");
-
-                  getDatabaseClient().send(null, localShard, localReplica, cobj, DatabaseClient.Replica.SPECIFIED, true);
-                }
-                handleHealthChange(isHealthy, wasDead, changed, localShard, localReplica);
-              }
-              catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-              }
-              catch (Exception e) {
-                if (!shutdownDeathMonitor) {
-                  logger.error("Error in death monitor thread: shard={}, replica={}", localShard, localReplica, e);
-                }
-              }
-            }
-          }, "SonicBase Death Monitor Thread: shard=" + i + REPLICA_STR + j);
-          deathMonitorThreads[i][j].start();
+          startDeathMonitorThread(timeoutOverride, i, localShard, j, localReplica);
         }
       }
     }
+  }
+
+  private void startDeathReportThread(Long timeoutOverride) {
+    deathReportThread = ThreadUtil.createThread(() -> {
+      while (!shutdown) {
+        try {
+          Thread.sleep(timeoutOverride == null ? 10_000 : timeoutOverride);
+          StringBuilder builder = new StringBuilder();
+          for (int i = 0; i < shardCount; i++) {
+            for (int j = 0; j < replicationFactor; j++) {
+              builder.append("[").append(i).append(",").append(j).append("=");
+              builder.append(common.getServersConfig().getShards()[i].getReplicas()[j].isDead() ? "dead" : "alive").append("]");
+            }
+          }
+          logger.info("Death status={}", builder);
+
+          if (replicationFactor > 1 && masterManager.isNoLongerMaster()) {
+            logger.info("No longer master. Shutting down resources");
+            shutdownDeathMonitor();
+            shutdownRepartitioner();
+
+            licenseManager.shutdownMasterLicenseValidator();
+
+            masterManager.shutdownFixSchemaTimer();
+
+            if (streamsConsumerMonitorthread != null) {
+              streamsConsumerMonitorthread.interrupt();
+              streamsConsumerMonitorthread.join();
+              streamsConsumerMonitorthread = null;
+            }
+
+            break;
+          }
+        }
+        catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          break;
+        }
+        catch (Exception e) {
+          logger.error("Error in death reporting thread", e);
+        }
+      }
+    }, "SonicBase Death Reporting Thread");
+    deathReportThread.start();
+  }
+
+  private void startDeathMonitorThread(Long timeoutOverride, int i, int localShard, int j, int localReplica) {
+    deathMonitorThreads[i][j] = ThreadUtil.createThread(() -> {
+      while (!shutdownDeathMonitor) {
+        try {
+          Thread.sleep((deathOverride == null && timeoutOverride == null) ? 2000 : timeoutOverride);
+          AtomicBoolean isHealthy = new AtomicBoolean();
+          for (int i1 = 0; i1 < 5; i1++) {
+            checkHealthOfServer(localShard, localReplica, isHealthy);
+            if (isHealthy.get()) {
+              break;
+            }
+            Thread.sleep(timeoutOverride == null ? 1_000 : timeoutOverride);
+          }
+          boolean wasDead = common.getServersConfig().getShards()[localShard].getReplicas()[localReplica].isDead();
+          boolean changed = false;
+          if (wasDead && isHealthy.get() || !wasDead && !isHealthy.get()) {
+            changed = true;
+          }
+          if (changed && isHealthy.get()) {
+            ComObject cobj = new ComObject();
+            cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
+            cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
+            cobj.put(ComObject.Tag.METHOD, "DatabaessServer:prepareToComeAlive");
+
+            getDatabaseClient().send(null, localShard, localReplica, cobj, DatabaseClient.Replica.SPECIFIED, true);
+          }
+          handleHealthChange(isHealthy, wasDead, changed, localShard, localReplica);
+        }
+        catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          break;
+        }
+        catch (Exception e) {
+          if (!shutdownDeathMonitor) {
+            logger.error("Error in death monitor thread: shard={}, replica={}", localShard, localReplica, e);
+          }
+        }
+      }
+    }, "SonicBase Death Monitor Thread: shard=" + i + REPLICA_STR + j);
+    deathMonitorThreads[i][j].start();
   }
 
   private void handleHealthChange(AtomicBoolean isHealthy, boolean wasDead, boolean changed, int shard, int replica) {

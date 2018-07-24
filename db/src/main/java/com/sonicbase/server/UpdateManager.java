@@ -1365,85 +1365,102 @@ public class UpdateManager {
       if (value != null) {
         byte[][] ids = server.getAddressMap().fromUnsafeToKeys(value);
         if (ids.length == 1) {
-          boolean mismatch = false;
-          if (!indexName.equals(primaryKeyIndexName)) {
-            try {
-              KeyRecord keyRecord = new KeyRecord(ids[0]);
-              Object[] lhsKey = DatabaseCommon.deserializeKey(tableSchema, keyRecord.getPrimaryKey());
-              for (int i = 0; i < lhsKey.length; i++) {
-                if (0 != comparators[i].compare(lhsKey[i], primaryKey[i])) {
-                  mismatch = true;
-                }
-              }
-            }
-            catch (EOFException e) {
-              throw new DatabaseException(e);
-            }
-          }
-          if (!mismatch) {
-            if (indexName.equals(primaryKeyIndexName)) {
-              if (Record.DB_VIEW_FLAG_DELETING != Record.getDbViewFlags(ids[0])) {
-                index.addAndGetCount(-1);
-              }
-            }
-            else {
-              if (Record.DB_VIEW_FLAG_DELETING != KeyRecord.getDbViewFlags(ids[0])) {
-                index.addAndGetCount(-1);
-              }
-            }
-            value = index.remove(key);
-            if (value != null) {
-              server.getAddressMap().freeUnsafeIds(value);
-            }
-          }
+          processSingleRecord(tableSchema, primaryKeyIndexName, primaryKey, indexName, key, comparators, index, ids);
         }
         else {
-          byte[][] newValues = new byte[ids.length - 1][];
-          int offset = 0;
-          boolean found = false;
-          byte[] foundBytes = null;
-          for (byte[] currValue : ids) {
-            boolean mismatch = false;
-            KeyRecord keyRecord = new KeyRecord(currValue);
-            try {
-              Object[] lhsKey = DatabaseCommon.deserializeKey(tableSchema, keyRecord.getPrimaryKey());
-              for (int i = 0; i < lhsKey.length; i++) {
-                if (0 != comparators[i].compare(lhsKey[i], primaryKey[i])) {
-                  mismatch = true;
-                }
-              }
-            }
-            catch (Exception e) {
-              throw new DatabaseException(e);
-            }
+          processMultipleRecords(tableSchema, primaryKeyIndexName, primaryKey, indexName, key, comparators, index, value, ids);
+        }
+      }
+    }
+  }
 
-            if (mismatch) {
-              newValues[offset++] = currValue;
-            }
-            else {
-              found = true;
-              foundBytes = currValue;
-            }
-          }
-          if (found) {
-            if (indexName.equals(primaryKeyIndexName)) {
-              if (Record.DB_VIEW_FLAG_DELETING != Record.getDbViewFlags(foundBytes)) {
-                index.addAndGetCount(-1);
-              }
-            }
-            else {
-              if (Record.DB_VIEW_FLAG_DELETING != KeyRecord.getDbViewFlags(foundBytes)) {
-                index.addAndGetCount(-1);
-              }
-            }
-            Object newValue = server.getAddressMap().toUnsafeFromKeys(newValues);
-            index.put(key, newValue);
-            if (value != null) {
-              server.getAddressMap().freeUnsafeIds(value);
-            }
+  private void processSingleRecord(TableSchema tableSchema, String primaryKeyIndexName, Object[] primaryKey, String indexName, Object[] key, Comparator[] comparators, Index index, byte[][] ids) {
+    boolean mismatch = false;
+    if (!indexName.equals(primaryKeyIndexName)) {
+      try {
+        KeyRecord keyRecord = new KeyRecord(ids[0]);
+        Object[] lhsKey = DatabaseCommon.deserializeKey(tableSchema, keyRecord.getPrimaryKey());
+        for (int i = 0; i < lhsKey.length; i++) {
+          if (0 != comparators[i].compare(lhsKey[i], primaryKey[i])) {
+            mismatch = true;
           }
         }
       }
+      catch (EOFException e) {
+        throw new DatabaseException(e);
+      }
+    }
+    if (!mismatch) {
+      removeIndexEntry(primaryKeyIndexName, indexName, key, index, ids);
+    }
+  }
+
+  private void processMultipleRecords(TableSchema tableSchema, String primaryKeyIndexName, Object[] primaryKey, String indexName, Object[] key, Comparator[] comparators, Index index, Object value, byte[][] ids) {
+    byte[][] newValues = new byte[ids.length - 1][];
+    int offset = 0;
+    boolean found = false;
+    byte[] foundBytes = null;
+    for (byte[] currValue : ids) {
+      boolean mismatch = false;
+      KeyRecord keyRecord = new KeyRecord(currValue);
+      try {
+        Object[] lhsKey = DatabaseCommon.deserializeKey(tableSchema, keyRecord.getPrimaryKey());
+        for (int i = 0; i < lhsKey.length; i++) {
+          if (0 != comparators[i].compare(lhsKey[i], primaryKey[i])) {
+            mismatch = true;
+          }
+        }
+      }
+      catch (Exception e) {
+        throw new DatabaseException(e);
+      }
+
+      if (mismatch) {
+        newValues[offset++] = currValue;
+      }
+      else {
+        found = true;
+        foundBytes = currValue;
+      }
+    }
+    if (found) {
+      insertRecordInIndex(primaryKeyIndexName, indexName, key, index, value, newValues, foundBytes);
+    }
+  }
+
+  private void insertRecordInIndex(String primaryKeyIndexName, String indexName, Object[] key, Index index, Object value, byte[][] newValues, byte[] foundBytes) {
+    if (indexName.equals(primaryKeyIndexName)) {
+      if (Record.DB_VIEW_FLAG_DELETING != Record.getDbViewFlags(foundBytes)) {
+        index.addAndGetCount(-1);
+      }
+    }
+    else {
+      if (Record.DB_VIEW_FLAG_DELETING != KeyRecord.getDbViewFlags(foundBytes)) {
+        index.addAndGetCount(-1);
+      }
+    }
+    Object newValue = server.getAddressMap().toUnsafeFromKeys(newValues);
+    index.put(key, newValue);
+    if (value != null) {
+      server.getAddressMap().freeUnsafeIds(value);
+    }
+  }
+
+  private void removeIndexEntry(String primaryKeyIndexName, String indexName, Object[] key, Index index, byte[][] ids) {
+    Object value;
+    if (indexName.equals(primaryKeyIndexName)) {
+      if (Record.DB_VIEW_FLAG_DELETING != Record.getDbViewFlags(ids[0])) {
+        index.addAndGetCount(-1);
+      }
+    }
+    else {
+      if (Record.DB_VIEW_FLAG_DELETING != KeyRecord.getDbViewFlags(ids[0])) {
+        index.addAndGetCount(-1);
+      }
+    }
+    value = index.remove(key);
+    if (value != null) {
+      server.getAddressMap().freeUnsafeIds(value);
     }
   }
 

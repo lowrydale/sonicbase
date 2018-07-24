@@ -30,12 +30,11 @@ import static java.sql.Types.*;
 @ExcludeRename
 public class DatabaseCommon {
 
-  public static final String SONICBASE_SCHEMA_STR = "_sonicbase_schema";
-  public static final String SNAPSHOT_STR = "snapshot";
-  public static final String UTF_8_STR = "utf-8";
-  public static final String SCHEMA_BIN_STR = "schema.bin";
+  private static final String SONICBASE_SCHEMA_STR = "_sonicbase_schema";
+  private static final String SNAPSHOT_STR = "snapshot";
+  private static final String UTF_8_STR = "utf-8";
+  private static final String SCHEMA_BIN_STR = "schema.bin";
   private static Logger logger = LoggerFactory.getLogger(DatabaseCommon.class);
-
 
   private int shard = -1;
   private int replica = -1;

@@ -37,7 +37,6 @@ public class TableSchema {
     return fields;
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP", justification="copying the returned data is too slow")
   public String[] getPrimaryKey() {
     return primaryKey;
   }
@@ -169,7 +168,6 @@ public class TableSchema {
       this.unboundUpper = unboundUpper;
     }
 
-    @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP", justification="copying the returned data is too slow")
     public Object[] getUpperKey() {
       return upperKey;
     }
@@ -182,8 +180,6 @@ public class TableSchema {
       this.shardOwning = shardOwning;
     }
 
-    @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
-    @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
     public void setUpperKey(Object[] upperKey) {
       this.upperKey = upperKey;
     }

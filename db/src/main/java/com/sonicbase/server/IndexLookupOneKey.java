@@ -300,7 +300,6 @@ public class IndexLookupOneKey extends IndexLookup {
   }
 
   private void handleLookupEquals() {
-    Map.Entry<Object[], Object> entry = null;
     final AtomicInteger countSkipped = new AtomicInteger();
 
     if (originalLeftKey == null) {
@@ -314,84 +313,94 @@ public class IndexLookupOneKey extends IndexLookup {
         break;
       }
     }
-    List<Map.Entry<Object[], Object>> entries = null;
+
     if (!hasNull && originalLeftKey.length == indexSchema.getFields().length &&
         (indexSchema.isPrimaryKey() || indexSchema.isUnique())) {
-      byte[][] records = null;
-      byte[][] currKeyRecords = null;
-      Object value = null;
+      processFullKeyForUniqueIndex(countSkipped);
+    }
+    else {
+      processPartialKeyOrNonUniqueIndex(countSkipped);
+    }
+  }
 
-      boolean shouldProcess = true;
-      shouldProcess = handleProbe(countSkipped, shouldProcess);
-      if (shouldProcess) {
-        value = index.get(originalLeftKey);
-        if (value != null && !value.equals(0L)) {
-          if (keys) {
-            currKeyRecords = server.getAddressMap().fromUnsafeToKeys(value);
-          }
-          else {
-            records = server.getAddressMap().fromUnsafeToRecords(value);
+  private void processPartialKeyOrNonUniqueIndex(AtomicInteger countSkipped) {
+    List<Map.Entry<Object[], Object>> entries;
+    Map.Entry<Object[], Object> entry;
+    entries = index.equalsEntries(originalLeftKey);
+    if (entries != null) {
+      for (Map.Entry<Object[], Object> currEntry : entries) {
+        entry = currEntry;
+        if (DatabaseCommon.compareKey(indexSchema.getComparators(), originalLeftKey, entry.getKey()) != 0) {
+          break;
+        }
+        Object value = entry.getValue();
+        if (value == null) {
+          break;
+        }
+        if (excludeKeys != null) {
+          for (Object[] excludeKey : excludeKeys) {
+            if (DatabaseCommon.compareKey(indexSchema.getComparators(), excludeKey, originalLeftKey) == 0) {
+              return;
+            }
           }
         }
-        if (value != null) {
+        byte[][] records = null;
+        byte[][] currKeyRecords = null;
+        boolean shouldProcess = true;
+
+        shouldProcess = handleProbe(countSkipped, shouldProcess);
+
+        if (shouldProcess) {
+          value = entry.getValue();
+          if (value != null && !value.equals(0L)) {
+            if (keys) {
+              currKeyRecords = server.getAddressMap().fromUnsafeToKeys(value);
+            }
+            else {
+              records = server.getAddressMap().fromUnsafeToRecords(value);
+            }
+          }
           Object[] keyToUse = leftKey;
           if (keyToUse == null) {
             keyToUse = originalLeftKey;
           }
-
-          AtomicBoolean done = new AtomicBoolean();
-          handleRecord(viewVersion, keyToUse, evaluateExpression, records, currKeyRecords, done);
+          if (value != null) {
+            AtomicBoolean done = new AtomicBoolean();
+            handleRecord(viewVersion, keyToUse, evaluateExpression, records, currKeyRecords, done);
+            if (done.get()) {
+              return;
+            }
+          }
         }
       }
     }
-    else {
-      entries = index.equalsEntries(originalLeftKey);
-      if (entries != null) {
-        for (Map.Entry<Object[], Object> currEntry : entries) {
-          entry = currEntry;
-          if (DatabaseCommon.compareKey(indexSchema.getComparators(), originalLeftKey, entry.getKey()) != 0) {
-            break;
-          }
-          Object value = entry.getValue();
-          if (value == null) {
-            break;
-          }
-          if (excludeKeys != null) {
-            for (Object[] excludeKey : excludeKeys) {
-              if (DatabaseCommon.compareKey(indexSchema.getComparators(), excludeKey, originalLeftKey) == 0) {
-                return;
-              }
-            }
-          }
-          byte[][] records = null;
-          byte[][] currKeyRecords = null;
-          boolean shouldProcess = true;
+  }
 
-          shouldProcess = handleProbe(countSkipped, shouldProcess);
+  private void processFullKeyForUniqueIndex(AtomicInteger countSkipped) {
+    byte[][] records = null;
+    byte[][] currKeyRecords = null;
+    Object value = null;
 
-          if (shouldProcess) {
-            value = entry.getValue();
-            if (value != null && !value.equals(0L)) {
-              if (keys) {
-                currKeyRecords = server.getAddressMap().fromUnsafeToKeys(value);
-              }
-              else {
-                records = server.getAddressMap().fromUnsafeToRecords(value);
-              }
-            }
-            Object[] keyToUse = leftKey;
-            if (keyToUse == null) {
-              keyToUse = originalLeftKey;
-            }
-            if (value != null) {
-              AtomicBoolean done = new AtomicBoolean();
-              handleRecord(viewVersion, keyToUse, evaluateExpression, records, currKeyRecords, done);
-              if (done.get()) {
-                return;
-              }
-            }
-          }
+    boolean shouldProcess = true;
+    shouldProcess = handleProbe(countSkipped, shouldProcess);
+    if (shouldProcess) {
+      value = index.get(originalLeftKey);
+      if (value != null && !value.equals(0L)) {
+        if (keys) {
+          currKeyRecords = server.getAddressMap().fromUnsafeToKeys(value);
         }
+        else {
+          records = server.getAddressMap().fromUnsafeToRecords(value);
+        }
+      }
+      if (value != null) {
+        Object[] keyToUse = leftKey;
+        if (keyToUse == null) {
+          keyToUse = originalLeftKey;
+        }
+
+        AtomicBoolean done = new AtomicBoolean();
+        handleRecord(viewVersion, keyToUse, evaluateExpression, records, currKeyRecords, done);
       }
     }
   }

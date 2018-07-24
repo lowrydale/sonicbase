@@ -22,9 +22,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static org.testng.Assert.assertEquals;
 
-/**
- * Created by lowryda on 9/4/17.
- */
 public class TestLongManagerLostEntries {
 
   ConcurrentHashMap<Long, Long> foundIds = new ConcurrentHashMap<>();

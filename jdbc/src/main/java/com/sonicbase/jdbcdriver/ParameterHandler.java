@@ -127,7 +127,6 @@ public class ParameterHandler {
   }
 
   public ParameterMetaData getParameterMetaData() throws SQLException {
-    //todo: implement
     throw new NotImplementedException();
   }
 

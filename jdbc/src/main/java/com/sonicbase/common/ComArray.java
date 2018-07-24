@@ -11,9 +11,6 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Created by lowryda on 6/24/17.
- */
 public class ComArray {
   public static final String UTF_8_STR = "utf-8";
   private ComObject.DynamicType nestedType;

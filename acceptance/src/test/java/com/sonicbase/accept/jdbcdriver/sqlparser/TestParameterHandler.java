@@ -5,9 +5,6 @@ import org.testng.annotations.Test;
 
 import java.io.*;
 
-/**
- * Created by lowryda on 3/13/15.
- */
 public class TestParameterHandler {
 
   @Test

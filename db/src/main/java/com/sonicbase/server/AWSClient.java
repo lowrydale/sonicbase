@@ -25,9 +25,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/**
- * Created by lowryda on 6/16/17.
- */
 public class AWSClient {
 
   public static final String KEYS_PART_STR = "/keys/";

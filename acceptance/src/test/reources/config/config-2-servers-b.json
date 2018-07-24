@@ -1,0 +1,39 @@
+{
+  "dataDirectory": "$HOME/db/database-b",
+  "installDirectory": "$HOME/test-sonicbase",
+  "partitionCountForRecordIndex" : 10000,
+  "subPartitionsForIdIndex" : 10,
+  "initialIndexSize" : 10000000,
+  "indexEntrySize" : 60,
+  "maxJavaHeap": "50%",
+  "maxProcessMemory": "90%",
+  "clientIsPrivate": false,
+  "backup" : {
+    "type" : "fileSystem",
+    "directory": "$HOME/db/db-backup",
+    "period": "daily",
+    "time": "23:00",
+    "maxBackupCount": 10,
+    "sharedDirectory": true
+  },
+  "shards" : [
+    {
+      "replicas": [
+        {
+          "privateAddress": "localhost",
+          "publicAddress": "localhost",
+          "port": 9110
+        }
+      ]
+    },
+    {
+      "replicas": [
+        {
+          "publicAddress": "localhost",
+          "privateAddress": "localhost",
+          "port": 9160
+        }
+      ]
+    }
+  ]
+}

@@ -75,84 +75,12 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
         Random rand = new Random(System.currentTimeMillis());
         int countDeleted = 0;
         while (true) {
-          ExpressionImpl.NextReturn ids = expression .next(explain, new AtomicLong(), new AtomicLong(), null, null, schemaRetryCount);
-          if (ids == null || ids.getIds() == null) {
+          DoDelete doDelete = new DoDelete(dbName, explain, sequence0, sequence1, sequence2, restrictToThisServer,
+              procedureContext, schemaRetryCount, tableSchema, rand, countDeleted).invoke();
+          if (doDelete.is()) {
             return countDeleted;
           }
-
-          IndexSchema indexSchema = null;
-          for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
-            if (entry.getValue().isPrimaryKey()) {
-              indexSchema = entry.getValue();
-            }
-          }
-          if (indexSchema == null) {
-            throw new DatabaseException("primary index not found");
-          }
-
-          String[] indexFields = indexSchema.getFields();
-          int[] fieldOffsets = new int[indexFields.length];
-          for (int k = 0; k < indexFields.length; k++) {
-            fieldOffsets[k] = tableSchema.getFieldOffset(indexFields[k]);
-          }
-
-          for (Object[][] entry : ids.getKeys()) {
-            ExpressionImpl.CachedRecord cachedRecord = recordCache.get(tableName, entry[0]);
-            Record record = cachedRecord == null ? null : cachedRecord.getRecord();
-            if (record == null) {
-              boolean forceSelectOnServer = false;
-              record = ExpressionImpl.doReadRecord(dbName, client, forceSelectOnServer, recordCache, entry[0], tableName,
-                  null, null, null, client.getCommon().getSchemaVersion(),
-                  restrictToThisServer, procedureContext, schemaRetryCount);
-            }
-            if (record != null) {
-              List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, tableSchema,
-                  indexSchema.getName(), null, BinaryExpression.Operator.EQUAL, null, entry[0], null);
-              if (selectedShards.isEmpty()) {
-                throw new DatabaseException("No shards selected for query");
-              }
-
-              ComObject cobj = new ComObject();
-              cobj.put(ComObject.Tag.SERIALIZATION_VERSION, DatabaseClient.SERIALIZATION_VERSION);
-              cobj.put(ComObject.Tag.KEY_BYTES, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), entry[0]));
-              if (schemaRetryCount < 2) {
-                cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
-              }
-              cobj.put(ComObject.Tag.DB_NAME, dbName);
-              cobj.put(ComObject.Tag.TABLE_NAME, tableName);
-              cobj.put(ComObject.Tag.INDEX_NAME, indexSchema.getName());
-              cobj.put(ComObject.Tag.IS_EXCPLICITE_TRANS, client.isExplicitTrans());
-              cobj.put(ComObject.Tag.IS_COMMITTING, client.isCommitting());
-              cobj.put(ComObject.Tag.TRANSACTION_ID, client.getTransactionId());
-              if (sequence0 != null && sequence1 != null && sequence2 != null) {
-                cobj.put(ComObject.Tag.SEQUENCE_0_OVERRIDE, sequence0);
-                cobj.put(ComObject.Tag.SEQUENCE_1_OVERRIDE, sequence1);
-                cobj.put(ComObject.Tag.SEQUENCE_2_OVERRIDE, sequence2);
-              }
-              client.send("UpdateManager:deleteRecord", selectedShards.get(0), rand.nextLong(), cobj, DatabaseClient.Replica.DEF);
-
-              cobj = new ComObject();
-              cobj.put(ComObject.Tag.DB_NAME, dbName);
-              if (schemaRetryCount < 2) {
-                cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
-              }
-              cobj.put(ComObject.Tag.PRIMARY_KEY_BYTES, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), entry[0]));
-              cobj.put(ComObject.Tag.TABLE_NAME, tableName);
-              cobj.put(ComObject.Tag.IS_EXCPLICITE_TRANS, client.isExplicitTrans());
-              cobj.put(ComObject.Tag.IS_COMMITTING, client.isCommitting());
-              cobj.put(ComObject.Tag.TRANSACTION_ID, client.getTransactionId());
-              byte[] bytes = record.serialize(client.getCommon(), DatabaseClient.SERIALIZATION_VERSION);
-              cobj.put(ComObject.Tag.RECORD_BYTES, bytes);
-              if (sequence0 != null && sequence1 != null && sequence2 != null) {
-                cobj.put(ComObject.Tag.SEQUENCE_0_OVERRIDE, sequence0);
-                cobj.put(ComObject.Tag.SEQUENCE_1_OVERRIDE, sequence1);
-                cobj.put(ComObject.Tag.SEQUENCE_2_OVERRIDE, sequence2);
-              }
-
-              client.sendToAllShards("UpdateManager:deleteIndexEntry", rand.nextLong(), cobj, DatabaseClient.Replica.DEF);
-              countDeleted++;
-            }
-          }
+          countDeleted = doDelete.getCountDeleted();
         }
       }
       catch (SchemaOutOfSyncException e) {
@@ -187,6 +115,136 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
     }
     catch (Exception e) {
       throw new DatabaseException(e);
+    }
+  }
+
+  private class DoDelete {
+    private boolean myResult;
+    private String dbName;
+    private SelectStatementImpl.Explain explain;
+    private Long sequence0;
+    private Long sequence1;
+    private Short sequence2;
+    private boolean restrictToThisServer;
+    private StoredProcedureContextImpl procedureContext;
+    private int schemaRetryCount;
+    private TableSchema tableSchema;
+    private Random rand;
+    private int countDeleted;
+
+    public DoDelete(String dbName, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount, TableSchema tableSchema, Random rand, int countDeleted) {
+      this.dbName = dbName;
+      this.explain = explain;
+      this.sequence0 = sequence0;
+      this.sequence1 = sequence1;
+      this.sequence2 = sequence2;
+      this.restrictToThisServer = restrictToThisServer;
+      this.procedureContext = procedureContext;
+      this.schemaRetryCount = schemaRetryCount;
+      this.tableSchema = tableSchema;
+      this.rand = rand;
+      this.countDeleted = countDeleted;
+    }
+
+    boolean is() {
+      return myResult;
+    }
+
+    public int getCountDeleted() {
+      return countDeleted;
+    }
+
+    public DoDelete invoke() {
+      ExpressionImpl.NextReturn ids = expression .next(explain, new AtomicLong(), new AtomicLong(), null, null, schemaRetryCount);
+      if (ids == null || ids.getIds() == null) {
+        myResult = true;
+        return this;
+      }
+
+      IndexSchema indexSchema = null;
+      for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
+        if (entry.getValue().isPrimaryKey()) {
+          indexSchema = entry.getValue();
+        }
+      }
+      if (indexSchema == null) {
+        throw new DatabaseException("primary index not found");
+      }
+
+      String[] indexFields = indexSchema.getFields();
+      int[] fieldOffsets = new int[indexFields.length];
+      for (int k = 0; k < indexFields.length; k++) {
+        fieldOffsets[k] = tableSchema.getFieldOffset(indexFields[k]);
+      }
+
+      for (Object[][] entry : ids.getKeys()) {
+        ExpressionImpl.CachedRecord cachedRecord = recordCache.get(tableName, entry[0]);
+        Record record = cachedRecord == null ? null : cachedRecord.getRecord();
+        if (record == null) {
+          boolean forceSelectOnServer = false;
+          record = ExpressionImpl.doReadRecord(dbName, client, forceSelectOnServer, recordCache, entry[0], tableName,
+              null, null, null, client.getCommon().getSchemaVersion(),
+              restrictToThisServer, procedureContext, schemaRetryCount);
+        }
+        if (record != null) {
+          List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, tableSchema,
+              indexSchema.getName(), null, BinaryExpression.Operator.EQUAL, null, entry[0], null);
+          if (selectedShards.isEmpty()) {
+            throw new DatabaseException("No shards selected for query");
+          }
+
+          doDeleteRecord(indexSchema, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), entry[0]), selectedShards);
+
+          doDeleteIndexEntry(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), entry[0]), record);
+
+          countDeleted++;
+        }
+      }
+      myResult = false;
+      return this;
+    }
+
+    private void doDeleteIndexEntry(byte[] primaryKeyBytes, Record record) {
+      ComObject cobj = new ComObject();
+      cobj.put(ComObject.Tag.DB_NAME, dbName);
+      if (schemaRetryCount < 2) {
+        cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
+      }
+      cobj.put(ComObject.Tag.PRIMARY_KEY_BYTES, primaryKeyBytes);
+      cobj.put(ComObject.Tag.TABLE_NAME, tableName);
+      cobj.put(ComObject.Tag.IS_EXCPLICITE_TRANS, client.isExplicitTrans());
+      cobj.put(ComObject.Tag.IS_COMMITTING, client.isCommitting());
+      cobj.put(ComObject.Tag.TRANSACTION_ID, client.getTransactionId());
+      byte[] bytes = record.serialize(client.getCommon(), DatabaseClient.SERIALIZATION_VERSION);
+      cobj.put(ComObject.Tag.RECORD_BYTES, bytes);
+      if (sequence0 != null && sequence1 != null && sequence2 != null) {
+        cobj.put(ComObject.Tag.SEQUENCE_0_OVERRIDE, sequence0);
+        cobj.put(ComObject.Tag.SEQUENCE_1_OVERRIDE, sequence1);
+        cobj.put(ComObject.Tag.SEQUENCE_2_OVERRIDE, sequence2);
+      }
+
+      client.sendToAllShards("UpdateManager:deleteIndexEntry", rand.nextLong(), cobj, DatabaseClient.Replica.DEF);
+    }
+
+    private void doDeleteRecord(IndexSchema indexSchema, byte[] bytes, List<Integer> selectedShards) {
+      ComObject cobj = new ComObject();
+      cobj.put(ComObject.Tag.SERIALIZATION_VERSION, DatabaseClient.SERIALIZATION_VERSION);
+      cobj.put(ComObject.Tag.KEY_BYTES, bytes);
+      if (schemaRetryCount < 2) {
+        cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
+      }
+      cobj.put(ComObject.Tag.DB_NAME, dbName);
+      cobj.put(ComObject.Tag.TABLE_NAME, tableName);
+      cobj.put(ComObject.Tag.INDEX_NAME, indexSchema.getName());
+      cobj.put(ComObject.Tag.IS_EXCPLICITE_TRANS, client.isExplicitTrans());
+      cobj.put(ComObject.Tag.IS_COMMITTING, client.isCommitting());
+      cobj.put(ComObject.Tag.TRANSACTION_ID, client.getTransactionId());
+      if (sequence0 != null && sequence1 != null && sequence2 != null) {
+        cobj.put(ComObject.Tag.SEQUENCE_0_OVERRIDE, sequence0);
+        cobj.put(ComObject.Tag.SEQUENCE_1_OVERRIDE, sequence1);
+        cobj.put(ComObject.Tag.SEQUENCE_2_OVERRIDE, sequence2);
+      }
+      client.send("UpdateManager:deleteRecord", selectedShards.get(0), rand.nextLong(), cobj, DatabaseClient.Replica.DEF);
     }
   }
 }

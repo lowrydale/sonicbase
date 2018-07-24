@@ -51,8 +51,6 @@ public class IndexSchema {
     return name;
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
-  @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public void setFields(String[] fields, TableSchema tableSchema) {
     this.fields = fields;
     calculateFieldOffsets(tableSchema);
@@ -65,35 +63,26 @@ public class IndexSchema {
     }
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
-  @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public void setCurrPartitions(TableSchema.Partition[] partitions) {
     this.currPartitions = partitions;
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
-  @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public void setLastPartitions(TableSchema.Partition[] partitions) {
     this.lastPartitions = partitions;
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP", justification="copying the returned data is too slow")
   public String[] getFields() {
     return fields;
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP", justification="copying the returned data is too slow")
   public TableSchema.Partition[] getCurrPartitions() {
     return currPartitions;
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP", justification="copying the returned data is too slow")
   public TableSchema.Partition[] getLastPartitions() {
     return lastPartitions;
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP2", justification="copying the passed in data is too slow")
-  @SuppressWarnings("PMD.ArrayIsStoredDirectly") //copying the passed in data is too slow
   public void setComparators(Comparator[] comparators) {
     this.comparators = comparators;
   }
@@ -102,7 +91,6 @@ public class IndexSchema {
     return fieldOffsets;
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="EI_EXPOSE_REP", justification="copying the returned data is too slow")
   public Comparator[] getComparators() {
     return comparators;
   }

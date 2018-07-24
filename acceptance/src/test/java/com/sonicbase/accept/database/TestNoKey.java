@@ -26,9 +26,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 
-/**
- * Created by lowryda on 8/26/17.
- */
 public class TestNoKey {
 
   private Connection conn;

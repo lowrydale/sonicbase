@@ -705,32 +705,7 @@ public class PartitionManager extends Thread {
                 moveIndexEntriesToShard(dbName, tableName, indexName, isPrimaryKey, shard, list.moveRequests);
                 for (MoveRequest request : list.moveRequests) {
                   if (request.shouldDeleteNow) {
-                    synchronized (index.getMutex(request.key)) {
-                      if (isPrimaryKey) {
-                        byte[][] content = databaseServer.getAddressMap().fromUnsafeToRecords(index.get(request.key));
-                        if (content != null) {
-                          for (byte[] bytes : content) {
-                            if (Record.DB_VIEW_FLAG_DELETING != Record.getDbViewFlags(bytes)) {
-                              index.addAndGetCount(-1);
-                            }
-                          }
-                        }
-                      }
-                      else {
-                        byte[][] content = databaseServer.getAddressMap().fromUnsafeToKeys(index.get(request.key));
-                        if (content != null) {
-                          for (byte[] bytes : content) {
-                            if (Record.DB_VIEW_FLAG_DELETING != KeyRecord.getDbViewFlags(bytes)) {
-                              index.addAndGetCount(-1);
-                            }
-                          }
-                        }
-                      }
-                      Object value = index.remove(request.key);
-                      if (value != null) {
-                        databaseServer.getAddressMap().freeUnsafeIds(value);
-                      }
-                    }
+                    deleteIndexEntryNow(request);
                   }
                   else {
                     keysToDelete.add(request.getKey());
@@ -774,6 +749,35 @@ public class PartitionManager extends Thread {
         }
       }, "MoveProcessor - shard=" + shard);
       thread.start();
+    }
+
+    private void deleteIndexEntryNow(MoveRequest request) {
+      synchronized (index.getMutex(request.key)) {
+        if (isPrimaryKey) {
+          byte[][] content = databaseServer.getAddressMap().fromUnsafeToRecords(index.get(request.key));
+          if (content != null) {
+            for (byte[] bytes : content) {
+              if (Record.DB_VIEW_FLAG_DELETING != Record.getDbViewFlags(bytes)) {
+                index.addAndGetCount(-1);
+              }
+            }
+          }
+        }
+        else {
+          byte[][] content = databaseServer.getAddressMap().fromUnsafeToKeys(index.get(request.key));
+          if (content != null) {
+            for (byte[] bytes : content) {
+              if (Record.DB_VIEW_FLAG_DELETING != KeyRecord.getDbViewFlags(bytes)) {
+                index.addAndGetCount(-1);
+              }
+            }
+          }
+        }
+        Object value = index.remove(request.key);
+        if (value != null) {
+          databaseServer.getAddressMap().freeUnsafeIds(value);
+        }
+      }
     }
 
     public void await() {
@@ -1876,7 +1880,11 @@ public class PartitionManager extends Thread {
         }
       }
 
-      ThreadPoolExecutor executor = ThreadUtil.createExecutor(newPartitions.size(), "SonicBase calculatePartitions Thread");
+      setUpperKeys(dbName, newPartitions, indexName, tableName, getKey, nList, offsetList);
+    }
+
+    private void setUpperKeys(String dbName, List<TableSchema.Partition> newPartitions, String indexName, String tableName, GetKeyAtOffset getKey, List<Integer> nList, List<Long> offsetList) {
+      ThreadPoolExecutor executor = ThreadUtil.createExecutor(newPartitions.size(), "SonicBase CalculatePartitions Thread");
       try {
         Map<Integer, List<OffsetEntry>> shards = new HashMap<>();
         for (int i = 0; i < newPartitions.size(); i++) {

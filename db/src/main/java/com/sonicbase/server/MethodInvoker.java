@@ -14,9 +14,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * Created by lowryda on 7/28/17.
- */
 @SuppressWarnings({"squid:S1168", "squid:S1172"}) // I prefer to return null instead of an empty array
                                                   // all methods called from method invoker must have cobj and replayed command parms
 public class MethodInvoker {

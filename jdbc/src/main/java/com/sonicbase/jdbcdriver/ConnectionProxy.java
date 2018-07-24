@@ -560,7 +560,6 @@ public class ConnectionProxy implements Connection {
   }
 
   public int getNetworkTimeout() throws SQLException {
-    // todo: implement for JDK 1.7
     throw new NotImplementedException();
   }
 

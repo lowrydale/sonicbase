@@ -76,25 +76,7 @@ public class MasterManager {
       if (server.getShard() != 0) {
         return;
       }
-      Thread thread = new Thread(() -> {
-        while (!server.getShutdown()) {
-          try {
-            promoteToMaster(null, false);
-            break;
-          }
-          catch (Exception e) {
-            logger.error("Error promoting to master", e);
-            try {
-              Thread.sleep(timeoutOverride == null ? 2000 : timeoutOverride);
-            }
-            catch (InterruptedException e1) {
-              Thread.currentThread().interrupt();
-              break;
-            }
-          }
-        }
-      });
-      thread.start();
+      promoteToMaster(timeoutOverride);
       return;
     }
 
@@ -130,32 +112,7 @@ public class MasterManager {
                 logger.error("Error electing master: shard=" + shard, e);
               }
             }
-            while (!server.getShutdown()) {
-              try {
-                Thread.sleep(timeoutOverride == null ? (DatabaseServer.getDeathOverride() == null ? 2000 : 1000) : timeoutOverride);
-
-                final int masterReplica = server.getCommon().getServersConfig().getShards()[shard].getMasterReplica();
-                if (masterReplica == -1) {
-                  electNewMaster(shard, masterReplica, monitorShards, monitorReplicas, nextMonitor);
-                }
-                else {
-                  final AtomicBoolean isHealthy = new AtomicBoolean(false);
-                  for (int i1 = 0; i1 < 5; i1++) {
-                    server.checkHealthOfServer(shard, masterReplica, isHealthy);
-                    if (isHealthy.get()) {
-                      break;
-                    }
-                  }
-
-                  if (!isHealthy.get()) {
-                    electNewMaster(shard, masterReplica, monitorShards, monitorReplicas, nextMonitor);
-                  }
-                }
-              }
-              catch (Exception e) {
-                logger.error("Error in master monitor: shard=" + shard, e);
-              }
-            }
+            electNewMasterIfNeeded(timeoutOverride, monitorShards, monitorReplicas, shard, nextMonitor);
           }, "SonicBase Master Monitor Thread for Shard: " + shard);
           masterThreadForShard.start();
           masterMonitorThreadsForShards.add(masterThreadForShard);
@@ -163,6 +120,57 @@ public class MasterManager {
       }
     }, "SonicBase Maste Monitor Thread");
     masterMonitorThread.start();
+  }
+
+  private void electNewMasterIfNeeded(Long timeoutOverride, int[] monitorShards, int[] monitorReplicas, int shard, AtomicInteger nextMonitor) {
+    while (!server.getShutdown()) {
+      try {
+        Thread.sleep(timeoutOverride == null ? (DatabaseServer.getDeathOverride() == null ? 2000 : 1000) : timeoutOverride);
+
+        final int masterReplica = server.getCommon().getServersConfig().getShards()[shard].getMasterReplica();
+        if (masterReplica == -1) {
+          electNewMaster(shard, masterReplica, monitorShards, monitorReplicas, nextMonitor);
+        }
+        else {
+          final AtomicBoolean isHealthy = new AtomicBoolean(false);
+          for (int i1 = 0; i1 < 5; i1++) {
+            server.checkHealthOfServer(shard, masterReplica, isHealthy);
+            if (isHealthy.get()) {
+              break;
+            }
+          }
+
+          if (!isHealthy.get()) {
+            electNewMaster(shard, masterReplica, monitorShards, monitorReplicas, nextMonitor);
+          }
+        }
+      }
+      catch (Exception e) {
+        logger.error("Error in master monitor: shard=" + shard, e);
+      }
+    }
+  }
+
+  private void promoteToMaster(Long timeoutOverride) {
+    Thread thread = new Thread(() -> {
+      while (!server.getShutdown()) {
+        try {
+          promoteToMaster(null, false);
+          break;
+        }
+        catch (Exception e) {
+          logger.error("Error promoting to master", e);
+          try {
+            Thread.sleep(timeoutOverride == null ? 2000 : timeoutOverride);
+          }
+          catch (InterruptedException e1) {
+            Thread.currentThread().interrupt();
+            break;
+          }
+        }
+      }
+    });
+    thread.start();
   }
 
   private boolean electNewMaster(int shard, int oldMasterReplica, int[] monitorShards, int[] monitorReplicas,

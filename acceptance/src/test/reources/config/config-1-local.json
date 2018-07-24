@@ -1,0 +1,45 @@
+{
+  "dataDirectory": "$HOME/db-data",
+  "installDirectory": "$HOME/sonicbase",
+  "compressRecords": false,
+  "useUnsafe": true,
+  "maxJavaHeap": "20%",
+  "user": "ubuntu",
+  "clientIsPrivate": false,
+  "xbackup" : {
+    "type" : "fileSystem",
+    "directory": "$HOME/db-backup",
+    "period": "daily",
+    "time": "23:00",
+    "maxBackupCount": 10,
+    "sharedDirectory": false
+  },
+  "backup" : {
+    "bucket" : "sonicbase-test-backup",
+    "period" : "daily",
+    "prefix" : "backups",
+    "time" : "23:00",
+    "type" : "AWS",
+    "maxBackupCount" : 10
+  },
+  "shards" : [
+    {
+      "replicas": [
+        {
+          "publicAddress": "localhost",
+          "privateAddress": "localhost",
+          "port": 9010,
+          "httpPort": 8080
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "publicAddress": "localhost",
+      "privateAddress": "localhost",
+      "port": 8090
+    }
+  ]
+
+}

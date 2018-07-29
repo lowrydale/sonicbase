@@ -22,7 +22,9 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
-@SuppressWarnings("squid:S1168") // I prefer to return null instead of an empty array
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class ExpressionImpl implements Expression {
 
   private static Map<Integer, Type> typesById = new HashMap<>();
@@ -151,46 +153,20 @@ public class ExpressionImpl implements Expression {
                                      SelectFunctionImpl function, boolean restrictToThisServer,
                                      StoredProcedureContextImpl procedureContext, int schemaRetryCount) throws IOException {
     if ((function.getName().equalsIgnoreCase("min") || function.getName().equalsIgnoreCase("max"))) {
-      doLookupForMinOrMax(client, dbName, expression, indexSchema, counter, function, restrictToThisServer, procedureContext, schemaRetryCount);
+      doLookupForMinOrMax(client, dbName, expression, indexSchema, counter, function, restrictToThisServer,
+          procedureContext, schemaRetryCount);
     }
     else {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.LEGACY_COUNTER, counter.serialize());
       cobj.put(ComObject.Tag.DB_NAME, dbName);
       cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
-      cobj.put(ComObject.Tag.METHOD, "ReadManager:evaluateCounterGetKeys");
-
-      String batchKey = "ReadManager:evaluateCounterGetKeys";
 
       Counter lastCounter = null;
       int shardCount = common.getServersConfig().getShardCount();
 
       for (int i = 0; i < shardCount; i++) {
-        byte[] ret = client.send(batchKey, i, 0, cobj, DatabaseClient.Replica.DEF);
-        ComObject retObj = new ComObject(ret);
-
-        byte[] minKeyBytes = retObj.getByteArray(ComObject.Tag.MIN_KEY);
-        byte[] maxKeyBytes = retObj.getByteArray(ComObject.Tag.MAX_KEY);
-
-        Counter minCounter = null;
-        if (minKeyBytes != null) {
-          minCounter = getCounterValue(common, client, dbName, counter, minKeyBytes, false);
-        }
-        else {
-          minCounter = new Counter();
-        }
-        Counter maxCounter = null;
-        if (maxKeyBytes != null) {
-          maxCounter = getCounterValue(common, client, dbName, counter, maxKeyBytes, false);
-        }
-        else {
-          maxCounter = new Counter();
-        }
-
-        if (lastCounter != null) {
-          setCounterValues(lastCounter, minCounter, maxCounter);
-        }
-        lastCounter = minCounter;
+        lastCounter = evaluateCounterGetKeys(common, client, dbName, counter, cobj, lastCounter, i);
       }
       counter.setMaxLong(lastCounter.getMaxLong());
       counter.setMinLong(lastCounter.getMinLong());
@@ -200,7 +176,40 @@ public class ExpressionImpl implements Expression {
     }
   }
 
-  private static void doLookupForMinOrMax(DatabaseClient client, String dbName, ExpressionImpl expression, IndexSchema indexSchema, Counter counter, SelectFunctionImpl function, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) {
+  private static Counter evaluateCounterGetKeys(DatabaseCommon common, DatabaseClient client, String dbName,
+                                                Counter counter, ComObject cobj, Counter lastCounter, int i) throws IOException {
+    byte[] ret = client.send("ReadManager:evaluateCounterGetKeys", i, 0, cobj, DatabaseClient.Replica.DEF);
+    ComObject retObj = new ComObject(ret);
+
+    byte[] minKeyBytes = retObj.getByteArray(ComObject.Tag.MIN_KEY);
+    byte[] maxKeyBytes = retObj.getByteArray(ComObject.Tag.MAX_KEY);
+
+    Counter minCounter = null;
+    if (minKeyBytes != null) {
+      minCounter = getCounterValue(common, client, dbName, counter, minKeyBytes, false);
+    }
+    else {
+      minCounter = new Counter();
+    }
+    Counter maxCounter = null;
+    if (maxKeyBytes != null) {
+      maxCounter = getCounterValue(common, client, dbName, counter, maxKeyBytes, false);
+    }
+    else {
+      maxCounter = new Counter();
+    }
+
+    if (lastCounter != null) {
+      setCounterValues(lastCounter, minCounter, maxCounter);
+    }
+    lastCounter = minCounter;
+    return lastCounter;
+  }
+
+  private static void doLookupForMinOrMax(DatabaseClient client, String dbName, ExpressionImpl expression,
+                                          IndexSchema indexSchema, Counter counter, SelectFunctionImpl function,
+                                          boolean restrictToThisServer, StoredProcedureContextImpl procedureContext,
+                                          int schemaRetryCount) {
     BinaryExpression.Operator op = BinaryExpression.Operator.GREATER;
     AtomicReference<String> usedIndex = new AtomicReference<>();
     Random rand = new Random(System.currentTimeMillis());
@@ -281,6 +290,16 @@ public class ExpressionImpl implements Expression {
   }
 
   private static void setCounterValues(Counter lastCounter, Counter minCounter, Counter maxCounter) {
+
+    getMaxCounterValue(lastCounter, maxCounter);
+
+    getMinCounterValue(lastCounter, minCounter);
+
+    minCounter.setMaxLong(maxCounter.getMaxLong());
+    minCounter.setMaxDouble(maxCounter.getMaxDouble());
+  }
+
+  private static void getMaxCounterValue(Counter lastCounter, Counter maxCounter) {
     Long maxLong = maxCounter.getMaxLong();
     Long lastMaxLong = lastCounter.getMaxLong();
     if (maxLong != null) {
@@ -301,6 +320,9 @@ public class ExpressionImpl implements Expression {
     else {
       maxCounter.setMaxDouble(lastMaxDouble);
     }
+  }
+
+  private static void getMinCounterValue(Counter lastCounter, Counter minCounter) {
     Long minLong = minCounter.getMinLong();
     Long lastMinLong = lastCounter.getMinLong();
     if (minLong != null) {
@@ -321,11 +343,10 @@ public class ExpressionImpl implements Expression {
     else {
       minCounter.setMinDouble(lastMinDouble);
     }
-    minCounter.setMaxLong(maxCounter.getMaxLong());
-    minCounter.setMaxDouble(maxCounter.getMaxDouble());
   }
 
-  private static Counter getCounterValue(DatabaseCommon common, DatabaseClient client, String dbName, Counter counter, byte[] keyBytes,
+  private static Counter getCounterValue(DatabaseCommon common, DatabaseClient client, String dbName, Counter counter,
+                                         byte[] keyBytes,
                                          boolean isMin) throws IOException {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.LEGACY_COUNTER, counter.serialize());
@@ -360,7 +381,8 @@ public class ExpressionImpl implements Expression {
     for (int i = 0; i < indexFields.length; i++) {
       fieldOffsets[i] = tableSchema.getFieldOffset(indexFields[i]);
     }
-    List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, tableSchema,
+    List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true,
+        false, tableSchema,
         indexName, null, BinaryExpression.Operator.EQUAL, null, key, null);
 
     byte[] ret = client.send(batchKey, selectedShards.get(0), 0, cobj, DatabaseClient.Replica.DEF);
@@ -376,6 +398,7 @@ public class ExpressionImpl implements Expression {
   }
 
   public void getColumnsInExpression(List<ColumnImpl> columns) {
+    //nothing to implement
   }
 
   public void setIsCurrPartitions(boolean isCurrPartitions) {
@@ -448,6 +471,7 @@ public class ExpressionImpl implements Expression {
   }
 
   public void getColumns(Set<ColumnImpl> columns) {
+    //nothing to implement
   }
 
   public void setTableName(String tableName) {
@@ -516,11 +540,13 @@ public class ExpressionImpl implements Expression {
   }
 
 
-  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
+  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
+                         Limit limit, Offset offset, int schemaRetryCount) {
     return null;
   }
 
-  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned, Limit limit,
+  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset,
+                         AtomicLong countReturned, Limit limit,
                                   Offset offset, boolean evaluateExpression, boolean analyze, int schemaRetryCount) {
     return null;
   }
@@ -534,7 +560,7 @@ public class ExpressionImpl implements Expression {
   }
 
   public void queryRewrite() {
-
+    //nothing to implement
   }
 
   public ColumnImpl getPrimaryColumn() {
@@ -695,8 +721,12 @@ public class ExpressionImpl implements Expression {
         if (!(o instanceof Key)) {
           return false;
         }
+        return doCheckKeysEqual(o);
+      }
+
+      private boolean doCheckKeysEqual(Object o) {
         for (int i = 0; i < key.length; i++) {
-          if (key[i] == null || ((Key) o).key[i] == null) {
+          if (isEitherKeyNull(i, o)) {
             continue;
           }
           if (key[i] instanceof Long) {
@@ -719,6 +749,10 @@ public class ExpressionImpl implements Expression {
           }
         }
         return true;
+      }
+
+      private boolean isEitherKeyNull(int i, Object o) {
+        return key[i] == null || ((Key) o).key[i] == null;
       }
     }
 
@@ -779,7 +813,6 @@ public class ExpressionImpl implements Expression {
       final RecordCache recordCache, final int viewVersion, final boolean restrictToThisServer,
       final StoredProcedureContextImpl procedureContext, final int schemaRetryCount) {
     try {
-      int[] fieldOffsets;
       final AtomicReference<Map.Entry<String, IndexSchema>> indexSchema = new AtomicReference<>();
 
       prepareToReadRecords(tableSchema, columns, indexSchema);
@@ -816,49 +849,17 @@ public class ExpressionImpl implements Expression {
     }
   }
 
-  private static void prepareToReadRecords(TableSchema tableSchema, String[] columns, AtomicReference<Map.Entry<String, IndexSchema>> indexSchema) {
+  private static void prepareToReadRecords(TableSchema tableSchema, String[] columns,
+                                           AtomicReference<Map.Entry<String, IndexSchema>> indexSchema) {
     int[] fieldOffsets;
     for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
       String[] fields = entry.getValue().getFields();
       boolean shouldIndex = false;
       if (fields.length ==  columns.length) {
-        boolean foundAll = true;
-        for (int i = 0; i < fields.length; i++) {
-          boolean found = false;
-          for (int j = 0; j < columns.length; j++) {
-            if (fields[i].equals(columns[j])) {
-              found = true;
-              break;
-            }
-          }
-          if (!found) {
-            foundAll = false;
-            break;
-          }
-        }
-        if (foundAll) {
-          shouldIndex = true;
-        }
+        shouldIndex = prepareToReadRecordsWhereFieldsLenEqualsColumnsLen(columns, fields, shouldIndex);
       }
       else {
-        int columnsFound = 0;
-        for (int i = 0; i < fields.length; i++) {
-          boolean found = false;
-          for (int j = 0; j < columns.length; j++) {
-            if (fields[i].equals(columns[j])) {
-              found = true;
-            }
-          }
-          if (!found) {
-            break;
-          }
-          else {
-            columnsFound++;
-          }
-        }
-        if (columnsFound >= 1) {
-          shouldIndex = true;
-        }
+        shouldIndex = prepareToReadRecordsWhereFieldsLenNotEqualsColumnsLen(columns, fields, shouldIndex);
       }
       if (shouldIndex) {
         indexSchema.set(entry);
@@ -872,7 +873,54 @@ public class ExpressionImpl implements Expression {
     }
   }
 
-  private static void processResults(TableSchema tableSchema, RecordCache recordCache, HashMap<Integer, Object[][]> fullMap, String[] primaryKeyFields, Future future) throws InterruptedException, ExecutionException {
+  private static boolean prepareToReadRecordsWhereFieldsLenNotEqualsColumnsLen(String[] columns, String[] fields,
+                                                                               boolean shouldIndex) {
+    int columnsFound = 0;
+    for (int i = 0; i < fields.length; i++) {
+      boolean found = false;
+      for (int j = 0; j < columns.length; j++) {
+        if (fields[i].equals(columns[j])) {
+          found = true;
+        }
+      }
+      if (!found) {
+        break;
+      }
+      else {
+        columnsFound++;
+      }
+    }
+    if (columnsFound >= 1) {
+      shouldIndex = true;
+    }
+    return shouldIndex;
+  }
+
+  private static boolean prepareToReadRecordsWhereFieldsLenEqualsColumnsLen(String[] columns, String[] fields,
+                                                                            boolean shouldIndex) {
+    boolean foundAll = true;
+    for (int i = 0; i < fields.length; i++) {
+      boolean found = false;
+      for (int j = 0; j < columns.length; j++) {
+        if (fields[i].equals(columns[j])) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        foundAll = false;
+        break;
+      }
+    }
+    if (foundAll) {
+      shouldIndex = true;
+    }
+    return shouldIndex;
+  }
+
+  private static void processResults(TableSchema tableSchema, RecordCache recordCache,
+                                     HashMap<Integer, Object[][]> fullMap, String[] primaryKeyFields,
+                                     Future future) throws InterruptedException, ExecutionException {
     BatchLookupReturn curr = (BatchLookupReturn) future.get();
     if (curr.records.size() != 0) {
       for (Map.Entry<Integer, Record[]> entry : curr.records.entrySet()) {
@@ -897,15 +945,19 @@ public class ExpressionImpl implements Expression {
     }
   }
 
-  private static Map<Integer, List<IdEntry>> preparePartitionedValues(DatabaseClient client, TableSchema tableSchema, List<IdEntry> keysToRead, AtomicReference<Map.Entry<String, IndexSchema>> indexSchema) {
+  private static Map<Integer, List<IdEntry>> preparePartitionedValues(DatabaseClient client, TableSchema tableSchema,
+                                                                      List<IdEntry> keysToRead,
+                                                                      AtomicReference<Map.Entry<String, IndexSchema>> indexSchema) {
     Map<Integer, List<IdEntry>> partitionedValues = new HashMap<>();
     for (int j = 0; j < client.getShardCount(); j++) {
       partitionedValues.put(j, new ArrayList<IdEntry>());
     }
 
     for (int i = 0; i < keysToRead.size(); i++) {
-      List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, tableSchema,
-          indexSchema.get().getKey(), null, BinaryExpression.Operator.EQUAL, null, keysToRead.get(i).getValue(), null);
+      List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(
+          true, false, tableSchema,
+          indexSchema.get().getKey(), null, BinaryExpression.Operator.EQUAL,
+          null, keysToRead.get(i).getValue(), null);
       if (selectedShards.isEmpty()) {
         throw new DatabaseException("No shards selected for query");
       }
@@ -1114,9 +1166,11 @@ public class ExpressionImpl implements Expression {
   }
 
   private static BatchLookupReturn batchLookupIds(
-      final String dbName, final DatabaseCommon common, final DatabaseClient client, final boolean forceSelectOnServer, final int count, final TableSchema tableSchema,
+      final String dbName, final DatabaseCommon common, final DatabaseClient client, final boolean forceSelectOnServer,
+      final int count, final TableSchema tableSchema,
       final BinaryExpression.Operator operator,
-      final Map.Entry<String, IndexSchema> indexSchema, final List<ColumnImpl> columns, final List<IdEntry> srcValues, final int shard,
+      final Map.Entry<String, IndexSchema> indexSchema, final List<ColumnImpl> columns, final List<IdEntry> srcValues,
+      final int shard,
       AtomicReference<String> usedIndex, final RecordCache recordCache, final int viewVersion, final boolean restrictToThisServer, 
       final StoredProcedureContextImpl procedureContext, final int schemaRetryCount) {
 
@@ -1141,44 +1195,20 @@ public class ExpressionImpl implements Expression {
 
             int subCount = srcValues.size();
 
-            boolean writingLongs = false;
-            if (!srcValues.isEmpty() && srcValues.get(0).getValue().length == 1) {
-              Object value = srcValues.get(0).getValue()[0];
-              if (value instanceof Long) {
-                cobj.put(ComObject.Tag.SINGLE_VALUE, true);
-                writingLongs = true;
-              }
-              else {
-                cobj.put(ComObject.Tag.SINGLE_VALUE, false);
-                writingLongs = false;
-              }
-            }
-            else {
-              cobj.put(ComObject.Tag.SINGLE_VALUE, false);
-            }
+            boolean writingLongs = markSingleValueOrNot(srcValues, cobj);
 
             ComArray keys = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.OBJECT_TYPE);
-            int k = 0;
-            for (; k < subCount; k++) {
-              ComObject key = new ComObject();
-              keys.add(key);
 
-              IdEntry entry = srcValues.get(k);
-              key.put(ComObject.Tag.OFFSET, entry.getOffset());
-              if (writingLongs) {
-                key.put(ComObject.Tag.LONG_KEY, (long) entry.getValue()[0]);
-              }
-              else {
-                key.put(ComObject.Tag.KEY_BYTES, DatabaseCommon.serializeKey(tableSchema, indexSchema.getKey(), entry.getValue()));
-              }
-            }
+            putKeysInComObject(tableSchema, indexSchema, srcValues, subCount, writingLongs, keys);
 
             cobj.put(ComObject.Tag.DB_NAME, dbName);
             cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
             cobj.put(ComObject.Tag.COUNT, count);
-            byte[] lookupRet = client.send("ReadManager:batchIndexLookup", shard, -1, cobj, DatabaseClient.Replica.DEF);
+            byte[] lookupRet = client.send("ReadManager:batchIndexLookup", shard, -1, cobj,
+                DatabaseClient.Replica.DEF);
 
-            return batchLookupIdsProcessResults(dbName, common, client, forceSelectOnServer, tableSchema, columns, recordCache, viewVersion, restrictToThisServer, procedureContext, schemaRetryCount, lookupRet);
+            return batchLookupIdsProcessResults(dbName, common, client, forceSelectOnServer, tableSchema, columns,
+                recordCache, viewVersion, restrictToThisServer, procedureContext, schemaRetryCount, lookupRet);
           }
           catch (IOException e) {
             throw new DatabaseException(e);
@@ -1210,7 +1240,49 @@ public class ExpressionImpl implements Expression {
     }
   }
 
-  private static BatchLookupReturn batchLookupIdsProcessResults(String dbName, DatabaseCommon common, DatabaseClient client, boolean forceSelectOnServer, TableSchema tableSchema, List<ColumnImpl> columns, RecordCache recordCache, int viewVersion, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount, byte[] lookupRet) throws EOFException {
+  private static void putKeysInComObject(TableSchema tableSchema, Map.Entry<String, IndexSchema> indexSchema,
+                                         List<IdEntry> srcValues, int subCount, boolean writingLongs, ComArray keys) {
+    for (int k = 0; k < subCount; k++) {
+      ComObject key = new ComObject();
+      keys.add(key);
+
+      IdEntry entry = srcValues.get(k);
+      key.put(ComObject.Tag.OFFSET, entry.getOffset());
+      if (writingLongs) {
+        key.put(ComObject.Tag.LONG_KEY, (long) entry.getValue()[0]);
+      }
+      else {
+        key.put(ComObject.Tag.KEY_BYTES, DatabaseCommon.serializeKey(tableSchema, indexSchema.getKey(), entry.getValue()));
+      }
+    }
+  }
+
+  private static boolean markSingleValueOrNot(List<IdEntry> srcValues, ComObject cobj) {
+    boolean writingLongs = false;
+    if (!srcValues.isEmpty() && srcValues.get(0).getValue().length == 1) {
+      Object value = srcValues.get(0).getValue()[0];
+      if (value instanceof Long) {
+        cobj.put(ComObject.Tag.SINGLE_VALUE, true);
+        writingLongs = true;
+      }
+      else {
+        cobj.put(ComObject.Tag.SINGLE_VALUE, false);
+        writingLongs = false;
+      }
+    }
+    else {
+      cobj.put(ComObject.Tag.SINGLE_VALUE, false);
+    }
+    return writingLongs;
+  }
+
+  private static BatchLookupReturn batchLookupIdsProcessResults(String dbName, DatabaseCommon common,
+                                                                DatabaseClient client, boolean forceSelectOnServer,
+                                                                TableSchema tableSchema, List<ColumnImpl> columns,
+                                                                RecordCache recordCache, int viewVersion,
+                                                                boolean restrictToThisServer,
+                                                                StoredProcedureContextImpl procedureContext,
+                                                                int schemaRetryCount, byte[] lookupRet) throws EOFException {
     ComObject retObj = new ComObject(lookupRet);
     Map<Integer, Object[][]> retKeys = new HashMap<>();
     Map<Integer, Record[]> retRecords = new HashMap<>();
@@ -1229,35 +1301,45 @@ public class ExpressionImpl implements Expression {
         aggregateKeys(retKeys, offset1, ids);
       }
 
-      ComArray recordsArray = retEntryObj.getArray(ComObject.Tag.RECORDS);
-      if (!recordsArray.getArray().isEmpty()) {
-        Record[] records = new Record[recordsArray.getArray().size()];
-
-        for (int l = 0; l < records.length; l++) {
-          byte[] recordBytes = (byte[])recordsArray.getArray().get(l);
-          records[l] = new Record(dbName, common, recordBytes);
-        }
-
-        aggregateRecords(retRecords, offset1, records);
-      }
-      else {
-        if (ids != null) {
-          Record[] records = new Record[ids.length];
-          for (int j = 0; j < ids.length; j++) {
-            Object[] key = ids[j];
-            Record record = doReadRecord(dbName, client, forceSelectOnServer, recordCache, key,
-                tableSchema.getName(), columns, null, null, viewVersion,
-                restrictToThisServer, procedureContext, schemaRetryCount);
-            records[j] = record;
-          }
-          aggregateRecords(retRecords, offset1, records);
-        }
-      }
+      aggregateRecordsFromBatchLookup(dbName, common, client, forceSelectOnServer, tableSchema, columns, recordCache,
+          viewVersion, restrictToThisServer, procedureContext, schemaRetryCount, retRecords, retEntryObj, offset1, ids);
     }
     BatchLookupReturn batchReturn = new BatchLookupReturn();
     batchReturn.keys = retKeys;
     batchReturn.records = retRecords;
     return batchReturn;
+  }
+
+  private static void aggregateRecordsFromBatchLookup(String dbName, DatabaseCommon common, DatabaseClient client,
+                                                      boolean forceSelectOnServer, TableSchema tableSchema,
+                                                      List<ColumnImpl> columns, RecordCache recordCache, int viewVersion,
+                                                      boolean restrictToThisServer, StoredProcedureContextImpl procedureContext,
+                                                      int schemaRetryCount, Map<Integer, Record[]> retRecords,
+                                                      ComObject retEntryObj, int offset1, Object[][] ids) {
+    ComArray recordsArray = retEntryObj.getArray(ComObject.Tag.RECORDS);
+    if (!recordsArray.getArray().isEmpty()) {
+      Record[] records = new Record[recordsArray.getArray().size()];
+
+      for (int l = 0; l < records.length; l++) {
+        byte[] recordBytes = (byte[])recordsArray.getArray().get(l);
+        records[l] = new Record(dbName, common, recordBytes);
+      }
+
+      aggregateRecords(retRecords, offset1, records);
+    }
+    else {
+      if (ids != null) {
+        Record[] records = new Record[ids.length];
+        for (int j = 0; j < ids.length; j++) {
+          Object[] key = ids[j];
+          Record record = doReadRecord(dbName, client, forceSelectOnServer, recordCache, key,
+              tableSchema.getName(), columns, null, null, viewVersion,
+              restrictToThisServer, procedureContext, schemaRetryCount);
+          records[j] = record;
+        }
+        aggregateRecords(retRecords, offset1, records);
+      }
+    }
   }
 
   private static void aggregateKeys(Map<Integer, Object[][]> retKeys, int offset, Object[][] ids) {
@@ -1331,10 +1413,7 @@ public class ExpressionImpl implements Expression {
         Object[] localNextKey = nextKey;
         DatabaseCommon common = client.getCommon();
 
-        List<Integer> selectedShards = new ArrayList<>();
-        for (int i = 0; i < client.getShardCount(); i++) {
-          selectedShards.add(i);
-        }
+        List<Integer> selectedShards = addAllShardsToSelectedShards(client);
 
         ExpressionImpl rightKeyExpression = getRightKeyExpression((ExpressionImpl) expression.getTopLevelExpression());
 
@@ -1360,36 +1439,10 @@ public class ExpressionImpl implements Expression {
         Object[][][] retKeys = null;
         byte[][] recordRet = null;
 
-        while (nextShard != -2 && (retKeys == null || retKeys.length < count)) {
-          PrepareTableScanCall prepareTableScanCall = new PrepareTableScanCall(dbName, viewVersion, client, count,
-              tableSchema, orderByExpressions, expression, parms, columns, counters, groupByContext, currOffset, limit,
-              offset, isProbe, localNextKey, common, rightKeyExpression).invoke();
-          columns = prepareTableScanCall.getColumns();
-          ComObject cobj = prepareTableScanCall.getCobj();
-
-          ComObject retObj;
-          if (restrictToThisServer) {
-            retObj = DatabaseServerProxy.indexLookupExpression(client.getDatabaseServer(), cobj, procedureContext);
-          }
-          else {
-            byte[] lookupRet = client.send("ReadManager:indexLookupExpression", localShard, 0, cobj,
-                DatabaseClient.Replica.DEF);
-            retObj = new ComObject(lookupRet);
-          }
-          ProcessTableScanResults processTableScanResults = new ProcessTableScanResults(dbName, client, tableSchema, nextKey,
-              recordCache, counters, groupByContext, currOffset, limit, offset, restrictToThisServer, localShard, common,
-              selectedShards, nextShard, retKeys, recordRet, retObj).invoke();
-          nextKey = processTableScanResults.getNextKey();
-          localShard = processTableScanResults.getLocalShard();
-          localNextKey = processTableScanResults.getLocalNextKey();
-          nextShard = processTableScanResults.getNextShard();
-          retKeys = processTableScanResults.getRetKeys();
-          recordRet = processTableScanResults.getRecordRet();
-        }
-
-        return new SelectContextImpl(tableSchema.getName(),
-            indexSchema.getName(), null, nextShard, localNextKey,
-            retKeys, recordCache, -1, true);
+        return indexLookupForTableScan(dbName, viewVersion, client, count, tableSchema, orderByExpressions, expression,
+            parms, columns, nextKey, recordCache, counters, groupByContext, currOffset, limit, offset, isProbe,
+            restrictToThisServer, procedureContext, localShard, localNextKey, common, selectedShards, rightKeyExpression,
+            indexSchema, nextShard, retKeys, recordRet);
       }
       catch (SchemaOutOfSyncException e) {
         // try again
@@ -1398,6 +1451,58 @@ public class ExpressionImpl implements Expression {
         throw new DatabaseException(e);
       }
     }
+  }
+
+  private static List<Integer> addAllShardsToSelectedShards(DatabaseClient client) {
+    List<Integer> selectedShards = new ArrayList<>();
+    for (int i = 0; i < client.getShardCount(); i++) {
+      selectedShards.add(i);
+    }
+    return selectedShards;
+  }
+
+  private static SelectContextImpl indexLookupForTableScan(String dbName, long viewVersion, DatabaseClient client,
+                                                           int count, TableSchema tableSchema,
+                                                           List<OrderByExpressionImpl> orderByExpressions,
+                                                           ExpressionImpl expression, ParameterHandler parms,
+                                                           List<ColumnImpl> columns, Object[] nextKey, RecordCache recordCache,
+                                                           Counter[] counters, GroupByContext groupByContext, AtomicLong currOffset,
+                                                           Limit limit, Offset offset, boolean isProbe,
+                                                           boolean restrictToThisServer, StoredProcedureContextImpl procedureContext,
+                                                           int localShard, Object[] localNextKey, DatabaseCommon common,
+                                                           List<Integer> selectedShards, ExpressionImpl rightKeyExpression,
+                                                           IndexSchema indexSchema, int nextShard, Object[][][] retKeys,
+                                                           byte[][] recordRet) throws IOException {
+    while (nextShard != -2 && (retKeys == null || retKeys.length < count)) {
+      PrepareTableScanCall prepareTableScanCall = new PrepareTableScanCall(dbName, viewVersion, client, count,
+          tableSchema, orderByExpressions, expression, parms, columns, counters, groupByContext, currOffset, limit,
+          offset, isProbe, localNextKey, common, rightKeyExpression).invoke();
+      columns = prepareTableScanCall.getColumns();
+      ComObject cobj = prepareTableScanCall.getCobj();
+
+      ComObject retObj;
+      if (restrictToThisServer) {
+        retObj = DatabaseServerProxy.indexLookupExpression(client.getDatabaseServer(), cobj, procedureContext);
+      }
+      else {
+        byte[] lookupRet = client.send("ReadManager:indexLookupExpression", localShard, 0, cobj,
+            DatabaseClient.Replica.DEF);
+        retObj = new ComObject(lookupRet);
+      }
+      ProcessTableScanResults processTableScanResults = new ProcessTableScanResults(dbName, client, tableSchema, nextKey,
+          recordCache, counters, groupByContext, currOffset, limit, offset, restrictToThisServer, localShard, common,
+          selectedShards, nextShard, retKeys, recordRet, retObj).invoke();
+      nextKey = processTableScanResults.getNextKey();
+      localShard = processTableScanResults.getLocalShard();
+      localNextKey = processTableScanResults.getLocalNextKey();
+      nextShard = processTableScanResults.getNextShard();
+      retKeys = processTableScanResults.getRetKeys();
+      recordRet = processTableScanResults.getRecordRet();
+    }
+
+    return new SelectContextImpl(tableSchema.getName(),
+        indexSchema.getName(), null, nextShard, localNextKey,
+        retKeys, recordCache, -1, true);
   }
 
   private static ExpressionImpl getRightKeyExpression(ExpressionImpl expression) {
@@ -1563,7 +1668,11 @@ public class ExpressionImpl implements Expression {
     private ComObject retObj;
     private Object[] localNextKey;
 
-    public ProcessTableScanResults(String dbName, DatabaseClient client, TableSchema tableSchema, Object[] nextKey, RecordCache recordCache, Counter[] counters, GroupByContext groupByContext, AtomicLong currOffset, Limit limit, Offset offset, boolean restrictToThisServer, int localShard, DatabaseCommon common, List<Integer> selectedShards, int nextShard, Object[][][] retKeys, byte[][] recordRet, ComObject retObj) {
+    public ProcessTableScanResults(String dbName, DatabaseClient client, TableSchema tableSchema, Object[] nextKey,
+                                   RecordCache recordCache, Counter[] counters, GroupByContext groupByContext,
+                                   AtomicLong currOffset, Limit limit, Offset offset, boolean restrictToThisServer,
+                                   int localShard, DatabaseCommon common, List<Integer> selectedShards, int nextShard,
+                                   Object[][][] retKeys, byte[][] recordRet, ComObject retObj) {
       this.dbName = dbName;
       this.client = client;
       this.tableSchema = tableSchema;
@@ -1621,6 +1730,46 @@ public class ExpressionImpl implements Expression {
         localNextKey = retKey;
       }
 
+      getNextShardForTableScan();
+
+      Object[][][] currRetKeys = getNextKeyForTableScan();
+
+      ComArray recordArray = retObj.getArray(ComObject.Tag.RECORDS);
+      int recordCount = recordArray == null ? 0 : recordArray.getArray().size();
+      byte[][] currRetRecords = new byte[recordCount][];
+      for (int k = 0; k < recordCount; k++) {
+        byte[] recordBytes = (byte[]) recordArray.getArray().get(k);
+        currRetRecords[k] = recordBytes;
+      }
+
+      processCountersForTableScanResults();
+
+      byte[] groupBytes = retObj.getByteArray(ComObject.Tag.LEGACY_GROUP_CONTEXT);
+      if (groupBytes != null) {
+        groupByContext.deserialize(groupBytes, client.getCommon());
+      }
+
+      recordRet = aggregateResults(recordRet, currRetRecords);
+
+
+      retKeys = aggregateResults(retKeys, currRetKeys);
+
+      fillRecordCacheWithTableScanResults();
+
+      if (limit != null) {
+        long tmpOffset = 1;
+        if (offset != null) {
+          tmpOffset = offset.getOffset();
+        }
+        if (currOffset.get() >= tmpOffset + limit.getRowCount() - 1) {
+          nextShard = -2;
+          nextKey = null;
+        }
+      }
+      return this;
+    }
+
+    private void getNextShardForTableScan() {
       if (localNextKey == null) {
         if (restrictToThisServer) {
           localShard = nextShard = -2;
@@ -1634,7 +1783,10 @@ public class ExpressionImpl implements Expression {
           }
         }
       }
+    }
 
+    private Object[][][] getNextKeyForTableScan() throws EOFException {
+      byte[] keyBytes;
       Object[] tmpKey = null;
       ComArray keyArray = retObj.getArray(ComObject.Tag.KEYS);
       Object[][][] currRetKeys = null;
@@ -1651,37 +1803,10 @@ public class ExpressionImpl implements Expression {
       if (localNextKey == null) {
         localNextKey = tmpKey;
       }
+      return currRetKeys;
+    }
 
-      ComArray recordArray = retObj.getArray(ComObject.Tag.RECORDS);
-      int recordCount = recordArray == null ? 0 : recordArray.getArray().size();
-      byte[][] currRetRecords = new byte[recordCount][];
-      for (int k = 0; k < recordCount; k++) {
-        byte[] recordBytes = (byte[]) recordArray.getArray().get(k);
-        currRetRecords[k] = recordBytes;
-      }
-
-      Counter[] retCounters = null;
-      ComArray countersArray = retObj.getArray(ComObject.Tag.COUNTERS);
-      if (countersArray != null) {
-        retCounters = new Counter[countersArray.getArray().size()];
-        for (int i = 0; i < countersArray.getArray().size(); i++) {
-          retCounters[i] = new Counter();
-          byte[] counterBytes = (byte[]) countersArray.getArray().get(i);
-          retCounters[i].deserialize(counterBytes);
-        }
-        System.arraycopy(retCounters, 0, counters, 0, Math.min(counters.length, retCounters.length));
-      }
-
-      byte[] groupBytes = retObj.getByteArray(ComObject.Tag.LEGACY_GROUP_CONTEXT);
-      if (groupBytes != null) {
-        groupByContext.deserialize(groupBytes, client.getCommon());
-      }
-
-      recordRet = aggregateResults(recordRet, currRetRecords);
-
-
-      retKeys = aggregateResults(retKeys, currRetKeys);
-
+    private void fillRecordCacheWithTableScanResults() {
       if (recordRet != null) {
         String[] primaryKeyFields = null;
         for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
@@ -1708,18 +1833,20 @@ public class ExpressionImpl implements Expression {
         }
 
       }
+    }
 
-      if (limit != null) {
-        long tmpOffset = 1;
-        if (offset != null) {
-          tmpOffset = offset.getOffset();
+    private void processCountersForTableScanResults() throws IOException {
+      Counter[] retCounters = null;
+      ComArray countersArray = retObj.getArray(ComObject.Tag.COUNTERS);
+      if (countersArray != null) {
+        retCounters = new Counter[countersArray.getArray().size()];
+        for (int i = 0; i < countersArray.getArray().size(); i++) {
+          retCounters[i] = new Counter();
+          byte[] counterBytes = (byte[]) countersArray.getArray().get(i);
+          retCounters[i].deserialize(counterBytes);
         }
-        if (currOffset.get() >= tmpOffset + limit.getRowCount() - 1) {
-          nextShard = -2;
-          nextKey = null;
-        }
+        System.arraycopy(retCounters, 0, counters, 0, Math.min(counters.length, retCounters.length));
       }
-      return this;
     }
   }
 
@@ -1744,7 +1871,12 @@ public class ExpressionImpl implements Expression {
     private ExpressionImpl rightKeyExpression;
     private ComObject cobj;
 
-    public PrepareTableScanCall(String dbName, long viewVersion, DatabaseClient client, int count, TableSchema tableSchema, List<OrderByExpressionImpl> orderByExpressions, ExpressionImpl expression, ParameterHandler parms, List<ColumnImpl> columns, Counter[] counters, GroupByContext groupByContext, AtomicLong currOffset, Limit limit, Offset offset, boolean isProbe, Object[] localNextKey, DatabaseCommon common, ExpressionImpl rightKeyExpression) {
+    public PrepareTableScanCall(String dbName, long viewVersion, DatabaseClient client, int count,
+                                TableSchema tableSchema, List<OrderByExpressionImpl> orderByExpressions,
+                                ExpressionImpl expression, ParameterHandler parms, List<ColumnImpl> columns,
+                                Counter[] counters, GroupByContext groupByContext, AtomicLong currOffset,
+                                Limit limit, Offset offset, boolean isProbe, Object[] localNextKey, DatabaseCommon common,
+                                ExpressionImpl rightKeyExpression) {
       this.dbName = dbName;
       this.viewVersion = viewVersion;
       this.client = client;
@@ -1780,7 +1912,8 @@ public class ExpressionImpl implements Expression {
         cobj.put(ComObject.Tag.PARMS, parms.serialize());
       }
       if (expression != null) {
-        cobj.put(ComObject.Tag.LEGACY_EXPRESSION, ExpressionImpl.serializeExpression((ExpressionImpl) expression.getTopLevelExpression()));
+        cobj.put(ComObject.Tag.LEGACY_EXPRESSION, ExpressionImpl.serializeExpression(
+            (ExpressionImpl) expression.getTopLevelExpression()));
       }
       if (orderByExpressions != null) {
         ComArray array = cobj.putArray(ComObject.Tag.ORDER_BY_EXPRESSIONS, ComObject.Type.BYTE_ARRAY_TYPE);
@@ -1816,34 +1949,12 @@ public class ExpressionImpl implements Expression {
         cobj.put(ComObject.Tag.OFFSET_LONG, offset.getOffset());
       }
 
-      if (columns == null) {
-        columns = new ArrayList<>();
-      }
-      for (IndexSchema schema : tableSchema.getIndices().values()) {
-        if (schema.isPrimaryKey()) {
-          for (String field : schema.getFields()) {
-            boolean found = false;
-            for (ColumnImpl column : columns) {
-              if (column.getColumnName().equalsIgnoreCase(field)) {
-                found = true;
-              }
-            }
-            if (!found) {
-              columns.add(new ColumnImpl(null, null, tableSchema.getName(), field, null));
-            }
-          }
-        }
-      }
+      prepareColumnsForTableScan();
 
       ComArray columnArray = cobj.putArray(ComObject.Tag.COLUMN_OFFSETS, ComObject.Type.INT_TYPE);
       writeColumns(tableSchema, columns, columnArray);
 
-      if (counters != null) {
-        ComArray array = cobj.putArray(ComObject.Tag.COUNTERS, ComObject.Type.BYTE_ARRAY_TYPE);
-        for (int i = 0; i < counters.length; i++) {
-          array.add(counters[i].serialize());
-        }
-      }
+      prepareCountersForTableScan();
 
       if (groupByContext != null) {
         cobj.put(ComObject.Tag.LEGACY_GROUP_CONTEXT, groupByContext.serialize(client.getCommon()));
@@ -1855,6 +1966,40 @@ public class ExpressionImpl implements Expression {
       cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
       cobj.put(ComObject.Tag.METHOD, "ReadManager:indexLookupExpression");
       return this;
+    }
+
+    private void prepareCountersForTableScan() throws IOException {
+      if (counters != null) {
+        ComArray array = cobj.putArray(ComObject.Tag.COUNTERS, ComObject.Type.BYTE_ARRAY_TYPE);
+        for (int i = 0; i < counters.length; i++) {
+          array.add(counters[i].serialize());
+        }
+      }
+    }
+
+    private void prepareColumnsForTableScan() {
+      if (columns == null) {
+        columns = new ArrayList<>();
+      }
+      for (IndexSchema schema : tableSchema.getIndices().values()) {
+        if (schema.isPrimaryKey()) {
+          for (String field : schema.getFields()) {
+            prepareColumForField(field);
+          }
+        }
+      }
+    }
+
+    private void prepareColumForField(String field) {
+      boolean found = false;
+      for (ColumnImpl column : columns) {
+        if (column.getColumnName().equalsIgnoreCase(field)) {
+          found = true;
+        }
+      }
+      if (!found) {
+        columns.add(new ColumnImpl(null, null, tableSchema.getName(), field, null));
+      }
     }
   }
 }

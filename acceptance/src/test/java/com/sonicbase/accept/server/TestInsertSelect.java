@@ -26,9 +26,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.testng.Assert.*;
 
-/**
- * Responsible for
- */
 public class TestInsertSelect {
 
   private Connection conn;

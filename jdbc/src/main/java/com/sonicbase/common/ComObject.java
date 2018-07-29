@@ -20,6 +20,9 @@ import java.util.Map;
 import static com.sonicbase.common.ComObject.Type.*;
 
 @ExcludeRename
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class ComObject {
 
   public static final String UTF_8_STR = "utf-8";

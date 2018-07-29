@@ -27,9 +27,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.testng.Assert.assertEquals;
 
-/**
- * Responsible for
- */
 public class TestMisc {
 
   private Connection conn;

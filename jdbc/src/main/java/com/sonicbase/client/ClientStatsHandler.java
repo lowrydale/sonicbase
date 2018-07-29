@@ -7,15 +7,21 @@ import com.sonicbase.common.ComArray;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.ServersConfig;
 import org.apache.giraph.utils.Varint;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class ClientStatsHandler {
-  private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
+  private static Logger logger = LoggerFactory.getLogger(ClientStatsHandler.class);
 
   private final DatabaseClient client;
   private static ConcurrentHashMap<String, ConcurrentHashMap<String, HistogramEntry>> registeredQueries = new ConcurrentHashMap<>();
@@ -57,64 +63,7 @@ public class ClientStatsHandler {
     public void run() {
       while (!client.getShutdown()) {
         try {
-          Thread.sleep(sleepOverride == null ? 15_000 : sleepOverride);
-
-          boolean oneIsAlive = false;
-          DatabaseClient sharedClient = DatabaseClient.getSharedClients().get(cluster);
-          ServersConfig.Host[] replicas = sharedClient.getCommon().getServersConfig().getShards()[0].getReplicas();
-          for (ServersConfig.Host host : replicas) {
-            if (!host.isDead()) {
-              oneIsAlive = true;
-              break;
-            }
-          }
-
-          if (!oneIsAlive) {
-            sharedClient.syncSchema();
-            continue;
-          }
-
-          ComObject cobj = new ComObject();
-          ComArray array = cobj.putArray(ComObject.Tag.HISTOGRAM_SNAPSHOT, ComObject.Type.OBJECT_TYPE);
-
-          if (registeredQueries.get(cluster) == null) {
-            continue;
-          }
-          for (HistogramEntry entry : registeredQueries.get(cluster).values()) {
-            if (entry.getHistogram() == null || entry.getHistogram().getCount() == 0) {
-              continue;
-            }
-
-            ComObject snapshotObj = new ComObject();
-            snapshotObj.put(ComObject.Tag.DB_NAME, entry.getDbName());
-            snapshotObj.put(ComObject.Tag.ID, entry.getQueryId());
-            if (!entry.getMaxedLatencies().get()) {
-              ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-              DataOutputStream out = new DataOutputStream(bytesOut);
-              for (Long latency : entry.getLatencies()) {
-                Varint.writeUnsignedVarLong(latency, out);
-              }
-              snapshotObj.put(ComObject.Tag.LATENCIES_BYTES, bytesOut.toByteArray());
-              array.add(snapshotObj);
-            }
-            else {
-              Snapshot snapshot = entry.getHistogram().getSnapshot();
-              snapshotObj.put(ComObject.Tag.COUNT, (int) entry.getHistogram().getCount());
-              snapshotObj.put(ComObject.Tag.LAT_AVG, (double) snapshot.getMean());
-              snapshotObj.put(ComObject.Tag.LAT_75, (double) snapshot.get75thPercentile());
-              snapshotObj.put(ComObject.Tag.LAT_95, (double) snapshot.get95thPercentile());
-              snapshotObj.put(ComObject.Tag.LAT_99, (double) snapshot.get99thPercentile());
-              snapshotObj.put(ComObject.Tag.LAT_999, (double) snapshot.get999thPercentile());
-              snapshotObj.put(ComObject.Tag.LAT_MAX, (double) snapshot.getMax());
-              array.add(snapshotObj);
-            }
-
-            entry.getLatencies().clear();
-            entry.getMaxedLatencies().set(false);
-            entry.setHistogram(null);
-          }
-
-          sharedClient.send("MonitorManager:registerStats", 0, 0, cobj, DatabaseClient.Replica.DEF);
+          doRecordStats();
         }
         catch (InterruptedException e) {
           Thread.currentThread().interrupt();
@@ -123,6 +72,76 @@ public class ClientStatsHandler {
         catch (Exception e) {
           logger.error("Error in stats reporting thread", e);
         }
+      }
+    }
+
+    private void doRecordStats() throws InterruptedException, IOException {
+      Thread.sleep(sleepOverride == null ? 15_000 : sleepOverride);
+
+      boolean oneIsAlive = false;
+      DatabaseClient sharedClient = DatabaseClient.getSharedClients().get(cluster);
+      ServersConfig.Host[] replicas = sharedClient.getCommon().getServersConfig().getShards()[0].getReplicas();
+      oneIsAlive = checkIfAtLeastOneHostIsAlive(oneIsAlive, replicas);
+
+      if (!oneIsAlive) {
+        sharedClient.syncSchema();
+        return;
+      }
+
+      ComObject cobj = new ComObject();
+      ComArray array = cobj.putArray(ComObject.Tag.HISTOGRAM_SNAPSHOT, ComObject.Type.OBJECT_TYPE);
+
+      if (registeredQueries.get(cluster) == null) {
+        return;
+      }
+      for (HistogramEntry entry : registeredQueries.get(cluster).values()) {
+        if (entry.getHistogram() == null || entry.getHistogram().getCount() == 0) {
+          continue;
+        }
+
+        addSnapshotObj(array, entry);
+
+        entry.getLatencies().clear();
+        entry.getMaxedLatencies().set(false);
+        entry.setHistogram(null);
+      }
+
+      sharedClient.send("MonitorManager:registerStats", 0, 0, cobj, DatabaseClient.Replica.DEF);
+    }
+
+    private boolean checkIfAtLeastOneHostIsAlive(boolean oneIsAlive, ServersConfig.Host[] replicas) {
+      for (ServersConfig.Host host : replicas) {
+        if (!host.isDead()) {
+          oneIsAlive = true;
+          break;
+        }
+      }
+      return oneIsAlive;
+    }
+
+    private void addSnapshotObj(ComArray array, HistogramEntry entry) throws IOException {
+      ComObject snapshotObj = new ComObject();
+      snapshotObj.put(ComObject.Tag.DB_NAME, entry.getDbName());
+      snapshotObj.put(ComObject.Tag.ID, entry.getQueryId());
+      if (!entry.getMaxedLatencies().get()) {
+        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(bytesOut);
+        for (Long latency : entry.getLatencies()) {
+          Varint.writeUnsignedVarLong(latency, out);
+        }
+        snapshotObj.put(ComObject.Tag.LATENCIES_BYTES, bytesOut.toByteArray());
+        array.add(snapshotObj);
+      }
+      else {
+        Snapshot snapshot = entry.getHistogram().getSnapshot();
+        snapshotObj.put(ComObject.Tag.COUNT, (int) entry.getHistogram().getCount());
+        snapshotObj.put(ComObject.Tag.LAT_AVG, (double) snapshot.getMean());
+        snapshotObj.put(ComObject.Tag.LAT_75, (double) snapshot.get75thPercentile());
+        snapshotObj.put(ComObject.Tag.LAT_95, (double) snapshot.get95thPercentile());
+        snapshotObj.put(ComObject.Tag.LAT_99, (double) snapshot.get99thPercentile());
+        snapshotObj.put(ComObject.Tag.LAT_999, (double) snapshot.get999thPercentile());
+        snapshotObj.put(ComObject.Tag.LAT_MAX, (double) snapshot.getMax());
+        array.add(snapshotObj);
       }
     }
   }

@@ -1,11 +1,5 @@
 package com.sonicbase.jdbcdriver;
 
-/**
- * User: lowryda
- * Date: 10/25/14
- * Time: 9:42 AM
- */
-
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.client.DatabaseServerProxy;
 import com.sonicbase.client.DescribeStatementHandler;
@@ -21,6 +15,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class ConnectionProxy implements Connection {
 
   private static final Object clientMutex = new Object();
@@ -63,7 +60,8 @@ public class ConnectionProxy implements Connection {
         db = outerParts[1];
         db = db.toLowerCase();
       }
-      client = new DatabaseClient(hosts, DatabaseServerProxy.getShard(server), DatabaseServerProxy.getReplica(server), true, DatabaseServerProxy.getCommon(server), server, false);
+      client = new DatabaseClient(hosts, DatabaseServerProxy.getShard(server), DatabaseServerProxy.getReplica(server),
+          true, DatabaseServerProxy.getCommon(server), server, false);
       if (db != null) {
         client.initDb();
       }
@@ -433,11 +431,13 @@ public class ConnectionProxy implements Connection {
     throw new NotImplementedException();
   }
 
-  public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
+  public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency,
+                                            int resultSetHoldability) throws SQLException {
     throw new NotImplementedException();
   }
 
-  public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
+  public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency,
+                                       int resultSetHoldability) throws SQLException {
     throw new SQLException(NOT_SUPPORTED_STR);
   }
 

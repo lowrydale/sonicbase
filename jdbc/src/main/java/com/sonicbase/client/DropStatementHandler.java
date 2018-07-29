@@ -7,6 +7,9 @@ import com.sonicbase.query.impl.SelectStatementImpl;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.drop.Drop;
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class DropStatementHandler implements StatementHandler {
   private final DatabaseClient client;
 

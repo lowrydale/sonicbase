@@ -5,9 +5,9 @@ import org.apache.commons.io.IOUtils;
 import java.io.*;
 import java.sql.SQLException;
 
-/**
- * Responsible for
- */
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class Clob implements java.sql.Clob {
   public static final String NULL_DATA_STR = "null data";
   private String data;

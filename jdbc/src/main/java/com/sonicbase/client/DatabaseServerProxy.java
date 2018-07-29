@@ -7,6 +7,9 @@ import com.sonicbase.query.DatabaseException;
 
 import java.lang.reflect.Method;
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class DatabaseServerProxy {
 
   private static Method indexLookupExpression;
@@ -39,7 +42,8 @@ public class DatabaseServerProxy {
 
   }
 
-  public static ComObject serverSelect(Object server, ComObject cobj, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) {
+  public static ComObject serverSelect(Object server, ComObject cobj, boolean restrictToThisServer,
+                                       StoredProcedureContextImpl procedureContext) {
     try {
       return (ComObject) serverSelect.invoke(server, cobj, restrictToThisServer, procedureContext);
     }
@@ -75,7 +79,8 @@ public class DatabaseServerProxy {
     }
   }
 
-  public static ComObject serverSetSelect(Object server, ComObject cobj, final boolean restrictToThisServer, final StoredProcedureContextImpl procedureContext) {
+  public static ComObject serverSetSelect(Object server, ComObject cobj, final boolean restrictToThisServer,
+                                          final StoredProcedureContextImpl procedureContext) {
     try {
       return (ComObject) serverSetSelect.invoke(server, cobj, restrictToThisServer, procedureContext);
     }

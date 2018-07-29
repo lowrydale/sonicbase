@@ -21,14 +21,12 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static com.sonicbase.common.DatabaseCommon.sortSchemaFiles;
 
-/**
- * Responsible for
- */
-@SuppressWarnings({"squid:S1172", "squid:S2629", "squid:S1168", "squid:S3516"})
+@SuppressWarnings({"squid:S1172", "squid:S2629", "squid:S1168", "squid:S3516", "squid:S00107"})
 // all methods called from method invoker must have cobj and replayed command parms
 // info is always enabled, don't need to conditionally call
 // I prefer to return null instead of an empty array
 // all methods called from method invoker must return a ComObject even if they are all null
+// I don't know a good way to reduce the parameter count
 public class SchemaManager {
 
   public static final String SLAVE_STR = "slave";
@@ -316,7 +314,8 @@ public class SchemaManager {
         CreateTableStatementImpl createTableStatement = new CreateTableStatementImpl();
         createTableStatement.deserialize(cobj.getByteArray(ComObject.Tag.CREATE_TABLE_STATEMENT));
 
-        logger.info("Create table: shard={}, replica={}, name={}", server.getShard(), server.getReplica(), createTableStatement.getTablename());
+        logger.info("Create table: shard={}, replica={}, name={}", server.getShard(), server.getReplica(),
+            createTableStatement.getTablename());
 
         synchronized (this) {
           TableSchema schema = new TableSchema();
@@ -377,26 +376,31 @@ public class SchemaManager {
         server.getCommon().getSchemaWriteLock(dbName).unlock();
       }
 
-      if (!replayedCommand && masterSlave.equals(MASTER_STR)) {
-        Random rand = new Random(System.currentTimeMillis());
-        for (int i = 0; i < server.getShardCount(); i++) {
-          ComObject slaveObj = new ComObject();
+      createTableSlave(replayedCommand, masterSlave, dbName, tableName);
 
-          slaveObj.put(ComObject.Tag.SCHEMA_BYTES, server.getCommon().serializeSchema(DatabaseClient.SERIALIZATION_VERSION));
-          slaveObj.put(ComObject.Tag.TABLE_NAME, tableName);
-          slaveObj.put(ComObject.Tag.DB_NAME, dbName);
-          slaveObj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
-          slaveObj.put(ComObject.Tag.METHOD, "SchemaManager:createTableSlave");
-          slaveObj.put(ComObject.Tag.MASTER_SLAVE, SLAVE_STR);
-          server.getDatabaseClient().send(null, i, rand.nextLong(), slaveObj, DatabaseClient.Replica.DEF);
-        }
-      }
       ComObject retObj = new ComObject();
       retObj.put(ComObject.Tag.SCHEMA_BYTES, server.getCommon().serializeSchema(serializationVersionNumber));
       return retObj;
     }
     catch (IOException e) {
       throw new DatabaseException(e);
+    }
+  }
+
+  private void createTableSlave(boolean replayedCommand, String masterSlave, String dbName, String tableName) throws IOException {
+    if (!replayedCommand && masterSlave.equals(MASTER_STR)) {
+      Random rand = new Random(System.currentTimeMillis());
+      for (int i = 0; i < server.getShardCount(); i++) {
+        ComObject slaveObj = new ComObject();
+
+        slaveObj.put(ComObject.Tag.SCHEMA_BYTES, server.getCommon().serializeSchema(DatabaseClient.SERIALIZATION_VERSION));
+        slaveObj.put(ComObject.Tag.TABLE_NAME, tableName);
+        slaveObj.put(ComObject.Tag.DB_NAME, dbName);
+        slaveObj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
+        slaveObj.put(ComObject.Tag.METHOD, "SchemaManager:createTableSlave");
+        slaveObj.put(ComObject.Tag.MASTER_SLAVE, SLAVE_STR);
+        server.getDatabaseClient().send(null, i, rand.nextLong(), slaveObj, DatabaseClient.Replica.DEF);
+      }
     }
   }
 
@@ -422,7 +426,8 @@ public class SchemaManager {
         for (IndexSchema indexSchema : tableSchema.getIndices().values()) {
           for (String fieldName : indexSchema.getFields()) {
             if (columnName.equals(fieldName)) {
-              throw new DatabaseException("Field being used by index, cannot drop: field=" + columnName + ", index=" + indexSchema.getName());
+              throw new DatabaseException("Field being used by index, cannot drop: field=" + columnName + ", index=" +
+                  indexSchema.getName());
             }
           }
         }
@@ -625,9 +630,11 @@ public class SchemaManager {
 
           String fullIndexName = indexName;
 
-          if (server.getCommon().getTableSchema(dbName, table.get(), server.getDataDir()).getIndices().containsKey(fullIndexName.toLowerCase())) {
+          if (server.getCommon().getTableSchema(dbName, table.get(),
+              server.getDataDir()).getIndices().containsKey(fullIndexName.toLowerCase())) {
             ComObject retObj = new ComObject();
-            retObj.put(ComObject.Tag.SCHEMA_BYTES, server.getCommon().serializeSchema(cobj.getShort(ComObject.Tag.SERIALIZATION_VERSION)));
+            retObj.put(ComObject.Tag.SCHEMA_BYTES, server.getCommon().serializeSchema(
+                cobj.getShort(ComObject.Tag.SERIALIZATION_VERSION)));
             return retObj;
           }
         }
@@ -654,7 +661,8 @@ public class SchemaManager {
     }
   }
 
-  private void populateIndexIfNeeded(boolean replayedCommand, String dbName, AtomicReference<String> table, List<String> createdIndices) {
+  private void populateIndexIfNeeded(boolean replayedCommand, String dbName, AtomicReference<String> table,
+                                     List<String> createdIndices) {
     if (!replayedCommand && createdIndices != null) {
       String primaryIndexName = null;
       TableSchema tableSchema = server.getCommon().getTableSchema(dbName, table.get(), server.getDataDir());
@@ -668,17 +676,21 @@ public class SchemaManager {
         totalSize = getIndexTotalSize(dbName, table, primaryIndexName, totalSize);
       }
 
-      if (totalSize != 0) {
-        for (String currIndexName : createdIndices) {
-          ComObject cobj = new ComObject();
-          cobj.put(ComObject.Tag.DB_NAME, dbName);
-          cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
-          cobj.put(ComObject.Tag.TABLE_NAME, table.get());
-          cobj.put(ComObject.Tag.INDEX_NAME, currIndexName);
-          cobj.put(ComObject.Tag.METHOD, "UpdateManager:populateIndex");
-          for (int i = 0; i < server.getShardCount(); i++) {
-            server.getDatabaseClient().send(null, i, 0, cobj, DatabaseClient.Replica.DEF);
-          }
+      doPopulateIndex(dbName, table, createdIndices, totalSize);
+    }
+  }
+
+  private void doPopulateIndex(String dbName, AtomicReference<String> table, List<String> createdIndices, long totalSize) {
+    if (totalSize != 0) {
+      for (String currIndexName : createdIndices) {
+        ComObject cobj = new ComObject();
+        cobj.put(ComObject.Tag.DB_NAME, dbName);
+        cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
+        cobj.put(ComObject.Tag.TABLE_NAME, table.get());
+        cobj.put(ComObject.Tag.INDEX_NAME, currIndexName);
+        cobj.put(ComObject.Tag.METHOD, "UpdateManager:populateIndex");
+        for (int i = 0; i < server.getShardCount(); i++) {
+          server.getDatabaseClient().send(null, i, 0, cobj, DatabaseClient.Replica.DEF);
         }
       }
     }
@@ -689,26 +701,14 @@ public class SchemaManager {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.DB_NAME, dbName);
       cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getClient().getCommon().getSchemaVersion());
-      byte[] response = server.getClient().send("PartitionManager:getIndexCounts", shard, 0, cobj, DatabaseClient.Replica.MASTER);
+      byte[] response = server.getClient().send("PartitionManager:getIndexCounts", shard, 0, cobj,
+          DatabaseClient.Replica.MASTER);
       ComObject retObj = new ComObject(response);
       ComArray tables = retObj.getArray(ComObject.Tag.TABLES);
       if (tables != null) {
         for (int i = 0; i < tables.getArray().size(); i++) {
           ComObject tableObj = (ComObject) tables.getArray().get(i);
-          String tableName = tableObj.getString(ComObject.Tag.TABLE_NAME);
-          if (tableName.equals(table.get())) {
-            ComArray indices = tableObj.getArray(ComObject.Tag.INDICES);
-            if (indices != null) {
-              for (int j = 0; j < indices.getArray().size(); j++) {
-                ComObject indexObj = (ComObject) indices.getArray().get(j);
-                String foundIndexName = indexObj.getString(ComObject.Tag.INDEX_NAME);
-                if (primaryIndexName.equals(foundIndexName)) {
-                  long size = indexObj.getLong(ComObject.Tag.SIZE);
-                  totalSize += size;
-                }
-              }
-            }
-          }
+          totalSize = getIndexTotalSizeForTable(table, primaryIndexName, totalSize, tableObj);
         }
 
       }
@@ -716,7 +716,27 @@ public class SchemaManager {
     return totalSize;
   }
 
-  private void createIndexSlave(boolean replayedCommand, String dbName, AtomicReference<String> table, String masterSlave, List<String> createdIndices) throws IOException {
+  private long getIndexTotalSizeForTable(AtomicReference<String> table, String primaryIndexName, long totalSize,
+                                         ComObject tableObj) {
+    String tableName = tableObj.getString(ComObject.Tag.TABLE_NAME);
+    if (tableName.equals(table.get())) {
+      ComArray indices = tableObj.getArray(ComObject.Tag.INDICES);
+      if (indices != null) {
+        for (int j = 0; j < indices.getArray().size(); j++) {
+          ComObject indexObj = (ComObject) indices.getArray().get(j);
+          String foundIndexName = indexObj.getString(ComObject.Tag.INDEX_NAME);
+          if (primaryIndexName.equals(foundIndexName)) {
+            long size = indexObj.getLong(ComObject.Tag.SIZE);
+            totalSize += size;
+          }
+        }
+      }
+    }
+    return totalSize;
+  }
+
+  private void createIndexSlave(boolean replayedCommand, String dbName, AtomicReference<String> table, String masterSlave,
+                                List<String> createdIndices) throws IOException {
     if (!replayedCommand && masterSlave.equals(MASTER_STR)) {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.DB_NAME, dbName);
@@ -787,7 +807,8 @@ public class SchemaManager {
 
       List<IndexSchema> toDrop = new ArrayList<>();
       synchronized (this) {
-        for (Map.Entry<String, IndexSchema> entry : server.getCommon().getTableSchema(dbName, table, server.getDataDir()).getIndices().entrySet()) {
+        for (Map.Entry<String, IndexSchema> entry : server.getCommon().getTableSchema(dbName, table,
+            server.getDataDir()).getIndices().entrySet()) {
           String name = entry.getValue().getName();
           String outerName = name;
           if (outerName.equals(indexName)) {
@@ -809,23 +830,7 @@ public class SchemaManager {
         server.getCommon().saveSchema(server.getDataDir());
       }
 
-      cobj = new ComObject();
-      cobj.put(ComObject.Tag.DB_NAME, dbName);
-      cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
-      cobj.put(ComObject.Tag.METHOD, "SchemaManager:dropIndexSlave");
-      cobj.put(ComObject.Tag.SCHEMA_BYTES, server.getCommon().serializeSchema(DatabaseClient.SERIALIZATION_VERSION));
-      cobj.put(ComObject.Tag.TABLE_NAME, table);
-      cobj.put(ComObject.Tag.MASTER_SLAVE, SLAVE_STR);
-      ComArray array = cobj.putArray(ComObject.Tag.INDICES, ComObject.Type.STRING_TYPE);
-      for (IndexSchema indexSchema : toDrop) {
-        array.add(indexSchema.getName());
-      }
-
-      for (int i = 0; i < server.getShardCount(); i++) {
-        for (int j = 0; j < server.getReplicationFactor(); j++) {
-          server.getDatabaseClient().send(null, i, j, cobj, DatabaseClient.Replica.SPECIFIED);
-        }
-      }
+      dropIndexSlave(dbName, table, toDrop);
 
       ComObject retObj = new ComObject();
       retObj.put(ComObject.Tag.SCHEMA_BYTES, server.getCommon().serializeSchema(serializationVersionNumber));
@@ -837,6 +842,27 @@ public class SchemaManager {
     }
   }
 
+  private void dropIndexSlave(String dbName, String table, List<IndexSchema> toDrop) throws IOException {
+    ComObject cobj;
+    cobj = new ComObject();
+    cobj.put(ComObject.Tag.DB_NAME, dbName);
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
+    cobj.put(ComObject.Tag.METHOD, "SchemaManager:dropIndexSlave");
+    cobj.put(ComObject.Tag.SCHEMA_BYTES, server.getCommon().serializeSchema(DatabaseClient.SERIALIZATION_VERSION));
+    cobj.put(ComObject.Tag.TABLE_NAME, table);
+    cobj.put(ComObject.Tag.MASTER_SLAVE, SLAVE_STR);
+    ComArray array = cobj.putArray(ComObject.Tag.INDICES, ComObject.Type.STRING_TYPE);
+    for (IndexSchema indexSchema : toDrop) {
+      array.add(indexSchema.getName());
+    }
+
+    for (int i = 0; i < server.getShardCount(); i++) {
+      for (int j = 0; j < server.getReplicationFactor(); j++) {
+        server.getDatabaseClient().send(null, i, j, cobj, DatabaseClient.Replica.SPECIFIED);
+      }
+    }
+  }
+
   public void reconcileSchema() {
     try {
       if (server.getShard() != 0 || server.getReplica() != 0) {
@@ -844,7 +870,8 @@ public class SchemaManager {
       }
       logger.info("reconcile schema - begin");
       int threadCount = server.getShardCount() * server.getReplicationFactor();
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(threadCount, threadCount, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+      ThreadPoolExecutor executor = new ThreadPoolExecutor(threadCount, threadCount, 10_000,
+          TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
       try {
         final ComObject highestSchemaVersions = readSchemaVersions();
         List<Future> futures = new ArrayList<>();
@@ -852,41 +879,7 @@ public class SchemaManager {
           for (int j = 0; j < server.getReplicationFactor(); j++) {
             final int shard = i;
             final int replica = j;
-            futures.add(executor.submit(new Callable() {
-              @Override
-              public Object call() throws Exception {
-                long beginTime = System.currentTimeMillis();
-                while (!server.getShutdown()) {
-                  try {
-                    if (server.getShard() == shard && server.getReplica() == replica) {
-                      break;
-                    }
-                    ComObject cobj = new ComObject();
-                    byte[] ret = server.getDatabaseClient().send("SchemaManager:getSchemaVersions", shard, replica, cobj, DatabaseClient.Replica.SPECIFIED);
-                    if (ret != null) {
-                      ComObject retObj = new ComObject(ret);
-                      retObj.put(ComObject.Tag.SHARD, shard);
-                      retObj.put(ComObject.Tag.REPLICA, replica);
-                      return retObj;
-                    }
-                    Thread.sleep(1_000);
-                  }
-                  catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return null;
-                  }
-                  catch (Exception e) {
-                    logger.error("Error checking if server is healthy: shard={}, replica={}", shard, replica);
-                  }
-                  if (System.currentTimeMillis() - beginTime > 2 * 60 * 1000) {
-                    logger.error("Server appears to be dead, skipping: shard={}, replica={}", shard, replica);
-                    break;
-                  }
-                }
-                return null;
-              }
-            }));
-
+            futures.add(executor.submit((Callable) () -> getSchemaVersion(shard, replica)));
           }
         }
         try {
@@ -898,7 +891,8 @@ public class SchemaManager {
             }
           }
           for (ComObject retObj : retObjs) {
-            getHighestSchemaVersions(retObj.getInt(ComObject.Tag.SHARD), retObj.getInt(ComObject.Tag.REPLICA), highestSchemaVersions, retObj);
+            getHighestSchemaVersions(retObj.getInt(ComObject.Tag.SHARD), retObj.getInt(ComObject.Tag.REPLICA),
+                highestSchemaVersions, retObj);
           }
 
           pushHighestSchema(highestSchemaVersions);
@@ -919,6 +913,39 @@ public class SchemaManager {
     catch (Exception e) {
       logger.error("Error reconciling schema", e);
     }
+  }
+
+  private Object getSchemaVersion(int shard, int replica) {
+    long beginTime = System.currentTimeMillis();
+    while (!server.getShutdown()) {
+      try {
+        if (server.getShard() == shard && server.getReplica() == replica) {
+          break;
+        }
+        ComObject cobj = new ComObject();
+        byte[] ret = server.getDatabaseClient().send("SchemaManager:getSchemaVersions", shard, replica, cobj,
+            DatabaseClient.Replica.SPECIFIED);
+        if (ret != null) {
+          ComObject retObj = new ComObject(ret);
+          retObj.put(ComObject.Tag.SHARD, shard);
+          retObj.put(ComObject.Tag.REPLICA, replica);
+          return retObj;
+        }
+        Thread.sleep(1_000);
+      }
+      catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        return null;
+      }
+      catch (Exception e) {
+        logger.error("Error checking if server is healthy: shard={}, replica={}", shard, replica);
+      }
+      if (System.currentTimeMillis() - beginTime > 2 * 60 * 1000) {
+        logger.error("Server appears to be dead, skipping: shard={}, replica={}", shard, replica);
+        return null;
+      }
+    }
+    return null;
   }
 
   public ComObject getSchemaVersions(ComObject cobj, boolean replayedCommand) {
@@ -969,7 +996,8 @@ public class SchemaManager {
       cobj.put(ComObject.Tag.INDEX_SCHEMA, indexSchema);
       cobj.put(ComObject.Tag.SCHEMA_VERSION, schemaVersion);
 
-      server.getDatabaseClient().sendToAllShards("SchemaManager:updateIndexSchema", 0, cobj, DatabaseClient.Replica.ALL);
+      server.getDatabaseClient().sendToAllShards("SchemaManager:updateIndexSchema", 0, cobj,
+          DatabaseClient.Replica.ALL);
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -977,14 +1005,16 @@ public class SchemaManager {
 
   }
 
-  private byte[] getHighestIndexSchema(String currDbName, String currTableName, String currIndexName, Integer shard, Integer replica) {
+  private byte[] getHighestIndexSchema(String currDbName, String currTableName, String currIndexName, Integer shard,
+                                       Integer replica) {
     try {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.DB_NAME, currDbName);
       cobj.put(ComObject.Tag.TABLE_NAME, currTableName);
       cobj.put(ComObject.Tag.INDEX_NAME, currIndexName);
 
-      byte[] ret = server.getDatabaseClient().send("SchemaManager:getIndexSchema", shard, replica, cobj, DatabaseClient.Replica.SPECIFIED);
+      byte[] ret = server.getDatabaseClient().send("SchemaManager:getIndexSchema", shard, replica, cobj,
+          DatabaseClient.Replica.SPECIFIED);
       ComObject retObj = new ComObject(ret);
       return retObj.getByteArray(ComObject.Tag.INDEX_SCHEMA);
     }
@@ -1001,7 +1031,8 @@ public class SchemaManager {
       cobj.put(ComObject.Tag.TABLE_SCHEMA, tableSchema);
       cobj.put(ComObject.Tag.SCHEMA_VERSION, schemaVersion);
 
-      server.getDatabaseClient().sendToAllShards("SchemaManager:updateTableSchema", 0, cobj, DatabaseClient.Replica.ALL);
+      server.getDatabaseClient().sendToAllShards("SchemaManager:updateTableSchema", 0, cobj,
+          DatabaseClient.Replica.ALL);
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -1154,42 +1185,46 @@ public class SchemaManager {
       dbObj.put(ComObject.Tag.DB_NAME, dbName);
       ComArray tables = dbObj.putArray(ComObject.Tag.TABLES, ComObject.Type.OBJECT_TYPE);
       for (TableSchema tableSchema : server.getCommon().getTables(dbName).values()) {
-        ComObject tableObj = new ComObject();
-        tables.add(tableObj);
-        tableObj.put(ComObject.Tag.TABLE_NAME, tableSchema.getName());
-        File tableDir = server.getSnapshotManager().getTableSchemaDir(dbName, tableSchema.getName());
-        File[] tableSchemas = tableDir.listFiles();
-        if (tableSchemas != null && tableSchemas.length > 0) {
-          sortSchemaFiles(tableSchemas);
-          File tableSchemaFile = tableSchemas[tableSchemas.length - 1];
-          tableObj.put(ComObject.Tag.SCHEMA_VERSION, getSchemVersionFromFile(tableSchemaFile));
-        }
-        else {
-          tableObj.put(ComObject.Tag.SCHEMA_VERSION, 0);
-        }
-        tableObj.put(ComObject.Tag.SHARD, server.getShard());
-        tableObj.put(ComObject.Tag.REPLICA, server.getReplica());
-        ComArray indices = tableObj.putArray(ComObject.Tag.INDICES, ComObject.Type.OBJECT_TYPE);
-        for (IndexSchema indexSchema : tableSchema.getIndices().values()) {
-          ComObject indexObj = new ComObject();
-          indices.add(indexObj);
-          indexObj.put(ComObject.Tag.INDEX_NAME, indexSchema.getName());
-          File indexDir = server.getSnapshotManager().getIndexSchemaDir(dbName, tableSchema.getName(), indexSchema.getName());
-          File[] indexSchemas = indexDir.listFiles();
-          if (indexSchemas != null && indexSchemas.length > 0) {
-            sortSchemaFiles(indexSchemas);
-            File indexSchemaFile = indexSchemas[indexSchemas.length - 1];
-            indexObj.put(ComObject.Tag.SCHEMA_VERSION, getSchemVersionFromFile(indexSchemaFile));
-          }
-          else {
-            indexObj.put(ComObject.Tag.SCHEMA_VERSION, 0);
-          }
-          indexObj.put(ComObject.Tag.SHARD, server.getShard());
-          indexObj.put(ComObject.Tag.REPLICA, server.getReplica());
-        }
+        readSchemaVersionsForTable(dbName, tables, tableSchema);
       }
     }
     return cobj;
+  }
+
+  private void readSchemaVersionsForTable(String dbName, ComArray tables, TableSchema tableSchema) {
+    ComObject tableObj = new ComObject();
+    tables.add(tableObj);
+    tableObj.put(ComObject.Tag.TABLE_NAME, tableSchema.getName());
+    File tableDir = server.getSnapshotManager().getTableSchemaDir(dbName, tableSchema.getName());
+    File[] tableSchemas = tableDir.listFiles();
+    if (tableSchemas != null && tableSchemas.length > 0) {
+      sortSchemaFiles(tableSchemas);
+      File tableSchemaFile = tableSchemas[tableSchemas.length - 1];
+      tableObj.put(ComObject.Tag.SCHEMA_VERSION, getSchemVersionFromFile(tableSchemaFile));
+    }
+    else {
+      tableObj.put(ComObject.Tag.SCHEMA_VERSION, 0);
+    }
+    tableObj.put(ComObject.Tag.SHARD, server.getShard());
+    tableObj.put(ComObject.Tag.REPLICA, server.getReplica());
+    ComArray indices = tableObj.putArray(ComObject.Tag.INDICES, ComObject.Type.OBJECT_TYPE);
+    for (IndexSchema indexSchema : tableSchema.getIndices().values()) {
+      ComObject indexObj = new ComObject();
+      indices.add(indexObj);
+      indexObj.put(ComObject.Tag.INDEX_NAME, indexSchema.getName());
+      File indexDir = server.getSnapshotManager().getIndexSchemaDir(dbName, tableSchema.getName(), indexSchema.getName());
+      File[] indexSchemas = indexDir.listFiles();
+      if (indexSchemas != null && indexSchemas.length > 0) {
+        sortSchemaFiles(indexSchemas);
+        File indexSchemaFile = indexSchemas[indexSchemas.length - 1];
+        indexObj.put(ComObject.Tag.SCHEMA_VERSION, getSchemVersionFromFile(indexSchemaFile));
+      }
+      else {
+        indexObj.put(ComObject.Tag.SCHEMA_VERSION, 0);
+      }
+      indexObj.put(ComObject.Tag.SHARD, server.getShard());
+      indexObj.put(ComObject.Tag.REPLICA, server.getReplica());
+    }
   }
 
   private int getSchemVersionFromFile(File schemaFile) {
@@ -1209,47 +1244,64 @@ public class SchemaManager {
       for (int j = 0; j < tables.getArray().size(); j++) {
         ComObject table = (ComObject) tables.getArray().get(j);
         String tableName = table.getString(ComObject.Tag.TABLE_NAME);
-        int tableSchemaVersion = table.getInt(ComObject.Tag.SCHEMA_VERSION);
-        tablesFound.put(tableName, tableSchemaVersion);
-        ComObject highestTable = getSchemaVersion(dbName, tableName, highestSchemaVersions);
-        if (highestTable == null) {
-          setHighestSchemaVersion(dbName, tableName, tableSchemaVersion, shard, replica, highestSchemaVersions, tablesFound);
+
+        setHighestSchemaVersionsForTable(shard, replica, highestSchemaVersions, dbName, tablesFound, table, tableName);
+
+        setHighestSchemaVersionsForIndices(shard, replica, highestSchemaVersions, dbName, table, tableName);
+      }
+    }
+  }
+
+  private void setHighestSchemaVersionsForTable(int shard, int replica, ComObject highestSchemaVersions, String dbName,
+                                                ConcurrentHashMap<String, Integer> tablesFound, ComObject table,
+                                                String tableName) {
+    int tableSchemaVersion = table.getInt(ComObject.Tag.SCHEMA_VERSION);
+    tablesFound.put(tableName, tableSchemaVersion);
+    ComObject highestTable = getSchemaVersion(dbName, tableName, highestSchemaVersions);
+    if (highestTable == null) {
+      setHighestSchemaVersion(dbName, tableName, tableSchemaVersion, shard, replica, highestSchemaVersions, tablesFound);
+    }
+    else {
+      if (tableSchemaVersion > highestTable.getInt(ComObject.Tag.SCHEMA_VERSION)) {
+        setHighestSchemaVersion(dbName, tableName, tableSchemaVersion, shard, replica, highestSchemaVersions, tablesFound);
+      }
+      else if (tableSchemaVersion < highestTable.getInt(ComObject.Tag.SCHEMA_VERSION)) {
+        setHighestSchemaVersion(dbName, tableName, highestTable.getInt(ComObject.Tag.SCHEMA_VERSION),
+            highestTable.getInt(ComObject.Tag.SHARD),
+            highestTable.getInt(ComObject.Tag.REPLICA), highestSchemaVersions, tablesFound);
+      }
+      else {
+        tablesFound.remove(tableName);
+      }
+    }
+  }
+
+  private void setHighestSchemaVersionsForIndices(int shard, int replica, ComObject highestSchemaVersions,
+                                                  String dbName, ComObject table, String tableName) {
+    ConcurrentHashMap<String, Integer> indicesFound = new ConcurrentHashMap<>();
+    ComArray indices = table.getArray(ComObject.Tag.INDICES);
+    for (int k = 0; k < indices.getArray().size(); k++) {
+      ComObject index = (ComObject) indices.getArray().get(k);
+      int indexSchemaVersion = index.getInt(ComObject.Tag.SCHEMA_VERSION);
+      String indexName = index.getString(ComObject.Tag.INDEX_NAME);
+      indicesFound.put(indexName, indexSchemaVersion);
+      ComObject highestIndex = getSchemaVersion(dbName, tableName, indexName, highestSchemaVersions);
+      if (highestIndex == null) {
+        setHighestSchemaVersion(dbName, tableName, indexName, indexSchemaVersion, shard, replica,
+            highestSchemaVersions, indicesFound);
+      }
+      else {
+        if (indexSchemaVersion > highestIndex.getInt(ComObject.Tag.SCHEMA_VERSION)) {
+          setHighestSchemaVersion(dbName, tableName, indexName, indexSchemaVersion, shard, replica,
+              highestSchemaVersions, indicesFound);
+        }
+        else if (indexSchemaVersion < highestIndex.getInt(ComObject.Tag.SCHEMA_VERSION)) {
+          setHighestSchemaVersion(dbName, tableName, indexName, highestIndex.getInt(ComObject.Tag.SCHEMA_VERSION),
+              highestIndex.getInt(ComObject.Tag.SHARD), highestIndex.getInt(ComObject.Tag.REPLICA),
+              highestSchemaVersions, indicesFound);
         }
         else {
-          if (tableSchemaVersion > highestTable.getInt(ComObject.Tag.SCHEMA_VERSION)) {
-            setHighestSchemaVersion(dbName, tableName, tableSchemaVersion, shard, replica, highestSchemaVersions, tablesFound);
-          }
-          else if (tableSchemaVersion < highestTable.getInt(ComObject.Tag.SCHEMA_VERSION)) {
-            setHighestSchemaVersion(dbName, tableName, highestTable.getInt(ComObject.Tag.SCHEMA_VERSION), highestTable.getInt(ComObject.Tag.SHARD),
-                highestTable.getInt(ComObject.Tag.REPLICA), highestSchemaVersions, tablesFound);
-          }
-          else {
-            tablesFound.remove(tableName);
-          }
-        }
-        ConcurrentHashMap<String, Integer> indicesFound = new ConcurrentHashMap<>();
-        ComArray indices = table.getArray(ComObject.Tag.INDICES);
-        for (int k = 0; k < indices.getArray().size(); k++) {
-          ComObject index = (ComObject) indices.getArray().get(k);
-          int indexSchemaVersion = index.getInt(ComObject.Tag.SCHEMA_VERSION);
-          String indexName = index.getString(ComObject.Tag.INDEX_NAME);
-          indicesFound.put(indexName, indexSchemaVersion);
-          ComObject highestIndex = getSchemaVersion(dbName, tableName, indexName, highestSchemaVersions);
-          if (highestIndex == null) {
-            setHighestSchemaVersion(dbName, tableName, indexName, indexSchemaVersion, shard, replica, highestSchemaVersions, indicesFound);
-          }
-          else {
-            if (indexSchemaVersion > highestIndex.getInt(ComObject.Tag.SCHEMA_VERSION)) {
-              setHighestSchemaVersion(dbName, tableName, indexName, indexSchemaVersion, shard, replica, highestSchemaVersions, indicesFound);
-            }
-            else if (indexSchemaVersion < highestIndex.getInt(ComObject.Tag.SCHEMA_VERSION)) {
-              setHighestSchemaVersion(dbName, tableName, indexName, highestIndex.getInt(ComObject.Tag.SCHEMA_VERSION),
-                  highestIndex.getInt(ComObject.Tag.SHARD), highestIndex.getInt(ComObject.Tag.REPLICA), highestSchemaVersions, indicesFound);
-            }
-            else {
-              indicesFound.remove(indexName);
-            }
-          }
+          indicesFound.remove(indexName);
         }
       }
     }
@@ -1275,7 +1327,8 @@ public class SchemaManager {
   }
 
   private void setHighestSchemaVersion(String dbName, String tableName, String indexName, int indexSchemaVersion,
-                                       int shard, int replica, ComObject highestSchemaVersions, ConcurrentHashMap<String, Integer> indicesFound) {
+                                       int shard, int replica, ComObject highestSchemaVersions,
+                                       ConcurrentHashMap<String, Integer> indicesFound) {
     ComArray databases = highestSchemaVersions.getArray(ComObject.Tag.DATABASES);
     for (int i = 0; i < databases.getArray().size(); i++) {
       ComObject db = (ComObject) databases.getArray().get(i);
@@ -1283,34 +1336,43 @@ public class SchemaManager {
       if (currDbName.equals(dbName)) {
         ComArray tables = db.getArray(ComObject.Tag.TABLES);
         for (int j = 0; j < tables.getArray().size(); j++) {
-          ComObject table = (ComObject) tables.getArray().get(i);
-          String currTableName = table.getString(ComObject.Tag.TABLE_NAME);
-          if (currTableName.equals(tableName)) {
-            ComArray indices = table.getArray(ComObject.Tag.INDICES);
-            for (int k = 0; k < indices.getArray().size(); k++) {
-              ComObject index = (ComObject) indices.getArray().get(k);
-              String currIndexName = index.getString(ComObject.Tag.INDEX_NAME);
-              indicesFound.remove(currIndexName);
-              if (currIndexName.equals(indexName)) {
-                index.put(ComObject.Tag.SCHEMA_VERSION, indexSchemaVersion);
-                index.put(ComObject.Tag.SHARD, shard);
-                index.put(ComObject.Tag.REPLICA, replica);
-                index.put(ComObject.Tag.HAS_DISCREPANCY, true);
-                return;
-              }
-            }
-            ComObject index = new ComObject();
-            indices.add(index);
-            index.put(ComObject.Tag.INDEX_NAME, indexName);
-            index.put(ComObject.Tag.SCHEMA_VERSION, indexSchemaVersion);
-            index.put(ComObject.Tag.SHARD, shard);
-            index.put(ComObject.Tag.REPLICA, replica);
-            index.put(ComObject.Tag.HAS_DISCREPANCY, true);
-
-          }
+          if (setHighestSchemaVersionForTable(tableName, indexName, indexSchemaVersion, shard, replica,
+              indicesFound, i, tables))
+            return;
         }
       }
     }
+  }
+
+  private boolean setHighestSchemaVersionForTable(String tableName, String indexName, int indexSchemaVersion,
+                                                  int shard, int replica, ConcurrentHashMap<String, Integer> indicesFound,
+                                                  int i, ComArray tables) {
+    ComObject table = (ComObject) tables.getArray().get(i);
+    String currTableName = table.getString(ComObject.Tag.TABLE_NAME);
+    if (currTableName.equals(tableName)) {
+      ComArray indices = table.getArray(ComObject.Tag.INDICES);
+      for (int k = 0; k < indices.getArray().size(); k++) {
+        ComObject index = (ComObject) indices.getArray().get(k);
+        String currIndexName = index.getString(ComObject.Tag.INDEX_NAME);
+        indicesFound.remove(currIndexName);
+        if (currIndexName.equals(indexName)) {
+          index.put(ComObject.Tag.SCHEMA_VERSION, indexSchemaVersion);
+          index.put(ComObject.Tag.SHARD, shard);
+          index.put(ComObject.Tag.REPLICA, replica);
+          index.put(ComObject.Tag.HAS_DISCREPANCY, true);
+          return true;
+        }
+      }
+      ComObject index = new ComObject();
+      indices.add(index);
+      index.put(ComObject.Tag.INDEX_NAME, indexName);
+      index.put(ComObject.Tag.SCHEMA_VERSION, indexSchemaVersion);
+      index.put(ComObject.Tag.SHARD, shard);
+      index.put(ComObject.Tag.REPLICA, replica);
+      index.put(ComObject.Tag.HAS_DISCREPANCY, true);
+
+    }
+    return false;
   }
 
   private ComObject getSchemaVersion(String dbName, String tableName, String indexName, ComObject highestSchemaVersions) {
@@ -1321,17 +1383,9 @@ public class SchemaManager {
       if (currDbName.equals(dbName)) {
         ComArray tables = db.getArray(ComObject.Tag.TABLES);
         for (int j = 0; j < tables.getArray().size(); j++) {
-          ComObject table = (ComObject) tables.getArray().get(j);
-          String currTableName = table.getString(ComObject.Tag.TABLE_NAME);
-          if (currTableName.equals(tableName)) {
-            ComArray indices = table.getArray(ComObject.Tag.INDICES);
-            for (int k = 0; k < indices.getArray().size(); k++) {
-              ComObject index = (ComObject) indices.getArray().get(k);
-              String currIndexName = index.getString(ComObject.Tag.INDEX_NAME);
-              if (currIndexName.equals(indexName)) {
-                return index;
-              }
-            }
+          ComObject index = getSchemaVersionForIndex(tableName, indexName, tables, j);
+          if (index != null) {
+            return index;
           }
         }
       }
@@ -1339,8 +1393,25 @@ public class SchemaManager {
     return null;
   }
 
+  private ComObject getSchemaVersionForIndex(String tableName, String indexName, ComArray tables, int j) {
+    ComObject table = (ComObject) tables.getArray().get(j);
+    String currTableName = table.getString(ComObject.Tag.TABLE_NAME);
+    if (currTableName.equals(tableName)) {
+      ComArray indices = table.getArray(ComObject.Tag.INDICES);
+      for (int k = 0; k < indices.getArray().size(); k++) {
+        ComObject index = (ComObject) indices.getArray().get(k);
+        String currIndexName = index.getString(ComObject.Tag.INDEX_NAME);
+        if (currIndexName.equals(indexName)) {
+          return index;
+        }
+      }
+    }
+    return null;
+  }
+
   private void setHighestSchemaVersion(String dbName, String tableName, int tableSchemaVersion, int shard,
-                                       int replica, ComObject highestSchemaVersions, ConcurrentHashMap<String, Integer> tablesFound) {
+                                       int replica, ComObject highestSchemaVersions,
+                                       ConcurrentHashMap<String, Integer> tablesFound) {
     ComArray databases = highestSchemaVersions.getArray(ComObject.Tag.DATABASES);
     for (int i = 0; i < databases.getArray().size(); i++) {
       ComObject db = (ComObject) databases.getArray().get(i);

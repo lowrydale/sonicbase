@@ -13,6 +13,9 @@ import net.sf.jsqlparser.statement.create.table.Index;
 import java.sql.SQLException;
 import java.util.List;
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class CreateIndexStatementHandler implements StatementHandler {
   private final DatabaseClient client;
 

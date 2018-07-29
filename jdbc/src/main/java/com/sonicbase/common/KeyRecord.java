@@ -5,11 +5,9 @@ import org.apache.giraph.utils.Varint;
 
 import java.io.*;
 
-/**
- * User: lowryda
- * Date: 9/30/14
- * Time: 5:22 PM
- */
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class KeyRecord {
   private byte[] primaryKey;
   private long sequence0;

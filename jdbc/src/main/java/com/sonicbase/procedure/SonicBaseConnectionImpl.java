@@ -7,6 +7,9 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class SonicBaseConnectionImpl implements SonicBaseConnection {
   private Connection proxy;
 
@@ -125,7 +128,8 @@ public class SonicBaseConnectionImpl implements SonicBaseConnection {
   }
 
   @Override
-  public SonicBasePreparedStatement prepareSonicBaseStatement(StoredProcedureContext context, String sql, int resultSetType, int resultSetConcurrency) throws SQLException {
+  public SonicBasePreparedStatement prepareSonicBaseStatement(StoredProcedureContext context, String sql,
+                                                              int resultSetType, int resultSetConcurrency) throws SQLException {
     return new SonicBasePreparedStatementImpl(context, proxy.prepareStatement(sql, resultSetType, resultSetConcurrency));
   }
 
@@ -180,12 +184,14 @@ public class SonicBaseConnectionImpl implements SonicBaseConnection {
   }
 
   @Override
-  public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
+  public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency,
+                                            int resultSetHoldability) throws SQLException {
     return proxy.prepareStatement(sql, resultSetType, resultSetConcurrency, resultSetHoldability);
   }
 
   @Override
-  public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
+  public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency,
+                                       int resultSetHoldability) throws SQLException {
     return proxy.prepareCall(sql, resultSetType, resultSetConcurrency, resultSetHoldability);
   }
 

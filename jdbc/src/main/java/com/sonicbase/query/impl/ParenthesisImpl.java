@@ -20,9 +20,9 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
-/**
- * Responsible for
- */
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class ParenthesisImpl extends ExpressionImpl {
   private ExpressionImpl expression;
   private boolean isNot;
@@ -262,10 +262,6 @@ public class ParenthesisImpl extends ExpressionImpl {
   @Override
   public boolean canSortWithIndex() {
     return false;
-  }
-
-  @Override
-  public void queryRewrite() {
   }
 
   @Override

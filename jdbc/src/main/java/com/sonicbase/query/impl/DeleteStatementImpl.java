@@ -22,6 +22,9 @@ import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class DeleteStatementImpl extends StatementImpl implements DeleteStatement {
   private final DatabaseClient client;
   private final ExpressionImpl.RecordCache recordCache;
@@ -51,7 +54,8 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
   }
 
   @Override
-  public Object execute(String dbName, String sqlToUse, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
+  public Object execute(String dbName, String sqlToUse, SelectStatementImpl.Explain explain, Long sequence0,
+                        Long sequence1, Short sequence2,
                         boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) {
     while (true) {
       try {
@@ -77,10 +81,10 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
         while (true) {
           DoDelete doDelete = new DoDelete(dbName, explain, sequence0, sequence1, sequence2, restrictToThisServer,
               procedureContext, schemaRetryCount, tableSchema, rand, countDeleted).invoke();
+          countDeleted = doDelete.getCountDeleted();
           if (doDelete.is()) {
             return countDeleted;
           }
-          countDeleted = doDelete.getCountDeleted();
         }
       }
       catch (SchemaOutOfSyncException e) {
@@ -132,7 +136,9 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
     private Random rand;
     private int countDeleted;
 
-    public DoDelete(String dbName, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount, TableSchema tableSchema, Random rand, int countDeleted) {
+    public DoDelete(String dbName, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1,
+                    Short sequence2, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext,
+                    int schemaRetryCount, TableSchema tableSchema, Random rand, int countDeleted) {
       this.dbName = dbName;
       this.explain = explain;
       this.sequence0 = sequence0;
@@ -155,7 +161,8 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
     }
 
     public DoDelete invoke() {
-      ExpressionImpl.NextReturn ids = expression .next(explain, new AtomicLong(), new AtomicLong(), null, null, schemaRetryCount);
+      ExpressionImpl.NextReturn ids = expression .next(explain, new AtomicLong(), new AtomicLong(), null,
+          null, schemaRetryCount);
       if (ids == null || ids.getIds() == null) {
         myResult = true;
         return this;
@@ -186,22 +193,28 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
               null, null, null, client.getCommon().getSchemaVersion(),
               restrictToThisServer, procedureContext, schemaRetryCount);
         }
-        if (record != null) {
-          List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, tableSchema,
-              indexSchema.getName(), null, BinaryExpression.Operator.EQUAL, null, entry[0], null);
-          if (selectedShards.isEmpty()) {
-            throw new DatabaseException("No shards selected for query");
-          }
-
-          doDeleteRecord(indexSchema, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), entry[0]), selectedShards);
-
-          doDeleteIndexEntry(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), entry[0]), record);
-
-          countDeleted++;
-        }
+        doDeleteRecordAndIndexEntry(indexSchema, entry, record);
       }
       myResult = false;
       return this;
+    }
+
+    private void doDeleteRecordAndIndexEntry(IndexSchema indexSchema, Object[][] entry, Record record) {
+      if (record != null) {
+        List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true,
+            false, tableSchema,
+            indexSchema.getName(), null, BinaryExpression.Operator.EQUAL, null,
+            entry[0], null);
+        if (selectedShards.isEmpty()) {
+          throw new DatabaseException("No shards selected for query");
+        }
+
+        doDeleteRecord(indexSchema, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), entry[0]), selectedShards);
+
+        doDeleteIndexEntry(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), entry[0]), record);
+
+        countDeleted++;
+      }
     }
 
     private void doDeleteIndexEntry(byte[] primaryKeyBytes, Record record) {

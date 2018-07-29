@@ -18,9 +18,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.testng.Assert.assertEquals;
 
-/**
- * Responsible for
- */
 public class TestLongRunningCommands {
 
   @Test

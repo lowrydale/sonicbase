@@ -2,6 +2,8 @@ package com.sonicbase.jdbcdriver;
 
 import com.sonicbase.common.ExcludeRename;
 import com.sonicbase.query.impl.ResultSetImpl;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
 import java.io.Reader;
@@ -13,11 +15,13 @@ import java.sql.Date;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-@SuppressWarnings("squid:S1168") // I prefer to return null instead of any empty array
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class ResultSetProxy implements java.sql.ResultSet {
 
   public static final String NOT_SUPPORTED_STR = "not supported";
-  private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
+  private static Logger logger = LoggerFactory.getLogger(ResultSetProxy.class);
 
   private List<ResultSetInfo> resultSets = new ArrayList<>();
   private int currResultSetOffset;
@@ -27,10 +31,6 @@ public class ResultSetProxy implements java.sql.ResultSet {
 
   public long getViewVersion() {
     return resultSets.get(0).resultSet.getViewVersion();
-  }
-
-  public int getCurrShard() {
-    return resultSets.get(0).resultSet.getCurrShard();
   }
 
   public int getLastShard() {

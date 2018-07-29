@@ -20,6 +20,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 @ExcludeRename
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class DataType {
 
 
@@ -985,7 +988,8 @@ public class DataType {
         return 1;
       }
       if (!(o1 instanceof byte[]) || !(o2 instanceof byte[])) {
-        throw new DatabaseException("Datatype mismatch - expecting byte[]: found=" + o1.getClass().getName() + ", found=" + o2.getClass().getName());
+        throw new DatabaseException("Datatype mismatch - expecting byte[]: found=" + o1.getClass().getName() +
+            ", found=" + o2.getClass().getName());
       }
       for (int i = 0; i < Math.min(((byte[]) o1).length, ((byte[]) o2).length); i++) {
         if (((byte[]) o1)[i] < ((byte[]) o2)[i]) {
@@ -1016,7 +1020,8 @@ public class DataType {
       return 1;
     }
     if (!(o1 instanceof byte[]) || !(o2 instanceof byte[])) {
-      throw new DatabaseException("Datatype mismatch - expecting byte[]: found=" + o1.getClass().getName() + ", found=" + o2.getClass().getName());
+      throw new DatabaseException("Datatype mismatch - expecting byte[]: found=" + o1.getClass().getName() +
+          ", found=" + o2.getClass().getName());
     }
     byte[] lhs = (byte[]) o1;
     byte[] rhs = (byte[]) o2;

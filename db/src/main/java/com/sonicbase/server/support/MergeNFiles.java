@@ -17,7 +17,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-@SuppressWarnings("squid:S1168") // I prefer to return null instead of an empty array
+@SuppressWarnings({"squid:S1168", "squid:S00107"}) // I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class MergeNFiles {
 
   private short serializationVersion;
@@ -267,7 +268,8 @@ public class MergeNFiles {
     return comparator;
   }
 
-  private Comparator<MergeRow> getComparatorForNonSetOperatorWithOrderByExpression(int[] fieldOffsets, boolean[] ascendingFlags, Comparator[] comparators, int[] tableOffsets) {
+  private Comparator<MergeRow> getComparatorForNonSetOperatorWithOrderByExpression(
+      int[] fieldOffsets, boolean[] ascendingFlags, Comparator[] comparators, int[] tableOffsets) {
     Comparator<MergeRow> comparator;
     comparator = (o1, o2) -> {
       for (int i = 0; i < fieldOffsets.length; i++) {
@@ -281,7 +283,8 @@ public class MergeNFiles {
           return 1 * (ascendingFlags[i] ? 1 : -1);
         }
 
-        int value = comparators[i].compare(o1.row[tableOffsets[i]].getFields()[fieldOffsets[i]], o2.row[tableOffsets[i]].getFields()[fieldOffsets[i]]);
+        int value = comparators[i].compare(o1.row[tableOffsets[i]].getFields()[fieldOffsets[i]],
+            o2.row[tableOffsets[i]].getFields()[fieldOffsets[i]]);
         if (value < 0) {
           return -1 * (ascendingFlags[i] ? 1 : -1);
         }
@@ -316,7 +319,8 @@ public class MergeNFiles {
     return comparator;
   }
 
-  private Comparator<MergeRow> getComparatorForSetOperatorWithOrderByExpression(int[][] fieldOffsets, Comparator[] comparators, boolean[] ascendingFlags) {
+  private Comparator<MergeRow> getComparatorForSetOperatorWithOrderByExpression(
+      int[][] fieldOffsets, Comparator[] comparators, boolean[] ascendingFlags) {
     Comparator<MergeRow> comparator;
     comparator = (o1, o2) -> {
       for (int i = 0; i < fieldOffsets.length; i++) {

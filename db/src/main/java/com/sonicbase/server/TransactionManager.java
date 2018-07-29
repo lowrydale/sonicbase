@@ -14,6 +14,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+@SuppressWarnings({"squid:S1172", "squid:S1168", "squid:S00107"})
+// all methods called from method invoker must have cobj and replayed command parms
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class TransactionManager {
 
   public enum OperationType {
@@ -29,7 +33,8 @@ public class TransactionManager {
 
   private final com.sonicbase.server.DatabaseServer server;
   private ConcurrentHashMap<Long, Transaction> transactions = new ConcurrentHashMap<>();
-  private ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Object[], RecordLock>>> locks = new ConcurrentHashMap<>();
+  private ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Object[], RecordLock>>> locks =
+      new ConcurrentHashMap<>();
 
   TransactionManager(
       DatabaseServer databaseServer) {
@@ -135,34 +140,50 @@ public class TransactionManager {
         Transaction trans = transactions.get(transactionId);
         for (int i = 0; i < trans.locks.size(); i++) {
           lock = trans.locks.get(i);
-          if (lock.tableName.equals(tableName)) {
-            Comparator[] comparators = null;
-            for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
-              if (entry.getValue().isPrimaryKey()) {
-                comparators = entry.getValue().getComparators();
-              }
-            }
-            if (comparators == null) {
-              throw new DatabaseException("Comparators are null: dbName=" + dbName + ", table=" + tableName);
-            }
-            boolean mismatch = false;
-            for (int j = 0; j < primaryKey.length; j++) {
-              if (comparators[j].compare(primaryKey[j], lock.primaryKey[j]) != 0) {
-                mismatch = true;
-                break;
-              }
-            }
-            if (!mismatch) {
-              trans.locks.remove(i);
-              if (trans.locks.isEmpty()) {
-                transactions.remove(transactionId);
-              }
-              break;
-            }
+          if (deleteLockForTable(dbName, tableName, transactionId, tableSchema, primaryKey, lock, trans, i)) {
+            break;
           }
         }
       }
     }
+  }
+
+  private boolean deleteLockForTable(String dbName, String tableName, long transactionId, TableSchema tableSchema,
+                                     Object[] primaryKey, RecordLock lock, Transaction trans, int i) {
+    if (lock.tableName.equals(tableName)) {
+      Comparator[] comparators = null;
+      for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
+        if (entry.getValue().isPrimaryKey()) {
+          comparators = entry.getValue().getComparators();
+        }
+      }
+      if (comparators == null) {
+        throw new DatabaseException("Comparators are null: dbName=" + dbName + ", table=" + tableName);
+      }
+      if (doDeleteLock(transactionId, primaryKey, lock, trans, i, comparators)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private boolean doDeleteLock(long transactionId, Object[] primaryKey, RecordLock lock, Transaction trans, int i,
+                               Comparator[] comparators) {
+    boolean mismatch = false;
+    for (int j = 0; j < primaryKey.length; j++) {
+      if (comparators[j].compare(primaryKey[j], lock.primaryKey[j]) != 0) {
+        mismatch = true;
+        break;
+      }
+    }
+    if (!mismatch) {
+      trans.locks.remove(i);
+      if (trans.locks.isEmpty()) {
+        transactions.remove(transactionId);
+      }
+      return true;
+    }
+    return false;
   }
 
   void preHandleTransaction(String dbName, String tableName, String indexName, boolean isExplicitTrans,
@@ -173,10 +194,20 @@ public class TransactionManager {
       locks.put(dbName, new ConcurrentHashMap<>());
     }
     tableLocks = locks.get(dbName).get(tableName);
+
+    tableLocks = createTableLocks(dbName, tableName, tableLocks);
+
+    doPreHandleTransaction(tableName, indexName, isExplicitTrans, isCommitting, transactionId, primaryKey,
+        shouldExecute, shouldDeleteLock, tableLocks);
+  }
+
+  private ConcurrentSkipListMap<Object[], RecordLock> createTableLocks(
+      String dbName, String tableName, ConcurrentSkipListMap<Object[], RecordLock> tableLocks) {
     synchronized (locks) {
       if (tableLocks == null) {
         IndexSchema primaryKeySchema = null;
-        for (Map.Entry<String, IndexSchema> entry : server.getCommon().getTables(dbName).get(tableName).getIndices().entrySet()) {
+        for (Map.Entry<String, IndexSchema> entry :
+            server.getCommon().getTables(dbName).get(tableName).getIndices().entrySet()) {
           if (entry.getValue().isPrimaryKey()) {
             primaryKeySchema = entry.getValue();
             break;
@@ -186,24 +217,32 @@ public class TransactionManager {
           throw new DatabaseException("primaryKeySchema is null: dbName=" + dbName + ", table=" + tableName);
         }
         final Comparator[] comparators = primaryKeySchema.getComparators();
-        tableLocks = new ConcurrentSkipListMap<>((o1, o2) -> {
-          for (int i = 0; i < o1.length; i++) {
-            if (o1[i] == null || o2[i] == null) {
-              continue;
-            }
-            int value = comparators[i].compare(o1[i], o2[i]);
-            if (value < 0) {
-              return -1;
-            }
-            if (value > 0) {
-              return 1;
-            }
-          }
-          return 0;
-        });
+        tableLocks = new ConcurrentSkipListMap<>((o1, o2) -> getComparatorForTableLocks(comparators, o1, o2));
         locks.get(dbName).put(tableName, tableLocks);
       }
     }
+    return tableLocks;
+  }
+
+  private int getComparatorForTableLocks(Comparator[] comparators, Object[] o1, Object[] o2) {
+    for (int i = 0; i < o1.length; i++) {
+      if (o1[i] == null || o2[i] == null) {
+        continue;
+      }
+      int value = comparators[i].compare(o1[i], o2[i]);
+      if (value < 0) {
+        return -1;
+      }
+      if (value > 0) {
+        return 1;
+      }
+    }
+    return 0;
+  }
+
+  private void doPreHandleTransaction(String tableName, String indexName, boolean isExplicitTrans, boolean isCommitting,
+                                      long transactionId, Object[] primaryKey, AtomicBoolean shouldExecute,
+                                      AtomicBoolean shouldDeleteLock, ConcurrentSkipListMap<Object[], RecordLock> tableLocks) {
     RecordLock lock = tableLocks.get(primaryKey);
     if (lock == null) {
       if (isExplicitTrans) {

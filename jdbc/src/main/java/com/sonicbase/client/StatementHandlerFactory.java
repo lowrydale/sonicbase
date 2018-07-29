@@ -14,6 +14,9 @@ import net.sf.jsqlparser.statement.update.Update;
 
 import java.util.concurrent.ConcurrentHashMap;
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class StatementHandlerFactory {
 
   private ConcurrentHashMap<String, StatementHandler> handlers = new ConcurrentHashMap<>();

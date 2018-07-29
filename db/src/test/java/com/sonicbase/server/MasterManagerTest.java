@@ -4,8 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import org.apache.commons.io.IOUtils;
-import org.apache.log4j.Logger;
 import org.mockito.stubbing.Answer;
+import org.slf4j.Logger;
 import org.testng.annotations.Test;
 
 import java.io.IOException;

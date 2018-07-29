@@ -22,10 +22,10 @@ import java.util.zip.GZIPInputStream;
 
 import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION_26;
 
-/**
- * Responsible for
- */
-@SuppressWarnings("squid:S1172") // all methods called from method invoker must have cobj and replayed command parms
+@SuppressWarnings({"squid:S1172", "squid:S1168", "squid:S00107"})
+// all methods called from method invoker must have cobj and replayed command parms
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class LogManager {
 
   private static final String ERROR_REPLAYING_REQUEST_STR = "Error replaying request";
@@ -59,7 +59,8 @@ public class LogManager {
     this.databaseServer = databaseServer;
     this.server = databaseServer;
     this.rootDir = rootDir;
-    executor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors() * 8, "SonicBase LogManager Thread");
+    executor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors() * 8,
+        "SonicBase LogManager Thread");
 
     synchronized (this) {
       try {
@@ -231,7 +232,8 @@ public class LogManager {
           localCobj.put(ComObject.Tag.DB_NAME, NONE_STR);
           localCobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
           localCobj.put(ComObject.Tag.SEQUENCE_NUMBER, maxAllocatedLogSequenceNumber.get());
-          server.getClient().send("LogManager:setMaxSequenceNum", server.getShard(), replica, localCobj, DatabaseClient.Replica.SPECIFIED, true);
+          server.getClient().send("LogManager:setMaxSequenceNum", server.getShard(), replica, localCobj,
+              DatabaseClient.Replica.SPECIFIED, true);
         }
         catch (Exception e) {
           logger.error("Error setting maxSequenceNum: shard={}, replica={}", server.getShard(), replica);
@@ -256,16 +258,7 @@ public class LogManager {
           sliceFiles.append(file.getAbsolutePath()).append("\n");
         }
       }
-      if (includePeers) {
-        for (int replica = 0; replica < server.getReplicationFactor(); replica++) {
-          files = new File(getLogRoot() + File.separator + PEER_STR + replica).listFiles();
-          if (files != null) {
-            for (File file : files) {
-              sliceFiles.append(file.getAbsolutePath()).append("\n");
-            }
-          }
-        }
-      }
+      sliceLogsForPeers(includePeers, sliceFiles);
 
       for (LogWriter logWriter : logWriters) {
         logWriter.closeAndCreateLog();
@@ -279,6 +272,20 @@ public class LogManager {
     }
     catch (Exception e) {
       throw new DatabaseException(e);
+    }
+  }
+
+  private void sliceLogsForPeers(boolean includePeers, StringBuilder sliceFiles) {
+    File[] files;
+    if (includePeers) {
+      for (int replica = 0; replica < server.getReplicationFactor(); replica++) {
+        files = new File(getLogRoot() + File.separator + PEER_STR + replica).listFiles();
+        if (files != null) {
+          for (File file : files) {
+            sliceFiles.append(file.getAbsolutePath()).append("\n");
+          }
+        }
+      }
     }
   }
 
@@ -502,7 +509,8 @@ public class LogManager {
           }
         }
         else {
-          newFile = new File(dataRootDir.getAbsolutePath() + "/peer-" + peerReplicaNum, offset + "-" + dt + "-" + nano + ".bin");
+          newFile = new File(dataRootDir.getAbsolutePath() + "/peer-" + peerReplicaNum, offset +
+              "-" + dt + "-" + nano + ".bin");
         }
         newFile.getParentFile().mkdirs();
         currFilename.set(newFile.getAbsolutePath());
@@ -799,91 +807,21 @@ public class LogManager {
           logger.info("applyLogs - begin: fileCount={}", files.length);
           List<LogSource> sources = new ArrayList<>();
           Set<String> sliceFiles = new HashSet<>();
-          if (slicePoint != null) {
-            BufferedReader reader = new BufferedReader(new StringReader(slicePoint));
-            while (true) {
-              String line = reader.readLine();
-              if (line == null) {
-                break;
-              }
-              sliceFiles.add(line);
-            }
-          }
-          for (File file : files) {
-            if (peerFiles && !file.getName().startsWith("peer")) {
-              continue;
-            }
-            if (slicePoint == null) {
-              LogSource src = new LogSource(file, server, logger, countRead);
-              sources.add(src);
-              allCurrentSources.add(src);
-              continue;
-            }
-            if (beforeSlice && sliceFiles.contains(file.getAbsolutePath())) {
-              LogSource src = new LogSource(file, server, logger, countRead);
-              sources.add(src);
-              allCurrentSources.add(src);
-            }
 
-            if (!beforeSlice && !sliceFiles.contains(file.getAbsolutePath())) {
-              LogSource src = new LogSource(file, server, logger, countRead);
-              sources.add(src);
-              allCurrentSources.add(src);
-            }
-          }
+          getSliceFiles(slicePoint, sliceFiles);
+
+          addSources(slicePoint, beforeSlice, peerFiles, files, sources, sliceFiles);
+
           final long begin = System.currentTimeMillis();
           final AtomicLong lastLogged = new AtomicLong(System.currentTimeMillis());
           try {
             List<NettyServer.Request> batch = new ArrayList<>();
             while (!shutdown) {
-              if (sources.isEmpty()) {
+              ProcessSource processSource = new ProcessSource(sources, begin, lastLogged, batch).invoke();
+              batch = processSource.getBatch();
+              if (processSource.is()) {
                 break;
               }
-              LogSource minSource = sources.get(0);
-              for (int i = 0; i < sources.size(); i++) {
-                LogSource currSource = sources.get(i);
-                if (currSource.buffer == null) {
-                  continue;
-                }
-                if (minSource.buffer == null || currSource.sequence0 < minSource.sequence0 ||
-                    currSource.sequence0 == minSource.sequence0 && currSource.sequence1 < minSource.sequence1) {
-                  minSource = currSource;
-                }
-              }
-              if (minSource.buffer == null) {
-                break;
-              }
-
-              try {
-                final byte[] buffer = minSource.buffer;
-                final long sequence0 = minSource.sequence0;
-                final long sequence1 = minSource.sequence1;
-                final String methodStr = minSource.methodStr;
-
-                NettyServer.Request request = new NettyServer.Request();
-                request.setBody(buffer);
-                request.setSequence0(sequence0);
-                request.setSequence1(sequence1);
-
-                if (!DatabaseClient.getParallelVerbs().contains(methodStr)) {
-                  flushBatch(begin, lastLogged, batch);
-                  batch = new ArrayList<>();
-                  batch.add(request);
-                  flushBatch(begin, lastLogged, batch);
-                  batch = new ArrayList<>();
-                }
-                else {
-                  batch.add(request);
-                  if (batch.size() > 64) {
-                    flushBatch(begin, lastLogged, batch);
-                    batch = new ArrayList<>();
-                  }
-                }
-              }
-              catch (Exception t) {
-                logger.error(ERROR_REPLAYING_REQUEST_STR, t);
-              }
-              minSource.take(server, logger);
             }
 
             flushBatch(begin, lastLogged, batch);
@@ -906,13 +844,54 @@ public class LogManager {
     }
   }
 
+  private void getSliceFiles(String slicePoint, Set<String> sliceFiles) throws IOException {
+    if (slicePoint != null) {
+      BufferedReader reader = new BufferedReader(new StringReader(slicePoint));
+      while (true) {
+        String line = reader.readLine();
+        if (line == null) {
+          break;
+        }
+        sliceFiles.add(line);
+      }
+    }
+  }
+
+
+  private void addSources(String slicePoint, boolean beforeSlice, boolean peerFiles, File[] files,
+                          List<LogSource> sources, Set<String> sliceFiles) throws IOException {
+    for (File file : files) {
+      if (peerFiles && !file.getName().startsWith("peer")) {
+        continue;
+      }
+      if (slicePoint == null) {
+        LogSource src = new LogSource(file, server, logger, countRead);
+        sources.add(src);
+        allCurrentSources.add(src);
+        continue;
+      }
+      if (beforeSlice && sliceFiles.contains(file.getAbsolutePath())) {
+        LogSource src = new LogSource(file, server, logger, countRead);
+        sources.add(src);
+        allCurrentSources.add(src);
+      }
+
+      if (!beforeSlice && !sliceFiles.contains(file.getAbsolutePath())) {
+        LogSource src = new LogSource(file, server, logger, countRead);
+        sources.add(src);
+        allCurrentSources.add(src);
+      }
+    }
+  }
+
   private void flushBatch(final long begin, final AtomicLong lastLogged,
                           final List<NettyServer.Request> finalBatch) {
     List<Future> futures = new ArrayList<>();
     for (final NettyServer.Request currRequest : finalBatch) {
       futures.add(executor.submit((Callable) () -> {
         try {
-          server.invokeMethod(currRequest.getBody(), currRequest.getSequence0(), currRequest.getSequence1(), true, false, null, null);
+          server.invokeMethod(currRequest.getBody(), currRequest.getSequence0(), currRequest.getSequence1(),
+              true, false, null, null);
           countReplayed.incrementAndGet();
           if (System.currentTimeMillis() - lastLogged.get() > 2000) {
             lastLogged.set(System.currentTimeMillis());
@@ -989,31 +968,120 @@ public class LogManager {
         if (files != null) {
           outer:
           for (File file : files) {
-            try {
-              for (LogWriter logWriter : logWriters) {
-                if (file.getAbsolutePath().equals(logWriter.currFilename.get())) {
-                  continue outer;
-                }
-              }
-
-              long fileTime = file.lastModified();
-              if (exactDate) {
-                if (fileTime < lastSnapshot && file.exists()) {
-                  Files.delete(file.toPath());
-                }
-              }
-              else {
-                if (fileTime < lastSnapshot - (10 * 1_000) && file.exists()) {
-                  Files.delete(file.toPath());
-                }
-              }
-            }
-            catch (Exception e) {
-              logger.error("Error deleting log file: filename={}", file.getAbsolutePath());
-            }
+            deleteOldLogsProcessFile(lastSnapshot, exactDate, file);
           }
         }
       }
+    }
+  }
+
+  private void deleteOldLogsProcessFile(long lastSnapshot, boolean exactDate, File file) {
+    try {
+      for (LogWriter logWriter : logWriters) {
+        if (file.getAbsolutePath().equals(logWriter.currFilename.get())) {
+          return;
+        }
+      }
+
+      long fileTime = file.lastModified();
+      if (exactDate) {
+        if (fileTime < lastSnapshot && file.exists()) {
+          Files.delete(file.toPath());
+        }
+      }
+      else {
+        if (fileTime < lastSnapshot - (10 * 1_000) && file.exists()) {
+          Files.delete(file.toPath());
+        }
+      }
+    }
+    catch (Exception e) {
+      logger.error("Error deleting log file: filename={}", file.getAbsolutePath());
+    }
+  }
+
+  private class ProcessSource {
+    private boolean myResult;
+    private List<LogSource> sources;
+    private long begin;
+    private AtomicLong lastLogged;
+    private List<NettyServer.Request> batch;
+
+    public ProcessSource(List<LogSource> sources, long begin, AtomicLong lastLogged, List<NettyServer.Request> batch) {
+      this.sources = sources;
+      this.begin = begin;
+      this.lastLogged = lastLogged;
+      this.batch = batch;
+    }
+
+    boolean is() {
+      return myResult;
+    }
+
+    public List<NettyServer.Request> getBatch() {
+      return batch;
+    }
+
+    public ProcessSource invoke() {
+      if (sources.isEmpty()) {
+        myResult = true;
+        return this;
+      }
+      LogSource minSource = sources.get(0);
+      for (int i = 0; i < sources.size(); i++) {
+        LogSource currSource = sources.get(i);
+        if (currSource.buffer == null) {
+          continue;
+        }
+        if (minSource.buffer == null || currSource.sequence0 < minSource.sequence0 ||
+            currSource.sequence0 == minSource.sequence0 && currSource.sequence1 < minSource.sequence1) {
+          minSource = currSource;
+        }
+      }
+      if (minSource.buffer == null) {
+        myResult = true;
+        return this;
+      }
+
+      batch = addRequestToBatch(begin, lastLogged, batch, minSource);
+
+      minSource.take(server, logger);
+      myResult = false;
+      return this;
+    }
+
+    private List<NettyServer.Request> addRequestToBatch(long begin, AtomicLong lastLogged,
+                                                        List<NettyServer.Request> batch, LogSource minSource) {
+      try {
+        final byte[] buffer = minSource.buffer;
+        final long sequence0 = minSource.sequence0;
+        final long sequence1 = minSource.sequence1;
+        final String methodStr = minSource.methodStr;
+
+        NettyServer.Request request = new NettyServer.Request();
+        request.setBody(buffer);
+        request.setSequence0(sequence0);
+        request.setSequence1(sequence1);
+
+        if (!DatabaseClient.getParallelVerbs().contains(methodStr)) {
+          flushBatch(begin, lastLogged, batch);
+          batch = new ArrayList<>();
+          batch.add(request);
+          flushBatch(begin, lastLogged, batch);
+          batch = new ArrayList<>();
+        }
+        else {
+          batch.add(request);
+          if (batch.size() > 64) {
+            flushBatch(begin, lastLogged, batch);
+            batch = new ArrayList<>();
+          }
+        }
+      }
+      catch (Exception t) {
+        logger.error(ERROR_REPLAYING_REQUEST_STR, t);
+      }
+      return batch;
     }
   }
 }

@@ -12,7 +12,8 @@ import net.sf.jsqlparser.statement.select.Limit;
 import net.sf.jsqlparser.statement.select.Offset;
 import org.apache.commons.io.FileUtils;
 import org.apache.giraph.utils.Varint;
-import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.*;
@@ -22,14 +23,14 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * Responsible for
- */
-@SuppressWarnings("squid:S1168") // I prefer to return null instead of an empty array
+@SuppressWarnings({"squid:S1172", "squid:S1168", "squid:S00107"})
+// all methods called from method invoker must have cobj and replayed command parms
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class DiskBasedResultSet {
 
-  public static final String RESULT_SETS_STR = "result-sets";
-  private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
+  private static final String RESULT_SETS_STR = "result-sets";
+  private static Logger logger = LoggerFactory.getLogger(DiskBasedResultSet.class);
 
   private static AtomicLong nextResultSetId = new AtomicLong();
 
@@ -47,7 +48,8 @@ public class DiskBasedResultSet {
       DatabaseServer databaseServer,
       Offset offset,
       Limit limit,
-      final String[] tableNames, int[] tableOffsets, final ResultSetImpl[] resultSets, final List<OrderByExpressionImpl> orderByExpressions,
+      final String[] tableNames, int[] tableOffsets, final ResultSetImpl[] resultSets,
+      final List<OrderByExpressionImpl> orderByExpressions,
       int count, SelectStatementImpl select, boolean setOperator) {
     this.server = databaseServer;
     this.tableNames = tableNames;
@@ -59,7 +61,8 @@ public class DiskBasedResultSet {
     synchronized (this) {
       while (true) {
         resultSetId = nextResultSetId.getAndIncrement();
-        file = new File(server.getDataDir(), RESULT_SETS_STR + File.separator + databaseServer.getShard() + File.separator + server.getReplica() + File.separator + resultSetId);
+        file = new File(server.getDataDir(), RESULT_SETS_STR + File.separator + databaseServer.getShard() +
+            File.separator + server.getReplica() + File.separator + resultSetId);
         if (!file.exists()) {
           break;
         }
@@ -81,6 +84,58 @@ public class DiskBasedResultSet {
       }
     }
 
+    boolean selectAll = getKeepers(dbName, databaseServer, tableNames, orderByExpressions, select, tableOffsets2, keepers);
+
+    ThreadPoolExecutor executor = ThreadUtil.createExecutor(resultSets.length, "SonicBase DiskBasedResultsSet Thread");
+    List<Future> futures = new ArrayList<>();
+
+    try {
+      for (int k = 0; k < resultSets.length; k++) {
+        processResultSet(serializationVersion, dbName, tableNames, resultSets, orderByExpressions, finalFile,
+            fileOffset, keepers, selectAll, executor, futures, k);
+      }
+      for (Future future : futures) {
+        future.get();
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+    finally {
+      executor.shutdownNow();
+    }
+    mergeSort(serializationVersion, dbName, file);
+
+    createOffsetLimitFile(offset, limit, file);
+
+    updateAccessTime(file);
+  }
+
+  private boolean getKeepers(String dbName, DatabaseServer databaseServer, String[] tableNames,
+                             List<OrderByExpressionImpl> orderByExpressions, SelectStatementImpl select,
+                             Map<String, Integer> tableOffsets2, boolean[][] keepers) {
+    boolean selectAll = getSelectAll(dbName, databaseServer, tableNames, select, tableOffsets2, keepers);
+
+    for (int i = 0; i < tableNames.length; i++) {
+      for (Map.Entry<String, IndexSchema> indexSchema : server.getCommon().getTables(dbName).get(tableNames[i]).getIndices().entrySet()) {
+        if (indexSchema.getValue().isPrimaryKey()) {
+          for (String column : indexSchema.getValue().getFields()) {
+            getKeepers(dbName, databaseServer, tableNames, tableOffsets2, keepers, column, tableNames[i]);
+          }
+        }
+      }
+    }
+
+    for (OrderByExpressionImpl expression : orderByExpressions) {
+      String tableName = expression.getTableName();
+      String columnName = expression.getColumnName();
+      getKeepers(dbName, databaseServer, tableNames, tableOffsets2, keepers, columnName, tableName);
+    }
+    return selectAll;
+  }
+
+  private boolean getSelectAll(String dbName, DatabaseServer databaseServer, String[] tableNames,
+                               SelectStatementImpl select, Map<String, Integer> tableOffsets2, boolean[][] keepers) {
     boolean selectAll;
     if (select == null) {
       selectAll = true;
@@ -98,45 +153,7 @@ public class DiskBasedResultSet {
         getKeepers(dbName, databaseServer, tableNames, tableOffsets2, keepers, columnName, tableName);
       }
     }
-
-    for (int i = 0; i < tableNames.length; i++) {
-      for (Map.Entry<String, IndexSchema> indexSchema : server.getCommon().getTables(dbName).get(tableNames[i]).getIndices().entrySet()) {
-        if (indexSchema.getValue().isPrimaryKey()) {
-          for (String column : indexSchema.getValue().getFields()) {
-            getKeepers(dbName, databaseServer, tableNames, tableOffsets2, keepers, column, tableNames[i]);
-          }
-        }
-      }
-    }
-
-    for (OrderByExpressionImpl expression : orderByExpressions) {
-      String tableName = expression.getTableName();
-      String columnName = expression.getColumnName();
-      getKeepers(dbName, databaseServer, tableNames, tableOffsets2, keepers, columnName, tableName);
-    }
-
-    ThreadPoolExecutor executor = ThreadUtil.createExecutor(resultSets.length, "SonicBase DiskBasedResultsSet Thread");
-    List<Future> futures = new ArrayList<>();
-
-    try {
-      for (int k = 0; k < resultSets.length; k++) {
-        processResultSet(serializationVersion, dbName, tableNames, resultSets, orderByExpressions, finalFile, fileOffset, keepers, selectAll, executor, futures, k);
-      }
-      for (Future future : futures) {
-        future.get();
-      }
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-    finally {
-      executor.shutdownNow();
-    }
-    mergeSort(serializationVersion, dbName, file);
-
-    createOffsetLimitFile(offset, limit, file);
-
-    updateAccessTime(file);
+    return selectAll;
   }
 
   private void createOffsetLimitFile(Offset offset, Limit limit, File file) {
@@ -164,7 +181,10 @@ public class DiskBasedResultSet {
     }
   }
 
-  private void processResultSet(short serializationVersion, String dbName, String[] tableNames, ResultSetImpl[] resultSets, List<OrderByExpressionImpl> orderByExpressions, File finalFile, AtomicInteger fileOffset, boolean[][] keepers, boolean selectAll, ThreadPoolExecutor executor, List<Future> futures, int k) {
+  private void processResultSet(short serializationVersion, String dbName, String[] tableNames,
+                                ResultSetImpl[] resultSets, List<OrderByExpressionImpl> orderByExpressions,
+                                File finalFile, AtomicInteger fileOffset, boolean[][] keepers, boolean selectAll,
+                                ThreadPoolExecutor executor, List<Future> futures, int k) {
     final int localK = k;
     final boolean finalSelectAll = selectAll;
     futures.add(executor.submit((Callable) () -> {
@@ -175,60 +195,91 @@ public class DiskBasedResultSet {
       }
 
       List<ExpressionImpl.CachedRecord[]> batch = new ArrayList<>();
-      for (ExpressionImpl.CachedRecord[] row : records) {
-        if (!finalSelectAll) {
-          for (int i = 0; i < row.length; i++) {
-            if (row[i] == null) {
-              continue;
-            }
-            for (int j = 0; j < row[i].getRecord().getFields().length; j++)
-              if (!keepers[i][j]) {
-                row[i].getRecord().getFields()[j] = null;
-              }
-          }
-        }
-        batch.add(row);
-      }
+      setFieldsToNullAsNeeded(keepers, finalSelectAll, records, batch);
       while (true) {
-        rs.setPageSize(1000);
-        rs.forceSelectOnServer();
-        long begin = System.currentTimeMillis();
-        int schemaRetryCount = 0;
-        rs.getMoreResults(schemaRetryCount);
-        records = rs.getReadRecordsAndSerializedRecords();
-        if (records == null) {
+        if (doProcessResultSet(serializationVersion, dbName, tableNames, orderByExpressions, finalFile, fileOffset,
+            localK, rs, batch)) {
           break;
         }
-        logger.info("got more results: duration=" + (System.currentTimeMillis() - begin) + ", recordCount=" + records.length);
-        for (ExpressionImpl.CachedRecord[] row : records) {
-          batch.add(row);
-        }
-        synchronized (rs.getRecordCache().getRecordsForTable()) {
-          rs.getRecordCache().getRecordsForTable().clear();
-        }
-        if (batch.size() >= 500_000) {
-          ExpressionImpl.CachedRecord[][] batchRecords = new ExpressionImpl.CachedRecord[batch.size()][];
-          for (int i = 0; i < batchRecords.length; i++) {
-            batchRecords[i] = batch.get(i);
-          }
-          begin = System.currentTimeMillis();
-          ResultSetImpl.sortResults(dbName, server.getClient().getCommon(), batchRecords, tableNames, orderByExpressions);
-          logger.info("sorted in-memory results: duration=" + (System.currentTimeMillis() - begin));
+      }
 
-          for (int i = 0; i < batchRecords.length; i++) {
-            ExpressionImpl.CachedRecord[] newRow = new ExpressionImpl.CachedRecord[tableNames.length];
-            newRow[localK] = batchRecords[i][0];
-            batchRecords[i] = newRow;
-          }
-          writeRecordsToFile(serializationVersion, finalFile, batchRecords, fileOffset.getAndIncrement());
-          batch.clear();
+      sortAndWriteResultsToFile(serializationVersion, dbName, tableNames, orderByExpressions, finalFile, fileOffset,
+          localK, batch);
+
+      batch.clear();
+      return null;
+    }));
+  }
+
+  private void setFieldsToNullAsNeeded(boolean[][] keepers, boolean finalSelectAll,
+                                       ExpressionImpl.CachedRecord[][] records, List<ExpressionImpl.CachedRecord[]> batch) {
+    for (ExpressionImpl.CachedRecord[] row : records) {
+      if (!finalSelectAll) {
+        for (int i = 0; i < row.length; i++) {
+          setFieldsToNullAsNeededProcessField(keepers[i], row[i]);
         }
       }
+      batch.add(row);
+    }
+  }
+
+  private void setFieldsToNullAsNeededProcessField(boolean[] keeper, ExpressionImpl.CachedRecord cachedRecord) {
+    if (cachedRecord == null) {
+      return;
+    }
+    for (int j = 0; j < cachedRecord.getRecord().getFields().length; j++) {
+      if (!keeper[j]) {
+        cachedRecord.getRecord().getFields()[j] = null;
+      }
+    }
+  }
+
+  private void sortAndWriteResultsToFile(short serializationVersion, String dbName, String[] tableNames,
+                                         List<OrderByExpressionImpl> orderByExpressions, File finalFile,
+                                         AtomicInteger fileOffset, int localK, List<ExpressionImpl.CachedRecord[]> batch) {
+    ExpressionImpl.CachedRecord[][] batchRecords = new ExpressionImpl.CachedRecord[batch.size()][];
+    for (int i = 0; i < batchRecords.length; i++) {
+      batchRecords[i] = batch.get(i);
+    }
+    ResultSetImpl.sortResults(dbName, server.getClient().getCommon(), batchRecords, tableNames, orderByExpressions);
+    for (int i = 0; i < batchRecords.length; i++) {
+      ExpressionImpl.CachedRecord[] newRow = new ExpressionImpl.CachedRecord[tableNames.length];
+      newRow[localK] = batchRecords[i][0];
+      batchRecords[i] = newRow;
+    }
+    writeRecordsToFile(serializationVersion, finalFile, batchRecords, fileOffset.getAndIncrement());
+  }
+
+  private boolean doProcessResultSet(short serializationVersion, String dbName, String[] tableNames,
+                                     List<OrderByExpressionImpl> orderByExpressions, File finalFile,
+                                     AtomicInteger fileOffset, int localK, ResultSetImpl rs,
+                                     List<ExpressionImpl.CachedRecord[]> batch) {
+    ExpressionImpl.CachedRecord[][] records;
+    rs.setPageSize(1000);
+    rs.forceSelectOnServer();
+    long begin = System.currentTimeMillis();
+    int schemaRetryCount = 0;
+    rs.getMoreResults(schemaRetryCount);
+    records = rs.getReadRecordsAndSerializedRecords();
+    if (records == null) {
+      return true;
+    }
+    logger.info("got more results: duration={}, recordCount={}", (System.currentTimeMillis() - begin), records.length);
+    for (ExpressionImpl.CachedRecord[] row : records) {
+      batch.add(row);
+    }
+    synchronized (rs.getRecordCache().getRecordsForTable()) {
+      rs.getRecordCache().getRecordsForTable().clear();
+    }
+    if (batch.size() >= 500_000) {
       ExpressionImpl.CachedRecord[][] batchRecords = new ExpressionImpl.CachedRecord[batch.size()][];
       for (int i = 0; i < batchRecords.length; i++) {
         batchRecords[i] = batch.get(i);
       }
+      begin = System.currentTimeMillis();
       ResultSetImpl.sortResults(dbName, server.getClient().getCommon(), batchRecords, tableNames, orderByExpressions);
+      logger.info("sorted in-memory results: duration={}", (System.currentTimeMillis() - begin));
+
       for (int i = 0; i < batchRecords.length; i++) {
         ExpressionImpl.CachedRecord[] newRow = new ExpressionImpl.CachedRecord[tableNames.length];
         newRow[localK] = batchRecords[i][0];
@@ -236,8 +287,8 @@ public class DiskBasedResultSet {
       }
       writeRecordsToFile(serializationVersion, finalFile, batchRecords, fileOffset.getAndIncrement());
       batch.clear();
-      return null;
-    }));
+    }
+    return false;
   }
 
   public String[] getTableNames() {
@@ -297,7 +348,8 @@ public class DiskBasedResultSet {
   }
 
   public void addRecord(String dbName, short serializationVersion, ExpressionImpl.CachedRecord[] record,
-                        int tableOffset, int tableCount, List<ExpressionImpl.CachedRecord[]> batch, File file, AtomicInteger fileOffset) {
+                        int tableOffset, int tableCount, List<ExpressionImpl.CachedRecord[]> batch, File file,
+                        AtomicInteger fileOffset) {
     ExpressionImpl.CachedRecord[] newRecord = new ExpressionImpl.CachedRecord[tableCount];
     System.arraycopy(record, 0, newRecord, tableOffset, record.length);
     batch.add(newRecord);
@@ -306,7 +358,8 @@ public class DiskBasedResultSet {
     }
   }
 
-  private void flushBatch(String dbName, short serializationVersion, List<ExpressionImpl.CachedRecord[]> batch, File file, AtomicInteger fileOffset) {
+  private void flushBatch(String dbName, short serializationVersion, List<ExpressionImpl.CachedRecord[]> batch,
+                          File file, AtomicInteger fileOffset) {
     ExpressionImpl.CachedRecord[][] batchRecords = new ExpressionImpl.CachedRecord[batch.size()][];
     for (int i = 0; i < batchRecords.length; i++) {
       batchRecords[i] = batch.get(i);
@@ -329,7 +382,8 @@ public class DiskBasedResultSet {
     synchronized (this) {
       while (true) {
         resultSetId = nextResultSetId.getAndIncrement();
-        file = new File(server.getDataDir(), RESULT_SETS_STR + File.separator + databaseServer.getShard() + File.separator + server.getReplica() + File.separator + resultSetId);
+        file = new File(server.getDataDir(), RESULT_SETS_STR + File.separator + databaseServer.getShard() +
+            File.separator + server.getReplica() + File.separator + resultSetId);
         if (!file.exists()) {
           break;
         }
@@ -351,28 +405,7 @@ public class DiskBasedResultSet {
 
     final List<ColumnImpl> localSelectColumns = selectColumns == null ? new ArrayList<>() : selectColumns;
 
-    for (ColumnImpl column : localSelectColumns) {
-      String tableName = column.getTableName();
-      String columnName = column.getColumnName();
-      getKeepers(dbName, databaseServer, tableNames, tableOffsets, keepers, columnName, tableName);
-    }
-
-    for (int i = 0; i < tableNames.length; i++) {
-      for (Map.Entry<String, IndexSchema> indexSchema : server.getCommon().getTables(dbName).get(tableNames[i]).getIndices().entrySet()) {
-        if (indexSchema.getValue().isPrimaryKey()) {
-          for (String column : indexSchema.getValue().getFields()) {
-            getKeepers(dbName, databaseServer, tableNames, tableOffsets, keepers, column, tableNames[i]);
-          }
-        }
-      }
-    }
-
-    for (OrderByExpressionImpl expression : orderByExpressions) {
-      String tableName = expression.getTableName();
-      String columnName = expression.getColumnName();
-      getKeepers(dbName, databaseServer, tableNames, tableOffsets, keepers, columnName, tableName);
-    }
-
+    getKeepers(dbName, databaseServer, tableNames, orderByExpressions, tableOffsets, keepers, localSelectColumns);
 
     final int[][] fieldOffsets = new int[tableNames.length][];
     for (int i = 0; i < tableNames.length; i++) {
@@ -408,7 +441,8 @@ public class DiskBasedResultSet {
       rhsCount = rhsRecord.length;
     }
 
-    processRecordsFromResultSets(serializationVersion, dbName, unique, intersect, except, file, fileOffset, comparator, lhsRs, rhsRs, batch, lhsRecord, rhsRecord, lastLhsRecord, lhsCount, rhsCount);
+    processRecordsFromResultSets(serializationVersion, dbName, unique, intersect, except, file, fileOffset, comparator,
+        lhsRs, rhsRs, batch, lhsRecord, rhsRecord, lastLhsRecord, lhsCount, rhsCount);
 
     flushBatch(dbName, serializationVersion, batch, file, fileOffset);
 
@@ -417,7 +451,38 @@ public class DiskBasedResultSet {
     updateAccessTime(file);
   }
 
-  private void processRecordsFromResultSets(Short serializationVersion, String dbName, boolean unique, boolean intersect, boolean except, File file, AtomicInteger fileOffset, Comparator<ExpressionImpl.CachedRecord[]> comparator, ResultSetContext lhsRs, ResultSetContext rhsRs, List<ExpressionImpl.CachedRecord[]> batch, ExpressionImpl.CachedRecord[] lhsRecord, ExpressionImpl.CachedRecord[] rhsRecord, ExpressionImpl.CachedRecord[] lastLhsRecord, int lhsCount, int rhsCount) {
+  private void getKeepers(String dbName, DatabaseServer databaseServer, String[] tableNames,
+                          List<OrderByExpressionImpl> orderByExpressions, Map<String, Integer> tableOffsets,
+                          boolean[][] keepers, List<ColumnImpl> localSelectColumns) {
+    for (ColumnImpl column : localSelectColumns) {
+      String tableName = column.getTableName();
+      String columnName = column.getColumnName();
+      getKeepers(dbName, databaseServer, tableNames, tableOffsets, keepers, columnName, tableName);
+    }
+
+    for (int i = 0; i < tableNames.length; i++) {
+      for (Map.Entry<String, IndexSchema> indexSchema : server.getCommon().getTables(dbName).get(tableNames[i]).getIndices().entrySet()) {
+        if (indexSchema.getValue().isPrimaryKey()) {
+          for (String column : indexSchema.getValue().getFields()) {
+            getKeepers(dbName, databaseServer, tableNames, tableOffsets, keepers, column, tableNames[i]);
+          }
+        }
+      }
+    }
+
+    for (OrderByExpressionImpl expression : orderByExpressions) {
+      String tableName = expression.getTableName();
+      String columnName = expression.getColumnName();
+      getKeepers(dbName, databaseServer, tableNames, tableOffsets, keepers, columnName, tableName);
+    }
+  }
+
+  private void processRecordsFromResultSets(Short serializationVersion, String dbName, boolean unique, boolean intersect,
+                                            boolean except, File file, AtomicInteger fileOffset,
+                                            Comparator<ExpressionImpl.CachedRecord[]> comparator, ResultSetContext lhsRs,
+                                            ResultSetContext rhsRs, List<ExpressionImpl.CachedRecord[]> batch,
+                                            ExpressionImpl.CachedRecord[] lhsRecord, ExpressionImpl.CachedRecord[] rhsRecord,
+                                            ExpressionImpl.CachedRecord[] lastLhsRecord, int lhsCount, int rhsCount) {
     while (true) {
       if (lhsRecord == null) {
         rhsRecord = consumeRhsRecord(serializationVersion, dbName, intersect, except, file, fileOffset, comparator,
@@ -430,35 +495,12 @@ public class DiskBasedResultSet {
         lastLhsRecord = consumeLhsRecord.getLastLhsRecord();
       }
       if (lhsRecord != null && rhsRecord != null) {
-        if (lastLhsRecord != null) {
-          if (0 == comparator.compare(lastLhsRecord, lhsRecord)) {
-            lastLhsRecord = lhsRecord;
-            lhsRecord = lhsRs.nextRecord();
-            continue;
-          }
-          if (0 == comparator.compare(lastLhsRecord, rhsRecord)) {
-            rhsRecord = rhsRs.nextRecord();
-            continue;
-          }
-        }
-        int compareValue = comparator.compare(lhsRecord, rhsRecord);
-        if (compareValue == 0) {
-          ProcessRecordsEqual processRecordsEqual = new ProcessRecordsEqual(serializationVersion, dbName, unique,
-              except, file, fileOffset, lhsRs, rhsRs, batch, lhsRecord, rhsRecord, lhsCount, rhsCount).invoke();
-          lhsRecord = processRecordsEqual.getLhsRecord();
-          rhsRecord = processRecordsEqual.getRhsRecord();
-          lastLhsRecord = processRecordsEqual.getLastLhsRecord();
-        }
-        else if (compareValue < 0) {
-          ProcessRecordLess processRecordLess = new ProcessRecordLess(serializationVersion, dbName, intersect,
-              file, fileOffset, lhsRs, batch, lhsRecord, lhsCount, rhsCount).invoke();
-          lhsRecord = processRecordLess.getLhsRecord();
-          lastLhsRecord = processRecordLess.getLastLhsRecord();
-        }
-        else if (compareValue > 0) {
-          rhsRecord = processRecordGreater(serializationVersion, dbName, intersect, except, file, fileOffset, rhsRs,
-              batch, rhsRecord, lhsCount, rhsCount);
-        }
+        ProcessRecords processRecords = new ProcessRecords(serializationVersion, dbName, unique, intersect, except,
+            file, fileOffset, comparator, lhsRs, rhsRs, batch, lhsRecord, rhsRecord, lastLhsRecord, lhsCount, rhsCount).invoke();
+        lhsRecord = processRecords.getLhsRecord();
+        rhsRecord = processRecords.getRhsRecord();
+        lastLhsRecord = processRecords.getLastLhsRecord();
+        continue;
       }
       if (lhsRecord == null && rhsRecord == null) {
         break;
@@ -466,15 +508,13 @@ public class DiskBasedResultSet {
     }
   }
 
-  private ExpressionImpl.CachedRecord[] processRecordGreater(Short serializationVersion, String dbName, boolean intersect, boolean except, File file, AtomicInteger fileOffset, ResultSetContext rhsRs, List<ExpressionImpl.CachedRecord[]> batch, ExpressionImpl.CachedRecord[] rhsRecord, int lhsCount, int rhsCount) {
-    if (!intersect && !except) {
-      addRecord(dbName, serializationVersion, rhsRecord, lhsCount, lhsCount + rhsCount, batch, file, fileOffset);
-    }
-    rhsRecord = rhsRs.nextRecord();
-    return rhsRecord;
-  }
 
-  private ExpressionImpl.CachedRecord[] consumeRhsRecord(Short serializationVersion, String dbName, boolean intersect, boolean except, File file, AtomicInteger fileOffset, Comparator<ExpressionImpl.CachedRecord[]> comparator, ResultSetContext rhsRs, List<ExpressionImpl.CachedRecord[]> batch, ExpressionImpl.CachedRecord[] rhsRecord, ExpressionImpl.CachedRecord[] lastLhsRecord, int lhsCount, int rhsCount) {
+  private ExpressionImpl.CachedRecord[] consumeRhsRecord(Short serializationVersion, String dbName, boolean intersect,
+                                                         boolean except, File file, AtomicInteger fileOffset,
+                                                         Comparator<ExpressionImpl.CachedRecord[]> comparator,
+                                                         ResultSetContext rhsRs, List<ExpressionImpl.CachedRecord[]> batch,
+                                                         ExpressionImpl.CachedRecord[] rhsRecord,
+                                                         ExpressionImpl.CachedRecord[] lastLhsRecord, int lhsCount, int rhsCount) {
     while (rhsRecord != null) {
       if (lastLhsRecord != null && 0 == comparator.compare(lastLhsRecord, rhsRecord)) {
         rhsRecord = rhsRs.nextRecord();
@@ -488,8 +528,8 @@ public class DiskBasedResultSet {
     return rhsRecord;
   }
 
-  @NotNull
-  private Comparator<ExpressionImpl.CachedRecord[]> getRecordComparator(List<ColumnImpl> localSelectColumns, int[][] fieldOffsets, Comparator[] comparators) {
+  private Comparator<ExpressionImpl.CachedRecord[]> getRecordComparator(List<ColumnImpl> localSelectColumns,
+                                                                        int[][] fieldOffsets, Comparator[] comparators) {
     return (o1, o2) -> {
         int lhsOffset = -1;
         for (int i = 0; i < o1.length; i++) {
@@ -505,20 +545,30 @@ public class DiskBasedResultSet {
             break;
           }
         }
-        for (int i = 0; i < localSelectColumns.size(); i++) {
-          Object lhsObj = o1[lhsOffset].getRecord().getFields()[fieldOffsets[0][i]];
-          Object rhsObj = o2[rhsOffset].getRecord().getFields()[fieldOffsets[1][i]];
-          int compareValue = comparators[i].compare(lhsObj, rhsObj);
-          if (compareValue < 0 || compareValue > 0) {
-            return compareValue;
-          }
-        }
-        return 0;
-      };
+      Integer compareValue = doCompareRecords(localSelectColumns, fieldOffsets, comparators, o1[lhsOffset], o2[rhsOffset]);
+      if (compareValue != null) {
+        return compareValue;
+      }
+      return 0;
+    };
+  }
+
+  private Integer doCompareRecords(List<ColumnImpl> localSelectColumns, int[][] fieldOffsets, Comparator[] comparators,
+                                   ExpressionImpl.CachedRecord cachedRecord, ExpressionImpl.CachedRecord cachedRecord1) {
+    for (int i = 0; i < localSelectColumns.size(); i++) {
+      Object lhsObj = cachedRecord.getRecord().getFields()[fieldOffsets[0][i]];
+      Object rhsObj = cachedRecord1.getRecord().getFields()[fieldOffsets[1][i]];
+      int compareValue = comparators[i].compare(lhsObj, rhsObj);
+      if (compareValue < 0 || compareValue > 0) {
+        return compareValue;
+      }
+    }
+    return null;
   }
 
   public static void deleteOldResultSets(DatabaseServer server) {
-    File file = new File(server.getDataDir(), RESULT_SETS_STR + File.separator + server.getShard() + File.separator + server.getReplica() + File.separator);
+    File file = new File(server.getDataDir(), RESULT_SETS_STR + File.separator + server.getShard() + File.separator +
+        server.getReplica() + File.separator);
     File[] resultSets = file.listFiles();
     if (resultSets != null) {
       for (File resultSet : resultSets) {
@@ -528,7 +578,7 @@ public class DiskBasedResultSet {
             long updateTime = file.lastModified();
             if (updateTime < System.currentTimeMillis() - 24 * 60 * 60 * 1000) {
               FileUtils.deleteDirectory(resultSet);
-              logger.info("Deleted old disk-based result set: dir=" + resultSet.getAbsolutePath());
+              logger.info("Deleted old disk-based result set: dir={}", resultSet.getAbsolutePath());
             }
           }
           catch (Exception e) {
@@ -603,7 +653,8 @@ public class DiskBasedResultSet {
     return resultSetId;
   }
 
-  private void writeRecordsToFile(short serializationVersion, File file, ExpressionImpl.CachedRecord[][] records, int fileOffset) {
+  private void writeRecordsToFile(short serializationVersion, File file, ExpressionImpl.CachedRecord[][] records,
+                                  int fileOffset) {
     try {
 
       File subFile = new File(file, String.valueOf(fileOffset));
@@ -646,7 +697,8 @@ public class DiskBasedResultSet {
 
   public void delete() {
     try {
-      File file = new File(server.getDataDir(), RESULT_SETS_STR + File.separator + server.getShard() + File.separator + server.getReplica() + File.separator + resultSetId);
+      File file = new File(server.getDataDir(), RESULT_SETS_STR + File.separator + server.getShard() +
+          File.separator + server.getReplica() + File.separator + resultSetId);
       FileUtils.deleteDirectory(file);
     }
     catch (IOException e) {
@@ -656,7 +708,8 @@ public class DiskBasedResultSet {
 
   public byte[][][] nextPage(int pageNumber) {
     try {
-      File file = new File(server.getDataDir(), RESULT_SETS_STR + File.separator + server.getShard() + File.separator + server.getReplica() + File.separator + resultSetId);
+      File file = new File(server.getDataDir(), RESULT_SETS_STR + File.separator + server.getShard() +
+          File.separator + server.getReplica() + File.separator + resultSetId);
       if (!file.exists()) {
         return null;
       }
@@ -724,7 +777,11 @@ public class DiskBasedResultSet {
     private int lhsCount;
     private int rhsCount;
 
-    public ConsumeLhsRecord(Short serializationVersion, String dbName, boolean intersect, File file, AtomicInteger fileOffset, Comparator<ExpressionImpl.CachedRecord[]> comparator, ResultSetContext lhsRs, List<ExpressionImpl.CachedRecord[]> batch, ExpressionImpl.CachedRecord[] lhsRecord, ExpressionImpl.CachedRecord[] lastLhsRecord, int lhsCount, int rhsCount) {
+    public ConsumeLhsRecord(Short serializationVersion, String dbName, boolean intersect, File file,
+                            AtomicInteger fileOffset, Comparator<ExpressionImpl.CachedRecord[]> comparator,
+                            ResultSetContext lhsRs, List<ExpressionImpl.CachedRecord[]> batch,
+                            ExpressionImpl.CachedRecord[] lhsRecord, ExpressionImpl.CachedRecord[] lastLhsRecord,
+                            int lhsCount, int rhsCount) {
       this.serializationVersion = serializationVersion;
       this.dbName = dbName;
       this.intersect = intersect;
@@ -779,7 +836,10 @@ public class DiskBasedResultSet {
     private int rhsCount;
     private ExpressionImpl.CachedRecord[] lastLhsRecord;
 
-    public ProcessRecordsEqual(Short serializationVersion, String dbName, boolean unique, boolean except, File file, AtomicInteger fileOffset, ResultSetContext lhsRs, ResultSetContext rhsRs, List<ExpressionImpl.CachedRecord[]> batch, ExpressionImpl.CachedRecord[] lhsRecord, ExpressionImpl.CachedRecord[] rhsRecord, int lhsCount, int rhsCount) {
+    public ProcessRecordsEqual(Short serializationVersion, String dbName, boolean unique, boolean except, File file,
+                               AtomicInteger fileOffset, ResultSetContext lhsRs, ResultSetContext rhsRs,
+                               List<ExpressionImpl.CachedRecord[]> batch, ExpressionImpl.CachedRecord[] lhsRecord,
+                               ExpressionImpl.CachedRecord[] rhsRecord, int lhsCount, int rhsCount) {
       this.serializationVersion = serializationVersion;
       this.dbName = dbName;
       this.unique = unique;
@@ -834,7 +894,9 @@ public class DiskBasedResultSet {
     private int rhsCount;
     private ExpressionImpl.CachedRecord[] lastLhsRecord;
 
-    public ProcessRecordLess(Short serializationVersion, String dbName, boolean intersect, File file, AtomicInteger fileOffset, ResultSetContext lhsRs, List<ExpressionImpl.CachedRecord[]> batch, ExpressionImpl.CachedRecord[] lhsRecord, int lhsCount, int rhsCount) {
+    public ProcessRecordLess(Short serializationVersion, String dbName, boolean intersect, File file,
+                             AtomicInteger fileOffset, ResultSetContext lhsRs, List<ExpressionImpl.CachedRecord[]> batch,
+                             ExpressionImpl.CachedRecord[] lhsRecord, int lhsCount, int rhsCount) {
       this.serializationVersion = serializationVersion;
       this.dbName = dbName;
       this.intersect = intersect;
@@ -857,11 +919,112 @@ public class DiskBasedResultSet {
 
     public ProcessRecordLess invoke() {
       if (!intersect) {
-        addRecord(dbName, serializationVersion, lhsRecord, 0, lhsCount + rhsCount, batch, file, fileOffset);
+        addRecord(dbName, serializationVersion, lhsRecord, 0, lhsCount + rhsCount, batch, file,
+            fileOffset);
       }
       lastLhsRecord = lhsRecord;
       lhsRecord = lhsRs.nextRecord();
       return this;
+    }
+  }
+
+  private class ProcessRecords {
+    private Short serializationVersion;
+    private String dbName;
+    private boolean unique;
+    private boolean intersect;
+    private boolean except;
+    private File file;
+    private AtomicInteger fileOffset;
+    private Comparator<ExpressionImpl.CachedRecord[]> comparator;
+    private ResultSetContext lhsRs;
+    private ResultSetContext rhsRs;
+    private List<ExpressionImpl.CachedRecord[]> batch;
+    private ExpressionImpl.CachedRecord[] lhsRecord;
+    private ExpressionImpl.CachedRecord[] rhsRecord;
+    private ExpressionImpl.CachedRecord[] lastLhsRecord;
+    private int lhsCount;
+    private int rhsCount;
+
+    public ProcessRecords(Short serializationVersion, String dbName, boolean unique, boolean intersect, boolean except,
+                          File file, AtomicInteger fileOffset, Comparator<ExpressionImpl.CachedRecord[]> comparator,
+                          ResultSetContext lhsRs, ResultSetContext rhsRs, List<ExpressionImpl.CachedRecord[]> batch,
+                          ExpressionImpl.CachedRecord[] lhsRecord, ExpressionImpl.CachedRecord[] rhsRecord,
+                          ExpressionImpl.CachedRecord[] lastLhsRecord, int lhsCount, int rhsCount) {
+      this.serializationVersion = serializationVersion;
+      this.dbName = dbName;
+      this.unique = unique;
+      this.intersect = intersect;
+      this.except = except;
+      this.file = file;
+      this.fileOffset = fileOffset;
+      this.comparator = comparator;
+      this.lhsRs = lhsRs;
+      this.rhsRs = rhsRs;
+      this.batch = batch;
+      this.lhsRecord = lhsRecord;
+      this.rhsRecord = rhsRecord;
+      this.lastLhsRecord = lastLhsRecord;
+      this.lhsCount = lhsCount;
+      this.rhsCount = rhsCount;
+    }
+
+    public ExpressionImpl.CachedRecord[] getLhsRecord() {
+      return lhsRecord;
+    }
+
+    public ExpressionImpl.CachedRecord[] getRhsRecord() {
+      return rhsRecord;
+    }
+
+    public ExpressionImpl.CachedRecord[] getLastLhsRecord() {
+      return lastLhsRecord;
+    }
+
+    public ProcessRecords invoke() {
+      if (lastLhsRecord != null) {
+        if (0 == comparator.compare(lastLhsRecord, lhsRecord)) {
+          lastLhsRecord = lhsRecord;
+          lhsRecord = lhsRs.nextRecord();
+          return this;
+        }
+        if (0 == comparator.compare(lastLhsRecord, rhsRecord)) {
+          rhsRecord = rhsRs.nextRecord();
+          return this;
+        }
+      }
+      int compareValue = comparator.compare(lhsRecord, rhsRecord);
+      if (compareValue == 0) {
+        ProcessRecordsEqual processRecordsEqual = new ProcessRecordsEqual(serializationVersion, dbName, unique,
+            except, file, fileOffset, lhsRs, rhsRs, batch, lhsRecord, rhsRecord, lhsCount, rhsCount).invoke();
+        lhsRecord = processRecordsEqual.getLhsRecord();
+        rhsRecord = processRecordsEqual.getRhsRecord();
+        lastLhsRecord = processRecordsEqual.getLastLhsRecord();
+      }
+      else if (compareValue < 0) {
+        ProcessRecordLess processRecordLess = new ProcessRecordLess(serializationVersion, dbName, intersect,
+            file, fileOffset, lhsRs, batch, lhsRecord, lhsCount, rhsCount).invoke();
+        lhsRecord = processRecordLess.getLhsRecord();
+        lastLhsRecord = processRecordLess.getLastLhsRecord();
+      }
+      else if (compareValue > 0) {
+        rhsRecord = processRecordGreater(serializationVersion, dbName, intersect, except, file, fileOffset, rhsRs,
+            batch, rhsRecord, lhsCount, rhsCount);
+      }
+      return this;
+    }
+
+    private ExpressionImpl.CachedRecord[] processRecordGreater(Short serializationVersion, String dbName,
+                                                               boolean intersect, boolean except, File file,
+                                                               AtomicInteger fileOffset, ResultSetContext rhsRs,
+                                                               List<ExpressionImpl.CachedRecord[]> batch,
+                                                               ExpressionImpl.CachedRecord[] rhsRecord, int lhsCount,
+                                                               int rhsCount) {
+      if (!intersect && !except) {
+        addRecord(dbName, serializationVersion, rhsRecord, lhsCount, lhsCount + rhsCount, batch, file, fileOffset);
+      }
+      rhsRecord = rhsRs.nextRecord();
+      return rhsRecord;
     }
   }
 }

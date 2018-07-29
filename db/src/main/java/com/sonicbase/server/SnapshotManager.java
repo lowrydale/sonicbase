@@ -22,11 +22,12 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-@SuppressWarnings({"squid:S1172", "squid:S2629", "squid:S1168", "squid:S3516"})
+@SuppressWarnings({"squid:S1172", "squid:S2629", "squid:S1168", "squid:S3516", "squid:S00107"})
 // all methods called from method invoker must have cobj and replayed command parms
 // info is always enabled, don't need to conditionally call
 // I prefer to return null instead of an empty array
 // all methods called from method invoker must return a ComObject even if they are all null
+// I don't know a good way to reduce the parameter count
 public class SnapshotManager {
 
   private static Logger logger = LoggerFactory.getLogger(SnapshotManager.class);
@@ -156,40 +157,7 @@ public class SnapshotManager {
 
       logger.info("Recover from snapshot: dir={}", snapshotDir.getAbsolutePath());
 
-      ThreadPoolExecutor executor = ThreadUtil.createExecutor(SNAPSHOT_PARTITION_COUNT,
-          "SonicBase SnapshotManager recoverFromSnapshot Thread");
-
-      try {
-        final AtomicLong recoveredCount = new AtomicLong();
-        recoveredCount.set(0);
-
-        final long indexBegin = System.currentTimeMillis();
-        recoveredCount.set(0);
-        final  AtomicLong lastLogged = new AtomicLong(System.currentTimeMillis());
-        File file = snapshotDir;
-
-        if (file.exists()) {
-          for (File tableFile : file.listFiles()) {
-            if (!tableFile.isDirectory()) {
-              continue;
-            }
-            for (File indexDir : tableFile.listFiles()) {
-              for (final File indexFile : indexDir.listFiles()) {
-                totalBytes += indexFile.length();
-              }
-            }
-          }
-        }
-        if (file.exists()) {
-          recoverTables(dbName, executor, recoveredCount, indexBegin, lastLogged, file);
-        }
-        logger.info("Recover progress - finished all indices. count={}, rate={}, duration={}", recoveredCount.get(),
-            ((float) recoveredCount.get() / (float) (System.currentTimeMillis() - indexBegin) * 1000f),
-            (System.currentTimeMillis() - indexBegin) / 1000f);
-      }
-      finally {
-        executor.shutdownNow();
-      }
+      doRecoverFromSnapshot(dbName, snapshotDir);
     }
     catch (Exception e) {
       errorRecovering = e;
@@ -200,47 +168,104 @@ public class SnapshotManager {
     }
   }
 
-  private void recoverTables(String dbName, ThreadPoolExecutor executor, AtomicLong recoveredCount, long indexBegin, AtomicLong lastLogged, File file) {
-    for (File tableFile : file.listFiles()) {
-      final String tableName = tableFile.getName();
-      if (!tableFile.isDirectory()) {
-        continue;
-      }
-      for (File indexDir : tableFile.listFiles()) {
-        final String indexName = indexDir.getName();
-        List<Future> futures = new ArrayList<>();
-        final AtomicInteger offset = new AtomicInteger();
-        logger.info("Recovering: table={}, index={}", tableName, indexName);
-        for (final File indexFile : indexDir.listFiles()) {
-          final int currOffset = offset.get();
-          final TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
-          final IndexSchema indexSchema = server.getIndexSchema(dbName, tableSchema.getName(), indexName);
-          final Index index = server.getIndex(dbName, tableName, indexName);
+  private void doRecoverFromSnapshot(String dbName, File snapshotDir) {
+    ThreadPoolExecutor executor = ThreadUtil.createExecutor(SNAPSHOT_PARTITION_COUNT,
+        "SonicBase SnapshotManager recoverFromSnapshot Thread");
 
-          recoverIndex(executor, recoveredCount, indexBegin, lastLogged, tableName, indexName, futures, indexFile, currOffset, tableSchema, indexSchema, index);
+    try {
+      final AtomicLong recoveredCount = new AtomicLong();
+      recoveredCount.set(0);
 
-          offset.incrementAndGet();
-        }
-        for (Future future : futures) {
-          try {
-            if (!(Boolean) future.get()) {
-              throw new DatabaseException("Error recovering from bucket");
+      final long indexBegin = System.currentTimeMillis();
+      recoveredCount.set(0);
+      final  AtomicLong lastLogged = new AtomicLong(System.currentTimeMillis());
+      File file = snapshotDir;
+
+      if (file.exists()) {
+        for (File tableFile : file.listFiles()) {
+          if (!tableFile.isDirectory()) {
+            continue;
+          }
+          for (File indexDir : tableFile.listFiles()) {
+            for (final File indexFile : indexDir.listFiles()) {
+              totalBytes += indexFile.length();
             }
           }
-          catch (Exception t) {
-            errorRecovering = t;
-            throw new DatabaseException("Error recovering from bucket", t);
+        }
+      }
+      if (file.exists()) {
+        recoverTables(dbName, executor, recoveredCount, indexBegin, lastLogged, file);
+      }
+      logger.info("Recover progress - finished all indices. count={}, rate={}, duration={}", recoveredCount.get(),
+          ((float) recoveredCount.get() / (float) (System.currentTimeMillis() - indexBegin) * 1000f),
+          (System.currentTimeMillis() - indexBegin) / 1000f);
+    }
+    finally {
+      executor.shutdownNow();
+    }
+  }
+
+  private void recoverTables(String dbName, ThreadPoolExecutor executor, AtomicLong recoveredCount, long indexBegin,
+                             AtomicLong lastLogged, File file) {
+    File[] files = file.listFiles();
+    if (files != null) {
+      for (File tableFile : files) {
+        final String tableName = tableFile.getName();
+        if (!tableFile.isDirectory()) {
+          continue;
+        }
+        File[] indexDirs = tableFile.listFiles();
+        if (indexDirs != null) {
+          for (File indexDir : indexDirs) {
+            final String indexName = indexDir.getName();
+            List<Future> futures = new ArrayList<>();
+            final AtomicInteger offset = new AtomicInteger();
+            logger.info("Recovering: table={}, index={}", tableName, indexName);
+            File[] indexFiles = indexDir.listFiles();
+            recoverIndexFiles(dbName, executor, recoveredCount, indexBegin, lastLogged, tableName, indexName,
+                futures, offset, indexFiles);
           }
         }
-        logger.info("Recover progress - finished index. table={}, index={}, count={}, rate={}, duration={}",
-            tableName, indexName, recoveredCount.get(),
-            ((float) recoveredCount.get() / (float) (System.currentTimeMillis() - indexBegin) * 1000f),
-            (System.currentTimeMillis() - indexBegin) / 1000f);
       }
     }
   }
 
-  private void recoverIndex(ThreadPoolExecutor executor, AtomicLong recoveredCount, long indexBegin, AtomicLong lastLogged, String tableName, String indexName, List<Future> futures, File indexFile, int currOffset, TableSchema tableSchema, IndexSchema indexSchema, Index index) {
+  private void recoverIndexFiles(String dbName, ThreadPoolExecutor executor, AtomicLong recoveredCount,
+                                 long indexBegin, AtomicLong lastLogged, String tableName, String indexName,
+                                 List<Future> futures, AtomicInteger offset, File[] indexFiles) {
+    if (indexFiles != null) {
+      for (final File indexFile : indexFiles) {
+        final int currOffset = offset.get();
+        final TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
+        final IndexSchema indexSchema = server.getIndexSchema(dbName, tableSchema.getName(), indexName);
+        final Index index = server.getIndex(dbName, tableName, indexName);
+
+        recoverIndex(executor, recoveredCount, indexBegin, lastLogged, tableName, indexName, futures, indexFile,
+            currOffset, tableSchema, indexSchema, index);
+
+        offset.incrementAndGet();
+      }
+    }
+    for (Future future : futures) {
+      try {
+        if (!(Boolean) future.get()) {
+          throw new DatabaseException("Error recovering from bucket");
+        }
+      }
+      catch (Exception t) {
+        errorRecovering = t;
+        throw new DatabaseException("Error recovering from bucket", t);
+      }
+    }
+    logger.info("Recover progress - finished index. table={}, index={}, count={}, rate={}, duration={}",
+        tableName, indexName, recoveredCount.get(),
+        ((float) recoveredCount.get() / (float) (System.currentTimeMillis() - indexBegin) * 1000f),
+        (System.currentTimeMillis() - indexBegin) / 1000f);
+  }
+
+  private void recoverIndex(ThreadPoolExecutor executor, AtomicLong recoveredCount, long indexBegin,
+                            AtomicLong lastLogged, String tableName, String indexName, List<Future> futures,
+                            File indexFile, int currOffset, TableSchema tableSchema, IndexSchema indexSchema, Index index) {
     futures.add(executor.submit(() -> {
       try (DataInputStream inStream = new DataInputStream(new BufferedInputStream(
           new ByteCounterStream(finishedBytes, new FileInputStream(indexFile))))) {
@@ -395,29 +420,10 @@ public class SnapshotManager {
     snapshotThread = ThreadUtil.createThread(() -> {
       while (!Thread.interrupted()) {
         try {
-          if (lastSnapshot != -1) {
-            long timeToWait = 30 * 1000 - (System.currentTimeMillis() - lastSnapshot);
-            if (timeToWait > 0) {
-              Thread.sleep(timeToWait);
-            }
-          }
-          else {
-            Thread.sleep(10000);
-          }
-          while (!enableSnapshot) {
-            Thread.sleep(1000);
-          }
+          waitToStartSnapshot();
 
-          Set<String> dbNames = new HashSet<>();
-          for (String dbName : server.getCommon().getDatabases().keySet()) {
-            dbNames.add(dbName);
-          }
-          for (String dbName : server.getDbNames(server.getDataDir())) {
-            dbNames.add(dbName);
-          }
-          for (String dbName : dbNames) {
-            runSnapshot(dbName);
-          }
+          startSnapshotForDbs();
+
           server.getCommon().saveSchema(server.getDataDir());
         }
         catch (InterruptedException e) {
@@ -432,10 +438,40 @@ public class SnapshotManager {
     snapshotThread.start();
   }
 
-  private void deleteRecord(String dbName, String tableName, TableSchema tableSchema, IndexSchema indexSchema, Object[] key, byte[] record, int[] fieldOffsets) {
+  private void waitToStartSnapshot() throws InterruptedException {
+    if (lastSnapshot != -1) {
+      long timeToWait = 30 * 1000 - (System.currentTimeMillis() - lastSnapshot);
+      if (timeToWait > 0) {
+        Thread.sleep(timeToWait);
+      }
+    }
+    else {
+      Thread.sleep(10000);
+    }
+    while (!enableSnapshot) {
+      Thread.sleep(1000);
+    }
+  }
+
+  private void startSnapshotForDbs() throws IOException {
+    Set<String> dbNames = new HashSet<>();
+    for (String dbName : server.getCommon().getDatabases().keySet()) {
+      dbNames.add(dbName);
+    }
+    for (String dbName : server.getDbNames(server.getDataDir())) {
+      dbNames.add(dbName);
+    }
+    for (String dbName : dbNames) {
+      runSnapshot(dbName);
+    }
+  }
+
+  private void deleteRecord(String dbName, String tableName, TableSchema tableSchema, IndexSchema indexSchema,
+                            Object[] key, byte[] record, int[] fieldOffsets) {
 
     List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false,
-        tableSchema, indexSchema.getName(), null, BinaryExpression.Operator.EQUAL, null, key, null);
+        tableSchema, indexSchema.getName(), null, BinaryExpression.Operator.EQUAL,
+        null, key, null);
     if (selectedShards.isEmpty()) {
       throw new DatabaseException("No shards selected for query");
     }
@@ -448,7 +484,8 @@ public class SnapshotManager {
     cobj.put(ComObject.Tag.TABLE_NAME, tableName);
     cobj.put(ComObject.Tag.INDEX_NAME, indexSchema.getName());
     cobj.put(ComObject.Tag.METHOD, "UpdateManager:deleteRecord");
-    server.getClient().send("UpdateManager:deleteRecord", selectedShards.get(0), 0, cobj, DatabaseClient.Replica.DEF);
+    server.getClient().send("UpdateManager:deleteRecord", selectedShards.get(0), 0, cobj,
+        DatabaseClient.Replica.DEF);
 
     cobj = new ComObject();
     cobj.put(ComObject.Tag.DB_NAME, dbName);
@@ -496,6 +533,26 @@ public class SnapshotManager {
 
     final AtomicInteger tableCount = new AtomicInteger();
     final AtomicInteger indexCount = new AtomicInteger();
+    doRunSnapshot(dbName, file, deleteIfOlder, countSaved, lastLogged, tableCount, indexCount);
+
+    File snapshotDir = new File(snapshotRootDir, String.valueOf(highestSnapshot + 1));
+
+    file.renameTo(snapshotDir);
+
+    deleteOldSnapshots(dbName);
+
+    try {
+      server.getLogManager().deleteOldLogs(lastTimeStartedSnapshot, false);
+    }
+    catch (Exception e) {
+      logger.error("Error deleting old logs", e);
+    }
+
+    logger.info("Snapshot - end: snapshotId={}, duration={}", (highestSnapshot + 1), (System.currentTimeMillis() - begin));
+  }
+
+  private void doRunSnapshot(String dbName, File file, Long deleteIfOlder, AtomicLong countSaved, AtomicLong lastLogged,
+                             AtomicInteger tableCount, AtomicInteger indexCount) throws IOException {
     for (final Map.Entry<String, TableSchema> tableEntry : server.getCommon().getTables(dbName).entrySet()) {
       tableCount.incrementAndGet();
       for (final Map.Entry<String, IndexSchema> indexEntry : tableEntry.getValue().getIndices().entrySet()) {
@@ -520,7 +577,8 @@ public class SnapshotManager {
             outStreams[i] = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(currFile), 65_000));
           }
 
-          snapshotIndex(dbName, deleteIfOlder, countSaved, lastLogged, tableEntry, indexEntry, fieldOffsets, subBegin, savedCount, index, outStreams);
+          snapshotIndex(dbName, deleteIfOlder, countSaved, lastLogged, tableEntry, indexEntry, fieldOffsets, subBegin,
+              savedCount, index, outStreams);
 
           logger.info("Snapshot progress - finished index: count={}, rate={}, duration={}, table={}, index={}",
               savedCount, ((float) savedCount.get() / (float) (System.currentTimeMillis() - subBegin) * 1000f),
@@ -538,24 +596,12 @@ public class SnapshotManager {
         }
       }
     }
-
-    File snapshotDir = new File(snapshotRootDir, String.valueOf(highestSnapshot + 1));
-
-    file.renameTo(snapshotDir);
-
-    deleteOldSnapshots(dbName);
-
-    try {
-      server.getLogManager().deleteOldLogs(lastTimeStartedSnapshot, false);
-    }
-    catch (Exception e) {
-      logger.error("Error deleting old logs", e);
-    }
-
-    logger.info("Snapshot - end: snapshotId={}, duration={}", (highestSnapshot + 1), (System.currentTimeMillis() - begin));
   }
 
-  private void snapshotIndex(String dbName, Long deleteIfOlder, AtomicLong countSaved, AtomicLong lastLogged, Map.Entry<String, TableSchema> tableEntry, Map.Entry<String, IndexSchema> indexEntry, int[] fieldOffsets, long subBegin, AtomicLong savedCount, Index index, DataOutputStream[] outStreams) {
+  private void snapshotIndex(String dbName, Long deleteIfOlder, AtomicLong countSaved, AtomicLong lastLogged,
+                             Map.Entry<String, TableSchema> tableEntry, Map.Entry<String, IndexSchema> indexEntry,
+                             int[] fieldOffsets, long subBegin, AtomicLong savedCount, Index index,
+                             DataOutputStream[] outStreams) {
     final boolean isPrimaryKey = indexEntry.getValue().isPrimaryKey();
     Map.Entry<Object[], Object> first = index.firstEntry();
     if (first != null) {
@@ -584,7 +630,10 @@ public class SnapshotManager {
     }
   }
 
-  private void writeRecords(String dbName, Long deleteIfOlder, AtomicLong lastLogged, Map.Entry<String, TableSchema> tableEntry, Map.Entry<String, IndexSchema> indexEntry, int[] fieldOffsets, long subBegin, AtomicLong savedCount, DataOutputStream[] outStreams, Object[] key, int bucket, byte[][] records, long updateTime) throws IOException {
+  private void writeRecords(String dbName, Long deleteIfOlder, AtomicLong lastLogged,
+                            Map.Entry<String, TableSchema> tableEntry, Map.Entry<String, IndexSchema> indexEntry,
+                            int[] fieldOffsets, long subBegin, AtomicLong savedCount, DataOutputStream[] outStreams,
+                            Object[] key, int bucket, byte[][] records, long updateTime) throws IOException {
     if (records != null) {
       outStreams[bucket].writeBoolean(true);
       byte[] keyBytes = DatabaseCommon.serializeKey(tableEntry.getValue(), indexEntry.getKey(), key);

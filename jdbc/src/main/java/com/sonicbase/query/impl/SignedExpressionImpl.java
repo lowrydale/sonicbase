@@ -11,12 +11,11 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * Responsible for
- */
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class SignedExpressionImpl extends ExpressionImpl {
   private ExpressionImpl expression;
   private boolean isNegative;
@@ -35,11 +34,6 @@ public class SignedExpressionImpl extends ExpressionImpl {
 
   public void setNegative(boolean negative) {
     this.isNegative = negative;
-  }
-
-  @Override
-  public void getColumns(Set<ColumnImpl> columns) {
-
   }
 
   /**
@@ -118,7 +112,8 @@ public class SignedExpressionImpl extends ExpressionImpl {
 
 
   @Override
-  public NextReturn next(SelectStatementImpl.Explain explainBuilder, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
+  public NextReturn next(SelectStatementImpl.Explain explainBuilder, AtomicLong currOffset, AtomicLong countReturned,
+                         Limit limit, Offset offset, int schemaRetryCount) {
     return null;
   }
 
@@ -130,11 +125,6 @@ public class SignedExpressionImpl extends ExpressionImpl {
   @Override
   public boolean canSortWithIndex() {
     return false;
-  }
-
-  @Override
-  public void queryRewrite() {
-
   }
 
   @Override

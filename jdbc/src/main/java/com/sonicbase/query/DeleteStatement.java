@@ -3,9 +3,9 @@ package com.sonicbase.query;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.impl.SelectStatementImpl;
 
-/**
- * Responsible for
- */
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public interface DeleteStatement extends Statement {
 
   void setTableName(String tableName);

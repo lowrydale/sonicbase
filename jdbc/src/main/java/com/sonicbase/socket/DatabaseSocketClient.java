@@ -26,11 +26,10 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-/**
- * User: lowryda
- * Date: 11/7/14
- * Time: 5:20 PM
- */
+
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class DatabaseSocketClient {
 
   private static final int CONNECTION_COUNT = 10000;
@@ -51,33 +50,7 @@ public class DatabaseSocketClient {
         }
         sock = pool.poll(0, TimeUnit.MILLISECONDS);
         if (sock == null) {
-          try {
-            final CountDownLatch latch = new CountDownLatch(1);
-            final AtomicReference<Connection> newSock = new AtomicReference<>();
-            connectionCount.incrementAndGet();
-            Thread thread = new Thread(() -> {
-              try {
-                newSock.set(new Connection(host, port));
-                openConnections.add(newSock.get());
-                latch.countDown();
-              }
-              catch (Exception e) {
-                logger.error("Error connecting to server: host={}, port={}", host, port);
-              }
-            });
-            thread.start();
-            if (latch.await(20_000, TimeUnit.MILLISECONDS)) {
-              sock = newSock.get();
-            }
-            else {
-              thread.interrupt();
-              thread.join();
-              throw new DatabaseException("Error connecting to server: host=" + host + PORT_STR + port);
-            }
-          }
-          catch (Exception t) {
-            throw new DatabaseException("Error creating connection: host=" + host + PORT_STR + port, t);
-          }
+          sock = doBorrowConnection(host, port);
         }
         sock.countCalled++;
         return sock;
@@ -94,6 +67,38 @@ public class DatabaseSocketClient {
       }
     }
     throw new DatabaseException("Error borrowing connection");
+  }
+
+  private static Connection doBorrowConnection(String host, int port) {
+    Connection sock;
+    try {
+      final CountDownLatch latch = new CountDownLatch(1);
+      final AtomicReference<Connection> newSock = new AtomicReference<>();
+      connectionCount.incrementAndGet();
+      Thread thread = new Thread(() -> {
+        try {
+          newSock.set(new Connection(host, port));
+          openConnections.add(newSock.get());
+          latch.countDown();
+        }
+        catch (Exception e) {
+          logger.error("Error connecting to server: host={}, port={}", host, port);
+        }
+      });
+      thread.start();
+      if (latch.await(20_000, TimeUnit.MILLISECONDS)) {
+        sock = newSock.get();
+      }
+      else {
+        thread.interrupt();
+        thread.join();
+        throw new DatabaseException("Error connecting to server: host=" + host + PORT_STR + port);
+      }
+    }
+    catch (Exception t) {
+      throw new DatabaseException("Error creating connection: host=" + host + PORT_STR + port, t);
+    }
+    return sock;
   }
 
   public static void returnConnection(
@@ -235,30 +240,9 @@ public class DatabaseSocketClient {
     try {
       long begin = System.nanoTime();
       totalCallCount.incrementAndGet();
-      if (callCount.incrementAndGet() % 10000 == 0) {
-        int connectionCount = 0;
-        int maxConnectionCount = 0;
-        for (ArrayBlockingQueue<Connection> value : pools.values()) {
-          connectionCount += value.size();
-          maxConnectionCount = Math.max(value.size(), maxConnectionCount);
-        }
 
-        logger.info("SocketClient stats: callCount={}, avgDuration={}, processingDuration={}, avgRequestDuration={}, avgResponseDuration={}, avgConnectionCount={}, maxConnectionCount={}",
-            totalCallCount.get(), ((double)callDuration.get() / callCount.get() / 1000000d),
-            ((double)processingDuration.get() / callCount.get() / 1000000d),
-            ((double)requestDuration.get() / callCount.get() / 1000000d),
-            ((double)responseDuration.get() / callCount.get() / 1000000d), (connectionCount / pools.size()), maxConnectionCount);
-        synchronized (lastLogReset) {
-          if (System.currentTimeMillis() - lastLogReset.get() > 4 * 60 * 1000) {
-            callDuration.set(0);
-            callCount.set(0);
-            requestDuration.set(0);
-            responseDuration.set(0);
-            processingDuration.set(0);
-            lastLogReset.set(System.currentTimeMillis());
-          }
-        }
-      }
+      logCallStats();
+
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       byte[] intBuff = new byte[4];
       int requestCount = requests.size();
@@ -270,29 +254,8 @@ public class DatabaseSocketClient {
       bytesOut.close();
       byte[] body = bytesOut.toByteArray();
       int originalBodyLen = body.length;
-      if (COMPRESS) {
-        if (LZO_COMPRESSION) {
-          LZ4Factory factory = LZ4Factory.fastestInstance();
 
-          LZ4Compressor compressor = factory.fastCompressor();
-          int maxCompressedLength = compressor.maxCompressedLength(body.length);
-          byte[] compressed = new byte[maxCompressedLength];
-          int compressedLength = compressor.compress(body, 0, body.length, compressed, 0, maxCompressedLength);
-          body = new byte[compressedLength];
-          System.arraycopy(compressed, 0, body, 0, compressedLength);
-        }
-        else {
-          ByteArrayOutputStream bodyBytesOut = new ByteArrayOutputStream();
-          GZIPOutputStream bodyOut = new GZIPOutputStream(bodyBytesOut);
-          bodyOut.write(body);
-          bodyOut.close();
-          body = bodyBytesOut.toByteArray();
-        }
-        Util.writeRawLittleEndian32(body.length + 12, intBuff);
-      }
-      else {
-        Util.writeRawLittleEndian32(body.length + 8, intBuff);
-      }
+      body = handleCompressionForSend(intBuff, body);
 
       boolean shouldReturn = true;
       Connection sock = borrowConnection(host, port);
@@ -304,7 +267,6 @@ public class DatabaseSocketClient {
           byte[] originalLenBuff = new byte[4];
           Util.writeRawLittleEndian32(originalBodyLen, originalLenBuff);
           sockBytes.write(originalLenBuff);
-
         }
         long checksumValue = 0;
         byte[] longBuff = new byte[8];
@@ -320,7 +282,6 @@ public class DatabaseSocketClient {
         requestDuration.addAndGet(System.nanoTime() - beginRequest);
 
         int totalRead = 0;
-
         int bodyLen = 0;
 
         byte[] responseBody = readResponse(intBuff, sock, totalRead, bodyLen, processingBegin);
@@ -333,21 +294,7 @@ public class DatabaseSocketClient {
         Util.readRawLittleEndian64(responseBody, offset); // responseChecksum
         offset += 8;
 
-        if (DatabaseSocketClient.COMPRESS) {
-          if (DatabaseSocketClient.LZO_COMPRESSION) {
-            LZ4Factory factory = LZ4Factory.fastestInstance();
-
-            LZ4FastDecompressor decompressor = factory.fastDecompressor();
-            byte[] restored = new byte[originalBodyLen];
-            decompressor.decompress(responseBody, offset, restored, 0, originalBodyLen);
-            body = restored;
-          }
-          else {
-            GZIPInputStream bodyIn = new GZIPInputStream(new ByteArrayInputStream(body));
-            body = new byte[originalBodyLen];
-            bodyIn.read(body);
-          }
-        }
+        body = handleCompressionForReceive(body, originalBodyLen, responseBody, offset);
 
         ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
         bytesIn.read(intBuff); //response count
@@ -373,23 +320,100 @@ public class DatabaseSocketClient {
         throw new DeadServerException(e);
       }
       finally {
-        if (shouldReturn) {
-          if (sock.countCalled > 100000) {
-            if (sock != null && sock.sock != null) {
-              sock.sock.close();
-              openConnections.remove(sock);
-            }
-          }
-          else {
-            returnConnection(sock, host, port);
-          }
-        }
+        returnConnectionAsNeeded(host, port, shouldReturn, sock);
       }
       callDuration.addAndGet(System.nanoTime() - begin);
     }
     catch (IOException e) {
       throw new DeadServerException(e);
     }
+  }
+
+  private static void logCallStats() {
+    if (callCount.incrementAndGet() % 10000 == 0) {
+      int connectionCount = 0;
+      int maxConnectionCount = 0;
+      for (ArrayBlockingQueue<Connection> value : pools.values()) {
+        connectionCount += value.size();
+        maxConnectionCount = Math.max(value.size(), maxConnectionCount);
+      }
+
+      logger.info("SocketClient stats: callCount={}, avgDuration={}, processingDuration={}, avgRequestDuration={}, avgResponseDuration={}, avgConnectionCount={}, maxConnectionCount={}",
+          totalCallCount.get(), ((double)callDuration.get() / callCount.get() / 1000000d),
+          ((double)processingDuration.get() / callCount.get() / 1000000d),
+          ((double)requestDuration.get() / callCount.get() / 1000000d),
+          ((double)responseDuration.get() / callCount.get() / 1000000d), (connectionCount / pools.size()), maxConnectionCount);
+      synchronized (lastLogReset) {
+        if (System.currentTimeMillis() - lastLogReset.get() > 4 * 60 * 1000) {
+          callDuration.set(0);
+          callCount.set(0);
+          requestDuration.set(0);
+          responseDuration.set(0);
+          processingDuration.set(0);
+          lastLogReset.set(System.currentTimeMillis());
+        }
+      }
+    }
+  }
+
+  private static void returnConnectionAsNeeded(String host, int port, boolean shouldReturn, Connection sock) throws IOException {
+    if (shouldReturn) {
+      if (sock.countCalled > 100000) {
+        if (sock != null && sock.sock != null) {
+          sock.sock.close();
+          openConnections.remove(sock);
+        }
+      }
+      else {
+        returnConnection(sock, host, port);
+      }
+    }
+  }
+
+  private static byte[] handleCompressionForReceive(byte[] body, int originalBodyLen, byte[] responseBody, int offset) throws IOException {
+    if (DatabaseSocketClient.COMPRESS) {
+      if (DatabaseSocketClient.LZO_COMPRESSION) {
+        LZ4Factory factory = LZ4Factory.fastestInstance();
+
+        LZ4FastDecompressor decompressor = factory.fastDecompressor();
+        byte[] restored = new byte[originalBodyLen];
+        decompressor.decompress(responseBody, offset, restored, 0, originalBodyLen);
+        body = restored;
+      }
+      else {
+        GZIPInputStream bodyIn = new GZIPInputStream(new ByteArrayInputStream(body));
+        body = new byte[originalBodyLen];
+        bodyIn.read(body);
+      }
+    }
+    return body;
+  }
+
+  private static byte[] handleCompressionForSend(byte[] intBuff, byte[] body) throws IOException {
+    if (COMPRESS) {
+      if (LZO_COMPRESSION) {
+        LZ4Factory factory = LZ4Factory.fastestInstance();
+
+        LZ4Compressor compressor = factory.fastCompressor();
+        int maxCompressedLength = compressor.maxCompressedLength(body.length);
+        byte[] compressed = new byte[maxCompressedLength];
+        int compressedLength = compressor.compress(body, 0, body.length, compressed, 0, maxCompressedLength);
+        body = new byte[compressedLength];
+        System.arraycopy(compressed, 0, body, 0, compressedLength);
+      }
+      else {
+        ByteArrayOutputStream bodyBytesOut = new ByteArrayOutputStream();
+        GZIPOutputStream bodyOut = new GZIPOutputStream(bodyBytesOut);
+        bodyOut.write(body);
+        bodyOut.close();
+        body = bodyBytesOut.toByteArray();
+      }
+      Util.writeRawLittleEndian32(body.length + 12, intBuff);
+    }
+    else {
+      Util.writeRawLittleEndian32(body.length + 8, intBuff);
+    }
+    return body;
   }
 
   private static byte[] readResponse(byte[] intBuff, Connection sock, int totalRead, int bodyLen, long processingBegin) throws IOException {

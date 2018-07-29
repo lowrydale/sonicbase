@@ -19,6 +19,9 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class ConstantImpl extends ExpressionImpl {
   private Object value;
   private int sqlType;
@@ -123,7 +126,7 @@ public class ConstantImpl extends ExpressionImpl {
 
   @Override
   public void getColumns(Set<ColumnImpl> columns) {
-
+    //nothing to implement
   }
 
   public void negate() {
@@ -205,7 +208,8 @@ public class ConstantImpl extends ExpressionImpl {
   }
 
   @Override
-  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
+  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
+                         Limit limit, Offset offset, int schemaRetryCount) {
     return null;
   }
 
@@ -228,7 +232,7 @@ public class ConstantImpl extends ExpressionImpl {
 
   @Override
   public void queryRewrite() {
-
+    //nothing to implement
   }
 
   @Override

@@ -7,6 +7,9 @@ import java.sql.*;
 import java.util.Properties;
 import java.util.logging.Logger;
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class Driver implements java.sql.Driver {
 
 

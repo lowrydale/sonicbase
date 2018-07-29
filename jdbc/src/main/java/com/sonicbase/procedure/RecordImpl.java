@@ -16,6 +16,9 @@ import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.Map;
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class RecordImpl implements Record {
   private String dbName;
   private short serializationNumber;

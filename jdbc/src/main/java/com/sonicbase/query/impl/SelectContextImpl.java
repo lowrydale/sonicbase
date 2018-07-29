@@ -3,9 +3,9 @@ package com.sonicbase.query.impl;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.BinaryExpression;
 
-/**
- * Responsible for
- */
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class SelectContextImpl {
   private boolean restrictToThisServer;
   private boolean currPartitions;

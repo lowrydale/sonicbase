@@ -20,6 +20,9 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class AllRecordsExpressionImpl extends ExpressionImpl {
   private String fromTable;
 
@@ -89,7 +92,8 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
   }
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset,
+  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
+                         Limit limit, Offset offset,
                          boolean b, boolean analyze, int schemaRetryCount) {
     List<OrderByExpressionImpl> orderByExpressions = getOrderByExpressions();
     String orderByColumn = null;
@@ -99,23 +103,9 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
     TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(getFromTable());
     IndexSchema indexSchema = null;
     IndexSchema primaryIndex = null;
-    for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
-      if (entry.getValue().isPrimaryKey()) {
-        primaryIndex = entry.getValue();
-      }
-      if (orderByColumn == null || getGroupByContext() != null) {
-        if (entry.getValue().isPrimaryKey()) {
-          indexSchema = entry.getValue();
-          break;
-        }
-      }
-      else {
-        if (entry.getValue().getFields()[0].equals(orderByColumn)) {
-          indexSchema = entry.getValue();
-          break;
-        }
-      }
-    }
+    GetIndexSchema getIndexSchema = new GetIndexSchema(orderByColumn, tableSchema, indexSchema, primaryIndex).invoke();
+    indexSchema = getIndexSchema.getIndexSchema();
+    primaryIndex = getIndexSchema.getPrimaryIndex();
     if (indexSchema == null) {
       indexSchema = primaryIndex;
     }
@@ -162,8 +152,10 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
 
 
   @Override
-  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
-    return next(DatabaseClient.SELECT_PAGE_SIZE, explain, currOffset, countReturned, limit, offset, false, false, schemaRetryCount);
+  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
+                         Limit limit, Offset offset, int schemaRetryCount) {
+    return next(DatabaseClient.SELECT_PAGE_SIZE, explain, currOffset, countReturned, limit, offset, false,
+        false, schemaRetryCount);
   }
 
   @Override
@@ -186,4 +178,46 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
     return null;
   }
 
+  private class GetIndexSchema {
+    private String orderByColumn;
+    private TableSchema tableSchema;
+    private IndexSchema indexSchema;
+    private IndexSchema primaryIndex;
+
+    public GetIndexSchema(String orderByColumn, TableSchema tableSchema, IndexSchema indexSchema, IndexSchema primaryIndex) {
+      this.orderByColumn = orderByColumn;
+      this.tableSchema = tableSchema;
+      this.indexSchema = indexSchema;
+      this.primaryIndex = primaryIndex;
+    }
+
+    public IndexSchema getIndexSchema() {
+      return indexSchema;
+    }
+
+    public IndexSchema getPrimaryIndex() {
+      return primaryIndex;
+    }
+
+    public GetIndexSchema invoke() {
+      for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
+        if (entry.getValue().isPrimaryKey()) {
+          primaryIndex = entry.getValue();
+        }
+        if (orderByColumn == null || getGroupByContext() != null) {
+          if (entry.getValue().isPrimaryKey()) {
+            indexSchema = entry.getValue();
+            break;
+          }
+        }
+        else {
+          if (entry.getValue().getFields()[0].equals(orderByColumn)) {
+            indexSchema = entry.getValue();
+            break;
+          }
+        }
+      }
+      return this;
+    }
+  }
 }

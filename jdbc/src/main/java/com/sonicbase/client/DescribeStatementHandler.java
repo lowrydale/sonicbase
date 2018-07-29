@@ -13,24 +13,27 @@ import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.PartitionUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.*;
 import java.io.BufferedInputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
 import java.security.cert.X509Certificate;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class DescribeStatementHandler {
   public static final String TABLE_NAME_STR = ", tableName=";
   public static final String WIDTH_STR = "Width";
   public static final String SERVER_STR = "server";
-  private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
+  private static Logger logger = LoggerFactory.getLogger(DescribeStatementHandler.class);
 
   private final DatabaseClient client;
 
@@ -38,93 +41,19 @@ public class DescribeStatementHandler {
     this.client = client;
   }
 
-  public ResultSet doDescribe(String dbName, String sql) throws InterruptedException, ExecutionException, IOException {
+  public ResultSet doDescribe(String dbName, String sql) {
     String[] parts = sql.split(" ");
     if (parts[1].trim().equalsIgnoreCase("table")) {
-      String table = parts[2].trim().toLowerCase();
-      TableSchema tableSchema = client.getCommon().getTables(dbName).get(table);
-      if (tableSchema == null) {
-        throw new DatabaseException("Table not defined: dbName=" + dbName + TABLE_NAME_STR + table);
-      }
-      List<FieldSchema> fields = tableSchema.getFields();
-      int maxLen = 0;
-      int maxTypeLen = 0;
-      int maxWidthLen = 0;
-      for (FieldSchema field : fields) {
-        maxLen = Math.max("Name".length(), Math.max(field.getName().length(), maxLen));
-        maxTypeLen = Math.max("Type".length(), Math.max(field.getType().name().length(), maxTypeLen));
-        maxWidthLen = Math.max(WIDTH_STR.length(), Math.max(String.valueOf(field.getWidth()).length(), maxWidthLen));
-      }
-
-      int totalWidth = "| ".length() + maxLen + " | ".length() + maxTypeLen + " | ".length() + maxWidthLen + " |".length();
-
-      StringBuilder builder = new StringBuilder();
-
-      appendChars(builder, "-", totalWidth);
-      builder.append("\n");
-
-      builder.append("| Name");
-      appendChars(builder, " ", maxLen - "Name".length());
-      builder.append(" | Type");
-      appendChars(builder, " ", maxTypeLen - "Type".length());
-      builder.append(" | Width");
-      appendChars(builder, " ", maxWidthLen - WIDTH_STR.length());
-      builder.append(" |\n");
-      appendChars(builder, "-", totalWidth);
-      builder.append("\n");
-      for (FieldSchema field : fields) {
-        if (field.getName().equals("_sonicbase_id")) {
-          continue;
-        }
-        builder.append("| ");
-        builder.append(field.getName());
-        appendChars(builder, " ", maxLen - field.getName().length());
-        builder.append(" | ");
-        builder.append(field.getType().name());
-        appendChars(builder, " ", maxTypeLen - field.getType().name().length());
-        builder.append(" | ");
-        builder.append(String.valueOf(field.getWidth()));
-        appendChars(builder, " ", maxWidthLen - String.valueOf(field.getWidth()).length());
-        builder.append(" |\n");
-      }
-      appendChars(builder, "-", totalWidth);
-      builder.append("\n");
-
-      for (IndexSchema indexSchema : tableSchema.getIndices().values()) {
-        builder.append("Index=").append(indexSchema.getName()).append("\n");
-        doDescribeOneIndex(tableSchema, indexSchema, builder);
-      }
-
-      String ret = builder.toString();
-      String[] lines = ret.split("\\n");
-      return new ResultSetImpl(lines);
+      return doDescribeTable(dbName, parts[2]);
     }
     else if (parts[1].trim().equalsIgnoreCase("tables")) {
-      StringBuilder builder = new StringBuilder();
-      for (TableSchema tableSchema : client.getCommon().getTables(dbName).values()) {
-        builder.append(tableSchema.getName() + "\n");
-      }
-      String ret = builder.toString();
-      String[] lines = ret.split("\\n");
-      return new ResultSetImpl(lines);
+      return doDescribeTables(dbName);
     }
     else if (parts[1].trim().equalsIgnoreCase("licenses")) {
       return describeLicenses();
     }
     else if (parts[1].trim().equalsIgnoreCase("index")) {
-      String str = parts[2].trim().toLowerCase();
-      String[] innerParts = str.split("\\.");
-      String table = innerParts[0].toLowerCase();
-      if (innerParts.length == 1) {
-        throw new DatabaseException("Must specify <table name>.<index name>");
-      }
-      String index = innerParts[1].toLowerCase();
-      StringBuilder builder = new StringBuilder();
-      doDescribeIndex(dbName, table, index, builder);
-
-      String ret = builder.toString();
-      String[] lines = ret.split("\\n");
-      return new ResultSetImpl(lines);
+      return doDescribeIndex(dbName, parts[2]);
     }
     else if (parts[1].trim().equalsIgnoreCase("shards")) {
       return describeShards(dbName);
@@ -150,6 +79,98 @@ public class DescribeStatementHandler {
 
   }
 
+  private ResultSet doDescribeIndex(String dbName, String part) {
+    String str = part.trim().toLowerCase();
+    String[] innerParts = str.split("\\.");
+    String table = innerParts[0].toLowerCase();
+    if (innerParts.length == 1) {
+      throw new DatabaseException("Must specify <table name>.<index name>");
+    }
+    String index = innerParts[1].toLowerCase();
+    StringBuilder builder = new StringBuilder();
+    doDescribeIndex(dbName, table, index, builder);
+
+    String ret = builder.toString();
+    String[] lines = ret.split("\\n");
+    return new ResultSetImpl(lines);
+  }
+
+  private ResultSet doDescribeTables(String dbName) {
+    StringBuilder builder = new StringBuilder();
+    for (TableSchema tableSchema : client.getCommon().getTables(dbName).values()) {
+      builder.append(tableSchema.getName() + "\n");
+    }
+    String ret = builder.toString();
+    String[] lines = ret.split("\\n");
+    return new ResultSetImpl(lines);
+  }
+
+  private ResultSet doDescribeTable(String dbName, String part) {
+    String table = part.trim().toLowerCase();
+    TableSchema tableSchema = client.getCommon().getTables(dbName).get(table);
+    if (tableSchema == null) {
+      throw new DatabaseException("Table not defined: dbName=" + dbName + TABLE_NAME_STR + table);
+    }
+    List<FieldSchema> fields = tableSchema.getFields();
+    int maxLen = 0;
+    int maxTypeLen = 0;
+    int maxWidthLen = 0;
+    for (FieldSchema field : fields) {
+      maxLen = Math.max("Name".length(), Math.max(field.getName().length(), maxLen));
+      maxTypeLen = Math.max("Type".length(), Math.max(field.getType().name().length(), maxTypeLen));
+      maxWidthLen = Math.max(WIDTH_STR.length(), Math.max(String.valueOf(field.getWidth()).length(), maxWidthLen));
+    }
+
+    int totalWidth = "| ".length() + maxLen + " | ".length() + maxTypeLen + " | ".length() + maxWidthLen + " |".length();
+
+    StringBuilder builder = new StringBuilder();
+
+    appendChars(builder, "-", totalWidth);
+    builder.append("\n");
+
+    builder.append("| Name");
+    appendChars(builder, " ", maxLen - "Name".length());
+    builder.append(" | Type");
+    appendChars(builder, " ", maxTypeLen - "Type".length());
+    builder.append(" | Width");
+    appendChars(builder, " ", maxWidthLen - WIDTH_STR.length());
+    builder.append(" |\n");
+    appendChars(builder, "-", totalWidth);
+    builder.append("\n");
+
+    doDescribeFields(fields, maxLen, maxTypeLen, maxWidthLen, builder);
+
+    appendChars(builder, "-", totalWidth);
+    builder.append("\n");
+
+    for (IndexSchema indexSchema : tableSchema.getIndices().values()) {
+      builder.append("Index=").append(indexSchema.getName()).append("\n");
+      doDescribeOneIndex(tableSchema, indexSchema, builder);
+    }
+
+    String ret = builder.toString();
+    String[] lines = ret.split("\\n");
+    return new ResultSetImpl(lines);
+  }
+
+  private void doDescribeFields(List<FieldSchema> fields, int maxLen, int maxTypeLen, int maxWidthLen, StringBuilder builder) {
+    for (FieldSchema field : fields) {
+      if (field.getName().equals("_sonicbase_id")) {
+        continue;
+      }
+      builder.append("| ");
+      builder.append(field.getName());
+      appendChars(builder, " ", maxLen - field.getName().length());
+      builder.append(" | ");
+      builder.append(field.getType().name());
+      appendChars(builder, " ", maxTypeLen - field.getType().name().length());
+      builder.append(" | ");
+      builder.append(String.valueOf(field.getWidth()));
+      appendChars(builder, " ", maxWidthLen - String.valueOf(field.getWidth()).length());
+      builder.append(" |\n");
+    }
+  }
+
   private void appendChars(StringBuilder builder, String character, int count) {
     for (int i = 0; i < count; i++) {
       builder.append(character);
@@ -168,9 +189,11 @@ public class DescribeStatementHandler {
             }
 
             public void checkClientTrusted(X509Certificate[] certs, String authType) {
+              //nothing to implement
             }
 
             public void checkServerTrusted(X509Certificate[] certs, String authType) {
+              //nothing to implement
             }
 
           }
@@ -311,62 +334,7 @@ public class DescribeStatementHandler {
 
         List<Map<String, String>> serverStatsData = new ArrayList<>();
 
-        List<Future<Map<String, String>>> futures = new ArrayList<>();
-        for (int i = 0; i < client.getShardCount(); i++) {
-          for (int j = 0; j < client.getReplicaCount(); j++) {
-            final int shard = i;
-            final int replica = j;
-            boolean dead = client.getServersArray()[i][j].isDead();
-            if (dead) {
-              continue;
-            }
-            futures.add(client.getExecutor().submit(() -> {
-              boolean dead1 = client.getCommon().getServersConfig().getShards()[shard].getReplicas()[replica].isDead();
-              if (dead1) {
-                Map<String, String> line = new HashMap<>();
-                line.put("host", "shard=" + shard + ", replica=" + replica);
-                line.put("cpu", "?");
-                line.put("resGig", "?");
-                line.put("javaMemMin", "?");
-                line.put("javaMemMax", "?");
-                line.put("receive", "?");
-                line.put("transmit", "?");
-                line.put("diskAvail", "?");
-                return line;
-              }
-              ComObject cobj = new ComObject();
-              cobj.put(ComObject.Tag.DB_NAME, "__none__");
-              cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
-              cobj.put(ComObject.Tag.METHOD, "OSStatsManager:getOSStats");
-
-              byte[] ret = client.send(null, shard, replica, cobj, DatabaseClient.Replica.SPECIFIED);
-              ComObject retObj = new ComObject(ret);
-
-              double resGig = retObj.getDouble(ComObject.Tag.RES_GIG);
-              double cpu = retObj.getDouble(ComObject.Tag.CPU);
-              double javaMemMin = retObj.getDouble(ComObject.Tag.JAVA_MEM_MIN);
-              double javaMemMax = retObj.getDouble(ComObject.Tag.JAVA_MEM_MAX);
-              double recRate = retObj.getDouble(ComObject.Tag.AVG_REC_RATE) / 1000000000d;
-              double transRate = retObj.getDouble(ComObject.Tag.AVG_TRANS_RATE) / 1000000000d;
-              String diskAvail = retObj.getString(ComObject.Tag.DISK_AVAIL);
-              String host = retObj.getString(ComObject.Tag.HOST);
-              int port = retObj.getInt(ComObject.Tag.PORT);
-
-              Map<String, String> line = new HashMap<>();
-
-              line.put("host", host + ":" + port);
-              line.put("cpu", String.format("%.0f", cpu));
-              line.put("resGig", String.format("%.2f", resGig));
-              line.put("javaMemMin", String.format("%.2f", javaMemMin));
-              line.put("javaMemMax", String.format("%.2f", javaMemMax));
-              line.put("receive", String.format("%.4f", recRate));
-              line.put("transmit", String.format("%.4f", transRate));
-              line.put("diskAvail", diskAvail);
-              return line;
-            }));
-
-          }
-        }
+        List<Future<Map<String, String>>> futures = describeServerStatsForEachServer();
 
         for (Future<Map<String, String>> future : futures) {
           try {
@@ -387,6 +355,67 @@ public class DescribeStatementHandler {
       }
     }
 
+  }
+
+  private List<Future<Map<String, String>>> describeServerStatsForEachServer() {
+    List<Future<Map<String, String>>> futures = new ArrayList<>();
+    for (int i = 0; i < client.getShardCount(); i++) {
+      for (int j = 0; j < client.getReplicaCount(); j++) {
+        final int shard = i;
+        final int replica = j;
+        boolean dead = client.getServersArray()[i][j].isDead();
+        if (dead) {
+          continue;
+        }
+        futures.add(client.getExecutor().submit(() -> doDescribeServerStats(shard, replica)));
+      }
+    }
+    return futures;
+  }
+
+  private Map<String, String> doDescribeServerStats(int shard, int replica) {
+    boolean dead1 = client.getCommon().getServersConfig().getShards()[shard].getReplicas()[replica].isDead();
+    if (dead1) {
+      Map<String, String> line = new HashMap<>();
+      line.put("host", "shard=" + shard + ", replica=" + replica);
+      line.put("cpu", "?");
+      line.put("resGig", "?");
+      line.put("javaMemMin", "?");
+      line.put("javaMemMax", "?");
+      line.put("receive", "?");
+      line.put("transmit", "?");
+      line.put("diskAvail", "?");
+      return line;
+    }
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.DB_NAME, "__none__");
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
+    cobj.put(ComObject.Tag.METHOD, "OSStatsManager:getOSStats");
+
+    byte[] ret = client.send(null, shard, replica, cobj, DatabaseClient.Replica.SPECIFIED);
+    ComObject retObj = new ComObject(ret);
+
+    double resGig = retObj.getDouble(ComObject.Tag.RES_GIG);
+    double cpu = retObj.getDouble(ComObject.Tag.CPU);
+    double javaMemMin = retObj.getDouble(ComObject.Tag.JAVA_MEM_MIN);
+    double javaMemMax = retObj.getDouble(ComObject.Tag.JAVA_MEM_MAX);
+    double recRate = retObj.getDouble(ComObject.Tag.AVG_REC_RATE) / 1000000000d;
+    double transRate = retObj.getDouble(ComObject.Tag.AVG_TRANS_RATE) / 1000000000d;
+    String diskAvail = retObj.getString(ComObject.Tag.DISK_AVAIL);
+    String host = retObj.getString(ComObject.Tag.HOST);
+    int port = retObj.getInt(ComObject.Tag.PORT);
+
+    Map<String, String> line = new HashMap<>();
+
+    line.put("host", host + ":" + port);
+    line.put("cpu", String.format("%.0f", cpu));
+    line.put("resGig", String.format("%.2f", resGig));
+    line.put("javaMemMin", String.format("%.2f", javaMemMin));
+    line.put("javaMemMax", String.format("%.2f", javaMemMax));
+    line.put("receive", String.format("%.4f", recRate));
+    line.put("transmit", String.format("%.4f", transRate));
+    line.put("diskAvail", diskAvail);
+    return line;
   }
 
   class Entry {
@@ -420,43 +449,9 @@ public class DescribeStatementHandler {
 
         StringBuilder ret = new StringBuilder();
 
-        Map<String, Entry> entries = new HashMap<>();
-        PartitionUtils.GlobalIndexCounts counts = PartitionUtils.getIndexCounts(dbName, client);
-        for (Map.Entry<String, PartitionUtils.TableIndexCounts> tableEntry : counts.getTables().entrySet()) {
-          for (Map.Entry<String, PartitionUtils.IndexCounts> indexEntry : tableEntry.getValue().getIndices().entrySet()) {
-            Map<Integer, Long> currCounts = indexEntry.getValue().getCounts();
-            for (Map.Entry<Integer, Long> countEntry : currCounts.entrySet()) {
-              Entry entry = new Entry(tableEntry.getKey(), indexEntry.getKey(), countEntry.getKey(), "Table=" +
-                  tableEntry.getKey() + ", Index=" + indexEntry.getKey() +
-                  ", Shard=" + countEntry.getKey() + ", count=" + countEntry.getValue() + "\n");
-              entries.put(entry.getKey(), entry);
-            }
-          }
-        }
+        Map<String, Entry> entries = putEntries(dbName);
 
-        for (final Map.Entry<String, TableSchema> table : client.getCommon().getTables(dbName).entrySet()) {
-          for (final Map.Entry<String, IndexSchema> indexSchema : table.getValue().getIndices().entrySet()) {
-            int shard = 0;
-            TableSchema.Partition[] partitions = indexSchema.getValue().getCurrPartitions();
-            TableSchema.Partition[] lastPartitions = indexSchema.getValue().getLastPartitions();
-            for (int i = 0; i < partitions.length; i++) {
-              String key = "[null]";
-              if (partitions[i].getUpperKey() != null) {
-                key = DatabaseCommon.keyToString(partitions[i].getUpperKey());
-              }
-              String lastKey = "[null]";
-              if (lastPartitions != null && lastPartitions[i].getUpperKey() != null) {
-                lastKey = DatabaseCommon.keyToString(lastPartitions[i].getUpperKey());
-              }
-              ret.append("Table=" + table.getKey() + ", Index=" + indexSchema.getKey() + ", shard=" + shard + ", key=" +
-                  key).append(", lastKey=").append(lastKey).append("\n");
-              shard++;
-            }
-            for (int i = 0; i < client.getShardCount(); i++) {
-              ret.append(entries.get(table.getKey() + ":" + indexSchema.getKey() + ":" + i).result);
-            }
-          }
-        }
+        describeShardsForEachIndex(dbName, ret, entries);
 
         String retStr = ret.toString();
         String[] lines = retStr.split("\\n");
@@ -470,6 +465,57 @@ public class DescribeStatementHandler {
         throw new DatabaseException(e);
       }
     }
+  }
+
+  private Map<String, Entry> putEntries(String dbName) {
+    Map<String, Entry> entries = new HashMap<>();
+    PartitionUtils.GlobalIndexCounts counts = PartitionUtils.getIndexCounts(dbName, client);
+    for (Map.Entry<String, PartitionUtils.TableIndexCounts> tableEntry : counts.getTables().entrySet()) {
+      for (Map.Entry<String, PartitionUtils.IndexCounts> indexEntry : tableEntry.getValue().getIndices().entrySet()) {
+        Map<Integer, Long> currCounts = indexEntry.getValue().getCounts();
+        for (Map.Entry<Integer, Long> countEntry : currCounts.entrySet()) {
+          Entry entry = new Entry(tableEntry.getKey(), indexEntry.getKey(), countEntry.getKey(), "Table=" +
+              tableEntry.getKey() + ", Index=" + indexEntry.getKey() +
+              ", Shard=" + countEntry.getKey() + ", count=" + countEntry.getValue() + "\n");
+          entries.put(entry.getKey(), entry);
+        }
+      }
+    }
+    return entries;
+  }
+
+  private void describeShardsForEachIndex(String dbName, StringBuilder ret, Map<String, Entry> entries) {
+    for (final Map.Entry<String, TableSchema> table : client.getCommon().getTables(dbName).entrySet()) {
+      for (final Map.Entry<String, IndexSchema> indexSchema : table.getValue().getIndices().entrySet()) {
+        int shard = 0;
+        TableSchema.Partition[] partitions = indexSchema.getValue().getCurrPartitions();
+        TableSchema.Partition[] lastPartitions = indexSchema.getValue().getLastPartitions();
+        for (int i = 0; i < partitions.length; i++) {
+          shard = describeShardsForEachPartitionOfEachIndex(ret, table, indexSchema, shard, partitions[i], lastPartitions, i);
+        }
+        for (int i = 0; i < client.getShardCount(); i++) {
+          ret.append(entries.get(table.getKey() + ":" + indexSchema.getKey() + ":" + i).result);
+        }
+      }
+    }
+  }
+
+  private int describeShardsForEachPartitionOfEachIndex(StringBuilder ret, Map.Entry<String, TableSchema> table,
+                                                        Map.Entry<String, IndexSchema> indexSchema, int shard,
+                                                        TableSchema.Partition partition,
+                                                        TableSchema.Partition[] lastPartitions, int i) {
+    String key = "[null]";
+    if (partition.getUpperKey() != null) {
+      key = DatabaseCommon.keyToString(partition.getUpperKey());
+    }
+    String lastKey = "[null]";
+    if (lastPartitions != null && lastPartitions[i].getUpperKey() != null) {
+      lastKey = DatabaseCommon.keyToString(lastPartitions[i].getUpperKey());
+    }
+    ret.append("Table=" + table.getKey() + ", Index=" + indexSchema.getKey() + ", shard=" + shard + ", key=" +
+        key).append(", lastKey=").append(lastKey).append("\n");
+    shard++;
+    return shard;
   }
 
   class ShardState {

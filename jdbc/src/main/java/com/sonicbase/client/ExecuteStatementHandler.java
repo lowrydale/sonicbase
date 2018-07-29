@@ -13,6 +13,9 @@ import net.sf.jsqlparser.statement.execute.Execute;
 import java.sql.SQLException;
 import java.util.concurrent.ThreadLocalRandom;
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class ExecuteStatementHandler implements StatementHandler {
   private final DatabaseClient client;
 
@@ -23,7 +26,8 @@ public class ExecuteStatementHandler implements StatementHandler {
   @Override
   public Object execute(String dbName, ParameterHandler parms, String sqlToUse, Statement statement,
                         SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
-                        boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) throws SQLException {
+                        boolean restrictToThisServer, StoredProcedureContextImpl procedureContext,
+                        int schemaRetryCount) {
     Execute execute = (Execute) statement;
     if (!"procedure".equalsIgnoreCase((execute.getName()))) {
       throw new DatabaseException("invalid execute parameter: parm=" + execute.getName());
@@ -33,7 +37,8 @@ public class ExecuteStatementHandler implements StatementHandler {
     cobj.put(ComObject.Tag.SQL, sqlToUse);
     cobj.put(ComObject.Tag.DB_NAME, dbName);
 
-    byte[] ret = client.send("DatabaseServer:executeProcedurePrimary", ThreadLocalRandom.current().nextInt(0, client.getShardCount()), 0, cobj, DatabaseClient.Replica.DEF);
+    byte[] ret = client.send("DatabaseServer:executeProcedurePrimary",
+        ThreadLocalRandom.current().nextInt(0, client.getShardCount()), 0, cobj, DatabaseClient.Replica.DEF);
     if (ret != null) {
 
       ComObject retObj = new ComObject(ret);

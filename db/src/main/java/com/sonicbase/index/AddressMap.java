@@ -20,25 +20,25 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static com.sonicbase.server.DatabaseServer.TIME_2017;
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class AddressMap {
-
-  private org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("com.sonicbase.logger");
 
   private LongList[] map = new LongArrayList[10_000];
   private AtomicLong currOuterAddress = new AtomicLong();
-  final ConcurrentLinkedQueue<Long> freeList = new ConcurrentLinkedQueue<>();
+  private final ConcurrentLinkedQueue<Long> freeList = new ConcurrentLinkedQueue<>();
   private ReentrantReadWriteLock[] readWriteLocks = new ReentrantReadWriteLock[10_000];
   private ReentrantReadWriteLock.ReadLock[] readLocks = new ReentrantReadWriteLock.ReadLock[10_000];
   private ReentrantReadWriteLock.WriteLock[] writeLocks = new ReentrantReadWriteLock.WriteLock[10_000];
   private LZ4Factory factory = LZ4Factory.fastestInstance();
+  private Unsafe unsafe = getUnsafe();
 
-
-  private Long2LongOpenHashMap[] addressMap = new Long2LongOpenHashMap[10_000];
+  private Long2LongOpenHashMap[] addressMaps = new Long2LongOpenHashMap[10_000];
   private final DatabaseServer server;
 
   private static Unsafe getUnsafe() {
     try {
-
       Field singleoneInstanceField = Unsafe.class.getDeclaredField("theUnsafe");
       singleoneInstanceField.setAccessible(true);
       return (Unsafe) singleoneInstanceField.get(null);
@@ -49,11 +49,6 @@ public class AddressMap {
     }
   }
 
-
-  private Unsafe unsafe = getUnsafe();
-
-
-
   public AddressMap(DatabaseServer server) {
     this.server = server;
 
@@ -62,9 +57,9 @@ public class AddressMap {
       readLocks[i] = readWriteLocks[i].readLock();
       writeLocks[i] = readWriteLocks[i].writeLock();
     }
-    for (int i = 0; i < addressMap.length; i++) {
-      addressMap[i] = new Long2LongOpenHashMap();
-      addressMap[i].defaultReturnValue(-1L);
+    for (int i = 0; i < addressMaps.length; i++) {
+      addressMaps[i] = new Long2LongOpenHashMap();
+      addressMaps[i].defaultReturnValue(-1L);
     }
     for (int i = 0; i < map.length; i++) {
       map[i] = new LongArrayList();
@@ -73,15 +68,15 @@ public class AddressMap {
 
   public void clear() {
     freeList.clear();
-    for (int i = 0; i < addressMap.length; i++) {
-      for (long innerAddress : addressMap[i].values()) {
+    for (int i = 0; i < addressMaps.length; i++) {
+      for (long innerAddress : addressMaps[i].values()) {
         unsafe.freeMemory(innerAddress);
       }
     }
-    addressMap = new Long2LongOpenHashMap[10_000];
-    for (int i = 0; i < addressMap.length; i++) {
-      addressMap[i] = new Long2LongOpenHashMap();
-      addressMap[i].defaultReturnValue(-1L);
+    addressMaps = new Long2LongOpenHashMap[10_000];
+    for (int i = 0; i < addressMaps.length; i++) {
+      addressMaps[i] = new Long2LongOpenHashMap();
+      addressMaps[i].defaultReturnValue(-1L);
     }
 
     map = new LongArrayList[10_000];
@@ -90,17 +85,12 @@ public class AddressMap {
     }
   }
 
-  public Object getMutex(long outerAddress) {
-    int slot = (int) (outerAddress % map.length);
-    return map[slot];
-  }
-
-  public ReentrantReadWriteLock.ReadLock getReadLock(long outerAddress) {
+  private ReentrantReadWriteLock.ReadLock getReadLock(long outerAddress) {
     int slot = (int) (outerAddress % map.length);
     return readLocks[slot];
   }
 
-  public ReentrantReadWriteLock.WriteLock getWriteLock(long outerAddress) {
+  private ReentrantReadWriteLock.WriteLock getWriteLock(long outerAddress) {
     int slot = (int) (outerAddress % map.length);
     return writeLocks[slot];
   }
@@ -119,36 +109,32 @@ public class AddressMap {
     return 0;
   }
 
-  public long addAddress(long innerAddress, long updateTime) {
+  private long addAddress(long innerAddress) {
     long outerAddress = currOuterAddress.incrementAndGet();
-//    return innerAddress;
-
     ReentrantReadWriteLock.WriteLock lock = getWriteLock(outerAddress);
     lock.lock();
     try {
-      addressMap[(int) (outerAddress % map.length)].put(outerAddress, innerAddress);
+      addressMaps[(int) (outerAddress % map.length)].put(outerAddress, innerAddress);
     }
     finally {
       lock.unlock();
     }
-
-
     return outerAddress;
   }
 
-  public Long getAddress(long outerAddress) {
-      long ret = addressMap[(int) (outerAddress % map.length)].get(outerAddress);
-      if (ret == -1) {
-        return null;
-      }
-      return ret;
+  private Long getAddress(long outerAddress) {
+    long ret = addressMaps[(int) (outerAddress % map.length)].get(outerAddress);
+    if (ret == -1) {
+      return null;
+    }
+    return ret;
   }
 
-  public void removeAddress(long outerAddress, Unsafe unsafe) {
+  private void removeAddress(long outerAddress, Unsafe unsafe) {
     ReentrantReadWriteLock.WriteLock writeLock = getWriteLock(outerAddress);
     writeLock.lock();
     try {
-      long innerAddress = addressMap[(int) (outerAddress % map.length)].remove(outerAddress);
+      long innerAddress = addressMaps[(int) (outerAddress % map.length)].remove(outerAddress);
       if (innerAddress != -1) {
         unsafe.freeMemory(innerAddress);
       }
@@ -163,12 +149,12 @@ public class AddressMap {
     byte[][] records;
     byte[] bytes;
 
-    public IndexValue(long updateTime, byte[][] records) {
+    IndexValue(long updateTime, byte[][] records) {
       this.updateTime = updateTime;
       this.records = records;
     }
 
-    public IndexValue(long updateTime, byte[] bytes) {
+    IndexValue(long updateTime, byte[] bytes) {
       this.updateTime = updateTime;
       this.bytes = bytes;
     }
@@ -187,107 +173,115 @@ public class AddressMap {
 
   public Object toUnsafeFromRecords(long updateTime, byte[][] records) {
     if (!server.useUnsafe()) {
-      try {
-        if (!server.compressRecords()) {
-          return new IndexValue(updateTime, records);
-        }
-        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-        DataOutputStream out = new DataOutputStream(bytesOut);
-        Varint.writeUnsignedVarInt(records.length, out);
-        for (byte[] record : records) {
-          Varint.writeUnsignedVarInt(record.length, out);
-          out.write(record);
-        }
-        out.close();
-        byte[] bytes = bytesOut.toByteArray();
-        int origLen = -1;
-
-        if (server.compressRecords()) {
-          origLen = bytes.length;
-
-
-          LZ4Compressor compressor = factory.highCompressor();//fastCompressor();
-          int maxCompressedLength = compressor.maxCompressedLength(bytes.length);
-          byte[] compressed = new byte[maxCompressedLength];
-          int compressedLength = compressor.compress(bytes, 0, bytes.length, compressed, 0, maxCompressedLength);
-          bytes = new byte[compressedLength + 8];
-          System.arraycopy(compressed, 0, bytes, 8, compressedLength);
-        }
-
-        bytesOut = new ByteArrayOutputStream();
-        out = new DataOutputStream(bytesOut);
-        out.writeInt(bytes.length);
-        out.writeInt(origLen);
-        out.close();
-        byte[] lenBuffer = bytesOut.toByteArray();
-
-        System.arraycopy(lenBuffer, 0, bytes, 0, lenBuffer.length);
-
-        return new IndexValue(updateTime, bytes);
-      }
-      catch (Exception e) {
-        throw new DatabaseException(e);
-      }
+      return toUnsafeForNonUnsafe(updateTime, records);
     }
     else {
-      int recordsLen = 0;
-      for (byte[] record : records) {
-        recordsLen += record.length;
-      }
+      return toUnsafeForUnsafe(updateTime, records);
+    }
+  }
 
-      byte[] bytes = new byte[4 + (4 * records.length) + recordsLen];
-      int actualLen = 0;
-      int offset = 0; //update time
-      DataUtils.intToBytes(records.length, bytes, offset);
+  private Object toUnsafeForUnsafe(long updateTime, byte[][] records) {
+    int recordsLen = 0;
+    for (byte[] record : records) {
+      recordsLen += record.length;
+    }
+
+    byte[] bytes = new byte[4 + (4 * records.length) + recordsLen];
+    int actualLen = 0;
+    int offset = 0; //update time
+    DataUtils.intToBytes(records.length, bytes, offset);
+    offset += 4;
+    for (byte[] record : records) {
+      DataUtils.intToBytes(record.length, bytes, offset);
       offset += 4;
-      for (byte[] record : records) {
-        DataUtils.intToBytes(record.length, bytes, offset);
-        offset += 4;
-        System.arraycopy(record, 0, bytes, offset, record.length);
-        offset += record.length;
-      }
-      actualLen = bytes.length;
+      System.arraycopy(record, 0, bytes, offset, record.length);
+      offset += record.length;
+    }
+    actualLen = bytes.length;
 
+    int origLen = -1;
+    if (server.compressRecords()) {
+      origLen = bytes.length;
+
+      LZ4Factory localFactory = LZ4Factory.fastestInstance();
+
+      LZ4Compressor compressor = localFactory.fastCompressor();
+      int maxCompressedLength = compressor.maxCompressedLength(bytes.length);
+      byte[] compressed = new byte[maxCompressedLength];
+      int compressedLength = compressor.compress(bytes, 0, bytes.length, compressed, 0, maxCompressedLength);
+      bytes = new byte[compressedLength];
+      System.arraycopy(compressed, 0, bytes, 0, compressedLength);
+      actualLen = bytes.length;
+    }
+
+    if (bytes.length > 1000000000) {
+      throw new DatabaseException("Invalid allocation: size=" + bytes.length);
+    }
+
+    long address = unsafe.allocateMemory(bytes.length + 16L);
+
+    DataUtils.intToAddress(origLen, address + 8, unsafe);
+    DataUtils.intToAddress(actualLen, address + 8 + 4, unsafe);
+
+    for (int i = 7; i >= 0; i--) {
+      unsafe.putByte(address + 16 + i, (byte)(updateTime & 0xFF));
+      updateTime >>= 8;
+    }
+
+    for (int i = 0; i < bytes.length; i++) {
+      unsafe.putByte(address + 16 + i, bytes[i]);
+    }
+
+    if (address == 0 || address == -1L) {
+      throw new DatabaseException("Inserted null address *****************");
+    }
+
+    return addAddress(address);
+  }
+
+  private Object toUnsafeForNonUnsafe(long updateTime, byte[][] records) {
+    try {
+      if (!server.compressRecords()) {
+        return new IndexValue(updateTime, records);
+      }
+      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+      DataOutputStream out = new DataOutputStream(bytesOut);
+      Varint.writeUnsignedVarInt(records.length, out);
+      for (byte[] record : records) {
+        Varint.writeUnsignedVarInt(record.length, out);
+        out.write(record);
+      }
+      out.close();
+      byte[] bytes = bytesOut.toByteArray();
       int origLen = -1;
+
       if (server.compressRecords()) {
         origLen = bytes.length;
 
-        LZ4Factory factory = LZ4Factory.fastestInstance();
-
-        LZ4Compressor compressor = factory.fastCompressor();
+        LZ4Compressor compressor = factory.highCompressor();
         int maxCompressedLength = compressor.maxCompressedLength(bytes.length);
         byte[] compressed = new byte[maxCompressedLength];
         int compressedLength = compressor.compress(bytes, 0, bytes.length, compressed, 0, maxCompressedLength);
-        bytes = new byte[compressedLength];
-        System.arraycopy(compressed, 0, bytes, 0, compressedLength);
-        actualLen = bytes.length;
+        bytes = new byte[compressedLength + 8];
+        System.arraycopy(compressed, 0, bytes, 8, compressedLength);
       }
 
-      if (bytes.length > 1000000000) {
-        throw new DatabaseException("Invalid allocation: size=" + bytes.length);
-      }
+      bytesOut = new ByteArrayOutputStream();
+      out = new DataOutputStream(bytesOut);
+      out.writeInt(bytes.length);
+      out.writeInt(origLen);
+      out.close();
+      byte[] lenBuffer = bytesOut.toByteArray();
 
-      long address = unsafe.allocateMemory(bytes.length + 16);
+      System.arraycopy(lenBuffer, 0, bytes, 0, lenBuffer.length);
 
-      DataUtils.intToAddress(origLen, address + 8, unsafe);
-      DataUtils.intToAddress(actualLen, address + 8 + 4, unsafe);
-
-      for (int i = 7; i >= 0; i--) {
-        unsafe.putByte(address + 16 + i, (byte)(updateTime & 0xFF));
-        updateTime >>= 8;
-      }
-
-      for (int i = 0; i < bytes.length; i++) {
-        unsafe.putByte(address + 16 + i, bytes[i]);
-      }
-
-      if (address == 0 || address == -1L) {
-        throw new DatabaseException("Inserted null address *****************");
-      }
-
-      return addAddress(address, updateTime);
+      return new IndexValue(updateTime, bytes);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
     }
   }
+
   public Object toUnsafeFromKeys(byte[][] records) {
     long seconds = (System.currentTimeMillis() - TIME_2017) / 1000;
     return toUnsafeFromKeys(seconds, records);
@@ -302,92 +296,99 @@ public class AddressMap {
   public byte[][] fromUnsafeToRecords(Object obj) {
     try {
       if (obj instanceof Long) {
-
-        ReentrantReadWriteLock.ReadLock readLock = getReadLock((Long)obj);
-        readLock.lock();
-        try {
-          Long innerAddress = getAddress((Long) obj);
-          if (innerAddress == null) {
-            return null;
-          }
-          int origLen = ((unsafe.getByte(innerAddress + 8 + 0) & 0xff) << 24) |
-              ((unsafe.getByte(innerAddress + 8 + 1) & 0xff) << 16) |
-              ((unsafe.getByte(innerAddress + 8 + 2) & 0xff) << 8) |
-              (unsafe.getByte(innerAddress + 8 + 3) & 0xff);
-
-          int actualLen = ((unsafe.getByte(innerAddress + 12 + 0) & 0xff) << 24) |
-              ((unsafe.getByte(innerAddress + 12 + 1) & 0xff) << 16) |
-              ((unsafe.getByte(innerAddress + 12 + 2) & 0xff) << 8) |
-              (unsafe.getByte(innerAddress + 12 + 3) & 0xff);
-          if (origLen == -1) {
-            int offset = 0;
-            int recCount = DataUtils.addressToInt(innerAddress + offset + 16, unsafe);
-            offset += 4;
-            byte[][] ret = new byte[recCount][];
-            for (int i = 0; i < ret.length; i++) {
-              int len = DataUtils.addressToInt(innerAddress + offset + 16, unsafe);
-              offset += 4;
-              byte[] record = new byte[len];
-              for (int j = 0; j < len; j++) {
-                record[j] = unsafe.getByte(innerAddress + offset + 16);
-                offset++;
-              }
-              ret[i] = record;
-            }
-            return ret;
-          }
-
-          if (origLen != -1) {
-            LZ4Factory factory = LZ4Factory.fastestInstance();
-
-            byte[] bytes = new byte[actualLen];
-            for (int j = 0; j < actualLen; j++) {
-              bytes[j] = unsafe.getByte(innerAddress + 16 + j);
-            }
-
-            LZ4FastDecompressor decompressor = factory.fastDecompressor();
-            byte[] restored = new byte[origLen];
-            decompressor.decompress(bytes, 0, restored, 0, origLen);
-            bytes = restored;
-
-            DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
-            byte[][] ret = new byte[(int) in.readInt()][];
-            for (int i = 0; i < ret.length; i++) {
-              int len = (int) in.readInt();
-              byte[] record = new byte[len];
-              in.readFully(record);
-              ret[i] = record;
-            }
-            return ret;
-          }
-        }
-        finally {
-          readLock.unlock();
-        }
+        return fromUnsafeForUnsafe((Long) obj);
       }
       else {
-        if (!server.compressRecords()) {
-          return ((IndexValue)obj).records;
-        }
-        byte[] bytes = ((IndexValue)obj).bytes;
-        byte[] lenBuffer = new byte[8];
-        System.arraycopy(bytes, 0, lenBuffer, 0, lenBuffer.length);
-        ByteArrayInputStream bytesIn = new ByteArrayInputStream(lenBuffer);
-        DataInputStream in = new DataInputStream(bytesIn);
-        int count = in.readInt();
-        int origLen = in.readInt();
+        return fromUnsafeForNonUnsafe((IndexValue) obj);
+      }
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+  }
 
-        if (origLen != -1) {
-          LZ4FastDecompressor decompressor = factory.fastDecompressor();
-          byte[] restored = new byte[origLen];
-          decompressor.decompress(bytes, lenBuffer.length, restored, 0, origLen);
-          bytes = restored;
-        }
+  private byte[][] fromUnsafeForNonUnsafe(IndexValue obj) throws IOException {
+    if (!server.compressRecords()) {
+      return obj.records;
+    }
+    byte[] bytes = obj.bytes;
+    byte[] lenBuffer = new byte[8];
+    System.arraycopy(bytes, 0, lenBuffer, 0, lenBuffer.length);
+    ByteArrayInputStream bytesIn = new ByteArrayInputStream(lenBuffer);
+    DataInputStream in = new DataInputStream(bytesIn);
+    in.readInt(); // count
+    int origLen = in.readInt();
 
-        in = new DataInputStream(new ByteArrayInputStream(bytes));
-        byte[][] ret = new byte[(int) Varint.readSignedVarLong(in)][];
+    if (origLen != -1) {
+      LZ4FastDecompressor decompressor = factory.fastDecompressor();
+      byte[] restored = new byte[origLen];
+      decompressor.decompress(bytes, lenBuffer.length, restored, 0, origLen);
+      bytes = restored;
+    }
+
+    in = new DataInputStream(new ByteArrayInputStream(bytes));
+    byte[][] ret = new byte[(int) Varint.readSignedVarLong(in)][];
+    for (int i = 0; i < ret.length; i++) {
+      int len = (int) Varint.readSignedVarLong(in);
+      byte[] record = new byte[len];
+      in.readFully(record);
+      ret[i] = record;
+    }
+    return ret;
+  }
+
+  private byte[][] fromUnsafeForUnsafe(Long obj) throws IOException {
+    ReentrantReadWriteLock.ReadLock readLock = getReadLock(obj);
+    readLock.lock();
+    try {
+      Long innerAddress = getAddress(obj);
+      if (innerAddress == null) {
+        return null;
+      }
+      int origLen = ((unsafe.getByte(innerAddress + 8 + 0) & 0xff) << 24) |
+          ((unsafe.getByte(innerAddress + 8 + 1) & 0xff) << 16) |
+          ((unsafe.getByte(innerAddress + 8 + 2) & 0xff) << 8) |
+          (unsafe.getByte(innerAddress + 8 + 3) & 0xff);
+
+      int actualLen = ((unsafe.getByte(innerAddress + 12 + 0) & 0xff) << 24) |
+          ((unsafe.getByte(innerAddress + 12 + 1) & 0xff) << 16) |
+          ((unsafe.getByte(innerAddress + 12 + 2) & 0xff) << 8) |
+          (unsafe.getByte(innerAddress + 12 + 3) & 0xff);
+      if (origLen == -1) {
+        int offset = 0;
+        int recCount = DataUtils.addressToInt(innerAddress + offset + 16, unsafe);
+        offset += 4;
+        byte[][] ret = new byte[recCount][];
         for (int i = 0; i < ret.length; i++) {
-          int len = (int) Varint.readSignedVarLong(in);
+          int len = DataUtils.addressToInt(innerAddress + offset + 16, unsafe);
+          offset += 4;
+          byte[] record = new byte[len];
+          for (int j = 0; j < len; j++) {
+            record[j] = unsafe.getByte(innerAddress + offset + 16);
+            offset++;
+          }
+          ret[i] = record;
+        }
+        return ret;
+      }
+
+      if (origLen != -1) {
+        LZ4Factory localFactory = LZ4Factory.fastestInstance();
+
+        byte[] bytes = new byte[actualLen];
+        for (int j = 0; j < actualLen; j++) {
+          bytes[j] = unsafe.getByte(innerAddress + 16 + j);
+        }
+
+        LZ4FastDecompressor decompressor = localFactory.fastDecompressor();
+        byte[] restored = new byte[origLen];
+        decompressor.decompress(bytes, 0, restored, 0, origLen);
+        bytes = restored;
+
+        DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
+        byte[][] ret = new byte[in.readInt()][];
+        for (int i = 0; i < ret.length; i++) {
+          int len = in.readInt();
           byte[] record = new byte[len];
           in.readFully(record);
           ret[i] = record;
@@ -395,8 +396,8 @@ public class AddressMap {
         return ret;
       }
     }
-    catch (IOException e) {
-      throw new DatabaseException(e);
+    finally {
+      readLock.unlock();
     }
     return null;
   }

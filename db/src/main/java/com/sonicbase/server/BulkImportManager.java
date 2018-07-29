@@ -23,7 +23,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-@SuppressWarnings("squid:S1172") // all methods called from method invoker must have cobj and replayed command parms
+@SuppressWarnings({"squid:S1172", "squid:S1168", "squid:S00107"})
+// all methods called from method invoker must have cobj and replayed command parms
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class BulkImportManager {
 
   private static final String SONICBASE_ID_STR = "_sonicbase_id";
@@ -267,7 +270,11 @@ public class BulkImportManager {
       return this;
     }
 
-    private void insertRecords(List<Future> futures, ResultSet rs, int batchSize, List<Object[]> currBatch, String dbName, final String tableName, final List<FieldSchema> fields, AtomicLong countRead, AtomicInteger countSubmitted, ThreadPoolExecutor executor, final Connection insertConn, final AtomicLong countProcessed, final AtomicInteger countFinished, final StringBuilder fieldsStr, final StringBuilder parmsStr, int currSlice) throws SQLException {
+    private void insertRecords(List<Future> futures, ResultSet rs, int batchSize, List<Object[]> currBatch,
+                               String dbName, final String tableName, final List<FieldSchema> fields,
+                               AtomicLong countRead, AtomicInteger countSubmitted, ThreadPoolExecutor executor,
+                               final Connection insertConn, final AtomicLong countProcessed, final AtomicInteger countFinished,
+                               final StringBuilder fieldsStr, final StringBuilder parmsStr, int currSlice) throws SQLException {
       while (rs.next() && !cancelBulkImport.get(dbName + ":" + tableName).get()) {
         if (shutdown) {
           break;
@@ -281,21 +288,25 @@ public class BulkImportManager {
           countSubmitted.incrementAndGet();
           final List<Object[]> batchToProcess = currBatch;
           currBatch = new ArrayList<>();
-          futures.add(executor.submit(() -> BulkImportManager.this.insertRecords(insertConn, countProcessed, countFinished, batchToProcess, tableName,
+          futures.add(executor.submit(() -> BulkImportManager.this.insertRecords(insertConn, countProcessed,
+              countFinished, batchToProcess, tableName,
               fields, fieldsStr, parmsStr)));
         }
       }
       if (!currBatch.isEmpty() && !cancelBulkImport.get(dbName + ":" + tableName).get()) {
         countSubmitted.incrementAndGet();
-        BulkImportManager.this.insertRecords(insertConn, countProcessed, countFinished, currBatch, tableName, fields, fieldsStr, parmsStr);
+        BulkImportManager.this.insertRecords(insertConn, countProcessed, countFinished, currBatch, tableName, fields,
+            fieldsStr, parmsStr);
       }
       logger.info("bulkImport finished reading records: currSlice={}", currSlice);
     }
 
-    private String processFirstSlice(String[] keyFields, ComArray keys, StringBuilder fieldsStr, String tableName, TableSchema tableSchema, ComObject cobj) throws EOFException {
+    private String processFirstSlice(String[] keyFields, ComArray keys, StringBuilder fieldsStr, String tableName,
+                                     TableSchema tableSchema, ComObject cobj) throws EOFException {
       String statementStr;
       Object[] currKey = DatabaseCommon.deserializeKey(tableSchema, (byte[]) keys.getArray().get(1));
-      Object[] lowerKey = cobj.getByteArray(ComObject.Tag.LOWER_KEY) == null ? null : DatabaseCommon.deserializeKey(tableSchema, cobj.getByteArray(ComObject.Tag.LOWER_KEY));
+      Object[] lowerKey = cobj.getByteArray(ComObject.Tag.LOWER_KEY) == null ? null :
+          DatabaseCommon.deserializeKey(tableSchema, cobj.getByteArray(ComObject.Tag.LOWER_KEY));
       if (lowerKey != null) {
         statementStr = SELECT_STR + fieldsStr.toString() + FROM_STR + tableName + WHERE_STR + keyFields[0] +
             " >= " + lowerKey[0] + AND_STR + keyFields[0] + " < " + currKey[0] + ")";
@@ -321,10 +332,12 @@ public class BulkImportManager {
       return statementStr;
     }
 
-    private String processLastSlice(String[] keyFields, int currSlice, ComArray keys, StringBuilder fieldsStr, String tableName, TableSchema tableSchema, ComObject cobj) throws EOFException {
+    private String processLastSlice(String[] keyFields, int currSlice, ComArray keys, StringBuilder fieldsStr,
+                                    String tableName, TableSchema tableSchema, ComObject cobj) throws EOFException {
       String statementStr;
       Object[] currKey = DatabaseCommon.deserializeKey(tableSchema, (byte[]) keys.getArray().get(currSlice));
-      Object[] upperKey = cobj.getByteArray(ComObject.Tag.NEXT_KEY) == null ? null : DatabaseCommon.deserializeKey(tableSchema, cobj.getByteArray(ComObject.Tag.NEXT_KEY));
+      Object[] upperKey = cobj.getByteArray(ComObject.Tag.NEXT_KEY) == null ? null :
+          DatabaseCommon.deserializeKey(tableSchema, cobj.getByteArray(ComObject.Tag.NEXT_KEY));
       if (upperKey != null) {
         statementStr = SELECT_STR + fieldsStr.toString() + FROM_STR + tableName + WHERE_STR + keyFields[0] +
             " >= " + currKey[0] + AND_STR + keyFields[0] + " < " + upperKey[0] + ")";
@@ -370,9 +383,11 @@ public class BulkImportManager {
 
         boolean haveExpression = true;
 
-        String statementStr = buildSelectStatement(keyFields, haveExpression, currSlice, keys, fieldsStr, tableName, tableSchema, cobj);
+        String statementStr = buildSelectStatement(keyFields, haveExpression, currSlice, keys, fieldsStr, tableName,
+            tableSchema, cobj);
 
-        processReads(futures, localConn, statementStr, currSlice, tableName, fieldsStr, parmsStr, dbName, fields, countRead, countSubmitted, executor, insertConn, countProcessed, countFinished);
+        processReads(futures, localConn, statementStr, currSlice, tableName, fieldsStr, parmsStr, dbName, fields,
+            countRead, countSubmitted, executor, insertConn, countProcessed, countFinished);
       }
       catch (Exception e) {
         logger.error(ERROR_IMPORTING_RECORDS_STR, e);
@@ -393,7 +408,8 @@ public class BulkImportManager {
     }
 
     private String buildSelectStatement(String[] keyFields, boolean haveExpression, int currSlice, ComArray keys,
-                                        StringBuilder fieldsStr, String tableName, TableSchema tableSchema, ComObject cobj) throws EOFException {
+                                        StringBuilder fieldsStr, String tableName, TableSchema tableSchema,
+                                        ComObject cobj) throws EOFException {
       String statementStr;
       if (currSlice == 0) {
         if (keys.getArray().size() == 1) {
@@ -417,7 +433,11 @@ public class BulkImportManager {
       return processWhereClause(haveExpression, cobj, statementStr);
     }
 
-    private void processReads(List<Future> futures, Connection localConn, String statementStr, int currSlice, String tableName, StringBuilder fieldsStr, StringBuilder parmsStr, String dbName, List<FieldSchema> fields, AtomicLong countRead, AtomicInteger countSubmitted, ThreadPoolExecutor executor, Connection insertConn, AtomicLong countProcessed, AtomicInteger countFinished) throws SQLException, InterruptedException, ExecutionException {
+    private void processReads(List<Future> futures, Connection localConn, String statementStr, int currSlice,
+                              String tableName, StringBuilder fieldsStr, StringBuilder parmsStr, String dbName,
+                              List<FieldSchema> fields, AtomicLong countRead, AtomicInteger countSubmitted,
+                              ThreadPoolExecutor executor, Connection insertConn, AtomicLong countProcessed,
+                              AtomicInteger countFinished) throws SQLException, InterruptedException, ExecutionException {
       try (PreparedStatement stmt = localConn.prepareStatement(statementStr)) {
         logger.info("bulkImport select statement: slice={}, str={}", currSlice, statementStr);
         logger.info("bulkImport upsert statement: slice={}, str=UPSERT INTO {} ({}) VALUES ({})", currSlice, tableName,
@@ -426,7 +446,8 @@ public class BulkImportManager {
           int batchSize = 100;
           List<Object[]> currBatch = new ArrayList<>();
 
-          insertRecords(futures, rs, batchSize, currBatch, dbName, tableName, fields, countRead, countSubmitted, executor, insertConn, countProcessed, countFinished, fieldsStr, parmsStr, currSlice);
+          insertRecords(futures, rs, batchSize, currBatch, dbName, tableName, fields, countRead, countSubmitted,
+              executor, insertConn, countProcessed, countFinished, fieldsStr, parmsStr, currSlice);
         }
         catch (Exception e) {
           throw new DatabaseException("Error executing query: sql=" + statementStr, e);
@@ -741,7 +762,7 @@ public class BulkImportManager {
   @SuppressWarnings("squid:S2077") //don't need variable bindings
   private void doImportForNoPrimaryKey(Connection conn, long count, int serverCount, int totalThreadCount,
                                        TableSchema tableSchema, IndexSchema indexSchema,
-                                       final String tableName, final String dbName, ComObject cobj) throws SQLException {
+                                       final String tableName, final String dbName, ComObject cobj) {
 
     importCountProcessed.put(dbName + ":" + tableName, new AtomicLong(0));
     importFinished.put(dbName + ":" + tableName, false);
@@ -800,7 +821,9 @@ public class BulkImportManager {
     }
   }
 
-  private void doInsertForNoPrimaryKey(Connection conn, String tableName, String dbName, List<FieldSchema> fields, StringBuilder fieldsStr, StringBuilder parmsStr, String statementStr) throws SQLException, ClassNotFoundException, InterruptedException, ExecutionException {
+  private void doInsertForNoPrimaryKey(Connection conn, String tableName, String dbName, List<FieldSchema> fields,
+                                       StringBuilder fieldsStr, StringBuilder parmsStr, String statementStr)
+      throws SQLException, ClassNotFoundException, InterruptedException, ExecutionException {
     List<Future> futures = new ArrayList<>();
     ThreadPoolExecutor executor = ThreadUtil.createExecutor(8, "SonicBase doImportForNoPrimaryKey Thread");
     try (PreparedStatement stmt = conn.prepareStatement(statementStr)) {
@@ -910,38 +933,16 @@ public class BulkImportManager {
         Object[] lastPartialKey = new Object[keyFields.length];
         boolean lookingForUniqueKey = false;
         while (rs.next() && !cancelBulkImport.get(dbName + ":" + tableName).get()) {
-          boolean foundUniqueKey = false;
-          if (lookingForUniqueKey) {
-            Object[] possibleKey = new Object[keyFields.length];
-            possibleKey[0] = getValueOfField(rs, keyFields[0], dataTypes[0]);
-            int compareValue = DatabaseCommon.compareKey(indexSchema.getComparators(), possibleKey, lastPartialKey);
-            if (compareValue != 0) {
-              foundUniqueKey = true;
-            }
-          }
-          if (foundUniqueKey || recordOffset == offsets[slice]) {
-            foundUniqueKey = false;
-            lookingForUniqueKey = false;
-            Object[] checkingKey = new Object[keyFields.length];
-            checkingKey[0] = getValueOfField(rs, keyFields[0], dataTypes[0]);
-            if (lastPartialKey[0] != null && 0 == DatabaseCommon.compareKey(indexSchema.getComparators(), checkingKey, lastPartialKey)) {
-              lookingForUniqueKey = true;
-            }
-            if (!lookingForUniqueKey) {
-              keys[slice] = new Object[keyFields.length];
-              for (int i = 0; i < keyFields.length; i++) {
-                keys[slice][i] = getValueOfField(rs, keyFields[i], dataTypes[i]);
-              }
-              lastPartialKey[0] = keys[slice][0];
-              slice++;
-            }
-          }
-          if (slice == keys.length) {
+          ProcessResult processResult = new ProcessResult(countProcessed, indexSchema, keyFields, dataTypes,
+              recordOffset == offsets[slice], keys, recordOffset, slice, rs, actualCount, lastPartialKey,
+              lookingForUniqueKey).invoke();
+          recordOffset = processResult.getRecordOffset();
+          slice = processResult.getSlice();
+          actualCount = processResult.getActualCount();
+          lookingForUniqueKey = processResult.isLookingForUniqueKey();
+          if (processResult.is()) {
             break;
           }
-          countProcessed.incrementAndGet();
-          recordOffset++;
-          actualCount++;
         }
 
         startBulkImportOnServer(serverCount, tableSchema, indexSchema, tableName, dbName, cobj, keys, actualCount);
@@ -949,7 +950,9 @@ public class BulkImportManager {
     }
   }
 
-  private void startBulkImportOnServer(int serverCount, TableSchema tableSchema, IndexSchema indexSchema, String tableName, String dbName, ComObject cobj, Object[][] keys, long actualCount) throws InterruptedException {
+  private void startBulkImportOnServer(int serverCount, TableSchema tableSchema, IndexSchema indexSchema,
+                                       String tableName, String dbName, ComObject cobj, Object[][] keys,
+                                       long actualCount) throws InterruptedException {
     long countPer = actualCount / serverCount;
 
     cobj.put(ComObject.Tag.EXPECTED_COUNT, countPer);
@@ -985,20 +988,23 @@ public class BulkImportManager {
     startBulkImportOnServerDoSend(serverCount, tableName, dbName, requests);
   }
 
-  private void startBulkImportOnServerDoSend(int serverCount, String tableName, String dbName, List<ComObject> requests) throws InterruptedException {
+  private void startBulkImportOnServerDoSend(int serverCount, String tableName, String dbName,
+                                             List<ComObject> requests) throws InterruptedException {
     Set<String> assigned = new HashSet<>();
     int requestOffset = 0;
     while (requestOffset < serverCount) {
       for (int shard = 0; shard < server.getShardCount(); shard++) {
         for (int replica = 0; replica < server.getReplicationFactor(); replica++) {
-          requestOffset = startBulkImportOnServerDoSendToReplica(tableName, dbName, requests, assigned, requestOffset, shard, replica);
+          requestOffset = startBulkImportOnServerDoSendToReplica(tableName, dbName, requests, assigned, requestOffset,
+              shard, replica);
         }
       }
       Thread.sleep(10_000);
     }
   }
 
-  private int startBulkImportOnServerDoSendToReplica(String tableName, String dbName, List<ComObject> requests, Set<String> assigned, int requestOffset, int shard, int replica) {
+  private int startBulkImportOnServerDoSendToReplica(String tableName, String dbName, List<ComObject> requests,
+                                                     Set<String> assigned, int requestOffset, int shard, int replica) {
     if (!cancelBulkImport.get(dbName + ":" + tableName).get() && !assigned.contains(shard + ":" + replica)) {
       byte[] bytes = server.getClient().send(null, shard, replica,
           requests.get(requestOffset), DatabaseClient.Replica.SPECIFIED);
@@ -1085,7 +1091,8 @@ public class BulkImportManager {
         insertStmt.setString(parmOffset, (String) value));
   }
 
-  public static void setFieldsInInsertStatement(PreparedStatement insertStmt, int parmOffset, Object[] currRecord, List<FieldSchema> fields) {
+  public static void setFieldsInInsertStatement(PreparedStatement insertStmt, int parmOffset, Object[] currRecord,
+                                                List<FieldSchema> fields) {
     try {
       int fieldOffset = 0;
       for (FieldSchema field : fields) {
@@ -1111,7 +1118,8 @@ public class BulkImportManager {
   }
 
   @SuppressWarnings("squid:S2077") //don't need variable bindings
-  private void insertRecords(Connection insertConn, AtomicLong countProcessed, AtomicInteger countFinished, List<Object[]> currBatch, String tableName,
+  private void insertRecords(Connection insertConn, AtomicLong countProcessed, AtomicInteger countFinished,
+                             List<Object[]> currBatch, String tableName,
                              List<FieldSchema> fields, StringBuilder fieldsStr, StringBuilder parmsStr) {
     PreparedStatement insertStmt = null;
     try {
@@ -1261,36 +1269,11 @@ public class BulkImportManager {
       if (entry.getKey().startsWith(dbName + ":")) {
         String tableName = entry.getKey();
         for (String currTable : tables) {
-          if (currTable.equals(tableName)) {
-            boolean finished = false;
-            String exception = null;
-            for (Map.Entry<String, BulkImportStatus> serverEntry : entry.getValue().entrySet()) {
-              if (serverEntry.getValue().finished) {
-                finished = true;
-              }
-              if (serverEntry.getValue().exception != null) {
-                exception = serverEntry.getValue().exception;
-              }
-            }
-            boolean localPreProcessFinished = false;
-            String preProcessEx = null;
-            for (Map.Entry<String, BulkImportStatus> serverEntry : entry.getValue().entrySet()) {
-
-              if (serverEntry.getValue().preProcessFinished) {
-                localPreProcessFinished = true;
-              }
-              if (serverEntry.getValue().preProcessException != null) {
-                preProcessEx = serverEntry.getValue().preProcessException;
-              }
-            }
-            if (!finished && exception == null) {
-              inProgress = true;
-              break outer;
-            }
-            if (!localPreProcessFinished && preProcessEx == null) {
-              inProgress = true;
-              break outer;
-            }
+          DoProcessBulkImportStatusForTable doProcessBulkImportStatusForTable = new DoProcessBulkImportStatusForTable(
+              inProgress, entry, tableName, currTable).invoke();
+          inProgress = doProcessBulkImportStatusForTable.isInProgress();
+          if (doProcessBulkImportStatusForTable.is()) {
+            break outer;
           }
         }
       }
@@ -1322,7 +1305,8 @@ public class BulkImportManager {
     }
   }
 
-  private boolean doStartBulkImportForTableDoSend(String dbName, String tableName, byte[] cobjBytes, boolean hasAccepted, int shard, int replica) {
+  private boolean doStartBulkImportForTableDoSend(String dbName, String tableName, byte[] cobjBytes, boolean hasAccepted,
+                                                  int shard, int replica) {
     ComObject cobj = new ComObject(cobjBytes);
     cobj.put(ComObject.Tag.METHOD, "BulkImportManager:coordinateBulkImportForTable");
     cobj.put(ComObject.Tag.TABLE_NAME, tableName);
@@ -1375,7 +1359,8 @@ public class BulkImportManager {
     return retObj;
   }
 
-  private void doGetBulkImportStatus(ComArray array, Map.Entry<String, ConcurrentHashMap<String, BulkImportStatus>> entry, String tableName) {
+  private void doGetBulkImportStatus(ComArray array, Map.Entry<String, ConcurrentHashMap<String,
+      BulkImportStatus>> entry, String tableName) {
     long countExpected = 0;
     long countProcessed = 0;
     boolean finished = true;
@@ -1410,7 +1395,9 @@ public class BulkImportManager {
         localPreProcessCountExpected, localPreProcessCountProcessed, localPreProcessFinished, preProcessEx);
   }
 
-  private void getBulkImportStatsSetReturn(ComArray array, String tableName, long countExpected, long countProcessed, boolean finished, String exception, long preProcessCountExpected, long preProcessCountProcessed, boolean preProcessFinished, String preProcessEx) {
+  private void getBulkImportStatsSetReturn(ComArray array, String tableName, long countExpected, long countProcessed,
+                                           boolean finished, String exception, long preProcessCountExpected,
+                                           long preProcessCountProcessed, boolean preProcessFinished, String preProcessEx) {
     ComObject serverObj = new ComObject();
     serverObj.put(ComObject.Tag.TABLE_NAME, tableName);
     serverObj.put(ComObject.Tag.EXPECTED_COUNT, countExpected);
@@ -1428,4 +1415,162 @@ public class BulkImportManager {
     array.add(serverObj);
   }
 
+  private class ProcessResult {
+    private boolean myResult;
+    private AtomicLong countProcessed;
+    private IndexSchema indexSchema;
+    private String[] keyFields;
+    private DataType.Type[] dataTypes;
+    private boolean b;
+    private Object[][] keys;
+    private int recordOffset;
+    private int slice;
+    private ResultSet rs;
+    private long actualCount;
+    private Object[] lastPartialKey;
+    private boolean lookingForUniqueKey;
+
+    public ProcessResult(AtomicLong countProcessed, IndexSchema indexSchema, String[] keyFields,
+                         DataType.Type[] dataTypes, boolean b, Object[][] keys, int recordOffset, int slice, ResultSet rs,
+                         long actualCount, Object[] lastPartialKey, boolean lookingForUniqueKey) {
+      this.countProcessed = countProcessed;
+      this.indexSchema = indexSchema;
+      this.keyFields = keyFields;
+      this.dataTypes = dataTypes;
+      this.b = b;
+      this.keys = keys;
+      this.recordOffset = recordOffset;
+      this.slice = slice;
+      this.rs = rs;
+      this.actualCount = actualCount;
+      this.lastPartialKey = lastPartialKey;
+      this.lookingForUniqueKey = lookingForUniqueKey;
+    }
+
+    boolean is() {
+      return myResult;
+    }
+
+    public int getRecordOffset() {
+      return recordOffset;
+    }
+
+    public int getSlice() {
+      return slice;
+    }
+
+    public long getActualCount() {
+      return actualCount;
+    }
+
+    public boolean isLookingForUniqueKey() {
+      return lookingForUniqueKey;
+    }
+
+    public ProcessResult invoke() throws SQLException {
+      boolean foundUniqueKey = false;
+      if (lookingForUniqueKey) {
+        Object[] possibleKey = new Object[keyFields.length];
+        possibleKey[0] = getValueOfField(rs, keyFields[0], dataTypes[0]);
+        int compareValue = DatabaseCommon.compareKey(indexSchema.getComparators(), possibleKey, lastPartialKey);
+        if (compareValue != 0) {
+          foundUniqueKey = true;
+        }
+      }
+      if (foundUniqueKey || b) {
+        lookingForUniqueKey = false;
+        Object[] checkingKey = new Object[keyFields.length];
+        checkingKey[0] = getValueOfField(rs, keyFields[0], dataTypes[0]);
+        if (lastPartialKey[0] != null && 0 == DatabaseCommon.compareKey(indexSchema.getComparators(), checkingKey, lastPartialKey)) {
+          lookingForUniqueKey = true;
+        }
+        if (!lookingForUniqueKey) {
+          keys[slice] = new Object[keyFields.length];
+          for (int i = 0; i < keyFields.length; i++) {
+            keys[slice][i] = getValueOfField(rs, keyFields[i], dataTypes[i]);
+          }
+          lastPartialKey[0] = keys[slice][0];
+          slice++;
+        }
+      }
+      if (slice == keys.length) {
+        myResult = true;
+        return this;
+      }
+      countProcessed.incrementAndGet();
+      recordOffset++;
+      actualCount++;
+      myResult = false;
+      return this;
+    }
+  }
+
+  private class DoProcessBulkImportStatusForTable {
+    private boolean myResult;
+    private boolean inProgress;
+    private Map.Entry<String, ConcurrentHashMap<String, BulkImportStatus>> entry;
+    private String tableName;
+    private String currTable;
+
+    public DoProcessBulkImportStatusForTable(boolean inProgress, Map.Entry<String,
+        ConcurrentHashMap<String, BulkImportStatus>> entry, String tableName, String currTable) {
+      this.inProgress = inProgress;
+      this.entry = entry;
+      this.tableName = tableName;
+      this.currTable = currTable;
+    }
+
+    boolean is() {
+      return myResult;
+    }
+
+    public boolean isInProgress() {
+      return inProgress;
+    }
+
+    public DoProcessBulkImportStatusForTable invoke() {
+      if (currTable.equals(tableName)) {
+        boolean finished = false;
+        String exception = null;
+        for (Map.Entry<String, BulkImportStatus> serverEntry : entry.getValue().entrySet()) {
+          if (serverEntry.getValue().finished) {
+            finished = true;
+          }
+          if (serverEntry.getValue().exception != null) {
+            exception = serverEntry.getValue().exception;
+          }
+        }
+        if (doProcessBulkImportStatusForTable(finished, exception)) {
+          return this;
+        }
+      }
+      myResult = false;
+      return this;
+    }
+
+    private boolean doProcessBulkImportStatusForTable(boolean finished, String exception) {
+      boolean localPreProcessFinished = false;
+      String preProcessEx = null;
+      for (Map.Entry<String, BulkImportStatus> serverEntry : entry.getValue().entrySet()) {
+
+        if (serverEntry.getValue().preProcessFinished) {
+          localPreProcessFinished = true;
+        }
+        if (serverEntry.getValue().preProcessException != null) {
+          preProcessEx = serverEntry.getValue().preProcessException;
+        }
+      }
+      if (!finished && exception == null) {
+        inProgress = true;
+        myResult = true;
+        return true;
+      }
+      if (!localPreProcessFinished && preProcessEx == null) {
+        inProgress = true;
+        myResult = true;
+        return true;
+      }
+      return false;
+    }
+  }
 }

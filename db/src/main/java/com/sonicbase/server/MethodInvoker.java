@@ -14,8 +14,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-@SuppressWarnings({"squid:S1168", "squid:S1172"}) // I prefer to return null instead of an empty array
-                                                  // all methods called from method invoker must have cobj and replayed command parms
+@SuppressWarnings({"squid:S1172", "squid:S1168", "squid:S00107"})
+// all methods called from method invoker must have cobj and replayed command parms
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class MethodInvoker {
   private static Logger logger = LoggerFactory.getLogger(MethodInvoker.class);
 
@@ -101,13 +103,6 @@ public class MethodInvoker {
         replayedCommand = true;
       }
 
-      if (server.isRecovered() && server.shouldDisableNow() && server.isUsingMultipleReplicas() &&
-          !methodStr.equals("DatabaseServer:healthCheck") && !methodStr.equals("DatabaseServer:healthCheckPriority") &&
-          !methodStr.equals("DatabaseServer:getConfig") &&
-          !methodStr.equals("LicenseManager:licenseCheckin") &&
-          !methodStr.equals("DatabaseServer:getSchema") && !methodStr.equals("DatabaseServer:getDbNames")) {
-        throw new LicenseOutOfComplianceException("Licenses out of compliance");
-      }
       if (methodStr.equals("queueForOtherServer")) {
         return queueForOtherServer(requestBytes, request);
       }
@@ -151,24 +146,30 @@ public class MethodInvoker {
       throw e; //don't log
     }
     catch (Exception e) {
-      if (-1 != ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class)) {
-        throw new DatabaseException(e); //don't log
-      }
-      if (e.getCause() instanceof SchemaOutOfSyncException) {
-        throw new DatabaseException(e);
-      }
-      if (-1 != ExceptionUtils.indexOfThrowable(e, UniqueConstraintViolationException.class)) {
-        throw new DatabaseException(e); //don't log
-      }
-      if (e.getMessage().contains("Shutdown in progress")) {
-        throw new DatabaseException(e);
-      }
-      logger.error("Error handling command: method=" + new ComObject(requestBytes).getString(ComObject.Tag.METHOD), e);
-      throw new DatabaseException(e);
+      handleGenericException(requestBytes, e);
     }
+    return null;
   }
 
-  private ComObject doInvokeMethod(boolean replayedCommand, AtomicLong handlerTime, ComObject request, String methodStr, Long existingSequence0, long sequence0, long sequence1) {
+  private void handleGenericException(byte[] requestBytes, Exception e) {
+    if (-1 != ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class)) {
+      throw new DatabaseException(e); //don't log
+    }
+    if (e.getCause() instanceof SchemaOutOfSyncException) {
+      throw new DatabaseException(e);
+    }
+    if (-1 != ExceptionUtils.indexOfThrowable(e, UniqueConstraintViolationException.class)) {
+      throw new DatabaseException(e); //don't log
+    }
+    if (e.getMessage().contains("Shutdown in progress")) {
+      throw new DatabaseException(e);
+    }
+    logger.error("Error handling command: method=" + new ComObject(requestBytes).getString(ComObject.Tag.METHOD), e);
+    throw new DatabaseException(e);
+  }
+
+  private ComObject doInvokeMethod(boolean replayedCommand, AtomicLong handlerTime, ComObject request, String methodStr,
+                                   Long existingSequence0, long sequence0, long sequence1) {
     ComObject ret;
     try {
       long handleBegin = System.nanoTime();

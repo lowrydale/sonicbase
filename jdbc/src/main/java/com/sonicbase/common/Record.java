@@ -7,11 +7,9 @@ import org.apache.giraph.utils.Varint;
 import java.io.*;
 import java.util.Set;
 
-/**
- * User: lowryda
- * Date: 9/30/14
- * Time: 5:22 PM
- */
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class Record {
   private TableSchema tableSchema;
   private Object[] fields;
@@ -39,7 +37,8 @@ public class Record {
 
   public void recoverFromSnapshot(String dbName, DatabaseCommon common, byte[] bytes, Set<Integer> columns, boolean readHeader) {
     try {
-      DataInputStream sin = new DataInputStream(new ByteArrayInputStream(bytes, !readHeader ? 26 : 0, !readHeader ? bytes.length - 26 : bytes.length));
+      DataInputStream sin = new DataInputStream(new ByteArrayInputStream(bytes, !readHeader ? 26 : 0, !readHeader ?
+          bytes.length - 26 : bytes.length));
       if (readHeader) {
         sin.readShort(); // serializationVersion
         sequence0 = sin.readLong();

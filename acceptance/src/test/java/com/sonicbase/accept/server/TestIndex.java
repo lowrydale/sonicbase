@@ -37,9 +37,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import static java.util.Arrays.asList;
 import static org.testng.Assert.assertEquals;
 
-/**
- * Responsible for
- */
 public class TestIndex {
 
   DatabaseClient client;

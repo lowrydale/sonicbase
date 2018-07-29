@@ -9,6 +9,10 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+@SuppressWarnings({"squid:S1172", "squid:S1168", "squid:S00107"})
+// all methods called from method invoker must have cobj and replayed command parms
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class IndexLookupTwoKeys extends IndexLookup {
 
   public IndexLookupTwoKeys(DatabaseServer server) {
@@ -37,14 +41,16 @@ public class IndexLookupTwoKeys extends IndexLookup {
       }
 
       boolean useGreater = false;
-      GetStartingKey getStartingKey = new GetStartingKey(entry, greaterKey, greaterOriginalKey, lessKey, lessOriginalKey, useGreater).invoke();
+      GetStartingKey getStartingKey = new GetStartingKey(entry, greaterKey, greaterOriginalKey, lessKey, lessOriginalKey,
+          useGreater).invoke();
       entry = getStartingKey.getEntry();
       greaterKey = getStartingKey.getGreaterKey();
       lessKey = getStartingKey.getLessKey();
       useGreater = getStartingKey.isUseGreater();
 
       if (entry != null) {
-        AdjustStartingKey adjustStartingKey = new AdjustStartingKey(entry, greaterOp, greaterKey, greaterOriginalKey, lessOp, lessKey, lessOriginalKey, useGreater).invoke();
+        AdjustStartingKey adjustStartingKey = new AdjustStartingKey(entry, greaterOp, greaterKey, greaterOriginalKey,
+            lessOp, lessKey, lessOriginalKey, useGreater).invoke();
         entry = adjustStartingKey.getEntry();
         Object[] key = adjustStartingKey.getKey();
 
@@ -57,20 +63,13 @@ public class IndexLookupTwoKeys extends IndexLookup {
     return entry;
   }
 
-  private Map.Entry<Object[], Object> traverseIndex(Map.Entry<Object[], Object> entry, AtomicInteger countSkipped, BinaryExpression.Operator greaterOp, Object[] greaterOriginalKey, BinaryExpression.Operator lessOp, Object[] lessOriginalKey, Object[] key) {
-    outer:
-    while (entry != null) {
-      if (retKeyRecords.size() >= count || retRecords.size() >= count) {
-        break;
-      }
-
+  private Map.Entry<Object[], Object> traverseIndex(Map.Entry<Object[], Object> entry, AtomicInteger countSkipped,
+                                                    BinaryExpression.Operator greaterOp, Object[] greaterOriginalKey,
+                                                    BinaryExpression.Operator lessOp, Object[] lessOriginalKey, Object[] key) {
+    while (entry != null && !(retKeyRecords.size() >= count || retRecords.size() >= count)) {
       if (key != null) {
-        if (excludeKeys != null) {
-          for (Object[] excludeKey : excludeKeys) {
-            if (DatabaseCommon.compareKey(indexSchema.getComparators(), excludeKey, key) == 0) {
-              continue outer;
-            }
-          }
+        if (processExcludeKeys(key)) {
+          continue;
         }
 
         CheckIfRightIsDone checkIfRightIsDone = new CheckIfRightIsDone(entry, lessOp, lessOriginalKey).invoke();
@@ -79,46 +78,30 @@ public class IndexLookupTwoKeys extends IndexLookup {
           break;
         }
       }
-      byte[][] currKeyRecords = null;
-      byte[][] records = null;
-      boolean shouldProcess = true;
+      ProcessKey processKey = new ProcessKey(entry, countSkipped).invoke();
+      entry = processKey.getEntry();
+      if (processKey.shouldBreak()) {
+        break;
+      }
 
-      if (isProbe) {
-        if (countSkipped.incrementAndGet() < DatabaseClient.OPTIMIZED_RANGE_PAGE_SIZE) {
-          shouldProcess = false;
-        }
-        else {
-          countSkipped.set(0);
-        }
-      }
-      if (shouldProcess) {
-        ProcessKey processKey = new ProcessKey(entry, currKeyRecords, records).invoke();
-        entry = processKey.getEntry();
-        if (processKey.shouldBreak()) {
-          break outer;
-        }
-      }
-      if (ascending != null && !ascending) {
-        entry = index.lowerEntry(entry.getKey());
-      }
-      else {
-        entry = index.higherEntry(entry.getKey());
-      }
-      if (entry != null) {
-        if (entry.getKey() == null) {
-          throw new DatabaseException("entry key is null");
-        }
-        if (lessOriginalKey == null) {
-          throw new DatabaseException("original less key is null");
-        }
-        CheckForEndTraversal checkForEndTraversal = new CheckForEndTraversal(entry, greaterOp, greaterOriginalKey, lessOp, lessOriginalKey).invoke();
-        entry = checkForEndTraversal.getEntry();
-        if (checkForEndTraversal.shouldBreak()) {
-          break;
-        }
+      PostTraversal post = new PostTraversal(entry, greaterOp, greaterOriginalKey, lessOp, lessOriginalKey).invoke();
+      entry = post.entry;
+      if (post.shouldReturn) {
+        return entry;
       }
     }
     return entry;
+  }
+
+  private boolean processExcludeKeys(Object[] key) {
+    if (excludeKeys != null) {
+      for (Object[] excludeKey : excludeKeys) {
+        if (DatabaseCommon.compareKey(indexSchema.getComparators(), excludeKey, key) == 0) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   private class GetStartingKey {
@@ -129,7 +112,8 @@ public class IndexLookupTwoKeys extends IndexLookup {
     private Object[] lessOriginalKey;
     private boolean useGreater;
 
-    public GetStartingKey(Map.Entry<Object[], Object> entry, Object[] greaterKey, Object[] greaterOriginalKey, Object[] lessKey, Object[] lessOriginalKey, boolean useGreater) {
+    GetStartingKey(Map.Entry<Object[], Object> entry, Object[] greaterKey, Object[] greaterOriginalKey, Object[] lessKey,
+                   Object[] lessOriginalKey, boolean useGreater) {
       this.entry = entry;
       this.greaterKey = greaterKey;
       this.greaterOriginalKey = greaterOriginalKey;
@@ -142,55 +126,63 @@ public class IndexLookupTwoKeys extends IndexLookup {
       return entry;
     }
 
-    public Object[] getGreaterKey() {
+    Object[] getGreaterKey() {
       return greaterKey;
     }
 
-    public Object[] getLessKey() {
+    Object[] getLessKey() {
       return lessKey;
     }
 
-    public boolean isUseGreater() {
+    boolean isUseGreater() {
       return useGreater;
     }
 
     public GetStartingKey invoke() {
       if (ascending == null || ascending) {
-        useGreater = true;
-        if (greaterKey != null) {
-          entry = index.ceilingEntry(greaterKey);
-          lessKey = originalLeftKey;
-        }
-        else {
-          if (greaterOriginalKey == null) {
-            entry = index.firstEntry();
-          }
-          else {
-            entry = index.ceilingEntry(greaterOriginalKey);
-          }
-        }
-        if (entry == null) {
-          entry = index.firstEntry();
-        }
+        processAscending();
       }
       else {
-        if (lessKey != null) {
-          entry = index.floorEntry(lessKey);
-          greaterKey = originalRightKey;
-        }
-        else {
-          if (lessOriginalKey == null) {
-            entry = index.lastEntry();
-          }
-          else {
-            entry = index.floorEntry(lessOriginalKey);
-          }
-        }
-        if (entry == null) {
-          entry = index.lastEntry();
-        }
+        processDescending();
       }
       return this;
+    }
+
+    private void processDescending() {
+      if (lessKey != null) {
+        entry = index.floorEntry(lessKey);
+        greaterKey = originalRightKey;
+      }
+      else {
+        if (lessOriginalKey == null) {
+          entry = index.lastEntry();
+        }
+        else {
+          entry = index.floorEntry(lessOriginalKey);
+        }
+      }
+      if (entry == null) {
+        entry = index.lastEntry();
+      }
+    }
+
+    private void processAscending() {
+      useGreater = true;
+      if (greaterKey != null) {
+        entry = index.ceilingEntry(greaterKey);
+        lessKey = originalLeftKey;
+      }
+      else {
+        if (greaterOriginalKey == null) {
+          entry = index.firstEntry();
+        }
+        else {
+          entry = index.ceilingEntry(greaterOriginalKey);
+        }
+      }
+      if (entry == null) {
+        entry = index.firstEntry();
+      }
     }
   }
 
@@ -205,7 +197,9 @@ public class IndexLookupTwoKeys extends IndexLookup {
     private boolean useGreater;
     private Object[] key;
 
-    public AdjustStartingKey(Map.Entry<Object[], Object> entry, BinaryExpression.Operator greaterOp, Object[] greaterKey, Object[] greaterOriginalKey, BinaryExpression.Operator lessOp, Object[] lessKey, Object[] lessOriginalKey, boolean useGreater) {
+    public AdjustStartingKey(Map.Entry<Object[], Object> entry, BinaryExpression.Operator greaterOp, Object[] greaterKey,
+                             Object[] greaterOriginalKey, BinaryExpression.Operator lessOp, Object[] lessKey,
+                             Object[] lessOriginalKey, boolean useGreater) {
       this.entry = entry;
       this.greaterOp = greaterOp;
       this.greaterKey = greaterKey;
@@ -236,23 +230,27 @@ public class IndexLookupTwoKeys extends IndexLookup {
         adjustStartingKeyAscending();
       }
       if (entry != null && lessKey != null) {
-        if (useGreater) {
-          int compareValue = DatabaseCommon.compareKey(indexSchema.getComparators(), entry.getKey(), greaterOriginalKey);
-          if ((0 == compareValue || -1 == compareValue) && greaterOp == BinaryExpression.Operator.GREATER) {
-            entry = null;
-          }
-        }
-        else {
-          int compareValue = DatabaseCommon.compareKey(indexSchema.getComparators(), entry.getKey(), lessKey);
-          if ((0 == compareValue || 1 == compareValue) && lessOp == BinaryExpression.Operator.LESS) {
-            entry = null;
-          }
-          if (1 == compareValue) {
-            entry = null;
-          }
-        }
+        processEntry();
       }
       return this;
+    }
+
+    private void processEntry() {
+      if (useGreater) {
+        int compareValue = DatabaseCommon.compareKey(indexSchema.getComparators(), entry.getKey(), greaterOriginalKey);
+        if ((0 == compareValue || -1 == compareValue) && greaterOp == BinaryExpression.Operator.GREATER) {
+          entry = null;
+        }
+      }
+      else {
+        int compareValue = DatabaseCommon.compareKey(indexSchema.getComparators(), entry.getKey(), lessKey);
+        if ((0 == compareValue || 1 == compareValue) && lessOp == BinaryExpression.Operator.LESS) {
+          entry = null;
+        }
+        if (1 == compareValue) {
+          entry = null;
+        }
+      }
     }
 
     private void adjustStartingKeyAscending() {
@@ -261,7 +259,8 @@ public class IndexLookupTwoKeys extends IndexLookup {
             greaterOp.equals(BinaryExpression.Operator.LESS_EQUAL) ||
             greaterOp.equals(BinaryExpression.Operator.GREATER) ||
             greaterOp.equals(BinaryExpression.Operator.GREATER_EQUAL)) {
-          boolean foundMatch = key != null && 0 == DatabaseCommon.compareKey(indexSchema.getComparators(), entry.getKey(), greaterKey);
+          boolean foundMatch = key != null && 0 == DatabaseCommon.compareKey(indexSchema.getComparators(),
+              entry.getKey(), greaterKey);
           if (foundMatch) {
             entry = index.higherEntry((entry.getKey()));
           }
@@ -297,15 +296,13 @@ public class IndexLookupTwoKeys extends IndexLookup {
   }
 
   private class ProcessKey {
+    private final AtomicInteger countSkipped;
     private boolean myResult;
     private Map.Entry<Object[], Object> entry;
-    private byte[][] currKeyRecords;
-    private byte[][] records;
 
-    public ProcessKey(Map.Entry<Object[], Object> entry, byte[][] currKeyRecords, byte[]... records) {
+    ProcessKey(Map.Entry<Object[], Object> entry, AtomicInteger countSkipped) {
       this.entry = entry;
-      this.currKeyRecords = currKeyRecords;
-      this.records = records;
+      this.countSkipped = countSkipped;
     }
 
     boolean shouldBreak() {
@@ -317,19 +314,37 @@ public class IndexLookupTwoKeys extends IndexLookup {
     }
 
     public ProcessKey invoke() {
-      if (entry.getValue() != null && !entry.getValue().equals(0L)) {
-        if (keys) {
-          currKeyRecords = server.getAddressMap().fromUnsafeToKeys(entry.getValue());
+      byte[][] currKeyRecords = null;
+      byte[][] records = null;
+
+      boolean shouldProcess = true;
+      if (isProbe) {
+        if (countSkipped.incrementAndGet() < DatabaseClient.OPTIMIZED_RANGE_PAGE_SIZE) {
+          shouldProcess = false;
         }
         else {
-          records = server.getAddressMap().fromUnsafeToRecords(entry.getValue());
+          countSkipped.set(0);
         }
       }
-      if (keys) {
-        Object unsafeAddress = entry.getValue();
-        currKeyRecords = server.getAddressMap().fromUnsafeToKeys(unsafeAddress);
+      if (shouldProcess) {
+        if (entry.getValue() != null && !entry.getValue().equals(0L)) {
+          if (keys) {
+            currKeyRecords = server.getAddressMap().fromUnsafeToKeys(entry.getValue());
+          }
+          else {
+            records = server.getAddressMap().fromUnsafeToRecords(entry.getValue());
+          }
+        }
+        if (processEntry(currKeyRecords, records)) {
+          myResult = true;
+          return this;
+        }
       }
+      myResult = false;
+      return this;
+    }
 
+    private boolean processEntry(byte[][] currKeyRecords, byte[][] records) {
       if (entry.getValue() != null) {
         Object[] keyToUse = entry.getKey();
         if (keyToUse == null) {
@@ -342,11 +357,10 @@ public class IndexLookupTwoKeys extends IndexLookup {
         if (done.get()) {
           entry = null;
           myResult = true;
-          return this;
+          return true;
         }
       }
-      myResult = false;
-      return this;
+      return false;
     }
   }
 
@@ -358,7 +372,8 @@ public class IndexLookupTwoKeys extends IndexLookup {
     private BinaryExpression.Operator lessOp;
     private Object[] lessOriginalKey;
 
-    public CheckForEndTraversal(Map.Entry<Object[], Object> entry, BinaryExpression.Operator greaterOp, Object[] greaterOriginalKey, BinaryExpression.Operator lessOp, Object... lessOriginalKey) {
+    public CheckForEndTraversal(Map.Entry<Object[], Object> entry, BinaryExpression.Operator greaterOp,
+                                Object[] greaterOriginalKey, BinaryExpression.Operator lessOp, Object... lessOriginalKey) {
       this.entry = entry;
       this.greaterOp = greaterOp;
       this.greaterOriginalKey = greaterOriginalKey;
@@ -443,6 +458,50 @@ public class IndexLookupTwoKeys extends IndexLookup {
         return this;
       }
       myResult = false;
+      return this;
+    }
+  }
+
+  private class PostTraversal {
+    private Map.Entry<Object[], Object> entry;
+    private BinaryExpression.Operator greaterOp;
+    private Object[] greaterOriginalKey;
+    private BinaryExpression.Operator lessOp;
+    private Object[] lessOriginalKey;
+    private boolean shouldReturn;
+
+    public PostTraversal(Map.Entry<Object[], Object> entry, BinaryExpression.Operator greaterOp,
+                         Object[] greaterOriginalKey, BinaryExpression.Operator lessOp, Object... lessOriginalKey) {
+      this.entry = entry;
+      this.greaterOp = greaterOp;
+      this.greaterOriginalKey = greaterOriginalKey;
+      this.lessOp = lessOp;
+      this.lessOriginalKey = lessOriginalKey;
+    }
+
+    public PostTraversal invoke() {
+      if (ascending != null && !ascending) {
+        entry = index.lowerEntry(entry.getKey());
+      }
+      else {
+        entry = index.higherEntry(entry.getKey());
+      }
+      if (entry != null) {
+        if (entry.getKey() == null) {
+          throw new DatabaseException("entry key is null");
+        }
+        if (lessOriginalKey == null) {
+          throw new DatabaseException("original less key is null");
+        }
+        CheckForEndTraversal checkForEndTraversal = new CheckForEndTraversal(entry, greaterOp, greaterOriginalKey,
+            lessOp, lessOriginalKey).invoke();
+        entry = checkForEndTraversal.getEntry();
+        if (checkForEndTraversal.shouldBreak()) {
+          shouldReturn = true;
+          return this;
+        }
+      }
+      shouldReturn = false;
       return this;
     }
   }

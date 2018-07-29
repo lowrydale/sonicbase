@@ -60,8 +60,6 @@ public class TestBulkImport {
   @BeforeClass
   public void beforeClass() throws IOException, InterruptedException, SQLException, ClassNotFoundException {
     try {
-
-
       String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-2-servers-a.json")), "utf-8");
       ObjectMapper mapper = new ObjectMapper();
       final ObjectNode config = (ObjectNode) mapper.readTree(configStr);

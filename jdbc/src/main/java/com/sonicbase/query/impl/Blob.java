@@ -5,9 +5,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.sql.SQLException;
 
-/**
- * Responsible for
- */
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class Blob implements java.sql.Blob {
   public static final String OUT_OF_BOUNDS_STR = "out of bounds";
   public static final String NOT_SUPPORTED_STR = "not supported";

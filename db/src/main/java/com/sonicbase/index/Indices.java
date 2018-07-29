@@ -6,6 +6,9 @@ import java.util.Comparator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class Indices {
   private ConcurrentHashMap<String, ConcurrentHashMap<String, Index>> indexes = new ConcurrentHashMap<>();
 

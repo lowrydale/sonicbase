@@ -66,14 +66,11 @@ public class Explore {
       if (batch.size() >= 2_000) {
         final List<Integer> finalBatch = batch;
         batch = new ArrayList<>();
-        simpleFutures.add(executor.submit(new Callable<Object>() {
-          @Override
-          public Object call() throws Exception {
-            for (int i : finalBatch) {
-              count.incrementAndGet();
-            }
-            return 1;
+        simpleFutures.add(executor.submit((Callable<Object>) () -> {
+          for (int i1 : finalBatch) {
+            count.incrementAndGet();
           }
+          return 1;
         }));
 
       }

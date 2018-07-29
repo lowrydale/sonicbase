@@ -12,7 +12,10 @@ import java.sql.*;
 import java.util.HashMap;
 import java.util.Map;
 
-@SuppressWarnings("squid:RedundantThrowsDeclarationCheck") //derivecd class throws SQLException
+@SuppressWarnings({"squid:RedundantThrowsDeclarationCheck", "squid:S1168", "squid:S00107"})
+//derivecd class throws SQLException
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class ParameterHandler {
 
   private HashMap<String, Parameter.ParameterBase> currParmsByName = new HashMap<>();

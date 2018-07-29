@@ -4,9 +4,6 @@ import org.testng.annotations.Test;
 
 import java.util.concurrent.ConcurrentSkipListMap;
 
-/**
- * Responsible for
- */
 public class TestMisc {
 
   @Test

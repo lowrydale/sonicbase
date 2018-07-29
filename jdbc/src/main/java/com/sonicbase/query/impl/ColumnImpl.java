@@ -17,6 +17,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class ColumnImpl extends ExpressionImpl {
   private ExpressionList parameters;
   private String function;
@@ -47,7 +50,8 @@ public class ColumnImpl extends ExpressionImpl {
     super.getColumnsInExpression(columns);
     boolean found = false;
     for (ColumnImpl currColumn : columns) {
-      if (((currColumn.getTableName() == null || getTableName() == null) || (currColumn.getTableName() == null || currColumn.getTableName().equals(getTableName()))) &&
+      if (((currColumn.getTableName() == null || getTableName() == null) || (currColumn.getTableName() == null ||
+          currColumn.getTableName().equals(getTableName()))) &&
           currColumn.getColumnName().equals(getColumnName())) {
         found = true;
         break;
@@ -200,7 +204,8 @@ public class ColumnImpl extends ExpressionImpl {
   }
 
   @Override
-  public NextReturn next(SelectStatementImpl.Explain explainBuilder, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
+  public NextReturn next(SelectStatementImpl.Explain explainBuilder, AtomicLong currOffset, AtomicLong countReturned,
+                         Limit limit, Offset offset, int schemaRetryCount) {
     return null;
   }
 

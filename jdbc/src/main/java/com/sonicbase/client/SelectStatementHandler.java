@@ -32,6 +32,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.sonicbase.client.DatabaseClient.toLower;
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class SelectStatementHandler implements StatementHandler {
 
   private final DatabaseClient client;
@@ -41,53 +44,61 @@ public class SelectStatementHandler implements StatementHandler {
   }
 
   public Object execute(String dbName, ParameterHandler parms, String sqlToUse, Statement statement,
-                        SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2, boolean restrictToThisServer,
-                        StoredProcedureContextImpl procedureContext, int schemaRetryCount) {
+                        SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
+                        boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) {
     Select selectNode = (Select) statement;
     SelectBody selectBody = selectNode.getSelectBody();
     AtomicInteger currParmNum = new AtomicInteger();
     if (selectBody instanceof PlainSelect) {
       SelectStatementImpl selectStatement = parseSelectStatement(client, parms, (PlainSelect) selectBody, currParmNum);
-      return selectStatement.execute(dbName, sqlToUse, explain, null, null, null, restrictToThisServer, procedureContext, schemaRetryCount);
+      return selectStatement.execute(dbName, sqlToUse, explain, null, null, null,
+          restrictToThisServer, procedureContext, schemaRetryCount);
     }
     else if (selectBody instanceof SetOperationList) {
-      SetOperationList opList = (SetOperationList) selectBody;
-      String[] tableNames = new String[opList.getSelects().size()];
-      SelectStatementImpl[] statements = new SelectStatementImpl[opList.getSelects().size()];
-      for (int i = 0; i < opList.getSelects().size(); i++) {
-        SelectBody innerBody = opList.getSelects().get(i);
-        SelectStatementImpl selectStatement = parseSelectStatement(client, parms, (PlainSelect) innerBody, currParmNum);
-        tableNames[i] = selectStatement.getFromTable();
-        statements[i] = selectStatement;
-      }
-      String[] operations = new String[opList.getOperations().size()];
-      for (int i = 0; i < operations.length; i++) {
-        operations[i] = opList.getOperations().get(i).toString();
-      }
-      List<OrderByElement> orderByElements = opList.getOrderByElements();
-      OrderByExpressionImpl[] orderBy = null;
-      if (orderByElements != null) {
-        orderBy = new OrderByExpressionImpl[orderByElements.size()];
-        for (int i = 0; i < orderBy.length; i++) {
-          OrderByElement element = orderByElements.get(i);
-          String tableName = ((Column) element.getExpression()).getTable().getName();
-          String columnName = ((Column) element.getExpression()).getColumnName();
-          orderBy[i] = new OrderByExpressionImpl(tableName == null ? null : tableName.toLowerCase(),
-              columnName.toLowerCase(), element.isAsc());
-        }
-      }
-      SetOperation setOperation = new SetOperation();
-      setOperation.setSelectStatements(statements);
-      setOperation.setOperations(operations);
-      setOperation.setOrderBy(orderBy);
-      try {
-        return serverSetSelect(dbName, tableNames, setOperation, restrictToThisServer, procedureContext);
-      }
-      catch (Exception e) {
-        throw new DatabaseException(e);
-      }
+      return executeSetOperation(dbName, parms, restrictToThisServer, procedureContext,
+          (SetOperationList) selectBody, currParmNum);
     }
     return null;
+  }
+
+  private Object executeSetOperation(String dbName, ParameterHandler parms, boolean restrictToThisServer,
+                                     StoredProcedureContextImpl procedureContext, SetOperationList selectBody,
+                                     AtomicInteger currParmNum) {
+    SetOperationList opList = selectBody;
+    String[] tableNames = new String[opList.getSelects().size()];
+    SelectStatementImpl[] statements = new SelectStatementImpl[opList.getSelects().size()];
+    for (int i = 0; i < opList.getSelects().size(); i++) {
+      SelectBody innerBody = opList.getSelects().get(i);
+      SelectStatementImpl selectStatement = parseSelectStatement(client, parms, (PlainSelect) innerBody, currParmNum);
+      tableNames[i] = selectStatement.getFromTable();
+      statements[i] = selectStatement;
+    }
+    String[] operations = new String[opList.getOperations().size()];
+    for (int i = 0; i < operations.length; i++) {
+      operations[i] = opList.getOperations().get(i).toString();
+    }
+    List<OrderByElement> orderByElements = opList.getOrderByElements();
+    OrderByExpressionImpl[] orderBy = null;
+    if (orderByElements != null) {
+      orderBy = new OrderByExpressionImpl[orderByElements.size()];
+      for (int i = 0; i < orderBy.length; i++) {
+        OrderByElement element = orderByElements.get(i);
+        String tableName = ((Column) element.getExpression()).getTable().getName();
+        String columnName = ((Column) element.getExpression()).getColumnName();
+        orderBy[i] = new OrderByExpressionImpl(tableName == null ? null : tableName.toLowerCase(),
+            columnName.toLowerCase(), element.isAsc());
+      }
+    }
+    SetOperation setOperation = new SetOperation();
+    setOperation.setSelectStatements(statements);
+    setOperation.setOperations(operations);
+    setOperation.setOrderBy(orderBy);
+    try {
+      return serverSetSelect(dbName, tableNames, setOperation, restrictToThisServer, procedureContext);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
   }
 
   public static class SetOperation {
@@ -172,7 +183,8 @@ public class SelectStatementHandler implements StatementHandler {
           functionAliases.putAll(select.getFunctionAliases());
         }
 
-        ResultSetImpl ret = new ResultSetImpl(dbName, client, tableNames, setOperation, aliases, functionAliases, restrictToThisServer, procedureContext);
+        ResultSetImpl ret = new ResultSetImpl(dbName, client, tableNames, setOperation, aliases, functionAliases,
+            restrictToThisServer, procedureContext);
         doServerSetSelect(dbName, tableNames, setOperation, ret, restrictToThisServer, procedureContext);
         return ret;
       }
@@ -189,7 +201,8 @@ public class SelectStatementHandler implements StatementHandler {
 
   }
 
-  public void doServerSetSelect(String dbName, String[] tableNames, SetOperation setOperation, ResultSetImpl ret, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) throws IOException {
+  public void doServerSetSelect(String dbName, String[] tableNames, SetOperation setOperation, ResultSetImpl ret,
+                                boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) throws IOException {
     ComObject cobj = new ComObject();
     ComArray array = cobj.putArray(ComObject.Tag.SELECT_STATEMENTS, ComObject.Type.BYTE_ARRAY_TYPE);
     for (int i = 0; i < setOperation.getSelectStatements().length; i++) {
@@ -228,11 +241,17 @@ public class SelectStatementHandler implements StatementHandler {
             Math.abs(ThreadLocalRandom.current().nextLong()), cobj, DatabaseClient.Replica.DEF);
       }
       else {
-        recordRet = client.send(null, setOperation.getShard(), setOperation.getReplica(), cobj, DatabaseClient.Replica.SPECIFIED);
+        recordRet = client.send(null, setOperation.getShard(), setOperation.getReplica(), cobj,
+            DatabaseClient.Replica.SPECIFIED);
       }
       retObj = new ComObject(recordRet);
     }
 
+    handleResponseForServerSetSelect(dbName, tableNames, setOperation, ret, retObj);
+  }
+
+  private void handleResponseForServerSetSelect(String dbName, String[] tableNames, SetOperation setOperation,
+                                                ResultSetImpl ret, ComObject retObj) {
     TableSchema[] tableSchemas = new TableSchema[tableNames.length];
     for (int i = 0; i < tableNames.length; i++) {
       tableSchemas[i] = client.getCommon().getTables(dbName).get(tableNames[i]);
@@ -257,7 +276,20 @@ public class SelectStatementHandler implements StatementHandler {
     ComArray tableRecords = retObj.getArray(ComObject.Tag.TABLE_RECORDS);
     Object[][][] retKeys = new Object[tableRecords == null ? 0 : tableRecords.getArray().size()][][];
     Record[][] currRetRecords = new Record[tableRecords == null ? 0 : tableRecords.getArray().size()][];
-    ExpressionImpl.CachedRecord[][] retRecords = new ExpressionImpl.CachedRecord[tableRecords == null ? 0 : tableRecords.getArray().size()][];
+    ExpressionImpl.CachedRecord[][] retRecords = new ExpressionImpl.CachedRecord[tableRecords == null ? 0 :
+        tableRecords.getArray().size()][];
+
+    processResponseRecordsForServerSetSelect(dbName, tableNames, ret, tableSchemas, primaryKeyFields, tableRecords,
+        retKeys, currRetRecords, retRecords);
+
+    ret.setRetKeys(retKeys);
+    ret.setRecords(retRecords);
+  }
+
+  private void processResponseRecordsForServerSetSelect(String dbName, String[] tableNames, ResultSetImpl ret,
+                                                        TableSchema[] tableSchemas, String[][] primaryKeyFields,
+                                                        ComArray tableRecords, Object[][][] retKeys, Record[][] currRetRecords,
+                                                        ExpressionImpl.CachedRecord[][] retRecords) {
     for (int k = 0; k < currRetRecords.length; k++) {
       currRetRecords[k] = new Record[tableNames.length];
       retRecords[k] = new ExpressionImpl.CachedRecord[tableNames.length];
@@ -284,10 +316,7 @@ public class SelectStatementHandler implements StatementHandler {
         }
       }
     }
-    ret.setRetKeys(retKeys);
-    ret.setRecords(retRecords);
   }
-
 
 
   public static ExpressionImpl getExpression(
@@ -359,7 +388,8 @@ public class SelectStatementHandler implements StatementHandler {
     return retExpression;
   }
 
-  private static ExpressionImpl getFunctionExpression(DatabaseClient client, AtomicInteger currParmNum, Function whereExpression, String tableName, ParameterHandler parms) {
+  private static ExpressionImpl getFunctionExpression(DatabaseClient client, AtomicInteger currParmNum,
+                                                      Function whereExpression, String tableName, ParameterHandler parms) {
     ExpressionImpl retExpression;
     Function sourceFunc = whereExpression;
     ExpressionList sourceParms = sourceFunc.getParameters();
@@ -426,7 +456,8 @@ public class SelectStatementHandler implements StatementHandler {
     return retExpression;
   }
 
-  private static ExpressionImpl getInExpression(DatabaseClient client, AtomicInteger currParmNum, InExpression whereExpression, String tableName, ParameterHandler parms) {
+  private static ExpressionImpl getInExpression(DatabaseClient client, AtomicInteger currParmNum,
+                                                InExpression whereExpression, String tableName, ParameterHandler parms) {
     ExpressionImpl retExpression;
     InExpressionImpl retInExpression = new InExpressionImpl(client, parms, tableName);
     InExpression inExpression = whereExpression;
@@ -445,7 +476,8 @@ public class SelectStatementHandler implements StatementHandler {
     return retExpression;
   }
 
-  private static ExpressionImpl getBinaryExpression(DatabaseClient client, AtomicInteger currParmNum, Expression whereExpression, String tableName, ParameterHandler parms) {
+  private static ExpressionImpl getBinaryExpression(DatabaseClient client, AtomicInteger currParmNum,
+                                                    Expression whereExpression, String tableName, ParameterHandler parms) {
     ExpressionImpl retExpression;
     BinaryExpressionImpl binaryOp = new BinaryExpressionImpl();
 
@@ -507,7 +539,8 @@ public class SelectStatementHandler implements StatementHandler {
     return retExpression;
   }
 
-  private static ExpressionImpl getParenthesisExpression(DatabaseClient client, AtomicInteger currParmNum, Parenthesis whereExpression, String tableName, ParameterHandler parms) {
+  private static ExpressionImpl getParenthesisExpression(DatabaseClient client, AtomicInteger currParmNum,
+                                                         Parenthesis whereExpression, String tableName, ParameterHandler parms) {
     ExpressionImpl retExpression;
     retExpression = getExpression(client, currParmNum, whereExpression.getExpression(), tableName, parms);
     if (whereExpression.isNot()) {
@@ -519,7 +552,8 @@ public class SelectStatementHandler implements StatementHandler {
     return retExpression;
   }
 
-  private static ExpressionImpl getOrExpression(DatabaseClient client, AtomicInteger currParmNum, OrExpression whereExpression, String tableName, ParameterHandler parms) {
+  private static ExpressionImpl getOrExpression(DatabaseClient client, AtomicInteger currParmNum,
+                                                OrExpression whereExpression, String tableName, ParameterHandler parms) {
     ExpressionImpl retExpression;
     BinaryExpressionImpl binaryOp = new BinaryExpressionImpl();
 
@@ -533,7 +567,8 @@ public class SelectStatementHandler implements StatementHandler {
     return retExpression;
   }
 
-  private static ExpressionImpl getAndExpression(DatabaseClient client, AtomicInteger currParmNum, AndExpression whereExpression, String tableName, ParameterHandler parms) {
+  private static ExpressionImpl getAndExpression(DatabaseClient client, AtomicInteger currParmNum,
+                                                 AndExpression whereExpression, String tableName, ParameterHandler parms) {
     ExpressionImpl retExpression;
     BinaryExpressionImpl binaryOp = new BinaryExpressionImpl();
     binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.AND);
@@ -642,7 +677,7 @@ public class SelectStatementHandler implements StatementHandler {
     List<SelectItem> selectItems = selectBody.getSelectItems();
     for (SelectItem selectItem : selectItems) {
       if (selectItem instanceof SelectExpressionItem) {
-        psrseSelectExpression(selectStatement, pselect, expression, selectItems, (SelectExpressionItem) selectItem);
+        parseSelectExpression(selectStatement, pselect, expression, selectItems, (SelectExpressionItem) selectItem);
       }
     }
 
@@ -658,7 +693,8 @@ public class SelectStatementHandler implements StatementHandler {
     List<OrderByElement> orderByElements = pselect.getOrderByElements();
     if (orderByElements != null) {
       for (OrderByElement element : orderByElements) {
-        selectStatement.addOrderBy(((Column) element.getExpression()).getTable().getName(), ((Column) element.getExpression()).getColumnName(), element.isAsc());
+        selectStatement.addOrderBy(((Column) element.getExpression()).getTable().getName(),
+            ((Column) element.getExpression()).getColumnName(), element.isAsc());
       }
     }
     selectStatement.setPageSize(client.getPageSize());
@@ -666,7 +702,9 @@ public class SelectStatementHandler implements StatementHandler {
     return selectStatement;
   }
 
-  private static void psrseSelectExpression(SelectStatementImpl selectStatement, PlainSelect pselect, ExpressionImpl expression, List<SelectItem> selectItems, SelectExpressionItem selectItem) {
+  private static void parseSelectExpression(SelectStatementImpl selectStatement, PlainSelect pselect,
+                                            ExpressionImpl expression, List<SelectItem> selectItems,
+                                            SelectExpressionItem selectItem) {
     SelectExpressionItem item = selectItem;
     Alias alias = item.getAlias();
     String aliasName = null;
@@ -679,56 +717,76 @@ public class SelectStatementHandler implements StatementHandler {
           ((Column) item.getExpression()).getColumnName(), aliasName);
     }
     else if (item.getExpression() instanceof Function) {
-      Function function = (Function) item.getExpression();
-      String name = function.getName();
-      boolean groupCount = null != pselect.getGroupByColumnReferences() &&
-          !pselect.getGroupByColumnReferences().isEmpty() &&
-          name.equalsIgnoreCase("count");
-      if (groupCount || name.equalsIgnoreCase("min") || name.equalsIgnoreCase("max") || name.equalsIgnoreCase("sum") || name.equalsIgnoreCase("avg")) {
-        Column parm = (Column) function.getParameters().getExpressions().get(0);
-        selectStatement.addSelectColumn(name, function.getParameters(), parm.getTable().getName(), parm.getColumnName(), aliasName);
-      }
-      else if (name.equalsIgnoreCase("count")) {
-        if (null == pselect.getGroupByColumnReferences() || pselect.getGroupByColumnReferences().isEmpty()) {
-          if (function.isAllColumns()) {
-            selectStatement.setCountFunction();
-          }
-          else {
-            ExpressionList list = function.getParameters();
-            Column column = (Column) list.getExpressions().get(0);
-            selectStatement.setCountFunction(column.getTable().getName(), column.getColumnName());
-          }
-          if (function.isDistinct()) {
-            selectStatement.setIsDistinct();
-          }
-
-          String currAlias = null;
-          for (SelectItem currItem : selectItems) {
-            if (((SelectExpressionItem) currItem).getExpression() == function && ((SelectExpressionItem) currItem).getAlias() != null) {
-              currAlias = ((SelectExpressionItem) currItem).getAlias().getName();
-            }
-          }
-          if (!(expression instanceof AllRecordsExpressionImpl)) {
-            String columnName = "__all__";
-            if (!function.isAllColumns()) {
-              ExpressionList list = function.getParameters();
-              Column column = (Column) list.getExpressions().get(0);
-              columnName = column.getColumnName();
-            }
-            selectStatement.addSelectColumn(function.getName(), null, ((Table) pselect.getFromItem()).getName(),
-                columnName, currAlias);
-          }
-        }
-      }
-      else if (name.equalsIgnoreCase("upper") || name.equalsIgnoreCase("lower") ||
-          name.equalsIgnoreCase("substring") || name.equalsIgnoreCase("length")) {
-        Column parm = (Column) function.getParameters().getExpressions().get(0);
-        selectStatement.addSelectColumn(name, function.getParameters(), parm.getTable().getName(), parm.getColumnName(), aliasName);
-      }
+      parseFunction(selectStatement, pselect, expression, selectItems, item, aliasName);
     }
   }
 
-  private static void parseJoins(DatabaseClient client, ParameterHandler parms, AtomicInteger currParmNum, SelectStatementImpl selectStatement, PlainSelect pselect) {
+  private static void parseFunction(SelectStatementImpl selectStatement, PlainSelect pselect, ExpressionImpl expression,
+                                    List<SelectItem> selectItems, SelectExpressionItem item, String aliasName) {
+    Function function = (Function) item.getExpression();
+    String name = function.getName();
+    boolean groupCount = null != pselect.getGroupByColumnReferences() &&
+        !pselect.getGroupByColumnReferences().isEmpty() &&
+        name.equalsIgnoreCase("count");
+    if (groupCount || name.equalsIgnoreCase("min") || name.equalsIgnoreCase("max") ||
+        name.equalsIgnoreCase("sum") || name.equalsIgnoreCase("avg")) {
+      Column parm = (Column) function.getParameters().getExpressions().get(0);
+      selectStatement.addSelectColumn(name, function.getParameters(), parm.getTable().getName(),
+          parm.getColumnName(), aliasName);
+    }
+    else if (name.equalsIgnoreCase("count")) {
+      parseCountFunction(selectStatement, pselect, expression, selectItems, function);
+    }
+    else if (name.equalsIgnoreCase("upper") || name.equalsIgnoreCase("lower") ||
+        name.equalsIgnoreCase("substring") || name.equalsIgnoreCase("length")) {
+      Column parm = (Column) function.getParameters().getExpressions().get(0);
+      selectStatement.addSelectColumn(name, function.getParameters(), parm.getTable().getName(),
+          parm.getColumnName(), aliasName);
+    }
+  }
+
+  private static void parseCountFunction(SelectStatementImpl selectStatement, PlainSelect pselect,
+                                         ExpressionImpl expression, List<SelectItem> selectItems, Function function) {
+    if (null == pselect.getGroupByColumnReferences() || pselect.getGroupByColumnReferences().isEmpty()) {
+      if (function.isAllColumns()) {
+        selectStatement.setCountFunction();
+      }
+      else {
+        ExpressionList list = function.getParameters();
+        Column column = (Column) list.getExpressions().get(0);
+        selectStatement.setCountFunction(column.getTable().getName(), column.getColumnName());
+      }
+      if (function.isDistinct()) {
+        selectStatement.setIsDistinct();
+      }
+
+      String currAlias = null;
+      for (SelectItem currItem : selectItems) {
+        if (((SelectExpressionItem) currItem).getExpression() == function && ((SelectExpressionItem) currItem).getAlias() != null) {
+          currAlias = ((SelectExpressionItem) currItem).getAlias().getName();
+        }
+      }
+      parseCountFunctionForNonAllRecordsExpression(selectStatement, pselect, expression, function, currAlias);
+    }
+  }
+
+  private static void parseCountFunctionForNonAllRecordsExpression(SelectStatementImpl selectStatement,
+                                                                   PlainSelect pselect, ExpressionImpl expression,
+                                                                   Function function, String currAlias) {
+    if (!(expression instanceof AllRecordsExpressionImpl)) {
+      String columnName = "__all__";
+      if (!function.isAllColumns()) {
+        ExpressionList list = function.getParameters();
+        Column column = (Column) list.getExpressions().get(0);
+        columnName = column.getColumnName();
+      }
+      selectStatement.addSelectColumn(function.getName(), null, ((Table) pselect.getFromItem()).getName(),
+          columnName, currAlias);
+    }
+  }
+
+  private static void parseJoins(DatabaseClient client, ParameterHandler parms, AtomicInteger currParmNum,
+                                 SelectStatementImpl selectStatement, PlainSelect pselect) {
     List<Join> joins = pselect.getJoins();
     if (joins != null) {
       if (!client.getCommon().haveProLicense()) {

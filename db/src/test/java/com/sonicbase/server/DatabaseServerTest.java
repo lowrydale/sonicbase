@@ -11,9 +11,9 @@ import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.TestUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.log4j.Logger;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
+import org.slf4j.Logger;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -49,13 +49,11 @@ public class DatabaseServerTest {
 
     when(client.send(eq("DatabaseServer:healthCheck"), anyInt(), eq((long) 0), any(ComObject.class),
         eq(DatabaseClient.Replica.SPECIFIED))).thenAnswer(
-        new Answer() {
-          public Object answer(InvocationOnMock invocation) {
-            Object[] args = invocation.getArguments();
-            ComObject retObj = (ComObject) args[3];
-            retObj.put(ComObject.Tag.STATUS, "{\"status\" : \"ok\"}");
-            return retObj.serialize();
-          }
+        (Answer) invocation -> {
+          Object[] args = invocation.getArguments();
+          ComObject retObj = (ComObject) args[3];
+          retObj.put(ComObject.Tag.STATUS, "{\"status\" : \"ok\"}");
+          return retObj.serialize();
         });
 
 

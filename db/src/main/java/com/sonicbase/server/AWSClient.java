@@ -25,6 +25,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class AWSClient {
 
   public static final String KEYS_PART_STR = "/keys/";
@@ -169,7 +172,8 @@ public class AWSClient {
   public void uploadDirectory(final String bucket, final String prefix, final String path,
                               final File srcDir) {
       TransferManager localTransferManager = getTransferManager();
-        MultipleFileUpload xfer = localTransferManager.uploadDirectory(bucket, prefix + "/" + path, srcDir, true);
+        MultipleFileUpload xfer = localTransferManager.uploadDirectory(bucket,
+            prefix + "/" + path, srcDir, true);
     try {
       xfer.waitForCompletion();
     }
@@ -255,7 +259,8 @@ public class AWSClient {
 
   public void downloadDirectory(final String bucket, String prefix, String subDirectory, File destDir) {
     TransferManager localTransferManager = getTransferManager();
-    MultipleFileDownload download = localTransferManager.downloadDirectory(bucket, prefix + "/" + subDirectory, destDir, true);
+    MultipleFileDownload download = localTransferManager.downloadDirectory(bucket,
+        prefix + "/" + subDirectory, destDir, true);
     try {
       download.waitForCompletion();
     }

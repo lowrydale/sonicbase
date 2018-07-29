@@ -21,6 +21,10 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+@SuppressWarnings({"squid:S1172", "squid:S1168", "squid:S00107"})
+// all methods called from method invoker must have cobj and replayed command parms
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public abstract class IndexLookup {
   BinaryExpression.Operator rightOperator;
   protected int count;
@@ -269,31 +273,7 @@ public abstract class IndexLookup {
         record = new Record(dbName, server.getCommon(), recordBytes, columnOffsets, false);
       }
       if (groupContext != null) {
-
-        List<GroupByContext.FieldContext> fieldContexts = groupContext.getFieldContexts();
-        Object[] groupValues = new Object[fieldContexts.size()];
-        boolean isNull = true;
-        for (int j = 0; j < groupValues.length; j++) {
-          groupValues[j] = record.getFields()[fieldContexts.get(j).getFieldOffset()];
-          if (groupValues[j] != null) {
-            isNull = false;
-          }
-        }
-        if (!isNull) {
-          Map<String, Map<Object[], GroupByContext.GroupCounter>> map = groupContext.getGroupCounters();
-          if (map == null || map.size() == 0) {
-            groupContext.addGroupContext(groupValues);
-            map = groupContext.getGroupCounters();
-          }
-          for (Map<Object[], GroupByContext.GroupCounter> innerMap : map.values()) {
-            GroupByContext.GroupCounter counter = innerMap.get(groupValues);
-            if (counter == null) {
-              groupContext.addGroupContext(groupValues);
-              counter = innerMap.get(groupValues);
-            }
-            counter.getCounter().add(record.getFields());
-          }
-        }
+        doEvaluateCounters(record);
       }
 
       if (counters != null) {
@@ -301,6 +281,33 @@ public abstract class IndexLookup {
       }
     }
     return ret;
+  }
+
+  private void doEvaluateCounters(Record record) {
+    List<GroupByContext.FieldContext> fieldContexts = groupContext.getFieldContexts();
+    Object[] groupValues = new Object[fieldContexts.size()];
+    boolean isNull = true;
+    for (int j = 0; j < groupValues.length; j++) {
+      groupValues[j] = record.getFields()[fieldContexts.get(j).getFieldOffset()];
+      if (groupValues[j] != null) {
+        isNull = false;
+      }
+    }
+    if (!isNull) {
+      Map<String, Map<Object[], GroupByContext.GroupCounter>> map = groupContext.getGroupCounters();
+      if (map == null || map.size() == 0) {
+        groupContext.addGroupContext(groupValues);
+        map = groupContext.getGroupCounters();
+      }
+      for (Map<Object[], GroupByContext.GroupCounter> innerMap : map.values()) {
+        GroupByContext.GroupCounter counter = innerMap.get(groupValues);
+        if (counter == null) {
+          groupContext.addGroupContext(groupValues);
+          counter = innerMap.get(groupValues);
+        }
+        counter.getCounter().add(record.getFields());
+      }
+    }
   }
 
   void handleRecord(long viewVersion, Object[] key, boolean evaluateExpresion,
@@ -322,46 +329,54 @@ public abstract class IndexLookup {
         handleRecordEvaluateExpression(records, done);
       }
       else {
-        byte[][] ret = evaluateCounters(columnOffsets, records);
-        boolean pass = true;
-        if (procedureContext != null) {
-          if (procedureContext.getRecordEvaluator() == null) {
-            pass = true;
-          }
-          else {
-            for (byte[] bytes : records) {
-              Record record = new Record(tableSchema);
-              record.deserialize(dbName, server.getCommon(), bytes, null, true);
-              RecordImpl procedureRecord = new RecordImpl();
-              procedureRecord.setRecord(record);
-              procedureRecord.setDatabase(dbName);
-              procedureRecord.setTableSchema(tableSchema);
-              procedureRecord.setCommon(server.getCommon());
-              procedureRecord.setViewVersion((int) record.getDbViewNumber());
-              procedureRecord.setIsDeleting((record.getDbViewFlags() & Record.DB_VIEW_FLAG_DELETING) != 0);
-              procedureRecord.setIsAdding((record.getDbViewFlags() & Record.DB_VIEW_FLAG_ADDING) != 0);
-              pass = procedureContext.getRecordEvaluator().evaluate(procedureContext, procedureRecord);
-            }
-          }
+        handleRecordWithoutEvaluatingExpression(records, done);
+      }
+    }
+  }
+
+  private void handleRecordWithoutEvaluatingExpression(byte[][] records, AtomicBoolean done) {
+    byte[][] ret = evaluateCounters(columnOffsets, records);
+    boolean pass = true;
+    if (procedureContext != null) {
+      if (procedureContext.getRecordEvaluator() == null) {
+        pass = true;
+      }
+      else {
+        for (byte[] bytes : records) {
+          Record record = new Record(tableSchema);
+          record.deserialize(dbName, server.getCommon(), bytes, null, true);
+          RecordImpl procedureRecord = new RecordImpl();
+          procedureRecord.setRecord(record);
+          procedureRecord.setDatabase(dbName);
+          procedureRecord.setTableSchema(tableSchema);
+          procedureRecord.setCommon(server.getCommon());
+          procedureRecord.setViewVersion((int) record.getDbViewNumber());
+          procedureRecord.setIsDeleting((record.getDbViewFlags() & Record.DB_VIEW_FLAG_DELETING) != 0);
+          procedureRecord.setIsAdding((record.getDbViewFlags() & Record.DB_VIEW_FLAG_ADDING) != 0);
+          pass = procedureContext.getRecordEvaluator().evaluate(procedureContext, procedureRecord);
         }
-        if (pass && counters == null) {
-          for (byte[] currBytes : ret) {
-            done.set(false);
-            boolean include = true;
-            currOffset.incrementAndGet();
-            if (offset != null && currOffset.get() < offset) {
-              include = false;
-            }
-            if (include && limit != null && countReturned.get() >= limit) {
-              include = false;
-              done.set(true);
-            }
-            if (include) {
-              countReturned.incrementAndGet();
-              retRecords.add(currBytes);
-            }
-          }
-        }
+      }
+    }
+    if (pass && counters == null) {
+      handlePassingRecord(done, ret);
+    }
+  }
+
+  private void handlePassingRecord(AtomicBoolean done, byte[][] ret) {
+    for (byte[] currBytes : ret) {
+      done.set(false);
+      boolean include = true;
+      currOffset.incrementAndGet();
+      if (offset != null && currOffset.get() < offset) {
+        include = false;
+      }
+      if (include && limit != null && countReturned.get() >= limit) {
+        include = false;
+        done.set(true);
+      }
+      if (include) {
+        countReturned.incrementAndGet();
+        retRecords.add(currBytes);
       }
     }
   }
@@ -370,46 +385,36 @@ public abstract class IndexLookup {
     for (byte[] bytes : records) {
       Record record = new Record(tableSchema);
       record.deserialize(dbName, server.getCommon(), bytes, null, true);
-      boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
+      boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema},
+          new Record[]{record}, parms);
       if (pass) {
-        if (procedureContext != null) {
-          if (procedureContext.getRecordEvaluator() == null) {
-            pass = true;
-          }
-          else {
-            RecordImpl procedureRecord = new RecordImpl();
-            procedureRecord.setRecord(record);
-            procedureRecord.setDatabase(dbName);
-            procedureRecord.setTableSchema(tableSchema);
-            procedureRecord.setCommon(server.getCommon());
-            procedureRecord.setViewVersion((int) record.getDbViewNumber());
-            procedureRecord.setIsDeleting((record.getDbViewFlags() & Record.DB_VIEW_FLAG_DELETING) != 0);
-            procedureRecord.setIsAdding((record.getDbViewFlags() & Record.DB_VIEW_FLAG_ADDING) != 0);
-            pass = procedureContext.getRecordEvaluator().evaluate(procedureContext, procedureRecord);
-          }
-        }
-        if (pass) {
-          byte[][] currRecords = new byte[][]{bytes};
-          byte[][] ret = evaluateCounters(columnOffsets, currRecords);
-          if (counters == null) {
-            for (byte[] currBytes : ret) {
-              done.set(false);
-              boolean include = true;
-              currOffset.incrementAndGet();
-              if (offset != null && currOffset.get() < offset) {
-                include = false;
-              }
-              if (include && limit != null && countReturned.get() >= limit) {
-                include = false;
-                done.set(true);
-              }
-              if (include) {
-                countReturned.incrementAndGet();
-                retRecords.add(currBytes);
-              }
-            }
-          }
-        }
+        doHandleRecordEvaluateExpression(done, bytes, record, pass);
+      }
+    }
+  }
+
+  private void doHandleRecordEvaluateExpression(AtomicBoolean done, byte[] bytes, Record record, boolean pass) {
+    if (procedureContext != null) {
+      if (procedureContext.getRecordEvaluator() == null) {
+        pass = true;
+      }
+      else {
+        RecordImpl procedureRecord = new RecordImpl();
+        procedureRecord.setRecord(record);
+        procedureRecord.setDatabase(dbName);
+        procedureRecord.setTableSchema(tableSchema);
+        procedureRecord.setCommon(server.getCommon());
+        procedureRecord.setViewVersion((int) record.getDbViewNumber());
+        procedureRecord.setIsDeleting((record.getDbViewFlags() & Record.DB_VIEW_FLAG_DELETING) != 0);
+        procedureRecord.setIsAdding((record.getDbViewFlags() & Record.DB_VIEW_FLAG_ADDING) != 0);
+        pass = procedureContext.getRecordEvaluator().evaluate(procedureContext, procedureRecord);
+      }
+    }
+    if (pass) {
+      byte[][] currRecords = new byte[][]{bytes};
+      byte[][] ret = evaluateCounters(columnOffsets, currRecords);
+      if (counters == null) {
+        handlePassingRecord(done, ret);
       }
     }
   }
@@ -428,24 +433,28 @@ public abstract class IndexLookup {
           done.set(true);
         }
         if (include) {
-          boolean passesFlags = false;
-          long dbViewNum = KeyRecord.getDbViewNumber(currKeyRecord);
-          long dbViewFlags = KeyRecord.getDbViewFlags(currKeyRecord);
-          if ((dbViewNum <= viewVersion - 1) && (dbViewFlags & Record.DB_VIEW_FLAG_ADDING) != 0 ||
-              (dbViewNum == viewVersion || dbViewNum == viewVersion - 1) && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0 ||
-              (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
-            passesFlags = true;
-          }
-          if (passesFlags) {
-            retKeys.add(key);
-            retKeyRecords.add(currKeyRecord);
-            countReturned.incrementAndGet();
-          }
-          else {
-            currOffset.decrementAndGet();
-          }
+          doHandleRecordForKeys(viewVersion, key, currKeyRecord);
         }
       }
+    }
+  }
+
+  private void doHandleRecordForKeys(long viewVersion, Object[] key, byte[] currKeyRecord) {
+    boolean passesFlags = false;
+    long dbViewNum = KeyRecord.getDbViewNumber(currKeyRecord);
+    long dbViewFlags = KeyRecord.getDbViewFlags(currKeyRecord);
+    if ((dbViewNum <= viewVersion - 1) && (dbViewFlags & Record.DB_VIEW_FLAG_ADDING) != 0 ||
+        (dbViewNum == viewVersion || dbViewNum == viewVersion - 1) && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0 ||
+        (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
+      passesFlags = true;
+    }
+    if (passesFlags) {
+      retKeys.add(key);
+      retKeyRecords.add(currKeyRecord);
+      countReturned.incrementAndGet();
+    }
+    else {
+      currOffset.decrementAndGet();
     }
   }
 }

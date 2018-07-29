@@ -6,9 +6,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 
-/**
- * Responsible for
- */
 public class TestServers {
 
   public static void main(String[] args) throws Exception {

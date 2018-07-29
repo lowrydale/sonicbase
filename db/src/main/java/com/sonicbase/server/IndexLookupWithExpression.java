@@ -12,6 +12,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.sonicbase.client.DatabaseClient.OPTIMIZED_RANGE_PAGE_SIZE;
 
+@SuppressWarnings({"squid:S1172", "squid:S1168", "squid:S00107"})
+// all methods called from method invoker must have cobj and replayed command parms
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class IndexLookupWithExpression extends IndexLookup {
   public IndexLookupWithExpression(DatabaseServer server) {
     super(server);
@@ -30,52 +34,16 @@ public class IndexLookupWithExpression extends IndexLookup {
         break;
       }
 
-      boolean rightIsDone = false;
-      int compareRight = 1;
-      if (rightOperator != null) {
-        if (rightKey != null) {
-          compareRight = DatabaseCommon.compareKey(indexSchema.getComparators(), entry.getKey(), rightKey);
-        }
-        if (rightOperator.equals(BinaryExpression.Operator.LESS) && compareRight >= 0) {
-          rightIsDone = true;
-        }
-        if (rightOperator.equals(BinaryExpression.Operator.LESS_EQUAL) && compareRight > 0) {
-          rightIsDone = true;
-        }
-        if (rightIsDone) {
-          entry = null;
-          break;
-        }
+      CheckForRightIsDone checkForRightIsDone = new CheckForRightIsDone(entry).invoke();
+      entry = checkForRightIsDone.getEntry();
+      if (checkForRightIsDone.is()) {
+        break;
       }
 
-      boolean shouldProcess = true;
-      if (isProbe) {
-        if (countSkipped.incrementAndGet() < OPTIMIZED_RANGE_PAGE_SIZE) {
-          shouldProcess = false;
-        }
-        else {
-          countSkipped.set(0);
-        }
-      }
-      if (shouldProcess) {
-        byte[][] records = null;
-        if (entry.getValue() != null && !entry.getValue().equals(0L)) {
-          records = server.getAddressMap().fromUnsafeToRecords(entry.getValue());
-        }
-        if (expression != null && records != null) {
-          ProcessWithExpression processWithExpression = new ProcessWithExpression(entry, records).invoke();
-          entry = processWithExpression.getEntry();
-          if (processWithExpression.shouldBreak()) {
-            break outer;
-          }
-        }
-        else {
-          ProcessWithoutExpression processWithoutExpression = new ProcessWithoutExpression(entry, records).invoke();
-          entry = processWithoutExpression.getEntry();
-          if (processWithoutExpression.shoudBreak()) {
-            break outer;
-          }
-        }
+      ProcessRecord processRecord = new ProcessRecord(countSkipped, entry).invoke();
+      entry = processRecord.getEntry();
+      if (processRecord.is()) {
+        break outer;
       }
       if (ascending == null || ascending) {
         entry = index.higherEntry((entry.getKey()));
@@ -131,61 +99,88 @@ public class IndexLookupWithExpression extends IndexLookup {
       for (byte[] bytes : records) {
         Record record = new Record(tableSchema);
         record.deserialize(dbName, server.getCommon(), bytes, null, true);
-        boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{record}, parms);
+        boolean pass = (Boolean) ((ExpressionImpl) expression).evaluateSingleRecord(
+            new TableSchema[]{tableSchema}, new Record[]{record}, parms);
         if (pass) {
-          if (procedureContext != null) {
-            if (procedureContext.getRecordEvaluator() == null) {
-              pass = true;
-            }
-            else {
-              RecordImpl procedureRecord = new RecordImpl();
-              procedureRecord.setRecord(record);
-              procedureRecord.setDatabase(dbName);
-              procedureRecord.setTableSchema(tableSchema);
-              procedureRecord.setCommon(server.getCommon());
-              procedureRecord.setViewVersion((int) record.getDbViewNumber());
-              procedureRecord.setIsDeleting((record.getDbViewFlags() & Record.DB_VIEW_FLAG_DELETING) != 0);
-              procedureRecord.setIsAdding((record.getDbViewFlags() & Record.DB_VIEW_FLAG_ADDING) != 0);
-              pass = procedureContext.getRecordEvaluator().evaluate(procedureContext, procedureRecord);
-            }
-          }
-          if (pass) {
-            byte[][] currRecords = new byte[][]{bytes};
-            records = processViewFlags(viewVersion, records);
-            if (records != null) {
-              byte[][] currRet = evaluateCounters(columnOffsets, currRecords);
-              if (counters == null) {
-                for (byte[] currBytes : currRet) {
-                  boolean localDone = false;
-                  boolean include = true;
-                  long targetOffset = 1;
-                  currOffset.incrementAndGet();
-                  if (offset != null) {
-                    targetOffset = offset;
-                    if (currOffset.get() < offset) {
-                      include = false;
-                    }
-                  }
-                  if (include && limit != null && currOffset.get() >= targetOffset + limit) {
-                    include = false;
-                    localDone = true;
-                  }
-                  if (include) {
-                    retRecords.add(currBytes);
-                  }
-                  if (localDone) {
-                    entry = null;
-                    myResult = true;
-                    return this;
-                  }
-                }
-              }
-            }
+          ProcessWithExpression process = handlePassingRecord(bytes, record, pass);
+          if (process.shouldBreak()) {
+            myResult = true;
+            return this;
           }
         }
       }
       myResult = false;
       return this;
+    }
+
+    private ProcessWithExpression handlePassingRecord(byte[] bytes, Record record, boolean pass) {
+      if (procedureContext != null) {
+        if (procedureContext.getRecordEvaluator() == null) {
+          pass = true;
+        }
+        else {
+          RecordImpl procedureRecord = new RecordImpl();
+          procedureRecord.setRecord(record);
+          procedureRecord.setDatabase(dbName);
+          procedureRecord.setTableSchema(tableSchema);
+          procedureRecord.setCommon(server.getCommon());
+          procedureRecord.setViewVersion((int) record.getDbViewNumber());
+          procedureRecord.setIsDeleting((record.getDbViewFlags() & Record.DB_VIEW_FLAG_DELETING) != 0);
+          procedureRecord.setIsAdding((record.getDbViewFlags() & Record.DB_VIEW_FLAG_ADDING) != 0);
+          pass = procedureContext.getRecordEvaluator().evaluate(procedureContext, procedureRecord);
+        }
+      }
+      if (pass) {
+        ProcessWithExpression process = handlePassingRecord(bytes);
+        if (process.shouldBreak()) {
+          myResult = true;
+          return this;
+        }
+      }
+      myResult = false;
+      return this;
+    }
+
+    private ProcessWithExpression handlePassingRecord(byte[] bytes) {
+      byte[][] currRecords = new byte[][]{bytes};
+      records = processViewFlags(viewVersion, records);
+      if (records != null) {
+        byte[][] currRet = evaluateCounters(columnOffsets, currRecords);
+        if (counters == null) {
+          for (byte[] currBytes : currRet) {
+            if (doProcessRecord(currBytes)) {
+              return this;
+            }
+          }
+        }
+      }
+      return this;
+    }
+
+    private boolean doProcessRecord(byte[] currBytes) {
+      boolean localDone = false;
+      boolean include = true;
+      long targetOffset = 1;
+      currOffset.incrementAndGet();
+      if (offset != null) {
+        targetOffset = offset;
+        if (currOffset.get() < offset) {
+          include = false;
+        }
+      }
+      if (include && limit != null && currOffset.get() >= targetOffset + limit) {
+        include = false;
+        localDone = true;
+      }
+      if (include) {
+        retRecords.add(currBytes);
+      }
+      if (localDone) {
+        entry = null;
+        myResult = true;
+        return true;
+      }
+      return false;
     }
   }
 
@@ -213,29 +208,136 @@ public class IndexLookupWithExpression extends IndexLookup {
         byte[][] retRecordsArray = evaluateCounters(columnOffsets, records);
         if (counters == null) {
           for (byte[] currBytes : retRecordsArray) {
-            boolean localDone = false;
-            boolean include = true;
-            long targetOffset = 1;
-            currOffset.incrementAndGet();
-            if (offset != null) {
-              targetOffset = offset;
-              if (currOffset.get() < offset) {
-                include = false;
-              }
-            }
-            if (include && limit != null && currOffset.get() >= targetOffset + limit) {
-              include = false;
-              localDone = true;
-            }
-            if (include) {
-              retRecords.add(currBytes);
-            }
-            if (localDone) {
-              entry = null;
-              myResult = true;
+            if (doProcessRecord(currBytes)) {
               return this;
             }
           }
+        }
+      }
+      myResult = false;
+      return this;
+    }
+
+    private boolean doProcessRecord(byte[] currBytes) {
+      boolean localDone = false;
+      boolean include = true;
+      long targetOffset = 1;
+      currOffset.incrementAndGet();
+      if (offset != null) {
+        targetOffset = offset;
+        if (currOffset.get() < offset) {
+          include = false;
+        }
+      }
+      if (include && limit != null && currOffset.get() >= targetOffset + limit) {
+        include = false;
+        localDone = true;
+      }
+      if (include) {
+        retRecords.add(currBytes);
+      }
+      if (localDone) {
+        entry = null;
+        myResult = true;
+        return true;
+      }
+      return false;
+    }
+  }
+
+  private class ProcessRecord {
+    private boolean myResult;
+    private AtomicInteger countSkipped;
+    private Map.Entry<Object[], Object> entry;
+
+    public ProcessRecord(AtomicInteger countSkipped, Map.Entry<Object[], Object> entry) {
+      this.countSkipped = countSkipped;
+      this.entry = entry;
+    }
+
+    boolean is() {
+      return myResult;
+    }
+
+    public Map.Entry<Object[], Object> getEntry() {
+      return entry;
+    }
+
+    public ProcessRecord invoke() {
+      boolean shouldProcess = handleProbe();
+      if (shouldProcess) {
+        byte[][] records = null;
+        if (entry.getValue() != null && !entry.getValue().equals(0L)) {
+          records = server.getAddressMap().fromUnsafeToRecords(entry.getValue());
+        }
+        if (expression != null && records != null) {
+          ProcessWithExpression processWithExpression = new ProcessWithExpression(entry, records).invoke();
+          entry = processWithExpression.getEntry();
+          if (processWithExpression.shouldBreak()) {
+            myResult = true;
+            return this;
+          }
+        }
+        else {
+          ProcessWithoutExpression processWithoutExpression = new ProcessWithoutExpression(entry, records).invoke();
+          entry = processWithoutExpression.getEntry();
+          if (processWithoutExpression.shoudBreak()) {
+            myResult = true;
+            return this;
+          }
+        }
+      }
+      myResult = false;
+      return this;
+    }
+
+    private boolean handleProbe() {
+      boolean shouldProcess = true;
+      if (isProbe) {
+        if (countSkipped.incrementAndGet() < OPTIMIZED_RANGE_PAGE_SIZE) {
+          shouldProcess = false;
+        }
+        else {
+          countSkipped.set(0);
+        }
+      }
+      return shouldProcess;
+    }
+  }
+
+  private class CheckForRightIsDone {
+    private boolean myResult;
+    private Map.Entry<Object[], Object> entry;
+
+    public CheckForRightIsDone(Map.Entry<Object[], Object> entry) {
+      this.entry = entry;
+    }
+
+    boolean is() {
+      return myResult;
+    }
+
+    public Map.Entry<Object[], Object> getEntry() {
+      return entry;
+    }
+
+    public CheckForRightIsDone invoke() {
+      boolean rightIsDone = false;
+      int compareRight = 1;
+      if (rightOperator != null) {
+        if (rightKey != null) {
+          compareRight = DatabaseCommon.compareKey(indexSchema.getComparators(), entry.getKey(), rightKey);
+        }
+        if (rightOperator.equals(BinaryExpression.Operator.LESS) && compareRight >= 0) {
+          rightIsDone = true;
+        }
+        if (rightOperator.equals(BinaryExpression.Operator.LESS_EQUAL) && compareRight > 0) {
+          rightIsDone = true;
+        }
+        if (rightIsDone) {
+          entry = null;
+          myResult = true;
+          return this;
         }
       }
       myResult = false;

@@ -21,6 +21,9 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class InExpressionImpl extends ExpressionImpl implements InExpression {
   private ParameterHandler parms;
   private String tableName;
@@ -37,26 +40,25 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
   public InExpressionImpl() {
   }
 
-
   public String toString() {
-    String ret = "";
-    ret += leftExpression.toString();
+    StringBuilder ret = new StringBuilder();
+    ret.append(leftExpression.toString());
     if (isNot) {
-      ret += " not";
+      ret.append(" not");
     }
-    ret += " in (";
+    ret.append(" in (");
     boolean first = true;
     for (ExpressionImpl item : expressionList) {
       if (first) {
         first = false;
       }
       else {
-        ret += ", ";
+        ret.append(", ");
       }
-      ret += item.toString();
+      ret.append(item.toString());
     }
-    ret += ")";
-    return ret;
+    ret.append(")");
+    return ret.toString();
   }
 
   public List<ExpressionImpl> getExpressionList() {
@@ -80,7 +82,8 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
 
 
   public void setColumn(String tableName, String columnName, String alias) {
-    this.leftExpression = new ColumnImpl(null, null, tableName.toLowerCase(), columnName.toLowerCase(), alias.toLowerCase());
+    this.leftExpression = new ColumnImpl(null, null, tableName.toLowerCase(), columnName.toLowerCase(),
+        alias.toLowerCase());
   }
 
   public void addValue(String value) throws UnsupportedEncodingException {
@@ -196,7 +199,8 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
       SelectContextImpl context = tableScan(dbName, getViewVersion(), getClient(), count,
           getClient().getCommon().getTables(dbName).get(getTableName()),
            getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(),
-          getRecordCache(), getCounters(), getGroupByContext(), currOffset, limit, offset, isProbe(), isRestrictToThisServer(), getProcedureContext());
+          getRecordCache(), getCounters(), getGroupByContext(), currOffset, limit, offset, isProbe(),
+          isRestrictToThisServer(), getProcedureContext());
        if (context != null) {
          setNextShard(context.getNextShard());
          setNextKey(context.getNextKey());
@@ -209,9 +213,11 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
     ColumnImpl cNode = (ColumnImpl) getLeftExpression();
     String[] preferredIndexColumns = null;
 
-    for (Map.Entry<String, IndexSchema> currIndexSchema : getClient().getCommon().getTables(dbName).get(getTableName()).getIndices().entrySet()) {
+    for (Map.Entry<String, IndexSchema> currIndexSchema : getClient().getCommon().getTables(dbName).get(
+        getTableName()).getIndices().entrySet()) {
       String[] fields = currIndexSchema.getValue().getFields();
-      if (fields[0].equals(cNode.getColumnName()) && (preferredIndexColumns == null || preferredIndexColumns.length > fields.length)) {
+      if (fields[0].equals(cNode.getColumnName()) && (preferredIndexColumns == null ||
+          preferredIndexColumns.length > fields.length)) {
         preferredIndexColumns = fields;
         indexSchema = currIndexSchema.getValue();
       }
@@ -261,8 +267,10 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
 
 
   @Override
-  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
-    return next(DatabaseClient.SELECT_PAGE_SIZE, explain, currOffset, countReturned, limit, offset, false, false, schemaRetryCount);
+  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
+                         Limit limit, Offset offset, int schemaRetryCount) {
+    return next(DatabaseClient.SELECT_PAGE_SIZE, explain, currOffset, countReturned, limit, offset, false,
+        false, schemaRetryCount);
   }
 
   @Override

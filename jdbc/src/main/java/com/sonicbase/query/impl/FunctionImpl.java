@@ -19,6 +19,9 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class FunctionImpl extends ExpressionImpl {
   public static final String UTF_8_STR = "utf-8";
   private String name;
@@ -107,11 +110,6 @@ public class FunctionImpl extends ExpressionImpl {
   }
   public String getName() {
     return name;
-  }
-
-  @Override
-  public void getColumns(Set<ColumnImpl> columns) {
-
   }
 
   @Override
@@ -931,7 +929,8 @@ public class FunctionImpl extends ExpressionImpl {
   }
 
   @Override
-  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
+  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
+                         Limit limit, Offset offset, int schemaRetryCount) {
     return null;
   }
 
@@ -949,11 +948,6 @@ public class FunctionImpl extends ExpressionImpl {
   @Override
   public boolean canSortWithIndex() {
     return false;
-  }
-
-  @Override
-  public void queryRewrite() {
-
   }
 
   @Override

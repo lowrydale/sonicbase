@@ -23,9 +23,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 
-/**
- * Responsible for
- */
 public class TestDatabaseAdvancedToDo {
 
   private Connection conn;

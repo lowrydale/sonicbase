@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.sql.Types;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
@@ -20,14 +21,14 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION;
 import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION_21;
+import static com.sonicbase.schema.DataType.Type.BIGINT;
 import static java.sql.Types.*;
 
-/**
- * User: lowryda
- * Date: 9/30/14
- * Time: 11:08 PM
- */
 @ExcludeRename
+@SuppressWarnings({"squid:S1199","squid:S1168", "squid:S00107"})
+// don't want to extract code block into method
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class DatabaseCommon {
 
   private static final String SONICBASE_SCHEMA_STR = "_sonicbase_schema";
@@ -111,7 +112,8 @@ public class DatabaseCommon {
     try {
       internalWriteLock.lock();
       try {
-        String dataRoot = dataRoot = new File(dataDir, SNAPSHOT_STR + File.separator + shard + File.separator + replica).getAbsolutePath();
+        String dataRoot = dataRoot = new File(dataDir, SNAPSHOT_STR + File.separator + shard + File.separator +
+            replica).getAbsolutePath();
         File schemaFile = new File(dataRoot, SCHEMA_BIN_STR);
         logger.info("Loading schema: file={}", schemaFile.getAbsolutePath());
         if (schemaFile.exists()) {
@@ -129,8 +131,8 @@ public class DatabaseCommon {
             dbSchema = new Schema();
             schema.put(dbName, dbSchema);
           }
-          File file = new File(dataDir, SNAPSHOT_STR + File.separator + shard + File.separator + replica + File.separator +
-              SONICBASE_SCHEMA_STR + File.separator + dbName);
+          File file = new File(dataDir, SNAPSHOT_STR + File.separator + shard + File.separator + replica +
+              File.separator + SONICBASE_SCHEMA_STR + File.separator + dbName);
           File[] tableNames = file.listFiles();
           if (tableNames != null) {
             for (File tableFile : tableNames) {
@@ -173,30 +175,36 @@ public class DatabaseCommon {
           File indicesDir = new File(tableFile, File.separator + "indices");
           if (indicesDir.exists()) {
             File[] indices = indicesDir.listFiles();
-            if (indices != null) {
-              for (File indexDir : indices) {
-                String indexName = indexDir.getName();
-                IndexSchema previousIndexSchema = previousTableSchema == null ? null : previousTableSchema.getIndices().get(indexName);
-                File[] indexSchemas = indexDir.listFiles();
-                if (indexSchemas != null && indexSchemas.length > 0) {
-                  sortSchemaFiles(indexSchemas);
-                  File indexSchemaFile = indexSchemas[indexSchemas.length - 1];
-                  try (DataInputStream indexIn = new DataInputStream(new FileInputStream(indexSchemaFile))) {
-                    serializationVersion = indexIn.readShort();
-                    TableSchema.deserializeIndexSchema(indexIn, tableSchema);
-                  }
-                }
-                IndexSchema currIndexSchema = tableSchema.getIndices().get(indexName);
-                if (previousIndexSchema != null) {
-                  currIndexSchema.setCurrPartitions(previousIndexSchema.getCurrPartitions());
-                  currIndexSchema.setLastPartitions(previousIndexSchema.getLastPartitions());
-                }
-              }
-            }
+            loadIndicesForTableSchema(previousTableSchema, tableSchema, indices);
           }
         }
         catch (Exception e) {
           throw new DatabaseException("Error deserializing tableSchema: file=" + tableSchemaFile.getAbsolutePath());
+        }
+      }
+    }
+  }
+
+  private void loadIndicesForTableSchema(TableSchema previousTableSchema, TableSchema tableSchema,
+                                         File[] indices) throws IOException {
+    if (indices != null) {
+      for (File indexDir : indices) {
+        String indexName = indexDir.getName();
+        IndexSchema previousIndexSchema = previousTableSchema == null ? null :
+            previousTableSchema.getIndices().get(indexName);
+        File[] indexSchemas = indexDir.listFiles();
+        if (indexSchemas != null && indexSchemas.length > 0) {
+          sortSchemaFiles(indexSchemas);
+          File indexSchemaFile = indexSchemas[indexSchemas.length - 1];
+          try (DataInputStream indexIn = new DataInputStream(new FileInputStream(indexSchemaFile))) {
+            indexIn.readShort(); //serializationVersion
+            TableSchema.deserializeIndexSchema(indexIn, tableSchema);
+          }
+        }
+        IndexSchema currIndexSchema = tableSchema.getIndices().get(indexName);
+        if (previousIndexSchema != null) {
+          currIndexSchema.setCurrPartitions(previousIndexSchema.getCurrPartitions());
+          currIndexSchema.setLastPartitions(previousIndexSchema.getLastPartitions());
         }
       }
     }
@@ -396,84 +404,93 @@ public class DatabaseCommon {
       Object[] fields = new Object[keyLength];
       for (int i = 0; i < keyLength; i++) {
         if (in.readBoolean()) {
-          if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.BIGINT) {
-            fields[i] = Varint.readSignedVarLong(in);
-          }
-          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.INTEGER) {
-            fields[i] = (int) Varint.readSignedVarLong(in);
-          }
-          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.SMALLINT) {
-            fields[i] = (short) Varint.readSignedVarLong(in);
-          }
-          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.TINYINT) {
-            fields[i] = in.readByte();
-          }
-          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.FLOAT ||
-              tableSchema.getFields().get(columns[i]).getType() == DataType.Type.DOUBLE) {
-            fields[i] = in.readDouble();
-          }
-          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.REAL) {
-            fields[i] = in.readFloat();
-          }
-          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.BOOLEAN ||
-              tableSchema.getFields().get(columns[i]).getType() == DataType.Type.BIT) {
-            fields[i] = in.readBoolean();
-          }
-          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.CHAR ||
-              tableSchema.getFields().get(columns[i]).getType() == DataType.Type.NCHAR ||
-              tableSchema.getFields().get(columns[i]).getType() == DataType.Type.VARCHAR ||
-              tableSchema.getFields().get(columns[i]).getType() == DataType.Type.LONGVARCHAR ||
-              tableSchema.getFields().get(columns[i]).getType() == DataType.Type.LONGNVARCHAR ||
-              tableSchema.getFields().get(columns[i]).getType() == DataType.Type.CLOB ||
-              tableSchema.getFields().get(columns[i]).getType() == DataType.Type.NCLOB ||
-              tableSchema.getFields().get(columns[i]).getType() == DataType.Type.NVARCHAR) {
-            int len = (int) Varint.readSignedVarLong(in);
-            byte[] bytes = new byte[len];
-            in.read(bytes);
-            fields[i] = bytes;
-          }
-          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.LONGVARBINARY ||
-              tableSchema.getFields().get(columns[i]).getType() == DataType.Type.VARBINARY ||
-              tableSchema.getFields().get(columns[i]).getType() == DataType.Type.BLOB) {
-            int len = (int) Varint.readSignedVarLong(in);
-            byte[] data = new byte[len];
-            in.readFully(data);
-            fields[i] = data;
-          }
-          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.NUMERIC) {
-            int len = (int) Varint.readSignedVarLong(in);
-            byte[] buffer = new byte[len];
-            in.readFully(buffer);
-            String str = new String(buffer, UTF_8_STR);
-            fields[i] = new BigDecimal(str);
-          }
-          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.DECIMAL) {
-            int len = (int) Varint.readSignedVarLong(in);
-            byte[] buffer = new byte[len];
-            in.readFully(buffer);
-            String str = new String(buffer, UTF_8_STR);
-            fields[i] = new BigDecimal(str);
-          }
-          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.DATE) {
-            int len = (int) Varint.readSignedVarLong(in);
-            byte[] buffer = new byte[len];
-            in.readFully(buffer);
-            String str = new String(buffer, UTF_8_STR);
-            fields[i] = Date.valueOf(str);
-          }
-          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.TIME) {
-            int len = (int) Varint.readSignedVarLong(in);
-            byte[] buffer = new byte[len];
-            in.readFully(buffer);
-            String str = new String(buffer, UTF_8_STR);
-            fields[i] = Time.valueOf(str);
-          }
-          else if (tableSchema.getFields().get(columns[i]).getType() == DataType.Type.TIMESTAMP) {
-            int len = (int) Varint.readSignedVarLong(in);
-            byte[] buffer = new byte[len];
-            in.readFully(buffer);
-            String str = new String(buffer, UTF_8_STR);
-            fields[i] = Timestamp.valueOf(str);
+          switch (tableSchema.getFields().get(columns[i]).getType()) {
+            case BIGINT:
+              fields[i] = Varint.readSignedVarLong(in);
+              break;
+            case INTEGER:
+              fields[i] = (int) Varint.readSignedVarLong(in);
+              break;
+            case SMALLINT:
+              fields[i] = (short) Varint.readSignedVarLong(in);
+              break;
+            case TINYINT:
+              fields[i] = in.readByte();
+              break;
+            case FLOAT:
+            case DOUBLE:
+              fields[i] = in.readDouble();
+              break;
+            case REAL:
+              fields[i] = in.readFloat();
+              break;
+            case BOOLEAN:
+            case BIT:
+              fields[i] = in.readBoolean();
+              break;
+            case CHAR:
+            case NCHAR:
+            case VARCHAR:
+            case LONGVARCHAR:
+            case LONGNVARCHAR:
+            case CLOB:
+            case NCLOB:
+            case NVARCHAR: {
+              int len = (int) Varint.readSignedVarLong(in);
+              byte[] bytes = new byte[len];
+              in.read(bytes);
+              fields[i] = bytes;
+            }
+              break;
+            case LONGVARBINARY:
+            case VARBINARY:
+            case BLOB: {
+              int len = (int) Varint.readSignedVarLong(in);
+              byte[] data = new byte[len];
+              in.readFully(data);
+              fields[i] = data;
+            }
+              break;
+            case NUMERIC: {
+              int len = (int) Varint.readSignedVarLong(in);
+              byte[] buffer = new byte[len];
+              in.readFully(buffer);
+              String str = new String(buffer, UTF_8_STR);
+              fields[i] = new BigDecimal(str);
+            }
+              break;
+            case DECIMAL: {
+              int len = (int) Varint.readSignedVarLong(in);
+              byte[] buffer = new byte[len];
+              in.readFully(buffer);
+              String str = new String(buffer, UTF_8_STR);
+              fields[i] = new BigDecimal(str);
+            }
+              break;
+            case DATE: {
+              int len = (int) Varint.readSignedVarLong(in);
+              byte[] buffer = new byte[len];
+              in.readFully(buffer);
+              String str = new String(buffer, UTF_8_STR);
+              fields[i] = Date.valueOf(str);
+            }
+              break;
+            case TIME: {
+              int len = (int) Varint.readSignedVarLong(in);
+              byte[] buffer = new byte[len];
+              in.readFully(buffer);
+              String str = new String(buffer, UTF_8_STR);
+              fields[i] = Time.valueOf(str);
+            }
+              break;
+            case TIMESTAMP: {
+              int len = (int) Varint.readSignedVarLong(in);
+              byte[] buffer = new byte[len];
+              in.readFully(buffer);
+              String str = new String(buffer, UTF_8_STR);
+              fields[i] = Timestamp.valueOf(str);
+            }
+              break;
           }
         }
       }
@@ -519,82 +536,90 @@ public class DatabaseCommon {
       Object[] fields = new Object[keyLength];
       for (int i = 0; i < keyLength; i++) {
         if (in.readBoolean()) {
-          if (types[i] == DataType.Type.BIGINT) {
-            fields[i] = Varint.readSignedVarLong(in);
-          }
-          else if (types[i] == DataType.Type.INTEGER) {
-            fields[i] = (int) Varint.readSignedVarLong(in);
-          }
-          else if (types[i] == DataType.Type.SMALLINT) {
-            fields[i] = (short) Varint.readSignedVarLong(in);
-          }
-          else if (types[i] == DataType.Type.TINYINT) {
-            fields[i] = in.readByte();
-          }
-          else if (types[i] == DataType.Type.FLOAT) {
-            fields[i] = in.readDouble();
-          }
-          else if (types[i] == DataType.Type.REAL) {
-            fields[i] = in.readFloat();
-          }
-          else if (types[i] == DataType.Type.DOUBLE) {
-            fields[i] = in.readDouble();
-          }
-          else if (types[i] == DataType.Type.BOOLEAN) {
-            fields[i] = in.readBoolean();
-          }
-          else if (types[i] == DataType.Type.BIT) {
-            fields[i] = in.readBoolean();
-          }
-          else if (types[i] == DataType.Type.CHAR ||
-              types[i] == DataType.Type.NCHAR ||
-              types[i] == DataType.Type.VARCHAR ||
-              types[i] == DataType.Type.LONGVARCHAR ||
-              types[i] == DataType.Type.LONGNVARCHAR ||
-              types[i] == DataType.Type.CLOB ||
-              types[i] == DataType.Type.NCLOB ||
-              types[i] == DataType.Type.NVARCHAR) {
-            int len = (int) Varint.readSignedVarLong(in);
-            byte[] bytes = new byte[len];
-            in.read(bytes);
-            fields[i] = bytes;
-          }
-          else if (types[i] == DataType.Type.LONGVARBINARY ||
-              types[i] == DataType.Type.VARBINARY ||
-              types[i] == DataType.Type.BLOB) {
-            int len = (int) Varint.readSignedVarLong(in);
-            byte[] data = new byte[len];
-            in.readFully(data);
-            fields[i] = data;
-          }
-          else if (types[i] == DataType.Type.NUMERIC ||
-              types[i] == DataType.Type.DECIMAL) {
-            int len = (int) Varint.readSignedVarLong(in);
-            byte[] buffer = new byte[len];
-            in.readFully(buffer);
-            String str = new String(buffer, UTF_8_STR);
-            fields[i] = new BigDecimal(str);
-          }
-          else if (types[i] == DataType.Type.DATE) {
-            int len = (int) Varint.readSignedVarLong(in);
-            byte[] buffer = new byte[len];
-            in.readFully(buffer);
-            String str = new String(buffer, UTF_8_STR);
-            fields[i] = Date.valueOf(str);
-          }
-          else if (types[i] == DataType.Type.TIME) {
-            int len = (int) Varint.readSignedVarLong(in);
-            byte[] buffer = new byte[len];
-            in.readFully(buffer);
-            String str = new String(buffer, UTF_8_STR);
-            fields[i] = Time.valueOf(str);
-          }
-          else if (types[i] == DataType.Type.TIMESTAMP) {
-            int len = (int) Varint.readSignedVarLong(in);
-            byte[] buffer = new byte[len];
-            in.readFully(buffer);
-            String str = new String(buffer, UTF_8_STR);
-            fields[i] = Timestamp.valueOf(str);
+          switch (types[i]) {
+            case BIGINT:
+              fields[i] = Varint.readSignedVarLong(in);
+              break;
+            case INTEGER:
+              fields[i] = (int) Varint.readSignedVarLong(in);
+              break;
+            case SMALLINT:
+              fields[i] = (short) Varint.readSignedVarLong(in);
+              break;
+            case TINYINT:
+              fields[i] = in.readByte();
+              break;
+            case FLOAT:
+              fields[i] = in.readDouble();
+              break;
+            case REAL:
+              fields[i] = in.readFloat();
+              break;
+            case DOUBLE:
+              fields[i] = in.readDouble();
+              break;
+            case BOOLEAN:
+              fields[i] = in.readBoolean();
+              break;
+            case BIT:
+              fields[i] = in.readBoolean();
+              break;
+            case CHAR:
+            case NCHAR:
+            case VARCHAR:
+            case LONGVARCHAR:
+            case LONGNVARCHAR:
+            case CLOB:
+            case NCLOB:
+            case NVARCHAR: {
+              int len = (int) Varint.readSignedVarLong(in);
+              byte[] bytes = new byte[len];
+              in.read(bytes);
+              fields[i] = bytes;
+              break;
+            }
+            case LONGVARBINARY:
+            case VARBINARY:
+            case BLOB: {
+              int len = (int) Varint.readSignedVarLong(in);
+              byte[] data = new byte[len];
+              in.readFully(data);
+              fields[i] = data;
+              break;
+            }
+            case NUMERIC:
+            case DECIMAL: {
+              int len = (int) Varint.readSignedVarLong(in);
+              byte[] buffer = new byte[len];
+              in.readFully(buffer);
+              String str = new String(buffer, UTF_8_STR);
+              fields[i] = new BigDecimal(str);
+              break;
+            }
+            case DATE: {
+              int len = (int) Varint.readSignedVarLong(in);
+              byte[] buffer = new byte[len];
+              in.readFully(buffer);
+              String str = new String(buffer, UTF_8_STR);
+              fields[i] = Date.valueOf(str);
+              break;
+            }
+            case TIME: {
+              int len = (int) Varint.readSignedVarLong(in);
+              byte[] buffer = new byte[len];
+              in.readFully(buffer);
+              String str = new String(buffer, UTF_8_STR);
+              fields[i] = Time.valueOf(str);
+              break;
+            }
+            case TIMESTAMP: {
+              int len = (int) Varint.readSignedVarLong(in);
+              byte[] buffer = new byte[len];
+              in.readFully(buffer);
+              String str = new String(buffer, UTF_8_STR);
+              fields[i] = Timestamp.valueOf(str);
+              break;
+            }
           }
         }
       }
@@ -630,82 +655,88 @@ public class DatabaseCommon {
             }
             else {
               out.writeBoolean(true);
-              if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.BIGINT) {
-                Varint.writeSignedVarLong((Long) key[i], out);
-              }
-              else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.INTEGER) {
-                Varint.writeSignedVarLong((Integer) key[i], out);
-              }
-              else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.SMALLINT) {
-                Varint.writeSignedVarLong((Short) key[i], out);
-              }
-              else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.TINYINT) {
-                out.write((byte) key[i]);
-              }
-              else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.FLOAT) {
-                out.writeDouble((Double) key[i]);
-              }
-              else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.REAL) {
-                out.writeFloat((Float) key[i]);
-              }
-              else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.DOUBLE) {
-                out.writeDouble((Double) key[i]);
-              }
-              else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.BOOLEAN) {
-                out.writeBoolean((Boolean) key[i]);
-              }
-              else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.BIT) {
-                out.writeBoolean((Boolean) key[i]);
-              }
-              else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.CHAR ||
-                  tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.NCHAR ||
-                  tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.VARCHAR ||
-                  tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.CLOB ||
-                  tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.NCLOB ||
-                  tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.LONGNVARCHAR ||
-                  tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.NVARCHAR ||
-                  tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.LONGVARCHAR ||
-                  tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.LONGVARBINARY ||
-                  tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.VARBINARY ||
-                  tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.BLOB
-                  ) {
-                byte[] bytes = (byte[]) key[i];
-                if (bytes == null) {
-                  Varint.writeSignedVarLong(0, out);
+              switch (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType()) {
+                case BIGINT:
+                  Varint.writeSignedVarLong((Long) key[i], out);
+                  break;
+                case INTEGER:
+                  Varint.writeSignedVarLong((Integer) key[i], out);
+                  break;
+                case SMALLINT:
+                  Varint.writeSignedVarLong((Short) key[i], out);
+                  break;
+                case TINYINT:
+                  out.write((byte) key[i]);
+                  break;
+                case FLOAT:
+                  out.writeDouble((Double) key[i]);
+                  break;
+                case REAL:
+                  out.writeFloat((Float) key[i]);
+                  break;
+                case DOUBLE:
+                  out.writeDouble((Double) key[i]);
+                  break;
+                case BOOLEAN:
+                  out.writeBoolean((Boolean) key[i]);
+                  break;
+                case BIT:
+                  out.writeBoolean((Boolean) key[i]);
+                  break;
+                case CHAR:
+                case NCHAR:
+                case VARCHAR:
+                case CLOB:
+                case NCLOB:
+                case LONGNVARCHAR:
+                case NVARCHAR:
+                case LONGVARCHAR:
+                case LONGVARBINARY:
+                case VARBINARY:
+                case BLOB: {
+                  byte[] bytes = (byte[]) key[i];
+                  if (bytes == null) {
+                    Varint.writeSignedVarLong(0, out);
+                  }
+                  else {
+                    Varint.writeSignedVarLong(bytes.length, out);
+                    out.write(bytes);
+                  }
+                  break;
                 }
-                else {
+                case NUMERIC:
+                case DECIMAL: {
+                  BigDecimal value = ((BigDecimal) key[i]);
+                  String strValue = value.toPlainString();
+                  byte[] bytes = strValue.getBytes(UTF_8_STR);
                   Varint.writeSignedVarLong(bytes.length, out);
                   out.write(bytes);
+                  break;
                 }
-              }
-              else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.NUMERIC ||
-                  tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.DECIMAL) {
-                BigDecimal value = ((BigDecimal) key[i]);
-                String strValue = value.toPlainString();
-                byte[] bytes = strValue.getBytes(UTF_8_STR);
-                Varint.writeSignedVarLong(bytes.length, out);
-                out.write(bytes);
-              }
-              else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.DATE) {
-                Date value = ((Date) key[i]);
-                String str = value.toString();
-                byte[] bytes = str.getBytes(UTF_8_STR);
-                Varint.writeSignedVarLong(bytes.length, out);
-                out.write(bytes);
-              }
-              else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.TIME) {
-                Time value = ((Time) key[i]);
-                String str = value.toString();
-                byte[] bytes = str.getBytes(UTF_8_STR);
-                Varint.writeSignedVarLong(bytes.length, out);
-                out.write(bytes);
-              }
-              else if (tableSchema.getFields().get(tableSchema.getFieldOffset(column)).getType() == DataType.Type.TIMESTAMP) {
-                Timestamp value = ((Timestamp) key[i]);
-                String str = value.toString();
-                byte[] bytes = str.getBytes(UTF_8_STR);
-                Varint.writeSignedVarLong(bytes.length, out);
-                out.write(bytes);
+                case DATE: {
+                  Date value = ((Date) key[i]);
+                  String str = value.toString();
+                  byte[] bytes = str.getBytes(UTF_8_STR);
+                  Varint.writeSignedVarLong(bytes.length, out);
+                  out.write(bytes);
+                  break;
+                }
+                case TIME: {
+                  Time value = ((Time) key[i]);
+                  String str = value.toString();
+                  byte[] bytes = str.getBytes(UTF_8_STR);
+                  Varint.writeSignedVarLong(bytes.length, out);
+                  out.write(bytes);
+                  break;
+                }
+                case TIMESTAMP: {
+                  Timestamp value = ((Timestamp) key[i]);
+                  String str = value.toString();
+                  byte[] bytes = str.getBytes(UTF_8_STR);
+                  Varint.writeSignedVarLong(bytes.length, out);
+                  out.write(bytes);
+                  break;
+                }
               }
             }
           }
@@ -734,7 +765,7 @@ public class DatabaseCommon {
         if (in.readBoolean()) {
           int type = (int) Varint.readSignedVarLong(in);
           switch (type) {
-            case BIGINT:
+            case Types.BIGINT:
               ret[i] = Varint.readSignedVarLong(in);
               break;
             case INTEGER:
@@ -909,97 +940,107 @@ public class DatabaseCommon {
         offset++;
       }
       else {
-        if (tableSchema.getFields().get(offset).getType() == DataType.Type.BIGINT) {
-          long len = Varint.sizeOfSignedVarLong((Long)field);
-          Varint.writeSignedVarLong(len, out);
-          Varint.writeSignedVarLong((Long)field, out);
-          offset++;
-        }
-        else if (tableSchema.getFields().get(offset).getType() == DataType.Type.INTEGER) {
-          long len = Varint.sizeOfSignedVarLong((Integer)field);
-          Varint.writeSignedVarLong(len, out);
-          Varint.writeSignedVarLong((Integer)field, out);
-          offset++;
-        }
-        else if (tableSchema.getFields().get(offset).getType() == DataType.Type.SMALLINT) {
-          long len = Varint.sizeOfSignedVarLong((Short)field);
-          Varint.writeSignedVarLong(len, out);
-          Varint.writeSignedVarLong((Short)field, out);
-          offset++;
-        }
-        else if (tableSchema.getFields().get(offset).getType() == DataType.Type.TINYINT) {
-          Varint.writeSignedVarLong(1, out);
-          out.write((byte) field);
-          offset++;
-        }
-        else if (tableSchema.getFields().get(offset).getType() == DataType.Type.FLOAT ||
-            tableSchema.getFields().get(offset).getType() == DataType.Type.DOUBLE) {
-          Varint.writeSignedVarLong(8, out);
-          out.writeDouble((Double) field);
-          offset++;
-        }
-        else if (tableSchema.getFields().get(offset).getType() == DataType.Type.REAL) {
-          Varint.writeSignedVarLong(4, out);
-          out.writeFloat((Float) field);
-          offset++;
-        }
-        else if (tableSchema.getFields().get(offset).getType() == DataType.Type.CHAR ||
-            tableSchema.getFields().get(offset).getType() == DataType.Type.NCHAR ||
-            tableSchema.getFields().get(offset).getType() == DataType.Type.VARCHAR ||
-            tableSchema.getFields().get(offset).getType() == DataType.Type.NVARCHAR ||
-            tableSchema.getFields().get(offset).getType() == DataType.Type.CLOB ||
-            tableSchema.getFields().get(offset).getType() == DataType.Type.NCLOB ||
-            tableSchema.getFields().get(offset).getType() == DataType.Type.LONGNVARCHAR ||
-            tableSchema.getFields().get(offset).getType() == DataType.Type.LONGVARCHAR ||
-            tableSchema.getFields().get(offset).getType() == DataType.Type.LONGVARBINARY ||
-            tableSchema.getFields().get(offset).getType() == DataType.Type.VARBINARY ||
-            tableSchema.getFields().get(offset).getType() == DataType.Type.BLOB) {
-          byte[] bytes = (byte[]) field;
-          Varint.writeSignedVarLong(bytes.length, out);
-          out.write(bytes);
-          offset++;
-        }
-        else if (tableSchema.getFields().get(offset).getType() == DataType.Type.BOOLEAN ||
-            tableSchema.getFields().get(offset).getType() == DataType.Type.BIT) {
-          Varint.writeSignedVarLong(1, out);
-          out.write((Boolean) field ? 1 : 0);
-          offset++;
-        }
-        else if (tableSchema.getFields().get(offset).getType() == DataType.Type.NUMERIC ||
-            tableSchema.getFields().get(offset).getType() == DataType.Type.DECIMAL) {
-          BigDecimal value = ((BigDecimal) field);
-          String strValue = value.toPlainString();
-          byte[] bytes = strValue.getBytes(UTF_8_STR);
-          Varint.writeSignedVarLong(bytes.length, out);
-          out.write(bytes);
-          offset++;
-        }
-        else if (tableSchema.getFields().get(offset).getType() == DataType.Type.DATE) {
-          Date value = ((Date) field);
-          String str = value.toString();
-          byte[] bytes = str.getBytes(UTF_8_STR);
-          Varint.writeSignedVarLong(bytes.length, out);
-          out.write(bytes);
-          offset++;
-        }
-        else if (tableSchema.getFields().get(offset).getType() == DataType.Type.TIME) {
-          Time value = ((Time) field);
-          String str = value.toString();
-          byte[] bytes = str.getBytes(UTF_8_STR);
-          Varint.writeSignedVarLong(bytes.length, out);
-          out.write(bytes);
-          offset++;
-        }
-        else if (tableSchema.getFields().get(offset).getType() == DataType.Type.TIMESTAMP) {
-          Timestamp value = ((Timestamp) field);
-          String str = value.toString();
-          byte[] bytes = str.getBytes(UTF_8_STR);
-          Varint.writeSignedVarLong(bytes.length, out);
-          out.write(bytes);
-          offset++;
-        }
-        else {
-          tableSchema.getFields().get(offset).getType();
+        switch (tableSchema.getFields().get(offset).getType()) {
+          case BIGINT: {
+            long len = Varint.sizeOfSignedVarLong((Long) field);
+            Varint.writeSignedVarLong(len, out);
+            Varint.writeSignedVarLong((Long) field, out);
+            offset++;
+            break;
+          }
+          case INTEGER: {
+            long len = Varint.sizeOfSignedVarLong((Integer) field);
+            Varint.writeSignedVarLong(len, out);
+            Varint.writeSignedVarLong((Integer) field, out);
+            offset++;
+            break;
+          }
+          case SMALLINT: {
+            long len = Varint.sizeOfSignedVarLong((Short) field);
+            Varint.writeSignedVarLong(len, out);
+            Varint.writeSignedVarLong((Short) field, out);
+            offset++;
+            break;
+          }
+          case TINYINT:
+            Varint.writeSignedVarLong(1, out);
+            out.write((byte) field);
+            offset++;
+            break;
+          case FLOAT:
+          case DOUBLE:
+            Varint.writeSignedVarLong(8, out);
+            out.writeDouble((Double) field);
+            offset++;
+            break;
+          case REAL:
+            Varint.writeSignedVarLong(4, out);
+            out.writeFloat((Float) field);
+            offset++;
+            break;
+          case CHAR:
+          case NCHAR:
+          case VARCHAR:
+          case NVARCHAR:
+          case CLOB:
+          case NCLOB:
+          case LONGNVARCHAR:
+          case LONGVARCHAR:
+          case LONGVARBINARY:
+          case VARBINARY:
+          case BLOB: {
+            byte[] bytes = (byte[]) field;
+            Varint.writeSignedVarLong(bytes.length, out);
+            out.write(bytes);
+            offset++;
+            break;
+          }
+          case BOOLEAN:
+          case BIT:
+            Varint.writeSignedVarLong(1, out);
+            out.write((Boolean) field ? 1 : 0);
+            offset++;
+            break;
+          case NUMERIC:
+          case DECIMAL: {
+            BigDecimal value = ((BigDecimal) field);
+            String strValue = value.toPlainString();
+            byte[] bytes = strValue.getBytes(UTF_8_STR);
+            Varint.writeSignedVarLong(bytes.length, out);
+            out.write(bytes);
+            offset++;
+            break;
+          }
+          case DATE: {
+            Date value = ((Date) field);
+            String str = value.toString();
+            byte[] bytes = str.getBytes(UTF_8_STR);
+            Varint.writeSignedVarLong(bytes.length, out);
+            out.write(bytes);
+            offset++;
+            break;
+          }
+          case TIME: {
+            Time value = ((Time) field);
+            String str = value.toString();
+            byte[] bytes = str.getBytes(UTF_8_STR);
+            Varint.writeSignedVarLong(bytes.length, out);
+            out.write(bytes);
+            offset++;
+            break;
+          }
+          case TIMESTAMP: {
+            Timestamp value = ((Timestamp) field);
+            String str = value.toString();
+            byte[] bytes = str.getBytes(UTF_8_STR);
+            Varint.writeSignedVarLong(bytes.length, out);
+            out.write(bytes);
+            offset++;
+            break;
+          }
+          default:
+            tableSchema.getFields().get(offset).getType();
+            break;
         }
       }
     }
@@ -1036,7 +1077,7 @@ public class DatabaseCommon {
           in.skipBytes(size);
           continue;
         }
-        if (field.getType() == DataType.Type.BIGINT) {
+        if (field.getType() == BIGINT) {
           fields[currOffset] = Varint.readSignedVarLong(in);
         }
         else if (field.getType() == DataType.Type.INTEGER) {
@@ -1180,7 +1221,8 @@ public class DatabaseCommon {
   public void saveServersConfig(String dataDir) throws IOException {
     try {
       internalWriteLock.lock();
-      String dataRoot = dataRoot = new File(dataDir, SNAPSHOT_STR + File.separator + shard + File.separator + replica).getAbsolutePath();
+      String dataRoot = dataRoot = new File(dataDir, SNAPSHOT_STR + File.separator + shard + File.separator +
+          replica).getAbsolutePath();
       File configFile = new File(dataRoot, "config.bin");
       if (configFile.exists()) {
         Files.delete(configFile.toPath());

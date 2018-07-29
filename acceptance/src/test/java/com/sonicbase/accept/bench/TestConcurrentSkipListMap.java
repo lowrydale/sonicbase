@@ -7,11 +7,6 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-/**
- * User: lowryda
- * Date: 3/24/15
- * Time: 2:24 PM
- */
 public class TestConcurrentSkipListMap {
   public static void main(String[] args) {
     final ConcurrentSkipListMap<Object[], String> map = new ConcurrentSkipListMap<Object[], String>(new Comparator<Object[]>() {

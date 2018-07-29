@@ -18,7 +18,10 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-@SuppressWarnings("squid:S1172") // all methods called from method invoker must have cobj and replayed command parms
+@SuppressWarnings({"squid:S1172", "squid:S1168", "squid:S00107"})
+// all methods called from method invoker must have cobj and replayed command parms
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class DeleteManager {
 
   private static final String ERROR_PERFORMING_DELETES_STR = "Error performing deletes";
@@ -35,7 +38,8 @@ public class DeleteManager {
 
   DeleteManager(final DatabaseServer databaseServer) {
     this.databaseServer = databaseServer;
-    this.executor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors() * 2, "SonicBase DeleteManager Thread");
+    this.executor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors() * 2,
+        "SonicBase DeleteManager Thread");
     this.freeExecutor = ThreadUtil.createExecutor(4, "SonicBase DeleteManager FreeExecutor Thread");
     freeThread = ThreadUtil.createThread(() -> {
       while (!shutdown) {
@@ -76,7 +80,8 @@ public class DeleteManager {
     }
   }
 
-  private void saveDeletes(String dbName, String tableName, String indexName, ConcurrentLinkedQueue<DeleteRequest> deleteRequests) {
+  private void saveDeletes(String dbName, String tableName, String indexName,
+                           ConcurrentLinkedQueue<DeleteRequest> deleteRequests) {
     try {
       String dateStr = DateUtils.toString(new Date(System.currentTimeMillis()));
       Random rand = new Random(System.currentTimeMillis());
@@ -110,48 +115,9 @@ public class DeleteManager {
         List<Future> futures = new ArrayList<>();
         InputStream countIn = new LogManager.ByteCounterStream(new FileInputStream(file), countRead);
         try (DataInputStream in = new DataInputStream(new BufferedInputStream(countIn))) {
-          Varint.readSignedVarLong(in); //serializationVersion
-          String dbName = in.readUTF();
-          String tableName = in.readUTF();
-          TableSchema tableSchema = databaseServer.getCommon().getTables(dbName).get(tableName);
-
-          String indexName = in.readUTF();
-          final IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
-          String[] indexFields = indexSchema.getFields();
-          int[] fieldOffsets = new int[indexFields.length];
-          for (int k = 0; k < indexFields.length; k++) {
-            fieldOffsets[k] = tableSchema.getFieldOffset(indexFields[k]);
-          }
-
-          long schemaVersionToDeleteAt = in.readInt();
-          if (!ignoreVersion && schemaVersionToDeleteAt <= databaseServer.getCommon().getSchemaVersion()) {
+          if (doDeletesProcessStream(ignoreVersion, futures, in)) {
             return;
           }
-          final Index index = databaseServer.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
-          List<Object[]> batch = new ArrayList<>();
-          int errorsInARow = 0;
-          while (!shutdown) {
-            Object[] key = null;
-            try {
-              key = DatabaseCommon.deserializeKey(tableSchema, in);
-              errorsInARow = 0;
-              batch.add(key);
-              if (batch.size() > 1_000) {
-                batch = processBatch(futures, indexSchema, index, batch);
-              }
-            }
-            catch (EOFException e) {
-              //expected
-              break;
-            }
-            catch (Exception e) {
-              logger.error("Error deserializing key: " + ((errorsInARow > 20) ? " aborting" : ""), e);
-              if (errorsInARow++ > 20) {
-                break;
-              }
-            }
-          }
-          processBatch(futures, indexSchema, index, batch);
         }
         catch (Exception e) {
           logger.error(ERROR_PERFORMING_DELETES_STR, e);
@@ -171,6 +137,39 @@ public class DeleteManager {
     }
   }
 
+  private boolean doDeletesProcessStream(boolean ignoreVersion, List<Future> futures, DataInputStream in) throws IOException {
+    Varint.readSignedVarLong(in); //serializationVersion
+    String dbName = in.readUTF();
+    String tableName = in.readUTF();
+    TableSchema tableSchema = databaseServer.getCommon().getTables(dbName).get(tableName);
+
+    String indexName = in.readUTF();
+    final IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
+    String[] indexFields = indexSchema.getFields();
+    int[] fieldOffsets = new int[indexFields.length];
+    for (int k = 0; k < indexFields.length; k++) {
+      fieldOffsets[k] = tableSchema.getFieldOffset(indexFields[k]);
+    }
+
+    long schemaVersionToDeleteAt = in.readInt();
+    if (!ignoreVersion && schemaVersionToDeleteAt <= databaseServer.getCommon().getSchemaVersion()) {
+      return true;
+    }
+    final Index index = databaseServer.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
+    List<Object[]> batch = new ArrayList<>();
+    int errorsInARow = 0;
+    while (!shutdown) {
+      ProcessKey processKey = new ProcessKey(futures, in, tableSchema, indexSchema, index, batch, errorsInARow).invoke();
+      batch = processKey.getBatch();
+      errorsInARow = processKey.getErrorsInARow();
+      if (processKey.is()) {
+        break;
+      }
+    }
+    processBatch(futures, indexSchema, index, batch);
+    return false;
+  }
+
   private List<Object[]> processBatch(List<Future> futures, final IndexSchema indexSchema, final Index index, List<Object[]> batch) {
     final List<Object[]> currBatch = batch;
     batch = new ArrayList<>();
@@ -178,34 +177,42 @@ public class DeleteManager {
       final List<Object> toFreeBatch = new ArrayList<>();
       for (Object[] currKey : currBatch) {
         synchronized (index.getMutex(currKey)) {
-          Object value = index.get(currKey);
-          if (value != null) {
-            byte[][] content = databaseServer.getAddressMap().fromUnsafeToRecords(value);
-            if (content != null) {
-              if (indexSchema.isPrimaryKey()) {
-                if ((Record.DB_VIEW_FLAG_DELETING & Record.getDbViewFlags(content[0])) != 0) {
-                  Object o = index.remove(currKey);
-                  if (o != null) {
-                    toFree.put(o);
-                  }
-                }
-              }
-              else {
-                if ((Record.DB_VIEW_FLAG_DELETING & KeyRecord.getDbViewFlags(content[0])) != 0) {
-                  Object o = index.remove(currKey);
-                  if (o != null) {
-                    toFree.put(o);
-                  }
-                }
-              }
-            }
-          }
+          processValue(indexSchema, index, currKey);
         }
       }
       doFreeMemory(toFreeBatch);
       return null;
     }));
     return batch;
+  }
+
+  private void processValue(IndexSchema indexSchema, Index index, Object[] currKey) throws InterruptedException {
+    Object value = index.get(currKey);
+    if (value != null) {
+      byte[][] content = databaseServer.getAddressMap().fromUnsafeToRecords(value);
+      if (content != null) {
+        processRecords(indexSchema, index, currKey, content);
+      }
+    }
+  }
+
+  private void processRecords(IndexSchema indexSchema, Index index, Object[] currKey, byte[][] content) throws InterruptedException {
+    if (indexSchema.isPrimaryKey()) {
+      if ((Record.DB_VIEW_FLAG_DELETING & Record.getDbViewFlags(content[0])) != 0) {
+        Object o = index.remove(currKey);
+        if (o != null) {
+          toFree.put(o);
+        }
+      }
+    }
+    else {
+      if ((Record.DB_VIEW_FLAG_DELETING & KeyRecord.getDbViewFlags(content[0])) != 0) {
+        Object o = index.remove(currKey);
+        if (o != null) {
+          toFree.put(o);
+        }
+      }
+    }
   }
 
   private void doFreeMemory(final List<Object> toFreeBatch) {
@@ -224,19 +231,8 @@ public class DeleteManager {
     mainThread = new Thread(() -> {
       while (!shutdown) {
         try {
-          File dir = getReplicaRoot();
-          if (dir.exists()) {
-
-            if (doSleep()) {
-              break;
-            }
-
-            File[] files = dir.listFiles();
-            if (files != null && files.length != 0) {
-              Arrays.sort(files, Comparator.comparing(File::getAbsolutePath));
-
-              doDeletes(false, files[0]);
-            }
+          if (processFilesForDeletes()) {
+            break;
           }
         }
         catch (Exception e) {
@@ -245,6 +241,24 @@ public class DeleteManager {
       }
     }, "SonicBase Deletion Thread");
     mainThread.start();
+  }
+
+  private boolean processFilesForDeletes() {
+    File dir = getReplicaRoot();
+    if (dir.exists()) {
+
+      if (doSleep()) {
+        return true;
+      }
+
+      File[] files = dir.listFiles();
+      if (files != null && files.length != 0) {
+        Arrays.sort(files, Comparator.comparing(File::getAbsolutePath));
+
+        doDeletes(false, files[0]);
+      }
+    }
+    return false;
   }
 
   private boolean doSleep() {
@@ -286,11 +300,13 @@ public class DeleteManager {
     return (double)countRead.get() / (double)totalBytes;
   }
 
-  void saveDeletesForRecords(String dbName, String tableName, String indexName, long sequence0, long sequence1, ConcurrentLinkedQueue<DeleteRequest> keysToDeleteExpanded) {
+  void saveDeletesForRecords(String dbName, String tableName, String indexName, long sequence0, long sequence1,
+                             ConcurrentLinkedQueue<DeleteRequest> keysToDeleteExpanded) {
     saveDeletes(dbName, tableName, indexName, keysToDeleteExpanded);
   }
 
-  void saveDeletesForKeyRecords(String dbName, String tableName, String indexName, long sequence0, long sequence1, ConcurrentLinkedQueue<DeleteRequest> keysToDeleteExpanded) {
+  void saveDeletesForKeyRecords(String dbName, String tableName, String indexName, long sequence0, long sequence1,
+                                ConcurrentLinkedQueue<DeleteRequest> keysToDeleteExpanded) {
     saveDeletes(dbName, tableName, indexName, keysToDeleteExpanded);
   }
 
@@ -323,7 +339,8 @@ public class DeleteManager {
 
     isForcingDeletes.set(true);
     ThreadPoolExecutor localExecutor = new ThreadPoolExecutor(8, 8,
-        10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1_000), new ThreadPoolExecutor.CallerRunsPolicy());
+        10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1_000),
+        new ThreadPoolExecutor.CallerRunsPolicy());
     try {
       if (dir.exists()) {
         File[] files = dir.listFiles();
@@ -355,5 +372,65 @@ public class DeleteManager {
       localExecutor.shutdownNow();
     }
     return null;
+  }
+
+  private class ProcessKey {
+    private boolean myResult;
+    private List<Future> futures;
+    private DataInputStream in;
+    private TableSchema tableSchema;
+    private IndexSchema indexSchema;
+    private Index index;
+    private List<Object[]> batch;
+    private int errorsInARow;
+
+    public ProcessKey(List<Future> futures, DataInputStream in, TableSchema tableSchema, IndexSchema indexSchema,
+                      Index index, List<Object[]> batch, int errorsInARow) {
+      this.futures = futures;
+      this.in = in;
+      this.tableSchema = tableSchema;
+      this.indexSchema = indexSchema;
+      this.index = index;
+      this.batch = batch;
+      this.errorsInARow = errorsInARow;
+    }
+
+    boolean is() {
+      return myResult;
+    }
+
+    public List<Object[]> getBatch() {
+      return batch;
+    }
+
+    public int getErrorsInARow() {
+      return errorsInARow;
+    }
+
+    public ProcessKey invoke() {
+      Object[] key = null;
+      try {
+        key = DatabaseCommon.deserializeKey(tableSchema, in);
+        errorsInARow = 0;
+        batch.add(key);
+        if (batch.size() > 1_000) {
+          batch = processBatch(futures, indexSchema, index, batch);
+        }
+      }
+      catch (EOFException e) {
+        //expected
+        myResult = true;
+        return this;
+      }
+      catch (Exception e) {
+        logger.error("Error deserializing key: " + ((errorsInARow > 20) ? " aborting" : ""), e);
+        if (errorsInARow++ > 20) {
+          myResult = true;
+          return this;
+        }
+      }
+      myResult = false;
+      return this;
+    }
   }
 }

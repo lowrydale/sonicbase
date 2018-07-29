@@ -18,6 +18,9 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class CreateTableStatementHandler implements StatementHandler {
   private final DatabaseClient client;
 
@@ -26,7 +29,10 @@ public class CreateTableStatementHandler implements StatementHandler {
   }
 
   @Override
-  public Object execute(String dbName, ParameterHandler parms, String sqlToUse, Statement statement, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) throws SQLException {
+  public Object execute(String dbName, ParameterHandler parms, String sqlToUse, Statement statement,
+                        SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
+                        boolean restrictToThisServer, StoredProcedureContextImpl procedureContext,
+                        int schemaRetryCount) {
     CreateTable createTable = (CreateTable) statement;
     CreateTableStatementImpl createTableStatement = new CreateTableStatementImpl(client);
     createTableStatement.setTableName(createTable.getTable().getName());
@@ -43,25 +49,10 @@ public class CreateTableStatementHandler implements StatementHandler {
         String width = columnDefinition.getColDataType().getArgumentsStringList().get(0);
         fieldSchema.setWidth(Integer.valueOf(width));
       }
-      List specs = columnDefinition.getColumnSpecStrings();
-      if (specs != null) {
-        for (Object obj : specs) {
-          if (obj instanceof String) {
-            String spec = (String) obj;
-            if (spec.toLowerCase().contains("auto_increment")) {
-              fieldSchema.setAutoIncrement(true);
-            }
-            if (spec.toLowerCase().contains("array")) {
-              fieldSchema.setArray(true);
-            }
-          }
-        }
-      }
-      List argList = columnDefinition.getColDataType().getArgumentsStringList();
-      if (argList != null) {
-        int width = Integer.parseInt((String) argList.get(0));
-        fieldSchema.setWidth(width);
-      }
+      applyColumnSpecs(columnDefinition, fieldSchema);
+
+      applyWidth(columnDefinition, fieldSchema);
+
       fields.add(fieldSchema);
     }
 
@@ -86,6 +77,31 @@ public class CreateTableStatementHandler implements StatementHandler {
     createTableStatement.setPrimaryKey(primaryKey);
 
     return doCreateTable(dbName, createTableStatement);
+  }
+
+  private void applyWidth(ColumnDefinition columnDefinition, FieldSchema fieldSchema) {
+    List argList = columnDefinition.getColDataType().getArgumentsStringList();
+    if (argList != null) {
+      int width = Integer.parseInt((String) argList.get(0));
+      fieldSchema.setWidth(width);
+    }
+  }
+
+  private void applyColumnSpecs(ColumnDefinition columnDefinition, FieldSchema fieldSchema) {
+    List specs = columnDefinition.getColumnSpecStrings();
+    if (specs != null) {
+      for (Object obj : specs) {
+        if (obj instanceof String) {
+          String spec = (String) obj;
+          if (spec.toLowerCase().contains("auto_increment")) {
+            fieldSchema.setAutoIncrement(true);
+          }
+          if (spec.toLowerCase().contains("array")) {
+            fieldSchema.setArray(true);
+          }
+        }
+      }
+    }
   }
 
   public int doCreateTable(String dbName, CreateTableStatementImpl createTableStatement) {

@@ -10,6 +10,9 @@ import net.sf.jsqlparser.statement.truncate.Truncate;
 import java.sql.SQLException;
 import java.util.Random;
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class TruncateStatementHandler implements StatementHandler {
   private final DatabaseClient client;
 
@@ -20,7 +23,7 @@ public class TruncateStatementHandler implements StatementHandler {
   @Override
   public Object execute(String dbName, ParameterHandler parms, String sqlToUse, Statement statement,
                         SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
-                        boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) throws SQLException {
+                        boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) {
     Truncate truncate = (Truncate) statement;
     String table = truncate.getTable().getName();
     table = table.toLowerCase();

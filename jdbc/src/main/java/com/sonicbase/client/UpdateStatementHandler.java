@@ -15,6 +15,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class UpdateStatementHandler implements StatementHandler {
   private final DatabaseClient client;
 
@@ -23,7 +26,10 @@ public class UpdateStatementHandler implements StatementHandler {
   }
 
   @Override
-  public Object execute(String dbName, ParameterHandler parms, String sqlToUse, Statement statement, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) throws SQLException {
+  public Object execute(String dbName, ParameterHandler parms, String sqlToUse, Statement statement,
+                        SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
+                        boolean restrictToThisServer, StoredProcedureContextImpl procedureContext,
+                        int schemaRetryCount) {
     Update update = (Update) statement;
     UpdateStatementImpl updateStatement = new UpdateStatementImpl(client);
     AtomicInteger currParmNum = new AtomicInteger();
@@ -35,11 +41,13 @@ public class UpdateStatementHandler implements StatementHandler {
     }
     List<Expression> expressions = update.getExpressions();
     for (Expression expression : expressions) {
-      ExpressionImpl qExpression = SelectStatementHandler.getExpression(client, currParmNum, expression, updateStatement.getTableName(), parms);
+      ExpressionImpl qExpression = SelectStatementHandler.getExpression(client, currParmNum, expression,
+          updateStatement.getTableName(), parms);
       updateStatement.addSetExpression(qExpression);
     }
 
-    ExpressionImpl whereExpression = SelectStatementHandler.getExpression(client, currParmNum, update.getWhere(), updateStatement.getTableName(), parms);
+    ExpressionImpl whereExpression = SelectStatementHandler.getExpression(client, currParmNum, update.getWhere(),
+        updateStatement.getTableName(), parms);
     updateStatement.setWhereClause(whereExpression);
 
     if (client.isExplicitTrans()) {
@@ -51,6 +59,7 @@ public class UpdateStatementHandler implements StatementHandler {
       ops.add(new DatabaseClient.TransactionOperation(updateStatement, parms));
     }
     updateStatement.setParms(parms);
-    return updateStatement.execute(dbName, null, null, sequence0, sequence1, sequence2, restrictToThisServer, procedureContext, schemaRetryCount);
+    return updateStatement.execute(dbName, null, null, sequence0, sequence1, sequence2,
+        restrictToThisServer, procedureContext, schemaRetryCount);
   }
 }

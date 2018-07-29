@@ -32,9 +32,9 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * Responsible for
- */
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class ResultSetImpl implements ResultSet {
   private static final String UTF8_STR = "utf-8";
   private static final String LENGTH_STR = "length";
@@ -122,24 +122,12 @@ public class ResultSetImpl implements ResultSet {
     for (Map.Entry<String, ColumnImpl> alias : aliases.entrySet()) {
       if (columnLabel.equalsIgnoreCase(alias.getValue().getAlias())) {
         String function = alias.getValue().getFunction();
-        if (function.equals(COUNT_STR) || function.equals("min") || function.equals("max") || function.equals("sum") || function.equals("avg")) {
-          String[] actualLabel = getActualColumn(alias.getValue().getColumnName());
-          if (actualLabel[0] == null) {
-            actualLabel[0] = selectStatement.getFromTable();
-          }
-          boolean isNull = false;
-          Object[] values = new Object[groupByContext.getFieldContexts().size()];
-          for (int i = 0; i < values.length; i++) {
-            String groupColumnName = ((Column) groupByColumns.get(i)).getColumnName();
-            String[] actualColumn = getActualColumn(groupColumnName);
-            values[i] = getField(actualColumn, columnLabel);
-            if (values[i] == null) {
-              isNull = true;
-            }
-          }
-          if (!isNull) {
-            GroupByContext.GroupCounter counter = groupByContext.getGroupCounters().get(actualLabel[0] + ":" + actualLabel[1]).get(values);
-            return convertCounterValueToType(type, function, counter);
+        if (function.equals(COUNT_STR) || function.equals("min") || function.equals("max") || function.equals("sum") ||
+            function.equals("avg")) {
+          GetGroupByFunctionResutsForSimpleMathFunction getGroupByFunctionResutsForSimpleMathFunction =
+              new GetGroupByFunctionResutsForSimpleMathFunction(columnLabel, alias).invoke();
+          if (getGroupByFunctionResutsForSimpleMathFunction.is()) {
+            return convertCounterValueToType(type, function, getGroupByFunctionResutsForSimpleMathFunction.getCounter());
           }
         }
       }
@@ -149,40 +137,48 @@ public class ResultSetImpl implements ResultSet {
 
   private Object convertCounterValueToType(DataType.Type type, String function, GroupByContext.GroupCounter counter) {
     if (counter.getCounter().getLongCount() != null) {
-      if (function.equals("sum")) {
-        return type.getConverter().convert((long) counter.getCounter().getLongCount());
-      }
-      if (function.equals("max")) {
-        return type.getConverter().convert((long) counter.getCounter().getMaxLong());
-      }
-      if (function.equals("min")) {
-        return type.getConverter().convert((long) counter.getCounter().getMinLong());
-      }
-      if (function.equals("avg")) {
-        return type.getConverter().convert((double) counter.getCounter().getAvgLong());
-      }
-      if (function.equals(COUNT_STR)) {
-        return type.getConverter().convert((long) counter.getCounter().getCount());
-      }
-      return null;
+      return convertLongCounterValueToType(type, function, counter);
     }
     else if (counter.getCounter().getDoubleCount() != null) {
-      if (function.equals("sum")) {
-        return type.getConverter().convert((double) counter.getCounter().getDoubleCount());
-      }
-      if (function.equals("max")) {
-        return type.getConverter().convert((double) counter.getCounter().getMaxDouble());
-      }
-      if (function.equals("min")) {
-        return type.getConverter().convert((double) counter.getCounter().getMinDouble());
-      }
-      if (function.equals("avg")) {
-        return type.getConverter().convert((double) counter.getCounter().getAvgDouble());
-      }
-      if (function.equals(COUNT_STR)) {
-        return type.getConverter().convert((long) counter.getCounter().getCount());
-      }
-      return null;
+      return convertDoubleCounterValueToType(type, function, counter);
+    }
+    return null;
+  }
+
+  private Object convertDoubleCounterValueToType(DataType.Type type, String function, GroupByContext.GroupCounter counter) {
+    if (function.equals("sum")) {
+      return type.getConverter().convert((double) counter.getCounter().getDoubleCount());
+    }
+    if (function.equals("max")) {
+      return type.getConverter().convert((double) counter.getCounter().getMaxDouble());
+    }
+    if (function.equals("min")) {
+      return type.getConverter().convert((double) counter.getCounter().getMinDouble());
+    }
+    if (function.equals("avg")) {
+      return type.getConverter().convert((double) counter.getCounter().getAvgDouble());
+    }
+    if (function.equals(COUNT_STR)) {
+      return type.getConverter().convert((long) counter.getCounter().getCount());
+    }
+    return null;
+  }
+
+  private Object convertLongCounterValueToType(DataType.Type type, String function, GroupByContext.GroupCounter counter) {
+    if (function.equals("sum")) {
+      return type.getConverter().convert((long) counter.getCounter().getLongCount());
+    }
+    if (function.equals("max")) {
+      return type.getConverter().convert((long) counter.getCounter().getMaxLong());
+    }
+    if (function.equals("min")) {
+      return type.getConverter().convert((long) counter.getCounter().getMinLong());
+    }
+    if (function.equals("avg")) {
+      return type.getConverter().convert((double) counter.getCounter().getAvgLong());
+    }
+    if (function.equals(COUNT_STR)) {
+      return type.getConverter().convert((long) counter.getCounter().getCount());
     }
     return null;
   }
@@ -272,7 +268,8 @@ public class ResultSetImpl implements ResultSet {
       Record[] retRecords,
       List<ColumnImpl> columns,
       String indexUsed, Counter[] counters, Limit limit, Offset offset, AtomicLong currOffset, AtomicLong countReturned,
-      List<Expression> groupByColumns, GroupByContext groupContext, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) {
+      List<Expression> groupByColumns, GroupByContext groupContext, boolean restrictToThisServer,
+      StoredProcedureContextImpl procedureContext) {
     this.dbName = dbName;
     this.sqlToUse = sqlToUse;
     this.databaseClient = databaseClient;
@@ -286,7 +283,8 @@ public class ResultSetImpl implements ResultSet {
     this.columns = columns;
     this.recordCache = selectContext.getRecordCache();
     int schemaRetryCount = 0;
-    this.readRecords = readRecords(new ExpressionImpl.NextReturn(selectContext.getTableNames(), selectContext.getCurrKeys()), schemaRetryCount);
+    this.readRecords = readRecords(new ExpressionImpl.NextReturn(selectContext.getTableNames(),
+        selectContext.getCurrKeys()), schemaRetryCount);
     this.counters = counters;
     this.offset = offset;
     this.currOffset = currOffset;
@@ -318,17 +316,9 @@ public class ResultSetImpl implements ResultSet {
       final int[] tableOffsets = new int[orderByExpressions.size()];
       for (int i = 0; i < orderByExpressions.size(); i++) {
         String tableName = orderByExpressions.get(i).getTableName();
-        for (int j = 0; j < tableNames.length; j++) {
-          if (tableName == null) {
-            tableOffsets[i] = 0;
-          }
-          else {
-            if (tableName.equals(tableNames[j])) {
-              tableOffsets[i] = j;
-              break;
-            }
-          }
-        }
+
+        getTableOffsets(tableNames, tableOffsets, i, tableName);
+
         if (tableName == null) {
           tableName = tableNames[0];
         }
@@ -343,28 +333,32 @@ public class ResultSetImpl implements ResultSet {
     }
   }
 
-  private static int getSortComparator(int[] fieldOffsets, boolean[] ascendingFlags, Comparator[] comparators, int[] tableOffsets, ExpressionImpl.CachedRecord[] o1, ExpressionImpl.CachedRecord[] o2) {
+  private static void getTableOffsets(String[] tableNames, int[] tableOffsets, int i, String tableName) {
+    for (int j = 0; j < tableNames.length; j++) {
+      if (tableName == null) {
+        tableOffsets[i] = 0;
+      }
+      else {
+        if (tableName.equals(tableNames[j])) {
+          tableOffsets[i] = j;
+          break;
+        }
+      }
+    }
+  }
+
+  private static int getSortComparator(int[] fieldOffsets, boolean[] ascendingFlags, Comparator[] comparators,
+                                       int[] tableOffsets, ExpressionImpl.CachedRecord[] o1, ExpressionImpl.CachedRecord[] o2) {
     for (int i = 0; i < fieldOffsets.length; i++) {
-      if (o1[tableOffsets[i]] == null && o2[tableOffsets[i]] == null) {
+      if (handleNullsIsSortCompare(fieldOffsets[i], o1[tableOffsets[i]], o2[tableOffsets[i]])) {
         continue;
       }
-      if ((o1[tableOffsets[i]] == null || o1[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]] == null) &&
-          (o2[tableOffsets[i]] == null || o2[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]] == null)) {
-        continue;
+      Integer x = handleNullsInSortComparator(ascendingFlags, fieldOffsets[i], o1[tableOffsets[i]], o2[tableOffsets[i]], i);
+      if (x != null) {
+        return x;
       }
-      if (o1[tableOffsets[i]] == null) {
-        return -1 * (ascendingFlags[i] ? 1 : -1);
-      }
-      if (o2[tableOffsets[i]] == null) {
-        return 1 * (ascendingFlags[i] ? 1 : -1);
-      }
-      if (o1[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]] == null) {
-        return 1 * (ascendingFlags[i] ? 1 : -1);
-      }
-      if (o2[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]] == null) {
-        return -1 * (ascendingFlags[i] ? 1 : -1);
-      }
-      int value = comparators[i].compare(o1[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]], o2[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]]);
+      int value = comparators[i].compare(o1[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]],
+          o2[tableOffsets[i]].getRecord().getFields()[fieldOffsets[i]]);
       if (value < 0) {
         return -1 * (ascendingFlags[i] ? 1 : -1);
       }
@@ -375,6 +369,33 @@ public class ResultSetImpl implements ResultSet {
     return 0;
   }
 
+  private static boolean handleNullsIsSortCompare(int fieldOffset, ExpressionImpl.CachedRecord cachedRecord,
+                                                  ExpressionImpl.CachedRecord cachedRecord1) {
+    if (cachedRecord == null && cachedRecord1 == null) {
+      return true;
+    }
+    return (cachedRecord == null || cachedRecord.getRecord().getFields()[fieldOffset] == null) &&
+        (cachedRecord1 == null || cachedRecord1.getRecord().getFields()[fieldOffset] == null);
+  }
+
+  private static Integer handleNullsInSortComparator(boolean[] ascendingFlags, int fieldOffset,
+                                                     ExpressionImpl.CachedRecord cachedRecord,
+                                                     ExpressionImpl.CachedRecord cachedRecord1, int i) {
+    if (cachedRecord == null) {
+      return -1 * (ascendingFlags[i] ? 1 : -1);
+    }
+    if (cachedRecord1 == null) {
+      return 1 * (ascendingFlags[i] ? 1 : -1);
+    }
+    if (cachedRecord.getRecord().getFields()[fieldOffset] == null) {
+      return 1 * (ascendingFlags[i] ? 1 : -1);
+    }
+    if (cachedRecord1.getRecord().getFields()[fieldOffset] == null) {
+      return -1 * (ascendingFlags[i] ? 1 : -1);
+    }
+    return null;
+  }
+
   public boolean isAfterLast() {
     return currRecord == null;
   }
@@ -382,23 +403,9 @@ public class ResultSetImpl implements ResultSet {
   public boolean next() {
     currPos++;
 
-    if (describeStrs != null) {
-      return currPos <= describeStrs.length - 1;
-    }
-    if (recordsResults != null) {
-      if (currPos > recordsResults.getArray().size() - 1) {
-        cachedRecordResultAsRecord = null;
-        return false;
-      }
-      ComObject cobj = ((ComObject)recordsResults.getArray().get(currPos));
-      cachedRecordResultAsRecord = new RecordImpl(databaseClient.getCommon(), cobj);
-      return true;
-    }
-    if (mapResults != null) {
-      return currPos <= mapResults.size() - 1;
-    }
-    if (isCount) {
-      return currPos == 0;
+    Boolean x1 = abortEarlyAsNeeded();
+    if (x1 != null) {
+      return x1;
     }
 
     currTotalPos++;
@@ -411,8 +418,7 @@ public class ResultSetImpl implements ResultSet {
       return first;
     }
 
-    if (((setOperation != null && retKeys == null) || (setOperation == null && selectContext.getCurrKeys() == null))
-        && (readRecords == null || readRecords.length == 0)) {
+    if (abortOnEmptyRecords()) {
       return false;
     }
 
@@ -436,9 +442,43 @@ public class ResultSetImpl implements ResultSet {
         return x;
       }
 
-      skipResutlsUpToOffsetForGroupBy();
+      skipResultsUpToOffsetForGroupBy();
     }
 
+    getMoreResultsAsNeeded();
+
+    return (setOperation == null || (retKeys != null && retKeys.length != 0)) &&
+        (setOperation != null || selectContext.getCurrKeys() != null);
+  }
+
+  private boolean abortOnEmptyRecords() {
+    return ((setOperation != null && retKeys == null) || (setOperation == null && selectContext.getCurrKeys() == null))
+        && (readRecords == null || readRecords.length == 0);
+  }
+
+  private Boolean abortEarlyAsNeeded() {
+    if (describeStrs != null) {
+      return currPos <= describeStrs.length - 1;
+    }
+    if (recordsResults != null) {
+      if (currPos > recordsResults.getArray().size() - 1) {
+        cachedRecordResultAsRecord = null;
+        return false;
+      }
+      ComObject cobj = ((ComObject)recordsResults.getArray().get(currPos));
+      cachedRecordResultAsRecord = new RecordImpl(databaseClient.getCommon(), cobj);
+      return true;
+    }
+    if (mapResults != null) {
+      return currPos <= mapResults.size() - 1;
+    }
+    if (isCount) {
+      return currPos == 0;
+    }
+    return null;
+  }
+
+  private void getMoreResultsAsNeeded() {
     if ((setOperation != null && (retKeys.length == 0 || currPos >= retKeys.length)) ||
         (setOperation == null && (selectContext.getCurrKeys().length == 0 || currPos >= selectContext.getCurrKeys().length))) {
       int schemaRetryCount = 0;
@@ -455,9 +495,6 @@ public class ResultSetImpl implements ResultSet {
         }
       }
     }
-
-    return (setOperation == null || (retKeys != null && retKeys.length != 0)) &&
-        (setOperation != null || selectContext.getCurrKeys() != null);
   }
 
   private Boolean getResultsForCounters() {
@@ -471,52 +508,48 @@ public class ResultSetImpl implements ResultSet {
           }
         }
       }
-      if (requireEvaluation || (counters == null || !(selectStatement.getExpression() instanceof AllRecordsExpressionImpl))) {
-        boolean first = false;
-        if (currPos == 0) {
-          first = true;
-          int schemaRetryCount = 0;
-          while (true) {
-            try {
-              getMoreResults(schemaRetryCount);
-              if (selectContext.getCurrKeys() == null) {
-                break;
-              }
-            }
-            catch (SchemaOutOfSyncException e) {
-              schemaRetryCount++;
-            }
-            catch (Exception e) {
-              throw new DatabaseException(e);
-            }
-          }
-        }
-        return first;
-      }
-      else {
-        return currPos == 0;
-      }
+      return doGetMoreResultsForCounters(requireEvaluation);
     }
     return null;
   }
 
-  private void skipResutlsUpToOffsetForGroupBy() {
+  private Boolean doGetMoreResultsForCounters(boolean requireEvaluation) {
+    if (requireEvaluation || (counters == null || !(selectStatement.getExpression() instanceof AllRecordsExpressionImpl))) {
+      boolean first = false;
+      if (currPos == 0) {
+        first = true;
+        int schemaRetryCount = 0;
+        doGetMoreResultsForCounters(schemaRetryCount);
+      }
+      return first;
+    }
+    else {
+      return currPos == 0;
+    }
+  }
+
+  private void doGetMoreResultsForCounters(int schemaRetryCount) {
+    while (true) {
+      try {
+        getMoreResults(schemaRetryCount);
+        if (selectContext.getCurrKeys() == null) {
+          break;
+        }
+      }
+      catch (SchemaOutOfSyncException e) {
+        schemaRetryCount++;
+      }
+      catch (Exception e) {
+        throw new DatabaseException(e);
+      }
+    }
+  }
+
+  private void skipResultsUpToOffsetForGroupBy() {
     if (offset != null) {
       while (currTotalPos < offset.getOffset() - 1) {
         if ((selectContext.getCurrKeys().length == 0 || currPos >= selectContext.getCurrKeys().length)) {
-          int schemaRetryCount = 0;
-          while (true) {
-            try {
-              getMoreResults(schemaRetryCount);
-              break;
-            }
-            catch (SchemaOutOfSyncException e) {
-              schemaRetryCount++;
-            }
-            catch (Exception e) {
-              throw new DatabaseException(e);
-            }
-          }
+          doSkipResultsUpToOffsetForGroupBy();
         }
         currPos++;
         currTotalPos++;
@@ -524,31 +557,30 @@ public class ResultSetImpl implements ResultSet {
     }
   }
 
+  private void doSkipResultsUpToOffsetForGroupBy() {
+    int schemaRetryCount = 0;
+    while (true) {
+      try {
+        getMoreResults(schemaRetryCount);
+        break;
+      }
+      catch (SchemaOutOfSyncException e) {
+        schemaRetryCount++;
+      }
+      catch (Exception e) {
+        throw new DatabaseException(e);
+      }
+    }
+  }
+
   private Boolean getMoreResultsAsNeededForGroupBy(Object[] lastFields, Comparator[] comparators, String[][] actualColumns) {
-    outer:
     while (true) {
       currPos++;
       if ((selectContext.getCurrKeys().length == 0 || currPos >= selectContext.getCurrKeys().length)) {
         int schemaRetryCount = 0;
-        while (true) {
-          try {
-            getMoreResults(schemaRetryCount);
-            break;
-          }
-          catch (SchemaOutOfSyncException e) {
-            schemaRetryCount++;
-          }
-          catch (Exception e) {
-            throw new DatabaseException(e);
-          }
-        }
+        doGetMoreResultsAsNeededForGroupBy(schemaRetryCount);
       }
-      if (selectContext.getCurrKeys() == null && (readRecords == null || readRecords.length == 0)) {
-        currPos--;
-        return true;
-      }
-      if ((selectContext.getCurrKeys().length == 0 || currPos >= selectContext.getCurrKeys().length)) {
-        currPos--;
+      if (decrementCurrPosAsNeeded()) {
         return true;
       }
       boolean nonNull = true;
@@ -557,42 +589,83 @@ public class ResultSetImpl implements ResultSet {
           nonNull = false;
         }
       }
-      boolean hasNull = false;
-      Object[] lastTmp = new Object[lastFields.length];
-      for (int i = 0; i < lastFields.length; i++) {
-        if (lastFields[i] == null) {
-          return false;
-        }
-        Object field = getField(actualColumns[i], actualColumns[i][1]);
-        if (nonNull && 0 != comparators[i].compare(field, lastFields[i]) && field != null && lastFields[i] != null) {
-          currPos--;
-          break outer;
-        }
-        if (lastFields[i] != null && field == null) {
-          currPos--;
-          break outer;
-        }
-        lastFields[i] = field;
-        lastTmp[i] = field;
-        if (field == null) {
-          hasNull = true;
-        }
+      Boolean x = processResultOfGetMoreResultsForGroupBy(lastFields, comparators, actualColumns, nonNull);
+      if (x != null) {
+        return x;
       }
-      if (!hasNull) {
-        boolean notNull = true;
-        for (int i = 0; i < lastFields.length; i++) {
-          if (lastFields[i] != null) {
-            notNull = true;
-          }
-        }
-        if (!notNull) {
-          currPos--;
-          break outer;
-        }
-      }
+    }
+  }
 
+  private void doGetMoreResultsAsNeededForGroupBy(int schemaRetryCount) {
+    while (true) {
+      try {
+        getMoreResults(schemaRetryCount);
+        break;
+      }
+      catch (SchemaOutOfSyncException e) {
+        schemaRetryCount++;
+      }
+      catch (Exception e) {
+        throw new DatabaseException(e);
+      }
+    }
+  }
+
+  private boolean decrementCurrPosAsNeeded() {
+    if (selectContext.getCurrKeys() == null && (readRecords == null || readRecords.length == 0)) {
+      currPos--;
+      return true;
+    }
+    if ((selectContext.getCurrKeys().length == 0 || currPos >= selectContext.getCurrKeys().length)) {
+      currPos--;
+      return true;
+    }
+    return false;
+  }
+
+  private Boolean processResultOfGetMoreResultsForGroupBy(Object[] lastFields, Comparator[] comparators, String[][] actualColumns, boolean nonNull) {
+    boolean hasNull = false;
+    Object[] lastTmp = new Object[lastFields.length];
+    for (int i = 0; i < lastFields.length; i++) {
+      if (lastFields[i] == null) {
+        return false;
+      }
+      Object field = getField(actualColumns[i], actualColumns[i][1]);
+      if (decrementCurrPosAsNeeded(lastFields, i, nonNull, lastFields[i], comparators, field)) {
+        return false;
+      }
+      lastFields[i] = field;
+      lastTmp[i] = field;
+      if (field == null) {
+        hasNull = true;
+      }
+    }
+    if (!hasNull) {
+      boolean notNull = false;
+      for (int i = 0; i < lastFields.length; i++) {
+        if (lastFields[i] != null) {
+          notNull = true;
+        }
+      }
+      if (!notNull) {
+        currPos--;
+        return false;
+      }
     }
     return null;
+  }
+
+  private boolean decrementCurrPosAsNeeded(Object[] lastFields, int i, boolean nonNull, Object lastField,
+                                           Comparator[] comparators, Object field) {
+    if (nonNull && 0 != comparators[i].compare(field, lastFields[i]) && field != null && lastFields[i] != null) {
+      currPos--;
+      return true;
+    }
+    if (lastField != null && field == null) {
+      currPos--;
+      return true;
+    }
+    return false;
   }
 
 
@@ -686,19 +759,19 @@ public class ResultSetImpl implements ResultSet {
       label[0] = DatabaseClient.toLower(label[0]);
     }
     if (label[0] != null) {
-      for (int i = 0; i < selectContext.getTableNames().length; i++) {
-        if (label[0].equals(selectContext.getTableNames()[i])) {
-          TableSchema tableSchema = databaseClient.getCommon().getTables(dbName).get(label[0]);
-          Integer localOffset = tableSchema.getFieldOffset(label[1]);
-          if (localOffset != null) {
-            Object ret = doGetField(i, label, localOffset, columnLabel);
-            if (ret != null) {
-              return ret;
-            }
-          }
-        }
+      Object ret = doGetFieldFromSpecifiedTable(label, columnLabel);
+      if (ret != null) {
+        return ret;
       }
     }
+    Object ret = getGetFieldFromNonSpecifiedTable(label, columnLabel);
+    if (ret != null) {
+      return ret;
+    }
+    return null;
+  }
+
+  private Object getGetFieldFromNonSpecifiedTable(String[] label, String columnLabel) {
     for (int i = 0; i < tableNames.length; i++) {
       TableSchema tableSchema = databaseClient.getCommon().getTables(dbName).get(tableNames[i]);
       Integer localOffset = tableSchema.getFieldOffset(label[1]);
@@ -706,6 +779,22 @@ public class ResultSetImpl implements ResultSet {
         Object ret = doGetField(i, label, localOffset, columnLabel);
         if (ret != null) {
           return ret;
+        }
+      }
+    }
+    return null;
+  }
+
+  private Object doGetFieldFromSpecifiedTable(String[] label, String columnLabel) {
+    for (int i = 0; i < selectContext.getTableNames().length; i++) {
+      if (label[0].equals(selectContext.getTableNames()[i])) {
+        TableSchema tableSchema = databaseClient.getCommon().getTables(dbName).get(label[0]);
+        Integer localOffset = tableSchema.getFieldOffset(label[1]);
+        if (localOffset != null) {
+          Object ret = doGetField(i, label, localOffset, columnLabel);
+          if (ret != null) {
+            return ret;
+          }
         }
       }
     }
@@ -751,6 +840,12 @@ public class ResultSetImpl implements ResultSet {
       return (String) DataType.getStringConverter().convert(obj);
     }
 
+    retString = applyFunctionToGetString(function, retString);
+
+    return retString;
+  }
+
+  private String applyFunctionToGetString(SelectFunctionImpl function, String retString) {
     if (function != null) {
       if (function.getName().equals("upper")) {
         retString = retString.toUpperCase();
@@ -770,7 +865,6 @@ public class ResultSetImpl implements ResultSet {
         }
       }
     }
-
     return retString;
   }
 
@@ -1753,25 +1847,13 @@ public class ResultSetImpl implements ResultSet {
           selectStatement.setPageSize(pageSize);
           ExpressionImpl.NextReturn ids = selectStatement.next(dbName, null,
               selectContext.isRestrictToThisServer(), selectContext.getProcedureContext(), schemaRetryCount);
-          if (ids != null && ids.getIds() != null) {
-            selectStatement.applyDistinct(dbName, selectContext.getTableNames(), ids, uniqueRecords);
-          }
-
-          readRecords = readRecords(ids, schemaRetryCount);
-          if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
-            selectContext.setCurrKeys(ids.getKeys());
-          }
-          else {
-            selectContext.setCurrKeys((Object[][][]) null);
-          }
+          processResultsFromNextCall(schemaRetryCount, ids);
           currPos = 0;
         }
         return;
       }
 
-      if (selectContext.getNextShard() == -1)
-
-      {
+      if (selectContext.getNextShard() == -1) {
         selectContext.setCurrKeys((Object[][][]) null);
         currPos = 0;
       }
@@ -1780,6 +1862,20 @@ public class ResultSetImpl implements ResultSet {
       if (histogramEntry != null) {
         databaseClient.getClientStatsHandler().registerCompletedQueryForStats(histogramEntry, beginNanos);
       }
+    }
+  }
+
+  private void processResultsFromNextCall(int schemaRetryCount, ExpressionImpl.NextReturn ids) {
+    if (ids != null && ids.getIds() != null) {
+      selectStatement.applyDistinct(dbName, selectContext.getTableNames(), ids, uniqueRecords);
+    }
+
+    readRecords = readRecords(ids, schemaRetryCount);
+    if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
+      selectContext.setCurrKeys(ids.getKeys());
+    }
+    else {
+      selectContext.setCurrKeys((Object[][][]) null);
     }
   }
 
@@ -1833,15 +1929,7 @@ public class ResultSetImpl implements ResultSet {
           tableSchemas[i] = databaseClient.getCommon().getTables(dbName).get(localTableNames[i]);
         }
 
-        String[][] primaryKeyFields = new String[localTableNames.length][];
-        for (int i = 0; i < localTableNames.length; i++) {
-          for (Map.Entry<String, IndexSchema> entry : tableSchemas[i].getIndices().entrySet()) {
-            if (entry.getValue().isPrimaryKey()) {
-              primaryKeyFields[i] = entry.getValue().getFields();
-              break;
-            }
-          }
-        }
+        String[][] primaryKeyFields = getPrimaryKeyFields(localTableNames, tableSchemas);
 
         lastReadRecords = readRecords;
         readRecords = null;
@@ -1853,31 +1941,9 @@ public class ResultSetImpl implements ResultSet {
         int recordCount = tablesArray == null ? 0 : tablesArray.getArray().size();
         Object[][][] localRetKeys = new Object[recordCount][][];
         Record[][] currRetRecords = new Record[recordCount][];
-        for (int k = 0; k < recordCount; k++) {
-          currRetRecords[k] = new Record[localTableNames.length];
-          localRetKeys[k] = new Object[localTableNames.length][];
-          ComArray records = (ComArray) tablesArray.getArray().get(k);
-          for (int j = 0; j < localTableNames.length; j++) {
-            byte[] bytes = (byte[]) records.getArray().get(j);
-            if (bytes != null) {
-              Record record = new Record(tableSchemas[j]);
-              record.deserialize(dbName, databaseClient.getCommon(), bytes, null, true);
-              currRetRecords[k][j] = record;
 
-              Object[] key = new Object[primaryKeyFields[j].length];
-              for (int i = 0; i < primaryKeyFields[j].length; i++) {
-                key[i] = record.getFields()[tableSchemas[j].getFieldOffset(primaryKeyFields[j][i])];
-              }
-
-              if (localRetKeys[k][j] == null) {
-                localRetKeys[k][j] = key;
-              }
-
-              recordCache.put(localTableNames[j], key, new ExpressionImpl.CachedRecord(record, bytes));
-            }
-          }
-
-        }
+        fillRecordCacheWithServerResults(localTableNames, tableSchemas, primaryKeyFields, tablesArray, recordCount,
+            localRetKeys, currRetRecords);
 
         if (localRetKeys == null || localRetKeys.length == 0) {
           selectContext.setCurrKeys(null);
@@ -1896,7 +1962,50 @@ public class ResultSetImpl implements ResultSet {
         //try again
       }
     }
+  }
 
+  private String[][] getPrimaryKeyFields(String[] localTableNames, TableSchema[] tableSchemas) {
+    String[][] primaryKeyFields = new String[localTableNames.length][];
+    outer:
+    for (int i = 0; i < localTableNames.length; i++) {
+      for (Map.Entry<String, IndexSchema> entry : tableSchemas[i].getIndices().entrySet()) {
+        if (entry.getValue().isPrimaryKey()) {
+          primaryKeyFields[i] = entry.getValue().getFields();
+          break outer;
+        }
+      }
+    }
+    return primaryKeyFields;
+  }
+
+  private void fillRecordCacheWithServerResults(String[] localTableNames, TableSchema[] tableSchemas,
+                                                String[][] primaryKeyFields, ComArray tablesArray, int recordCount,
+                                                Object[][][] localRetKeys, Record[][] currRetRecords) {
+    for (int k = 0; k < recordCount; k++) {
+      currRetRecords[k] = new Record[localTableNames.length];
+      localRetKeys[k] = new Object[localTableNames.length][];
+      ComArray records = (ComArray) tablesArray.getArray().get(k);
+      for (int j = 0; j < localTableNames.length; j++) {
+        byte[] bytes = (byte[]) records.getArray().get(j);
+        if (bytes != null) {
+          Record record = new Record(tableSchemas[j]);
+          record.deserialize(dbName, databaseClient.getCommon(), bytes, null, true);
+          currRetRecords[k][j] = record;
+
+          Object[] key = new Object[primaryKeyFields[j].length];
+          for (int i = 0; i < primaryKeyFields[j].length; i++) {
+            key[i] = record.getFields()[tableSchemas[j].getFieldOffset(primaryKeyFields[j][i])];
+          }
+
+          if (localRetKeys[k][j] == null) {
+            localRetKeys[k][j] = key;
+          }
+
+          recordCache.put(localTableNames[j], key, new ExpressionImpl.CachedRecord(record, bytes));
+        }
+      }
+
+    }
   }
 
   public ExpressionImpl.CachedRecord[][] readRecords(ExpressionImpl.NextReturn nextReturn, int schemaRetryCount) {
@@ -1910,26 +2019,7 @@ public class ResultSetImpl implements ResultSet {
         ExpressionImpl.CachedRecord[][] retRecords = new ExpressionImpl.CachedRecord[actualIds.length][];
 
         if (retRecords.length > 0) {
-          Map<ExpressionImpl.RecordCache.Key, ExpressionImpl.CachedRecord>[] tables = new ConcurrentHashMap[nextReturn.getTableNames().length];
-          for (int j = 0; j < nextReturn.getTableNames().length; j++) {
-            tables[j] = recordCache.getRecordsForTable(nextReturn.getTableNames()[j]);
-          }
-
-          for (int i = 0; i < retRecords.length; i++) {
-            retRecords[i] = new ExpressionImpl.CachedRecord[actualIds[i].length];
-            for (int j = 0; j < retRecords[i].length; j++) {
-              if (actualIds[i][j] == null) {
-                continue;
-              }
-
-              ExpressionImpl.CachedRecord cachedRecord = tables[j].get(new ExpressionImpl.RecordCache.Key(actualIds[i][j]));
-              retRecords[i][j] = cachedRecord;
-              if (retRecords[i][j] == null) {
-                Record record = doReadRecord(actualIds[i][j], nextReturn.getTableNames()[j], schemaRetryCount);
-                retRecords[i][j] = new ExpressionImpl.CachedRecord(record, record.serialize(databaseClient.getCommon(), DatabaseClient.SERIALIZATION_VERSION));
-              }
-            }
-          }
+          processRetRecords(nextReturn, schemaRetryCount, actualIds, retRecords);
         }
         recordCache.clear();
         return retRecords;
@@ -1944,6 +2034,76 @@ public class ResultSetImpl implements ResultSet {
       }
     }
 
+  }
+
+  private void processRetRecords(ExpressionImpl.NextReturn nextReturn, int schemaRetryCount, Object[][][] actualIds,
+                                 ExpressionImpl.CachedRecord[][] retRecords) {
+    Map<ExpressionImpl.RecordCache.Key, ExpressionImpl.CachedRecord>[] tables =
+        new ConcurrentHashMap[nextReturn.getTableNames().length];
+    for (int j = 0; j < nextReturn.getTableNames().length; j++) {
+      tables[j] = recordCache.getRecordsForTable(nextReturn.getTableNames()[j]);
+    }
+
+    for (int i = 0; i < retRecords.length; i++) {
+      retRecords[i] = new ExpressionImpl.CachedRecord[actualIds[i].length];
+      for (int j = 0; j < retRecords[i].length; j++) {
+        if (actualIds[i][j] == null) {
+          continue;
+        }
+
+        ExpressionImpl.CachedRecord cachedRecord = tables[j].get(new ExpressionImpl.RecordCache.Key(actualIds[i][j]));
+        retRecords[i][j] = cachedRecord;
+        if (retRecords[i][j] == null) {
+          Record record = doReadRecord(actualIds[i][j], nextReturn.getTableNames()[j], schemaRetryCount);
+          retRecords[i][j] = new ExpressionImpl.CachedRecord(record, record.serialize(databaseClient.getCommon(),
+              DatabaseClient.SERIALIZATION_VERSION));
+        }
+      }
+    }
+  }
+
+  private class GetGroupByFunctionResutsForSimpleMathFunction {
+    private boolean myResult;
+    private String columnLabel;
+    private Map.Entry<String, ColumnImpl> alias;
+    private GroupByContext.GroupCounter counter;
+
+    public GetGroupByFunctionResutsForSimpleMathFunction(String columnLabel,  Map.Entry<String, ColumnImpl> alias) {
+      this.columnLabel = columnLabel;
+      this.alias = alias;
+    }
+
+    boolean is() {
+      return myResult;
+    }
+
+    public GroupByContext.GroupCounter getCounter() {
+      return counter;
+    }
+
+    public GetGroupByFunctionResutsForSimpleMathFunction invoke() {
+      String[] actualLabel = getActualColumn(alias.getValue().getColumnName());
+      if (actualLabel[0] == null) {
+        actualLabel[0] = selectStatement.getFromTable();
+      }
+      boolean isNull = false;
+      Object[] values = new Object[groupByContext.getFieldContexts().size()];
+      for (int i = 0; i < values.length; i++) {
+        String groupColumnName = ((Column) groupByColumns.get(i)).getColumnName();
+        String[] actualColumn = getActualColumn(groupColumnName);
+        values[i] = getField(actualColumn, columnLabel);
+        if (values[i] == null) {
+          isNull = true;
+        }
+      }
+      if (!isNull) {
+        counter = groupByContext.getGroupCounters().get(actualLabel[0] + ":" + actualLabel[1]).get(values);
+        myResult = true;
+        return this;
+      }
+      myResult = false;
+      return this;
+    }
   }
 }
 

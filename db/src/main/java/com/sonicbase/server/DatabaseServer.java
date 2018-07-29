@@ -39,13 +39,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
-
-/**
- * User: lowryda
- * Date: 12/27/13
- * Time: 4:39 PM
- */
-@SuppressWarnings("squid:S1172") // all methods called from method invoker must have cobj and replayed command parms
+@SuppressWarnings({"squid:S1172", "squid:S1168", "squid:S00107"})
+// all methods called from method invoker must have cobj and replayed command parms
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class DatabaseServer {
 
   private static final String SHARDS_STR = "shards";
@@ -61,9 +58,8 @@ public class DatabaseServer {
   private static Object deathOverrideMutex = new Object();
   public static boolean[][] deathOverride;
   private static Logger logger = LoggerFactory.getLogger(DatabaseServer.class);
-
-  private static org.apache.log4j.Logger errorLogger = org.apache.log4j.Logger.getLogger("com.sonicbase.errorLogger");
-  private static org.apache.log4j.Logger clientErrorLogger = org.apache.log4j.Logger.getLogger("com.sonicbase.clientErrorLogger");
+  private static Logger errorLogger = LoggerFactory.getLogger(DatabaseServer.class);
+  private static Logger clientErrorLogger = LoggerFactory.getLogger(DatabaseServer.class);
 
   static final boolean USE_SNAPSHOT_MGR_OLD = true;
   private int port;
@@ -125,11 +121,11 @@ public class DatabaseServer {
     return methodInvoker;
   }
 
-  public org.apache.log4j.Logger getErrorLogger() {
+  public Logger getErrorLogger() {
     return errorLogger;
   }
 
-  public org.apache.log4j.Logger getClientErrorLogger() {
+  public Logger getClientErrorLogger() {
     return clientErrorLogger;
   }
 
@@ -170,17 +166,11 @@ public class DatabaseServer {
 
     ObjectNode firstServer = (ObjectNode) shards.get(0).withArray(REPLICAS_STR).get(0);
     ServersConfig serversConfig = null;
-    executor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors() * 128, "Sonicbase DatabaseServer Thread");
+    executor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors() * 128,
+        "Sonicbase DatabaseServer Thread");
 
-    if (databaseDict.has("compressRecords")) {
-      compressRecords = databaseDict.get("compressRecords").asBoolean();
-    }
-    if (databaseDict.has("useUnsafe")) {
-      useUnsafe = databaseDict.get("useUnsafe").asBoolean();
-    }
-    else {
-      useUnsafe = true;
-    }
+    initCompressRecords(databaseDict);
+    initUnsafe(databaseDict);
 
     this.masterAddress = firstServer.get(PRIVATE_ADDRESS_STR).asText();
     this.masterPort = firstServer.get("port").asInt();
@@ -192,17 +182,8 @@ public class DatabaseServer {
       common.setReplica(0);
 
     }
-    boolean isInternal = false;
-    if (databaseDict.has(CLIENT_IS_PRIVATE_STR)) {
-      isInternal = databaseDict.get(CLIENT_IS_PRIVATE_STR).asBoolean();
-    }
-    boolean optimizedForThroughput = true;
-    if (databaseDict.has(OPTIMIZE_READS_FOR_STR)) {
-      String text = databaseDict.get(OPTIMIZE_READS_FOR_STR).asText();
-      if (!text.equalsIgnoreCase("totalThroughput")) {
-        optimizedForThroughput = false;
-      }
-    }
+    boolean isInternal = initIsInternal(databaseDict);
+    boolean optimizedForThroughput = initOpimizedFor(databaseDict);
     serversConfig = new ServersConfig(cluster, shards, isInternal, optimizedForThroughput);
 
     initServersForUnitTest(host, port, unitTest, serversConfig);
@@ -229,32 +210,7 @@ public class DatabaseServer {
 
     common.setServersConfig(serversConfig);
 
-    this.deleteManager = new DeleteManager(this);
-
-    this.updateManager = new UpdateManager(this);
-    this.snapshotManager = new SnapshotManager(this);
-
-    this.transactionManager = new TransactionManager(this);
-    this.readManager = new ReadManager(this);
-    this.logManager = new LogManager(this, new File(dataDir, "log"));
-    this.schemaManager = new SchemaManager(this);
-    this.bulkImportManager = new BulkImportManager(this);
-    this.masterManager = new MasterManager(this);
-    this.partitionManager = new PartitionManager(this, common);
-
-    this.methodInvoker = new MethodInvoker(this, logManager);
-    this.methodInvoker.registerMethodProvider("BulkImportManager", bulkImportManager);
-    this.methodInvoker.registerMethodProvider("DeleteManager", deleteManager);
-    this.methodInvoker.registerMethodProvider("LogManager", logManager);
-    this.methodInvoker.registerMethodProvider("MasterManager", masterManager);
-    this.methodInvoker.registerMethodProvider("PartitionManager", partitionManager);
-    this.methodInvoker.registerMethodProvider("ReadManager", readManager);
-    this.methodInvoker.registerMethodProvider("SchemaManager", schemaManager);
-    this.methodInvoker.registerMethodProvider("SnapshotManager", snapshotManager);
-    this.methodInvoker.registerMethodProvider("TransactionManager", transactionManager);
-    this.methodInvoker.registerMethodProvider("UpdateManager", updateManager);
-    this.methodInvoker.registerMethodProvider("DatabaseServer", this);
-    this.longRunningCommands = new LongRunningCalls(this);
+    initMethodInvokers();
 
     try {
       Class proClz = Class.forName("com.sonicbase.server.ProServer");
@@ -310,6 +266,67 @@ public class DatabaseServer {
 
     logger.info("Started server");
 
+  }
+
+  private boolean initIsInternal(ObjectNode databaseDict) {
+    boolean isInternal = false;
+    if (databaseDict.has(CLIENT_IS_PRIVATE_STR)) {
+      isInternal = databaseDict.get(CLIENT_IS_PRIVATE_STR).asBoolean();
+    }
+    return isInternal;
+  }
+
+  private void initCompressRecords(ObjectNode databaseDict) {
+    if (databaseDict.has("compressRecords")) {
+      compressRecords = databaseDict.get("compressRecords").asBoolean();
+    }
+  }
+
+  private boolean initOpimizedFor(ObjectNode databaseDict) {
+    boolean optimizedForThroughput = true;
+    if (databaseDict.has(OPTIMIZE_READS_FOR_STR)) {
+      String text = databaseDict.get(OPTIMIZE_READS_FOR_STR).asText();
+      if (!text.equalsIgnoreCase("totalThroughput")) {
+        optimizedForThroughput = false;
+      }
+    }
+    return optimizedForThroughput;
+  }
+
+  private void initUnsafe(ObjectNode databaseDict) {
+    if (databaseDict.has("useUnsafe")) {
+      useUnsafe = databaseDict.get("useUnsafe").asBoolean();
+    }
+    else {
+      useUnsafe = true;
+    }
+  }
+
+  private void initMethodInvokers() {
+    this.deleteManager = new DeleteManager(this);
+    this.updateManager = new UpdateManager(this);
+    this.snapshotManager = new SnapshotManager(this);
+    this.transactionManager = new TransactionManager(this);
+    this.readManager = new ReadManager(this);
+    this.logManager = new LogManager(this, new File(dataDir, "log"));
+    this.schemaManager = new SchemaManager(this);
+    this.bulkImportManager = new BulkImportManager(this);
+    this.masterManager = new MasterManager(this);
+    this.partitionManager = new PartitionManager(this, common);
+
+    this.methodInvoker = new MethodInvoker(this, logManager);
+    this.methodInvoker.registerMethodProvider("BulkImportManager", bulkImportManager);
+    this.methodInvoker.registerMethodProvider("DeleteManager", deleteManager);
+    this.methodInvoker.registerMethodProvider("LogManager", logManager);
+    this.methodInvoker.registerMethodProvider("MasterManager", masterManager);
+    this.methodInvoker.registerMethodProvider("PartitionManager", partitionManager);
+    this.methodInvoker.registerMethodProvider("ReadManager", readManager);
+    this.methodInvoker.registerMethodProvider("SchemaManager", schemaManager);
+    this.methodInvoker.registerMethodProvider("SnapshotManager", snapshotManager);
+    this.methodInvoker.registerMethodProvider("TransactionManager", transactionManager);
+    this.methodInvoker.registerMethodProvider("UpdateManager", updateManager);
+    this.methodInvoker.registerMethodProvider("DatabaseServer", this);
+    this.longRunningCommands = new LongRunningCalls(this);
   }
 
   public void shutdown() {
@@ -456,31 +473,7 @@ public class DatabaseServer {
     deathReportThread = ThreadUtil.createThread(() -> {
       while (!shutdown) {
         try {
-          Thread.sleep(timeoutOverride == null ? 10_000 : timeoutOverride);
-          StringBuilder builder = new StringBuilder();
-          for (int i = 0; i < shardCount; i++) {
-            for (int j = 0; j < replicationFactor; j++) {
-              builder.append("[").append(i).append(",").append(j).append("=");
-              builder.append(common.getServersConfig().getShards()[i].getReplicas()[j].isDead() ? "dead" : "alive").append("]");
-            }
-          }
-          logger.info("Death status={}", builder);
-
-          if (replicationFactor > 1 && masterManager.isNoLongerMaster()) {
-            logger.info("No longer master. Shutting down resources");
-            shutdownDeathMonitor();
-            shutdownRepartitioner();
-
-            licenseManager.shutdownMasterLicenseValidator();
-
-            masterManager.shutdownFixSchemaTimer();
-
-            if (streamsConsumerMonitorthread != null) {
-              streamsConsumerMonitorthread.interrupt();
-              streamsConsumerMonitorthread.join();
-              streamsConsumerMonitorthread = null;
-            }
-
+          if (doDeathReporting(timeoutOverride)) {
             break;
           }
         }
@@ -496,33 +489,45 @@ public class DatabaseServer {
     deathReportThread.start();
   }
 
+  private boolean doDeathReporting(Long timeoutOverride) throws InterruptedException {
+    Thread.sleep(timeoutOverride == null ? 10_000 : timeoutOverride);
+    StringBuilder builder = new StringBuilder();
+    for (int i = 0; i < shardCount; i++) {
+      for (int j = 0; j < replicationFactor; j++) {
+        builder.append("[").append(i).append(",").append(j).append("=");
+        builder.append(common.getServersConfig().getShards()[i].getReplicas()[j].isDead() ? "dead" : "alive").append("]");
+      }
+    }
+    logger.info("Death status={}", builder);
+
+    if (replicationFactor > 1 && masterManager.isNoLongerMaster()) {
+      demoteFromMaster();
+      return true;
+    }
+    return false;
+  }
+
+  private void demoteFromMaster() throws InterruptedException {
+    logger.info("No longer master. Shutting down resources");
+    shutdownDeathMonitor();
+    shutdownRepartitioner();
+
+    licenseManager.shutdownMasterLicenseValidator();
+
+    masterManager.shutdownFixSchemaTimer();
+
+    if (streamsConsumerMonitorthread != null) {
+      streamsConsumerMonitorthread.interrupt();
+      streamsConsumerMonitorthread.join();
+      streamsConsumerMonitorthread = null;
+    }
+  }
+
   private void startDeathMonitorThread(Long timeoutOverride, int i, int localShard, int j, int localReplica) {
     deathMonitorThreads[i][j] = ThreadUtil.createThread(() -> {
       while (!shutdownDeathMonitor) {
         try {
-          Thread.sleep((deathOverride == null && timeoutOverride == null) ? 2000 : timeoutOverride);
-          AtomicBoolean isHealthy = new AtomicBoolean();
-          for (int i1 = 0; i1 < 5; i1++) {
-            checkHealthOfServer(localShard, localReplica, isHealthy);
-            if (isHealthy.get()) {
-              break;
-            }
-            Thread.sleep(timeoutOverride == null ? 1_000 : timeoutOverride);
-          }
-          boolean wasDead = common.getServersConfig().getShards()[localShard].getReplicas()[localReplica].isDead();
-          boolean changed = false;
-          if (wasDead && isHealthy.get() || !wasDead && !isHealthy.get()) {
-            changed = true;
-          }
-          if (changed && isHealthy.get()) {
-            ComObject cobj = new ComObject();
-            cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
-            cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
-            cobj.put(ComObject.Tag.METHOD, "DatabaessServer:prepareToComeAlive");
-
-            getDatabaseClient().send(null, localShard, localReplica, cobj, DatabaseClient.Replica.SPECIFIED, true);
-          }
-          handleHealthChange(isHealthy, wasDead, changed, localShard, localReplica);
+          doDeathMonitorChecking(timeoutOverride, localShard, localReplica);
         }
         catch (InterruptedException e) {
           Thread.currentThread().interrupt();
@@ -536,6 +541,44 @@ public class DatabaseServer {
       }
     }, "SonicBase Death Monitor Thread: shard=" + i + REPLICA_STR + j);
     deathMonitorThreads[i][j].start();
+  }
+
+  private void doDeathMonitorChecking(Long timeoutOverride, int localShard, int localReplica) throws InterruptedException {
+    Thread.sleep((deathOverride == null && timeoutOverride == null) ? 2000 : timeoutOverride);
+
+    AtomicBoolean isHealthy = deathMonitorCheckForHealthy(timeoutOverride, localShard, localReplica);
+
+    boolean wasDead = common.getServersConfig().getShards()[localShard].getReplicas()[localReplica].isDead();
+    boolean changed = false;
+    if (wasDead && isHealthy.get() || !wasDead && !isHealthy.get()) {
+      changed = true;
+    }
+    prepareToComeAlive(localShard, localReplica, isHealthy, changed);
+    handleHealthChange(isHealthy, wasDead, changed, localShard, localReplica);
+  }
+
+  private void prepareToComeAlive(int localShard, int localReplica, AtomicBoolean isHealthy, boolean changed) {
+    if (changed && isHealthy.get()) {
+      ComObject cobj = new ComObject();
+      cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
+      cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
+      cobj.put(ComObject.Tag.METHOD, "DatabaessServer:prepareToComeAlive");
+
+      getDatabaseClient().send(null, localShard, localReplica, cobj, DatabaseClient.Replica.SPECIFIED, true);
+    }
+  }
+
+  private AtomicBoolean deathMonitorCheckForHealthy(Long timeoutOverride, int localShard, int localReplica)
+      throws InterruptedException {
+    AtomicBoolean isHealthy = new AtomicBoolean();
+    for (int i1 = 0; i1 < 5; i1++) {
+      checkHealthOfServer(localShard, localReplica, isHealthy);
+      if (isHealthy.get()) {
+        break;
+      }
+      Thread.sleep(timeoutOverride == null ? 1_000 : timeoutOverride);
+    }
+    return isHealthy;
   }
 
   private void handleHealthChange(AtomicBoolean isHealthy, boolean wasDead, boolean changed, int shard, int replica) {
@@ -829,12 +872,8 @@ public class DatabaseServer {
       List<Future> futures = new ArrayList<>();
       for (int i = 0; i < shardCount; i++) {
         final int localShard = i;
-        futures.add(localExecutor.submit(new Callable(){
-          @Override
-          public Object call() throws Exception {
-            return getDatabaseClient().send("DatabaseServer:executeProcedure", localShard, 0, cobj, DatabaseClient.Replica.DEF);
-          }
-        }));
+        futures.add(localExecutor.submit((Callable) () -> getDatabaseClient().send(
+            "DatabaseServer:executeProcedure", localShard, 0, cobj, DatabaseClient.Replica.DEF)));
       }
 
       List<StoredProcedureResponse> responses = new ArrayList<>();
@@ -951,7 +990,8 @@ public class DatabaseServer {
       if (this.client.get() != null) {
         return this.client.get();
       }
-      DatabaseClient localClient = new DatabaseClient(masterAddress, masterPort, common.getShard(), common.getReplica(), false, common, this);
+      DatabaseClient localClient = new DatabaseClient(masterAddress, masterPort, common.getShard(), common.getReplica(),
+          false, common, this);
       this.client.set(localClient);
       return this.client.get();
     }
@@ -1257,7 +1297,8 @@ public class DatabaseServer {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
-    byte[] ret = getDatabaseClient().send("DatabaseServer:getDbNames", 0, 0, cobj, DatabaseClient.Replica.MASTER, true);
+    byte[] ret = getDatabaseClient().send("DatabaseServer:getDbNames", 0, 0, cobj,
+        DatabaseClient.Replica.MASTER, true);
     ComObject retObj = new ComObject(ret);
     ComArray array = retObj.getArray(ComObject.Tag.DB_NAMES);
     for (int i = 0; i < array.getArray().size(); i++) {
@@ -1720,18 +1761,8 @@ public class DatabaseServer {
       ObjectMapper mapper = new ObjectMapper();
       ObjectNode localConfig = (ObjectNode) mapper.readTree(configStr);
 
-      boolean isInternal = false;
-      if (localConfig.has(CLIENT_IS_PRIVATE_STR)) {
-        isInternal = localConfig.get(CLIENT_IS_PRIVATE_STR).asBoolean();
-      }
-
-      boolean optimizedForThroughput = true;
-      if (localConfig.has(OPTIMIZE_READS_FOR_STR)) {
-        String text = localConfig.get(OPTIMIZE_READS_FOR_STR).asText();
-        if (!text.equalsIgnoreCase("totalThroughput")) {
-          optimizedForThroughput = false;
-        }
-      }
+      boolean isInternal = initIsInternal(localConfig);
+      boolean optimizedForThroughput = initOpimizedFor(localConfig);
 
       ServersConfig newConfig = new ServersConfig(cluster, localConfig.withArray(SHARDS_STR),
            isInternal, optimizedForThroughput);
@@ -1832,7 +1863,8 @@ public class DatabaseServer {
         continue;
       }
       try {
-        getDatabaseClient().send("DatabaseServer:setMaxRecordId", 0, localReplica, cobj, DatabaseClient.Replica.SPECIFIED, true);
+        getDatabaseClient().send("DatabaseServer:setMaxRecordId", 0, localReplica, cobj,
+            DatabaseClient.Replica.SPECIFIED, true);
       }
       catch (Exception e) {
         logger.error("Error pushing maxRecordId: replica=" + localReplica, e);

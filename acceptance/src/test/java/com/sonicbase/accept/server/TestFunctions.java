@@ -27,9 +27,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 
-/**
- * Responsible for
- */
 public class TestFunctions {
 
   private Connection conn;

@@ -10,12 +10,11 @@ import net.sf.jsqlparser.statement.select.Offset;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * Responsible for
- */
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class ParameterImpl extends ExpressionImpl {
   private int parmOffset;
   private String parmName;
@@ -34,11 +33,6 @@ public class ParameterImpl extends ExpressionImpl {
 
   public void setParmName(String parmName) {
     this.parmName = parmName;
-  }
-
-  @Override
-  public void getColumns(Set<ColumnImpl> columns) {
-
   }
 
   public String toString() {
@@ -88,7 +82,8 @@ public class ParameterImpl extends ExpressionImpl {
   }
 
   @Override
-  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
+  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
+                         Limit limit, Offset offset, int schemaRetryCount) {
     return null;
   }
 
@@ -106,11 +101,6 @@ public class ParameterImpl extends ExpressionImpl {
   @Override
   public boolean canSortWithIndex() {
     return false;
-  }
-
-  @Override
-  public void queryRewrite() {
-
   }
 
   @Override

@@ -6,6 +6,9 @@ import org.apache.giraph.utils.Varint;
 
 import java.io.*;
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class ServersConfig {
   private boolean optimizeForThroughput;
   private String cluster;

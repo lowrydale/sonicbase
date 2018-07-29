@@ -7,6 +7,9 @@ import net.sf.jsqlparser.statement.Statement;
 
 import java.sql.SQLException;
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public interface StatementHandler {
 
   Object execute(String dbName, ParameterHandler parms, String sqlToUse, Statement statement,

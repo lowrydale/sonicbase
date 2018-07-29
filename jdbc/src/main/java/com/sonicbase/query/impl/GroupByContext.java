@@ -14,6 +14,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
+@SuppressWarnings({"squid:S1168", "squid:S00107"})
+// I prefer to return null instead of an empty array
+// I don't know a good way to reduce the parameter count
 public class GroupByContext {
   private List<FieldContext> fieldContexts;
   private Map<String, Map<Object[], GroupCounter>> groupCounters;

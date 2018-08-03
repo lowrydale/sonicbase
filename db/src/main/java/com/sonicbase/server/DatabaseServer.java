@@ -112,6 +112,7 @@ public class DatabaseServer {
   private SchemaManager schemaManager;
   private Object proServer;
   private LicenseManagerProxy licenseManager;
+  private String gcLog;
 
   public static boolean[][] getDeathOverride() {
     return deathOverride;
@@ -152,6 +153,7 @@ public class DatabaseServer {
     this.host = host;
     this.port = port;
     this.xmx = xmx;
+    this.gcLog = gclog;
 
     ObjectNode databaseDict = config;
     this.dataDir = databaseDict.get("dataDirectory").asText();
@@ -219,6 +221,7 @@ public class DatabaseServer {
     }
     catch (Exception e) {
       logger.error("Error initializing pro server", e);
+      initProNoOpMethodInvokers();
     }
 
     updateManager.initStreamManager();
@@ -266,6 +269,18 @@ public class DatabaseServer {
 
     logger.info("Started server");
 
+  }
+
+  private void initProNoOpMethodInvokers() {
+    this.methodInvoker.registerNoOpMethodProvider("StreamManager");
+    this.methodInvoker.registerNoOpMethodProvider("BackupManager");
+    this.methodInvoker.registerNoOpMethodProvider("LicenseManager");
+    this.methodInvoker.registerNoOpMethodProvider("MonitorManager");
+    this.methodInvoker.registerNoOpMethodProvider("OSStatsManager");
+  }
+
+  public String getGcLog() {
+    return gcLog;
   }
 
   private boolean initIsInternal(ObjectNode databaseDict) {

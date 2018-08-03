@@ -1412,18 +1412,24 @@ public class UpdateManager {
     }
     String table = cobj.getString(ComObject.Tag.TABLE_NAME);
     String phase = cobj.getString(ComObject.Tag.PHASE);
-    TableSchema tableSchema = server.getCommon().getTableSchema(dbName, table, server.getDataDir());
-    if (tableSchema != null) {
-      for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
-        truncateIndex(dbName, table, phase, entry);
-      }
-    }
+    truncateTable(dbName, table, phase);
     return null;
   }
 
-  private void truncateIndex(String dbName, String table, String phase, Map.Entry<String, IndexSchema> entry) {
-    Index index = server.getIndex(dbName, table, entry.getKey());
-    if (entry.getValue().isPrimaryKey()) {
+  public void truncateTable(String dbName, String table, String phase) {
+    TableSchema tableSchema = server.getCommon().getTableSchema(dbName, table, server.getDataDir());
+    if (tableSchema != null) {
+      for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
+        truncateIndex(dbName, table, phase, entry.getKey());
+      }
+    }
+  }
+
+  public void truncateIndex(String dbName, String table, String phase, String indexName) {
+    TableSchema tableSchema = server.getCommon().getTables(dbName).get(table);
+    IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
+    Index index = server.getIndex(dbName, table, indexName);
+    if (indexSchema.isPrimaryKey()) {
       if (phase.equals("primary")) {
         truncateIndexRemoveFromIndex(index);
       }
@@ -1431,6 +1437,14 @@ public class UpdateManager {
     else if (phase.equals("secondary")) {
       truncateIndexRemoveFromIndex(index);
     }
+    index.setCount(0);
+  }
+
+  public void truncateAnyIndex(String dbName, String table,  String indexName) {
+    TableSchema tableSchema = server.getCommon().getTables(dbName).get(table);
+    Index index = server.getIndex(dbName, table, indexName);
+    truncateIndexRemoveFromIndex(index);
+
     index.setCount(0);
   }
 

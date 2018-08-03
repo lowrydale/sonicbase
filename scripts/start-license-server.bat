@@ -16,6 +16,6 @@ pushd %SEARH_HOME%\bin
 
 echo "starting LicenseServer: search_home=" + %SEARCH_HOME% + ", workingDir=" + %cd%
 
-%SEARCH_HOME%/bin/runclass.bat com.sonicbase.license.LicenseServer -port %1 > %SEARCH_HOME%/logs/license-%1.sysout.log
+%SEARCH_HOME%/bin/runclass.bat com.sonicbase.server.LicenseServer -port %1 > %SEARCH_HOME%/logs/license-%1.sysout.log
 
 popd

@@ -50,6 +50,7 @@ public class TestSetOperations {
 
   @BeforeClass
   public void beforeClass() throws Exception {
+    System.setProperty("log4j.configuration", "test-log4j.xml");
 
     String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
     ObjectMapper mapper = new ObjectMapper();

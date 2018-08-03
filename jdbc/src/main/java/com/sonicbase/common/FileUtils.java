@@ -9,7 +9,25 @@ import java.nio.file.Files;
 // I don't know a good way to reduce the parameter count
 public class FileUtils {
 
-  private FileUtils() {
+  public static long sizeOfDirectory(File dir) {
+    File[] files = dir.listFiles();
+    if (files == null) {
+      return 0;
+    }
+    long ret = 0;
+    for (File file : files) {
+      try {
+        if (file.isDirectory()) {
+          ret += sizeOfDirectory(file);
+        }
+        else {
+          ret += file.length();
+        }
+      }
+      catch (Exception e) {
+      }
+    }
+    return ret;
   }
 
   public static void deleteDirectory(File file) throws IOException {

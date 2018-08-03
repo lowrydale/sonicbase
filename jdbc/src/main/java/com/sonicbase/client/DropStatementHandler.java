@@ -3,6 +3,7 @@ package com.sonicbase.client;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
+import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.SelectStatementImpl;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.drop.Drop;
@@ -47,6 +48,24 @@ public class DropStatementHandler implements StatementHandler {
       cobj.put(ComObject.Tag.METHOD, "SchemaManager:dropIndex");
       cobj.put(ComObject.Tag.TABLE_NAME, tableName);
       cobj.put(ComObject.Tag.INDEX_NAME, indexName);
+      cobj.put(ComObject.Tag.MASTER_SLAVE, "master");
+      byte[] ret = client.send(null, 0, 0, cobj, DatabaseClient.Replica.MASTER);
+      ComObject retObj = new ComObject(ret);
+      client.getCommon().deserializeSchema(retObj.getByteArray(ComObject.Tag.SCHEMA_BYTES));
+    }
+    else if (drop.getType().equalsIgnoreCase("database")) {
+      for (String tableName : client.getCommon().getTables(dbName).keySet()) {
+        TruncateStatementHandler.doTruncateTable(client, dbName, tableName, schemaRetryCount);
+      }
+
+      String localDbName = drop.getName().getName().toLowerCase();
+      if (!localDbName.equals(dbName)) {
+        throw new DatabaseException("must be using same db as dropping: usingName=" + dbName + ", droppingName=" + localDbName);
+      }
+      ComObject cobj = new ComObject();
+      cobj.put(ComObject.Tag.DB_NAME, dbName);
+      cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
+      cobj.put(ComObject.Tag.METHOD, "SchemaManager:dropDatabase");
       cobj.put(ComObject.Tag.MASTER_SLAVE, "master");
       byte[] ret = client.send(null, 0, 0, cobj, DatabaseClient.Replica.MASTER);
       ComObject retObj = new ComObject(ret);

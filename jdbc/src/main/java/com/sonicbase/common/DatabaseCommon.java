@@ -1307,4 +1307,10 @@ public class DatabaseCommon {
     }
     return new ArrayList<>(dbs);
   }
+
+  public void dropDatabase(String dbName) {
+    synchronized (this) {
+      schema.remove(dbName);
+    }
+  }
 }

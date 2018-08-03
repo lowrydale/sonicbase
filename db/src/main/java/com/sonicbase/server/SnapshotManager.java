@@ -32,7 +32,7 @@ public class SnapshotManager {
 
   private static Logger logger = LoggerFactory.getLogger(SnapshotManager.class);
   private static final int SNAPSHOT_PARTITION_COUNT = 128;
-  private static final String SNAPSHOT_STR = "snapshot" + File.separator;
+  public static final String SNAPSHOT_STR = "snapshot" + File.separator;
   private static final String INDEX_STR = ", index=";
   private static final String RATE_STR = ", rate=";
   private static final String DURATION_STR = ", duration(s)=";
@@ -331,15 +331,18 @@ public class SnapshotManager {
     }
   }
 
-  private File getSnapshotReplicaDir() {
+  //public for pro version
+  public File getSnapshotReplicaDir() {
     return new File(server.getDataDir(), SNAPSHOT_STR + server.getShard() + File.separator + server.getReplica());
   }
 
-  private String getSnapshotRootDir(String dbName) {
+  //public for pro version
+  public String getSnapshotRootDir(String dbName) {
     return new File(getSnapshotReplicaDir(), dbName).getAbsolutePath();
   }
 
-  private String getSnapshotSchemaDir(String dbName) {
+  //public for pro version
+  public String getSnapshotSchemaDir(String dbName) {
     return new File(getSnapshotReplicaDir(), "_sonicbase_schema" + File.separator + dbName).getAbsolutePath();
   }
 
@@ -386,7 +389,17 @@ public class SnapshotManager {
       FileUtils.deleteDirectory(file);
     }
     catch (IOException e) {
-      throw new DatabaseException(e);
+      throw new DatabaseException("Error deleting table schema files: db=" + dbName + ", table=" + tableName, e);
+    }
+  }
+
+  public void deleteDbSchema(String dbName) {
+    File file = new File(getSnapshotSchemaDir(dbName));
+    try {
+      FileUtils.deleteDirectory(file);
+    }
+    catch (Exception e) {
+      throw new DatabaseException("Error deleting database schema files: db=" + dbName, e);
     }
   }
 
@@ -723,6 +736,59 @@ public class SnapshotManager {
 
   boolean isRecovering() {
     return isRecovering;
+  }
+
+  public void deleteTableFiles(String dbName, String tableName) {
+
+    String dataRoot = getSnapshotRootDir(dbName);
+    File dataRootDir = new File(dataRoot);
+
+    int highestSnapshot = getHighestCommittedSnapshotVersion(dataRootDir, logger);
+
+    if (highestSnapshot == -1) {
+      return;
+    }
+
+    try {
+      final File snapshotDir = new File(dataRoot, String.valueOf(highestSnapshot));
+      File tableDir = new File(snapshotDir, tableName);
+      FileUtils.deleteDirectory(tableDir);
+    }
+    catch (Exception e) {
+      throw new DatabaseException("Error deleting table dir: db=" + dbName + ", table=" + tableName, e);
+    }
+  }
+
+  public void deleteDbFiles(String dbName) {
+    String dataRoot = getSnapshotRootDir(dbName);
+    File dbDir = new File(dataRoot);
+    try {
+      FileUtils.deleteDirectory(dbDir);
+    }
+    catch (Exception e) {
+      throw new DatabaseException("Error deleting database dir: db=" + dbName, e);
+    }
+  }
+
+  public void deleteIndexFiles(String dbName, String tableName, String indexName) {
+    String dataRoot = getSnapshotRootDir(dbName);
+    File dataRootDir = new File(dataRoot);
+
+    int highestSnapshot = getHighestCommittedSnapshotVersion(dataRootDir, logger);
+
+    if (highestSnapshot == -1) {
+      return;
+    }
+
+    try {
+      final File snapshotDir = new File(dataRoot, String.valueOf(highestSnapshot));
+      File tableDir = new File(snapshotDir, tableName);
+      File indexDir = new File(tableDir, indexName);
+      FileUtils.deleteDirectory(indexDir);
+    }
+    catch (Exception e) {
+      throw new DatabaseException("Error deleting index dir: db=" + dbName + ", table=" + tableName + ", index=" + indexName, e);
+    }
   }
 
   private class ByteCounterStream extends InputStream {

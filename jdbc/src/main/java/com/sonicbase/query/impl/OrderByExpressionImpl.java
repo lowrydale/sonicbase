@@ -28,11 +28,6 @@ public class OrderByExpressionImpl {
     return bytesOut.toByteArray();
   }
 
-  /**
-   * ###############################
-   * DON"T MODIFY THIS SERIALIZATION
-   * ###############################
-   */
   public void serialize(DataOutputStream out) throws IOException {
     if (tableName == null) {
       out.writeInt(0);
@@ -50,11 +45,6 @@ public class OrderByExpressionImpl {
     deserialize(in);
   }
 
-  /**
-   * ###############################
-   * DON"T MODIFY THIS SERIALIZATION
-   * ###############################
-   */
   public void deserialize(DataInputStream in) throws IOException {
     if (in.readInt() == 1) {
       tableName = in.readUTF();

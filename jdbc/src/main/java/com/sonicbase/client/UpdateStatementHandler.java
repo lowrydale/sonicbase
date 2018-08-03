@@ -30,8 +30,16 @@ public class UpdateStatementHandler implements StatementHandler {
                         SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
                         boolean restrictToThisServer, StoredProcedureContextImpl procedureContext,
                         int schemaRetryCount) {
-    Update update = (Update) statement;
     UpdateStatementImpl updateStatement = new UpdateStatementImpl(client);
+    return execute(dbName, parms, sqlToUse, statement, explain, sequence0, sequence1, sequence2, restrictToThisServer,
+        procedureContext, schemaRetryCount, updateStatement);
+  }
+
+  public Object execute(String dbName, ParameterHandler parms, String sqlToUse, Statement statement,
+                        SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
+                        boolean restrictToThisServer, StoredProcedureContextImpl procedureContext,
+                        int schemaRetryCount, UpdateStatementImpl updateStatement) {
+    Update update = (Update) statement;
     AtomicInteger currParmNum = new AtomicInteger();
     updateStatement.setTableName(update.getTables().get(0).getName());
 

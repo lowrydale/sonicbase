@@ -39,11 +39,6 @@ public class ParameterImpl extends ExpressionImpl {
     return "parm(" + parmOffset + ")";
   }
 
-  /**
-   * ###############################
-   * DON"T MODIFY THIS SERIALIZATION
-   * ###############################
-   */
   @Override
   public void serialize(short serializationVersion, DataOutputStream out) {
     try {
@@ -55,11 +50,6 @@ public class ParameterImpl extends ExpressionImpl {
     }
   }
 
-  /**
-   * ###############################
-   * DON"T MODIFY THIS SERIALIZATION
-   * ###############################
-   */
   @Override
   public void deserialize(short serializationVersion, DataInputStream in) {
     try {

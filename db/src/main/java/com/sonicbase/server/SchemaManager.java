@@ -204,7 +204,7 @@ public class SchemaManager {
   }
 
   @SchemaWriteLock
-  public ComObject dropTable(ComObject cobj, boolean replayedCommand) {
+  public ComObject dropDatabase(ComObject cobj, boolean replayedCommand) {
     String masterSlave = cobj.getString(ComObject.Tag.MASTER_SLAVE);
     if (server.getShard() == 0 &&
         server.getCommon().getServersConfig().getShards()[0].getMasterReplica() == server.getReplica() &&
@@ -214,18 +214,16 @@ public class SchemaManager {
     try {
       short serializationVersionNumber = cobj.getShort(ComObject.Tag.SERIALIZATION_VERSION);
       String dbName = cobj.getString(ComObject.Tag.DB_NAME);
-      String tableName = cobj.getString(ComObject.Tag.TABLE_NAME);
 
-      server.getCommon().getSchemaWriteLock(dbName).lock();
-      try {
-        server.getCommon().dropTable(dbName, tableName);
-        server.removeIndices(dbName, tableName);
-        SnapshotManager snapshotManager = server.getSnapshotManager();
-        snapshotManager.deleteTableSchema(dbName, server.getCommon().getSchemaVersion(), tableName);
+      for (String tableName : server.getCommon().getTables(dbName).keySet()) {
+        //table truncate is initiated by client before dropping the database
+        doDropTable(dbName, tableName);
       }
-      finally {
-        server.getCommon().getSchemaWriteLock(dbName).unlock();
-      }
+
+      server.getCommon().dropDatabase(dbName);
+      SnapshotManager snapshotManager = server.getSnapshotManager();
+      snapshotManager.deleteDbSchema(dbName);
+      snapshotManager.deleteDbFiles(dbName);
 
       if (masterSlave.equals(MASTER_STR)) {
         Random rand = new Random(System.currentTimeMillis());
@@ -242,6 +240,54 @@ public class SchemaManager {
     }
     catch (Exception e) {
       throw new DatabaseException(e);
+    }
+  }
+
+  @SchemaWriteLock
+  public ComObject dropTable(ComObject cobj, boolean replayedCommand) {
+    String masterSlave = cobj.getString(ComObject.Tag.MASTER_SLAVE);
+    if (server.getShard() == 0 &&
+        server.getCommon().getServersConfig().getShards()[0].getMasterReplica() == server.getReplica() &&
+        masterSlave.equals(SLAVE_STR)) {
+      return null;
+    }
+    try {
+      short serializationVersionNumber = cobj.getShort(ComObject.Tag.SERIALIZATION_VERSION);
+      String dbName = cobj.getString(ComObject.Tag.DB_NAME);
+      String tableName = cobj.getString(ComObject.Tag.TABLE_NAME);
+
+      doDropTable(dbName, tableName);
+
+      if (masterSlave.equals(MASTER_STR)) {
+        Random rand = new Random(System.currentTimeMillis());
+        for (int i = 0; i < server.getShardCount(); i++) {
+          cobj.put(ComObject.Tag.MASTER_SLAVE, SLAVE_STR);
+          server.getDatabaseClient().send(null, i, rand.nextLong(), cobj, DatabaseClient.Replica.DEF);
+        }
+        server.pushSchema();
+      }
+
+      ComObject retObj = new ComObject();
+      retObj.put(ComObject.Tag.SCHEMA_BYTES, server.getCommon().serializeSchema(serializationVersionNumber));
+      return retObj;
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  private void doDropTable(String dbName, String tableName) {
+    server.getCommon().getSchemaWriteLock(dbName).lock();
+    try {
+      server.getCommon().dropTable(dbName, tableName);
+      //table truncate is initiated by client before dropping the table
+      server.removeIndices(dbName, tableName);
+      SnapshotManager snapshotManager = server.getSnapshotManager();
+      snapshotManager.deleteTableSchema(dbName, server.getCommon().getSchemaVersion(), tableName);
+      snapshotManager.deleteTableFiles(dbName, tableName);
+    }
+    finally {
+      server.getCommon().getSchemaWriteLock(dbName).unlock();
     }
   }
 
@@ -771,8 +817,10 @@ public class SchemaManager {
     ComArray array = cobj.getArray(ComObject.Tag.INDICES);
     for (int i = 0; i < array.getArray().size(); i++) {
       String indexName = (String) array.getArray().get(i);
+      server.getUpdateManager().truncateAnyIndex(dbName, tableName, indexName);
       server.removeIndex(dbName, tableName, indexName);
       SnapshotManager snapshotManager = server.getSnapshotManager();
+      snapshotManager.deleteIndexFiles(dbName, tableName, indexName);
       snapshotManager.deleteIndexSchema(dbName, server.getCommon().getSchemaVersion(), tableName, indexName);
     }
 
@@ -820,10 +868,12 @@ public class SchemaManager {
         }
 
         for (IndexSchema indexSchema : toDrop) {
+          server.getUpdateManager().truncateAnyIndex(dbName, table, indexName);
           server.removeIndex(dbName, table, indexSchema.getName());
           server.getCommon().getTableSchema(dbName, table, server.getDataDir()).getIndices().remove(indexSchema.getName());
           server.getCommon().getTableSchema(dbName, table, server.getDataDir()).getIndexesById().remove(indexSchema.getIndexId());
           SnapshotManager snapshotManager = server.getSnapshotManager();
+          snapshotManager.deleteIndexFiles(dbName, table, indexSchema.getName());
           snapshotManager.deleteIndexSchema(dbName, server.getCommon().getSchemaVersion(), table, indexSchema.getName());
         }
 

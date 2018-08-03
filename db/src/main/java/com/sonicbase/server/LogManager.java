@@ -624,7 +624,8 @@ public class LogManager {
     }
   }
 
-  private File getLogReplicaDir() {
+  //public for pro version
+  public File getLogReplicaDir() {
     return new File(rootDir, server.getShard() + File.separator + server.getReplica());
   }
 

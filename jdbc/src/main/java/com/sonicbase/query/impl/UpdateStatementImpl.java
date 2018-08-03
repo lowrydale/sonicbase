@@ -236,26 +236,18 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
     private void getValuesForColumnsToUpdate(TableSchema tableSchema, List<String> columnNames, List<Object> values,
                                              List<FieldSchema> tableFields, List<ColumnImpl> qColumns,
                                              List<ExpressionImpl> localSetExpressions,
-                                             Object[] newFields) throws UnsupportedEncodingException, SQLException {
+                                             Object[] newFields, Record existingRecord) throws UnsupportedEncodingException, SQLException {
       for (int i = 0; i < qColumns.size(); i++) {
         String columnName = qColumns.get(i).getColumnName();
         Object value = null;
         ExpressionImpl setExpression = localSetExpressions.get(i);
-        if (setExpression instanceof ConstantImpl) {
-          ConstantImpl cNode1 = (ConstantImpl) setExpression;
-          value = cNode1.getValue();
-          if (value instanceof String) {
-            value = ((String) value).getBytes(UTF_8_STR);
-          }
+
+        value = setExpression.evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{existingRecord}, getParms());
+
+        if (value instanceof String) {
+          value = ((String) value).getBytes(UTF_8_STR);
         }
-        else if (setExpression instanceof ParameterImpl) {
-          ParameterImpl pNode = (ParameterImpl) setExpression;
-          int parmNum = pNode.getParmOffset();
-          value = getParms().getValue(parmNum + 1);
-          if (value instanceof String) {
-            value = ((String) value).getBytes(UTF_8_STR);
-          }
-        }
+
         int offset = tableSchema.getFieldOffset(columnName);
         FieldSchema fieldSchema = tableFields.get(offset);
 
@@ -362,7 +354,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
         values = new ArrayList<>();
         tableFields = tableSchema.getFields();
 
-        getValuesForColumnsToUpdate(tableSchema, columnNames, values, tableFields, qColumns, localSetExpressions, newFields);
+        getValuesForColumnsToUpdate(tableSchema, columnNames, values, tableFields, qColumns, localSetExpressions, newFields, record);
 
         for (int i = 0; i < newPrimaryKey.length; i++) {
           newPrimaryKey[i] = record.getFields()[fieldOffsets[i]];

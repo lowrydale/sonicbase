@@ -120,11 +120,6 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     }
   }
 
-  /**
-   * ###############################
-   * DON"T MODIFY THIS SERIALIZATION
-   * ###############################
-   */
   public void serialize(DataOutputStream out) {
     try {
       Varint.writeSignedVarLong(serializationVersion, out);
@@ -190,11 +185,6 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     deserialize(in);
   }
 
-  /**
-   * ###############################
-   * DON"T MODIFY THIS SERIALIZATION
-   * ###############################
-   */
   public void deserialize(DataInputStream in) {
     try {
       serializationVersion = (short) Varint.readSignedVarLong(in);
@@ -1963,11 +1953,6 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
 
     }
 
-    /**
-     * ###############################
-     * DON"T MODIFY THIS SERIALIZATION
-     * ###############################
-     */
     public void serialize(DataOutputStream out) {
       try {
         out.writeInt(type.ordinal());
@@ -1979,11 +1964,6 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       }
     }
 
-    /**
-     * ###############################
-     * DON"T MODIFY THIS SERIALIZATION
-     * ###############################
-     */
     public void deserialize(DataInputStream in) {
       try {
         int typeOrd = in.readInt();

@@ -153,6 +153,12 @@
     </dependency>
 
     <dependency>
+      <groupId>com.sonicbase</groupId>
+      <artifactId>sonicbase-server</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
       <groupId>org.apache.giraph</groupId>
       <artifactId>giraph-core</artifactId>
       <version>${giraph-core.version}</version>
@@ -341,5 +347,6 @@
     <module>acceptance</module>
     <module>db</module>
     <module>jdbc</module>
+    <module>cli</module>
   </modules>
 </project>

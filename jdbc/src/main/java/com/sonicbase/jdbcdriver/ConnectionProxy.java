@@ -199,12 +199,12 @@ public class ConnectionProxy implements Connection {
     }
   }
 
-  public byte[] send(String batchKey,
+  public byte[] send(String method,
                      int shard, long authUser, ComObject body, Replica replica) {
     if (client != null) {
-      return client.send(batchKey, shard, authUser, body, replica.cliReplica);
+      return client.send(method, shard, authUser, body, replica.cliReplica);
     }
-    return clients.get(url).client.send(batchKey, shard, authUser, body, replica.cliReplica);
+    return clients.get(url).client.send(method, shard, authUser, body, replica.cliReplica);
   }
 
   public byte[] send(String batchKey,
@@ -239,6 +239,13 @@ public class ConnectionProxy implements Connection {
   public byte[] sendToMaster(ComObject body) {
     if (client != null) {
       return client.sendToMaster(body);
+    }
+    return clients.get(url).client.sendToMaster(body);
+  }
+
+  public byte[] sendToMaster(String method, ComObject body) {
+    if (client != null) {
+      return client.sendToMaster(method, body);
     }
     return clients.get(url).client.sendToMaster(body);
   }

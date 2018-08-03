@@ -221,7 +221,8 @@ public class DeleteManager {
     }
   }
 
-  private File getReplicaRoot() {
+  //public for pro version
+  public File getReplicaRoot() {
     return new File(databaseServer.getDataDir(), "deletes" + File.separator + databaseServer.getShard() +
         File.separator + databaseServer.getReplica() + File.separator);
   }

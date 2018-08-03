@@ -27,6 +27,8 @@ public class TestSnapshotManager {
 
   @Test
   public void test() throws InterruptedException, ExecutionException, ClassNotFoundException, SQLException, IOException {
+    System.setProperty("log4j.configuration", "test-log4j.xml");
+
     final com.sonicbase.server.DatabaseServer[] dbServers = new com.sonicbase.server.DatabaseServer[4];
     Connection conn = null;
     try {

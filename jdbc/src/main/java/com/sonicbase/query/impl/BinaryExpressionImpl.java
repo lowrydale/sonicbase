@@ -48,6 +48,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
   private boolean oneKeyLookup;
   private boolean isTableScan;
   private boolean isRightKey;
+  private static Map<Operator, SimpleComparator> simpleComparators = new EnumMap<>(Operator.class);
 
   public BinaryExpressionImpl(
       String columnName, Operator operator, DataType.Type type, Object value) {
@@ -876,19 +877,6 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     return localLeftExpression instanceof ColumnImpl && localRightExpression instanceof ColumnImpl;
   }
 
-  private int getAndOrCount(ExpressionImpl expression) {
-    int count = 0;
-    if (expression instanceof BinaryExpressionImpl) {
-      if (((BinaryExpressionImpl) expression).getOperator() == AND ||
-          ((BinaryExpressionImpl) expression).getOperator() == OR) {
-        count++;
-      }
-      count += getAndOrCount(((BinaryExpressionImpl) expression).getLeftExpression());
-      count += getAndOrCount(((BinaryExpressionImpl) expression).getRightExpression());
-    }
-    return count;
-  }
-
   protected NextReturn evaluateOneSidedIndex(
       final String[] tableNames, int count, ExpressionImpl leftExpression, ExpressionImpl rightExpression,
       String leftColumn, Operator leftOp,
@@ -1182,11 +1170,6 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     return rightExpression;
   }
 
-  /**
-   * ###############################
-   * DON"T MODIFY THIS SERIALIZATION
-   * ###############################
-   */
   @Override
   public void deserialize(short serializationVersion, DataInputStream in) {
     try {
@@ -1211,11 +1194,6 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     }
   }
 
-  /**
-   * ###############################
-   * DON"T MODIFY THIS SERIALIZATION
-   * ###############################
-   */
   @Override
   public void serialize(short serializationVersion, DataOutputStream out) {
     try {
@@ -1273,8 +1251,6 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     boolean compare(int value);
   }
 
-  private static Map<Operator, SimpleComparator> simpleComparators = new EnumMap<>(Operator.class);
-
   static {
     simpleComparators.put(EQUAL, k -> k == 0);
     simpleComparators.put(NOT_EQUAL, k -> k != 0);
@@ -1306,7 +1282,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
         case AND:
           return evaluateAndOperator(lhsValue, rhsValue);
         case OR:
-          return evaluatorOrOperator(lhsValue, rhsValue);
+          return evaluateOrOperator(lhsValue, rhsValue);
         case PLUS:
         case MINUS:
         case TIMES:
@@ -1315,7 +1291,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
         case BITWISE_OR:
         case BITWISE_X_OR:
         case MODULO:
-          return evaluatorMathOperator(localOperator, lhsValue, rhsValue);
+          return evaluateMathOperator(localOperator, lhsValue, rhsValue);
         default:
           Boolean ret = evaluateSimpleOperator(localOperator, lhsValue, rhsValue, comparator);
           if (ret != null) {
@@ -1342,7 +1318,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     return (Boolean) lhsValue && (Boolean) rhsValue;
   }
 
-  private Object evaluatorOrOperator(Object lhsValue, Object rhsValue) {
+  private Object evaluateOrOperator(Object lhsValue, Object rhsValue) {
     if (lhsValue == null || rhsValue == null) {
       return false;
     }
@@ -1368,12 +1344,12 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     return null;
   }
 
-  private Object evaluatorMathOperator(Operator localOperator, Object lhsValue, Object rhsValue) {
+  private Object evaluateMathOperator(Operator localOperator, Object lhsValue, Object rhsValue) {
     if (lhsValue == null || rhsValue == null) {
       return null;
     }
     if (lhsValue instanceof BigDecimal || rhsValue instanceof BigDecimal) {
-      return evaluatorBigDecimalMath(localOperator, lhsValue, rhsValue);
+      return evaluateBigDecimalMath(localOperator, lhsValue, rhsValue);
     }
     else if (lhsValue instanceof Double || rhsValue instanceof Double ||
         lhsValue instanceof Float || rhsValue instanceof Float) {
@@ -1383,7 +1359,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
         lhsValue instanceof Integer || rhsValue instanceof Integer ||
         lhsValue instanceof Short || rhsValue instanceof Short ||
         lhsValue instanceof Byte || rhsValue instanceof Byte) {
-      return evaluatorLongMath(localOperator, lhsValue, rhsValue);
+      return evaluateLongMath(localOperator, lhsValue, rhsValue);
     }
     else {
       throw new DatabaseException("Operator not supported for this datatype");
@@ -1405,7 +1381,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     return isNot;
   }
 
-  private Object evaluatorLongMath(Operator localOperator, Object lhsValue, Object rhsValue) {
+  private Object evaluateLongMath(Operator localOperator, Object lhsValue, Object rhsValue) {
     Long lhs = (Long) DataType.getLongConverter().convert(lhsValue);
     Long rhs = (Long) DataType.getLongConverter().convert(rhsValue);
     if (localOperator == PLUS) {
@@ -1463,7 +1439,7 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     }
   }
 
-  private Object evaluatorBigDecimalMath(Operator localOperator, Object lhsValue, Object rhsValue) {
+  private Object evaluateBigDecimalMath(Operator localOperator, Object lhsValue, Object rhsValue) {
     BigDecimal lhs = (BigDecimal) DataType.getBigDecimalConverter().convert(lhsValue);
     BigDecimal rhs = (BigDecimal) DataType.getBigDecimalConverter().convert(rhsValue);
     if (localOperator == PLUS) {

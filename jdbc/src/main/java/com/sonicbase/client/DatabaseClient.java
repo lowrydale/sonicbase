@@ -99,6 +99,7 @@ public class DatabaseClient {
   private static String[] writeVerbsArray = new String[]{
       "SchemaManager:dropTable",
       "SchemaManager:dropIndex",
+      "SchemaManager:dropDatabase",
       "SchemaManager:dropColumn",
       "SchemaManager:dropColumnSlave",
       "SchemaManager:addColumn",

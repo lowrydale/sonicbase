@@ -115,11 +115,6 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
     leftExpression.setProbe(probe);
   }
 
-  /**
-   * ###############################
-   * DON"T MODIFY THIS SERIALIZATION
-   * ###############################
-   */
   @Override
   public void serialize(short serializationVersion, DataOutputStream out) {
     try {
@@ -148,11 +143,6 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
     return ExpressionImpl.Type.IN_EXPRESSION;
   }
 
-  /**
-   * ###############################
-   * DON"T MODIFY THIS SERIALIZATION
-   * ###############################
-   */
   @Override
   public void deserialize(short serializationVersion, DataInputStream in) {
     try {

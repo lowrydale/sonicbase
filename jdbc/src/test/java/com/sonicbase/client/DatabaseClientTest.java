@@ -528,6 +528,6 @@ public class DatabaseClientTest {
 
     client.syncConfig();
 
-    assertEquals(callCount.get(), 1);
+    assertEquals(callCount.get(), 2);
   }
 }

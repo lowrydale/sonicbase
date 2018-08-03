@@ -117,11 +117,6 @@ public class GroupByContext {
     deserialize(in, common);
   }
 
-  /**
-   * ###############################
-   * DON"T MODIFY THIS SERIALIZATION
-   * ###############################
-   */
   public void deserialize(DataInputStream in, DatabaseCommon common) throws IOException {
     int fieldCount = in.readInt();
     fieldContexts = new ArrayList<>();
@@ -170,11 +165,6 @@ public class GroupByContext {
 
   }
 
-  /**
-   * ###############################
-   * DON"T MODIFY THIS SERIALIZATION
-   * ###############################
-   */
   public byte[] serialize(DatabaseCommon common) throws IOException {
     ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
     DataOutputStream out = new DataOutputStream(bytesOut);

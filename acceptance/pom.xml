@@ -84,6 +84,7 @@
             <groupId>com.sonicbase</groupId>
             <artifactId>sonicbase-server</artifactId>
             <version>1.2.12</version>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>
@@ -170,6 +171,7 @@
             <groupId>com.sonicbase</groupId>
             <artifactId>sonicbase-jdbc</artifactId>
             <version>1.2.12</version>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>

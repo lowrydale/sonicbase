@@ -67,6 +67,7 @@ public class TestDatabase {
   @BeforeClass
   public void beforeClass() throws Exception {
     try {
+      System.setProperty("log4j.configuration", "test-log4j.xml");
 
 
       String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
@@ -3293,7 +3294,7 @@ public class TestDatabase {
   public void testUpdate() throws SQLException {
     //fails
 
-    PreparedStatement stmt = conn.prepareStatement("update persons set id = ?, socialSecurityNumber=? where id=?");
+    PreparedStatement stmt = conn.prepareStatement("update persons set id = id + ?, socialSecurityNumber=? where id=?");
     stmt.setLong(1, 1000);
     stmt.setString(2, "ssn");
     stmt.setLong(3, 0);
@@ -3339,8 +3340,8 @@ public class TestDatabase {
     int count = stmt.executeUpdate();
     assertEquals(count, 1);
 
-    stmt = conn.prepareStatement("update persons set id = ?, socialSecurityNumber=? where id=?");
-    stmt.setLong(1, 101000);
+    stmt = conn.prepareStatement("update persons set id = id + ?, socialSecurityNumber=? where id=?");
+    stmt.setLong(1, 1000);
     stmt.setString(2, "ssn2");
     stmt.setLong(3, 100000);
     count = stmt.executeUpdate();

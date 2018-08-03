@@ -798,14 +798,22 @@ public class NettyServer {
   private CommandLine getCommandLineOptions(String[] args) throws ParseException {
     Options options = new Options();
     options.addOption("p", PORT_STR, true, PORT_STR);
-    options.addOption("s", SHARD_STR, true, SHARD_STR);
+    Option op = new Option("s", SHARD_STR, true, SHARD_STR);
+    op.setRequired(false);
+    options.addOption(op);
     options.addOption("h", HOST_STR, true, HOST_STR);
     options.addOption("m", MHOST_STR, true, MHOST_STR);
     options.addOption("n", MPORT_STR, true, MPORT_STR);
-    options.addOption("r", REPLICA_STR, true, REPLICA_STR);
+    op = new Option("r", REPLICA_STR, true, REPLICA_STR);
+    op.setRequired(false);
+    options.addOption(op);
     options.addOption("c", CLUSTER_STR, true, CLUSTER_STR);
-    options.addOption("g", GCLOG_STR, true, GCLOG_STR);
-    options.addOption("x", XMX_STR, true, XMX_STR);
+    op = new Option("g", GCLOG_STR, true, GCLOG_STR);
+    op.setRequired(false);
+    options.addOption(op);
+    op = new Option("x", XMX_STR, true, XMX_STR);
+    op.setRequired(false);
+    options.addOption(op);
 
     CommandLineParser parser = new DefaultParser();
     // parse the command line arguments

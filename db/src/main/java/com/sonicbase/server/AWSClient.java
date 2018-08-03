@@ -85,6 +85,9 @@ public class AWSClient {
       if (!file.exists()) {
         file = new File(System.getProperty(USER_DIR_STR), "../db/src/main/resources/config/config-" + cluster + JSON_STR);
       }
+      if (!file.exists()) {
+        file = new File(System.getProperty(USER_DIR_STR), "../pro/src/main/resources/config/config-" + cluster + JSON_STR);
+      }
       String configStr = IOUtils.toString(new BufferedInputStream(new FileInputStream(file)), "utf-8");
       ObjectMapper mapper = new ObjectMapper();
       return (ObjectNode) mapper.readTree(configStr);

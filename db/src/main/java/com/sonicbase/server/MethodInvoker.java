@@ -133,7 +133,7 @@ public class MethodInvoker {
         logRequest.getLatch().await();
       }
       if (ret == null) {
-        ret = new ComObject();
+        return null;
       }
 
       return ret.serialize();
@@ -184,12 +184,7 @@ public class MethodInvoker {
 
       ret = doInvokeMethod(replayedCommand, handlerTime, request, methodStr, handleBegin);
 
-      if (ret == null) {
-        ret = new ComObject();
-        ret.put(ComObject.Tag.SEQUENCE_0, sequence0);
-        ret.put(ComObject.Tag.SEQUENCE_1, sequence1);
-      }
-      else {
+      if (ret != null) {
         ret.put(ComObject.Tag.SEQUENCE_0, sequence0);
         ret.put(ComObject.Tag.SEQUENCE_1, sequence1);
       }
@@ -220,7 +215,10 @@ public class MethodInvoker {
       if (parts.length == 2) {
         MethodProvider providerObj = providers.get(parts[0]);
         if (providerObj == null) {
-          throw new DatabaseException("Inalid provider name: method=" + methodStr);
+          throw new DatabaseException("Invalid provider name: method=" + methodStr);
+        }
+        if (providerObj instanceof NoOpMethodProvider) {
+          return null;
         }
         provider = providerObj.provider;
         method = providerObj.methodMap.get(parts[1]);
@@ -268,9 +266,17 @@ public class MethodInvoker {
     }
   }
 
+  public void registerNoOpMethodProvider(String providerName) {
+    providers.put(providerName, new NoOpMethodProvider());
+  }
+
+
   class MethodProvider {
     private ConcurrentHashMap<String, Method> methodMap = new ConcurrentHashMap<>();
     private Object provider;
+  }
+
+  class NoOpMethodProvider extends MethodProvider {
   }
 
   private ConcurrentHashMap<String, MethodProvider> providers = new ConcurrentHashMap<>();

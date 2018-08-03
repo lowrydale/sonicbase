@@ -22,6 +22,8 @@ public class TestLongRunningCommands {
 
   @Test
   public void test() throws IOException, InterruptedException {
+    System.setProperty("log4j.configuration", "test-log4j.xml");
+
     String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
     ObjectMapper mapper = new ObjectMapper();
     final ObjectNode config = (ObjectNode) mapper.readTree(configStr);

@@ -519,11 +519,6 @@ public class ExpressionImpl implements Expression {
     return Type.BASE_EXPRESSION;
   }
 
-  /**
-   * ###############################
-   * DON"T MODIFY THIS SERIALIZATION
-   * ###############################
-   */
   public void deserialize(short serializationVersion, DataInputStream in) {
     try {
       this.serializationVersion = serializationVersion;
@@ -580,11 +575,6 @@ public class ExpressionImpl implements Expression {
     }
   }
 
-  /**
-   * ###############################
-   * DON"T MODIFY THIS SERIALIZATION
-   * ###############################
-   */
   public static void serializeExpression(ExpressionImpl expression, DataOutputStream out) {
     try {
       out.writeShort(expression.getSerializationVersion());
@@ -600,11 +590,6 @@ public class ExpressionImpl implements Expression {
     return deserializeExpression(new DataInputStream(new ByteArrayInputStream(bytes)));
   }
 
-  /**
-   * ###############################
-   * DON"T MODIFY THIS SERIALIZATION
-   * ###############################
-   */
   public static ExpressionImpl deserializeExpression(DataInputStream in) {
     try {
       short serializationVersion = in.readShort();

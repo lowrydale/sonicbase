@@ -127,11 +127,6 @@ public class ServersConfig {
     this(new DataInputStream(new ByteArrayInputStream(bytes)), serializationVersion);
   }
 
-  /**
-   * ###############################
-   * DON"T MODIFY THIS SERIALIZATION
-   * ###############################
-   */
   public ServersConfig(DataInputStream in, short serializationVersion) throws IOException {
     if (serializationVersion >= DatabaseClient.SERIALIZATION_VERSION_21) {
       cluster = in.readUTF();
@@ -147,11 +142,6 @@ public class ServersConfig {
     }
   }
 
-  /**
-   * ###############################
-   * DON"T MODIFY THIS SERIALIZATION
-   * ###############################
-   */
   public byte[] serialize(short serializationVersionNumber) throws IOException {
     ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
     DataOutputStream out = new DataOutputStream(bytesOut);

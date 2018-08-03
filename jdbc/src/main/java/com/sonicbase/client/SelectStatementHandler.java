@@ -479,7 +479,7 @@ public class SelectStatementHandler implements StatementHandler {
   private static ExpressionImpl getBinaryExpression(DatabaseClient client, AtomicInteger currParmNum,
                                                     Expression whereExpression, String tableName, ParameterHandler parms) {
     ExpressionImpl retExpression;
-    BinaryExpressionImpl binaryOp = new BinaryExpressionImpl();
+    BinaryExpressionImpl binaryOp = new  BinaryExpressionImpl();
 
     if (whereExpression instanceof EqualsTo) {
       binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.EQUAL);

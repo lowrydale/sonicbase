@@ -1,5 +1,7 @@
 #cd db
+cd ..
 mvn clean install -DskipTests
+cd scripts
 #cd ..
 
 cd obfuscated

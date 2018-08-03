@@ -36,11 +36,6 @@ public class SignedExpressionImpl extends ExpressionImpl {
     this.isNegative = negative;
   }
 
-  /**
-   * ###############################
-   * DON"T MODIFY THIS SERIALIZATION
-   * ###############################
-   */
   @Override
   public void serialize(short serializationVersion, DataOutputStream out) {
     try {
@@ -58,11 +53,6 @@ public class SignedExpressionImpl extends ExpressionImpl {
     return Type.SIGNED_EXPRESSION;
   }
 
-  /**
-   * ###############################
-   * DON"T MODIFY THIS SERIALIZATION
-   * ###############################
-   */
   @Override
   public void deserialize(short serializationVersion, DataInputStream in) {
     try {

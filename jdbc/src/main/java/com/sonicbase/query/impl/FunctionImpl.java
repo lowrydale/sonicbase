@@ -955,11 +955,6 @@ public class FunctionImpl extends ExpressionImpl {
     return null;
   }
 
-  /**
-   * ###############################
-   * DON"T MODIFY THIS SERIALIZATION
-   * ###############################
-   */
   @Override
   public void deserialize(short serializationVersion, DataInputStream in) {
     try {
@@ -977,12 +972,6 @@ public class FunctionImpl extends ExpressionImpl {
     }
   }
 
-
-  /**
-   * ###############################
-   * DON"T MODIFY THIS SERIALIZATION
-   * ###############################
-   */
   @Override
   public void serialize(short serializationVersion, DataOutputStream out) {
     try {

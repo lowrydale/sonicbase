@@ -33,7 +33,6 @@ public class TestRunner {
         TestSnapshotManager.class,
         TestSnapshotManagerLostEntries.class,
         TestStoredProcedures.class,
-        TestStreams.class,
         TestTransactions.class});
   }
 

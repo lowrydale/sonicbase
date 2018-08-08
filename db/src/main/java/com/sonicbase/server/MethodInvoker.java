@@ -152,6 +152,7 @@ public class MethodInvoker {
   }
 
   private void handleGenericException(byte[] requestBytes, Exception e) {
+
     if (-1 != ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class)) {
       throw new DatabaseException(e); //don't log
     }
@@ -161,7 +162,7 @@ public class MethodInvoker {
     if (-1 != ExceptionUtils.indexOfThrowable(e, UniqueConstraintViolationException.class)) {
       throw new DatabaseException(e); //don't log
     }
-    if (e.getMessage().contains("Shutdown in progress")) {
+    if (e.getMessage() != null && e.getMessage().contains("Shutdown in progress")) {
       throw new DatabaseException(e);
     }
     logger.error("Error handling command: method=" + new ComObject(requestBytes).getString(ComObject.Tag.METHOD), e);

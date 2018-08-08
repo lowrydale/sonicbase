@@ -6,6 +6,8 @@ import com.codahale.metrics.Snapshot;
 import com.sonicbase.common.ComArray;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.ServersConfig;
+import com.sonicbase.common.ThreadUtil;
+import com.sonicbase.query.DatabaseException;
 import org.apache.giraph.utils.Varint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,12 +27,40 @@ public class ClientStatsHandler {
 
   private final DatabaseClient client;
   private static ConcurrentHashMap<String, ConcurrentHashMap<String, HistogramEntry>> registeredQueries = new ConcurrentHashMap<>();
+  private final Thread statsEnabler;
+  private boolean disableStats;
 
   public ClientStatsHandler(DatabaseClient client) {
     this.client = client;
+    this.statsEnabler = ThreadUtil.createThread(() -> {
+      while (true) {
+        try {
+          Thread.sleep(60_000);
+          disableStats = false;
+        }
+        catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          break;
+        }
+      }
+    }, "SonicBase Stats Enabler");
+  }
+
+  public void shutdown() {
+    this.statsEnabler.interrupt();
+    try {
+      this.statsEnabler.join();
+    }
+    catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new DatabaseException(e);
+    }
   }
 
   public void registerCompletedQueryForStats(HistogramEntry histogramEntry, long beginNanos) {
+    if (disableStats) {
+      return;
+    }
     long latency = System.nanoTime() - beginNanos;
     histogramEntry.getHistogram().update(latency);
     if (histogramEntry.getMaxedLatencies().get()) {
@@ -205,6 +235,9 @@ public class ClientStatsHandler {
 
   public HistogramEntry registerQueryForStats(String cluster, String dbName, String sql) {
     try {
+      if (this.disableStats) {
+        return null;
+      }
       ConcurrentHashMap<String, HistogramEntry> clusterEntry = registeredQueries.get(cluster);
       if (clusterEntry == null) {
         clusterEntry = new ConcurrentHashMap<>();
@@ -235,7 +268,10 @@ public class ClientStatsHandler {
 
       DatabaseClient sharedClient = DatabaseClient.getSharedClients().get(cluster);
       byte[] ret = sendToMasterOnSharedClient(cobj, sharedClient);
-      if (ret != null) {
+      if (ret == null) {
+        disableStats = true;
+      }
+      else {
         ComObject retObj = new ComObject(ret);
         entry = new HistogramEntry();
         HistogramEntry retEntry = new HistogramEntry();

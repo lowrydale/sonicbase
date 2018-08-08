@@ -802,7 +802,7 @@ public class LogManager {
       synchronized (logLock) {
         File[] files = dataRootDir.listFiles();
         if (files == null) {
-          logger.warn("No files to restore: shard={}, replica={}", server.getShard(), server.getReplica());
+          logger.warn("No files to replay: shard={}, replica={}", server.getShard(), server.getReplica());
         }
         else {
           logger.info("applyLogs - begin: fileCount={}", files.length);

@@ -76,7 +76,6 @@ public class DatabaseServer {
   private DeleteManager deleteManager;
   private AtomicInteger batchRepartCount = new AtomicInteger();
   private boolean usingMultipleReplicas = false;
-  private AWSClient awsClient;
   private boolean onlyQueueCommands;
   private boolean applyingQueuesAndInteractive;
   private MethodInvoker methodInvoker;
@@ -206,8 +205,6 @@ public class DatabaseServer {
 
     common.setHaveProLicense(true);
 
-    this.awsClient = new AWSClient(getDatabaseClient());
-
     addressMap = new AddressMap(this);
 
     common.setServersConfig(serversConfig);
@@ -223,9 +220,9 @@ public class DatabaseServer {
       logger.error("Error initializing pro server", e);
       initProNoOpMethodInvokers();
     }
+    licenseManager = new LicenseManagerProxy(proServer);
 
     updateManager.initStreamManager();
-    licenseManager = new LicenseManagerProxy(proServer);
 
     this.replicationFactor = shards.get(0).withArray(REPLICAS_STR).size();
 
@@ -528,6 +525,8 @@ public class DatabaseServer {
     shutdownRepartitioner();
 
     licenseManager.shutdownMasterLicenseValidator();
+    updateManager.stopStreamsConsumerMasterMonitor();
+
 
     masterManager.shutdownFixSchemaTimer();
 
@@ -577,7 +576,7 @@ public class DatabaseServer {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
       cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
-      cobj.put(ComObject.Tag.METHOD, "DatabaessServer:prepareToComeAlive");
+      cobj.put(ComObject.Tag.METHOD, "DatabaseServer:prepareToComeAlive");
 
       getDatabaseClient().send(null, localShard, localReplica, cobj, DatabaseClient.Replica.SPECIFIED, true);
     }
@@ -667,10 +666,6 @@ public class DatabaseServer {
         break;
       }
     }
-  }
-
-  public AWSClient getAWSClient() {
-    return awsClient;
   }
 
   public static void disable() {

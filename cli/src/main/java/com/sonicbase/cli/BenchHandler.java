@@ -148,9 +148,15 @@ public class BenchHandler {
   }
 
 
-  public void benchStartTest(String command) {
+  public void benchStartTest(String command) throws InterruptedException, ExecutionException, IOException {
     String[] parts = command.split(" ");
     String test = parts[2];
+
+    if (test.equals("cluster")) {
+      benchStartCluster();
+      return;
+    }
+
     String queryType = null;
     if (parts.length > 3) {
       queryType = parts[3];
@@ -219,9 +225,14 @@ public class BenchHandler {
     }
   }
 
-  public void benchStopTest(String command) {
+  public void benchStopTest(String command) throws InterruptedException, ExecutionException, IOException {
     String[] parts = command.split(" ");
     String test = parts[2];
+
+    if (test.equals("cluster")) {
+      benchStopCluster();
+      return;
+    }
 
     boolean anyFailed = false;
     StringBuilder failed = new StringBuilder();
@@ -409,7 +420,7 @@ public class BenchHandler {
     }
   }
 
-  public void benchStartCluster() throws IOException, InterruptedException, ExecutionException {
+    public void benchStartCluster() throws IOException, InterruptedException, ExecutionException {
     final String cluster = cli.getCurrCluster();
     if (cluster == null) {
       System.out.println("Error, not using a cluster");

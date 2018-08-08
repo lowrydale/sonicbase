@@ -48,6 +48,13 @@ var TREE_ITEMS = [
                 ['Math', 'docs/select-math.html?framed=true'],
                 ['Functions', 'docs/functions.html?framed=true'],
                 ['Set Operators', 'docs/select-set-operators.html?framed=true'],
+          ['Joins', 0,
+              ['Inner', 'docs/joins-inner.html?framed=true'],
+              ['Left Outer', 'docs/joins-left-outer.html?framed=true'],
+              ['Right Outer', 'docs/joins-right-outer.html?framed=true'],
+              ['Full', 'docs/joins-full.html?framed=true'],
+              ['Three-Way', 'docs/joins-three-way.html?framed=true']
+          ],
 			 ],
 			 ['Insert', 'docs/insert.html?framed=true'],
 			 ['Batch Insert', 'docs/batch_insert.html?framed=true'],
@@ -60,7 +67,16 @@ var TREE_ITEMS = [
             ['Drop Index', 'docs/drop-index.html?framed=true'],
 			 ['Describe Table', 'docs/describe.html?framed=true'],
             ['Describe Tables', 'docs/describe-tables.html?framed=true'],
+        ['Describe Shards', 'docs/describe-shards.html?framed=true'],
 		],
+      ['Stored Procedures', 0,
+          ['Overview', 'docs/stored-procedures.html?framed=true'],
+          ['Example 1', 'docs/stored-procedures-example1.html?framed=true'],
+          ['Example 2', 'docs/stored-procedures-example2.html?framed=true'],
+          ['Example 3', 'docs/stored-procedures-example3.html?framed=true'],
+      ],
+      ['Rolling Restart',  'docs/rolling-restart.html?framed=true'],
+      ['Transactions',  'docs/transactions.html?framed=true'],
 		['Administration', 0,
                 ['Setup', 0,
                     ['Common', 'docs/setup.html?framed=true'],
@@ -83,26 +99,11 @@ var TREE_ITEMS = [
             ['Getting Started', 'docs/pro-getting-started.html?framed=true'],
 		    ['Features', 'docs/pro-features.html?framed=true'],
             ['SQL Syntax', 0,
-                ['Joins', 0,
-                    ['Inner', 'docs/joins-inner.html?framed=true'],
-                    ['Left Outer', 'docs/joins-left-outer.html?framed=true'],
-                    ['Right Outer', 'docs/joins-right-outer.html?framed=true'],
-                    ['Full', 'docs/joins-full.html?framed=true'],
-                    ['Three-Way', 'docs/joins-three-way.html?framed=true']
-                ],
-                ['Describe Shards', 'docs/describe-shards.html?framed=true'],
                 ['Describe Server Stats', 'docs/describe-server-stats.html?framed=true'],
                 ['Describe Server Health', 'docs/describe-server-health.html?framed=true'],
                 ['Describe Licenses', 'docs/license-server.html?framed=true']
             ],
-            ['Transactions',  'docs/transactions.html?framed=true'],
             ['Backup & Restore',  'docs/backup-restore.html?framed=true'],
-            ['Stored Procedures', 0,
-                ['Overview', 'docs/stored-procedures.html?framed=true'],
-                ['Example 1', 'docs/stored-procedures-example1.html?framed=true'],
-                ['Example 2', 'docs/stored-procedures-example2.html?framed=true'],
-                ['Example 3', 'docs/stored-procedures-example3.html?framed=true'],
-            ],
             ['Streaming Analytics', 0,
                 ['Consumers', 'docs/streaming-consumer.html?framed=true'],
                 ['Producers', 'docs/streaming-producer.html?framed=true']
@@ -117,7 +118,6 @@ var TREE_ITEMS = [
                     ['Query Stats',  'docs/monitor-query-stats.html?framed=true']
                 ]
             ],
-            ['Rolling Restart',  'docs/rolling-restart.html?framed=true']
 		]
 	]
 ];
@@ -234,6 +234,11 @@ var TREE_TPL = {
                      <a href="docs/create-index.html">SQL Syntax Create Index</a><br/>
                  <a href="docs/drop-index.html">SQL Syntax Drop Index</a><br/>
                  <a href="docs/describe.html">SQL Syntax Describe Table</a><br/>
+               <a href="docs/joins-inner.html">SQL Syntax Inner Join</a><br/>
+               <a href="docs/joins-left-outer.html">SQL Syntax Left Outer Join</a><br/>
+               <a href="docs/joins-right-outer.html">SQL Syntax Right Outer Join</a><br/>
+               <a href="docs/joins-full.html">SQL Syntax Full Join</a><br/>
+               <a href="docs/joins-three-way.html">SQL Syntax 3-way Join</a><br/>
                     <a href="docs/describe-tables.html">SQL Syntax Describe Tables</a><br/>
                      <a href="docs/setup.html">Administration Setup Common</a><br/>
                      <a href="docs/setup-linux-mac.html">Administration Setup Linux and Mac</a><br/>
@@ -247,25 +252,22 @@ var TREE_TPL = {
                      <a href="docs/datatypes.html">Data Types</a><br/>
                     <a href="docs/shards-and-replicas.html">Shards and Replicas</a><br/>
                      <a href="docs/automated-bulk-import.html">Automated Bulk Import</a>
-                     <a href="docs/monitoring.html">Monitoring</a><br/>
+               <a href="docs/stored-procedures.html">Stored Procedures Overview</a><br/>
+               <a href="docs/stored-procedures-example1.html">Stored Procedures Example 1</a><br/>
+               <a href="docs/stored-procedures-example2.html">Stored Procedures Example 2</a><br/>
+               <a href="docs/stored-procedures-example3.html">Stored Procedures Example 3</a><br/>
+               <a href="docs/transactions.html">Transactions</a><br/>
+
+               <a href="docs/monitoring.html">Monitoring</a><br/>
                      <a href="docs/performance-considerations.html">Performance Considerations</a><br/>
                     <a href="docs/troubleshooting.html">Troubleshooting</a><br/>
                      <a href="docs/pro-getting-started.html">Pro - Getting Started</a><br/>
                      <a href="docs/pro-features.html">Pro - Version Features</a><br/>
-                     <a href="docs/joins-inner.html">Pro - SQL Syntax Inner Join</a><br/>
-                     <a href="docs/joins-left-outer.html">Pro - SQL Syntax Left Outer Join</a><br/>
-                     <a href="docs/joins-right-outer.html">Pro - SQL Syntax Right Outer Join</a><br/>
-                     <a href="docs/joins-full.html">Pro - SQL Syntax Full Join</a><br/>
-                     <a href="docs/joins-three-way.html">Pro - SQL Syntax 3-way Join</a><br/>
+
                      <a href="docs/describe-shards.html">Pro - SQL Syntax Describe Shards</a><br/>
                      <a href="docs/describe-server-stats.html">Pro - SQL Syntax Describe Server Stats</a><br/>
                     <a href="docs/describe-server-health.html">Pro - SQL Syntax Describe Server Health</a><br/>
-                     <a href="docs/transactions.html">Pro - Transactions</a><br/>
                     <a href="docs/backup-restore.html">Pro - Backup & Restore</a><br/>
-                    <a href="docs/stored-procedures.html">Pro - Stored Procedures Overview</a><br/>
-                 <a href="docs/stored-procedures-example1.html">Pro - Stored Procedures Example 1</a><br/>
-                 <a href="docs/stored-procedures-example2.html">Pro - Stored Procedures Example 2</a><br/>
-                 <a href="docs/stored-procedures-example3.html">Pro - Stored Procedures Example 3</a><br/>
                     <a href="docs/streaming-consumer.html">Pro - Streaming Analytics - Consumers</a><br/>
                  <a href="docs/streaming-producer.html">Pro - Streaming Analytics- Producers</a><br/>
                  <a href="docs/license-server.html">Pro - License Server</a><br/>

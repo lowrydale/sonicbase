@@ -106,7 +106,7 @@ public class DescribeHandler {
     cli.setLastCommand(command);
   }
 
-  public void describe(String command) throws SQLException, ClassNotFoundException, IOException, InterruptedException {
+  public void describe(String command) throws SQLException, ClassNotFoundException, IOException, InterruptedException, ExecutionException {
     String cluster = cli.getCurrCluster();
     if (cluster == null) {
       System.out.println("Error, not using a cluster");
@@ -115,6 +115,27 @@ public class DescribeHandler {
 
     if (cli.getCurrDbName() == null) {
       System.out.println("Error, not using a database");
+      return;
+    }
+
+    if ("describe shards".equals(command)) {
+      getPartitionSizes(command);
+      return;
+    }
+    else if ("describe repartitioner".equals(command)) {
+      describeRepartitioner(command);
+      return;
+    }
+    else if ("describe server stats".equals(command)) {
+      describeServerStats(command);
+      return;
+    }
+    else if ("describe server health".equals(command)) {
+      describeServerHealth(command);
+      return;
+    }
+    else if ("describe schema version".equals(command)) {
+      describeSchemaVersion(command);
       return;
     }
 

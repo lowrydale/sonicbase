@@ -131,12 +131,19 @@ public class SQLHandler {
       return;
     }
 
+    cli.initConnection();
+
+    if (command.startsWith("create database")) {
+      String dbName = command.split(" ")[2].trim();
+      cli.getConn().createDatabase(dbName);
+      cli.useDatabase(dbName);
+      return;
+    }
+
     if (cli.getCurrDbName() == null) {
       System.out.println("Error, not using a database");
       return;
     }
-
-    cli.initConnection();
 
     System.out.println("Executing create request");
 

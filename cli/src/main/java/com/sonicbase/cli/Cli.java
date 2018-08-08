@@ -214,7 +214,7 @@ public class Cli {
   }
 
 
-  public void main(final String[] args) throws IOException, InterruptedException {
+  public static void main(final String[] args) throws IOException, InterruptedException {
     Cli cli = new Cli(args);
     cli.start();
   }
@@ -325,6 +325,10 @@ public class Cli {
     System.out.print(command);
   }
 
+  public void setCurrDbName(String dbName) {
+    currDbName = dbName;
+  }
+
   interface CommandInvoker {
     void invoke(String command) throws Exception;
   }
@@ -344,9 +348,7 @@ public class Cli {
     commands.put("backup status", (command)->backupHandler.backupStatus());
     commands.put("start restore", (command)->backupHandler.startRestore(command));
     commands.put("restore status", (command)->backupHandler.restoreStatus());
-    commands.put("reload server status", (command)->clusterHandler.reloadServerStatus(command));
     commands.put("reload server", (command)->clusterHandler.reloadServer(command));
-    commands.put("reload replica status", (command)->clusterHandler.getReplicaReloadStatus(command));
     commands.put("reload replica", (command)->clusterHandler.reloadReplica(command));
     commands.put("start shard", (command)-> {
         int pos = command.lastIndexOf(" ");
@@ -434,11 +436,6 @@ public class Cli {
         sqlHandler.alter(command);
       });
     commands.put("help", (command)->help());
-    commands.put("describe shards", (command)->describeHandler.getPartitionSizes(command));
-    commands.put("describe repartitioner", (command)->describeHandler.describeRepartitioner(command));
-    commands.put("describe server stats", (command)->describeHandler.describeServerStats(command));
-    commands.put("describe server health", (command)->describeHandler.describeServerHealth(command));
-    commands.put("describe schema version", (command)->describeHandler.describeSchemaVersion(command));
     commands.put("describe", (command)->{
         System.out.print("\033[2J\033[;H");
         describeHandler.describe(command);
@@ -449,8 +446,6 @@ public class Cli {
       });
     commands.put("reconfigure cluster", (command)->clusterHandler.reconfigureCluster());
     commands.put("stop cluster", (command)->clusterHandler.stopCluster());
-    commands.put("bench start cluster", (command)->benchHandler.benchStartCluster());
-    commands.put("bench stop cluster", (command)->benchHandler.benchStopCluster());
     commands.put("bench healthcheck", (command)->benchHandler.benchHealthcheck());
     commands.put("bench start", (command)->benchHandler.benchStartTest(command));
     commands.put("bench stop", (command)->benchHandler.benchStopTest(command));
@@ -956,7 +951,7 @@ public class Cli {
     }
   }
 
-  private void useDatabase(String dbName) throws SQLException, ClassNotFoundException {
+  public void useDatabase(String dbName) throws SQLException, ClassNotFoundException {
     String cluster = currCluster;
     if (cluster == null) {
       System.out.println("Error, not using a cluster");

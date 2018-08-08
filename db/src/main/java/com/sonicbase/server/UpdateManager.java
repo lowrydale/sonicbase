@@ -49,7 +49,6 @@ public class UpdateManager {
   private static final String CURR_VER_STR = "currVer:";
   private final com.sonicbase.server.DatabaseServer server;
   private StreamManagerProxy streamManager;
-  private List<Object> producers = new ArrayList<>();
   private AtomicLong batchCount = new AtomicLong();
   private AtomicLong batchEntryCount = new AtomicLong();
   private AtomicLong lastBatchLogReset = new AtomicLong(System.currentTimeMillis());
@@ -529,6 +528,10 @@ public class UpdateManager {
 
   public void startStreamsConsumerMasterMonitor() {
     streamManager.startStreamsConsumerMasterMonitor();
+  }
+
+  public void stopStreamsConsumerMasterMonitor() {
+    streamManager.stopStreamsConsumerMasterMonitor();
   }
 
   private static class InsertRequest {
@@ -1271,7 +1274,7 @@ public class UpdateManager {
                                                 boolean movingRecord) {
     if (!movingRecord) {
       if (threadLocalIsBatchRequest.get() != null && threadLocalIsBatchRequest.get()) {
-        if (!dbName.equals("_sonicbase_sys") && !producers.isEmpty()) {
+        if (!dbName.equals("_sonicbase_sys")) {
           streamManager.addToBatch(dbName, tableName, recordBytes, UpdateType.INSERT);
         }
       }
@@ -1512,7 +1515,7 @@ public class UpdateManager {
   private void processMultipleRecords(TableSchema tableSchema, String primaryKeyIndexName, Object[] primaryKey,
                                       String indexName, Object[] key, Comparator[] comparators, Index index,
                                       Object value, byte[][] ids) {
-    byte[][] newValues = new byte[ids.length - 1][];
+    byte[][] newValues = new byte[ids.length][];
     int offset = 0;
     boolean found = false;
     byte[] foundBytes = null;
@@ -1540,6 +1543,14 @@ public class UpdateManager {
       }
     }
     if (found) {
+      if (offset < newValues.length) {
+        byte[][] shrunkValues = new byte[offset][];
+        System.arraycopy(newValues, 0, shrunkValues, 0, offset);
+        newValues = shrunkValues;
+      }
+      else if (offset == newValues.length) {
+        logger.warn("primary key not found in secondary index: key=" + DatabaseCommon.keyToString(key));
+      }
       insertRecordInIndex(primaryKeyIndexName, indexName, key, index, value, newValues, foundBytes);
     }
   }

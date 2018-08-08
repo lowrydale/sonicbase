@@ -42,7 +42,7 @@ public class MiscHandler {
   public void startStreaming() {
     ComObject cobj = new ComObject();
     for (int shard = 0; shard < cli.getConn().getShardCount(); shard++) {
-      cli.getConn().send("SreamManager:stopStreaming", shard, 0, cobj, ConnectionProxy.Replica.ALL);
+      cli.getConn().send("StreamManager:startStreaming", shard, 0, cobj, ConnectionProxy.Replica.ALL);
     }
   }
 

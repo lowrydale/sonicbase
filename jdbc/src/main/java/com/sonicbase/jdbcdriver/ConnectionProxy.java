@@ -247,7 +247,7 @@ public class ConnectionProxy implements Connection {
     if (client != null) {
       return client.sendToMaster(method, body);
     }
-    return clients.get(url).client.sendToMaster(body);
+    return clients.get(url).client.sendToMaster(method, body);
   }
 
   public void syncSchema() {
@@ -380,7 +380,7 @@ public class ConnectionProxy implements Connection {
   }
 
   public String getCatalog() throws SQLException {
-    throw new NotImplementedException();
+    return null;
   }
 
   public void setTransactionIsolation(int level) throws SQLException {

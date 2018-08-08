@@ -1,0 +1,6 @@
+#cd db
+mvn clean install -DskipTests
+
+mvn install:install-file -Dfile=/Users/lowryda/Dropbox/git/sonicbase/db/target/sonicbase-server-1.2.13.jar -DgroupId=com.sonicbase -DartifactId=sonicbase-server -Dversion=1.2.13 -Dpackaging=jar
+mvn install:install-file -Dfile=/Users/lowryda/Dropbox/git/sonicbase/jdbc/target/sonicbase-jdbc-1.2.13.jar -DgroupId=com.sonicbase -DartifactId=sonicbase-jdbc -Dversion=1.2.13 -Dpackaging=jar
+mvn install:install-file -Dfile=/Users/lowryda/Dropbox/git/sonicbase/jdbc/target/sonicbase-cli-1.2.13.jar -DgroupId=com.sonicbase -DartifactId=sonicbase-cli -Dversion=1.2.13 -Dpackaging=jar

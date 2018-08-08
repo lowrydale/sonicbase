@@ -38,7 +38,7 @@ public class EC2ToConfig {
 
       File keysFile = new File(System.getProperty("user.home"), ".awskeys");
       if (!keysFile.exists()) {
-        throw new DatabaseException(".awskeys file not found");
+        throw new Exception(".awskeys file not found");
       }
       try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(keysFile)))) {
         String accessKey = reader.readLine();
@@ -72,7 +72,7 @@ public class EC2ToConfig {
     }
   }
 
-  public static void configureServers(AmazonEC2 ec2Client, ObjectNode databaseDict, String cluster) {
+  public static void configureServers(AmazonEC2 ec2Client, ObjectNode databaseDict, String cluster) throws Exception {
     DescribeInstancesRequest request = new DescribeInstancesRequest();
 
     List<String> valuesT1 = new ArrayList<>();
@@ -110,7 +110,7 @@ public class EC2ToConfig {
     }
 
     if (servers.size() % replicationFactor != 0) {
-      throw new DatabaseException("Server count not divisible by replication factor: serverCount=" + servers.size() + ", replicationFactor=" + replicationFactor);
+      throw new Exception("Server count not divisible by replication factor: serverCount=" + servers.size() + ", replicationFactor=" + replicationFactor);
     }
     int shardCount = servers.size() / replicationFactor;
     ArrayNode shards = new ArrayNode(JsonNodeFactory.instance);

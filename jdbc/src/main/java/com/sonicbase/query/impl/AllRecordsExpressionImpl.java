@@ -91,11 +91,9 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
       orderByColumn = orderByExpressions.get(0).getColumnName();
     }
     TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(getFromTable());
-    IndexSchema indexSchema = null;
-    IndexSchema primaryIndex = null;
-    GetIndexSchema getIndexSchema = new GetIndexSchema(orderByColumn, tableSchema, indexSchema, primaryIndex).invoke();
-    indexSchema = getIndexSchema.getIndexSchema();
-    primaryIndex = getIndexSchema.getPrimaryIndex();
+    GetIndexSchema getIndexSchema = new GetIndexSchema(orderByColumn, tableSchema).invoke();
+    IndexSchema indexSchema = getIndexSchema.getIndexSchema();
+    IndexSchema primaryIndex = getIndexSchema.getPrimaryIndex();
     if (indexSchema == null) {
       indexSchema = primaryIndex;
     }
@@ -174,11 +172,9 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
     private IndexSchema indexSchema;
     private IndexSchema primaryIndex;
 
-    public GetIndexSchema(String orderByColumn, TableSchema tableSchema, IndexSchema indexSchema, IndexSchema primaryIndex) {
+    public GetIndexSchema(String orderByColumn, TableSchema tableSchema) {
       this.orderByColumn = orderByColumn;
       this.tableSchema = tableSchema;
-      this.indexSchema = indexSchema;
-      this.primaryIndex = primaryIndex;
     }
 
     public IndexSchema getIndexSchema() {

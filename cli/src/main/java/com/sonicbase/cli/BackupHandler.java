@@ -66,10 +66,10 @@ public class BackupHandler {
       cobj.put(ComObject.Tag.SCHEMA_VERSION, cli.getConn().getSchemaVersion());
       ComObject retObj = new ComObject(cli.getConn().sendToMaster("BackupManager:getBackupStatus", cobj));
       double percentComplete = retObj.getDouble(ComObject.Tag.PERCENT_COMPLETE);
-      Boolean error = retObj.getBoolean(ComObject.Tag.ERROR);
+      String error = retObj.getString(ComObject.Tag.EXCEPTION);
       percentComplete *= 100d;
       String formatted = String.format("%.2f", percentComplete);
-      System.out.println("running - percentComplete=" + formatted + (error != null && error ? ", error=true" : ""));
+      System.out.println("running - percentComplete=" + formatted + (error != null ? ", error=" + error : ""));
     }
 
   }
@@ -92,17 +92,17 @@ public class BackupHandler {
       cobj.put(ComObject.Tag.SCHEMA_VERSION, cli.getConn().getSchemaVersion());
       ComObject retObj = new ComObject(cli.getConn().sendToMaster("BackupManager:getRestoreStatus", cobj));
 
-      Boolean error = retObj.getBoolean(ComObject.Tag.ERROR);
+      String error = retObj.getString(ComObject.Tag.EXCEPTION);
       double percentComplete = retObj.getDouble(ComObject.Tag.PERCENT_COMPLETE);
       percentComplete *= 100;
       String formatted = String.format("%.2f", percentComplete);
 
       String stage = retObj.getString(ComObject.Tag.STAGE);
       if (stage.equals("copyingFiles")) {
-        System.out.println("running - stage=copyingFiles, percentComplete=" + formatted +  (error != null && error ? ", error=true" : ""));
+        System.out.println("running - stage=copyingFiles, percentComplete=" + formatted +  (error != null ? ", error=" + error : ""));
       }
       else {
-        System.out.println("running - stage=" + stage + ", percentComplete=" + formatted);
+        System.out.println("running - stage=" + stage + ", percentComplete=" + formatted +  (error != null ? ", error=" + error : ""));
       }
     }
   }

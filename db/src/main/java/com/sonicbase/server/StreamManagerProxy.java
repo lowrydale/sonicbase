@@ -23,6 +23,7 @@ public class StreamManagerProxy {
   private Method publishInsertOrUpdate;
   private Method addToBatch;
   private Method startStreamsConsumerMasterMonitor;
+  private Method stopStreamsConsumerMasterMonitor;
 
   public StreamManagerProxy(Object proServer) {
     try {
@@ -39,6 +40,7 @@ public class StreamManagerProxy {
       addToBatch = streamClz.getMethod("addToBatch",
           String.class, String.class, byte[].class, UpdateManager.UpdateType.class);
       startStreamsConsumerMasterMonitor = streamClz.getMethod("startStreamsConsumerMasterMonitor");
+      stopStreamsConsumerMasterMonitor = streamClz.getMethod("stopStreamsConsumerMasterMonitor");
     }
     catch (Exception e) {
       logger.error("Error initializing streamManager", e);
@@ -53,6 +55,17 @@ public class StreamManagerProxy {
     }
     catch (Exception e) {
       streamManager = null;
+      throw new DatabaseException(e);
+    }
+  }
+
+  public void stopStreamsConsumerMasterMonitor() {
+    try {
+      if (stopStreamsConsumerMasterMonitor != null) {
+        stopStreamsConsumerMasterMonitor.invoke(streamManager);
+      }
+    }
+    catch (Exception e) {
       throw new DatabaseException(e);
     }
   }
@@ -126,4 +139,5 @@ public class StreamManagerProxy {
     }
 
   }
+
 }

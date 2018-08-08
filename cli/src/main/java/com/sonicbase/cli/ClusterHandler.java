@@ -470,6 +470,10 @@ public class ClusterHandler {
       return;
     }
 
+    if ("reload server status".equals(command)) {
+      reloadServerStatus(command);
+    }
+
     cli.initConnection();
 
     command = command.trim();
@@ -485,6 +489,9 @@ public class ClusterHandler {
     if (cluster == null) {
       System.out.println("Error, not using a cluster");
       return;
+    }
+    if ("reload replica status".equals(command)) {
+      getReplicaReloadStatus(command);
     }
 
     cli.initConnection();

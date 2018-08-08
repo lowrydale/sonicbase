@@ -321,15 +321,19 @@ public class DatabaseCommon {
 
 
   public void addTable(String dbName,TableSchema schema) {
-    synchronized (this) {
-      Schema retSchema = ensureSchemaExists(dbName);
-      retSchema.addTable(schema);
-    }
+    Schema retSchema = ensureSchemaExists(dbName);
+    retSchema.addTable(schema);
   }
 
   private Schema ensureSchemaExists(String dbName) {
     synchronized (this) {
-      return this.schema.computeIfAbsent(dbName, k -> new Schema());
+      //faster than computeIfAbsent
+      Schema ret = this.schema.get(dbName);
+      if (ret == null) {
+        ret = new Schema();
+        this.schema.put(dbName, ret);
+      }
+      return ret;
     }
   }
 

@@ -95,6 +95,10 @@ public class DatabaseSocketClient {
         throw new DatabaseException("Error connecting to server: host=" + host + PORT_STR + port);
       }
     }
+    catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new DatabaseException(e);
+    }
     catch (Exception t) {
       throw new DatabaseException("Error creating connection: host=" + host + PORT_STR + port, t);
     }

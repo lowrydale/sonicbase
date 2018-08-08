@@ -57,7 +57,7 @@
         </layout>
     </appender>
 
-    <logger name="com.sonicbase.logger" additivity="false">
+    <logger name="com.sonicbase" additivity="false">
         <level value="info"/>
         <appender-ref ref="roll"/>
     </logger>

@@ -22,6 +22,12 @@
     "type" : "AWS",
     "maxBackupCount" : 10
   },
+  "xbackup" : {
+    "directory": "$HOME/db-backup",
+    "sharedDirectory": true,
+    "type" : "fileSystem",
+    "maxBackupCount" : 10
+  },
   "shards" : [
     {
       "replicas": [

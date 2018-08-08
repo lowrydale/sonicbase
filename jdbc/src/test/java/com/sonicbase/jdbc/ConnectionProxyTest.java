@@ -423,7 +423,6 @@ public class ConnectionProxyTest {
 //    }
 //
 //    public int getNetworkTimeout() throws SQLException {
-//      // todo: implement for JDK 1.7
 //      throw new NotImplementedException();
 //    }
 //

@@ -61,13 +61,13 @@
     In your project's main directory, issue the following command:<br/>
     <br/>
         <pre class="java"><code>
-mvn install:install-file -Dfile=&lt;path&gt;/sonicbase-&lt;version&gt;.jar -DgroupId=com.sonicbase -DartifactId=sonicbase -Dversion=&lt;version&gt; -Dpackaging=jar
+mvn install:install-file -Dfile=&lt;path&gt;/sonicbase-jdbc-&lt;version&gt;.jar -DgroupId=com.sonicbase -DartifactId=sonicbase-jdbc -Dversion=&lt;version&gt; -Dpackaging=jar
         </code></pre>
     <br/>
     For example:<br/>
     <br/>
         <pre class="java"><code>
-mvn install:install-file -Dfile=/home/user/sonicbase-0.9.2.jar -DgroupId=com.sonicbase -DartifactId=sonicbase -Dversion=0.9.2 -Dpackaging=jar
+mvn install:install-file -Dfile=/home/user/sonicbase-jdbc-0.9.2.jar -DgroupId=com.sonicbase -DartifactId=sonicbase-jdbc -Dversion=0.9.2 -Dpackaging=jar
         </code></pre>
     <br/>
     The jar is located in the "lib" directory of the install directory. It is named "sonicbase-&lt;version&gt;.jar".<br/>
@@ -77,7 +77,7 @@ mvn install:install-file -Dfile=/home/user/sonicbase-0.9.2.jar -DgroupId=com.son
         <pre class="java"><code>
 &lt;dependency&gt;
     &lt;groupId&gt;com.sonicbase&lt;/groupId&gt;
-    &lt;artifactId&gt;sonicbase&lt;/artifactId&gt;
+    &lt;artifactId&gt;sonicbase-jdbc&lt;/artifactId&gt;
     &lt;version&gt;&lt;version&gt;&lt;/version&gt;
 &lt;/dependency&gt;
         </code></pre>
@@ -88,7 +88,7 @@ Before you connect to the database you need to create the database using the adm
 </div>
 
 <h2>JDK Requirements</h2>
-The jvm running the jdbc driver needs to be at least version 7.
+The jvm running the jdbc driver needs to be at least version 8.
 <br/>
 
 <h2>Connecting</h2>

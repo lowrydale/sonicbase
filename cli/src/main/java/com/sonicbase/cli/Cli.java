@@ -31,6 +31,7 @@ import net.sf.jsqlparser.parser.CCJSqlParserManager;
 import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.schema.Table;
 import net.sf.jsqlparser.statement.select.*;
+import org.apache.commons.cli.*;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
@@ -96,6 +97,13 @@ public class Cli {
     startCheckLicensesThread();
 
     initCommands();
+    backupHandler = new BackupHandler(this);
+    clusterHandler = new ClusterHandler(this);
+    benchHandler = new BenchHandler(this);
+    describeHandler = new DescribeHandler(this);
+    bulkImportHandler = new BulkImportHandler(this);
+    sqlHandler = new SQLHandler(this);
+    miscHandler = new MiscHandler(this);
 
     try {
       ProcessBuilder builder = new ProcessBuilder().command("uname", "-o");
@@ -129,11 +137,16 @@ public class Cli {
           plainConsole = true;
         }
         else {
-          StringBuilder builder = new StringBuilder();
-          for (int i = 0; i < args.length; i++) {
-            builder.append(args[i] + " ");
+          CommandLine commandLine= getCommandLineOptions(args);
+          String localCluster = commandLine.getOptionValue("cluster");
+          if (localCluster != null) {
+            useCluster(localCluster);
           }
-          runCommand(builder.toString());
+          String localDb = commandLine.getOptionValue("db");
+          if (localDb != null) {
+            useDatabase(localDb);
+          }
+          runCommand(commandLine.getOptionValue("command"));
           System.exit(0);
         }
       }
@@ -144,13 +157,6 @@ public class Cli {
 
       moveToBottom();
 
-      backupHandler = new BackupHandler(this);
-      clusterHandler = new ClusterHandler(this);
-      benchHandler = new BenchHandler(this);
-      describeHandler = new DescribeHandler(this);
-      bulkImportHandler = new BulkImportHandler(this);
-      sqlHandler = new SQLHandler(this);
-      miscHandler = new MiscHandler(this);
       while (true) {
         while (true) {
           StringBuilder builder = new StringBuilder();
@@ -196,6 +202,23 @@ public class Cli {
     }
 
   }
+
+  private CommandLine getCommandLineOptions(String[] args) throws ParseException {
+    Options options = new Options();
+    Option op = new Option("c", "cluster", true, "cluster");
+    op.setRequired(false);
+    options.addOption(op);
+    op = new Option("d", "db", true, "db");
+    op.setRequired(false);
+    options.addOption(op);
+    op = new Option("m", "command", true, "command");
+    op.setRequired(false);
+    options.addOption(op);
+
+    CommandLineParser parser = new DefaultParser();
+    return parser.parse(options, args);
+  }
+
 
   public boolean isWindows() {
     return !OS.contains("cygwin") && OS.contains("win");
@@ -405,7 +428,8 @@ public class Cli {
         System.out.print("\033[2J\033[;H");
         next();
       });
-    commands.put("build config", (command)->buildConfig());
+    commands.put("build config", (command)->buildConfig(command));
+    commands.put("build config aws", (command)->buildConfigAws(command));
     commands.put("force rebalance", (command)->forceRebalance());
     commands.put("insert", (command)->{
         System.out.print("\033[2J\033[;H");
@@ -876,7 +900,18 @@ public class Cli {
   }
 
 
-  private void buildConfig() {
+  private void buildConfig(String command) throws IOException {
+    if (currCluster == null) {
+      System.out.println("Error, not using a cluster");
+      return;
+    }
+    String[] parts = command.split(" ");
+    String filename = parts[parts.length - 1];
+    BuildConfig build = new BuildConfig();
+    build.buildConfig(currCluster, filename);
+  }
+
+  private void buildConfigAws(String command) throws IOException {
     if (currCluster == null) {
       System.out.println("Error, not using a cluster");
       return;

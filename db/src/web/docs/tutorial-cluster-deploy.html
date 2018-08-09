@@ -94,9 +94,12 @@ Edit the "config-test.json" file in the sonicbase/config directory. See <a href=
 On Windows the directory may look like "c:\\\\db-data". On linux it may look like "/mnt/db-data". On linux and mac
 you also have the option of prefixing your path with "$HOME" to specify the home directory. This option is not available on Windows.
         <h2>Configure Servers</h2>
+      <h3>Simple Server Config</h3>
+      Create a text file listing the address of each server you want in the cluster. Type the following command:<br/>
+      ./cli --cluster=[cluster name] --command="build config [path to text file]"
+      <h3>Detailed Server Config</h3>
       <div class="mylink">
-        Set the addresses and ports of each of your servers in the config file. If you have a pro license or 30-day trial you
-        may configure multiple servers as replicas. Below is an example of configuring two shards and two replicas. A shard is a subset
+        Set the addresses and ports of each of your servers in the config file. Below is an example of configuring two shards and two replicas. A shard is a subset
         of the data located on server and its replicas. See <a href="shards-and-replicas.html?framed=true">Shards and Replicas</a>.
       </div>
         <h3>Example With 2 Shards and 2 Replicas</h3>
@@ -165,10 +168,6 @@ you also have the option of prefixing your path with "$HOME" to specify the home
 <h2>Start Admin Client</h2>
 Change to the sonicbase/bin directory and type "./cli" for MacOS and Linux and "./cli.bat" for cygwin and "cli.bat" for Windows.
         This will start the SonicBase admin client.
-<h2>Start License Server</h2>
-      <div class="mylink">
-      If you have more that one replica configured you will need to <a href="../downloads.html?framed=true">purchase licenses</a> and start the license server. For more details see <a href="license-server.html?framed=true">License Server</a>.
-      </div>
 <h2>Use Cluster</h2>
 In the client, type:<br/>
 &nbsp;&nbsp;use cluster test<br/><br/>

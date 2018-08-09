@@ -19,6 +19,8 @@ public class BenchServer {
   static BenchmarkCheck benchCheck = new BenchmarkCheck();
   static BenchmarkInsert benchInsert = new BenchmarkInsert();
   static BenchmarkDelete benchDelete = new BenchmarkDelete();
+  static BenchmarkAWSInsertPublish benchAWSInsert = new BenchmarkAWSInsertPublish();
+  static BenchmarkAWSDeletePublish benchAWSDelete = new BenchmarkAWSDeletePublish();
   static BenchmarkIdentityQuery benchIdentity = new BenchmarkIdentityQuery();
   static BenchmarkRangeQuery benchRange = new BenchmarkRangeQuery();
   static BenchmarkJoins benchJoins = new BenchmarkJoins();
@@ -58,7 +60,24 @@ public class BenchServer {
       else if (uri.startsWith("/bench/stop/Delete")) {
         benchDelete.stop();
       }
-
+      else if (uri.startsWith("/bench/start/aws-insert")) {
+        benchAWSInsert.start(insertBegin, insertHighest, request.getParameter("cluster"), Integer.valueOf(request.getParameter("shardCount")),
+            Integer.valueOf(request.getParameter("shard")),
+            Long.valueOf(request.getParameter("offset")),
+            Long.valueOf(request.getParameter("count")), false);
+      }
+      else if (uri.startsWith("/bench/start/aws-delete")) {
+        benchAWSDelete.start(insertBegin, insertHighest, request.getParameter("cluster"), Integer.valueOf(request.getParameter("shardCount")),
+            Integer.valueOf(request.getParameter("shard")),
+            Long.valueOf(request.getParameter("offset")),
+            Long.valueOf(request.getParameter("count")), false);
+      }
+      else if (uri.startsWith("/bench/stop/aws-insert")) {
+        benchAWSInsert.stop();
+      }
+      else if (uri.startsWith("/bench/stop/aws-delete")) {
+        benchAWSDelete.stop();
+      }
 //      else if (uri.startsWith("/bench/start/kafka-insert")) {
 //        benchKafkaInsert.start(insertBegin, insertHighest, request.getParameter("cluster"), Integer.valueOf(request.getParameter("shardCount")),
 //            Integer.valueOf(request.getParameter("shard")),
@@ -118,6 +137,18 @@ public class BenchServer {
       else if (uri.startsWith("/bench/stats/delete")) {
         ret = benchDelete.stats();
       }
+      else if (uri.startsWith("/bench/stats/aws-insert")) {
+        ret = benchAWSInsert.stats();
+      }
+      else if (uri.startsWith("/bench/stats/aws-delete")) {
+        ret = benchAWSDelete.stats();
+      }
+//      else if (uri.startsWith("/bench/stats/kafka-insert")) {
+//        ret = benchKafkaInsert.stats();
+//      }
+//      else if (uri.startsWith("/bench/stats/kafka-delete")) {
+//        ret = benchKafkaDelete.stats();
+//      }
       else if (uri.startsWith("/bench/stats/identity")) {
         ret = benchIdentity.stats();
       }
@@ -133,6 +164,18 @@ public class BenchServer {
       else if (uri.startsWith("/bench/resetStats/delete")) {
         benchDelete.resetStats();
       }
+      else if (uri.startsWith("/bench/resetStats/aws-insert")) {
+        benchAWSInsert.resetStats();
+      }
+      else if (uri.startsWith("/bench/resetStats/aws-delete")) {
+        benchAWSDelete.resetStats();
+      }
+//      else if (uri.startsWith("/bench/resetStats/kafka-insert")) {
+//        benchKafkaInsert.resetStats();
+//      }
+//      else if (uri.startsWith("/bench/resetStats/kafka-delete")) {
+//        benchKafkaDelete.resetStats();
+//      }
       else if (uri.startsWith("/bench/resetStats/identity")) {
         benchIdentity.resetStats();
       }

@@ -1,0 +1,93 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>SonicBase - Batch Read SQL Syntax</title>
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="Directions on how to use the jdbc client to do batch read from SonicBase.">
+	<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+	<script type="text/javascript" src="../javascript/main.js"></script>
+
+	<link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+	<script src="../javascript/highlight.min.js"></script>
+	<script>hljs.initHighlightingOnLoad();</script>
+	<!-- Global site tag (gtag.js) - Google Analytics -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+	<script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-109032274-1');
+        ga('require', 'displayfeatures');
+	</script>
+</head>
+
+<body>
+<div class="container">
+	<header id="myHeader">
+		<div class="mobile">
+			<a href="../index.html">
+				<h4 class="logo">SonicBase™</h4>
+			</a>
+		</div>
+
+		<div class="desktop">
+			<a href="../index.html">
+				<img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+			</a>
+		<nav>
+			<ul>
+				<li><a href="../index.html">HOME</a></li>
+				<li> <a href="../documentation.html">DOCUMENTATION</a></li>
+				<li><a href="../contact.html">CONTACT</a></li>
+			</ul>
+		</nav>
+		</div>
+	</header>
+
+	<script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+	</script>
+
+	<div class="main-page-text">
+
+<h1>SQL Batch Read</h1>
+<br/>
+		Batch identity reads can greatly improve the performance of looking up a batch of records by a batch of keys.
+Batch identity reads can be achieved in two ways. The first approach is to use an "in expression". The second approach is
+		to use a series of "or expressions". For both approaches, a batch size of 200 is good. Use a larger batch size for
+		a larger cluster.
+		<h2>In Expression</h2>
+		This approach only works if you have a single field in the keys you are looking up.
+		<h3>Example</h3>
+		<pre class="java"><code>
+PreparedStatement stmt = conn.prepareStatement("select * from persons where id1 in (1, 2, 3, 4, 5, 6, 7, 8, 9) order by id1 asc");
+
+ResultSet rs = stmt.executeQuery();
+for (int i = 0; i < 10; i++) {
+  rs.next();
+  System.out.println(rs.getString("name"));
+}
+		</code></pre>
+
+		<h2>Or Expressions</h2>
+		Or expressions can by used to lookup records by a composite key.
+		<h3>Example</h3>
+		<pre class="java"><code>
+PreparedStatement stmt = conn.prepareStatement("select * from persons where id1 = 1 and id2 = 2 or id1 = 1 and id2=3 order by id1 asc");
+
+ResultSet rs = stmt.executeQuery();
+for (int i = 0; i < 2; i++) {
+  rs.next();
+  System.out.println(rs.getString("name"));
+}
+		</code></pre>
+
+</div>
+</div>
+</body>
+</html>

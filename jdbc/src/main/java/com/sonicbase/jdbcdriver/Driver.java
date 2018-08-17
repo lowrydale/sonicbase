@@ -12,17 +12,13 @@ import java.util.logging.Logger;
 // I don't know a good way to reduce the parameter count
 public class Driver implements java.sql.Driver {
 
-
   private static final String URL_PREFIX =  "jdbc:sonicbase";
-
-  private static Driver driver;
-
   private static final int MAJOR_VERSION = 0;
   private static final int MINOR_VERSION = 502;
 
   static {
     try {
-      driver = new Driver();
+      Driver driver = new Driver();
       DriverManager.registerDriver(driver);
     }
     catch (Exception e) {

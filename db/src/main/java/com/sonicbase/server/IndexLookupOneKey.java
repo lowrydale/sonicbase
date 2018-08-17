@@ -648,15 +648,12 @@ public class IndexLookupOneKey extends IndexLookup {
       if (ascending != null && !ascending) {
         final AtomicInteger countRead = new AtomicInteger();
         final List<MapEntry<Object[], Object>> currEntries = new ArrayList<>();
-        index.visitHeadMap(entry.getKey(), new Index.Visitor() {
-          @Override
-          public boolean visit(Object[] key, Object value) throws IOException {
-            MapEntry<Object[], Object> curr = new MapEntry<>();
-            curr.setKey(key);
-            curr.setValue(value);
-            currEntries.add(curr);
-            return countRead.incrementAndGet() < count - diff;
-          }
+        index.visitHeadMap(entry.getKey(), (key, value) -> {
+          MapEntry<Object[], Object> curr = new MapEntry<>();
+          curr.setKey(key);
+          curr.setValue(value);
+          currEntries.add(curr);
+          return countRead.incrementAndGet() < count - diff;
         });
         localEntries = currEntries.toArray(new Map.Entry[currEntries.size()]);
       }

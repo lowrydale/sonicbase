@@ -3,13 +3,13 @@
   <parent>
     <artifactId>sonicbase-root</artifactId>
     <groupId>com.sonicbase</groupId>
-    <version>1.2.13</version>
+    <version>1.2.14</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.sonicbase</groupId>
   <artifactId>sonicbase-server</artifactId>
   <name>sonicbase-server</name>
-  <version>1.2.13</version>
+  <version>1.2.14</version>
   <url>http://maven.apache.org</url>
   <build>
     <pluginManagement>
@@ -80,7 +80,7 @@
     <dependency>
       <groupId>com.sonicbase</groupId>
       <artifactId>sonicbase-jdbc</artifactId>
-      <version>1.2.13</version>
+      <version>1.2.14</version>
       <scope>provided</scope>
     </dependency>
     <dependency>

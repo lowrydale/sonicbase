@@ -93,6 +93,7 @@ Edit the "config-test.json" file in the sonicbase/config directory. See <a href=
         Note on Windows you will need to escape the backslashes so the value can be stored in the json file.<br/>
 On Windows the directory may look like "c:\\\\db-data". On linux it may look like "/mnt/db-data". On linux and mac
 you also have the option of prefixing your path with "$HOME" to specify the home directory. This option is not available on Windows.
+      The $WORKING_DIR macro should only be used on a local cluster.
         <h2>Configure Servers</h2>
       <h3>Simple Server Config</h3>
       Create a text file listing the address of each server you want in the cluster. Type the following command:<br/>

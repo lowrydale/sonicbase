@@ -38,6 +38,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.sonicbase.client.InsertStatementHandler.BATCH_STATUS_FAILED;
 import static com.sonicbase.client.InsertStatementHandler.BATCH_STATUS_SUCCCESS;
 import static org.testng.Assert.*;
 
@@ -289,23 +290,20 @@ public class TestDatabase {
       rs.next();
       assertEquals(rs.getString("relatives"), "updated value");
 
-      try {
-        stmt = conn.prepareStatement("insert into persons (id, socialSecurityNumber, relatives, restricted, gender, id3) VALUES (?, ?, ?, ?, ?, ?)");
-        for (int i = 0; i < recordCount; i++) {
-          stmt.setLong(1, i);
-          stmt.setString(2, "933-28-" + i);
-          stmt.setString(3, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
-          stmt.setBoolean(4, false);
-          stmt.setString(5, "m");
-          stmt.setLong(6, i + 1000);
-          ids.add((long) i);
-          stmt.addBatch();
-        }
-        stmt.executeBatch();
+      stmt = conn.prepareStatement("insert into persons (id, socialSecurityNumber, relatives, restricted, gender, id3) VALUES (?, ?, ?, ?, ?, ?)");
+      for (int i = 0; i < recordCount; i++) {
+        stmt.setLong(1, i);
+        stmt.setString(2, "933-28-" + i);
+        stmt.setString(3, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+        stmt.setBoolean(4, false);
+        stmt.setString(5, "m");
+        stmt.setLong(6, i + 1000);
+        ids.add((long) i);
+        stmt.addBatch();
       }
-      catch (Exception e) {
-        //e.printStackTrace();
-        assertTrue(ExceptionUtils.getStackTrace(e).contains("Unique constraint violated"));
+      batchRet = stmt.executeBatch();
+      for (int i = 0; i < recordCount; i++) {
+        assertEquals(batchRet[i], BATCH_STATUS_FAILED);
       }
 
       for (int i = 0; i < recordCount; i++) {
@@ -2536,26 +2534,6 @@ public class TestDatabase {
     assertFalse(ret.next());
   }
 
-  @Test
-  public void testIn() throws SQLException {
-
-    //test select with in expression
-    PreparedStatement stmt = conn.prepareStatement("select * from persons where id in (0, 1, 2, 3, 4)");
-    ResultSet ret = stmt.executeQuery();
-
-    ret.next();
-    assertEquals(ret.getLong("id"), 0);
-    ret.next();
-    assertEquals(ret.getLong("id"), 1);
-    ret.next();
-    assertEquals(ret.getLong("id"), 2);
-    ret.next();
-    assertEquals(ret.getLong("id"), 3);
-    ret.next();
-    assertEquals(ret.getLong("id"), 4);
-    assertFalse(ret.next());
-  }
-
   @Test(invocationCount = 1)
   public void testSecondaryIndex() throws SQLException {
 
@@ -3394,167 +3372,6 @@ public class TestDatabase {
 
     stmt = conn.prepareStatement("delete from persons where id=200000");
     stmt.executeUpdate();
-  }
-
-
-  //@Test
-  public void testBatchInsertNoKeySecondaryIndex() throws SQLException, InterruptedException {
-
-    try {
-      client.syncSchema();
-      conn.setAutoCommit(false);
-      PreparedStatement stmt = conn.prepareStatement("insert into nokeysecondaryindex (id, id2) VALUES (?, ?)");
-      for (int i = 0; i < 10; i++) {
-        stmt.setLong(1, 200000 + i);
-        stmt.setLong(2, 200000 * 2 + i);
-        stmt.addBatch();
-      }
-      stmt.executeBatch();
-      conn.commit();
-
-      stmt = conn.prepareStatement("select * from nokeysecondaryindex where id>=200000");
-      ResultSet resultSet = stmt.executeQuery();
-      for (int i = 0; i < 10; i++) {
-        assertTrue(resultSet.next());
-      }
-      assertFalse(resultSet.next());
-    }
-    finally {
-      for (int i = 0; i < 10; i++) {
-        PreparedStatement stmt = conn.prepareStatement("delete from nokeysecondaryindex where id=?");
-        stmt.setLong(1, 200000 + i);
-        stmt.executeUpdate();
-      }
-    }
-  }
-
-  @Test
-  public void testBatchInsertNoKey() throws SQLException, InterruptedException {
-
-//    LocalConsumer consumer = new LocalConsumer();
-//    while (true) {
-//      List<Message> msgs = consumer.receive();
-//      if (msgs == null || msgs.size() == 0) {
-//        break;
-//      }
-//    }
-
-    client.syncSchema();
-    conn.setAutoCommit(false);
-    PreparedStatement stmt = conn.prepareStatement("insert into nokey (id, id2) VALUES (?, ?)");
-    for (int i = 0; i < 10; i++) {
-      stmt.setLong(1, 200000 + i);
-      stmt.setLong(2, 200000 * 2 + i);
-      stmt.addBatch();
-      stmt.setLong(1, 200000 + i);
-      stmt.setLong(2, 200000 * 2 + i);
-      stmt.addBatch();
-    }
-    stmt.executeBatch();
-    conn.commit();
-
-    try {
-//      List<Message> msgs = consumer.receive();
-//      assertEquals(msgs.size(), 10);
-//      int offset = 0;
-//      for (Message msg : msgs) {
-//        String actual = msg.getBody();
-//        ObjectMapper mapper = new ObjectMapper();
-//        ObjectNode dict = (ObjectNode) mapper.readTree(actual);
-//        assertEquals(dict.withArray("records").size(), 1);
-//        JsonNode node = dict.withArray("records").get(0);
-//        assertEquals(node.get("id").asLong(), 200000 + (offset / 2));
-//        offset += 1;
-//      }
-
-
-      stmt = conn.prepareStatement("select * from nokey where id>=200000");
-      ResultSet resultSet = stmt.executeQuery();
-      for (int i = 0; i < 10; i++) {
-        assertTrue(resultSet.next());
-        assertEquals(resultSet.getLong("id"), 200000 + i);
-        assertTrue(resultSet.next());
-        assertEquals(resultSet.getLong("id"), 200000 + i);
-      }
-      assertFalse(resultSet.next());
-
-      for (int i = 0; i < 10; i++) {
-        stmt = conn.prepareStatement("delete from nokey where id=?");
-        stmt.setLong(1, 200000 + i);
-        stmt.executeUpdate();
-      }
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-  }
-
-  @Test
-  public void testBatchInsert() throws SQLException, InterruptedException, IOException {
-
-    try {
-
-//      LocalConsumer consumer = new LocalConsumer();
-//      while (true) {
-//        List<Message> msgs = consumer.receive();
-//        if (msgs == null || msgs.size() == 0) {
-//          break;
-//        }
-//      }
-
-      client.syncSchema();
-      conn.setAutoCommit(false);
-      PreparedStatement stmt = conn.prepareStatement("insert into persons (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
-      for (int i = 0; i < 10; i++) {
-        stmt.setLong(1, 200000 + i);
-        stmt.setLong(2, (100) % 2);
-        stmt.setString(3, "ssn");
-        stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
-        stmt.setBoolean(5, false);
-        stmt.setString(6, "m");
-        stmt.addBatch();
-      }
-      stmt.executeBatch();
-      conn.commit();
-
-      try {
-        stmt = conn.prepareStatement("update persons set id=1 where id=1");
-        for (int i = 0; i < 10; i++) {
-          stmt.addBatch();
-        }
-        stmt.executeBatch();
-      }
-      catch (Exception e) {
-        System.out.println("pass");
-      }
-
-      try {
-        stmt = conn.prepareStatement("delete from persons where id=1");
-        for (int i = 0; i < 10; i++) {
-          stmt.addBatch();
-        }
-        stmt.executeBatch();
-      }
-      catch (Exception e) {
-        System.out.println("pass");
-      }
-
-      Thread.sleep(5000);
-
-      stmt = conn.prepareStatement("select * from persons where id>=200000");
-      ResultSet resultSet = stmt.executeQuery();
-      for (int i = 0; i < 10; i++) {
-        assertTrue(resultSet.next());
-      }
-      assertFalse(resultSet.next());
-    }
-    finally {
-      for (int i = 0; i < 10; i++) {
-        PreparedStatement stmt = conn.prepareStatement("delete from persons where id=?");
-        stmt.setLong(1, 200000 + i);
-        stmt.executeUpdate();
-      }
-    }
   }
 
   @Test

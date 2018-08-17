@@ -12,6 +12,8 @@ import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.PartitionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.UnsupportedEncodingException;
 import java.sql.SQLException;
@@ -26,6 +28,8 @@ import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION;
 // I prefer to return null instead of an empty array
 // I don't know a good way to reduce the parameter count
 public class UpdateStatementImpl extends StatementImpl implements UpdateStatement {
+  private static Logger logger = LoggerFactory.getLogger(UpdateStatementImpl.class);
+
   public static final String UTF_8_STR = "utf-8";
   private final DatabaseClient client;
   private final ExpressionImpl.RecordCache recordCache;
@@ -72,12 +76,18 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
           whereClause.setReplica(replica);
         }
 
+        SelectStatementImpl select = new SelectStatementImpl(client);
+        select.setExpression(whereClause);
+        select.setFromTable(whereClause.getTableName());
+        String[] tableNames = new String[]{whereClause.getTableName()};
+        select.setTableNames(tableNames);
+
         Random rand = new Random(System.currentTimeMillis());
         int countUpdated = 0;
         getWhereClause().reset();
         while (true) {
 
-          DoExecute doExecute = new DoExecute(dbName, explain, sequence0, sequence1, sequence2, restrictToThisServer,
+          DoExecute doExecute = new DoExecute(select, dbName, explain, sequence0, sequence1, sequence2, restrictToThisServer,
               procedureContext, schemaRetryCount, rand, countUpdated).invoke();
           countUpdated = doExecute.getCountUpdated();
           if (doExecute.is()) {
@@ -101,7 +111,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
 
   }
 
-  public void deleteKey(String dbName, String tableName, InsertStatementHandler.KeyInfo keyInfo, String primaryKeyIndexName,
+  public static void deleteKey(DatabaseClient client, String dbName, String tableName, InsertStatementHandler.KeyInfo keyInfo, String primaryKeyIndexName,
                         Object[] primaryKey, int schemaRetryCount) {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.DB_NAME, dbName);
@@ -163,6 +173,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
   }
 
   private class DoExecute {
+    private final SelectStatementImpl select;
     private boolean myResult;
     private String dbName;
     private SelectStatementImpl.Explain explain;
@@ -175,9 +186,10 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
     private Random rand;
     private int countUpdated;
 
-    public DoExecute(String dbName, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
+    public DoExecute(SelectStatementImpl select, String dbName, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
                      boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount,
                      Random rand, int countUpdated) {
+      this.select = select;
       this.dbName = dbName;
       this.explain = explain;
       this.sequence0 = sequence0;
@@ -199,9 +211,11 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
     }
 
     public DoExecute invoke() throws UnsupportedEncodingException, SQLException {
-      ExpressionImpl.NextReturn ret = getWhereClause().next(explain, new AtomicLong(), new AtomicLong(), null,
-          null, schemaRetryCount);
-      if (ret == null || ret.getIds() == null) {
+      ExpressionImpl expr = getWhereClause();
+
+      ExpressionImpl.NextReturn ret = expr.next(select, DatabaseClient.SELECT_PAGE_SIZE, explain,
+          new AtomicLong(), new AtomicLong(), null, null, schemaRetryCount);
+      if (ret == null || ret.getIds() == null || ret.getIds().length == 0) {
         myResult = true;
         return this;
       }
@@ -291,7 +305,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
 
     private void doUpdateRecord(String dbName, Long sequence0, Long sequence1, Short sequence2, int schemaRetryCount,
                                 Random rand, TableSchema tableSchema, IndexSchema indexSchema, Record record,
-                                Object[] newPrimaryKey, List<Integer> selectedShards) {
+                                Record oldRecord, Object[] newPrimaryKey, List<Integer> selectedShards) {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.DB_NAME, dbName);
       if (schemaRetryCount < 2) {
@@ -304,6 +318,9 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
       cobj.put(ComObject.Tag.TRANSACTION_ID, client.getTransactionId());
       cobj.put(ComObject.Tag.PRIMARY_KEY_BYTES, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), newPrimaryKey));
       cobj.put(ComObject.Tag.BYTES, record.serialize(client.getCommon(), SERIALIZATION_VERSION));
+      if (oldRecord != null) {
+        cobj.put(ComObject.Tag.PREV_BYTES, oldRecord.serialize(client.getCommon(), SERIALIZATION_VERSION));
+      }
       if (sequence0 != null && sequence1 != null && sequence2 != null) {
         cobj.put(ComObject.Tag.SEQUENCE_0_OVERRIDE, sequence0);
         cobj.put(ComObject.Tag.SEQUENCE_1_OVERRIDE, sequence1);
@@ -350,6 +367,12 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
         List<ColumnImpl> qColumns = getColumns();
         List<ExpressionImpl> localSetExpressions = getSetExpressions();
         Object[] newFields = record.getFields();
+
+        Record oldRecord = new Record(tableSchema);
+        Object[] oldFields = new Object[newFields.length];
+        System.arraycopy(newFields, 0, oldFields, 0, newFields.length);
+        oldRecord.setFields(oldFields);
+
         columnNames = new ArrayList<>();
         values = new ArrayList<>();
         tableFields = tableSchema.getFields();
@@ -369,41 +392,96 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
           throw new DatabaseException("No shards selected for query");
         }
 
-        doUpdateRecord(dbName, sequence0, sequence1, sequence2, schemaRetryCount, rand, tableSchema, indexSchema,
-            record, newPrimaryKey, selectedShards);
+        Exception firstException = null;
+        List<InsertStatementHandler.KeyInfo> inserted = new ArrayList<>();
+        List<InsertStatementHandler.KeyInfo> deleted = new ArrayList<>();
+        boolean updated = false;
+        try {
+          doUpdateRecord(dbName, sequence0, sequence1, sequence2, schemaRetryCount, rand, tableSchema, indexSchema,
+              record, oldRecord, newPrimaryKey, selectedShards);
+          updated = true;
+          //update keys
 
-        //update keys
+          List<InsertStatementHandler.KeyInfo> newKeys = InsertStatementHandler.getKeys(tableSchema, columnNames, values, id);
 
-        List<InsertStatementHandler.KeyInfo> newKeys = InsertStatementHandler.getKeys(tableSchema, columnNames, values, id);
+          Map<String, ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo>> orderedKeyInfosPrevious = new HashMap<>();
+          Map<String, ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo>> orderedKeyInfosNew = new HashMap<>();
 
-        Map<String, ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo>> orderedKeyInfosPrevious = new HashMap<>();
-        Map<String, ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo>> orderedKeyInfosNew = new HashMap<>();
+          DatabaseClient.populateOrderedKeyInfo(orderedKeyInfosPrevious, previousKeys);
+          DatabaseClient.populateOrderedKeyInfo(orderedKeyInfosNew, newKeys);
 
-        DatabaseClient.populateOrderedKeyInfo(orderedKeyInfosPrevious, previousKeys);
-        DatabaseClient.populateOrderedKeyInfo(orderedKeyInfosNew, newKeys);
+          doDeleteKeys(dbName, schemaRetryCount, tableSchema, indexSchema, entry, orderedKeyInfosPrevious, orderedKeyInfosNew, deleted);
 
-        doDeleteKeys(dbName, schemaRetryCount, tableSchema, indexSchema, entry, orderedKeyInfosPrevious, orderedKeyInfosNew);
+          doInsertKeys(dbName, schemaRetryCount, tableSchema, indexSchema, newPrimaryKey, orderedKeyInfosPrevious, orderedKeyInfosNew, inserted);
+        }
+        catch (Exception e) {
+          if (firstException == null) {
+            firstException = e;
+          }
+          logger.error("Error updating record", e);
+          if (updated) {
+            doUpdateRecord(dbName, sequence0, sequence1, sequence2, schemaRetryCount, rand, tableSchema, indexSchema,
+                oldRecord, null, newPrimaryKey, selectedShards);
+          }
 
-        doInsertKeys(dbName, schemaRetryCount, tableSchema, indexSchema, newPrimaryKey, orderedKeyInfosPrevious, orderedKeyInfosNew);
+          rollbackInserts(tableName, indexSchema.getName(), entry, inserted);
+          rollbackDeletes(tableSchema, indexSchema.getName(), newPrimaryKey, oldRecord, deleted);
+        }
+        if (firstException != null) {
+          throw new DatabaseException(firstException);
+        }
+      }
+    }
+
+    private void rollbackDeletes(TableSchema tableSchema, String indexName, Object[] newPrimaryKey,
+                                 Record record, List<InsertStatementHandler.KeyInfo> deleted) {
+      for (InsertStatementHandler.KeyInfo keyInfo : deleted) {
+        try {
+          KeyRecord keyRecord = new KeyRecord();
+          byte[] primaryKeyBytes = DatabaseCommon.serializeKey(tableSchema,
+              keyInfo.getIndexSchema().getName(), newPrimaryKey);
+          keyRecord.setPrimaryKey(primaryKeyBytes);
+          keyRecord.setDbViewNumber(client.getCommon().getSchemaVersion());
+          InsertStatementHandler.insertKey(client, dbName, tableSchema.getName(), keyInfo, indexName,
+              newPrimaryKey, record, keyRecord, false, schemaRetryCount);
+        }
+        catch (Exception e) {
+          logger.error("Error rolling backup update with insert: table=" + tableName + ", index=" + indexName + ", key=" +
+              DatabaseCommon.keyToString(keyInfo.getKey()));
+        }
+      }
+    }
+
+    private void rollbackInserts(String tableName, String indexName, Object[][] entry, List<InsertStatementHandler.KeyInfo> keyInfos) {
+      for (InsertStatementHandler.KeyInfo keyInfo : keyInfos) {
+        try {
+          deleteKey(client, dbName, tableName, keyInfo, indexName, entry[0], schemaRetryCount);
+        }
+        catch (Exception e) {
+          logger.error("Error rolling backup update with delete: table=" + tableName + ", index=" + indexName + ", key=" +
+            DatabaseCommon.keyToString(keyInfo.getKey()));
+        }
       }
     }
 
     private void doDeleteKeys(String dbName, int schemaRetryCount, TableSchema tableSchema, IndexSchema indexSchema,
                               Object[][] entry,
                               Map<String, ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo>> orderedKeyInfosPrevious,
-                              Map<String, ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo>> orderedKeyInfosNew) {
+                              Map<String, ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo>> orderedKeyInfosNew, List<InsertStatementHandler.KeyInfo> deleted) {
       for (Map.Entry<String, ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo>> previousEntry :
           orderedKeyInfosPrevious.entrySet()) {
         ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo> newMap = orderedKeyInfosNew.get(previousEntry.getKey());
         if (newMap == null) {
           for (Map.Entry<Object[], InsertStatementHandler.KeyInfo> prevEntry : previousEntry.getValue().entrySet()) {
-            deleteKey(dbName, tableSchema.getName(), prevEntry.getValue(), indexSchema.getName(), entry[0], schemaRetryCount);
+            deleteKey(client, dbName, tableSchema.getName(), prevEntry.getValue(), indexSchema.getName(), entry[0], schemaRetryCount);
+            deleted.add(prevEntry.getValue());
           }
         }
         else {
           for (Map.Entry<Object[], InsertStatementHandler.KeyInfo> prevEntry : previousEntry.getValue().entrySet()) {
             if (!newMap.containsKey(prevEntry.getKey())) {
-              deleteKey(dbName, tableSchema.getName(), prevEntry.getValue(), indexSchema.getName(), entry[0], schemaRetryCount);
+              deleteKey(client, dbName, tableSchema.getName(), prevEntry.getValue(), indexSchema.getName(), entry[0], schemaRetryCount);
+              deleted.add(prevEntry.getValue());
             }
           }
         }
@@ -413,7 +491,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
     private void doInsertKeys(String dbName, int schemaRetryCount, TableSchema tableSchema, IndexSchema indexSchema,
                               Object[] newPrimaryKey,
                               Map<String, ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo>> orderedKeyInfosPrevious,
-                              Map<String, ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo>> orderedKeyInfosNew) {
+                              Map<String, ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo>> orderedKeyInfosNew, List<InsertStatementHandler.KeyInfo> inserted) {
       for (Map.Entry<String, ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo>> newEntry :
           orderedKeyInfosNew.entrySet()) {
         ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo> prevMap = orderedKeyInfosPrevious.get(newEntry.getKey());
@@ -425,11 +503,12 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
             keyRecord.setPrimaryKey(primaryKeyBytes);
             keyRecord.setDbViewNumber(client.getCommon().getSchemaVersion());
             InsertStatementHandler.insertKey(client, dbName, tableSchema.getName(), innerNewEntry.getValue(), indexSchema.getName(),
-                newPrimaryKey, keyRecord, false, schemaRetryCount);
+                newPrimaryKey, null, keyRecord, false, schemaRetryCount);
+            inserted.add(innerNewEntry.getValue());
           }
         }
         else {
-          doInsertKeysForPrevious(dbName, schemaRetryCount, tableSchema, indexSchema, newPrimaryKey, newEntry, prevMap);
+          doInsertKeysForPrevious(dbName, schemaRetryCount, tableSchema, indexSchema, newPrimaryKey, newEntry, prevMap, inserted);
         }
       }
     }
@@ -437,7 +516,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
     private void doInsertKeysForPrevious(String dbName, int schemaRetryCount, TableSchema tableSchema,
                                          IndexSchema indexSchema, Object[] newPrimaryKey,
                                          Map.Entry<String, ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo>> newEntry,
-                                         ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo> prevMap) {
+                                         ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo> prevMap, List<InsertStatementHandler.KeyInfo> inserted) {
       for (Map.Entry<Object[], InsertStatementHandler.KeyInfo> innerNewEntry : newEntry.getValue().entrySet()) {
         if (!prevMap.containsKey(innerNewEntry.getKey())) {
           if (innerNewEntry.getValue().getIndexSchema().getName().equals(indexSchema.getName())) {
@@ -448,8 +527,9 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
               indexSchema.getName(), newPrimaryKey);
           keyRecord.setPrimaryKey(primaryKeyBytes);
           keyRecord.setDbViewNumber(client.getCommon().getSchemaVersion());
-          InsertStatementHandler.insertKey(client, dbName, tableSchema.getName(), innerNewEntry.getValue(), indexSchema.getName(),
-              newPrimaryKey, keyRecord, false, schemaRetryCount);
+          InsertStatementHandler.insertKey(client, dbName, tableSchema.getName(), innerNewEntry.getValue(),
+              indexSchema.getName(), newPrimaryKey, null, keyRecord, false, schemaRetryCount);
+          inserted.add(innerNewEntry.getValue());
         }
       }
     }

@@ -84,12 +84,7 @@ public class SonicBaseConnectionImplTest {
     catch (SQLException e) {
     }
 
-    try {
-      conn.getCatalog();
-      fail();
-    }
-    catch (SQLException e) {
-    }
+    assertNull(conn.getCatalog());
 
     try {
       conn.setTransactionIsolation(1);

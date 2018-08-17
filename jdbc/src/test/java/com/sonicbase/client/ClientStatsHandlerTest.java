@@ -30,7 +30,7 @@ public class ClientStatsHandlerTest {
     when(client.send(eq("MonitorManager:registerStats"), anyInt(), anyInt(), anyObject(), anyObject())).thenAnswer(
         (Answer) invocationOnMock -> {called.set(true); return null;});
 
-    ClientStatsHandler handler = new ClientStatsHandler(client) {
+    ClientStatsHandler handler = new ClientStatsHandler() {
       public byte[] sendToMasterOnSharedClient(ComObject cobj, DatabaseClient sharedClient) {
         called.set(true);
         return null;

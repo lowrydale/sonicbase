@@ -161,8 +161,11 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
     }
 
     public DoDelete invoke() {
-      ExpressionImpl.NextReturn ids = expression .next(explain, new AtomicLong(), new AtomicLong(), null,
-          null, schemaRetryCount);
+      SelectStatementImpl select = new SelectStatementImpl(client);
+      select.setExpression(expression);
+
+      ExpressionImpl.NextReturn ids = expression.next(select, DatabaseClient.SELECT_PAGE_SIZE, explain, new AtomicLong(), new AtomicLong(),
+          null, null, schemaRetryCount);
       if (ids == null || ids.getIds() == null) {
         myResult = true;
         return this;

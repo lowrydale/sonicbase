@@ -275,15 +275,20 @@ public class DeleteManager {
 
   public void shutdown() {
     this.shutdown = true;
-    if (mainThread != null) {
-      mainThread.interrupt();
-      try {
+    try {
+      if (freeThread != null) {
+        freeThread.interrupt();
+        freeThread.join();
+      }
+      if (mainThread != null) {
+        mainThread.interrupt();
         mainThread.join();
+
       }
-      catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new DatabaseException(e);
-      }
+    }
+    catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new DatabaseException(e);
     }
   }
 

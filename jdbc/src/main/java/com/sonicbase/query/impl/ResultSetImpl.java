@@ -1064,9 +1064,11 @@ public class ResultSetImpl implements ResultSet {
 
   private boolean isMatchingAlias(String columnLabel) {
     boolean matchingAlias = false;
-    for (String alias : aliases.keySet()) {
-      if (alias.equals(columnLabel)) {
-        matchingAlias = true;
+    if (aliases != null) {
+      for (String alias : aliases.keySet()) {
+        if (alias.equals(columnLabel)) {
+          matchingAlias = true;
+        }
       }
     }
     return matchingAlias;
@@ -1907,11 +1909,10 @@ public class ResultSetImpl implements ResultSet {
         cobj.put(ComObject.Tag.SCHEMA_VERSION, databaseClient.getCommon().getSchemaVersion());
         cobj.put(ComObject.Tag.DB_NAME, dbName);
         cobj.put(ComObject.Tag.COUNT, DatabaseClient.SELECT_PAGE_SIZE);
-        cobj.put(ComObject.Tag.METHOD, "ReadManager:serverSelect");
         cobj.put(ComObject.Tag.CURR_OFFSET, currOffset.get());
         cobj.put(ComObject.Tag.COUNT_RETURNED, countReturned.get());
 
-        byte[] recordRet = databaseClient.send(null, selectStatement.getServerSelectShardNumber(),
+        byte[] recordRet = databaseClient.send("ReadManager:serverSelect", selectStatement.getServerSelectShardNumber(),
             selectStatement.getServerSelectReplicaNumber(), cobj, DatabaseClient.Replica.SPECIFIED);
 
         ComObject retObj = new ComObject(recordRet);

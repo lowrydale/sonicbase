@@ -157,8 +157,10 @@ public class DatabaseServer {
     ObjectNode databaseDict = config;
     this.dataDir = databaseDict.get("dataDirectory").asText();
     this.dataDir = dataDir.replace("$HOME", System.getProperty("user.home"));
+    this.dataDir = dataDir.replace("$WORKING_DIR", System.getProperty("user.dir"));
     this.installDir = databaseDict.get("installDirectory").asText();
     this.installDir = installDir.replace("$HOME", System.getProperty("user.home"));
+    this.installDir = installDir.replace("WORKING_DIR", System.getProperty("user.dir"));
     ArrayNode shards = databaseDict.withArray(SHARDS_STR);
     int replicaCount = shards.get(0).withArray(REPLICAS_STR).size();
     if (replicaCount > 1) {

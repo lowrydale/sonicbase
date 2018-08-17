@@ -161,7 +161,6 @@ public class Cli {
         while (true) {
           StringBuilder builder = new StringBuilder();
           while (true) {
-
             int ch = 0;
             if (isWindows() || isCygwin()) {
               ch = System.in.read();
@@ -1502,6 +1501,9 @@ public class Cli {
       if (installDir.startsWith("/")) {
         installDir = installDir.substring(1);
       }
+    }
+    else if (installDir.startsWith("$WORKING_DIR")) {
+      installDir = installDir.replace("$WORKING_DIR", System.getProperty("user.dir"));
     }
     return installDir;
   }

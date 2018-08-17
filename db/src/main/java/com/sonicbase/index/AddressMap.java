@@ -32,7 +32,6 @@ public class AddressMap {
 
   private LongList[] map = new LongArrayList[10_000];
   private AtomicLong currOuterAddress = new AtomicLong();
-  private final ConcurrentLinkedQueue<Long> freeList = new ConcurrentLinkedQueue<>();
   private ReentrantReadWriteLock[] readWriteLocks = new ReentrantReadWriteLock[10_000];
   private ReentrantReadWriteLock.ReadLock[] readLocks = new ReentrantReadWriteLock.ReadLock[10_000];
   private ReentrantReadWriteLock.WriteLock[] writeLocks = new ReentrantReadWriteLock.WriteLock[10_000];
@@ -72,7 +71,6 @@ public class AddressMap {
   }
 
   public void clear() {
-    freeList.clear();
     for (int i = 0; i < addressMaps.length; i++) {
       for (long innerAddress : addressMaps[i].values()) {
         unsafe.freeMemory(innerAddress);

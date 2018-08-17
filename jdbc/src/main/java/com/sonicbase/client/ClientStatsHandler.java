@@ -25,13 +25,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class ClientStatsHandler {
   private static Logger logger = LoggerFactory.getLogger(ClientStatsHandler.class);
 
-  private final DatabaseClient client;
   private static ConcurrentHashMap<String, ConcurrentHashMap<String, HistogramEntry>> registeredQueries = new ConcurrentHashMap<>();
   private final Thread statsEnabler;
   private boolean disableStats;
 
-  public ClientStatsHandler(DatabaseClient client) {
-    this.client = client;
+  public ClientStatsHandler() {
     this.statsEnabler = ThreadUtil.createThread(() -> {
       while (true) {
         try {

@@ -40,33 +40,30 @@ public class DatabaseSocketClient {
   private static ConcurrentLinkedQueue<Connection> openConnections = new ConcurrentLinkedQueue<>();
 
   private static Connection borrowConnection(final String host, final int port) {
-    for (int i = 0; i < 1; i++) {
-      try {
-        Connection sock = null;
-        ArrayBlockingQueue<Connection> pool = pools.get(host + ":" + port);
-        if (pool == null) {
-          pool = new ArrayBlockingQueue<>(CONNECTION_COUNT);
-          pools.put(host + ":" + port, pool);
-        }
-        sock = pool.poll(0, TimeUnit.MILLISECONDS);
-        if (sock == null) {
-          sock = doBorrowConnection(host, port);
-        }
-        sock.countCalled++;
-        return sock;
+    try {
+      Connection sock = null;
+      ArrayBlockingQueue<Connection> pool = pools.get(host + ":" + port);
+      if (pool == null) {
+        pool = new ArrayBlockingQueue<>(CONNECTION_COUNT);
+        pools.put(host + ":" + port, pool);
       }
-      catch (Exception t) {
-        try {
-          Thread.sleep(100);
-        }
-        catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          throw new DatabaseException(e);
-        }
-        throw new DatabaseException(t);
+      sock = pool.poll(0, TimeUnit.MILLISECONDS);
+      if (sock == null) {
+        sock = doBorrowConnection(host, port);
       }
+      sock.countCalled++;
+      return sock;
     }
-    throw new DatabaseException("Error borrowing connection");
+    catch (Exception t) {
+      try {
+        Thread.sleep(100);
+      }
+      catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new DatabaseException(e);
+      }
+      throw new DatabaseException(t);
+    }
   }
 
   private static Connection doBorrowConnection(String host, int port) {
@@ -298,7 +295,7 @@ public class DatabaseSocketClient {
         Util.readRawLittleEndian64(responseBody, offset); // responseChecksum
         offset += 8;
 
-        body = handleCompressionForReceive(body, originalBodyLen, responseBody, offset);
+        body = handleCompressionForReceive(originalBodyLen, responseBody, offset);
 
         ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
         bytesIn.read(intBuff); //response count
@@ -374,7 +371,8 @@ public class DatabaseSocketClient {
     }
   }
 
-  private static byte[] handleCompressionForReceive(byte[] body, int originalBodyLen, byte[] responseBody, int offset) throws IOException {
+  private static byte[] handleCompressionForReceive(int originalBodyLen, byte[] responseBody, int offset) throws IOException {
+    byte[] body;
     if (DatabaseSocketClient.COMPRESS) {
       if (DatabaseSocketClient.LZO_COMPRESSION) {
         LZ4Factory factory = LZ4Factory.fastestInstance();

@@ -4,7 +4,7 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.IndexSchema;
-import com.sonicbase.schema.TableSchema;;
+import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.TestUtils;
 import org.testng.annotations.Test;
 

@@ -185,6 +185,7 @@ public class SchemaManagerTest {
     cobj.put(ComObject.Tag.MASTER_SLAVE, "master");
 
     com.sonicbase.server.DatabaseServer server = mock(com.sonicbase.server.DatabaseServer.class);
+    when(server.getUpdateManager()).thenReturn(mock(UpdateManager.class));
     when(server.getSnapshotManager()).thenReturn(mock(SnapshotManager.class));
     when(server.getDataDir()).thenReturn("/tmp");
     DatabaseCommon common = new DatabaseCommon();

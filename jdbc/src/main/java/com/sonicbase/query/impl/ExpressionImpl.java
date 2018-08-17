@@ -535,14 +535,14 @@ public class ExpressionImpl implements Expression {
   }
 
 
-  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
+  public NextReturn next(SelectStatementImpl select, int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
                          Limit limit, Offset offset, int schemaRetryCount) {
     return null;
   }
 
-  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset,
+  public NextReturn next(SelectStatementImpl select, int count, SelectStatementImpl.Explain explain, AtomicLong currOffset,
                          AtomicLong countReturned, Limit limit,
-                                  Offset offset, boolean evaluateExpression, boolean analyze, int schemaRetryCount) {
+                         Offset offset, boolean evaluateExpression, boolean analyze, int schemaRetryCount) {
     return null;
   }
 
@@ -811,7 +811,7 @@ public class ExpressionImpl implements Expression {
           AtomicReference<String> usedIndex = new AtomicReference<>();
           return ExpressionImpl.batchLookupIds(dbName,
               client.getCommon(), client, forceSelectOnServer, pageSize, tableSchema,
-              BinaryExpression.Operator.EQUAL, indexSchema.get(), selectColumns, entry.getValue(), entry.getKey(),
+              BinaryExpression.Operator.EQUAL, indexSchema.get().getValue(), selectColumns, entry.getValue(), entry.getKey(),
               usedIndex, recordCache, viewVersion, restrictToThisServer, procedureContext, schemaRetryCount);
         }));
       }
@@ -1152,16 +1152,15 @@ public class ExpressionImpl implements Expression {
 
   private static BatchLookupReturn batchLookupIds(
       final String dbName, final DatabaseCommon common, final DatabaseClient client, final boolean forceSelectOnServer,
-      final int count, final TableSchema tableSchema,
-      final BinaryExpression.Operator operator,
-      final Map.Entry<String, IndexSchema> indexSchema, final List<ColumnImpl> columns, final List<IdEntry> srcValues,
+      final int count, final TableSchema tableSchema, final BinaryExpression.Operator operator,
+      final IndexSchema indexSchema, final List<ColumnImpl> columns, final List<IdEntry> srcValues,
       final int shard,
-      AtomicReference<String> usedIndex, final RecordCache recordCache, final int viewVersion, final boolean restrictToThisServer, 
+      AtomicReference<String> usedIndex, final RecordCache recordCache, final int viewVersion, final boolean restrictToThisServer,
       final StoredProcedureContextImpl procedureContext, final int schemaRetryCount) {
 
     Timer.Context ctx = DatabaseClient.BATCH_INDEX_LOOKUP_STATS.time();
     try {
-      usedIndex.set(indexSchema.getKey());
+      usedIndex.set(indexSchema.getName());
 
       final int threadCount = 1;
 
@@ -1172,7 +1171,7 @@ public class ExpressionImpl implements Expression {
             ComObject cobj = new ComObject();
             cobj.put(ComObject.Tag.SERIALIZATION_VERSION, DatabaseClient.SERIALIZATION_VERSION);
             cobj.put(ComObject.Tag.TABLE_NAME, tableSchema.getName());
-            cobj.put(ComObject.Tag.INDEX_NAME, indexSchema.getKey());
+            cobj.put(ComObject.Tag.INDEX_NAME, indexSchema.getName());
             cobj.put(ComObject.Tag.LEFT_OPERATOR, operator.getId());
 
             ComArray columnArray = cobj.putArray(ComObject.Tag.COLUMN_OFFSETS, ComObject.Type.INT_TYPE);
@@ -1192,7 +1191,7 @@ public class ExpressionImpl implements Expression {
             byte[] lookupRet = client.send("ReadManager:batchIndexLookup", shard, -1, cobj,
                 DatabaseClient.Replica.DEF);
 
-            return batchLookupIdsProcessResults(dbName, common, client, forceSelectOnServer, tableSchema, columns,
+            return batchLookupIdsProcessResults(dbName, common, client, forceSelectOnServer, tableSchema, indexSchema, columns,
                 recordCache, viewVersion, restrictToThisServer, procedureContext, schemaRetryCount, lookupRet);
           }
           catch (IOException e) {
@@ -1225,7 +1224,7 @@ public class ExpressionImpl implements Expression {
     }
   }
 
-  private static void putKeysInComObject(TableSchema tableSchema, Map.Entry<String, IndexSchema> indexSchema,
+  private static void putKeysInComObject(TableSchema tableSchema, IndexSchema indexSchema,
                                          List<IdEntry> srcValues, int subCount, boolean writingLongs, ComArray keys) {
     for (int k = 0; k < subCount; k++) {
       ComObject key = new ComObject();
@@ -1237,7 +1236,7 @@ public class ExpressionImpl implements Expression {
         key.put(ComObject.Tag.LONG_KEY, (long) entry.getValue()[0]);
       }
       else {
-        key.put(ComObject.Tag.KEY_BYTES, DatabaseCommon.serializeKey(tableSchema, indexSchema.getKey(), entry.getValue()));
+        key.put(ComObject.Tag.KEY_BYTES, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), entry.getValue()));
       }
     }
   }
@@ -1263,7 +1262,8 @@ public class ExpressionImpl implements Expression {
 
   private static BatchLookupReturn batchLookupIdsProcessResults(String dbName, DatabaseCommon common,
                                                                 DatabaseClient client, boolean forceSelectOnServer,
-                                                                TableSchema tableSchema, List<ColumnImpl> columns,
+                                                                TableSchema tableSchema, IndexSchema indexSchema,
+                                                                List<ColumnImpl> columns,
                                                                 RecordCache recordCache, int viewVersion,
                                                                 boolean restrictToThisServer,
                                                                 StoredProcedureContextImpl procedureContext,
@@ -1275,18 +1275,31 @@ public class ExpressionImpl implements Expression {
     for (Object entryObj : retKeysArray.getArray()) {
       ComObject retEntryObj = (ComObject)entryObj;
       int offset1 = retEntryObj.getInt(ComObject.Tag.OFFSET);
-      ComArray keysArray = retEntryObj.getArray(ComObject.Tag.KEYS);
+
+      ComArray keysArray;
+      if (indexSchema.isPrimaryKey()) {
+        keysArray = retEntryObj.getArray(ComObject.Tag.KEYS);
+      }
+      else {
+        keysArray = retEntryObj.getArray(ComObject.Tag.KEY_RECORDS);
+      }
       Object[][] ids = null;
       if (!keysArray.getArray().isEmpty()) {
         ids = new Object[keysArray.getArray().size()][];
         for (int j = 0; j < ids.length; j++) {
           byte[] keyBytes = (byte[])keysArray.getArray().get(j);
+
+          if (!indexSchema.isPrimaryKey()) {
+            KeyRecord keyRecord = new KeyRecord(keyBytes);
+            keyBytes = keyRecord.getPrimaryKey();
+          }
+
           ids[j] = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
         }
         aggregateKeys(retKeys, offset1, ids);
       }
 
-      aggregateRecordsFromBatchLookup(dbName, common, client, forceSelectOnServer, tableSchema, columns, recordCache,
+      aggregateRecordsFromBatchLookup(dbName, common, client, forceSelectOnServer, tableSchema, indexSchema, columns, recordCache,
           viewVersion, restrictToThisServer, procedureContext, schemaRetryCount, retRecords, retEntryObj, offset1, ids);
     }
     BatchLookupReturn batchReturn = new BatchLookupReturn();
@@ -1297,12 +1310,13 @@ public class ExpressionImpl implements Expression {
 
   private static void aggregateRecordsFromBatchLookup(String dbName, DatabaseCommon common, DatabaseClient client,
                                                       boolean forceSelectOnServer, TableSchema tableSchema,
-                                                      List<ColumnImpl> columns, RecordCache recordCache, int viewVersion,
-                                                      boolean restrictToThisServer, StoredProcedureContextImpl procedureContext,
+                                                      IndexSchema indexSchema, List<ColumnImpl> columns, RecordCache recordCache,
+                                                      int viewVersion, boolean restrictToThisServer,
+                                                      StoredProcedureContextImpl procedureContext,
                                                       int schemaRetryCount, Map<Integer, Record[]> retRecords,
                                                       ComObject retEntryObj, int offset1, Object[][] ids) {
     ComArray recordsArray = retEntryObj.getArray(ComObject.Tag.RECORDS);
-    if (!recordsArray.getArray().isEmpty()) {
+    if (!recordsArray.getArray().isEmpty() && indexSchema.isPrimaryKey()) {
       Record[] records = new Record[recordsArray.getArray().size()];
 
       for (int l = 0; l < records.length; l++) {
@@ -1313,14 +1327,31 @@ public class ExpressionImpl implements Expression {
       aggregateRecords(retRecords, offset1, records);
     }
     else {
+      IndexSchema primaryKeySchema = null;
+      for (IndexSchema index : tableSchema.getIndices().values()) {
+        if (index.isPrimaryKey()) {
+          primaryKeySchema = index;
+          break;
+        }
+      }
       if (ids != null) {
         Record[] records = new Record[ids.length];
+
+        int keyOffset = 0;
+        List<IdEntry> keys = new ArrayList<>();
+        for (Object[] key : ids) {
+          IdEntry entry = new IdEntry(keyOffset++, key);
+          keys.add(entry);
+        }
+
+        ExpressionImpl.readRecords(
+            dbName, client, ids.length * 2, false, tableSchema,
+            keys, primaryKeySchema.getFields(), columns, recordCache,
+            client.getCommon().getSchemaVersion(), false, null, 0);
+
         for (int j = 0; j < ids.length; j++) {
           Object[] key = ids[j];
-          Record record = doReadRecord(dbName, client, forceSelectOnServer, recordCache, key,
-              tableSchema.getName(), columns, null, null, viewVersion,
-              restrictToThisServer, procedureContext, schemaRetryCount);
-          records[j] = record;
+          records[j] = recordCache.get(tableSchema.getName(), key).record;
         }
         aggregateRecords(retRecords, offset1, records);
       }

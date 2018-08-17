@@ -61,8 +61,8 @@ public class BenchmarkInsert {
     }
   }
 
-  public static interface Converter {
-    public Object convert(Object value);
+  public interface Converter {
+    Object convert(Object value);
   }
 
   private static class LongConverter implements Converter {

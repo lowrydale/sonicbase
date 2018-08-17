@@ -452,6 +452,10 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     this.functionAliases = functionAliases;
   }
 
+  public void setServerSelect(boolean serverSelect) {
+    this.serverSelect = serverSelect;
+  }
+
   public class DistinctRecord {
     private final Record record;
     private final Comparator[] comparators;
@@ -1198,8 +1202,8 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       localExpression.setDbName(dbName);
       localExpression.setRestrictToThisServer(restrictToThisServer);
       localExpression.setProcedureContext(procedureContext);
-      ret = localExpression.next(count, explain, currOffset, countReturned, limit, offset, false,
-          false, schemaRetryCount);
+      ret = localExpression.next(this, count, explain, currOffset, countReturned, limit, offset,
+          false, false, schemaRetryCount);
     }
     if (ret == null) {
       return null;
@@ -1673,8 +1677,8 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
             expression.toString() + "\n");
       }
       long begin = System.nanoTime();
-      ExpressionImpl.NextReturn ids = expression.next(pageSize / threadCount, explain, currOffset,
-          countReturned, limit, offset, false, false, schemaRetryCount);
+      ExpressionImpl.NextReturn ids = expression.next(this, pageSize / threadCount, explain,
+          currOffset, countReturned, limit, offset, false, false, schemaRetryCount);
       if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
         hadSelectRet.set(true);
       }
@@ -1708,8 +1712,8 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       allExpression.setDbName(dbName);
       allExpression.setColumns(getSelectColumns());
       allExpression.setOrderByExpressions(expression.getOrderByExpressions());
-      ids = allExpression.next(pageSize / threadCount, explain, currOffset, countReturned, limit, offset,
-          false, false, schemaRetryCount);
+      ids = allExpression.next(this, pageSize / threadCount, explain, currOffset, countReturned, limit,
+          offset, false, false, schemaRetryCount);
       if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
         hadSelectRet.set(true);
       }
@@ -1749,8 +1753,8 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       allExpression.setDbName(dbName);
       allExpression.setColumns(getSelectColumns());
       allExpression.setOrderByExpressions(expression.getOrderByExpressions());
-      ids = allExpression.next(pageSize / threadCount, explain, currOffset, countReturned, limit, offset,
-          false, false, schemaRetryCount);
+      ids = allExpression.next(this, pageSize / threadCount, explain, currOffset, countReturned, limit,
+          offset, false, false, schemaRetryCount);
       if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
         hadSelectRet.set(true);
       }

@@ -3,7 +3,6 @@ package com.sonicbase.query.impl;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.Record;
 import com.sonicbase.jdbcdriver.ParameterHandler;
-import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.Expression;
 import com.sonicbase.query.InExpression;
@@ -19,7 +18,6 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 
 @SuppressWarnings({"squid:S1168", "squid:S00107"})
 // I prefer to return null instead of an empty array
@@ -180,7 +178,7 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
   }
 
   @Override
-  public NextReturn next(int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
+  public NextReturn next(SelectStatementImpl select, int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
                          Limit limit, Offset offset, boolean b, boolean analyze, int schemaRetryCount) {
     if (getNextShard() == -2) {
       return new NextReturn(new String[]{getTableName()}, null);
@@ -197,7 +195,6 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
          return new NextReturn(context.getTableNames(), context.getCurrKeys());
        }
     }
-    Object[][][] ret = null;
     IndexSchema indexSchema = null;
     List<ExpressionImpl> localExpressionList = getExpressionList();
     ColumnImpl cNode = (ColumnImpl) getLeftExpression();
@@ -226,41 +223,37 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
       }
     }
 
+    int keyOffset = 0;
+    List<IdEntry> keys = new ArrayList<>();
     for (ExpressionImpl inValue : localExpressionList) {
-
       Object value = getValueFromExpression(parms, inValue);
-
       Object[] key = new Object[]{value};
-      AtomicReference<String> usedIndex = new AtomicReference<>();
-
-      IndexLookup indexLookup = new IndexLookup();
-      indexLookup.setCount(count);
-      indexLookup.setIndexName(indexSchema.getName());
-      indexLookup.setLeftOp(BinaryExpression.Operator.EQUAL);
-      indexLookup.setLeftKey(key);
-      indexLookup.setLeftOriginalKey(key);
-      indexLookup.setColumnName(cNode.getColumnName());
-      indexLookup.setCurrOffset(currOffset);
-      indexLookup.setCountReturned(countReturned);
-      indexLookup.setLimit(limit);
-      indexLookup.setOffset(offset);
-      indexLookup.setSchemaRetryCount(schemaRetryCount);
-      indexLookup.setUsedIndex(usedIndex);
-      indexLookup.setEvaluateExpression(false);
-
-      SelectContextImpl currRet = indexLookup.lookup(this, getTopLevelExpression());
-      ret = aggregateResults(ret, currRet.getCurrKeys());
+      IdEntry entry = new IdEntry(keyOffset++, key);
+      keys.add(entry);
     }
+
+
+    TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(getTableName());
+    Map<Integer, Object[][]> readResults = ExpressionImpl.readRecords(
+        dbName, getClient(), localExpressionList.size() * 2, false, tableSchema,
+        keys, indexSchema.getFields(), getColumns(), getRecordCache(),
+        getClient().getCommon().getSchemaVersion(), false, null, 0);
+
+    Object[][][] ret = new Object[readResults.size()][][];
+    for (Map.Entry<Integer, Object[][]> entry : readResults.entrySet()) {
+      ret[entry.getKey()] = entry.getValue();
+    }
+
     setNextShard(-2);
     return new NextReturn(new String[]{getTableName()}, ret);
   }
 
 
   @Override
-  public NextReturn next(SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
+  public NextReturn next(SelectStatementImpl select, int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
                          Limit limit, Offset offset, int schemaRetryCount) {
-    return next(DatabaseClient.SELECT_PAGE_SIZE, explain, currOffset, countReturned, limit, offset, false,
-        false, schemaRetryCount);
+    return next(select, count, explain, currOffset, countReturned, limit, offset,
+        false, false, schemaRetryCount);
   }
 
   @Override

@@ -25,13 +25,11 @@ import java.util.Map;
 // I don't know a good way to reduce the parameter count
 public class DataType {
 
-
   public static final String UTF_8_STR = "utf-8";
 
-  public static interface Converter {
-    public Object convert(Object value);
+  public interface Converter {
+    Object convert(Object value);
   }
-
 
   public static Converter getLongConverter() {
     return longConverter;
@@ -1037,8 +1035,8 @@ public class DataType {
     return 0;
   };
 
-  public static interface Incrementer {
-    public Object increment(Object value);
+  public interface Incrementer {
+    Object increment(Object value);
   }
 
   public static Incrementer getIntIncrementer() {

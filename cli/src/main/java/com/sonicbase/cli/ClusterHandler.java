@@ -657,7 +657,11 @@ public class ClusterHandler {
     System.out.println("Stopping cluster: cluster=" + cluster);
     stopCluster();
     System.out.println("Starting purge: cluster=" + cluster);
-    String json = IOUtils.toString(Cli.class.getResourceAsStream("/config-" + cluster + ".json"), "utf-8");
+    InputStream stream = Cli.class.getResourceAsStream("/config-" + cluster + ".json");
+    if (stream == null) {
+      stream = Cli.class.getResourceAsStream("/config/config-" + cluster + ".json");
+    }
+    String json = IOUtils.toString(stream, "utf-8");
     ObjectMapper mapper = new ObjectMapper();
     ObjectNode config = (ObjectNode) mapper.readTree(json);
     final ObjectNode databaseDict = config;
@@ -673,74 +677,73 @@ public class ClusterHandler {
     }
     List<Future> futures = new ArrayList<>();
     for (final String address : addresses) {
-      futures.add(cli.getExecutor().submit(new Callable() {
-        @Override
-        public Object call() throws Exception {
-          String deployUser = databaseDict.get("user").asText();
-          if (address.equals("127.0.0.1") || address.equals("localhost")) {
-            File file = new File(dataDir);
+      futures.add(cli.getExecutor().submit((Callable) () -> {
+        String deployUser = databaseDict.get("user").asText();
+        if (address.equals("127.0.0.1") || address.equals("localhost")) {
+          File file = new File(dataDir);
+          if (!cli.isWindows()) {
             if (!dataDir.startsWith("/")) {
               file = new File(System.getProperty("user.home"), dataDir);
             }
-            File lastFile = new File(file.getAbsolutePath() + ".last");
-            file.renameTo(lastFile);
-            System.out.println("Deleting directory: dir=" + file.getAbsolutePath());
-            FileUtils.deleteDirectory(lastFile);
           }
-          else {
-            if (cli.isWindows()) {
-              final String installDir = cli.resolvePath(databaseDict.get("installDirectory").asText());
+          File lastFile = new File(file.getAbsolutePath() + ".last");
+          file.renameTo(lastFile);
+          System.out.println("Deleting directory: dir=" + file.getAbsolutePath());
+          FileUtils.deleteDirectory(lastFile);
+        }
+        else {
+          if (cli.isWindows()) {
+            final String installDir = cli.resolvePath(databaseDict.get("installDirectory").asText());
 
-              ProcessBuilder builder = null;
-              File file = new File("bin/remote-purge-data.ps1");
-              String str = IOUtils.toString(new FileInputStream(file), "utf-8");
-              str = str.replaceAll("\\$1", new File(System.getProperty("user.dir"), "credentials/" + cluster + "-" + cli.getUsername()).getAbsolutePath().replaceAll("\\\\", "/"));
-              str = str.replaceAll("\\$2", cli.getUsername());
-              str = str.replaceAll("\\$3", address);
-              str = str.replaceAll("\\$4", installDir);
-              str = str.replaceAll("\\$5", dataDir);
-              File outFile = new File("tmp/" + address + "-remote-purge-data.ps1");
-              outFile.getParentFile().mkdirs();
-              outFile.delete();
-              try {
-                try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outFile)))) {
-                  writer.write(str);
-                }
+            ProcessBuilder builder = null;
+            File file = new File("bin/remote-purge-data.ps1");
+            String str = IOUtils.toString(new FileInputStream(file), "utf-8");
+            str = str.replaceAll("\\$1", new File(System.getProperty("user.dir"), "credentials/" + cluster + "-" + cli.getUsername()).getAbsolutePath().replaceAll("\\\\", "/"));
+            str = str.replaceAll("\\$2", cli.getUsername());
+            str = str.replaceAll("\\$3", address);
+            str = str.replaceAll("\\$4", installDir);
+            str = str.replaceAll("\\$5", dataDir);
+            File outFile = new File("tmp/" + address + "-remote-purge-data.ps1");
+            outFile.getParentFile().mkdirs();
+            outFile.delete();
+            try {
+              try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outFile)))) {
+                writer.write(str);
+              }
 
-                builder = new ProcessBuilder().command("powershell", "-F", outFile.getAbsolutePath());
-                Process p = builder.start();
-                p.waitFor();
-              }
-              finally {
-                //outFile.delete();
-              }
-            }
-            else {
-              ProcessBuilder builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
-                  "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", deployUser + "@" +
-                      address, "mv", dataDir, dataDir + ".last");
-              //builder.directory(workingDir);
+              builder = new ProcessBuilder().command("powershell", "-F", outFile.getAbsolutePath());
               Process p = builder.start();
               p.waitFor();
-
-              builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
-                  "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", deployUser + "@" +
-                      address, "rm", "-rf", dataDir + ".last");
-              System.out.println("purging: address=" + address + ", dir=" + dataDir);
-              p = builder.start();
-              p.waitFor();
-
-              //delete it twice to make sure
-              builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
-                  "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", deployUser + "@" +
-                      address, "rm", "-rf", dataDir + ".last");
-              System.out.println("purging: address=" + address + ", dir=" + dataDir);
-              p = builder.start();
-              p.waitFor();
+            }
+            finally {
+              //outFile.delete();
             }
           }
-          return null;
+          else {
+            ProcessBuilder builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
+                "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", deployUser + "@" +
+                    address, "mv", dataDir, dataDir + ".last");
+            //builder.directory(workingDir);
+            Process p = builder.start();
+            p.waitFor();
+
+            builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
+                "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", deployUser + "@" +
+                    address, "rm", "-rf", dataDir + ".last");
+            System.out.println("purging: address=" + address + ", dir=" + dataDir);
+            p = builder.start();
+            p.waitFor();
+
+            //delete it twice to make sure
+            builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
+                "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", deployUser + "@" +
+                    address, "rm", "-rf", dataDir + ".last");
+            System.out.println("purging: address=" + address + ", dir=" + dataDir);
+            p = builder.start();
+            p.waitFor();
+          }
         }
+        return null;
       }));
     }
     for (Future future : futures) {

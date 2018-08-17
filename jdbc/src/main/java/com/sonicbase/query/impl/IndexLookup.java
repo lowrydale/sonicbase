@@ -766,7 +766,7 @@ public class IndexLookup {
       retKeys = ExpressionImpl.aggregateResults(retKeys, currRetKeys);
       retKeyRecords = ExpressionImpl.aggregateResults(retKeyRecords, currRetKeyRecords);
 
-      if (recordRet == null && retKeys == null && retKeyRecords == null) {
+      if (recordRet == null && retKeys == null &&  retKeyRecords == null) {
         nextKey.set(localLeftValue);
       }
 

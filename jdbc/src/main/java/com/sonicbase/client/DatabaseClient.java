@@ -167,7 +167,7 @@ public class DatabaseClient {
 
   private static Set<String> parallelVerbs = new HashSet<>();
   private String cluster;
-  private ClientStatsHandler clientStatsHandler = new ClientStatsHandler(this);
+  private ClientStatsHandler clientStatsHandler = new ClientStatsHandler();
 
   public Server[][] getServersArray() {
     return servers;

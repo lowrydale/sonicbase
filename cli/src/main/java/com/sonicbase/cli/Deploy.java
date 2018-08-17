@@ -163,6 +163,12 @@ public class Deploy {
         installDir = installDir.substring(1);
       }
     }
+    else if (installDir.startsWith("$WORKING_DIR")) {
+      installDir = installDir.replace("$WORKING_DIR", System.getProperty("user.dir"));
+      if (installDir.startsWith("/")) {
+        installDir = installDir.substring(1);
+      }
+    }
     return installDir;
   }
 

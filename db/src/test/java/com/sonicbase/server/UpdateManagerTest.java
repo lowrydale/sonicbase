@@ -169,9 +169,9 @@ public class UpdateManagerTest {
       keyRecord.setPrimaryKey(primaryKeyBytes);
       keyRecord.setDbViewNumber(common.getSchemaVersion());
 
-      ComObject cobj = InsertStatementHandler.serializeInsertKey(common, "test", 0, tableId,
+      ComObject cobj = InsertStatementHandler.serializeInsertKey(client, common, 0, "test", 0, tableId,
           indexId, "table1", keyInfo, indexSchema.getName(),
-          keys.get(j), keyRecord, false);
+          keys.get(j), null, keyRecord, false);
 
       byte[] keyRecordBytes = keyRecord.serialize(SERIALIZATION_VERSION);
       cobj.put(ComObject.Tag.KEY_RECORD_BYTES, keyRecordBytes);
@@ -392,7 +392,7 @@ public class UpdateManagerTest {
       insertStatement.addValue("field2", String.valueOf(keys.get(0)[0]).getBytes("utf-8"));
     //}
 
-    InsertStatementHandler.getBatch().set(new ArrayList<InsertStatementHandler.InsertRequest>());
+    InsertStatementHandler.getBatch().set(new ArrayList<>());
 
     handler.doInsert("test", insertStatement, 0);
 
@@ -437,7 +437,7 @@ public class UpdateManagerTest {
           new Record("test", common, records[j]).getFields()[1]);
     }
 
-    InsertStatementHandler.getBatch().set(new ArrayList<InsertStatementHandler.InsertRequest>());
+    InsertStatementHandler.getBatch().set(new ArrayList<>());
 
     handler.doInsert("test", insertStatement, 0);
 
@@ -789,9 +789,9 @@ public class UpdateManagerTest {
     keyRecord.setPrimaryKey(primaryKeyBytes);
     keyRecord.setDbViewNumber(common.getSchemaVersion());
 
-    ComObject cobj = InsertStatementHandler.serializeInsertKey(common, "test", 0, tableId,
+    ComObject cobj = InsertStatementHandler.serializeInsertKey(client, common, 0, "test", 0, tableId,
         indexId, "table1", keyInfo, indexSchema.getName(),
-        keys.get(9), keyRecord, false);
+        keys.get(9), null, keyRecord, false);
 
     byte[] keyRecordBytes = keyRecord.serialize(SERIALIZATION_VERSION);
     cobj.put(ComObject.Tag.KEY_RECORD_BYTES, keyRecordBytes);
@@ -902,9 +902,9 @@ public class UpdateManagerTest {
       keyRecord.setPrimaryKey(primaryKeyBytes);
       keyRecord.setDbViewNumber(common.getSchemaVersion());
 
-      ComObject cobj = InsertStatementHandler.serializeInsertKey(common, "test", 0, tableId,
+      ComObject cobj = InsertStatementHandler.serializeInsertKey(client, common, 0, "test", 0, tableId,
           indexId, "table1", keyInfo, indexSchema.getName(),
-          keys.get(j), keyRecord, false);
+          keys.get(j), null, keyRecord, false);
 
       byte[] keyRecordBytes = keyRecord.serialize(SERIALIZATION_VERSION);
       cobj.put(ComObject.Tag.KEY_RECORD_BYTES, keyRecordBytes);

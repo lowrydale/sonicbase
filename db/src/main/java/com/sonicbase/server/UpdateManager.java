@@ -329,7 +329,7 @@ public class UpdateManager {
             keyRecord.setPrimaryKey(primaryKeyBytes);
             keyRecord.setDbViewNumber(server.getCommon().getSchemaVersion());
             InsertStatementHandler.insertKey(server.getClient(), dbName, tableName, keyInfo, primaryKeyIndexName,
-                primaryKey.getKey(), keyRecord, true, schemaRetryCount);
+                primaryKey.getKey(), null, keyRecord, true, schemaRetryCount);
             break;
           }
           catch (SchemaOutOfSyncException e) {
@@ -407,6 +407,9 @@ public class UpdateManager {
 
   @SchemaReadLock
   public ComObject batchInsertIndexEntryByKey(ComObject cobj, boolean replayedCommand) {
+    ComObject retObj = new ComObject();
+    final ComArray batchResponses = retObj.putArray(ComObject.Tag.BATCH_RESPONSES, ComObject.Type.OBJECT_TYPE);
+
     AtomicBoolean isExplicitTrans = new AtomicBoolean();
     AtomicLong transactionId = new AtomicLong();
     int count = 0;
@@ -414,10 +417,41 @@ public class UpdateManager {
       ComArray array = cobj.getArray(ComObject.Tag.INSERT_OBJECTS);
       for (int i = 0; i < array.getArray().size(); i++) {
         ComObject innerObj = (ComObject) array.getArray().get(i);
+        int originalOffset = innerObj.getInt(ComObject.Tag.ORIGINAL_OFFSET);
+        int id = 0;
+        if (innerObj.getLong(ComObject.Tag.ID) != null) {
+          id = (int)(long)innerObj.getLong(ComObject.Tag.ID);
+        }
 
         throttle();
-        doInsertIndexEntryByKey(cobj, innerObj, replayedCommand, isExplicitTrans, transactionId, false);
-        count++;
+        try {
+          doInsertIndexEntryByKey(cobj, innerObj, replayedCommand, isExplicitTrans, transactionId, false);
+          count++;
+        }
+        catch (Exception e) {
+          if (-1 != ExceptionUtils.indexOfThrowable(e, UniqueConstraintViolationException.class)) {
+            if (batchResponses != null) {
+              synchronized (batchResponses) {
+                ComObject obj = new ComObject();
+                obj.put(ComObject.Tag.ORIGINAL_OFFSET, originalOffset);
+                obj.put(ComObject.Tag.ID, id);
+                obj.put(ComObject.Tag.INT_STATUS, InsertStatementHandler.BATCH_STATUS_UNIQUE_CONSTRAINT_VIOLATION);
+                batchResponses.add(obj);
+              }
+            }
+          }
+          else {
+            if (batchResponses != null) {
+              synchronized (batchResponses) {
+                ComObject obj = new ComObject();
+                obj.put(ComObject.Tag.ORIGINAL_OFFSET, originalOffset);
+                obj.put(ComObject.Tag.ID, id);
+                obj.put(ComObject.Tag.INT_STATUS, InsertStatementHandler.BATCH_STATUS_FAILED);
+                batchResponses.add(obj);
+              }
+            }
+          }
+        }
       }
       if (isExplicitTrans.get()) {
         TransactionManager.Transaction trans = server.getTransactionManager().getTransaction(transactionId.get());
@@ -429,7 +463,6 @@ public class UpdateManager {
       throw new DatabaseException(e);
     }
 
-    ComObject retObj = new ComObject();
     retObj.put(ComObject.Tag.COUNT, count);
     return retObj;
   }
@@ -497,6 +530,8 @@ public class UpdateManager {
 
       Index index = server.getIndex(dbName, tableSchema.getName(), indexName);
 
+      checkUniqueConstraintViolationOnUpdateForSecondaryKey(index, tableSchema, indexSchema, key);
+
       Object[] primaryKey = DatabaseCommon.deserializeKey(tableSchema, keyRecord.getPrimaryKey());
 
       AtomicBoolean shouldExecute = new AtomicBoolean();
@@ -523,6 +558,17 @@ public class UpdateManager {
     }
     catch (IOException e) {
       throw new DatabaseException(e);
+    }
+  }
+
+  private void checkUniqueConstraintViolationOnUpdateForSecondaryKey(Index index, TableSchema tableSchema,
+                                                                     IndexSchema indexSchema, Object[] key) {
+    if (indexSchema.isUnique()) {
+      Object obj = index.get(key);
+      if (obj != null) {
+        throw new UniqueConstraintViolationException("key on update not unique: table=" + tableSchema.getName() +
+            ", index=" + indexSchema.getName() + ", key=" + DatabaseCommon.keyToString(key));
+      }
     }
   }
 
@@ -729,6 +775,10 @@ public class UpdateManager {
                                                      short sequence2, boolean replayedCommand, long transactionId,
                                                      boolean isExpliciteTrans, boolean isCommitting, ComArray batchResponses) {
     int originalOffset = cobj.getInt(ComObject.Tag.ORIGINAL_OFFSET);
+    int originalId = 0;
+    if (cobj.getLong(ComObject.Tag.ID) != null) {
+      originalId = (int)(long)cobj.getLong(ComObject.Tag.ID);
+    }
 
     try {
       String dbName = outerCobj.getString(ComObject.Tag.DB_NAME);
@@ -775,6 +825,7 @@ public class UpdateManager {
         synchronized (batchResponses) {
           ComObject obj = new ComObject();
           obj.put(ComObject.Tag.ORIGINAL_OFFSET, originalOffset);
+          obj.put(ComObject.Tag.ID, originalId);
           obj.put(ComObject.Tag.INT_STATUS, InsertStatementHandler.BATCH_STATUS_SUCCCESS);
           batchResponses.add(obj);
         }
@@ -789,6 +840,7 @@ public class UpdateManager {
           synchronized (batchResponses) {
             ComObject obj = new ComObject();
             obj.put(ComObject.Tag.ORIGINAL_OFFSET, originalOffset);
+            obj.put(ComObject.Tag.ID, originalId);
             obj.put(ComObject.Tag.INT_STATUS, InsertStatementHandler.BATCH_STATUS_UNIQUE_CONSTRAINT_VIOLATION);
             batchResponses.add(obj);
           }
@@ -799,6 +851,7 @@ public class UpdateManager {
           synchronized (batchResponses) {
             ComObject obj = new ComObject();
             obj.put(ComObject.Tag.ORIGINAL_OFFSET, originalOffset);
+            obj.put(ComObject.Tag.ID, originalId);
             obj.put(ComObject.Tag.INT_STATUS, InsertStatementHandler.BATCH_STATUS_FAILED);
             batchResponses.add(obj);
           }
@@ -993,6 +1046,7 @@ public class UpdateManager {
       byte[] primaryKeyBytes = cobj.getByteArray(ComObject.Tag.PRIMARY_KEY_BYTES);
       Object[] primaryKey = DatabaseCommon.deserializeKey(tableSchema, primaryKeyBytes);
       byte[] bytes = cobj.getByteArray(ComObject.Tag.BYTES);
+      byte[] prevBytes = cobj.getByteArray(ComObject.Tag.PREV_BYTES);
 
       AtomicBoolean shouldExecute = new AtomicBoolean();
       AtomicBoolean shouldDeleteLock = new AtomicBoolean();
@@ -1001,6 +1055,15 @@ public class UpdateManager {
           transactionId, primaryKey, shouldExecute, shouldDeleteLock);
 
       Record record = new Record(dbName, server.getCommon(), bytes);
+      Record prevRecord = null;
+      if (prevBytes != null) {
+        prevRecord = new Record(dbName, server.getCommon(), prevBytes);
+      }
+
+      Boolean ignore = shouldIgnore(cobj);
+      if (!ignore) {
+        checkForUniqueConstraintViolationOnUpdate(dbName, tableName, indexName, record, prevRecord);
+      }
 
       setSequenceNumbersOnUpdate(cobj, primaryKey, record);
 
@@ -1024,6 +1087,27 @@ public class UpdateManager {
     }
     catch (IOException e) {
       throw new DatabaseException(e);
+    }
+  }
+
+  private void checkForUniqueConstraintViolationOnUpdate(String dbName, String tableName, String indexName, Record record, Record prevRecord) {
+    if (prevRecord != null) {
+      Index index = server.getIndex(dbName, tableName, indexName);
+      TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
+      IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
+      Object[] prevKey = new Object[indexSchema.getFields().length];
+      Object[] key = new Object[indexSchema.getFields().length];
+      for (int i = 0; i < key.length; i++) {
+        prevKey[i] = prevRecord.getFields()[tableSchema.getFieldOffset(indexSchema.getFields()[i])];
+        key[i] = record.getFields()[tableSchema.getFieldOffset(indexSchema.getFields()[i])];
+      }
+      if (0 != DatabaseCommon.compareKey(indexSchema.getComparators(), prevKey, key)) {
+        Object obj = index.get(key);
+        if (obj != null) {
+          throw new UniqueConstraintViolationException("new key for update not unique: table=" + tableName +
+              "index=" + indexName + ", key=" + DatabaseCommon.keyToString(key));
+        }
+      }
     }
   }
 

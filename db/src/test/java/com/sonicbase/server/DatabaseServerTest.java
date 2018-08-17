@@ -163,7 +163,7 @@ public class DatabaseServerTest {
     cobj.put(ComObject.Tag.MAX_ID, 100L);
     server.setMaxRecordId(cobj, false);
 
-    File file = new File(server.getDataDir(), "nextRecordId/1/0/nextRecorId.txt");
+    File file = new File(server.getDataDir(), "nextRecordId/1/1/nextRecorId.txt");
     String str = IOUtils.toString(new FileInputStream(file));
     assertEquals(str, "100");
 

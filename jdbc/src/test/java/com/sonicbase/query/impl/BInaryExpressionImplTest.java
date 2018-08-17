@@ -177,7 +177,7 @@ public class BInaryExpressionImplTest {
     Offset offset = null;
     AtomicReference<String> usedIndex = new AtomicReference<>();
     SelectStatementImpl.Explain explain = null;
-    ExpressionImpl.NextReturn ret = expression.evaluateAndExpression(100, usedIndex, explain, currOffset, countReturned,
+    ExpressionImpl.NextReturn ret = expression.evaluateAndExpression(null,100, usedIndex, explain, currOffset, countReturned,
         limit, offset, false, false, 0);
 
     for (int i = 0; i < ret.getKeys().length; i++) {

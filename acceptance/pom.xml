@@ -2,7 +2,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <packaging>jar</packaging>
-    <version>1.2.13</version>
+    <version>1.2.14</version>
     <name>sonicbase-acceptance</name>
     <groupId>com.sonicbase</groupId>
     <artifactId>sonicbase-acceptance</artifactId>
@@ -11,7 +11,7 @@
     <parent>
         <groupId>com.sonicbase</groupId>
         <artifactId>sonicbase-root</artifactId>
-        <version>1.2.13</version>
+        <version>1.2.14</version>
     </parent>
 
 
@@ -83,7 +83,7 @@
         <dependency>
             <groupId>com.sonicbase</groupId>
             <artifactId>sonicbase-server</artifactId>
-            <version>1.2.13</version>
+            <version>1.2.14</version>
             <scope>provided</scope>
         </dependency>
 
@@ -132,7 +132,7 @@
         <dependency>
             <groupId>javax.servlet</groupId>
             <artifactId>javax.servlet-api</artifactId>
-            <version>4.0.0</version>
+            <version>4.0.1</version>
             <scope>provided</scope>
         </dependency>
 
@@ -170,7 +170,7 @@
         <dependency>
             <groupId>com.sonicbase</groupId>
             <artifactId>sonicbase-jdbc</artifactId>
-            <version>1.2.13</version>
+            <version>1.2.14</version>
             <scope>provided</scope>
         </dependency>
 

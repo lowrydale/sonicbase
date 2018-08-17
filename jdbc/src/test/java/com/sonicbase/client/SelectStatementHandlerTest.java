@@ -173,7 +173,7 @@ public class SelectStatementHandlerTest {
       }
     };
 
-    client.setClientStatsHandler(new ClientStatsHandler(client) {
+    client.setClientStatsHandler(new ClientStatsHandler() {
       public byte[] sendToMasterOnSharedClient(ComObject cobj, DatabaseClient sharedClient) {
         return null;
       }

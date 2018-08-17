@@ -7,12 +7,14 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.KeyRecord;
+import com.sonicbase.common.UniqueConstraintViolationException;
 import com.sonicbase.index.Index;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -104,6 +106,9 @@ public class TestDatabaseAdvanced {
     stmt = conn.prepareStatement("create table Memberships (personId BIGINT, membershipName VARCHAR(20), resortId BIGINT, PRIMARY KEY (personId, membershipName))");
     stmt.executeUpdate();
 
+    stmt = conn.prepareStatement("create table trikey(id1 BIGINT, id2 VARCHAR(20), id3 BIGINT, PRIMARY KEY (id1, id2, id3))");
+    stmt.executeUpdate();
+
     stmt = conn.prepareStatement("create table Resorts (resortId BIGINT, resortName VARCHAR(20), PRIMARY KEY (resortId))");
     stmt.executeUpdate();
 
@@ -127,6 +132,9 @@ public class TestDatabaseAdvanced {
 
     stmt = conn.prepareStatement("create index id2 on persons(id2)");
     stmt.executeUpdate();
+
+    stmt = conn.prepareStatement("create unique index id3 on persons(id3)");
+    stmt.executeUpdate();
     //test upsert
 
     stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");
@@ -146,6 +154,18 @@ public class TestDatabaseAdvanced {
         stmt.setString(2, "membership-" + j);
         stmt.setLong(3, new long[]{1000, 2000}[j % 2]);
         assertEquals(stmt.executeUpdate(), 1);
+      }
+    }
+
+    for (int i = 0; i < 5; i++) {
+      for (int j = 0; j < 5; j++) {
+        for (int k = 0; k < 5; k++) {
+          stmt = conn.prepareStatement("insert into trikey (id1, id2, id3) VALUES (?, ?, ?)");
+          stmt.setLong(1, i);
+          stmt.setString(2, "id-" + j);
+          stmt.setLong(3, k);
+          assertEquals(stmt.executeUpdate(), 1);
+        }
       }
     }
 
@@ -183,7 +203,7 @@ public class TestDatabaseAdvanced {
       stmt = conn.prepareStatement("insert into persons (id, id2, id3, id4, num, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
       stmt.setLong(1, i + 100);
       stmt.setLong(2, (i + 100) % 2);
-      stmt.setLong(3, i + 100);
+      stmt.setLong(3, i + 100 + recordCount);
       stmt.setLong(4, (i + 100) % 3);
       stmt.setDouble(5, (i + 100) * 0.5);
       stmt.setString(6, "ssN-933-28-" + (i % 4));
@@ -297,15 +317,282 @@ public class TestDatabaseAdvanced {
       stmt.setLong(1, 1000);
       stmt.executeUpdate();
 
-      stmt = conn.prepareStatement("select * from persons where  id2=1000");
+      stmt = conn.prepareStatement("select * from persons where  id2=1001");
       ResultSet rs = stmt.executeQuery();
-      assertFalse(rs.next());
+      assertTrue(rs.next());
     }
     finally {
       PreparedStatement stmt = conn.prepareStatement("delete from persons where id=1000");
       stmt.executeUpdate();
       stmt = conn.prepareStatement("delete from persons where id2=1000");
       stmt.executeUpdate();
+    }
+  }
+
+  @Test
+  public void testOrPaging() throws SQLException {
+
+    int prevSize = ((ConnectionProxy)conn).getDatabaseClient().getPageSize();
+    ((ConnectionProxy)conn).getDatabaseClient().setPageSize(1);
+    try {
+      try (PreparedStatement stmt = conn.prepareStatement(
+          "explain select * from persons where id>=100 or id2=0")) {
+        try (ResultSet rs = stmt.executeQuery()) {
+          rs.next();
+          String value = rs.getString(1);
+        }
+      }
+
+      try (PreparedStatement stmt = conn.prepareStatement(
+          "select * from persons where id>=100 or id2=0" )) {
+        try (ResultSet rs = stmt.executeQuery()) {
+          for (int i = 0; i < recordCount; i++) {
+            rs.next();
+             assertEquals(rs.getLong("id"), i + 100);
+          }
+          rs.next();
+          assertEquals(rs.getLong("id"), 0);
+          rs.next();
+          assertEquals(rs.getLong("id"), 2);
+          assertFalse(rs.next());
+        }
+      }
+    }
+    finally {
+      ((ConnectionProxy)conn).getDatabaseClient().setPageSize(prevSize);
+    }
+  }
+
+  @Test
+  public void testOrPagingWithSort() throws SQLException {
+
+    int prevSize = ((ConnectionProxy)conn).getDatabaseClient().getPageSize();
+    ((ConnectionProxy)conn).getDatabaseClient().setPageSize(1);
+    try {
+      try (PreparedStatement stmt = conn.prepareStatement(
+          "explain select * from persons where id>=100 or id2=0 order by id desc")) {
+        try (ResultSet rs = stmt.executeQuery()) {
+          rs.next();
+          String value = rs.getString(1);
+        }
+      }
+
+      try (PreparedStatement stmt = conn.prepareStatement(
+          "select * from persons where id>=100 or id2=0 order by id desc")) {
+        try (ResultSet rs = stmt.executeQuery()) {
+          for (int i = recordCount - 1; i >= 0; i--) {
+            rs.next();
+            assertEquals(rs.getLong("id"), i + 100);
+          }
+          rs.next();
+          assertEquals(rs.getLong("id"), 2);
+          rs.next();
+          assertEquals(rs.getLong("id"), 0);
+          assertFalse(rs.next());
+        }
+      }
+    }
+    finally {
+      ((ConnectionProxy)conn).getDatabaseClient().setPageSize(prevSize);
+    }
+  }
+
+//  @Test
+//  public void testUpdateNonUniqueConstraintViolation() throws SQLException {
+//
+//    int prevSize = ((ConnectionProxy) conn).getDatabaseClient().getPageSize();
+//    ((ConnectionProxy) conn).getDatabaseClient().setPageSize(1);
+//    try {
+//      try (PreparedStatement stmt = conn.prepareStatement(
+//          "update persons set id = id + 1 where id>=100 order by id desc")) {
+//        stmt.executeUpdate();
+//      }
+//      try (PreparedStatement stmt = conn.prepareStatement(
+//          "select * from persons where id>=100 order by id desc")) {
+//        try (ResultSet rs = stmt.executeQuery()) {
+//          for (int i = recordCount - 1; i >= 0; i--) {
+//            rs.next();
+//            assertEquals(rs.getLong("id"), i + 100 + 1);
+//          }
+//          assertFalse(rs.next());
+//        }
+//      }
+//    }
+//    finally {
+//      ((ConnectionProxy)conn).getDatabaseClient().setPageSize(prevSize);
+//    }
+//  }
+
+//  @Test
+//  public void testUpdateUniqueConstraintViolation() throws SQLException {
+//
+//    int prevSize = ((ConnectionProxy) conn).getDatabaseClient().getPageSize();
+//    ((ConnectionProxy) conn).getDatabaseClient().setPageSize(1);
+//    try {
+//      try (PreparedStatement stmt = conn.prepareStatement(
+//          "select * from persons where id>=100 or id2=0 order by id desc")) {
+//        try (ResultSet rs = stmt.executeQuery()) {
+//          for (int i = recordCount - 1; i >= 0; i--) {
+//            rs.next();
+//            System.out.println(rs.getLong("id"));
+//            assertEquals(rs.getLong("id"), i + 100);
+//          }
+//          rs.next();
+//          assertEquals(rs.getLong("id"), 2);
+//          rs.next();
+//          assertEquals(rs.getLong("id"), 0);
+//          assertFalse(rs.next());
+//        }
+//      }
+//      try (PreparedStatement stmt = conn.prepareStatement(
+//          "update persons set id = id + 1 where id>=100 or id2=0 order by id asc")) {
+//        stmt.executeUpdate();
+//      }
+//      catch (Exception e) {
+//        assertNotEquals(ExceptionUtils.indexOfThrowable(e, UniqueConstraintViolationException.class), -1);
+//      }
+//      try (PreparedStatement stmt = conn.prepareStatement(
+//          "select * from persons where id>=100 or id2=0 order by id desc")) {
+//        try (ResultSet rs = stmt.executeQuery()) {
+//          for (int i = recordCount - 1; i >= 0; i--) {
+//            rs.next();
+//            System.out.println(rs.getLong("id"));
+//            assertEquals(rs.getLong("id"), i + 100);
+//          }
+//          rs.next();
+//          assertEquals(rs.getLong("id"), 2);
+//          rs.next();
+//          assertEquals(rs.getLong("id"), 0);
+//          assertFalse(rs.next());
+//        }
+//      }
+//    }
+//    finally {
+//      ((ConnectionProxy)conn).getDatabaseClient().setPageSize(prevSize);
+//    }
+//  }
+
+  @Test
+  public void testUpdateUniqueConstraintViolation() throws SQLException {
+
+    int prevSize = ((ConnectionProxy) conn).getDatabaseClient().getPageSize();
+    ((ConnectionProxy) conn).getDatabaseClient().setPageSize(1);
+    try {
+      try (PreparedStatement stmt = conn.prepareStatement(
+          "select * from persons where id>=100 or id2=0 order by id desc")) {
+        try (ResultSet rs = stmt.executeQuery()) {
+          for (int i = recordCount - 1; i >= 0; i--) {
+            rs.next();
+            System.out.println(rs.getLong("id"));
+            assertEquals(rs.getLong("id"), i + 100);
+          }
+          rs.next();
+          assertEquals(rs.getLong("id"), 2);
+          rs.next();
+          assertEquals(rs.getLong("id"), 0);
+          assertFalse(rs.next());
+        }
+      }
+      try (PreparedStatement stmt = conn.prepareStatement(
+          "update persons set id = id + 1 where id>=100 or id2=0 order by id asc")) {
+        stmt.executeUpdate();
+      }
+      catch (Exception e) {
+        assertNotEquals(ExceptionUtils.indexOfThrowable(e, UniqueConstraintViolationException.class), -1);
+      }
+      try (PreparedStatement stmt = conn.prepareStatement(
+          "select * from persons where id>=100 or id2=0 order by id desc")) {
+        try (ResultSet rs = stmt.executeQuery()) {
+          for (int i = recordCount - 1; i >= 0; i--) {
+            rs.next();
+            System.out.println(rs.getLong("id"));
+            assertEquals(rs.getLong("id"), i + 100);
+          }
+          rs.next();
+          assertEquals(rs.getLong("id"), 2);
+          rs.next();
+          assertEquals(rs.getLong("id"), 0);
+          assertFalse(rs.next());
+        }
+      }
+    }
+    finally {
+      ((ConnectionProxy)conn).getDatabaseClient().setPageSize(prevSize);
+    }
+  }
+
+  @Test
+  public void testInsertUniqueConstraintViolationOnSecondaryIndex() throws SQLException {
+
+        int prevSize = ((ConnectionProxy) conn).getDatabaseClient().getPageSize();
+        ((ConnectionProxy) conn).getDatabaseClient().setPageSize(1);
+
+    try (PreparedStatement stmt = conn.prepareStatement(
+        "insert into persons (id, id3) values (1000, 100)")) {
+      stmt.executeUpdate();
+    }
+    catch (Exception e) {
+      assertNotEquals(ExceptionUtils.indexOfThrowable(e, UniqueConstraintViolationException.class), -1);
+    }
+    System.out.println("after");
+    try (PreparedStatement stmt = conn.prepareStatement(
+          "select * from persons where id>=100 order by id desc")) {
+      try (ResultSet rs = stmt.executeQuery()) {
+        for (int i = 100 + recordCount - 1; i >= 100; i--) {
+          rs.next();
+          assertEquals(rs.getLong("id"), i);
+        }
+        assertFalse(rs.next());
+      }
+    }
+    finally {
+      ((ConnectionProxy)conn).getDatabaseClient().setPageSize(prevSize);
+    }
+  }
+
+  @Test
+  public void testUpdateOrPagingWithSort() throws SQLException {
+
+    int prevSize = ((ConnectionProxy)conn).getDatabaseClient().getPageSize();
+    ((ConnectionProxy)conn).getDatabaseClient().setPageSize(1);
+    try {
+      try (PreparedStatement stmt = conn.prepareStatement(
+          "update persons set id4 = id4 + 1 where id>=100 or id2=0 order by id desc")) {
+        stmt.executeUpdate();
+      }
+      try (PreparedStatement stmt = conn.prepareStatement(
+          "select * from persons where id>=100 or id2=1 order by id desc")) {
+        try (ResultSet rs = stmt.executeQuery()) {
+          rs.next();
+          assertEquals(rs.getLong("id4"), 2);
+          rs.next();
+          assertEquals(rs.getLong("id4"), 1);
+          rs.next();
+          assertEquals(rs.getLong("id4"), 3);
+          rs.next();
+          assertEquals(rs.getLong("id4"), 2);
+          rs.next();
+          assertEquals(rs.getLong("id4"), 1);
+          rs.next();
+          assertEquals(rs.getLong("id4"), 3);
+          rs.next();
+          assertEquals(rs.getLong("id4"), 2);
+          rs.next();
+          assertEquals(rs.getLong("id4"), 1);
+          rs.next();
+          assertEquals(rs.getLong("id4"), 3);
+          rs.next();
+          assertEquals(rs.getLong("id4"), 2);
+          rs.next();
+          assertEquals(rs.getLong("id4"), 1);
+          rs.next();
+          assertEquals(rs.getLong("id4"), 2);
+          assertFalse(rs.next());
+        }
+      }
+    }
+    finally {
+      ((ConnectionProxy)conn).getDatabaseClient().setPageSize(prevSize);
     }
   }
 

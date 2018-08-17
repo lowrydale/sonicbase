@@ -1,6 +1,6 @@
 {
-  "dataDirectory": "$HOME/db-data",
-  "installDirectory": "$HOME/sonicbase",
+  "dataDirectory": "$WORKING_DIR/db-data",
+  "installDirectory": "$WORKING_DIR",
   "compressRecords": false,
   "useUnsafe": true,
   "maxJavaHeap": "20%",

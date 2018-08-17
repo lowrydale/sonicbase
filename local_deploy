@@ -41,7 +41,7 @@ rsync -vlLt --exclude original*sonicbase-*.jar --exclude sonicbase-*tests.jar cl
 #rsync -rvlLt repo/linux64/* $HOME/sonicbase/lib/linux64
 
 rsync -rvlLt dependencies/kafka-clients-0.11.0.1.jar $HOME/sonicbase/lib
-rsync -rvlLt db/target/classes/config/config-*.json $HOME/sonicbase/config
+rsync -rvlLt db/target/classes/config/config-1-local.json $HOME/sonicbase/config
 rsync -rvlLt $HOME/Dropbox/sonicbase-config/* $HOME/sonicbase/config
 cd scripts
 rsync -rvlLt get-distribution $HOME/sonicbase/bin

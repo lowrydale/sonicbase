@@ -52,7 +52,6 @@ public class PartitionManager extends Thread {
   AtomicBoolean isRebalancing = new AtomicBoolean();
   private Integer batchOverride = null;
   private AtomicBoolean isRepartitioningIndex = new AtomicBoolean();
-  private int minSizeForRepartition = 0;
   private boolean shutdown;
   private AtomicBoolean isComplete = new AtomicBoolean(true);
 
@@ -1815,11 +1814,7 @@ public class PartitionManager extends Thread {
       }
       total += count;
     }
-    if (total < minSizeForRepartition) {
-      logger.info("Not adding toRebalance: table={}, index={}, min={}, max={}, total={}, shardCount={}", entry.getKey(),
-          indexName, min, max, total, counts.getCounts().size());
-      return false;
-    }
+
     if (force || (double) min / (double) max < 0.90) {
       toRebalance.add(entry.getKey() + " " + indexName);
       logger.info("Adding toRebalance: table={}, index={}", entry.getKey(), indexName);

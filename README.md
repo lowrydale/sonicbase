@@ -62,7 +62,7 @@ If you are using maven, add the jdbc jar to your project pom.xml file. In the de
     <version>[version]</version>
 </dependency>
 ~~~
-        The jdbc version should match your SonicBase server version.
+The jdbc version should match your SonicBase server version.
 
 Create and run the following class:
 

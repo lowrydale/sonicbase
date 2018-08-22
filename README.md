@@ -51,7 +51,18 @@ In the client, type:
 You should see the inserted record displayed in the client.
     
 ### Access From JDBC Driver
-Include the SonicBase jdbc driver in your application. The jar is located in the "lib" directory of the install directory. It is named "sonicbase-jdbc-<version>;.jar".
+Include the SonicBase jdbc driver in your application. The jar is located in the "lib" directory of the install directory. It is named "sonicbase-jdbc-\[version\].jar". Or you can include the jar from the Maven Cental Repository.
+
+If you are using maven, add the jdbc jar to your project pom.xml file. In the dependencies section add the following:
+
+~~~
+<dependency>
+    <groupId>com.sonicbase</groupId>
+    <artifactId>sonicbase-jdbc</artifactId>
+    <version>[version]</version>
+</dependency>
+~~~
+        The jdbc version should match your SonicBase server version.
 
 Create and run the following class:
 

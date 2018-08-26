@@ -1,6 +1,6 @@
 # SonicBase
 
-SonicBase is an in-memory distributed relational database. It is linearly scalable and can hold many billions of records. SonicBase is cross-platform supporting MacOS, Linux, Windows and Cygwin. Extreme performance can be achieved with stored procedures. SonicBase support cross-shard transactions and cross-shard joins. An administrative client is included. SonicBase provides a JDBC driver.
+SonicBase is an in-memory distributed sql rdbms. It is linearly scalable and can hold many billions of records. SonicBase is a relational cross-platform database, supporting MacOS, Linux, Windows and Cygwin. Extreme performance can be achieved with stored procedures. SonicBase support cross-shard transactions and cross-shard joins. An administrative client is included. SonicBase provides a JDBC driver. On a 4 node database we achieved 735k batch inserts per second, 1.2 million batch identity reads per second and 4.4 million range-based lookups per second.
 
 ## For the full **documentation**, follow this [link](https://sonicbase.com/documentation.html)
 
